@@ -157,6 +157,13 @@ class Poll(BaseContent, WorkflowMixin):
     def get_votes(self):
         return self.method.get_votes()
 
+    def save(self, **kw):
+        if self.method is not None:
+            if not isinstance(self.method, PollMethod):
+                # FIXME: Probably something Django-ish instead
+                raise InvalidPollMethod(f"{self.method} is not a PollMethod instance.")
+        super().save(**kw)
+
 
 class Vote(models.Model):
     user = models.ForeignKey(User, on_delete=models.PROTECT)

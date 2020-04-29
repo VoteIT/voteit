@@ -9,6 +9,9 @@ from voteit.poll.models import poll_methods, PollMethod, Vote
 
 @poll_methods
 class Simple(PollMethod):
+    """ This poll method is a simple approve / deny,
+        but also the base for all tests that should run against the abstract PollMethod.
+    """
     title = _("Simple")
 
     def start_check(self):

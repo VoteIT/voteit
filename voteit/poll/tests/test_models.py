@@ -1,6 +1,11 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
-from voteit.poll.exceptions import ElectoralRegisterMissing, ElectoralRegisterEmpty, InvalidProposalCount
+from voteit.poll.exceptions import (
+    ElectoralRegisterMissing,
+    ElectoralRegisterEmpty,
+    InvalidProposalCount,
+    InvalidPollMethod,
+)
 
 
 class PollMethodTests(TestCase):
@@ -13,6 +18,7 @@ class PollMethodTests(TestCase):
     def test_registration(self):
         from voteit.core.component import FactoryRegistry
         from voteit.poll.models import Vote
+
         poll_method = FactoryRegistry(self._cut)
 
         class _Vote(Vote):
@@ -26,11 +32,10 @@ class PollMethodTests(TestCase):
             def start_check(self):
                 pass
 
-        self.assertIn('hellomethod', poll_method)
+        self.assertIn("hellomethod", poll_method)
 
 
 class PollTests(TestCase):
-
     @property
     def Poll(self):
         from voteit.poll.models import Poll
@@ -40,18 +45,20 @@ class PollTests(TestCase):
     @property
     def ElectoralRegister(self):
         from voteit.poll.models import ElectoralRegister
+
         return ElectoralRegister
 
     @property
     def Proposal(self):
         from voteit.proposal.models import Proposal
+
         return Proposal
 
     def setUp(self):
         from voteit.poll.app.simple import Simple
 
         self.poll = self.Poll.objects.create()
-        self.user = User.objects.create(username='a')
+        self.user = User.objects.create(username="a")
         self.method = Simple.objects.create()
         self.method.poll = self.poll
 
@@ -79,7 +86,13 @@ class PollTests(TestCase):
 
     def test_opening_poll_empty_poll(self):
         self.poll.do_transition(self.poll.workflow.UPCOMING, self.user, force=True)
-        self.assertRaises(ElectoralRegisterMissing, self.poll.do_transition, self.poll.workflow.ONGOING, self.user, force=True)
+        self.assertRaises(
+            ElectoralRegisterMissing,
+            self.poll.do_transition,
+            self.poll.workflow.ONGOING,
+            self.user,
+            force=True,
+        )
 
     def test_opening_poll(self):
         self.poll.do_transition(self.poll.workflow.UPCOMING, self.user, force=True)
@@ -92,7 +105,9 @@ class PollTests(TestCase):
         )
         self.assertEqual(self.poll.workflow.ONGOING, self.poll.wf_state)
 
-
+    def test_assigning_bad_poll_method(self):
+        self.poll.method = self.ElectoralRegister.objects.create()
+        self.assertRaises(InvalidPollMethod, self.poll.save)
 
     # def test_start_poll(self):
     #     pass
