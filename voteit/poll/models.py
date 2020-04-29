@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from collections import Counter
 
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import UniqueConstraint
 from django.dispatch import receiver
@@ -17,25 +19,56 @@ from voteit.poll.exceptions import (
     ElectoralRegisterMissing,
     InvalidPollMethod,
     InvalidProposalCount,
-    NotAllowedToVote
+    NotAllowedToVote,
 )
 from voteit.poll.workflow import PollWorkflow
 
 
-class PollMethod(ABC):
-    def __init__(self, poll: Poll):
-        self.poll = poll
+class PollMethod(models.Model):
+    poll_rel = GenericRelation(
+        "poll.Poll", object_id_field="method_id", content_type_field="method_type"
+    )
+
+    class Meta:
+        abstract = True
 
     @property
-    @abstractmethod
-    def Vote(self, **kw) -> Vote:
-        """ Factory for votes """
-        pass
+    def poll(self):
+        return self._poll
+
+    @poll.setter
+    def poll(self, poll: Poll):
+        self.poll_rel.set([poll])
+
+    @cached_property
+    def _poll(self):
+        return self.poll_rel.get()
 
     @property
     @abstractmethod
     def title(self) -> str:
         pass
+
+    @property
+    @abstractmethod
+    def vote_set(self) -> models.Manager:
+        """ Return the Manager for this implementations Vote model.
+            See voteit.poll.app.simple for example
+        """
+
+    @property
+    @abstractmethod
+    def vote_factory(self) -> Vote:
+        pass
+
+    def create_vote(self, **kw) -> Vote:
+        """ Create vote from factory. """
+        # FIXME: Not sure about this since DRF seems to have another idea
+        kw.setdefault("method", self)
+        return self.vote_factory.objects.create(**kw)
+
+    def get_votes(self):
+        return self.vote_set.all()
 
     def get_result(self):
         """ Return JSON-serializable result.
@@ -46,13 +79,6 @@ class PollMethod(ABC):
                 # FIXME: Vote power here
                 counter[v.ballot()] += 1
         return counter
-
-    def get_votes(self):
-        return self.Vote.objects.filter(poll=self.poll)
-
-    def create(self, **kw):
-        kw.setdefault("poll", self.poll)
-        return self.Vote.objects.create(**kw)
 
     def start_check(self):
         """ Make sure all conditions are met before starting the poll with this method.
@@ -79,7 +105,9 @@ class Poll(BaseContent, WorkflowMixin):
     title = models.CharField(max_length=70)
     description = models.CharField(max_length=200)
     proposals = models.ManyToManyField("proposal.Proposal")
-    method_name = models.CharField(max_length=20, null=True)
+    method_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True)
+    method_id = models.PositiveIntegerField(null=True)
+    method = GenericForeignKey("method_type", "method_id")
     created = models.DateTimeField(editable=False, auto_now_add=True)
     started = models.DateTimeField(editable=False, null=True)
     closed = models.DateTimeField(editable=False, null=True)
@@ -98,6 +126,14 @@ class Poll(BaseContent, WorkflowMixin):
         related_name="poll",
     )
 
+    class Meta:
+        constraints = [
+            UniqueConstraint(
+                fields=["method_type", "method_id"],
+                name="%(app_label)s_%(class)s_method",
+            )
+        ]
+
     def change_electoral_register(
         self, electoral_register: ElectoralRegister, user: User
     ):
@@ -111,8 +147,6 @@ class Poll(BaseContent, WorkflowMixin):
             raise ElectoralRegisterMissing()
         if self.electoral_register.voters.count() < 1:
             raise ElectoralRegisterEmpty()
-        if self.method_name not in poll_methods:
-            raise InvalidPollMethod()
         if not isinstance(self.method, PollMethod):
             raise InvalidPollMethod()
         if self.proposals.count() < 1:
@@ -120,26 +154,28 @@ class Poll(BaseContent, WorkflowMixin):
         # And check the specifics for the poll method
         self.method.start_check()
 
-    @cached_property
-    def method(self):
-        return poll_methods[self.method_name](self)
-
     def get_votes(self):
         return self.method.get_votes()
 
 
 class Vote(models.Model):
     user = models.ForeignKey(User, on_delete=models.PROTECT)
-    poll = models.ForeignKey("poll.Poll", on_delete=models.CASCADE, related_name="+")
     created = models.DateTimeField(editable=False, auto_now_add=True)
     abstain = models.BooleanField(default=False)
+
+    @property
+    @abstractmethod
+    def method(self) -> PollMethod:
+        """ A relation to the poll_method used, for instance:
+            method = models.ForeignKey(Simple, on_delete=models.CASCADE, related_name="vote_set")
+        """
+        pass
 
     class Meta:
         abstract = True
         constraints = [
-            # FIXME doesn't work?
             UniqueConstraint(
-                fields=["user", "poll"],
+                fields=["user", "method"],
                 name="%(app_label)s_%(class)s_unique_vote_for_user",
             )
         ]
@@ -155,21 +191,24 @@ class Vote(models.Model):
         pass
 
     def save(self, **kw):
-        if not self.poll.electoral_register:
+        er = self.method.poll.electoral_register
+        if not er:
             raise ElectoralRegisterMissing()
-        if not self.poll.electoral_register.voters.filter(id=self.user.id):
+        if not er.voters.filter(id=self.user.id):
             raise NotAllowedToVote("Not allowed to vote")
         super().save(**kw)
 
 
 @receiver(before_transition, sender=Poll)
-def start_check_before_actual_transition(sender, instance: Poll, user: User, transition: Transition, *args, **kwargs):
+def start_check_before_actual_transition(
+    sender, instance: Poll, user: User, transition: Transition, *args, **kwargs
+):
     if transition.to_state == PollWorkflow.ONGOING:
         instance.start_check()
 
 
-#@receiver(before_transition, sender=Poll)
-#def remove_bad_votes(sender, instance, *args, **kwargs):
+# @receiver(before_transition, sender=Poll)
+# def remove_bad_votes(sender, instance, *args, **kwargs):
 #    """ When the ElectoralRegister has changed and there are polls that shouldn't be around.
 #    """
 #    # FIXME: Connect this with some kind of notification
@@ -179,4 +218,3 @@ def start_check_before_actual_transition(sender, instance: Poll, user: User, tra
 # Touch DB models in apps
 # FIXME: Is there no smarter way to do this?
 from voteit.poll.app import *
-

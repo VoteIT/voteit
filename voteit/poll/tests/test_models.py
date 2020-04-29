@@ -48,12 +48,15 @@ class PollTests(TestCase):
         return Proposal
 
     def setUp(self):
-        self.poll = self.Poll.objects.create(method_name='simple')
+        from voteit.poll.app.simple import Simple
+
+        self.poll = self.Poll.objects.create()
         self.user = User.objects.create(username='a')
+        self.method = Simple.objects.create()
+        self.method.poll = self.poll
 
     def test_method(self):
-        from voteit.poll.app.simple import Simple
-        self.assertIsInstance(self.poll.method, Simple)
+        self.assertIsInstance(self.poll.method, self.method.__class__)
 
     def test_start_check_no_electoral_register(self):
         self.assertRaises(ElectoralRegisterMissing, self.poll.start_check)

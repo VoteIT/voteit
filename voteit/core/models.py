@@ -30,9 +30,6 @@ class BaseContent(models.Model):
     class Meta:
         abstract = True
 
-    def __str__(self):
-        return self.title
-
 
 class WorkflowMixin(models.Model):
     wf_state = models.CharField(max_length=20, null=True)
@@ -52,7 +49,9 @@ class WorkflowMixin(models.Model):
 
     @property
     def wf_state_title(self) -> str:
-        return self.workflow.states.get(self.wf_state, _("Unknown state: %(state)s") % {'state': self.wf_state})
+        return self.workflow.states.get(
+            self.wf_state, _("Unknown state: %(state)s") % {"state": self.wf_state}
+        )
 
     @property
     def do_transition(self) -> Transition:
