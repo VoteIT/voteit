@@ -1,0 +1,52 @@
+from collections import UserDict
+
+
+class FactoryRegistry(UserDict):
+
+    def __init__(self, required):
+        if not isinstance(required, type):
+            raise TypeError(f"{required} is not a class")
+        self.required = required
+        super().__init__()
+
+    def __call__(self, factory):
+        if isinstance(factory, type):
+            # Class based
+            name = getattr(factory, 'name', factory.__name__.lower())
+        else:
+            # Object based
+            name = factory.name
+        self[name] = factory
+        return factory
+
+    def __setitem__(self, key:str, factory):
+        if isinstance(factory, type):
+            # Class based factory
+            if not issubclass(factory, self.required):
+                raise TypeError(f"{factory} isn't any of the required: {self.required}")
+            abs_methods = getattr(factory, '__abstractmethods__', None)
+            if abs_methods:
+                missing = "', '".join(abs_methods)
+                raise TypeError(f"{factory} doesn't implement the required abstract methods: '{missing}'")
+        else:
+            # Object based
+            if not isinstance(factory, self.required):
+                raise TypeError(f"{factory} isn't an instance of the required: {self.required}")
+        super().__setitem__(key, factory)
+
+
+#_PROTECT_ATTRS = ('__qualname__', '__module__')
+
+
+# class AttrCopyMeta(ABCMeta):
+#     def __new__(mcls, name, bases, namespace, **kwargs):
+#         cls = super().__new__(mcls, name, bases, namespace, **kwargs)
+#         for k in namespace:
+#             if k not in _PROTECT_ATTRS:
+#                 print (f"Setting {k} to {namespace[k]}")
+#                 setattr(cls, k, deepcopy(getattr(cls, k)))
+#         # cls.states = {}
+#         print("HEJ")
+#         import pdb;pdb.set_trace()
+#         #setattr(cls, 'states', deepcopy(getattr(cls, k)))
+#         return cls
