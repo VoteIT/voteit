@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.db import IntegrityError
 from django.test import TestCase
 from voteit.poll.exceptions import NotAllowedToVote
+from voteit.poll.exceptions import InvalidProposalCount
 
 
 class SimpleTests(TestCase):
@@ -31,6 +32,18 @@ class SimpleTests(TestCase):
         method.poll = self.poll
         self.assertEqual(method.poll, self.poll)
         self.assertIsInstance(method.poll, self.poll.__class__)
+
+    def test_start_check(self):
+        from voteit.proposal.models import Proposal
+        method = self.Simple.objects.create()
+        method.poll = self.poll
+        self.assertRaises(InvalidProposalCount, method.start_check)
+        p1 = Proposal.objects.create()
+        self.poll.proposals.add(p1)
+        self.assertIsNone(method.start_check())
+        p2 = Proposal.objects.create()
+        self.poll.proposals.add(p2)
+        self.assertRaises(InvalidProposalCount, method.start_check)
 
     def test_result(self):
         method = self.Simple.objects.create()

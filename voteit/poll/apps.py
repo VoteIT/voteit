@@ -6,5 +6,3 @@ class PollsConfig(AppConfig):
 
     #def ready(self):
     #    from voteit.poll.app import simple
-
-
