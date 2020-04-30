@@ -1,14 +1,31 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils.translation import gettext as _
 
-# Create your models here.
-from voteit.core.models import BaseContent, WorkflowMixin
-from voteit.meeting.workflow import MeetingWorkflow
+from django_fsm import FSMField, transition
+from voteit.core.models import BaseContent
+from voteit.meeting.workflow import MeetingWf
 
 
-class Meeting(BaseContent, WorkflowMixin):
-    wf_name = MeetingWorkflow.name
+class Meeting(BaseContent):
+    state = FSMField(default=MeetingWf.initial, choices=MeetingWf.choices(), protected=True)
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
     participants = models.ManyToManyField(User, blank=True, related_name="participant_in_meetings")
     potential_voters = models.ManyToManyField(User, blank=True, related_name="potential_voter_in_meetings")
+
+    @transition(field=state, source=MeetingWf.ONGOING, target=MeetingWf.UPCOMING)
+    def upcoming(self):
+        pass
+
+    @transition(field=state, source=[MeetingWf.UPCOMING, MeetingWf.CLOSED], target=MeetingWf.ONGOING)
+    def ongoing(self):
+        pass
+
+    @transition(field=state, source=MeetingWf.ONGOING, target=MeetingWf.CLOSED)
+    def closed(self):
+        pass
+
+    @transition(field=state, source=MeetingWf.CLOSED, target=MeetingWf.ARCHIVED)
+    def archived(self):
+        pass

@@ -8,12 +8,10 @@ from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelatio
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import UniqueConstraint
-from django.dispatch import receiver
-from voteit.core.signals import before_transition
+from django_fsm import FSMField, transition
 from django.utils.functional import cached_property
 from voteit.core.component import FactoryRegistry
-from voteit.core.models import WorkflowMixin, BaseContent
-from voteit.core.workflow import Transition
+from voteit.core.models import BaseContent
 from voteit.poll.exceptions import (
     ElectoralRegisterEmpty,
     ElectoralRegisterMissing,
@@ -21,7 +19,7 @@ from voteit.poll.exceptions import (
     InvalidProposalCount,
     NotAllowedToVote,
 )
-from voteit.poll.workflow import PollWorkflow
+from voteit.poll.workflow import PollWf
 
 
 class PollMethod(models.Model):
@@ -100,8 +98,9 @@ class ElectoralRegister(models.Model):
     voters = models.ManyToManyField(User)
 
 
-class Poll(BaseContent, WorkflowMixin):
-    wf_name = PollWorkflow.name
+class Poll(BaseContent):
+    # wf_name = PollWorkflow.name
+    state = FSMField(default=PollWf.initial, choices=PollWf.choices(), protected=True)
     title = models.CharField(max_length=70)
     description = models.CharField(max_length=200)
     proposals = models.ManyToManyField("proposal.Proposal")
@@ -139,6 +138,25 @@ class Poll(BaseContent, WorkflowMixin):
     ):
         self.electoral_register = electoral_register
         # FIXME: Delete all votes from users who aren't in the new registry when the poll closes?
+
+    @transition(field=state, source=PollWf.PRIVATE, target=PollWf.UPCOMING)
+    def upcoming(self):
+        # Attach electoral register
+        pass
+
+    @transition(field=state, source=PollWf.UPCOMING, target=PollWf.ONGOING)
+    def ongoing(self):
+        self.start_check()
+
+    @transition(field=state, source=PollWf.ONGOING, target=PollWf.CLOSED)
+    def close(self):
+        # Remove bad votes
+        pass
+
+    @transition(field=state, source=PollWf.ONGOING, target=PollWf.CANCELED)
+    def cancel(self):
+        # Nothing really?
+        pass
 
     def start_check(self):
         """ Check that this poll could be started. A very basic check for the most obvious things.
@@ -204,22 +222,6 @@ class Vote(models.Model):
         if not er.voters.filter(id=self.user.id):
             raise NotAllowedToVote("Not allowed to vote")
         super().save(**kw)
-
-
-@receiver(before_transition, sender=Poll)
-def start_check_before_actual_transition(
-    sender, instance: Poll, user: User, transition: Transition, *args, **kwargs
-):
-    if transition.to_state == PollWorkflow.ONGOING:
-        instance.start_check()
-
-
-# @receiver(before_transition, sender=Poll)
-# def remove_bad_votes(sender, instance, *args, **kwargs):
-#    """ When the ElectoralRegister has changed and there are polls that shouldn't be around.
-#    """
-#    # FIXME: Connect this with some kind of notification
-#    pass
 
 
 # Touch DB models in apps

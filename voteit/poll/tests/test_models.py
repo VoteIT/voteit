@@ -85,25 +85,22 @@ class PollTests(TestCase):
         self.assertIsNone(self.poll.start_check())
 
     def test_opening_poll_empty_poll(self):
-        self.poll.do_transition(self.poll.workflow.UPCOMING, self.user, force=True)
+        self.poll.upcoming()
         self.assertRaises(
             ElectoralRegisterMissing,
-            self.poll.do_transition,
-            self.poll.workflow.ONGOING,
-            self.user,
-            force=True,
+            self.poll.ongoing,
         )
 
     def test_opening_poll(self):
-        self.poll.do_transition(self.poll.workflow.UPCOMING, self.user, force=True)
+        self.poll.upcoming()
         self.poll.electoral_register = er = self.ElectoralRegister.objects.create()
         er.voters.add(self.user)
         prop = self.Proposal.objects.create()
         self.poll.proposals.add(prop)
-        self.assertIsNotNone(
-            self.poll.do_transition(self.poll.workflow.ONGOING, self.user, force=True)
+        self.assertIsNone(
+            self.poll.ongoing()
         )
-        self.assertEqual(self.poll.workflow.ONGOING, self.poll.wf_state)
+        self.assertEqual('ongoing', self.poll.state)
 
     def test_assigning_bad_poll_method(self):
         self.poll.method = self.ElectoralRegister.objects.create()

@@ -33,20 +33,3 @@ class FactoryRegistry(UserDict):
             if not isinstance(factory, self.required):
                 raise TypeError(f"{factory} isn't an instance of the required: {self.required}")
         super().__setitem__(key, factory)
-
-
-#_PROTECT_ATTRS = ('__qualname__', '__module__')
-
-
-# class AttrCopyMeta(ABCMeta):
-#     def __new__(mcls, name, bases, namespace, **kwargs):
-#         cls = super().__new__(mcls, name, bases, namespace, **kwargs)
-#         for k in namespace:
-#             if k not in _PROTECT_ATTRS:
-#                 print (f"Setting {k} to {namespace[k]}")
-#                 setattr(cls, k, deepcopy(getattr(cls, k)))
-#         # cls.states = {}
-#         print("HEJ")
-#         import pdb;pdb.set_trace()
-#         #setattr(cls, 'states', deepcopy(getattr(cls, k)))
-#         return cls
