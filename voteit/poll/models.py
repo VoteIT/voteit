@@ -19,7 +19,7 @@ from voteit.poll.exceptions import (
     InvalidProposalCount,
     NotAllowedToVote,
 )
-from voteit.poll.workflow import PollWf
+from voteit.poll.workflows import PollWf
 
 
 class PollMethod(models.Model):

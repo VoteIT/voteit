@@ -4,7 +4,7 @@ from django.utils.translation import gettext as _
 
 from django_fsm import FSMField, transition
 from voteit.core.models import BaseContent
-from voteit.meeting.workflow import MeetingWf
+from voteit.meeting.workflows import MeetingWf
 
 
 class Meeting(BaseContent):
