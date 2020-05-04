@@ -17,7 +17,7 @@ class SimpleTests(TestCase):
 
     @property
     def Simple(self):
-        from voteit.poll.app.simple import Simple
+        from voteit.poll.app.polls.simple import Simple
 
         return Simple
 
@@ -61,7 +61,7 @@ class SimpleTests(TestCase):
 class SimpleVoteTests(TestCase):
     def setUp(self):
         from voteit.poll.models import Poll, ElectoralRegister
-        from voteit.poll.app.simple import Simple
+        from voteit.poll.app.polls.simple import Simple
 
         self.user = User.objects.create(username="a")
         self.er = ElectoralRegister.objects.create()
@@ -72,7 +72,7 @@ class SimpleVoteTests(TestCase):
 
     @property
     def _cut(self):
-        from voteit.poll.app.simple import SimpleVote
+        from voteit.poll.app.polls.simple import SimpleVote
 
         return SimpleVote
 

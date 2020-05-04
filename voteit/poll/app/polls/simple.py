@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from django.db import models
 from django.utils.translation import gettext as _
-from voteit.poll.exceptions import InvalidProposalCount
 
-from voteit.poll.models import poll_methods, PollMethod, Vote
+from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.abcs import PollMethod, Vote
+from voteit.poll.registries import poll_methods
 
 
 @poll_methods
@@ -12,6 +13,7 @@ class Simple(PollMethod):
     """ This poll method is a simple approve / deny,
         but also the base for all tests that should run against the abstract PollMethod.
     """
+
     title = _("Simple")
 
     def start_check(self):

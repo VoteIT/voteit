@@ -1,96 +1,20 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from collections import Counter
-
 from django.contrib.auth.models import User
-from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import UniqueConstraint
 from django_fsm import FSMField, transition
-from django.utils.functional import cached_property
-from voteit.core.component import FactoryRegistry
 from voteit.core.models import BaseContent
 from voteit.poll.exceptions import (
     ElectoralRegisterEmpty,
     ElectoralRegisterMissing,
     InvalidPollMethod,
     InvalidProposalCount,
-    NotAllowedToVote,
 )
 from voteit.poll.workflows import PollWf
-
-
-class PollMethod(models.Model):
-    poll_rel = GenericRelation(
-        "poll.Poll", object_id_field="method_id", content_type_field="method_type"
-    )
-
-    class Meta:
-        abstract = True
-
-    @property
-    def poll(self):
-        return self._poll
-
-    @poll.setter
-    def poll(self, poll: Poll):
-        self.poll_rel.set([poll])
-
-    @cached_property
-    def _poll(self):
-        return self.poll_rel.get()
-
-    @property
-    @abstractmethod
-    def title(self) -> str:
-        pass
-
-    @property
-    @abstractmethod
-    def vote_set(self) -> models.Manager:
-        """ Return the Manager for this implementations Vote model.
-            See voteit.poll.app.simple for example
-        """
-
-    @property
-    @abstractmethod
-    def vote_factory(self) -> Vote:
-        pass
-
-    def create_vote(self, **kw) -> Vote:
-        """ Create vote from factory. """
-        # FIXME: Not sure about this since DRF seems to have another idea
-        kw.setdefault("method", self)
-        return self.vote_factory.objects.create(**kw)
-
-    def get_votes(self):
-        return self.vote_set.all()
-
-    def get_result(self):
-        """ Return JSON-serializable result.
-        """
-        counter = Counter()
-        for v in self.get_votes():
-            if not v.abstain:
-                # FIXME: Vote power here
-                counter[v.ballot()] += 1
-        return counter
-
-    def start_check(self):
-        """ Make sure all conditions are met before starting the poll with this method.
-        """
-
-
-poll_methods = FactoryRegistry(PollMethod)
-
-
-class ElectoralRegisterMethod(ABC):
-    pass
-
-
-er_method = FactoryRegistry(ElectoralRegisterMethod)
+from voteit.poll.abcs import PollMethod
 
 
 class ElectoralRegister(models.Model):
@@ -99,7 +23,6 @@ class ElectoralRegister(models.Model):
 
 
 class Poll(BaseContent):
-    # wf_name = PollWorkflow.name
     state = FSMField(default=PollWf.initial, choices=PollWf.choices(), protected=True)
     title = models.CharField(max_length=70)
     description = models.CharField(max_length=200)
@@ -183,47 +106,6 @@ class Poll(BaseContent):
         super().save(**kw)
 
 
-class Vote(models.Model):
-    user = models.ForeignKey(User, on_delete=models.PROTECT)
-    created = models.DateTimeField(editable=False, auto_now_add=True)
-    abstain = models.BooleanField(default=False)
-
-    @property
-    @abstractmethod
-    def method(self) -> PollMethod:
-        """ A relation to the poll_method used, for instance:
-            method = models.ForeignKey(Simple, on_delete=models.CASCADE, related_name="vote_set")
-        """
-        pass
-
-    class Meta:
-        abstract = True
-        constraints = [
-            UniqueConstraint(
-                fields=["user", "method"],
-                name="%(app_label)s_%(class)s_unique_vote_for_user",
-            )
-        ]
-
-    def __str__(self):
-        return f"<{self.__class__.__name} from {self.user}>"
-
-    @abstractmethod
-    def ballot(self):
-        """ The value we need to care about when calculating the result.
-            Must be hashable.
-        """
-        pass
-
-    def save(self, **kw):
-        er = self.method.poll.electoral_register
-        if not er:
-            raise ElectoralRegisterMissing()
-        if not er.voters.filter(id=self.user.id):
-            raise NotAllowedToVote("Not allowed to vote")
-        super().save(**kw)
-
-
 # Touch DB models in apps
 # FIXME: Is there no smarter way to do this?
-from voteit.poll.app import *
+from voteit.poll.app.polls import *

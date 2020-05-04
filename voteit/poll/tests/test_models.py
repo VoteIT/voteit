@@ -17,7 +17,7 @@ class PollMethodTests(TestCase):
 
     def test_registration(self):
         from voteit.core.component import FactoryRegistry
-        from voteit.poll.models import Vote
+        from voteit.poll.abcs import Vote
 
         poll_method = FactoryRegistry(self._cut)
 
@@ -55,7 +55,7 @@ class PollTests(TestCase):
         return Proposal
 
     def setUp(self):
-        from voteit.poll.app.simple import Simple
+        from voteit.poll.app.polls.simple import Simple
 
         self.poll = self.Poll.objects.create()
         self.user = User.objects.create(username="a")
