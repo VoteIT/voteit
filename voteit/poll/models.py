@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models import UniqueConstraint
 from django_fsm import FSMField, transition
 from voteit.core.models import BaseContent
+from voteit.meeting.models import Meeting
 from voteit.poll.exceptions import (
     ElectoralRegisterEmpty,
     ElectoralRegisterMissing,
@@ -19,13 +20,15 @@ from voteit.poll.abcs import PollMethod
 
 class ElectoralRegister(models.Model):
     created = models.DateTimeField(editable=False, auto_now_add=True)
-    voters = models.ManyToManyField(User)
+    voters = models.ManyToManyField(User, related_name="electoral_registers")
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="electoral_registers", null=True)
 
 
 class Poll(BaseContent):
     state = FSMField(default=PollWf.initial, choices=PollWf.choices(), protected=True)
     title = models.CharField(max_length=70)
     description = models.CharField(max_length=200)
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="polls", null=True)
     proposals = models.ManyToManyField("proposal.Proposal")
     method_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True)
     method_id = models.PositiveIntegerField(null=True)
@@ -45,7 +48,7 @@ class Poll(BaseContent):
         on_delete=models.PROTECT,
         editable=False,
         null=True,
-        related_name="poll",
+        related_name="polls",
     )
 
     class Meta:
@@ -109,3 +112,4 @@ class Poll(BaseContent):
 # Touch DB models in apps
 # FIXME: Is there no smarter way to do this?
 from voteit.poll.app.polls import *
+from voteit.poll.app.er_policys import *

@@ -9,7 +9,9 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
 from django.db.models import UniqueConstraint
 from django.utils.functional import cached_property
-from voteit.poll.exceptions import ElectoralRegisterMissing, NotAllowedToVote
+
+from voteit.poll.exceptions import ElectoralRegisterMissing
+from voteit.poll.exceptions import NotAllowedToVote
 
 if TYPE_CHECKING:
     from voteit.poll.models import Poll
@@ -25,7 +27,7 @@ class PollMethod(models.Model):
         abstract = True
 
     @property
-    def poll(self):
+    def poll(self) -> Poll:
         return self._poll
 
     @poll.setter
@@ -33,7 +35,7 @@ class PollMethod(models.Model):
         self.poll_rel.set([poll])
 
     @cached_property
-    def _poll(self):
+    def _poll(self) -> Poll:
         return self.poll_rel.get()
 
     @property
@@ -128,4 +130,8 @@ class ElectoralRegisterPolicy(models.Model):
     @property
     @abstractmethod
     def title(self) -> str:
+        pass
+
+    @abstractmethod
+    def apply(self, poll: Poll):
         pass
