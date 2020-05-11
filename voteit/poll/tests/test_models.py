@@ -1,3 +1,5 @@
+from collections import Counter
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from voteit.poll.exceptions import (
@@ -57,10 +59,9 @@ class PollTests(TestCase):
     def setUp(self):
         from voteit.poll.app.polls.simple import Simple
 
-        self.poll = self.Poll.objects.create()
-        self.user = User.objects.create(username="a")
         self.method = Simple.objects.create()
-        self.method.poll = self.poll
+        self.poll = self.Poll.objects.create(method=self.method)
+        self.user = User.objects.create(username="a")
 
     def test_method(self):
         self.assertIsInstance(self.poll.method, self.method.__class__)
@@ -106,14 +107,30 @@ class PollTests(TestCase):
         self.poll.method = self.ElectoralRegister.objects.create()
         self.assertRaises(InvalidPollMethod, self.poll.save)
 
+    def test_votes_from_non_voters_removed_on_close(self):
+        from voteit.poll.app.polls.simple import SimpleVote
+        self.poll.electoral_register = er = self.ElectoralRegister.objects.create()
+        self.poll.save()
+        user2 = User.objects.create(username='2')
+        er.voters.add(self.user, user2)
+        prop = self.Proposal.objects.create()
+        self.poll.proposals.add(prop)
+        self.poll.upcoming()
+        self.poll.ongoing()
+        vote1 = SimpleVote.objects.create(user=self.user, method=self.method, choice=1)
+        vote2 = SimpleVote.objects.create(user=user2, method=self.method, choice=1)
+        self.assertEqual(Counter({1: 2}), self.method.get_result())
+        self.assertIn(vote1, self.method.get_votes())
+        self.assertIn(vote2, self.method.get_votes())
+        self.poll.electoral_register = er2 = self.ElectoralRegister.objects.create()
+        er2.voters.add(self.user)
+        self.poll.save()
+        self.poll.close()
+        self.assertIn(vote1, self.method.get_votes())
+        self.assertNotIn(vote2, self.method.get_votes())
+
     # def test_start_poll(self):
     #     pass
     #
     # def test_close_poll(self):
-    #     pass
-    #
-    # def test_change_electoral_register(self):
-    #     pass
-    #
-    # def test_change_electoral_register_deletes_votes(self):
     #     pass

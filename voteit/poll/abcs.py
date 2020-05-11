@@ -28,14 +28,6 @@ class PollMethod(models.Model):
 
     @property
     def poll(self) -> Poll:
-        return self._poll
-
-    @poll.setter
-    def poll(self, poll: Poll):
-        self.poll_rel.set([poll])
-
-    @cached_property
-    def _poll(self) -> Poll:
         return self.poll_rel.get()
 
     @property
@@ -102,7 +94,7 @@ class Vote(models.Model):
         ]
 
     def __str__(self):
-        return f"<{self.__class__.__name} from {self.user}>"
+        return f"<{self.__class__.__name__} from {self.user}>"
 
     @abstractmethod
     def ballot(self):

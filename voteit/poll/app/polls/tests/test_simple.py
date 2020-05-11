@@ -29,14 +29,16 @@ class SimpleTests(TestCase):
 
     def test_generic_relation_from_method(self):
         method = self.Simple.objects.create()
-        method.poll = self.poll
+        self.poll.method = method
+        self.poll.save()
         self.assertEqual(method.poll, self.poll)
         self.assertIsInstance(method.poll, self.poll.__class__)
 
     def test_start_check(self):
         from voteit.proposal.models import Proposal
         method = self.Simple.objects.create()
-        method.poll = self.poll
+        self.poll.method = method
+        self.poll.save()
         self.assertRaises(InvalidProposalCount, method.start_check)
         p1 = Proposal.objects.create()
         self.poll.proposals.add(p1)
@@ -47,7 +49,8 @@ class SimpleTests(TestCase):
 
     def test_result(self):
         method = self.Simple.objects.create()
-        method.poll = self.poll
+        self.poll.method = method
+        self.poll.save()
         ua = User.objects.create(username="a")
         ub = User.objects.create(username="b")
         uc = User.objects.create(username="c")
@@ -66,9 +69,8 @@ class SimpleVoteTests(TestCase):
         self.user = User.objects.create(username="a")
         self.er = ElectoralRegister.objects.create()
         self.er.voters.add(self.user)
-        self.poll = Poll.objects.create(electoral_register=self.er)
         self.method = Simple.objects.create()
-        self.method.poll = self.poll
+        self.poll = Poll.objects.create(electoral_register=self.er, method=self.method)
 
     @property
     def _cut(self):

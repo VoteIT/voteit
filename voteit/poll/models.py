@@ -59,12 +59,6 @@ class Poll(BaseContent):
             )
         ]
 
-    def change_electoral_register(
-        self, electoral_register: ElectoralRegister, user: User
-    ):
-        self.electoral_register = electoral_register
-        # FIXME: Delete all votes from users who aren't in the new registry when the poll closes?
-
     @transition(field=state, source=PollWf.PRIVATE, target=PollWf.UPCOMING)
     def upcoming(self):
         # Attach electoral register
@@ -77,7 +71,7 @@ class Poll(BaseContent):
     @transition(field=state, source=PollWf.ONGOING, target=PollWf.CLOSED)
     def close(self):
         # Remove bad votes
-        pass
+        self.vote_cleanup_set().delete()
 
     @transition(field=state, source=PollWf.ONGOING, target=PollWf.CANCELED)
     def cancel(self):
@@ -97,6 +91,13 @@ class Poll(BaseContent):
             raise InvalidProposalCount("No proposals")
         # And check the specifics for the poll method
         self.method.start_check()
+
+    def vote_cleanup_set(self):
+        """ Votes that shouldn't be here if the poll closes.
+            Essentially that someone has voted but aren't in the current electoral register.
+        """
+        voters = self.electoral_register.voters.all()
+        return self.get_votes().exclude(user__in=voters)
 
     def get_votes(self):
         return self.method.get_votes()

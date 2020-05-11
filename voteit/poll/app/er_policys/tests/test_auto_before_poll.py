@@ -14,8 +14,8 @@ class AutoBeforePollTests(TestCase):
         self.user2 = User.objects.create(username="two")
         self.meeting.potential_voters.add(self.user1, self.user2)
         self.poll = Poll.objects.create(meeting=self.meeting)
-        method = Simple.objects.create()
-        method.poll = self.poll
+        self.poll.method = Simple.objects.create()
+        self.poll.save()
 
     @property
     def ABF(self):
