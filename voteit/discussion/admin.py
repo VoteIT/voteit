@@ -1,3 +1,8 @@
 from django.contrib import admin
 
-# Register your models here.
+from voteit.discussion.models import DiscussionPost
+
+
+@admin.register(DiscussionPost)
+class DiscussionPostAdmin(admin.ModelAdmin):
+    pass

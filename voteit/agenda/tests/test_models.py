@@ -5,20 +5,46 @@ from django.test import TestCase
 
 class AgendaItemTests(TestCase):
 
-    #def setUp(self):
-    #    pass
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+        self.meeting = Meeting.objects.create(title="Hello world")
 
     @property
-    def _cut(self):
+    def AgendaItem(self):
         from voteit.agenda.models import AgendaItem
         return AgendaItem
 
-    def test_meeting_relation(self):
-        from voteit.meeting.models import Meeting
-        meeting = Meeting.objects.create(title="Hello world")
-        obj = self._cut.objects.create(meeting=meeting)
-        self.assertEqual(obj.meeting, meeting)
-        self.assertEqual(obj, meeting.agenda_items.all()[0])
-        meeting.delete()
-        self.assertEqual(0, self._cut.objects.count())
+    def _mk_one(self, **kw):
+        kw.setdefault("meeting", self.meeting)
+        return self.AgendaItem.objects.create(**kw)
 
+    def test_meeting_relation(self):
+        obj = self._mk_one(meeting=self.meeting)
+        self.assertEqual(obj.meeting, self.meeting)
+        self.assertEqual(obj, self.meeting.agenda_items.all()[0])
+        self.meeting.delete()
+        self.assertEqual(0, self.AgendaItem.objects.count())
+
+    def test_get_polls(self):
+        from voteit.poll.models import Poll
+        ai = self._mk_one()
+        poll = Poll.objects.create(agenda_item=ai)
+        poll2 = Poll.objects.create()
+        self.assertIn(poll, ai.get_polls())
+        self.assertNotIn(poll2, ai.get_polls())
+
+    def test_get_discussions(self):
+        from voteit.discussion.models import DiscussionPost
+        ai = self._mk_one()
+        post = DiscussionPost.objects.create(agenda_item=ai)
+        post2 = DiscussionPost.objects.create()
+        self.assertIn(post, ai.get_discussions())
+        self.assertNotIn(post2, ai.get_discussions())
+
+    def test_get_proposals(self):
+        from voteit.proposal.models import Proposal
+        ai = self._mk_one()
+        prop = Proposal.objects.create(agenda_item=ai)
+        prop2 = Proposal.objects.create()
+        self.assertIn(prop, ai.get_proposals())
+        self.assertNotIn(prop2, ai.get_proposals())

@@ -21,14 +21,21 @@ from voteit.poll.abcs import PollMethod
 class ElectoralRegister(models.Model):
     created = models.DateTimeField(editable=False, auto_now_add=True)
     voters = models.ManyToManyField(User, related_name="electoral_registers")
-    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="electoral_registers", null=True)
+    meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="electoral_registers", null=True
+    )
 
 
 class Poll(BaseContent):
     state = FSMField(default=PollWf.initial, choices=PollWf.choices(), protected=True)
     title = models.CharField(max_length=70)
     description = models.CharField(max_length=200)
-    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="polls", null=True)
+    meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="polls", null=True
+    )
+    agenda_item = models.ForeignKey(
+        "agenda.AgendaItem", on_delete=models.CASCADE, null=True, related_name="polls"
+    )
     proposals = models.ManyToManyField("proposal.Proposal")
     method_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True)
     method_id = models.PositiveIntegerField(null=True)
