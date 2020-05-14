@@ -24,12 +24,16 @@ class PollMethodTests(TestCase):
         poll_method = FactoryRegistry(self._cut)
 
         class _Vote(Vote):
-            pass
+            class Meta:
+                app_label = "poll"
 
         @poll_method
         class HelloMethod(self._cut):
             Vote = _Vote
             title = "Hello"
+
+            class Meta:
+                app_label = "poll"
 
             def start_check(self):
                 pass
@@ -128,9 +132,3 @@ class PollTests(TestCase):
         self.poll.close()
         self.assertIn(vote1, self.method.get_votes())
         self.assertNotIn(vote2, self.method.get_votes())
-
-    # def test_start_poll(self):
-    #     pass
-    #
-    # def test_close_poll(self):
-    #     pass

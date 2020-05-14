@@ -17,18 +17,18 @@ if TYPE_CHECKING:
 
 class Meeting(BaseContent):
     state = FSMField(
-        default=MeetingWf.initial, choices=MeetingWf.choices(), protected=True
+        default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False
     )
     start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
     participants = models.ManyToManyField(
-        User, blank=True, related_name="participant_in_meetings"
+        User, blank=True, related_name="participant_in_meetings", editable=False
     )
     potential_voters = models.ManyToManyField(
-        User, blank=True, related_name="potential_voter_in_meetings"
+        User, blank=True, related_name="potential_voter_in_meetings", editable=False
     )
-    er_policy_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
-    er_policy_id = models.PositiveIntegerField(null=True)
+    er_policy_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, editable=False)
+    er_policy_id = models.PositiveIntegerField(null=True, editable=False)
     er_policy = GenericForeignKey("er_policy_type", "er_policy_id")
 
     def get_latest_er(self) -> ElectoralRegister:

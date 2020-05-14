@@ -1,3 +1,9 @@
 from django.contrib import admin
+from fsm_admin.mixins import FSMTransitionMixin
 
-# Register your models here.
+from voteit.proposal.models import Proposal
+
+
+@admin.register(Proposal)
+class ProposalAdmin(FSMTransitionMixin, admin.ModelAdmin):
+    fsm_field = ["state"]
