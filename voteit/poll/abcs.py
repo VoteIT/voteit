@@ -15,7 +15,6 @@ from voteit.poll.exceptions import NotAllowedToVote
 
 if TYPE_CHECKING:
     from voteit.poll.models import Poll
-    from voteit.poll.models import Vote
 
 
 class PollMethod(models.Model):
