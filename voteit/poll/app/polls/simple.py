@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Type
+
 from django.db import models
 from django.utils.translation import gettext as _
 
@@ -21,7 +23,7 @@ class Simple(PollMethod):
             raise InvalidProposalCount("Must be exactly one")
 
     @property
-    def vote_factory(self) -> SimpleVote:
+    def vote_factory(self) -> Type[SimpleVote]:
         return SimpleVote
 
 

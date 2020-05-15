@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections import Counter
+from typing import Type
 from typing import TYPE_CHECKING
 
 from django.contrib.auth.models import User
@@ -43,7 +44,7 @@ class PollMethod(models.Model):
 
     @property
     @abstractmethod
-    def vote_factory(self) -> Vote:
+    def vote_factory(self) -> Type[Vote]:
         pass
 
     def create_vote(self, **kw) -> Vote:
