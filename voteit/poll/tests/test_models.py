@@ -35,7 +35,7 @@ class PollMethodTests(TestCase):
             class Meta:
                 app_label = "poll"
 
-            def start_check(self):
+            def start_check(self):  # pragma: no coverage
                 pass
 
         self.assertIn("hellomethod", poll_method)
