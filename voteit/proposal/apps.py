@@ -1,5 +1,7 @@
 from django.apps import AppConfig
+from django.utils.translation import gettext_lazy as _
 
 
 class ProposalConfig(AppConfig):
-    name = 'proposal'
+    name = 'voteit.proposal'
+    verbose_name = _('Proposals')
