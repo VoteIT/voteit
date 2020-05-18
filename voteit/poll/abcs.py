@@ -7,8 +7,10 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.postgres.fields import JSONField
 from django.db import models
 from django.db.models import UniqueConstraint
+from django.utils.translation import gettext_lazy as _
 from django.utils.functional import cached_property
 
 from voteit.poll.exceptions import ElectoralRegisterMissing
@@ -44,14 +46,14 @@ class PollMethod(models.Model):
 
     @property
     @abstractmethod
-    def vote_factory(self) -> Type[Vote]:
+    def vote_model(self) -> Type[Vote]:
         pass
 
     def create_vote(self, **kw) -> Vote:
         """ Create vote from factory. """
         # FIXME: Not sure about this since DRF seems to have another idea
         kw.setdefault("method", self)
-        return self.vote_factory.objects.create(**kw)
+        return self.vote_model.objects.create(**kw)
 
     def get_votes(self):
         return self.vote_set.all()
@@ -71,9 +73,47 @@ class PollMethod(models.Model):
         """
 
 
+class MultipleWinnerPollMethod(PollMethod):
+    @property
+    @abstractmethod
+    def proportional(self) -> bool:
+        pass
+
+    @property
+    @abstractmethod
+    def majority_winner(self) -> bool:
+        pass
+
+    min_winners: int = 2
+    min_losers: int = 0
+
+    winners: int = models.PositiveSmallIntegerField(_('Winners'))
+    min_selected: int = models.PositiveSmallIntegerField(
+        _('Minimum selected proposals'), default=1,
+        help_text=_('Voter must rank at least this many proposals to cast vote.')
+    )
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    def check_applicable(cls, proposals: int, winners: int):
+        if proposals < (winners + cls.min_losers):
+            raise ValueError(_('The method %(method) require at least %(min_losers) more proposals than winners') % {
+                'method': cls.title,
+                'min_losers': cls.min_losers
+            })
+        if winners < cls.min_winners:
+            raise ValueError(_('The method %(method)s require at least %(min_winners)d winner(s)') % {
+                'method': cls.title,
+                'min_winners': cls.min_winners
+            })
+
+
 class Vote(models.Model):
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     created = models.DateTimeField(editable=False, auto_now_add=True)
+    changed = models.DateTimeField(editable=False, auto_now=True)
     abstain = models.BooleanField(default=False)
 
     @property
@@ -110,6 +150,21 @@ class Vote(models.Model):
         if not er.voters.filter(id=self.user.id):
             raise NotAllowedToVote("Not allowed to vote")
         super().save(**kw)
+
+    # Instantiate this manually for type hinting
+    objects = models.Manager()
+
+
+class RankedVote(Vote):
+    ranking: str = models.TextField(_('ranking'))
+
+    class Meta:
+        abstract = True
+
+    def ballot(self):
+        """ Returns a list of proposal primary keys.
+        """
+        return self.ranking.split(',')
 
 
 class ElectoralRegisterPolicy(models.Model):
