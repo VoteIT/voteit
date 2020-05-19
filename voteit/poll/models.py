@@ -75,10 +75,16 @@ class Poll(BaseContent):
     def ongoing(self):
         self.start_check()
 
-    @transition(field=state, source=PollWf.ONGOING, target=PollWf.CLOSED)
+    @transition(field=state, source=PollWf.ONGOING, target=PollWf.CLOSED, on_error=PollWf.FAILED)
     def close(self):
+        """ Failing poll methods should set the result to the reason for failing and raise an exception.
+        """
         # Remove bad votes
         self.vote_cleanup_set().delete()
+        # TODO: Get result and store somewhere.
+        # self.result = self.method.get_result()
+        # Or maybe:
+        # self.method.calculate_result()
 
     @transition(field=state, source=PollWf.ONGOING, target=PollWf.CANCELED)
     def cancel(self):
@@ -108,6 +114,11 @@ class Poll(BaseContent):
 
     def get_votes(self):
         return self.method.get_votes()
+
+    def get_vote_weight(self, user: User) -> int:
+        """ Allow vote weight in some contexts. """
+        # TODO
+        return 1
 
     def save(self, **kw):
         if self.method is not None:

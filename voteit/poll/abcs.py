@@ -2,18 +2,17 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections import Counter
-from typing import Type
+from typing import Type, List
 from typing import TYPE_CHECKING
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericRelation
-from django.contrib.postgres.fields import JSONField
 from django.db import models
 from django.db.models import UniqueConstraint
 from django.utils.translation import gettext_lazy as _
 from django.utils.functional import cached_property
 
-from voteit.poll.exceptions import ElectoralRegisterMissing
+from voteit.poll.exceptions import ElectoralRegisterMissing, InvalidProposalCount
 from voteit.poll.exceptions import NotAllowedToVote
 
 if TYPE_CHECKING:
@@ -64,8 +63,7 @@ class PollMethod(models.Model):
         counter = Counter()
         for v in self.get_votes():
             if not v.abstain:
-                # FIXME: Vote power here
-                counter[v.ballot()] += 1
+                counter[v.ballot()] += v.weight
         return counter
 
     def start_check(self):
@@ -74,16 +72,8 @@ class PollMethod(models.Model):
 
 
 class MultipleWinnerPollMethod(PollMethod):
-    @property
-    @abstractmethod
-    def proportional(self) -> bool:
-        pass
-
-    @property
-    @abstractmethod
-    def majority_winner(self) -> bool:
-        pass
-
+    """ Common features for polls with multiple winners.
+    """
     min_winners: int = 2
     min_losers: int = 0
 
@@ -96,22 +86,25 @@ class MultipleWinnerPollMethod(PollMethod):
     class Meta:
         abstract = True
 
-    @classmethod
-    def check_applicable(cls, proposals: int, winners: int):
-        if proposals < (winners + cls.min_losers):
-            raise ValueError(_('The method %(method) require at least %(min_losers) more proposals than winners') % {
-                'method': cls.title,
-                'min_losers': cls.min_losers
-            })
-        if winners < cls.min_winners:
-            raise ValueError(_('The method %(method)s require at least %(min_winners)d winner(s)') % {
-                'method': cls.title,
-                'min_winners': cls.min_winners
-            })
+    def start_check(self):
+        if self.poll.proposals.count() < (self.winners + self.min_losers):
+            raise InvalidProposalCount(
+                _('The method %(method)s require at least %(min_losers)d more proposals than winners') % {
+                    'method': self.title,
+                    'min_losers': self.min_losers
+                }
+            )
+        if self.winners < self.min_winners:
+            raise InvalidProposalCount(
+                _('The method %(method)s require at least %(min_winners)d winner(s)') % {
+                    'method': self.title,
+                    'min_winners': self.min_winners
+                }
+            )
 
 
 class Vote(models.Model):
-    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    user: User = models.ForeignKey(User, on_delete=models.PROTECT)
     created = models.DateTimeField(editable=False, auto_now_add=True)
     changed = models.DateTimeField(editable=False, auto_now=True)
     abstain = models.BooleanField(default=False)
@@ -135,6 +128,10 @@ class Vote(models.Model):
 
     def __str__(self):
         return f"<{self.__class__.__name__} from {self.user}>"
+
+    @property
+    def weight(self) -> int:
+        return self.method.poll.get_vote_weight(self.user)
 
     @abstractmethod
     def ballot(self):
@@ -161,10 +158,11 @@ class RankedVote(Vote):
     class Meta:
         abstract = True
 
-    def ballot(self):
+    @property
+    def ballot(self) -> List[int]:
         """ Returns a list of proposal primary keys.
         """
-        return self.ranking.split(',')
+        return [int(r) for r in self.ranking.split(',')]
 
 
 class ElectoralRegisterPolicy(models.Model):

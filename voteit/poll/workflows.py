@@ -7,12 +7,14 @@ class PollWf:
     ONGOING = "ongoing"
     CLOSED = "closed"
     CANCELED = "canceled"
+    FAILED = 'failed'
     states = {
         PRIVATE: _("Private"),
         UPCOMING: _("Upcoming"),
         ONGOING: _("Ongoing"),
         CLOSED: _("Closed"),
         CANCELED: _("Canceled"),
+        FAILED: _('Failed')
     }
     initial = PRIVATE
 
