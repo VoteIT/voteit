@@ -27,12 +27,22 @@ class Meeting(BaseContent):
     potential_voters = models.ManyToManyField(
         User, blank=True, related_name="potential_voter_in_meetings", editable=False
     )
-    er_policy_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, editable=False)
+    er_policy_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, null=True, editable=False
+    )
     er_policy_id = models.PositiveIntegerField(null=True, editable=False)
     er_policy = GenericForeignKey("er_policy_type", "er_policy_id")
+    organisation = models.ForeignKey(
+        "organisation.Organisation",
+        on_delete=models.CASCADE,
+        null=True,
+        related_name="meetings",
+    )
 
     def get_latest_er(self) -> ElectoralRegister:
-        return self.electoral_registers.filter(meeting=self).order_by('-created').first()
+        return (
+            self.electoral_registers.filter(meeting=self).order_by("-created").first()
+        )
 
     @transition(field=state, source=MeetingWf.ONGOING, target=MeetingWf.UPCOMING)
     def upcoming(self):
