@@ -11,8 +11,8 @@ class CoreDocTests(TestCase):
     def _docfile(self, fn):
         return os.path.join(self.DOCS_RELATIVE, fn)
 
-    def _doctext_file(self, fn):
+    def _doctest_file(self, fn):
         doctest.testfile(os.path.join(self.DOCS_RELATIVE, fn))
 
     def test_narrative_readme(self):
-        self._doctext_file("narrative.md")
+        self._doctest_file("narrative.md")
