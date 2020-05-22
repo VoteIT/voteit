@@ -10,11 +10,11 @@ class RulesTests(TestCase):
         self.user = User.objects.create(username="a")
 
     def test_is_participant(self):
-        from voteit.meeting.rules import is_meeting_participant
-        self.assertFalse(is_meeting_participant(self.user, self.meeting))
+        from voteit.meeting.rules import is_participant
+        self.assertFalse(is_participant(self.user, self.meeting))
         self.meeting.participants.add(self.user)
         self.meeting.save()
-        self.assertTrue(is_meeting_participant(self.user, self.meeting))
+        self.assertTrue(is_participant(self.user, self.meeting))
 
     def test_is_potential_voter(self):
         from voteit.meeting.rules import is_potential_voter

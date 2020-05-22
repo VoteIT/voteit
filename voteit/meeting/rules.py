@@ -5,7 +5,7 @@ from voteit.meeting.models import Meeting
 
 
 @rules.predicate
-def is_meeting_participant(user: User, meeting: Meeting):
+def is_participant(user: User, meeting: Meeting):
     # FIXME: Probably some smarter way to do this.
     return user in meeting.participants.all()
 
