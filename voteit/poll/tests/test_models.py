@@ -18,10 +18,10 @@ class PollMethodTests(TestCase):
         return PollMethod
 
     def test_registration(self):
-        from voteit.core.component import FactoryRegistry
+        from voteit.core.component import Registry
         from voteit.poll.abcs import Vote
 
-        poll_method = FactoryRegistry(self._cut)
+        poll_method = Registry(self._cut)
 
         class _Vote(Vote):
             class Meta:

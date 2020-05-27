@@ -6,9 +6,9 @@ from django.test import TestCase
 class FactoryRegistryTests(TestCase):
     @property
     def _cut(self):
-        from voteit.core.component import FactoryRegistry
+        from voteit.core.component import Registry
 
-        return FactoryRegistry
+        return Registry
 
     def test_registration(self):
         registry = self._cut(object)

@@ -1,7 +1,7 @@
 from collections import UserDict
 
 
-class FactoryRegistry(UserDict):
+class Registry(UserDict):
 
     def __init__(self, required):
         if not isinstance(required, type):

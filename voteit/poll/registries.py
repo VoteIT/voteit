@@ -1,7 +1,7 @@
-from voteit.core.component import FactoryRegistry
+from voteit.core.component import Registry
 from voteit.poll.abcs import PollMethod, ElectoralRegisterPolicy
 
 
-poll_methods = FactoryRegistry(PollMethod)
+poll_methods = Registry(PollMethod)
 
-er_policy = FactoryRegistry(ElectoralRegisterPolicy)
+er_policy = Registry(ElectoralRegisterPolicy)
