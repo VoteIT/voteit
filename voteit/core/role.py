@@ -44,7 +44,7 @@ class Role(ABC):
         self.m2m_relation.remove(*users)
 
     def __contains__(self, user: User):
-        return user in self.m2m_relation.all()
+        return self.m2m_relation.filter(pk=user.pk).exists()
 
     @classmethod
     def valid_for(cls, instance):
