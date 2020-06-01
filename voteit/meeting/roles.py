@@ -11,3 +11,4 @@ class Participant(Role):
     model = Meeting
     m2m_field = "participants"
     title = _("Meeting participant")
+    name = "participant"

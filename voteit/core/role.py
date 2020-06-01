@@ -11,8 +11,9 @@ class Role(ABC):
     rule: Predicate
     model: Type[Model]
     m2m_field: str
-    m2m_relation: None  # Assigned on instantiation
     title: str  # Human-readable translation string
+    name: str  # Registered internal name, lowercased class name by default. Used for lookups in roles registry
+    m2m_relation: None  # Assigned on instantiation
 
     @property
     @abstractmethod
@@ -34,6 +35,12 @@ class Role(ABC):
     @abstractmethod
     def title(self):
         """ Translation string.
+        """
+
+    @property
+    @abstractmethod
+    def name(self):
+        """ Internal id of the role.
         """
 
     def __init__(self, instance):
