@@ -1,16 +1,19 @@
 from logging import getLogger
+from typing import List, Type, Union
 
 from django.contrib.auth.models import User
-from django.utils.translation import gettext_lazy as _
 from django.db import models
-from typing import List, Type, Union
+from django.utils.translation import gettext_lazy as _
 
 from voteit.access_policy.abcs import AccessPolicy
 from voteit.access_policy.registries import access_policies
-from voteit.core.role import get_valid_roles, roles, Role
+from voteit.core.role import Role
+from voteit.core.role import get_valid_roles
+from voteit.core.role import roles
 
 __all__ = ["AutomaticAccess"]
 logger = getLogger(__name__)
+
 
 @access_policies
 class AutomaticAccess(AccessPolicy):
@@ -19,7 +22,9 @@ class AutomaticAccess(AccessPolicy):
     roles_given: str = models.TextField(_("Roles given"), null=True, blank=True)
 
     def get_valid_roles(self):
-        return sorted(get_valid_roles(self.meeting_aps.meeting), key=lambda x: x.title.lower())
+        return sorted(
+            get_valid_roles(self.meeting_aps.meeting), key=lambda x: x.title.lower()
+        )
 
     def set_roles(self, *assign_roles: List[Union[str, Type[Role]]]):
         names = []
@@ -42,7 +47,11 @@ class AutomaticAccess(AccessPolicy):
                     if role in valid_roles:
                         found_roles.append(role)
                     else:  # pragma: no cover
-                        logger.warning("AutomaticAccess with pk %s has an invalid role: %s", self.pk, role_name)
+                        logger.warning(
+                            "AutomaticAccess with pk %s has an invalid role: %s",
+                            self.pk,
+                            role_name,
+                        )
         return found_roles
 
     def assign(self, user: User):
