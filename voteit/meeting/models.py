@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext as _
 from django_fsm import FSMField, transition
 
@@ -36,6 +37,7 @@ class Meeting(BaseContent):
         "organisation.Organisation",
         on_delete=models.CASCADE,
         null=True,
+        blank=True,
         related_name="meetings",
     )
 
@@ -54,11 +56,11 @@ class Meeting(BaseContent):
         target=MeetingWf.ONGOING,
     )
     def ongoing(self):
-        pass
+        self.start_time = timezone.now()
 
     @transition(field=state, source=MeetingWf.ONGOING, target=MeetingWf.CLOSED)
     def closed(self):
-        pass
+        self.end_time = timezone.now()
 
     @transition(field=state, source=MeetingWf.CLOSED, target=MeetingWf.ARCHIVED)
     def archived(self):

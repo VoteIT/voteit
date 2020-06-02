@@ -1,9 +1,9 @@
 # Narrative model docs
 
-Ment to show the purpose of models and how they relate to each other.
+Meant to show the purpose of models and how they relate to each other.
 This file is part of the regular test suite too.
 
-Since most thins relate to user, we'll create a user first.
+Since most things relate to user, we'll create a user first.
 
     >>> from django.contrib.auth.models import User
     >>> jane = User.objects.create(username="jane")
