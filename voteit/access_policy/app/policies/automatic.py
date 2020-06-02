@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from voteit.access_policy.abcs import AccessPolicy
+from voteit.access_policy.models import AccessPolicy
 from voteit.access_policy.registries import access_policies
 from voteit.core.role import Role
 

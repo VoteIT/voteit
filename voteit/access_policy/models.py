@@ -1,29 +1,55 @@
-from __future__ import annotations
-
-from typing import Generator, Type, List, TYPE_CHECKING
+from abc import abstractmethod
 
 from django.db import models
-from voteit.access_policy.registries import access_policies
-from voteit.meeting.models import Meeting
+from typing import List, Union, Type
 
-if TYPE_CHECKING:
-    from voteit.access_policy.abcs import AccessPolicy
+from voteit.core.role import get_valid_roles
+from voteit.core.role import Role
+from voteit.core.role import roles
 
 
-class MeetingAccessPolicies(models.Model):
-    """ Any new access policies should have a relation to this object rather than meeting.
+class AccessPolicy(models.Model):
+    """ Subclass this to create an access policy.
+
+        The tests for this class are in voteit.access_policy.app.automatic
     """
 
+    active = models.BooleanField()
     meeting = models.OneToOneField(
-        Meeting, on_delete=models.CASCADE, related_name="access_policies"
+        "meeting.Meeting",
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_%(class)s",
     )
 
-    def get_active_policies(self) -> Generator[AccessPolicy]:
-        # FIXME: return created policies, are there any saner way?
-        for ap in self.get_policies():
-            qs = ap.objects.filter(meeting_aps=self, active=True)
-            if qs:
-                yield qs.first()  # All of them are 1-1 relations
+    class Meta:
+        abstract = True
 
-    def get_policies(self) -> List[Type[AccessPolicy]]:
-        return access_policies.values()
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """ Name of access policy, used as ID.
+        """
+
+    @property
+    @abstractmethod
+    def title(self) -> str:
+        """ Human readable name
+        """
+
+    def get_valid_roles(self) -> List[Type[Role]]:
+        return get_valid_roles(self.meeting)
+
+    def prep_roles(self, *role_list: List[Union[str, Type[Role]]]) -> List[Role]:
+        """ Take a list of role classes or strings. Check that
+            they're valid for a meeting context and return the role instance for
+            this specific meeting.
+        """
+        results = []
+        for role in role_list:
+            if isinstance(role, str):
+                role = roles[role]
+            if role.valid_for(self.meeting):
+                results.append(role(self.meeting))
+            else:  # pragma: no cover
+                raise ValueError(f"Role {role} is not assignable to meetings.")
+        return results

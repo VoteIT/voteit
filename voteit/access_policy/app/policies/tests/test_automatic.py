@@ -17,7 +17,7 @@ class AutomaticAPTests(TestCase):
 
     def test_set_given_roles(self):
         auto_ap = self._cut.objects.create(
-            meeting_aps=self.meeting.access_policies, active=True
+            meeting=self.meeting, active=True
         )
         auto_ap.set_given_roles("participant")
         self.assertEqual("participant", auto_ap.roles_given)
@@ -26,7 +26,7 @@ class AutomaticAPTests(TestCase):
         from voteit.meeting.roles import Participant
 
         auto_ap = self._cut.objects.create(
-            meeting_aps=self.meeting.access_policies, active=True
+            meeting=self.meeting, active=True
         )
         participants = Participant(self.meeting)
         self.assertNotIn(self.user, participants)
@@ -41,7 +41,7 @@ class AutomaticAPTests(TestCase):
         from voteit.meeting.roles import Participant
 
         auto_ap = self._cut.objects.create(
-            meeting_aps=self.meeting.access_policies, active=True
+            meeting=self.meeting, active=True
         )
         roles = auto_ap.get_valid_roles()
         self.assertIn(Participant, roles)

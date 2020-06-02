@@ -5,6 +5,5 @@ class AccessPolicyConfig(AppConfig):
     name = 'voteit.access_policy'
 
     def ready(self):
-        # Enable signals
-        from voteit.access_policy import signals
+        # Register policies
         from voteit.access_policy.app import policies
