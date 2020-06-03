@@ -12,6 +12,7 @@ class AgendaAdmin(FSMTransitionMixin, admin.ModelAdmin):
     list_filter = 'state', 'meeting',
     autocomplete_fields = 'meeting',
     search_fields = 'title', 'body',
+    exclude = 'order',
 
     def proposal_count(self, obj: AgendaItem):
         return obj.proposals.count()

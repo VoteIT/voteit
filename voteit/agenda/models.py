@@ -16,6 +16,10 @@ class AgendaItem(BaseContent):
     meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="agenda_items"
     )
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = 'meeting', 'order',
 
     def get_proposals(self):
         return self.proposals.all()
@@ -32,9 +36,11 @@ class AgendaItem(BaseContent):
         target=AgendaItemWf.UPCOMING
     )
     def upcoming(self):
-        """ Make agenda item upcoming
+        """ Make agenda item upcoming. Set as last item if publishing and order not previously set.
         """
-        pass
+        if self.state == AgendaItemWf.PRIVATE and self.order == 0:
+            max_order = max(ai.order for ai in AgendaItem.objects.filter(meeting=self.meeting))
+            self.order = max_order + 1
 
     @transition(
         field=state,
