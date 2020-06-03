@@ -7,8 +7,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils.translation import gettext as _
 from django_fsm import FSMField, transition
-from voteit.access_policy.registries import access_policies
 
+from voteit.access_policy.registries import access_policies
 from voteit.core.models import BaseContent
 from voteit.meeting.workflows import MeetingWf
 
@@ -28,6 +28,9 @@ class Meeting(BaseContent):
     )
     potential_voters = models.ManyToManyField(
         User, blank=True, related_name="potential_voter_in_meetings", editable=False
+    )
+    moderators = models.ManyToManyField(
+        User, blank=True, related_name="moderator_in_meetings", editable=False
     )
     er_policy_type = models.ForeignKey(
         ContentType, on_delete=models.CASCADE, null=True, editable=False
