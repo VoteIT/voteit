@@ -14,7 +14,7 @@ class AccessPolicy(models.Model):
         The tests for this class are in voteit.access_policy.app.automatic
     """
 
-    active = models.BooleanField()
+    active = models.BooleanField(default=False)
     meeting = models.OneToOneField(
         "meeting.Meeting",
         on_delete=models.CASCADE,
