@@ -21,6 +21,15 @@ class AgendaItem(BaseContent):
     class Meta:
         ordering = 'meeting', 'order',
 
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        """ Set order as last agenda item for meeting when creating.
+        """
+        if not self.pk:
+            max_order = self.meeting.agenda_items.aggregate(max_order=models.Max('order'))['max_order']
+            if max_order is not None:
+                self.order = max_order + 1
+        super().save(force_insert, force_update, using, update_fields)
+
     def get_proposals(self):
         return self.proposals.all()
 
@@ -36,12 +45,9 @@ class AgendaItem(BaseContent):
         target=AgendaItemWf.UPCOMING
     )
     def upcoming(self):
-        """ Make agenda item upcoming. Set as last item if publishing and order not previously set.
+        """ Make agenda item upcoming
         """
-        # TODO: Order should be set on object creation, not here
-        if self.state == AgendaItemWf.PRIVATE and self.order == 0:
-            max_order = max(ai.order for ai in AgendaItem.objects.filter(meeting=self.meeting))
-            self.order = max_order + 1
+        pass
 
     @transition(
         field=state,
