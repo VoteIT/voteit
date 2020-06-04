@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generator
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -9,10 +9,12 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from django_fsm import FSMField, transition
 
+from voteit.access_policy.registries import access_policies
 from voteit.core.models import BaseContent
 from voteit.meeting.workflows import MeetingWf
 
 if TYPE_CHECKING:
+    from voteit.access_policy.models import AccessPolicy
     from voteit.poll.models import ElectoralRegister
 
 
@@ -27,6 +29,9 @@ class Meeting(BaseContent):
     )
     potential_voters = models.ManyToManyField(
         User, blank=True, related_name="potential_voter_in_meetings", editable=False
+    )
+    moderators = models.ManyToManyField(
+        User, blank=True, related_name="moderator_in_meetings", editable=False
     )
     er_policy_type = models.ForeignKey(
         ContentType, on_delete=models.CASCADE, null=True, editable=False
@@ -45,6 +50,15 @@ class Meeting(BaseContent):
         return (
             self.electoral_registers.filter(meeting=self).order_by("-created").first()
         )
+
+    def get_access_policies(self, only_active=True) -> Generator[AccessPolicy]:
+        query = {}
+        if only_active:
+            query["active"] = True
+        for ap in access_policies.values():
+            qs = ap.objects.filter(meeting=self, **query)
+            if qs:
+                yield qs.first()  # All of them are 1-1 relations
 
     @transition(field=state, source=MeetingWf.ONGOING, target=MeetingWf.UPCOMING)
     def upcoming(self):

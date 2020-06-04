@@ -6,3 +6,5 @@ class MeetingConfig(AppConfig):
     name = 'voteit.meeting'
     verbose_name = _('Meeting')
 
+    def ready(self):
+        from voteit.meeting import roles

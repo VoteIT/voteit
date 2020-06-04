@@ -30,6 +30,8 @@ class RoleTests(TestCase):
             rule = is_participant
             model = Meeting
             m2m_field = "participants"
+            title = "Meeting participant"
+            name = "meetingparticipant"
 
         return MeetingParticipant
 
@@ -46,7 +48,7 @@ class RoleTests(TestCase):
         from voteit.core.role import roles
 
         self._register_helloclass()
-        self.assertIn("helloclass", roles)
+        self.assertIn("meetingparticipant", roles)
 
     def test_wrong_instance_type(self):
         self.assertRaises(TypeError, self.MeetingParticipant, object())
@@ -74,11 +76,10 @@ class RoleTests(TestCase):
         from voteit.core.role import get_valid_roles
 
         self.assertEqual(set(), set(get_valid_roles(object)))
-        self.assertEqual(set(), set(get_valid_roles(self.meeting)))
 
         HelloClass = self._register_helloclass()
 
-        self.assertEqual({HelloClass}, set(get_valid_roles(self.meeting)))
+        self.assertIn(HelloClass, set(get_valid_roles(self.meeting)))
 
     def test_assigned_roles(self):
         from voteit.core.role import get_assigned_roles
@@ -89,4 +90,4 @@ class RoleTests(TestCase):
 
         HelloClass(self.meeting).add(self.user)
 
-        self.assertEqual({HelloClass}, set(get_assigned_roles(self.meeting, self.user)))
+        self.assertIn(HelloClass, set(get_assigned_roles(self.meeting, self.user)))

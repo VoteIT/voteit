@@ -22,3 +22,10 @@ class RulesTests(TestCase):
         self.meeting.potential_voters.add(self.user)
         self.meeting.save()
         self.assertTrue(is_potential_voter(self.user, self.meeting))
+
+    def test_is_moderator(self):
+        from voteit.meeting.rules import is_moderator
+        self.assertFalse(is_moderator(self.user, self.meeting))
+        self.meeting.moderators.add(self.user)
+        self.meeting.save()
+        self.assertTrue(is_moderator(self.user, self.meeting))
