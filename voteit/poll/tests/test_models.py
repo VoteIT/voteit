@@ -1,5 +1,3 @@
-from collections import Counter
-
 from django.contrib.auth.models import User
 from django.test import TestCase
 from voteit.poll.exceptions import (
@@ -29,13 +27,20 @@ class PollMethodTests(TestCase):
 
         @poll_method
         class HelloMethod(self._cut):
-            Vote = _Vote
+            vote_model = _Vote
             title = "Hello"
+            vote_set = object()  # Dummy too
 
             class Meta:
                 app_label = "poll"
 
-            def start_check(self):  # pragma: no coverage
+            def calculate_result(self, ballots):
+                pass
+
+            def get_result(self):
+                pass
+
+            def start_check(self):
                 pass
 
         self.assertIn("hellomethod", poll_method)
@@ -65,70 +70,101 @@ class PollTests(TestCase):
 
         self.method = Simple.objects.create()
         self.poll = self.Poll.objects.create(method=self.method)
-        self.user = User.objects.create(username="a")
+        self.user = User.objects.create(username="1")
+        self.user2 = User.objects.create(username="2")
+        self.poll.electoral_register = self.er = self.ElectoralRegister.objects.create()
+        self.er.voters.add(self.user, self.user2)
+        self.poll.save()
 
     def test_method(self):
         self.assertIsInstance(self.poll.method, self.method.__class__)
 
     def test_start_check_no_electoral_register(self):
+        self.poll.electoral_register = None
         self.assertRaises(ElectoralRegisterMissing, self.poll.start_check)
 
     def test_start_check_electoral_register_empty(self):
-        self.poll.electoral_register = self.ElectoralRegister.objects.create()
+        self.er.voters.remove(self.user, self.user2)
         self.assertRaises(ElectoralRegisterEmpty, self.poll.start_check)
 
     def test_start_check_no_proposals(self):
-        self.poll.electoral_register = er = self.ElectoralRegister.objects.create()
-        er.voters.add(self.user)
         self.assertRaises(InvalidProposalCount, self.poll.start_check)
 
     def test_start_check(self):
-        self.poll.electoral_register = er = self.ElectoralRegister.objects.create()
-        er.voters.add(self.user)
         prop = self.Proposal.objects.create()
         self.poll.proposals.add(prop)
         self.assertIsNone(self.poll.start_check())
 
     def test_opening_poll_empty_poll(self):
+        self.poll.electoral_register = None
         self.poll.upcoming()
-        self.assertRaises(
-            ElectoralRegisterMissing,
-            self.poll.ongoing,
-        )
+        self.assertRaises(ElectoralRegisterMissing, self.poll.ongoing)
 
     def test_opening_poll(self):
         self.poll.upcoming()
-        self.poll.electoral_register = er = self.ElectoralRegister.objects.create()
-        er.voters.add(self.user)
         prop = self.Proposal.objects.create()
         self.poll.proposals.add(prop)
-        self.assertIsNone(
-            self.poll.ongoing()
-        )
-        self.assertEqual('ongoing', self.poll.state)
+        self.assertIsNone(self.poll.ongoing())
+        self.assertEqual("ongoing", self.poll.state)
 
     def test_assigning_bad_poll_method(self):
         self.poll.method = self.ElectoralRegister.objects.create()
         self.assertRaises(InvalidPollMethod, self.poll.save)
 
-    def test_votes_from_non_voters_removed_on_close(self):
-        from voteit.poll.app.polls.simple import SimpleVote
-        self.poll.electoral_register = er = self.ElectoralRegister.objects.create()
-        self.poll.save()
-        user2 = User.objects.create(username='2')
-        er.voters.add(self.user, user2)
+    def test_closing_poll(self):
         prop = self.Proposal.objects.create()
         self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        vote1 = SimpleVote.objects.create(user=self.user, method=self.method, choice=1)
-        vote2 = SimpleVote.objects.create(user=user2, method=self.method, choice=1)
-        self.assertEqual(Counter({1: 2}), self.method.get_result())
+        vote1 = self.method.vote_set.create(user=self.user, choice=1)
+        vote2 = self.method.vote_set.create(user=self.user2, choice=1)
         self.assertIn(vote1, self.method.get_votes())
         self.assertIn(vote2, self.method.get_votes())
+        self.poll.close()
+        self.assertEqual({"approve": 2, "deny": 0}, self.method.get_result())
+
+    def test_votes_from_non_voters_removed_on_close(self):
+        prop = self.Proposal.objects.create()
+        self.poll.proposals.add(prop)
+        self.poll.upcoming()
+        self.poll.ongoing()
+        vote1 = self.method.vote_set.create(user=self.user, choice=1)
+        vote2 = self.method.vote_set.create(user=self.user2, choice=1)
+        self.assertIn(vote1, self.method.get_votes())
+        self.assertIn(vote2, self.method.get_votes())
+        # Change ER
         self.poll.electoral_register = er2 = self.ElectoralRegister.objects.create()
         er2.voters.add(self.user)
         self.poll.save()
         self.poll.close()
         self.assertIn(vote1, self.method.get_votes())
         self.assertNotIn(vote2, self.method.get_votes())
+        self.assertEqual({"approve": 1, "deny": 0}, self.method.get_result())
+
+    def test_abstentions(self):
+        prop = self.Proposal.objects.create()
+        self.poll.proposals.add(prop)
+        self.poll.upcoming()
+        self.poll.ongoing()
+        self.method.vote_set.create(user=self.user, abstain=True)
+        self.method.vote_set.create(user=self.user2, choice=1)
+        self.poll.close()
+        self.assertEqual({"approve": 1, "deny": 0}, self.method.get_result())
+        self.assertEqual(1, self.method.abstains)
+
+    def test_checksum(self):
+        prop = self.Proposal.objects.create()
+        self.poll.proposals.add(prop)
+        self.poll.upcoming()
+        self.poll.ongoing()
+        self.method.vote_set.create(user=self.user, choice=2)
+        self.method.vote_set.create(user=self.user2, choice=1)
+        self.poll.close()
+        self.poll.save()
+        self.assertEqual(
+            "37f96aff28e9e4d862b8c4614329e61e2141a155b4367f9f7d69231d6d6d263d04c0e29"
+            "4d2c474b44f288ba7415b61f8d96976611b47753da9f3886c2c90d3fb",
+            self.method.ballot_checksum,
+        )
+        self.assertEqual('{"2": 1, "1": 1}', self.method.ballot_data)
+        self.assertTrue(self.method.verify_checksum())

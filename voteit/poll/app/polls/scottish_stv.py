@@ -1,3 +1,7 @@
+import json
+from collections import Counter, MutableMapping
+from decimal import Decimal
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from stvpoll.scottish_stv import ScottishSTV as _ScottishSTV
@@ -29,13 +33,28 @@ class ScottishSTV(MultipleWinnerPollMethod):
         help_text=_('Poll may yield incomplete result if random tiebreak is not allowed. '
                     'Random tiebreaks can sometimes affect the end result.')
     )
+    # FIXME: We'll want to store the result in some other way i think /Robin
+    result = models.TextField()
 
-    def get_result(self) -> dict:
+    def calculate_result(self, ballots: Counter):
         poll = _ScottishSTV(
             seats=self.winners,
             candidates=self.poll.proposals.all().values_list('id', flat=True),
             random_in_tiebreaks=self.allow_random,
         )
-        for vote in self.vote_set.all():
-            poll.add_ballot(vote.ballot, num=vote.weight)
-        return poll.calculate().as_dict()
+        for (ballot, count) in ballots.items():
+            ballot_as_list = [int(r) for r in ballot.split(",")]
+            poll.add_ballot(ballot_as_list, count)
+        result = poll.calculate().as_dict()
+        self.result = json.dumps(result, cls=_DecimalEncoder)
+        return result
+
+    def get_result(self) -> dict:
+        return json.loads(self.result)
+
+
+class _DecimalEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Decimal):
+            return str(o)
+        return super(_DecimalEncoder, self).default(o)

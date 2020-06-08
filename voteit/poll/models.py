@@ -12,7 +12,7 @@ from voteit.poll.exceptions import (
     ElectoralRegisterEmpty,
     ElectoralRegisterMissing,
     InvalidPollMethod,
-    InvalidProposalCount,
+    InvalidProposalCount, PollNotClosed,
 )
 from voteit.poll.workflows import PollWf
 from voteit.poll.abcs import PollMethod
@@ -81,10 +81,8 @@ class Poll(BaseContent):
         """
         # Remove bad votes
         self.vote_cleanup_set().delete()
-        # TODO: Get result and store somewhere.
-        # self.result = self.method.get_result()
-        # Or maybe:
-        # self.method.calculate_result()
+        # Calculate votes etc
+        self.method.close()
 
     @transition(field=state, source=PollWf.ONGOING, target=PollWf.CANCELED)
     def cancel(self):
@@ -119,6 +117,11 @@ class Poll(BaseContent):
         """ Allow vote weight in some contexts. """
         # TODO
         return 1
+
+    def get_result(self):
+        if self.state != PollWf.CLOSED:
+            raise PollNotClosed(f"{self} is in state {self.state}")
+        return self.method.get_result()
 
     def save(self, **kw):
         if self.method is not None:

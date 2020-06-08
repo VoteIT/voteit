@@ -23,3 +23,13 @@ class InvalidProposalCount(PollError):
 class NotAllowedToVote(PollError):
     """ User isn't in the electoral register.
     """
+
+
+class PollNotClosed(PollError):
+    """ Access to this method isn't allowed until the poll has closed.
+    """
+
+
+class BallotChecksumError(PollError):
+    """ Checksum doesn't match or doesn't exist.
+    """

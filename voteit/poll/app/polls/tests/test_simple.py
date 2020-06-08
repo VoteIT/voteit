@@ -1,8 +1,7 @@
-from collections import Counter
-
 from django.contrib.auth.models import User
 from django.db import IntegrityError
 from django.test import TestCase
+
 from voteit.poll.exceptions import NotAllowedToVote
 from voteit.poll.exceptions import InvalidProposalCount
 
@@ -51,14 +50,18 @@ class SimpleTests(TestCase):
         method = self.Simple.objects.create()
         self.poll.method = method
         self.poll.save()
+        self.poll.upcoming()
+        self.poll.proposals.create()
         ua = User.objects.create(username="a")
         ub = User.objects.create(username="b")
         uc = User.objects.create(username="c")
         self.er.voters.set([ua, ub, uc])
+        self.poll.ongoing()
         method.create_vote(choice=1, user=ua)
         method.create_vote(choice=1, user=ub)
         method.create_vote(choice=2, user=uc)
-        self.assertEqual(Counter({1: 2, 2: 1}), method.get_result())
+        self.poll.close()
+        self.assertEqual({"approve": 2, "deny": 1}, method.get_result())
 
 
 class SimpleVoteTests(TestCase):
@@ -90,7 +93,7 @@ class SimpleVoteTests(TestCase):
 
     def test_ballot(self):
         obj = self._cut.objects.create(choice=1, user=self.user, method=self.method)
-        self.assertEqual(1, obj.ballot())
+        self.assertEqual(1, obj.ballot)
 
     def test_poll_user_unique_together(self):
         self._cut.objects.create(choice=1, user=self.user, method=self.method)
