@@ -3,12 +3,13 @@ from abc import abstractmethod
 from django.db import models
 from typing import List, Union, Type
 
+from voteit.core.models import ABCModel
 from voteit.core.role import get_valid_roles
 from voteit.core.role import Role
 from voteit.core.role import roles
 
 
-class AccessPolicy(models.Model):
+class AccessPolicy(ABCModel):
     """ Subclass this to create an access policy.
 
         The tests for this class are in voteit.access_policy.app.automatic
