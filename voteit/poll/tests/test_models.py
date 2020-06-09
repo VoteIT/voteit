@@ -168,3 +168,55 @@ class PollTests(TestCase):
         )
         self.assertEqual('{"2": 1, "1": 1}', self.poll.ballot_data)
         self.assertTrue(self.poll.verify_checksum())
+
+
+class VoteWeightTests(TestCase):
+    @property
+    def Poll(self):
+        from voteit.poll.models import Poll
+
+        return Poll
+
+    @property
+    def ElectoralRegister(self):
+        from voteit.poll.models import ElectoralRegister
+
+        return ElectoralRegister
+
+    @property
+    def VoterWeight(self):
+        from voteit.poll.models import VoterWeight
+
+        return VoterWeight
+
+    def setUp(self):
+        from voteit.poll.app.polls.simple import Simple
+
+        self.method = Simple.objects.create()
+        self.er = self.ElectoralRegister.objects.create()
+        self.poll = self.Poll.objects.create(method=self.method, electoral_register=self.er)
+        self.user1 = User.objects.create(username='1')
+        self.user2 = User.objects.create(username='2')
+        self.user3 = User.objects.create(username='3')
+        self.VoterWeight.objects.create(register=self.poll.electoral_register, user=self.user1)
+        self.VoterWeight.objects.create(register=self.poll.electoral_register, user=self.user2)
+        self.VoterWeight.objects.create(register=self.poll.electoral_register, user=self.user3, weight=3)
+
+    def test_poll_result(self):
+        from voteit.poll.app.polls.simple import SimpleVote
+        from voteit.proposal.models import Proposal
+        from voteit.proposal.workflows import ProposalWf
+        self.poll.proposals.add(Proposal.objects.create(title='Abc123', body='I propose!'))
+        self.poll.upcoming()
+        self.poll.ongoing()
+        self.method.vote_set.create(user=self.user1, choice=SimpleVote.APPROVE)
+        self.method.vote_set.create(user=self.user2, choice=SimpleVote.APPROVE)
+        self.method.vote_set.create(user=self.user3, choice=SimpleVote.DENY)
+        self.poll.close()
+        self.assertEqual(self.method.get_result(), {'approve': 2, 'deny': 3})
+        # FIXME: Make this work :)
+        # self.assertEqual(self.poll.proposals.first().state, ProposalWf.DENIED)
+
+    def test_weight(self):
+        self.assertEqual(self.er.get_voter_weight(self.user1), 1)
+        self.assertEqual(self.er.get_voter_weight(self.user3), 3)
