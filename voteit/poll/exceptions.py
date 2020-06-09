@@ -25,8 +25,8 @@ class NotAllowedToVote(PollError):
     """
 
 
-class PollNotClosed(PollError):
-    """ Access to this method isn't allowed until the poll has closed.
+class PollNotFinished(PollError):
+    """ Access to this method isn't allowed until the poll has closed and there's an actual result.
     """
 
 

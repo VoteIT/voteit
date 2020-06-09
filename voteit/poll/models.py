@@ -1,21 +1,33 @@
 from __future__ import annotations
 
+from collections import Counter
+from hashlib import sha512
+from json import dumps
+from logging import getLogger
+
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import UniqueConstraint
-from django_fsm import FSMField, transition
+from django.dispatch import receiver
+from django.utils.timezone import now
+from django.utils.translation import gettext_lazy as _
+from django_fsm import FSMField, transition, post_transition
 from voteit.core.models import BaseContent
 from voteit.meeting.models import Meeting
+from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import (
+    BallotChecksumError,
     ElectoralRegisterEmpty,
     ElectoralRegisterMissing,
     InvalidPollMethod,
-    InvalidProposalCount, PollNotClosed,
+    InvalidProposalCount,
+    PollNotFinished,
 )
 from voteit.poll.workflows import PollWf
-from voteit.poll.abcs import PollMethod
+
+logger = getLogger(__name__)
 
 
 class ElectoralRegister(models.Model):
@@ -57,6 +69,18 @@ class Poll(BaseContent):
         null=True,
         related_name="polls",
     )
+    ballot_data = models.TextField(
+        verbose_name=_("JSON-serialized ballot data"), editable=False, null=True
+    )
+    ballot_checksum = models.CharField(
+        verbose_name=_("SHA512 checksum of ballot data"),
+        max_length=128,
+        editable=False,
+        null=True,
+    )
+    abstains = models.PositiveIntegerField(
+        verbose_name=_("Abstentions"), default=0, editable=False
+    )
 
     class Meta:
         constraints = [
@@ -74,20 +98,41 @@ class Poll(BaseContent):
     @transition(field=state, source=PollWf.UPCOMING, target=PollWf.ONGOING)
     def ongoing(self):
         self.start_check()
+        self.started = now()
 
-    @transition(field=state, source=PollWf.ONGOING, target=PollWf.CLOSED, on_error=PollWf.FAILED)
+    @transition(
+        field=state,
+        source=[PollWf.ONGOING, PollWf.FAILED, PollWf.CLOSED],
+        target=PollWf.CLOSED,
+    )
     def close(self):
-        """ Failing poll methods should set the result to the reason for failing and raise an exception.
+        """ Close the poll for further votes.
+            The next step is always to count the votes via the method finish()
         """
-        # Remove bad votes
+        self._mark_closed()
+
+    @transition(
+        field=state,
+        source=PollWf.CLOSED,
+        target=PollWf.FINISHED,
+        on_error=PollWf.FAILED,
+    )
+    def finish(self):
+        """ Count the votes and finish up. """
+        # Remove bad votes due to a change in electoral register during the poll.
+        # This is probably not allowed in most meetings.
         self.vote_cleanup_set().delete()
-        # Calculate votes etc
-        self.method.close()
+        ballots, abstains = self.get_ballots()
+        self.store_ballots(ballots, abstains)
+        self.method.calculate_result(ballots)
 
     @transition(field=state, source=PollWf.ONGOING, target=PollWf.CANCELED)
     def cancel(self):
-        # Nothing really?
-        pass
+        self._mark_closed()
+
+    def _mark_closed(self):
+        if not self.closed:
+            self.closed = now()
 
     def start_check(self):
         """ Check that this poll could be started. A very basic check for the most obvious things.
@@ -102,6 +147,43 @@ class Poll(BaseContent):
             raise InvalidProposalCount("No proposals")
         # And check the specifics for the poll method
         self.method.start_check()
+
+    def store_ballots(self, ballots: Counter, abstains=0):
+        """ Make sure ballot data is saved even if the votes will be cleared later on.
+        """
+        self.abstains = abstains
+        self.ballot_data = dumps(ballots)
+        self.ballot_checksum = sha512(self.ballot_data.encode("utf-8")).hexdigest()
+        logger.info(
+            "Finalized ballots for %s. Checksum: %s", self, self.ballot_checksum
+        )
+
+    def get_ballots(self) -> (Counter, int):
+        """ Return JSON-serializable result counter and number of abstentions.
+        """
+        counter = Counter()
+        abstains = 0
+        for v in self.method.get_votes():
+            if v.abstain:
+                abstains += v.weight
+            else:
+                counter[v.ballot] += v.weight
+        return counter, abstains
+
+    def verify_checksum(self):
+        if self.state != PollWf.FINISHED:
+            raise PollNotFinished()
+        if not self.ballot_checksum:
+            raise BallotChecksumError(f"Checksum empty for {self}")
+        if not self.ballot_data:
+            raise BallotChecksumError(f"Ballot data empty for {self}")
+        checksum = sha512(self.ballot_data.encode("utf-8")).hexdigest()
+        if self.ballot_checksum == checksum:
+            return True
+        else:
+            raise BallotChecksumError(
+                f"Checksum doesn't match for {self}. Stored: {self.ballot_checksum}, Current: {checksum}"
+            )
 
     def vote_cleanup_set(self):
         """ Votes that shouldn't be here if the poll closes.
@@ -119,8 +201,8 @@ class Poll(BaseContent):
         return 1
 
     def get_result(self):
-        if self.state != PollWf.CLOSED:
-            raise PollNotClosed(f"{self} is in state {self.state}")
+        if self.state != PollWf.FINISHED:
+            raise PollNotFinished(f"{self} is in state {self.state}")
         return self.method.get_result()
 
     def save(self, **kw):
@@ -131,7 +213,16 @@ class Poll(BaseContent):
         super().save(**kw)
 
 
+@receiver(post_transition, sender=Poll)
+def finish_closed_poll(
+    sender: Poll, instance: Poll, source: str, target: str, **kwargs
+):
+    """ As soon as the poll has closed, calculate the result.
+        This method should probably offload this transition change to a worker later on.
+    """
+    if target == PollWf.CLOSED:
+        instance.finish()
+
+
 # Touch DB models in apps
 # FIXME: Is there no smarter way to do this?
-from voteit.poll.app.polls import *
-from voteit.poll.app.er_policys import *

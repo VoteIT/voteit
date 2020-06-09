@@ -149,8 +149,8 @@ class PollTests(TestCase):
         self.method.vote_set.create(user=self.user, abstain=True)
         self.method.vote_set.create(user=self.user2, choice=1)
         self.poll.close()
-        self.assertEqual({"approve": 1, "deny": 0}, self.method.get_result())
-        self.assertEqual(1, self.method.abstains)
+        self.assertEqual({"approve": 1, "deny": 0}, self.poll.get_result())
+        self.assertEqual(1, self.poll.abstains)
 
     def test_checksum(self):
         prop = self.Proposal.objects.create()
@@ -164,7 +164,7 @@ class PollTests(TestCase):
         self.assertEqual(
             "37f96aff28e9e4d862b8c4614329e61e2141a155b4367f9f7d69231d6d6d263d04c0e29"
             "4d2c474b44f288ba7415b61f8d96976611b47753da9f3886c2c90d3fb",
-            self.method.ballot_checksum,
+            self.poll.ballot_checksum,
         )
-        self.assertEqual('{"2": 1, "1": 1}', self.method.ballot_data)
-        self.assertTrue(self.method.verify_checksum())
+        self.assertEqual('{"2": 1, "1": 1}', self.poll.ballot_data)
+        self.assertTrue(self.poll.verify_checksum())

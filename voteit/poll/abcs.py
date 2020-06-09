@@ -2,28 +2,20 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections import Counter
-from hashlib import sha512
-from json import dumps
 from logging import getLogger
-from typing import Type
 from typing import TYPE_CHECKING
+from typing import Type
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
 from django.db.models import UniqueConstraint
 from django.utils.translation import gettext_lazy as _
-from django.utils.functional import cached_property
 
 from voteit.core.models import ABCModel
-from voteit.poll.exceptions import (
-    ElectoralRegisterMissing,
-    PollNotClosed,
-    BallotChecksumError, PollError,
-)
+from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.exceptions import NotAllowedToVote
-from voteit.poll.workflows import PollWf
 
 if TYPE_CHECKING:
     from voteit.poll.models import Poll
@@ -36,18 +28,6 @@ class PollMethod(ABCModel):
 
     poll_rel = GenericRelation(
         "poll.Poll", object_id_field="method_id", content_type_field="method_type"
-    )
-    ballot_data = models.TextField(
-        verbose_name=_("JSON-serialized ballot data"), editable=False, null=True
-    )
-    ballot_checksum = models.CharField(
-        verbose_name=_("JSON-serialized ballot data"),
-        max_length=128,
-        editable=False,
-        null=True,
-    )
-    abstains = models.PositiveIntegerField(
-        verbose_name=_("Abstentions"), default=0, editable=False
     )
 
     class Meta:
@@ -83,36 +63,6 @@ class PollMethod(ABCModel):
     def get_votes(self):
         return self.vote_set.all()
 
-    def close(self):
-        """ Do all the steps required to close a poll."""
-        ballots, abstains = self.get_ballots()
-        self.store_ballots(ballots, abstains)
-        self.calculate_result(ballots)
-
-    def store_ballots(self, ballots: Counter, abstains=0):
-        """ Make sure ballot data is saved even if the votes will be cleared later on.
-        """
-        if self.ballot_checksum:
-            raise PollError("Ballots already stored")
-        self.abstains = abstains
-        self.ballot_data = dumps(ballots)
-        self.ballot_checksum = sha512(self.ballot_data.encode("utf-8")).hexdigest()
-        logger.info(
-            "Finalized ballots for %s. Checksum: %s", self, self.ballot_checksum
-        )
-
-    def get_ballots(self) -> (Counter, int):
-        """ Return JSON-serializable result counter and number of abstentions.
-        """
-        counter = Counter()
-        abstains = 0
-        for v in self.get_votes():
-            if v.abstain:
-                abstains += v.weight
-            else:
-                counter[v.ballot] += v.weight
-        return counter, abstains
-
     @abstractmethod
     def calculate_result(self, ballots: Counter):
         """ Takes the counted ballots, calculate the result and store it.
@@ -127,21 +77,6 @@ class PollMethod(ABCModel):
     def start_check(self):
         """ Make sure all conditions are met before starting the poll with this method.
         """
-
-    def verify_checksum(self):
-        if self.poll.state != PollWf.CLOSED:
-            raise PollNotClosed()
-        if not self.ballot_checksum:
-            raise BallotChecksumError(f"Checksum empty for {self}")
-        if not self.ballot_data:
-            raise BallotChecksumError(f"Ballot data empty for {self}")
-        checksum = sha512(self.ballot_data.encode("utf-8")).hexdigest()
-        if self.ballot_checksum == checksum:
-            return True
-        else:
-            raise BallotChecksumError(
-                f"Checksum doesn't match for {self}. Stored: {self.ballot_checksum}, Current: {checksum}"
-            )
 
 
 class MultipleWinnerPollMethod(PollMethod):
@@ -199,7 +134,7 @@ class Vote(ABCModel):
             )
         ]
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return f"<{self.__class__.__name__} from {self.user}>"
 
     @property
