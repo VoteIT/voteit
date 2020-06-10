@@ -53,6 +53,19 @@ class MotionRulesTests(TestCase):
         self.viewer_user = self.mp.viewer.create(username="viewer")  # FIXME
         self.motion = self.mp.motions.create(author=self.mover_user)
 
+    def test_can_change_motion(self):
+        self.assertFalse(self.any_user.has_perm(MP.CHANGE, self.motion))
+        self.assertFalse(self.mover_user.has_perm(MP.CHANGE, self.motion))
+        self.assertTrue(self.manager_user.has_perm(MP.CHANGE, self.motion))
+        self.mp.open()
+        self.assertFalse(self.any_user.has_perm(MP.CHANGE, self.motion))
+        self.assertTrue(self.mover_user.has_perm(MP.CHANGE, self.motion))
+        self.assertTrue(self.manager_user.has_perm(MP.CHANGE, self.motion))
+        self.motion.submit()
+        self.assertFalse(self.any_user.has_perm(MP.CHANGE, self.motion))
+        self.assertFalse(self.mover_user.has_perm(MP.CHANGE, self.motion))
+        self.assertTrue(self.manager_user.has_perm(MP.CHANGE, self.motion))
+
     def test_can_manage_motion(self):
         self.assertFalse(self.any_user.has_perm(MP.MANAGE, self.motion))
         self.assertFalse(self.mover_user.has_perm(MP.MANAGE, self.motion))

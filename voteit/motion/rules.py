@@ -54,10 +54,25 @@ rules.add_perm(MotionPermissions.ADD, can_add_motion)  # Note, related to contex
 
 # Motion permissions
 @rules.predicate
+def can_change_motion(user: User, motion: Motion):
+    """ Change the text, add proposals etc.
+    """
+    return is_mp_manager(user, motion.motion_process) or (
+        motion.author == user
+        and motion.state == MotionWf.DRAFT
+        and motion.motion_process.state == MotionProcessWf.OPEN
+    )
+
+
+@rules.predicate
 def can_submit_motion(user: User, motion: Motion):
     """ Is the author of the motion able to submit it?
     """
-    return motion.author == user and motion.motion_process.state == MotionProcessWf.OPEN
+    return (
+        motion.author == user
+        and motion.state == MotionWf.DRAFT
+        and motion.motion_process.state == MotionProcessWf.OPEN
+    )
 
 
 @rules.predicate
@@ -76,6 +91,7 @@ def can_manage_motion(user: User, motion: Motion):
     return is_mp_manager(user, motion.motion_process)
 
 
+rules.add_perm(MotionPermissions.CHANGE, can_change_motion)
 rules.add_perm(MotionPermissions.SUBMIT, can_submit_motion)
 rules.add_perm(MotionPermissions.RETRACT, can_retract_motion | can_manage_motion)
 rules.add_perm(MotionPermissions.MANAGE, can_manage_motion)
