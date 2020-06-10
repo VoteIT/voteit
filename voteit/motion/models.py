@@ -6,6 +6,8 @@ from django_fsm import transition
 from voteit.core.models import BaseContent
 from voteit.motion.workflows import MotionProcessWf
 from voteit.motion.workflows import MotionWf
+from voteit.motion.permissions import MotionProcessPermissions as MPP
+from voteit.motion.permissions import MotionPermissions as MP
 
 
 class MotionProcess(BaseContent):
@@ -19,8 +21,8 @@ class MotionProcess(BaseContent):
         blank=True,
         related_name="motion_processes",
     )
-    participants = models.ManyToManyField(
-        User, blank=True, related_name="participant_in_motionprocesses"
+    viewer = models.ManyToManyField(
+        User, blank=True, related_name="viewer_in_motionprocesses"
     )
     movers = models.ManyToManyField(
         User, blank=True, related_name="mover_in_motionprocesses"
@@ -29,15 +31,15 @@ class MotionProcess(BaseContent):
         User, blank=True, related_name="manager_in_motionprocesses"
     )
 
-    @transition(field=state, target=MotionProcessWf.PRIVATE)
+    @transition(field=state, target=MotionProcessWf.PRIVATE, permission=MPP.MANAGE)
     def private(self):
         pass
 
-    @transition(field=state, target=MotionProcessWf.OPEN)
+    @transition(field=state, target=MotionProcessWf.OPEN, permission=MPP.MANAGE)
     def open(self):
         pass
 
-    @transition(field=state, target=MotionProcessWf.CLOSED)
+    @transition(field=state, target=MotionProcessWf.CLOSED, permission=MPP.MANAGE)
     def close(self):
         pass
 
@@ -49,6 +51,33 @@ class Motion(BaseContent):
     motion_process = models.ForeignKey(MotionProcess, on_delete=models.CASCADE, related_name="motions")
     body = models.TextField()
     author = models.ForeignKey(User, on_delete=models.PROTECT, related_name="motions")
+
+    @transition(field=state, source=MotionWf.DRAFT, target=MotionWf.PUBLISHED, permission=MP.SUBMIT)
+    def submit(self):
+        """ User submits their motion.
+        """
+
+    @transition(field=state, target=MotionWf.PUBLISHED, permission=MP.MANAGE)
+    def publish(self):
+        """ Moderator publishes a motion.
+        """
+
+    @transition(field=state, source=MotionWf.PUBLISHED, target=MotionWf.RETRACTED, permission=MP.RETRACT)
+    def retract(self):
+        """ User or moderator retracts the motion.
+        """
+
+    @transition(field=state, source=MotionWf.PUBLISHED, target=MotionWf.ACCEPTED, permission=MP.MANAGE)
+    def accept(self):
+        pass
+
+    @transition(field=state, source=MotionWf.PUBLISHED, target=MotionWf.UNHANDLED, permission=MP.MANAGE)
+    def unhandled(self):
+        pass
+
+    @transition(field=state, source=MotionWf.PUBLISHED, target=MotionWf.DRAFT, permission=MP.MANAGE)
+    def draft(self):
+        pass
 
 
 class MotionProposal(models.Model):

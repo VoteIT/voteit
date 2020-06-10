@@ -4,16 +4,16 @@ from voteit.core.role import Role, roles
 from voteit.motion.models import MotionProcess
 from voteit.motion.rules import is_mp_manager
 from voteit.motion.rules import is_mp_mover
-from voteit.motion.rules import is_mp_participant
+from voteit.motion.rules import is_mp_viewer
 
 
 @roles
-class MPParticipant(Role):
-    rule = is_mp_participant
+class MPViewer(Role):
+    rule = is_mp_viewer
     model = MotionProcess
-    m2m_field = "participants"
-    title = _("Motion process participant")
-    name = "mp_participant"
+    m2m_field = "viewer"
+    title = _("Motion process viewer")
+    name = "mp_viewer"
 
 
 @roles
