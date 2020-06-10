@@ -139,7 +139,7 @@ class Vote(ABCModel):
 
     @property
     def weight(self) -> int:
-        return self.method.poll.get_vote_weight(self.user)
+        return self.method.poll.electoral_register.get_voter_weight(self.user)
 
     @property
     @abstractmethod
