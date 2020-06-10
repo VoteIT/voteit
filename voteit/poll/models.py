@@ -30,12 +30,25 @@ from voteit.poll.workflows import PollWf
 logger = getLogger(__name__)
 
 
+class VoterWeight(models.Model):
+    register = models.ForeignKey('ElectoralRegister', on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    weight = models.PositiveIntegerField(default=1)
+
+
 class ElectoralRegister(models.Model):
     created = models.DateTimeField(editable=False, auto_now_add=True)
-    voters = models.ManyToManyField(User, related_name="electoral_registers")
+    voters = models.ManyToManyField(User, through=VoterWeight, related_name="electoral_registers")
     meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="electoral_registers", null=True
     )
+
+    def get_voter_weight(self, user: User) -> int:
+        """
+        Allow votes to have a weight in some contexts.
+        Will raise VoterWeight.DoesNotExist if user not in registry.
+        """
+        return self.voterweight_set.get(user=user).weight
 
 
 class Poll(BaseContent):
@@ -62,7 +75,7 @@ class Poll(BaseContent):
         null=True,
         related_name="polls_initial",
     )
-    electoral_register = models.ForeignKey(
+    electoral_register: ElectoralRegister = models.ForeignKey(
         "ElectoralRegister",
         on_delete=models.PROTECT,
         editable=False,
@@ -194,11 +207,6 @@ class Poll(BaseContent):
 
     def get_votes(self):
         return self.method.get_votes()
-
-    def get_vote_weight(self, user: User) -> int:
-        """ Allow vote weight in some contexts. """
-        # TODO
-        return 1
 
     def get_result(self):
         if self.state != PollWf.FINISHED:
