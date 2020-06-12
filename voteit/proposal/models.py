@@ -1,6 +1,7 @@
+from django.contrib.auth.models import User
 from django.db import models
-
 from django_fsm import FSMField, transition
+
 from voteit.core.models import BaseContent
 from voteit.proposal.workflows import ProposalWf
 
@@ -13,6 +14,7 @@ class Proposal(BaseContent):
         User,
         on_delete=models.PROTECT,
         editable=True,
+        null=True,
         related_name="proposals",
     )
     prop_id = models.CharField(max_length=50)
