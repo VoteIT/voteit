@@ -3,8 +3,10 @@ from django.db import models
 from django_fsm import FSMField
 from django_fsm import transition
 from django.utils.translation import gettext_lazy as _
+from typing import List
 
 from voteit.core.models import BaseContent
+from voteit.meeting.models import Meeting
 from voteit.motion.workflows import MotionProcessWf
 from voteit.motion.workflows import MotionWf
 from voteit.motion.permissions import MotionProcessPermissions as MPP
@@ -25,7 +27,10 @@ class MotionProcess(BaseContent):
         related_name="motion_processes",
     )
     public = models.BooleanField(
-        verbose_name=_("Is anyone allowed to view motions except drafts and retracted?"), default=False
+        verbose_name=_(
+            "Is anyone allowed to view motions except drafts and retracted?"
+        ),
+        default=False,
     )
     viewer = models.ManyToManyField(
         User,
@@ -55,6 +60,25 @@ class MotionProcess(BaseContent):
     @transition(field=state, target=MotionProcessWf.CLOSED, permission=MPP.MANAGE)
     def close(self):
         pass
+
+    def get_selected_motions_qs(self, states: List[str] = None):
+        if states is None:
+            states = [MotionWf.ACCEPTED]
+        return self.motions.filter(state__in=states).order_by("created")
+
+    def populate_meeting(self, meeting: Meeting, states: List[str] = None):
+        """ Populate a meeting from given states. """
+        # FIXME: Sorted, created etc
+        # FIXME: Override author...?
+        # FIXME: Body fields, richtext etc?
+        qs = self.get_selected_motions_qs(states)
+        for motion in qs.all().prefetch_related("author", "proposals"):
+            ai = meeting.agenda_items.create(
+                author=motion.author, title=motion.title, body=motion.body
+            )
+            # FIXME: ordering!
+            for prop in motion.proposals.all():
+                ai.proposals.create(author=motion.author, body=prop.body)
 
 
 class Motion(BaseContent):
@@ -137,4 +161,5 @@ class MotionProposal(models.Model):
     motion = models.ForeignKey(
         Motion, on_delete=models.CASCADE, related_name="proposals"
     )
-    text = models.TextField()
+    body = models.TextField()
+    # FIXME: We might want to fix ordering here

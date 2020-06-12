@@ -17,13 +17,13 @@ class MotionProcessAdmin(FSMTransitionMixin, admin.ModelAdmin):
 @admin.register(Motion)
 class MotionAdmin(FSMTransitionMixin, admin.ModelAdmin):
     list_display = "title", "state", "author", "motion_process"
-    list_filter = "state", # "motion_process", "author"
-    search_fields = ("text",)
+    list_filter = "state", "author"
+    search_fields = ("body",)
     exclude = ("state",)
 
 
 @admin.register(MotionProposal)
 class MotionProposalAdmin(admin.ModelAdmin):
-    list_display = ("text", "motion")
+    list_display = ("body", "motion")
    # list_filter = ("motion",)
-    search_fields = ("text",)
+    search_fields = ("body",)
