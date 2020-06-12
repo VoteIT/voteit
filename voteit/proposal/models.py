@@ -14,6 +14,7 @@ class Proposal(BaseContent):
         User,
         on_delete=models.PROTECT,
         editable=True,
+        null=True,
         related_name="proposals",
     )
     prop_id = models.CharField(max_length=50)
