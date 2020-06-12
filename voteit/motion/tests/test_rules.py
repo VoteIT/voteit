@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from voteit.motion.permissions import MotionPermissions as MP
+from voteit.motion.permissions import MotionProcessPermissions as MPP
 
 
 class MotionProcessRulesTests(TestCase):
@@ -31,15 +32,40 @@ class MotionProcessRulesTests(TestCase):
 
     def test_can_add_motion(self):
         # Note this is tested against motion process
-        # Check via user
-        self.assertFalse(self.any_user.has_perm(MP.ADD, self.mp))
-        self.assertFalse(self.mover_user.has_perm(MP.ADD, self.mp))
-        self.assertTrue(self.manager_user.has_perm(MP.ADD, self.mp))
-        # And open the process
-        self.mp.open()
         self.assertFalse(self.any_user.has_perm(MP.ADD, self.mp))
         self.assertTrue(self.mover_user.has_perm(MP.ADD, self.mp))
         self.assertTrue(self.manager_user.has_perm(MP.ADD, self.mp))
+        # And close the process
+        self.mp.close()
+        self.assertFalse(self.any_user.has_perm(MP.ADD, self.mp))
+        self.assertFalse(self.mover_user.has_perm(MP.ADD, self.mp))
+        self.assertTrue(self.manager_user.has_perm(MP.ADD, self.mp))
+
+    def test_can_view_motion_process_public(self):
+        self.mp.public = True
+        self.mp.save()
+        self.assertTrue(self.any_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.viewer_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.mover_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.manager_user.has_perm(MPP.VIEW, self.mp))
+        # And close the process
+        self.mp.close()
+        self.assertTrue(self.any_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.viewer_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.mover_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.manager_user.has_perm(MPP.VIEW, self.mp))
+
+    def test_can_view_motion_process_private(self):
+        self.assertFalse(self.any_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.viewer_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.mover_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.manager_user.has_perm(MPP.VIEW, self.mp))
+        # And close the process
+        self.mp.close()
+        self.assertFalse(self.any_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.viewer_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.mover_user.has_perm(MPP.VIEW, self.mp))
+        self.assertTrue(self.manager_user.has_perm(MPP.VIEW, self.mp))
 
 
 class MotionRulesTests(TestCase):
@@ -50,18 +76,19 @@ class MotionRulesTests(TestCase):
         self.any_user = User.objects.create(username="any")
         self.manager_user = self.mp.managers.create(username="manager")
         self.mover_user = self.mp.movers.create(username="mover")
+        self.mover_other_user = self.mp.movers.create(username="other_mover")
         self.viewer_user = self.mp.viewer.create(username="viewer")  # FIXME
         self.motion = self.mp.motions.create(author=self.mover_user)
 
     def test_can_change_motion(self):
         self.assertFalse(self.any_user.has_perm(MP.CHANGE, self.motion))
-        self.assertFalse(self.mover_user.has_perm(MP.CHANGE, self.motion))
-        self.assertTrue(self.manager_user.has_perm(MP.CHANGE, self.motion))
-        self.mp.open()
-        self.assertFalse(self.any_user.has_perm(MP.CHANGE, self.motion))
         self.assertTrue(self.mover_user.has_perm(MP.CHANGE, self.motion))
         self.assertTrue(self.manager_user.has_perm(MP.CHANGE, self.motion))
         self.motion.submit()
+        self.assertFalse(self.any_user.has_perm(MP.CHANGE, self.motion))
+        self.assertFalse(self.mover_user.has_perm(MP.CHANGE, self.motion))
+        self.assertTrue(self.manager_user.has_perm(MP.CHANGE, self.motion))
+        self.mp.close()
         self.assertFalse(self.any_user.has_perm(MP.CHANGE, self.motion))
         self.assertFalse(self.mover_user.has_perm(MP.CHANGE, self.motion))
         self.assertTrue(self.manager_user.has_perm(MP.CHANGE, self.motion))
@@ -71,24 +98,50 @@ class MotionRulesTests(TestCase):
         self.assertFalse(self.mover_user.has_perm(MP.MANAGE, self.motion))
         self.assertTrue(self.manager_user.has_perm(MP.MANAGE, self.motion))
 
+    def test_can_view_motion_public(self):
+        self.mp.public = True
+        self.mp.save()
+        self.assertFalse(self.any_user.has_perm(MP.VIEW, self.motion))
+        self.assertTrue(self.mover_user.has_perm(MP.VIEW, self.motion))
+        self.assertFalse(self.mover_other_user.has_perm(MP.VIEW, self.motion))
+        self.assertTrue(self.manager_user.has_perm(MP.VIEW, self.motion))
+        # And publish the motion
+        self.motion.publish()
+        self.assertTrue(self.any_user.has_perm(MP.VIEW, self.motion))
+        self.assertTrue(self.mover_user.has_perm(MP.VIEW, self.motion))
+        self.assertTrue(self.mover_other_user.has_perm(MP.VIEW, self.motion))
+        self.assertTrue(self.manager_user.has_perm(MP.VIEW, self.motion))
+
+    def test_can_view_motion_private(self):
+        self.assertFalse(self.any_user.has_perm(MP.VIEW, self.motion))
+        self.assertTrue(self.mover_user.has_perm(MP.VIEW, self.motion))
+        self.assertFalse(self.mover_other_user.has_perm(MP.VIEW, self.motion))
+        self.assertTrue(self.manager_user.has_perm(MP.VIEW, self.motion))
+        # And publish
+        self.motion.publish()
+        self.assertFalse(self.any_user.has_perm(MP.VIEW, self.motion))
+        self.assertTrue(self.mover_user.has_perm(MP.VIEW, self.motion))
+        self.assertTrue(self.mover_other_user.has_perm(MP.VIEW, self.motion))
+        self.assertTrue(self.manager_user.has_perm(MP.VIEW, self.motion))
+
     def test_can_submit_motion(self):
-        self.assertFalse(self.any_user.has_perm(MP.SUBMIT, self.motion))
-        self.assertFalse(self.mover_user.has_perm(MP.SUBMIT, self.motion))
-        self.assertFalse(self.manager_user.has_perm(MP.SUBMIT, self.motion))  # Moderators publish!
-        self.mp.open()  # No submissions allowed if it's not open
         self.assertFalse(self.any_user.has_perm(MP.SUBMIT, self.motion))
         self.assertTrue(self.mover_user.has_perm(MP.SUBMIT, self.motion))
         self.assertFalse(self.manager_user.has_perm(MP.SUBMIT, self.motion))  # Moderators publish!
+        self.mp.close()  # No submissions allowed if it's not open
+        self.assertFalse(self.any_user.has_perm(MP.SUBMIT, self.motion))
+        self.assertFalse(self.mover_user.has_perm(MP.SUBMIT, self.motion))
+        self.assertFalse(self.manager_user.has_perm(MP.SUBMIT, self.motion))  # Moderators publish!
 
     def test_can_retract_motion(self):
-        self.assertFalse(self.any_user.has_perm(MP.RETRACT, self.motion))
-        self.assertFalse(self.mover_user.has_perm(MP.RETRACT, self.motion))
-        self.assertTrue(self.manager_user.has_perm(MP.RETRACT, self.motion))
-        self.mp.open()
         self.assertFalse(self.any_user.has_perm(MP.RETRACT, self.motion))
         self.assertTrue(self.mover_user.has_perm(MP.RETRACT, self.motion))
         self.assertTrue(self.manager_user.has_perm(MP.RETRACT, self.motion))
         self.motion.submit()
         self.assertFalse(self.any_user.has_perm(MP.RETRACT, self.motion))
         self.assertTrue(self.mover_user.has_perm(MP.RETRACT, self.motion))
+        self.assertTrue(self.manager_user.has_perm(MP.RETRACT, self.motion))
+        self.mp.close()
+        self.assertFalse(self.any_user.has_perm(MP.RETRACT, self.motion))
+        self.assertFalse(self.mover_user.has_perm(MP.RETRACT, self.motion))
         self.assertTrue(self.manager_user.has_perm(MP.RETRACT, self.motion))

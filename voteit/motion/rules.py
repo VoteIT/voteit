@@ -48,8 +48,19 @@ def can_add_motion(user: User, motion_process: MotionProcess):
     )
 
 
+@rules.predicate
+def can_view_motion_process(user: User, motion_process: MotionProcess):
+    return (
+        motion_process.public
+        or is_mp_viewer(user, motion_process)
+        or is_mp_mover(user, motion_process)
+        or is_mp_manager(user, motion_process)
+    )
+
+
 rules.add_perm(MotionProcessPermissions.MANAGE, is_mp_manager)
 rules.add_perm(MotionPermissions.ADD, can_add_motion)  # Note, related to context here
+rules.add_perm(MotionProcessPermissions.VIEW, can_view_motion_process)
 
 
 # Motion permissions
@@ -62,6 +73,25 @@ def can_change_motion(user: User, motion: Motion):
         and motion.state == MotionWf.DRAFT
         and motion.motion_process.state == MotionProcessWf.OPEN
     )
+
+
+@rules.predicate
+def can_view_motion(user: User, motion: Motion):
+    """ Motions can always be viewed by their author and managers.
+        Other users may view motions in the state published, accepted or rejected if any of these are true:
+        - The motion process is public
+        - They're listed as viewers or movers
+    """
+    if user == motion.author:
+        return True
+    if is_mp_manager(user, motion.motion_process):
+        return True
+    if motion.state in (MotionWf.PUBLISHED, MotionWf.ACCEPTED, MotionWf.REJECTED):
+        return (
+            motion.motion_process.public
+            or is_mp_viewer(user, motion.motion_process)
+            or is_mp_mover(user, motion.motion_process)
+        )
 
 
 @rules.predicate
@@ -92,6 +122,7 @@ def can_manage_motion(user: User, motion: Motion):
 
 
 rules.add_perm(MotionPermissions.CHANGE, can_change_motion)
+rules.add_perm(MotionPermissions.VIEW, can_view_motion)
 rules.add_perm(MotionPermissions.SUBMIT, can_submit_motion)
 rules.add_perm(MotionPermissions.RETRACT, can_retract_motion | can_manage_motion)
 rules.add_perm(MotionPermissions.MANAGE, can_manage_motion)

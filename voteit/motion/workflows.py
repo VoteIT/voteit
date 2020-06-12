@@ -2,16 +2,14 @@ from django.utils.translation import gettext as _
 
 
 class MotionProcessWf:
-    PRIVATE = "private"
     OPEN = "open"
     CLOSED = "closed"
 
     states = {
-        PRIVATE: _("Private"),
         OPEN: _("Open"),
         CLOSED: _("Closed"),
     }
-    initial = PRIVATE
+    initial = OPEN
 
     @classmethod
     def choices(cls):
@@ -23,6 +21,7 @@ class MotionWf:
     PUBLISHED = "published"
     RETRACTED = "retracted"
     ACCEPTED = "accepted"
+    REJECTED = "rejected"
     UNHANDLED = "unhandled"
 
     states = {
@@ -30,6 +29,7 @@ class MotionWf:
         PUBLISHED: _("Published"),
         RETRACTED: _("Retracted"),
         ACCEPTED: _("Accepted"),
+        REJECTED: _("Rejected"),
         UNHANDLED: _("Unhandled"),
     }
     initial = DRAFT
