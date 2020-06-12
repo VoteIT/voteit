@@ -1,6 +1,7 @@
+from django.contrib.auth.models import User
 from django.db import models
-
 from django_fsm import FSMField, transition
+
 from voteit.core.models import BaseContent
 from voteit.proposal.workflows import ProposalWf
 
