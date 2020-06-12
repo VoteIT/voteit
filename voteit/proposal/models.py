@@ -9,6 +9,12 @@ class Proposal(BaseContent):
     state = FSMField(
         default=ProposalWf.initial, choices=ProposalWf.choices(), protected=True
     )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        editable=True,
+        related_name="proposals",
+    )
     prop_id = models.CharField(max_length=50)
     agenda_item = models.ForeignKey(
         "agenda.AgendaItem",
