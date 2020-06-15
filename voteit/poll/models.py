@@ -61,6 +61,9 @@ class Poll(BaseContent):
     agenda_item = models.ForeignKey(
         "agenda.AgendaItem", on_delete=models.CASCADE, null=True, related_name="polls"
     )
+    organisation = models.ForeignKey(
+        "organisation.Organisation", on_delete=models.CASCADE, null=True, related_name="polls",
+    )
     proposals = models.ManyToManyField("proposal.Proposal")
     method_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True)
     method_id = models.PositiveIntegerField(null=True)

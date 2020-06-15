@@ -1,8 +1,12 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import rules
 from django.contrib.auth.models import User
-from voteit.meeting.permissions import MeetingPermissions
 
-from voteit.organisation.models import Organisation
+from voteit.organisation.permissions import OrgPermissions
+
+if TYPE_CHECKING:
+    from voteit.organisation.models import Organisation
 
 
 @rules.predicate
@@ -16,11 +20,9 @@ def is_meeting_creator(user: User, organisation: Organisation):
 
 
 # Object permissions
-@rules.predicate
-def can_add_meeting(user: User, organisation: Organisation):
-    """ Meetings are added from organisations, so the check is against an organisation. """
-    if organisation is not None:
-        return is_manager(user, organisation) or is_meeting_creator(user, organisation)
-
-
-rules.add_perm(MeetingPermissions.ADD, can_add_meeting)
+# FIXME: This is a stub
+rules.add_perm(OrgPermissions.ADD, is_manager)
+rules.add_perm(OrgPermissions.CHANGE, is_manager)
+rules.add_perm(OrgPermissions.DELETE, is_manager)
+rules.add_perm(OrgPermissions.VIEW, is_manager)
+rules.add_perm(OrgPermissions.MANAGE, is_manager)

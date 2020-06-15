@@ -1,9 +1,15 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import rules
 from django.contrib.auth.models import User
 
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
+
+if TYPE_CHECKING:
+    from voteit.organisation.models import Organisation
 
 
 @rules.predicate
@@ -32,6 +38,18 @@ def is_proposer(user: User, meeting: Meeting) -> bool:
 
 
 # Object permissions
+@rules.predicate
+def can_add_meeting(user: User, organisation: Organisation):
+    """ Meetings are added from organisations, so the check is against an organisation. """
+    from voteit.organisation.rules import is_manager
+    from voteit.organisation.rules import is_meeting_creator
+    if organisation is not None:
+        return is_manager(user, organisation) or is_meeting_creator(user, organisation)
+
+
+rules.add_perm(MeetingPermissions.ADD, can_add_meeting)
+
+
 @rules.predicate
 def can_view_meeting(user: User, meeting: Meeting):
     if meeting is not None:

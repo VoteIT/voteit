@@ -57,6 +57,19 @@ class PermissionTests(TestCase):
         from voteit.meeting.permissions import MeetingPermissions
         return getattr(MeetingPermissions, name)
 
+    def test_can_add_meeting(self):
+        from voteit.organisation.models import Organisation
+
+        ADD = self.p("ADD")
+        organisation = Organisation.objects.create()
+        self.meeting.organisation = organisation
+        self.meeting.save()
+        self.meeting_creator = organisation.meeting_creators.create(username="meeting_creator")
+        self.manager = organisation.managers.create(username="manager")
+        self.assertFalse(self.anon_user.has_perm(ADD, organisation))
+        self.assertTrue(self.meeting_creator.has_perm(ADD, organisation))
+        self.assertTrue(self.manager.has_perm(ADD, organisation))
+
     def test_can_view_meeting(self):
         VIEW = self.p("VIEW")
         self.assertFalse(self.anon_user.has_perm(VIEW, self.meeting))
