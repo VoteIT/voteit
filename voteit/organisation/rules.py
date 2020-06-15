@@ -6,9 +6,9 @@ from voteit.organisation.models import Organisation
 
 @rules.predicate
 def is_manager(user: User, organisation: Organisation):
-    return user in organisation.managers.all()
+    return organisation.managers.filter(pk=user.pk).exists()
 
 
 @rules.predicate
 def is_meeting_creator(user: User, organisation: Organisation):
-    return user in organisation.meeting_creators.all()
+    return organisation.meeting_creators.filter(pk=user.pk).exists()
