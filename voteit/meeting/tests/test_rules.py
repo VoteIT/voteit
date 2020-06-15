@@ -29,3 +29,17 @@ class RulesTests(TestCase):
         self.meeting.moderators.add(self.user)
         self.meeting.save()
         self.assertTrue(is_moderator(self.user, self.meeting))
+
+    def test_is_discusser(self):
+        from voteit.meeting.rules import is_discusser
+        self.assertFalse(is_discusser(self.user, self.meeting))
+        self.meeting.discussers.add(self.user)
+        self.meeting.save()
+        self.assertTrue(is_discusser(self.user, self.meeting))
+
+    def test_is_proposer(self):
+        from voteit.meeting.rules import is_proposer
+        self.assertFalse(is_proposer(self.user, self.meeting))
+        self.meeting.proposers.add(self.user)
+        self.meeting.save()
+        self.assertTrue(is_proposer(self.user, self.meeting))

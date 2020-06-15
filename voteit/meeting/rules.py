@@ -17,3 +17,13 @@ def is_potential_voter(user: User, meeting: Meeting) -> bool:
 @rules.predicate
 def is_moderator(user: User, meeting: Meeting) -> bool:
     return meeting.moderators.filter(pk=user.pk).exists()
+
+
+@rules.predicate
+def is_discusser(user: User, meeting: Meeting) -> bool:
+    return meeting.discussers.filter(pk=user.pk).exists()
+
+
+@rules.predicate
+def is_proposer(user: User, meeting: Meeting) -> bool:
+    return meeting.proposers.filter(pk=user.pk).exists()

@@ -1,19 +1,34 @@
-from abc import ABC, abstractmethod
+from __future__ import annotations
+from abc import ABC, abstractmethod, ABCMeta
 
 from django.contrib.auth.models import User
-from django.db.models import Model, ManyToManyField
+from django.db.models import Model
 from rules import Predicate
-from typing import List, Type, Optional
+from typing import List, Type, Set, Generator
 from voteit.core.component import Registry
 
 
-class Role(ABC):
+class RoleMeta(ABCMeta):
+    def __new__(mcls, name, bases, namespace, **kwargs):
+        """ Apologies for this hack, but it's here to make sure that the "requires" attribute is never inherited,
+            since class attributes will otherwise be completely messed up.
+        """
+        cls = super().__new__(mcls, name, bases, namespace, **kwargs)
+        if cls.__name__ != "Role":
+            cls.requires = set()
+        return cls
+
+
+class Role(ABC, metaclass=RoleMeta):
     rule: Predicate
     model: Type[Model]
     m2m_field: str
     title: str  # Human-readable translation string
     name: str  # Registered internal name, lowercased class name by default. Used for lookups in roles registry
     m2m_relation: None  # Assigned on instantiation
+    # Setting this role requires these other roles to be set too.
+    # The required role must be for the same model as this.
+    requires: Set = None
 
     @property
     @abstractmethod
@@ -51,10 +66,24 @@ class Role(ABC):
         # FIXME: Check that returned attr is a ManyRelatedManager class
 
     def add(self, *users: List[User]):
+        """ Give a list of users this role, and if it depends on some other role,
+            give the users that role too.
+            Example: Discusser role requires someone to be able to view the meeting,
+            so it will require the role Participant.
+        """
         self.m2m_relation.add(*users)
+        for role in self.requires:
+            other = role(self.instance)
+            other.add(*users)
 
     def remove(self, *users: List[User]):
+        """ Remove this role from a list of users.
+            If the role that's removed is required by other roles, remove those as well.
+        """
         self.m2m_relation.remove(*users)
+        for role in get_reverse_required(self.instance, self.__class__):
+            role_inst = role(self.instance)
+            role_inst.remove(*users)
 
     def __contains__(self, user: User):
         return self.m2m_relation.filter(pk=user.pk).exists()
@@ -66,11 +95,19 @@ class Role(ABC):
     def allowed(self, user: User):
         return self.rule(user, self.instance)
 
+    @classmethod
+    def add_requirement(cls, role: Type[Role]):
+        if role.model != cls.model:
+            raise TypeError(f"{cls} and {role} doesn't have the same model requirement.")
+        if cls is role:
+            raise ValueError(f"{cls} can't depend on itself.")
+        cls.requires.add(role)
+
 
 roles = Registry(Role)
 
 
-def get_valid_roles(instance: Model):
+def get_valid_roles(instance: Model) -> Generator[Type[Role]]:
     """ Return all role classes that might be assigned to this instance.
     """
     for role in roles.values():
@@ -78,7 +115,7 @@ def get_valid_roles(instance: Model):
             yield role
 
 
-def get_assigned_roles(instance: Model, user: User):
+def get_assigned_roles(instance: Model, user: User) -> Set:
     """ Return all classes this user has in this instance.
     """
     results = set()
@@ -86,3 +123,13 @@ def get_assigned_roles(instance: Model, user: User):
         if user in role(instance):
             results.add(role)
     return results
+
+
+def get_reverse_required(instance: Model, role: Type[Role]) -> Generator[Type[Role]]:
+    """ Figure out which other roles depend on this one.
+    """
+    for other in get_valid_roles(instance):
+        if other is role:
+            continue
+        if role in other.requires:
+            yield other

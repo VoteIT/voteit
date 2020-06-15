@@ -22,13 +22,37 @@ class Meeting(BaseContent):
     state = FSMField(
         default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False
     )
-    start_time = models.DateTimeField(null=True, blank=True)
-    end_time = models.DateTimeField(null=True, blank=True)
+    start_time = models.DateTimeField(
+        verbose_name=_("When the meeting starts/started."), null=True, blank=True
+    )
+    end_time = models.DateTimeField(
+        verbose_name=_("When the meeting ends/ended."), null=True, blank=True
+    )
+    public = models.BooleanField(verbose_name=_("Is this meeting viewable by anyone?"), default=False)
     participants = models.ManyToManyField(
-        User, blank=True, related_name="participant_in_meetings", editable=False
+        User,
+        verbose_name=_(
+            "User can participate in some form. "
+            "This is basically read permission, unless the process is public."
+        ),
+        blank=True,
+        related_name="participant_in_meetings",
+        editable=False,
     )
     potential_voters = models.ManyToManyField(
-        User, blank=True, related_name="potential_voter_in_meetings", editable=False
+        User,
+        verbose_name=_("This user may become a voter in this meeting."),
+        blank=True, related_name="potential_voter_in_meetings", editable=False
+    )
+    discussers = models.ManyToManyField(
+        User,
+        verbose_name=_("User may add discussion posts."),
+        blank=True, related_name="discusser_in_meetings", editable=False
+    )
+    proposers = models.ManyToManyField(
+        User,
+        verbose_name=_("User may add proposals."),
+        blank=True, related_name="proposer_in_meetings", editable=False
     )
     moderators = models.ManyToManyField(
         User, blank=True, related_name="moderator_in_meetings", editable=False

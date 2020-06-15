@@ -91,3 +91,40 @@ class RoleTests(TestCase):
         HelloClass(self.meeting).add(self.user)
 
         self.assertIn(HelloClass, set(get_assigned_roles(self.meeting, self.user)))
+
+    def test_role_requirement_add(self):
+        from voteit.meeting.roles import Participant
+        from voteit.meeting.roles import Proposer
+        participants = Participant(self.meeting)
+        proposers = Proposer(self.meeting)
+        self.assertNotIn(self.user, participants)
+        self.assertNotIn(self.user, proposers)
+        # Proposer is linked to participants, and thus required.
+        proposers.add(self.user)
+        self.assertIn(self.user, participants)
+        self.assertIn(self.user, proposers)
+
+    def test_role_requirement_remove(self):
+        from voteit.meeting.roles import Participant
+        from voteit.meeting.roles import Proposer
+        participants = Participant(self.meeting)
+        proposers = Proposer(self.meeting)
+        self.assertNotIn(self.user, participants)
+        self.assertNotIn(self.user, proposers)
+        # Proposer is linked to participants, and thus required.
+        proposers.add(self.user)
+        self.assertIn(self.user, participants)
+        self.assertIn(self.user, proposers)
+        # Removing participant will cause proposer to be removed too
+        participants.remove(self.user)
+        self.assertNotIn(self.user, participants)
+        self.assertNotIn(self.user, proposers)
+
+    def test_role_requirement_other_kind_of_role(self):
+        from voteit.organisation.roles import OrgManager
+        hello_cls = self._register_helloclass()
+        self.assertRaises(TypeError, hello_cls.add_requirement, OrgManager)
+
+    def test_role_requirement_to_self(self):
+        hello_cls = self._register_helloclass()
+        self.assertRaises(ValueError, hello_cls.add_requirement, hello_cls)
