@@ -43,3 +43,48 @@ class RulesTests(TestCase):
         self.meeting.proposers.add(self.user)
         self.meeting.save()
         self.assertTrue(is_proposer(self.user, self.meeting))
+
+
+class PermissionTests(TestCase):
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+        self.meeting = Meeting.objects.create()
+        self.anon_user = User.objects.create(username="anon")
+        self.moderator = self.meeting.moderators.create(username="moderator")
+        self.participant = self.meeting.participants.create(username="participant")
+
+    def p(self, name):
+        from voteit.meeting.permissions import MeetingPermissions
+        return getattr(MeetingPermissions, name)
+
+    def test_can_view_meeting(self):
+        VIEW = self.p("VIEW")
+        self.assertFalse(self.anon_user.has_perm(VIEW, self.meeting))
+        self.assertTrue(self.moderator.has_perm(VIEW, self.meeting))
+        self.assertTrue(self.participant.has_perm(VIEW, self.meeting))
+
+    def test_can_view_meeting_public(self):
+        VIEW = self.p("VIEW")
+        self.meeting.public = True
+        self.meeting.save()
+        self.assertTrue(self.anon_user.has_perm(VIEW, self.meeting))
+        self.assertTrue(self.moderator.has_perm(VIEW, self.meeting))
+        self.assertTrue(self.participant.has_perm(VIEW, self.meeting))
+
+    def test_can_moderate(self):
+        MODERATE = self.p("MODERATE")
+        self.assertFalse(self.anon_user.has_perm(MODERATE, self.meeting))
+        self.assertTrue(self.moderator.has_perm(MODERATE, self.meeting))
+        self.assertFalse(self.participant.has_perm(MODERATE, self.meeting))
+
+    def test_can_change_meeting(self):
+        CHANGE = self.p("CHANGE")
+        self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting))
+        self.assertTrue(self.moderator.has_perm(CHANGE, self.meeting))
+        self.assertFalse(self.participant.has_perm(CHANGE, self.meeting))
+
+    def test_can_delete_meeting(self):
+        DELETE = self.p("DELETE")
+        self.assertFalse(self.anon_user.has_perm(DELETE, self.meeting))
+        self.assertTrue(self.moderator.has_perm(DELETE, self.meeting))
+        self.assertFalse(self.participant.has_perm(DELETE, self.meeting))

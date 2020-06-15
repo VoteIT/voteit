@@ -22,3 +22,18 @@ class RulesTests(TestCase):
         self.org.meeting_creators.add(self.user)
         self.org.save()
         self.assertTrue(is_meeting_creator(self.user, self.org))
+
+
+class PermissionTests(TestCase):
+    def setUp(self):
+        from voteit.organisation.models import Organisation
+        self.org = Organisation.objects.create()
+        self.anon_user = User.objects.create(username="anon")
+        self.meeting_creator = self.org.meeting_creators.create(username="meeting_creator")
+        self.manager = self.org.managers.create(username="manager")
+
+    def test_can_add_meeting(self):
+        from voteit.meeting.permissions import MeetingPermissions
+        self.assertFalse(self.anon_user.has_perm(MeetingPermissions.ADD, self.org))
+        self.assertTrue(self.meeting_creator.has_perm(MeetingPermissions.ADD, self.org))
+        self.assertTrue(self.manager.has_perm(MeetingPermissions.ADD, self.org))
