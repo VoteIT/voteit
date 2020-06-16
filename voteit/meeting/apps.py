@@ -8,3 +8,4 @@ class MeetingConfig(AppConfig):
 
     def ready(self):
         from voteit.meeting import roles
+        from voteit.meeting import rules

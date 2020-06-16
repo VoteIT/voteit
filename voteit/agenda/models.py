@@ -1,5 +1,6 @@
 from django.db import models
 from django_fsm import FSMField, transition
+from django.utils.translation import gettext as _
 from voteit.agenda.permissions import AgendaPermissions
 from voteit.agenda.workflows import AgendaItemWf
 
@@ -16,6 +17,12 @@ class AgendaItem(BaseContent):
     )
     meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="agenda_items"
+    )
+    block_discussion = models.BooleanField(
+        verbose_name=_("Block new discussion posts"), default=False
+    )
+    block_proposals = models.BooleanField(
+        verbose_name=_("Block new proposals"), default=False
     )
     order = models.PositiveSmallIntegerField(default=0)
 

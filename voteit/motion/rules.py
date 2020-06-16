@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import rules
 from django.contrib.auth.models import User
+from voteit.core.rules import is_author
 from voteit.motion.permissions import MotionPermissions
 from voteit.motion.permissions import MotionProcessPermissions
 from voteit.motion.workflows import MotionProcessWf
@@ -42,10 +43,6 @@ def is_mp_manager(user: User, motion_process: MotionProcess):
         and motion_process.managers.filter(pk=user.pk).exists()
     )
 
-
-@rules.predicate
-def is_author(user: User, motion: Motion):
-    return isinstance(motion, Motion) and motion.author == user
 
 
 # MotionProcess permissions
