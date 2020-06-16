@@ -13,7 +13,7 @@ class MotionProcessRulesTests(TestCase):
         self.any_user = User.objects.create(username="any")
         self.manager_user = self.mp.managers.create(username="manager")
         self.mover_user = self.mp.movers.create(username="mover")
-        self.viewer_user = self.mp.viewer.create(username="viewer")  # FIXME
+        self.viewer_user = self.mp.viewer.create(username="viewer")
 
     def test_is_mp_viewer(self):
         from voteit.motion.rules import is_mp_viewer
@@ -77,7 +77,7 @@ class MotionRulesTests(TestCase):
         self.manager_user = self.mp.managers.create(username="manager")
         self.mover_user = self.mp.movers.create(username="mover")
         self.mover_other_user = self.mp.movers.create(username="other_mover")
-        self.viewer_user = self.mp.viewer.create(username="viewer")  # FIXME
+        self.viewer_user = self.mp.viewer.create(username="viewer")
         self.motion = self.mp.motions.create(author=self.mover_user)
 
     def test_can_change_motion(self):
