@@ -97,6 +97,23 @@ class Role(ABC, metaclass=RoleMeta):
 
     @classmethod
     def add_requirement(cls, role: Type[Role]):
+        """ Requirement causes the required role to be added or removed automatically.
+            The two roles must both be for the same model.
+
+            Example:
+                Discusser requires that someone is a participant of a meeting too.
+
+                class Participant(Role):
+                    ...
+
+                class Discusser(Role):
+                    ...
+
+                Discusser.add_requirement(Participant)
+
+                When ever someone gets the discusser role, the participant role will be added too.
+                If the participant role is removed, the discusser role will be removed also.
+        """
         if role.model != cls.model:
             raise TypeError(f"{cls} and {role} doesn't have the same model requirement.")
         if cls is role:
