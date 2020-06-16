@@ -6,6 +6,8 @@ from voteit.motion.rules import is_mp_manager
 from voteit.motion.rules import is_mp_mover
 from voteit.motion.rules import is_mp_viewer
 
+__all__ = ("MPViewer", "MPMover", "MPManager")
+
 
 @roles
 class MPViewer(Role):
@@ -25,6 +27,9 @@ class MPMover(Role):
     name = "mp_participant"
 
 
+MPMover.add_requirement(MPViewer)
+
+
 @roles
 class MPManager(Role):
     rule = is_mp_manager
@@ -32,3 +37,6 @@ class MPManager(Role):
     m2m_field = "managers"
     title = _("Motion process manager")
     name = "mp_manager"
+
+
+MPManager.add_requirement(MPViewer)

@@ -9,10 +9,14 @@ class MotionProcessRulesTests(TestCase):
 
     def setUp(self):
         from voteit.motion.models import MotionProcess
+        from voteit.motion.roles import MPManager
+        from voteit.motion.roles import MPMover
         self.mp = MotionProcess.objects.create()
         self.any_user = User.objects.create(username="any")
         self.manager_user = self.mp.managers.create(username="manager")
+        MPManager(self.mp).add(self.manager_user)  # Make sure required roles happen
         self.mover_user = self.mp.movers.create(username="mover")
+        MPMover(self.mp).add(self.mover_user)
         self.viewer_user = self.mp.viewer.create(username="viewer")
 
     def test_is_mp_viewer(self):
@@ -72,11 +76,15 @@ class MotionRulesTests(TestCase):
 
     def setUp(self):
         from voteit.motion.models import MotionProcess
+        from voteit.motion.roles import MPManager
+        from voteit.motion.roles import MPMover
         self.mp = MotionProcess.objects.create()
         self.any_user = User.objects.create(username="any")
         self.manager_user = self.mp.managers.create(username="manager")
+        MPManager(self.mp).add(self.manager_user)  # Handle required roles
         self.mover_user = self.mp.movers.create(username="mover")
         self.mover_other_user = self.mp.movers.create(username="other_mover")
+        MPMover(self.mp).add(self.mover_user, self.mover_other_user)
         self.viewer_user = self.mp.viewer.create(username="viewer")
         self.motion = self.mp.motions.create(author=self.mover_user)
 
