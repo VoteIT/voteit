@@ -1,5 +1,6 @@
 from django.db import models
 from django_fsm import FSMField, transition
+from voteit.agenda.permissions import AgendaPermissions
 from voteit.agenda.workflows import AgendaItemWf
 
 from voteit.core.models import BaseContent
@@ -42,7 +43,8 @@ class AgendaItem(BaseContent):
     @transition(
         field=state,
         source=[AgendaItemWf.PRIVATE, AgendaItemWf.ONGOING],
-        target=AgendaItemWf.UPCOMING
+        target=AgendaItemWf.UPCOMING,
+        permission=AgendaPermissions.CHANGE,
     )
     def upcoming(self):
         """ Make agenda item upcoming
@@ -52,7 +54,8 @@ class AgendaItem(BaseContent):
     @transition(
         field=state,
         source=[AgendaItemWf.UPCOMING],
-        target=AgendaItemWf.PRIVATE
+        target=AgendaItemWf.PRIVATE,
+        permission=AgendaPermissions.CHANGE,
     )
     def unpublish(self):
         """ Make agenda item private
@@ -62,7 +65,8 @@ class AgendaItem(BaseContent):
     @transition(
         field=state,
         source=[AgendaItemWf.UPCOMING, AgendaItemWf.CLOSED],
-        target=AgendaItemWf.ONGOING
+        target=AgendaItemWf.ONGOING,
+        permission=AgendaPermissions.CHANGE,
     )
     def open(self):
         """ Make agenda item ongoing
@@ -72,7 +76,8 @@ class AgendaItem(BaseContent):
     @transition(
         field=state,
         source=[AgendaItemWf.ONGOING],
-        target=AgendaItemWf.CLOSED
+        target=AgendaItemWf.CLOSED,
+        permission=AgendaPermissions.CHANGE,
     )
     def close(self):
         """ Close agenda item

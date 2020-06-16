@@ -14,27 +14,39 @@ if TYPE_CHECKING:
 
 @rules.predicate
 def is_participant(user: User, meeting: Meeting) -> bool:
-    return meeting.participants.filter(pk=user.pk).exists()
+    return isinstance(meeting, Meeting) and meeting.participants.filter(pk=user.pk).exists()
 
 
 @rules.predicate
 def is_potential_voter(user: User, meeting: Meeting) -> bool:
-    return meeting.potential_voters.filter(pk=user.pk).exists()
+    return isinstance(meeting, Meeting) and meeting.potential_voters.filter(pk=user.pk).exists()
 
 
 @rules.predicate
 def is_moderator(user: User, meeting: Meeting) -> bool:
-    return meeting.moderators.filter(pk=user.pk).exists()
+    return isinstance(meeting, Meeting) and meeting.moderators.filter(pk=user.pk).exists()
 
 
 @rules.predicate
 def is_discusser(user: User, meeting: Meeting) -> bool:
-    return meeting.discussers.filter(pk=user.pk).exists()
+    return isinstance(meeting, Meeting) and meeting.discussers.filter(pk=user.pk).exists()
 
 
 @rules.predicate
 def is_proposer(user: User, meeting: Meeting) -> bool:
-    return meeting.proposers.filter(pk=user.pk).exists()
+    return isinstance(meeting, Meeting) and meeting.proposers.filter(pk=user.pk).exists()
+
+
+@rules.predicate
+def is_not_archived(user: User, meeting: Meeting) -> bool:
+    # Keep negated state here since it might be called with meeting as None!
+    # Using is_archived with negation will cause a false positive for that case
+    return isinstance(meeting, Meeting) and meeting.state != MeetingWf.ARCHIVED
+
+
+@rules.predicate
+def is_public(user: User, meeting: Meeting) -> bool:
+    return isinstance(meeting, Meeting) and meeting.public
 
 
 # Object permissions
@@ -48,27 +60,8 @@ def can_add_meeting(user: User, organisation: Organisation):
 
 
 rules.add_perm(MeetingPermissions.ADD, can_add_meeting)
-
-
-@rules.predicate
-def can_view_meeting(user: User, meeting: Meeting):
-    if meeting is not None:
-        if meeting.public:
-            return True
-        return is_participant(user, meeting) or is_moderator(user, meeting)
-
-
-rules.add_perm(MeetingPermissions.VIEW, can_view_meeting)
-
-
-@rules.predicate
-def can_moderate_meeting(user: User, meeting: Meeting):
-    if meeting is not None:
-        if meeting.state != MeetingWf.ARCHIVED:
-            return is_moderator(user, meeting)
-
-
-rules.add_perm(MeetingPermissions.MODERATE, can_moderate_meeting)
+rules.add_perm(MeetingPermissions.VIEW, is_public | is_participant | is_moderator)
+rules.add_perm(MeetingPermissions.MODERATE, is_not_archived & is_moderator)
 # We might want to add editor role later on
-rules.add_perm(MeetingPermissions.CHANGE, can_moderate_meeting)
-rules.add_perm(MeetingPermissions.DELETE, can_moderate_meeting)
+rules.add_perm(MeetingPermissions.CHANGE, is_not_archived & is_moderator)
+rules.add_perm(MeetingPermissions.DELETE, is_not_archived & is_moderator)
