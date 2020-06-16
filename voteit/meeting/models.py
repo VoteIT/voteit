@@ -11,6 +11,7 @@ from django_fsm import FSMField, transition
 
 from voteit.access_policy.registries import access_policies
 from voteit.core.models import BaseContent
+from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 
 if TYPE_CHECKING:
@@ -28,7 +29,9 @@ class Meeting(BaseContent):
     end_time = models.DateTimeField(
         verbose_name=_("When the meeting ends/ended."), null=True, blank=True
     )
-    public = models.BooleanField(verbose_name=_("Is this meeting viewable by anyone?"), default=False)
+    public = models.BooleanField(
+        verbose_name=_("Is this meeting viewable by anyone?"), default=False
+    )
     participants = models.ManyToManyField(
         User,
         verbose_name=_(
@@ -42,17 +45,23 @@ class Meeting(BaseContent):
     potential_voters = models.ManyToManyField(
         User,
         verbose_name=_("This user may become a voter in this meeting."),
-        blank=True, related_name="potential_voter_in_meetings", editable=False
+        blank=True,
+        related_name="potential_voter_in_meetings",
+        editable=False,
     )
     discussers = models.ManyToManyField(
         User,
         verbose_name=_("User may add discussion posts."),
-        blank=True, related_name="discusser_in_meetings", editable=False
+        blank=True,
+        related_name="discusser_in_meetings",
+        editable=False,
     )
     proposers = models.ManyToManyField(
         User,
         verbose_name=_("User may add proposals."),
-        blank=True, related_name="proposer_in_meetings", editable=False
+        blank=True,
+        related_name="proposer_in_meetings",
+        editable=False,
     )
     moderators = models.ManyToManyField(
         User, blank=True, related_name="moderator_in_meetings", editable=False
@@ -84,7 +93,12 @@ class Meeting(BaseContent):
             if qs:
                 yield qs.first()  # All of them are 1-1 relations
 
-    @transition(field=state, source=MeetingWf.ONGOING, target=MeetingWf.UPCOMING)
+    @transition(
+        field=state,
+        source=MeetingWf.ONGOING,
+        target=MeetingWf.UPCOMING,
+        permission=MeetingPermissions.MODERATE,
+    )
     def upcoming(self):
         pass
 
@@ -92,14 +106,26 @@ class Meeting(BaseContent):
         field=state,
         source=[MeetingWf.UPCOMING, MeetingWf.CLOSED],
         target=MeetingWf.ONGOING,
+        permission=MeetingPermissions.MODERATE,
     )
     def ongoing(self):
         self.start_time = timezone.now()
 
-    @transition(field=state, source=MeetingWf.ONGOING, target=MeetingWf.CLOSED)
+    @transition(
+        field=state,
+        source=MeetingWf.ONGOING,
+        target=MeetingWf.CLOSED,
+        permission=MeetingPermissions.MODERATE,
+    )
     def closed(self):
         self.end_time = timezone.now()
 
-    @transition(field=state, source=MeetingWf.CLOSED, target=MeetingWf.ARCHIVED)
-    def archived(self):
+    @transition(
+        field=state,
+        source=MeetingWf.CLOSED,
+        target=MeetingWf.ARCHIVED,
+        permission=MeetingPermissions.ARCHIVE,
+    )
+    def archive(self):
+        # FIXME - state for cleaning up and locking meetings
         pass

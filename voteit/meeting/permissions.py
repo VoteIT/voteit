@@ -6,3 +6,4 @@ class MeetingPermissions:
     DELETE = "voteit.meeting.delete_meeting"
     VIEW = "voteit.motion.view_motion"
     MODERATE = "voteit.meeting.moderate_meeting"
+    ARCHIVE = "voteit.meeting.archive_meeting"

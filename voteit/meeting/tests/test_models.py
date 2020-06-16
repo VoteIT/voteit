@@ -16,7 +16,7 @@ class MeetingTests(TestCase):
         meeting.closed()
         meeting.ongoing()
         meeting.closed()
-        meeting.archived()
+        meeting.archive()
         self.assertEqual("archived", meeting.state)
 
     def test_er_policy(self):
