@@ -16,6 +16,8 @@ class MeetingTests(TestCase):
         meeting.closed()
         meeting.ongoing()
         meeting.closed()
+        meeting.request_archiving()
+        meeting.abort_archiving()
         meeting.archive()
         self.assertEqual("archived", meeting.state)
 
@@ -51,3 +53,10 @@ class MeetingTests(TestCase):
         ap_inst.save()
         self.assertFalse(list(meeting.get_access_policies()))
         self.assertTrue(list(meeting.get_access_policies(only_active=False)))
+
+    def test_archive_archives_ais(self):
+        meeting = self.Meeting.objects.create()
+        meeting.agenda_items.create()
+        meeting.archive()
+        ai = meeting.agenda_items.first()
+        self.assertEqual("archived", ai.state)

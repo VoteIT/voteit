@@ -1,11 +1,15 @@
 from __future__ import annotations
+
+from datetime import timedelta
 from typing import TYPE_CHECKING, Generator
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from django.db import transaction
 from django.utils import timezone
+from django.utils.timezone import now
 from django.utils.translation import gettext as _
 from django_fsm import FSMField, transition
 
@@ -78,6 +82,7 @@ class Meeting(BaseContent):
         blank=True,
         related_name="meetings",
     )
+    archive_after = models.DateTimeField(null=True, editable=False)
 
     def get_latest_er(self) -> ElectoralRegister:
         return (
@@ -123,9 +128,34 @@ class Meeting(BaseContent):
     @transition(
         field=state,
         source=MeetingWf.CLOSED,
-        target=MeetingWf.ARCHIVED,
+        target=MeetingWf.ARCHIVING,
         permission=MeetingPermissions.ARCHIVE,
     )
+    def request_archiving(self):
+        self.archive_after = now() + timedelta(days=3)
+        # FIXME: Do lots of checks here later on, make sure ais are closed etc
+
+    @transition(
+        field=state,
+        source=MeetingWf.ARCHIVING,
+        target=MeetingWf.CLOSED,
+        permission=MeetingPermissions.ARCHIVE,
+    )
+    def abort_archiving(self):
+        self.archive_after = None
+
+    @transition(
+        field=state,
+        target=MeetingWf.ARCHIVED,
+        permission="__not_allowed_manually__",
+    )
     def archive(self):
-        # FIXME - state for cleaning up and locking meetings
+        with transaction.atomic():
+            for ai in self.agenda_items.all():
+                ai.archive()
+                ai.save()
+        # Catch DatabaseError?
+        # FIXME cleanup, actual work etc...
+
+    def archiving_allowed(self):
         pass
