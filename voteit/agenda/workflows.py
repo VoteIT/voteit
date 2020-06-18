@@ -6,11 +6,13 @@ class AgendaItemWf:
     UPCOMING = "upcoming"
     ONGOING = "ongoing"
     CLOSED = "closed"
+    ARCHIVED = "archived"
     states = {
         PRIVATE: _("Private"),
         UPCOMING: _("Upcoming"),
         ONGOING: _("Ongoing"),
         CLOSED: _("Closed"),
+        ARCHIVED: _("Archived"),
     }
     initial = PRIVATE
 

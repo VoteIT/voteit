@@ -1,24 +1,16 @@
 import rules
 from django.contrib.auth.models import User
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.workflows import AgendaItemWf
-from voteit.core.rules import is_author
+from voteit.agenda.rules import is_non_private_ai
+from voteit.core.rules import is_author, is_not_archived
 from voteit.discussion.models import DiscussionPost
 from voteit.meeting.rules import (
     is_moderator,
-    is_not_archived,
     is_discusser,
     is_participant,
     is_public,
 )
 from voteit.discussion.permissions import DiscussionPermissions
-
-
-def is_non_private_ai(user: User, agenda_item: AgendaItem):
-    return (
-        isinstance(agenda_item, AgendaItem)
-        and agenda_item.state != AgendaItemWf.PRIVATE
-    )
 
 
 def is_not_discussion_blocked(user: User, agenda_item: AgendaItem):

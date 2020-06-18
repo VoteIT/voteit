@@ -90,3 +90,13 @@ class AgendaItem(BaseContent):
         """ Close agenda item
         """
         pass
+
+    @transition(
+        field=state,
+        target=AgendaItemWf.ARCHIVED,
+        permission="__not_allowed__",  # Handled by scripts
+    )
+    def archive(self):
+        # Mark agenda item as archived. Handled by scripts.
+        # It should be able to go to archived from any state.
+        pass
