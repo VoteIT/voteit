@@ -3,6 +3,7 @@ from django.db import models
 from django_fsm import FSMField, transition
 
 from voteit.core.models import BaseContent
+from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
 
 
@@ -25,15 +26,21 @@ class Proposal(BaseContent):
         related_name="proposals",
     )
 
-    @transition(field=state, source=ProposalWf.PUBLISHED, target=ProposalWf.RETRACTED)
+    @transition(
+        field=state,
+        source=ProposalWf.PUBLISHED,
+        target=ProposalWf.RETRACTED,
+        permission=ProposalPermissions.RETRACT,
+    )
     def retract(self):
-        """ Normal user operation to retract. """
+        """ Normal user operation to retract. Or for moderators."""
         pass
 
     @transition(
         field=state,
         source=[ProposalWf.PUBLISHED, ProposalWf.RETRACTED],
         target=ProposalWf.VOTING,
+        permission=ProposalPermissions.CHANGE,
     )
     def lock_for_vote(self):
         """ When a vote starts, mark all proposals as "voting" so they can't be retracted.
@@ -46,6 +53,7 @@ class Proposal(BaseContent):
         field=state,
         source=[ProposalWf.PUBLISHED, ProposalWf.VOTING],
         target=ProposalWf.APPROVED,
+        permission=ProposalPermissions.CHANGE,
     )
     def approved(self):
         """ Proposal approved via poll or moderator. """
@@ -55,17 +63,25 @@ class Proposal(BaseContent):
         field=state,
         source=[ProposalWf.PUBLISHED, ProposalWf.VOTING],
         target=ProposalWf.DENIED,
+        permission=ProposalPermissions.CHANGE,
     )
     def denied(self):
         """ Proposal denied via poll or moderator. """
         pass
 
-    @transition(field=state, source=ProposalWf.PUBLISHED, target=ProposalWf.UNHANDLED)
+    @transition(
+        field=state,
+        source=ProposalWf.PUBLISHED,
+        target=ProposalWf.UNHANDLED,
+        permission=ProposalPermissions.CHANGE,
+    )
     def unhandled(self):
         """ Proposal was never handled. Automatic transition or from moderator. """
         pass
 
-    @transition(field=state, target=ProposalWf.PUBLISHED)
+    @transition(
+        field=state, target=ProposalWf.PUBLISHED, permission=ProposalPermissions.CHANGE
+    )
     def publish(self):
         """ Reset proposal back to published. """
         pass

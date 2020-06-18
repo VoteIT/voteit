@@ -51,16 +51,6 @@ def is_proposer(user: User, meeting: Meeting) -> bool:
 
 
 @rules.predicate
-def is_not_finished(user: User, meeting: Meeting):
-    """ The meeting is upcoming or ongoing.
-    """
-    return isinstance(meeting, Meeting) and meeting.state in (
-        MeetingWf.UPCOMING,
-        MeetingWf.ONGOING,
-    )
-
-
-@rules.predicate
 def is_public(user: User, meeting: Meeting) -> bool:
     return isinstance(meeting, Meeting) and meeting.public
 

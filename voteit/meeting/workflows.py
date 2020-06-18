@@ -19,3 +19,6 @@ class MeetingWf:
     @classmethod
     def choices(cls):
         return cls.states.items()
+
+    finished_states = {CLOSED, ARCHIVING, ARCHIVED}
+    archived_states = {ARCHIVING, ARCHIVED}

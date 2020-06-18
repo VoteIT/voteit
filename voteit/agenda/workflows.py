@@ -19,3 +19,6 @@ class AgendaItemWf:
     @classmethod
     def choices(cls):
         return cls.states.items()
+
+    finished_states = {CLOSED, ARCHIVED}
+    archived_states = {ARCHIVED}
