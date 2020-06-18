@@ -12,7 +12,6 @@ class AgendaItem(BaseContent):
     state = FSMField(
         default=AgendaItemWf.initial,
         choices=AgendaItemWf.choices(),
-        protected=True,
         editable=False,
     )
     meeting = models.ForeignKey(
@@ -49,7 +48,6 @@ class AgendaItem(BaseContent):
 
     @transition(
         field=state,
-        source=[AgendaItemWf.PRIVATE, AgendaItemWf.ONGOING],
         target=AgendaItemWf.UPCOMING,
         permission=AgendaPermissions.CHANGE,
     )
@@ -60,7 +58,6 @@ class AgendaItem(BaseContent):
 
     @transition(
         field=state,
-        source=[AgendaItemWf.UPCOMING],
         target=AgendaItemWf.PRIVATE,
         permission=AgendaPermissions.CHANGE,
     )
@@ -71,7 +68,6 @@ class AgendaItem(BaseContent):
 
     @transition(
         field=state,
-        source=[AgendaItemWf.UPCOMING, AgendaItemWf.CLOSED],
         target=AgendaItemWf.ONGOING,
         permission=AgendaPermissions.CHANGE,
     )
@@ -82,7 +78,6 @@ class AgendaItem(BaseContent):
 
     @transition(
         field=state,
-        source=[AgendaItemWf.ONGOING],
         target=AgendaItemWf.CLOSED,
         permission=AgendaPermissions.CHANGE,
     )
