@@ -29,10 +29,9 @@ class RulesTests(TestCase):
         return getattr(DiscussionPermissions, perm)
 
     def _archive(self):
-        self.meeting.ongoing()
-        self.meeting.closed()
         self.meeting.archive()
         self.meeting.save()
+        self.ai.refresh_from_db()
 
     def test_view_private(self):
         self.ai.unpublish()

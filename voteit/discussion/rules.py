@@ -20,7 +20,7 @@ def is_not_discussion_blocked(user: User, agenda_item: AgendaItem):
 def can_add_discussion_post(user: User, agenda_item: AgendaItem):
     """ Moderators can always add"""
     if isinstance(agenda_item, AgendaItem) and is_not_archived(
-        user, agenda_item.meeting
+        user, agenda_item
     ):
         return is_moderator(user, agenda_item.meeting) or (
             is_non_private_ai(user, agenda_item)
