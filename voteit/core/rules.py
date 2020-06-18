@@ -20,4 +20,4 @@ def is_not_archived(user: User, instance: Union[Meeting, AgendaItem]):
     """ Generic check for archived state.
         Keep this as a negated state since check for is not None will return a false positive otherwise!
     """
-    return instance is not None and getattr(instance, "state", object()) != "archived"
+    return instance is not None and getattr(instance, "state", None) not in ("archived", "archiving", None)
