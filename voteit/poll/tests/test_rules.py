@@ -94,6 +94,7 @@ class PollRulesTests(TestCase):
 
     def test_delete_poll_ongoing(self):
         self.poll.upcoming()
+        self.poll.start_check()
         self.poll.ongoing()
         DELETE = self.p("DELETE")
         self.assertFalse(self.anon_user.has_perm(DELETE, self.poll))

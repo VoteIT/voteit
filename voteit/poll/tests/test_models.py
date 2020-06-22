@@ -93,7 +93,7 @@ class PollTests(TestCase):
     def test_start_check(self):
         prop = self.Proposal.objects.create()
         self.poll.proposals.add(prop)
-        self.assertIsNone(self.poll.start_check())
+        self.assertTrue(self.poll.start_check())
 
     def test_opening_poll_empty_poll(self):
         self.poll.electoral_register = None

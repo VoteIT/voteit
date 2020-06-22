@@ -103,14 +103,28 @@ class Poll(BaseContent):
             )
         ]
 
+    def start_check(self) -> bool:
+        """ Check that this poll could be started. A very basic check for the most obvious things.
+            Note that it's used as a transition condition, so it must return True if everything is ok!
+        """
+        if self.electoral_register is None:
+            raise ElectoralRegisterMissing()
+        if self.electoral_register.voters.count() < 1:
+            raise ElectoralRegisterEmpty()
+        if not isinstance(self.method, PollMethod):
+            raise InvalidPollMethod()
+        if self.proposals.count() < 1:
+            raise InvalidProposalCount("No proposals")
+        # And check the specifics for the poll method
+        self.method.start_check()
+        return True
+
     @transition(field=state, source=PollWf.PRIVATE, target=PollWf.UPCOMING)
     def upcoming(self):
-        # Attach electoral register
         pass
 
-    @transition(field=state, source=PollWf.UPCOMING, target=PollWf.ONGOING)
+    @transition(field=state, source=PollWf.UPCOMING, target=PollWf.ONGOING, conditions=[start_check])
     def ongoing(self):
-        self.start_check()
         self.started = now()
 
     @transition(
@@ -150,20 +164,6 @@ class Poll(BaseContent):
     def _mark_closed(self):
         if not self.closed:
             self.closed = now()
-
-    def start_check(self):
-        """ Check that this poll could be started. A very basic check for the most obvious things.
-        """
-        if self.electoral_register is None:
-            raise ElectoralRegisterMissing()
-        if self.electoral_register.voters.count() < 1:
-            raise ElectoralRegisterEmpty()
-        if not isinstance(self.method, PollMethod):
-            raise InvalidPollMethod()
-        if self.proposals.count() < 1:
-            raise InvalidProposalCount("No proposals")
-        # And check the specifics for the poll method
-        self.method.start_check()
 
     def store_ballots(self, ballots: Counter, abstains=0):
         """ Make sure ballot data is saved even if the votes will be cleared later on.
