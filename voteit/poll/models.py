@@ -61,9 +61,6 @@ class Poll(BaseContent):
     agenda_item = models.ForeignKey(
         "agenda.AgendaItem", on_delete=models.CASCADE, null=True, related_name="polls"
     )
-    organisation = models.ForeignKey(
-        "organisation.Organisation", on_delete=models.CASCADE, null=True, related_name="polls",
-    )
     proposals = models.ManyToManyField("proposal.Proposal", related_name="polls")
     method_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True)
     method_id = models.PositiveIntegerField(null=True)
@@ -145,6 +142,10 @@ class Poll(BaseContent):
     @transition(field=state, source=PollWf.ONGOING, target=PollWf.CANCELED)
     def cancel(self):
         self._mark_closed()
+
+    @transition(field=state, source=PollWf.UPCOMING, target=PollWf.PRIVATE)
+    def unpublish(self):
+        pass
 
     def _mark_closed(self):
         if not self.closed:

@@ -6,7 +6,7 @@ class PollWf:
     UPCOMING = "upcoming"
     ONGOING = "ongoing"
     CLOSED = "closed"
-    FINISHED = "finshed"
+    FINISHED = "finished"
     CANCELED = "canceled"
     FAILED = 'failed'
     states = {
@@ -19,6 +19,7 @@ class PollWf:
         FAILED: _('Failed')
     }
     initial = PRIVATE
+    permissive_states = {PRIVATE, UPCOMING}  # States where moderators can do changes
 
     @classmethod
     def choices(cls):

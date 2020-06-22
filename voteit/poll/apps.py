@@ -9,3 +9,4 @@ class PollConfig(AppConfig):
     def ready(self):
         from voteit.poll.app import polls
         from voteit.poll.app import er_policys
+        from voteit.poll import rules
