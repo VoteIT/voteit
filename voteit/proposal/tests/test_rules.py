@@ -100,7 +100,7 @@ class RulesTests(TestCase):
     def test_add_closed_meeting_closed_ai(self):
         # Note: Meetings shouldn't be able to close without closing the AIs
         self.meeting.ongoing()
-        self.meeting.closed()
+        self.meeting.close()
         self.ai.close()
         ADD = self.p("ADD")
         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
@@ -139,7 +139,7 @@ class RulesTests(TestCase):
 
     def test_change_closed_meeting_closed_ai(self):
         self.meeting.ongoing()
-        self.meeting.closed()
+        self.meeting.close()
         self.meeting.save()
         self.ai.close()
         self.ai.save()
@@ -181,7 +181,7 @@ class RulesTests(TestCase):
 
     def test_delete_closed_meeting_closed_ai(self):
         self.meeting.ongoing()
-        self.meeting.closed()
+        self.meeting.close()
         self.meeting.save()
         self.ai.close()
         self.ai.save()
@@ -241,7 +241,7 @@ class RulesTests(TestCase):
     def test_retract_closed_meeting_closed_ai(self):
         self.ai.close()
         self.meeting.ongoing()
-        self.meeting.closed()
+        self.meeting.close()
         RETRACT = self.p("RETRACT")
         self.assertFalse(self.anon_user.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.participant.has_perm(RETRACT, self.proposal))

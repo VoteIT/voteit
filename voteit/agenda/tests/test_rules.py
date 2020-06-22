@@ -19,7 +19,7 @@ class RulesTests(TestCase):
 
     def _archive(self):
         self.meeting.ongoing()
-        self.meeting.closed()
+        self.meeting.close()
         self.meeting.archive()
         self.meeting.save()
 

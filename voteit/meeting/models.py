@@ -122,7 +122,7 @@ class Meeting(BaseContent):
         target=MeetingWf.CLOSED,
         permission=MeetingPermissions.MODERATE,
     )
-    def closed(self):
+    def close(self):
         self.end_time = timezone.now()
 
     @transition(

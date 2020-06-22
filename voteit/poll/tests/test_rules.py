@@ -113,7 +113,7 @@ class PollRulesTests(TestCase):
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.close()
-        self.ai.open()
+        self.ai.ongoing()
         self.ai.close()
         DELETE = self.p("DELETE")
         self.assertFalse(self.anon_user.has_perm(DELETE, self.poll))
@@ -189,7 +189,7 @@ class VoteRulesTests(TestCase):
         from voteit.meeting.roles import Moderator
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create(meeting=self.meeting)
-        self.ai.open()
+        self.ai.ongoing()
         self.method = Simple.objects.create()
         self.poll = self.method.poll_rel.create(agenda_item=self.ai, meeting=self.meeting)
         self.poll.proposals.create()

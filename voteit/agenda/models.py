@@ -71,7 +71,7 @@ class AgendaItem(BaseContent):
         target=AgendaItemWf.ONGOING,
         permission=AgendaPermissions.CHANGE,
     )
-    def open(self):
+    def ongoing(self):
         """ Make agenda item ongoing
         """
         pass
