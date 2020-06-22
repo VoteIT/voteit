@@ -234,7 +234,3 @@ def finish_closed_poll(
     """
     if target == PollWf.CLOSED:
         instance.finish()
-
-
-# Touch DB models in apps
-# FIXME: Is there no smarter way to do this?
