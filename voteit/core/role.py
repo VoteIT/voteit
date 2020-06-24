@@ -3,9 +3,12 @@ from abc import ABC, abstractmethod, ABCMeta
 from typing import List, Type, Set, Iterator
 
 from django.contrib.auth.models import User
-from django.db.models import Model, ManyToManyField
+from django.db.models import ManyToManyField
+from django.db.models import Model
 
 from voteit.core.component import Registry
+from voteit.core.signals import role_added
+from voteit.core.signals import role_removed
 
 
 class RoleMeta(ABCMeta):
@@ -63,6 +66,7 @@ class Role(ABC, metaclass=RoleMeta):
             so it will require the role Participant.
         """
         self.m2m_relation.add(*users)
+        role_added.send(sender=self.__class__, instance=self, users=users)
         for role_type in self.requires:
             role = role_type(self.instance)
             role.add(*users)
@@ -72,6 +76,7 @@ class Role(ABC, metaclass=RoleMeta):
             If the role that's removed is required by other roles, remove those as well.
         """
         self.m2m_relation.remove(*users)
+        role_removed.send(sender=self.__class__, instance=self, users=users)
         for role_type in roles.get_reverse_required(self.instance, self.__class__):
             role = role_type(self.instance)
             role.remove(*users)
