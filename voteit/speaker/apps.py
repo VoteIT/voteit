@@ -7,5 +7,5 @@ class SpeakerConfig(AppConfig):
     verbose_name = _("Speaker")
 
     def ready(self):
-        pass
-        # from voteit.speaker import rules
+        from voteit.speaker import rules
+        from voteit.speaker import roles
