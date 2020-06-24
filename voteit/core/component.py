@@ -4,7 +4,7 @@ from collections import UserDict
 class Registry(UserDict):
 
     def __init__(self, required):
-        if not isinstance(required, type):
+        if not isinstance(required, type):  # pragma: no coverage
             raise TypeError(f"{required} is not a class")
         self.required = required
         super().__init__()

@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.dispatch import receiver
 from django.test import TestCase
 
 
@@ -116,3 +117,35 @@ class RoleTests(TestCase):
         roles = self.setup_registry()
         hello_cls = self._register_helloclass(roles)
         self.assertRaises(ValueError, hello_cls.add_requirement, hello_cls)
+
+    def test_signal_role_added(self):
+        from voteit.core.signals import role_added
+        roles = self.setup_registry()
+        HelloClass = self._register_helloclass(roles)
+
+        L = []
+
+        @receiver(role_added, sender=HelloClass)
+        def my_listener(users=[], **kw):
+            L.extend(users)
+
+        hello = HelloClass(self.meeting)
+        hello.add(self.user)
+        self.assertIn(self.user, L)
+
+    def test_signal_role_removed(self):
+        from voteit.core.signals import role_removed
+        roles = self.setup_registry()
+        HelloClass = self._register_helloclass(roles)
+
+        L = []
+
+        @receiver(role_removed, sender=HelloClass)
+        def my_listener(users=[], **kw):
+            L.extend(users)
+
+        hello = HelloClass(self.meeting)
+        hello.add(self.user)
+        self.assertNotIn(self.user, L)
+        hello.remove(self.user)
+        self.assertIn(self.user, L)
