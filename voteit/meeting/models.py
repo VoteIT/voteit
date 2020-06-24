@@ -70,6 +70,9 @@ class Meeting(BaseContent):
     moderators = models.ManyToManyField(
         User, blank=True, related_name="moderator_in_meetings", editable=False
     )
+    speakers = models.ManyToManyField(
+        User, blank=True, related_name="speaker_in_meetings", editable=False
+    )
     er_policy_type = models.ForeignKey(
         ContentType, on_delete=models.CASCADE, null=True, editable=False
     )
