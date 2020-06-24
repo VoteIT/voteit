@@ -16,3 +16,10 @@ class CoreDocTests(TestCase):
 
     def test_narrative_readme(self):
         self._doctest_file("narrative.md")
+
+
+# def load_tests(loader, tests, ignore):
+#     from voteit.core import role
+#     opts = doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS | doctest.FAIL_FAST
+#     tests.addTests(doctest.DocTestSuite(role, optionflags=opts))
+#     return tests
