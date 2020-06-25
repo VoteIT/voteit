@@ -1,9 +1,10 @@
 from collections import UserDict
+from typing import Type
 
 
 class Registry(UserDict):
 
-    def __init__(self, required):
+    def __init__(self, required: Type):
         if not isinstance(required, type):  # pragma: no coverage
             raise TypeError(f"{required} is not a class")
         self.required = required
