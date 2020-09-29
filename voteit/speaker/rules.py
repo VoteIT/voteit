@@ -1,20 +1,19 @@
 import rules
 from django.contrib.auth.models import User
-from voteit.meeting.models import Meeting
-from voteit.speaker.models import ListHandler
+from voteit.speaker.models import SpeakerListSystem
 
 
 @rules.predicate
-def is_list_moderator(user: User, list_handler: ListHandler) -> bool:
+def is_list_moderator(user: User, list_system: SpeakerListSystem) -> bool:
     return (
-        isinstance(list_handler, ListHandler)
-        and list_handler.moderators.filter(pk=user.pk).exists()
+        isinstance(list_system, SpeakerListSystem)
+        and list_system.moderators.filter(pk=user.pk).exists()
     )
 
 
 @rules.predicate
-def is_list_moderator(user: User, list_handler: ListHandler) -> bool:
+def is_list_speaker(user: User, list_system: SpeakerListSystem) -> bool:
     return (
-        isinstance(list_handler, ListHandler)
-        and list_handler.moderators.filter(pk=user.pk).exists()
+        isinstance(list_system, SpeakerListSystem)
+        and list_system.speakers.filter(pk=user.pk).exists()
     )
