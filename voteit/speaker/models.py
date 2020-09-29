@@ -122,6 +122,10 @@ class Speaker(models.Model):
         """
         return self.started is not None and self.seconds is None
 
+    @property
+    def in_queue(self) -> bool:
+        return self.order is not None
+
     def start(self):
         """ Remove from queue (order) and set a timestamp. """
         if self.started is None:
@@ -191,7 +195,7 @@ class SpeakerList(models.Model):
         field=state,
         source=SpeakerListWf.CLOSED,
         target=SpeakerListWf.OPEN,
-        permission=SpeakerListPermissions.MODERATE,
+        permission=SpeakerListPermissions.CHANGE,
     )
     def open(self):
         pass
@@ -200,7 +204,7 @@ class SpeakerList(models.Model):
         field=state,
         source=SpeakerListWf.OPEN,
         target=SpeakerListWf.CLOSED,
-        permission=SpeakerListPermissions.MODERATE,
+        permission=SpeakerListPermissions.CHANGE,
     )
     def close(self):
         pass

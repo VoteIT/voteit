@@ -1,17 +1,15 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+
 class SpeakerRulesTests(TestCase):
 
     def setUp(self):
         from voteit.speaker.models import SpeakerListSystem
-        from voteit.speaker.models import SpeakerList
         from voteit.speaker.app.list_methods.simple import Simple
 
         self.method = Simple.objects.create()
         self.system = SpeakerListSystem.objects.create(method=self.method)
-        #self.list = SpeakerList.objects.create(list_system=self.system)
-
         self.user_moderator = self.system.moderators.create(username="moderator")
         self.user_speaker = self.system.speakers.create(username="speaker")
         self.user_any = User.objects.create(username="jane")
@@ -28,328 +26,212 @@ class SpeakerRulesTests(TestCase):
         self.assertTrue(is_list_speaker(self.user_speaker, self.system))
         self.assertFalse(is_list_speaker(self.user_any, self.system))
 
-#     def p(self, perm):
-#         from voteit.poll.permissions import PollPermissions
-#         return getattr(PollPermissions, perm)
-#
-#     def test_is_voter(self):
-#         from voteit.poll.rules import is_voter
-#         self.assertFalse(is_voter(self.anon_user, self.poll))
-#         self.assertTrue(is_voter(self.voter_user, self.poll))
 
-#     def test_add_poll_ai(self):
-#         ADD = self.p("ADD")
-#         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
-#         self.assertFalse(self.voter_user.has_perm(ADD, self.ai))
-#         self.assertTrue(self.moderator.has_perm(ADD, self.ai))
+class SpeakerTests(TestCase):
+
+    def setUp(self):
+        from voteit.speaker.models import SpeakerListSystem
+        from voteit.speaker.app.list_methods.simple import Simple
+
+        self.method = Simple.objects.create()
+        self.system = SpeakerListSystem.objects.create(method=self.method)
+        self.user_moderator = self.system.moderators.create(username="moderator")
+        self.user_speaker_in_list = self.system.speakers.create(username="in")
+        self.user_speaker_not_in_list = self.system.speakers.create(username="out")
+        self.user_any = User.objects.create(username="jane")
+        self.list = self.system.speaker_lists.create()
+        self.speaker = self.list.speaker_items.create(user=self.user_speaker_in_list)
+
+    def p(self, name):
+        from voteit.speaker.permissions import SpeakerPermissions
+        return getattr(SpeakerPermissions, name)
+
+    def test_add_speaker_open_list(self):
+        ADD = self.p("ADD")
+        self.assertTrue(self.user_moderator.has_perm(ADD, self.list))
+        self.assertTrue(self.user_speaker_in_list.has_perm(ADD, self.list))
+        self.assertTrue(self.user_speaker_not_in_list.has_perm(ADD, self.list))
+        self.assertFalse(self.user_any.has_perm(ADD, self.list))
+
+    def test_add_speaker_closed_list(self):
+        ADD = self.p("ADD")
+        self.list.close()
+        self.assertTrue(self.user_moderator.has_perm(ADD, self.list))
+        self.assertFalse(self.user_speaker_in_list.has_perm(ADD, self.list))
+        self.assertFalse(self.user_speaker_not_in_list.has_perm(ADD, self.list))
+        self.assertFalse(self.user_any.has_perm(ADD, self.list))
+
+    def test_change_speaker(self):
+        CHANGE = self.p("CHANGE")
+        self.assertTrue(self.user_moderator.has_perm(CHANGE, self.speaker))
+        self.assertFalse(self.user_speaker_in_list.has_perm(CHANGE, self.speaker))
+        self.assertFalse(self.user_speaker_not_in_list.has_perm(CHANGE, self.speaker))
+        self.assertFalse(self.user_any.has_perm(CHANGE, self.speaker))
+
+    def test_delete_speaker_list_open(self):
+        DELETE = self.p("DELETE")
+        self.assertTrue(self.user_moderator.has_perm(DELETE, self.speaker))
+        self.assertTrue(self.user_speaker_in_list.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_speaker_not_in_list.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_any.has_perm(DELETE, self.speaker))
+
+    def test_delete_speaker_list_closed(self):
+        DELETE = self.p("DELETE")
+        self.assertTrue(self.user_moderator.has_perm(DELETE, self.speaker))
+        self.assertTrue(self.user_speaker_in_list.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_speaker_not_in_list.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_any.has_perm(DELETE, self.speaker))
+
+    def test_delete_speaker_ongoing(self):
+        DELETE = self.p("DELETE")
+        self.speaker.start()
+        self.speaker.save()
+        self.assertTrue(self.user_moderator.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_speaker_in_list.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_speaker_not_in_list.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_any.has_perm(DELETE, self.speaker))
+
+    def test_delete_speaker_finished(self):
+        DELETE = self.p("DELETE")
+        self.speaker.start()
+        self.speaker.seconds = 10
+        self.speaker.save()
+        self.assertTrue(self.user_moderator.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_speaker_in_list.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_speaker_not_in_list.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_any.has_perm(DELETE, self.speaker))
+
+    def test_view_speaker_contextless(self):
+        VIEW = self.p("VIEW")
+        self.assertTrue(self.user_moderator.has_perm(VIEW, self.speaker))
+        self.assertTrue(self.user_speaker_in_list.has_perm(VIEW, self.speaker))
+        self.assertTrue(self.user_speaker_not_in_list.has_perm(VIEW, self.speaker))
+        self.assertFalse(self.user_any.has_perm(VIEW, self.speaker))
+
+    def test_view_speaker_meeting(self):
+        VIEW = self.p("VIEW")
+        from voteit.meeting.models import Meeting
+        meeting = Meeting.objects.create()
+        self.system.meeting = meeting
+        self.system.save()
+        meeting_participant = meeting.participants.create()
+        self.assertTrue(self.user_moderator.has_perm(VIEW, self.speaker))
+        self.assertTrue(self.user_speaker_in_list.has_perm(VIEW, self.speaker))
+        self.assertTrue(self.user_speaker_not_in_list.has_perm(VIEW, self.speaker))
+        self.assertFalse(self.user_any.has_perm(VIEW, self.speaker))
+        self.assertTrue(meeting_participant.has_perm(VIEW, self.speaker))
 
 
-# class PollRulesTests(TestCase):
-#
-#     def setUp(self):
-#         from voteit.poll.models import Poll
-#         from voteit.poll.models import ElectoralRegister
-#         from voteit.poll.app.polls.simple import Simple
-#         from voteit.meeting.models import Meeting
-#         from voteit.meeting.roles import Moderator
-#         self.meeting = Meeting.objects.create()
-#         self.ai = self.meeting.agenda_items.create(meeting=self.meeting)
-#         self.ai.upcoming()
-#         self.poll = Poll.objects.create(method=Simple.objects.create(), agenda_item=self.ai, meeting=self.meeting)
-#         self.poll.proposals.create()
-#         self.er = ElectoralRegister.objects.create()
-#         self.poll.electoral_register = self.er
-#         self.poll.save()
-#         self.anon_user = User.objects.create(username="anon")
-#         self.participant_user = self.meeting.participants.create(username="participant")
-#         self.voter_user = self.er.voters.create(username="voter")
-#         # Voters should always be participants too
-#         self.meeting.participants.add(self.voter_user)
-#         self.moderator = self.meeting.moderators.create(username="moderator")
-#         Moderator(self.meeting).add(self.moderator)
-#
-#     def p(self, perm):
-#         from voteit.poll.permissions import PollPermissions
-#         return getattr(PollPermissions, perm)
-#
-#     def test_is_voter(self):
-#         from voteit.poll.rules import is_voter
-#         self.assertFalse(is_voter(self.anon_user, self.poll))
-#         self.assertTrue(is_voter(self.voter_user, self.poll))
-#
-#     def test_add_poll_ai(self):
-#         ADD = self.p("ADD")
-#         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
-#         self.assertFalse(self.voter_user.has_perm(ADD, self.ai))
-#         self.assertTrue(self.moderator.has_perm(ADD, self.ai))
-#
-#     def test_add_poll_standalone_meeting(self):
-#         ADD = self.p("ADD")
-#         self.assertFalse(self.anon_user.has_perm(ADD, self.meeting))
-#         self.assertFalse(self.voter_user.has_perm(ADD, self.meeting))
-#         self.assertTrue(self.moderator.has_perm(ADD, self.meeting))
-#
-#     def test_add_poll_archived_ai(self):
-#         self.ai.archive()
-#         ADD = self.p("ADD")
-#         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
-#         self.assertFalse(self.voter_user.has_perm(ADD, self.ai))
-#         self.assertFalse(self.moderator.has_perm(ADD, self.ai))
-#
-#     def test_add_poll_archived_meeting(self):
-#         self.meeting.archive()
-#         ADD = self.p("ADD")
-#         self.assertFalse(self.anon_user.has_perm(ADD, self.meeting))
-#         self.assertFalse(self.voter_user.has_perm(ADD, self.meeting))
-#         self.assertFalse(self.moderator.has_perm(ADD, self.meeting))
-#
-#     def test_change_poll_upcoming(self):
-#         self.poll.upcoming()
-#         CHANGE = self.p("CHANGE")
-#         self.assertFalse(self.anon_user.has_perm(CHANGE, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(CHANGE, self.poll))
-#         self.assertTrue(self.moderator.has_perm(CHANGE, self.poll))
-#
-#     def test_change_poll_ongoing(self):
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         CHANGE = self.p("CHANGE")
-#         self.assertFalse(self.anon_user.has_perm(CHANGE, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(CHANGE, self.poll))
-#         self.assertFalse(self.moderator.has_perm(CHANGE, self.poll))
-#
-#     def test_change_poll_closed(self):
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         self.poll.close()
-#         CHANGE = self.p("CHANGE")
-#         self.assertFalse(self.anon_user.has_perm(CHANGE, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(CHANGE, self.poll))
-#         self.assertFalse(self.moderator.has_perm(CHANGE, self.poll))
-#
-#     def test_delete_poll_upcoming(self):
-#         self.poll.upcoming()
-#         DELETE = self.p("DELETE")
-#         self.assertFalse(self.anon_user.has_perm(DELETE, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(DELETE, self.poll))
-#         self.assertTrue(self.moderator.has_perm(DELETE, self.poll))
-#
-#     def test_delete_poll_ongoing(self):
-#         self.poll.upcoming()
-#         self.poll.start_check()
-#         self.poll.ongoing()
-#         DELETE = self.p("DELETE")
-#         self.assertFalse(self.anon_user.has_perm(DELETE, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(DELETE, self.poll))
-#         self.assertTrue(self.moderator.has_perm(DELETE, self.poll))
-#
-#     def test_delete_poll_closed(self):
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         self.poll.close()
-#         DELETE = self.p("DELETE")
-#         self.assertFalse(self.anon_user.has_perm(DELETE, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(DELETE, self.poll))
-#         self.assertTrue(self.moderator.has_perm(DELETE, self.poll))
-#
-#     def test_delete_poll_closed_ai(self):
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         self.poll.close()
-#         self.ai.ongoing()
-#         self.ai.close()
-#         DELETE = self.p("DELETE")
-#         self.assertFalse(self.anon_user.has_perm(DELETE, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(DELETE, self.poll))
-#         self.assertTrue(self.moderator.has_perm(DELETE, self.poll))
-#
-#     def test_delete_poll_archived_meeting(self):
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         self.poll.close()
-#         self.meeting.archive()
-#         DELETE = self.p("DELETE")
-#         self.assertFalse(self.anon_user.has_perm(DELETE, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(DELETE, self.poll))
-#         self.assertFalse(self.moderator.has_perm(DELETE, self.poll))
-#
-#     def test_view_private_poll_upcoming_ai(self):
-#         self.assertEqual(self.poll.state, "private")
-#         self.assertEqual(self.ai.state, "upcoming")
-#         VIEW = self.p("VIEW")
-#         self.assertFalse(self.anon_user.has_perm(VIEW, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(VIEW, self.poll))
-#         self.assertTrue(self.moderator.has_perm(VIEW, self.poll))
-#         self.assertFalse(self.participant_user.has_perm(VIEW, self.poll))
-#
-#     def test_view_upcoming_poll_private_ai(self):
-#         self.ai.unpublish()
-#         self.poll.upcoming()
-#         self.assertEqual(self.poll.state, "upcoming")
-#         self.assertEqual(self.ai.state, "private")
-#         VIEW = self.p("VIEW")
-#         self.assertFalse(self.anon_user.has_perm(VIEW, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(VIEW, self.poll))
-#         self.assertTrue(self.moderator.has_perm(VIEW, self.poll))
-#         self.assertFalse(self.participant_user.has_perm(VIEW, self.poll))
-#
-#     def test_view_upcoming_poll_and_ai(self):
-#         self.poll.upcoming()
-#         self.assertEqual(self.poll.state, "upcoming")
-#         self.assertEqual(self.ai.state, "upcoming")
-#         VIEW = self.p("VIEW")
-#         self.assertFalse(self.anon_user.has_perm(VIEW, self.poll))
-#         self.assertTrue(self.voter_user.has_perm(VIEW, self.poll))
-#         self.assertTrue(self.moderator.has_perm(VIEW, self.poll))
-#         self.assertTrue(self.participant_user.has_perm(VIEW, self.poll))
-#
-#     def test_view_poll_meeting_only(self):
-#         self.poll.upcoming()
-#         self.poll.agenda_item = None
-#         VIEW = self.p("VIEW")
-#         self.assertFalse(self.anon_user.has_perm(VIEW, self.poll))
-#         self.assertTrue(self.voter_user.has_perm(VIEW, self.poll))
-#         self.assertTrue(self.moderator.has_perm(VIEW, self.poll))
-#         self.assertTrue(self.participant_user.has_perm(VIEW, self.poll))
-#
-#     def test_view_poll_meeting_only_private_poll(self):
-#         self.poll.agenda_item = None
-#         self.assertEqual(self.poll.state, "private")
-#         VIEW = self.p("VIEW")
-#         self.assertFalse(self.anon_user.has_perm(VIEW, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(VIEW, self.poll))
-#         self.assertTrue(self.moderator.has_perm(VIEW, self.poll))
-#         self.assertFalse(self.participant_user.has_perm(VIEW, self.poll))
-#
-#
-# class VoteRulesTests(TestCase):
-#
-#     def setUp(self):
-#         # from voteit.poll.models import Poll
-#         from voteit.poll.models import ElectoralRegister
-#         from voteit.poll.app.polls.simple import Simple
-#         from voteit.meeting.models import Meeting
-#         from voteit.meeting.roles import Moderator
-#         self.meeting = Meeting.objects.create()
-#         self.ai = self.meeting.agenda_items.create(meeting=self.meeting)
-#         self.ai.ongoing()
-#         self.method = Simple.objects.create()
-#         self.poll = self.method.poll_rel.create(agenda_item=self.ai, meeting=self.meeting)
-#         self.poll.proposals.create()
-#         self.er = ElectoralRegister.objects.create()
-#         self.poll.electoral_register = self.er
-#         self.poll.save()
-#         self.anon_user = User.objects.create(username="anon")
-#         self.participant_user = self.meeting.participants.create(username="participant")
-#         self.voter_user = self.er.voters.create(username="voter")
-#         self.voted_user = self.er.voters.create(username="voted")
-#         # Voters should always be participants too
-#         self.meeting.participants.add(self.voter_user, self.voted_user)
-#         self.moderator = self.meeting.moderators.create(username="moderator")
-#         Moderator(self.meeting).add(self.moderator)
-#         # And the voted user have voted of course :)
-#         self.vote = self.method.vote_set.create(choice=1, user=self.voted_user)
-#
-#     def p(self, perm):
-#         from voteit.poll.permissions import VotePermissions
-#         return getattr(VotePermissions, perm)
-#
-#     def test_add_upcoming(self):
-#         self.poll.upcoming()
-#         self.poll.save()
-#         self.assertEqual("upcoming", self.poll.state)
-#         ADD = self.p("ADD")
-#         self.assertFalse(self.anon_user.has_perm(ADD, self.poll))
-#         self.assertFalse(self.participant_user.has_perm(ADD, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(ADD, self.poll))
-#         self.assertFalse(self.voted_user.has_perm(ADD, self.poll))
-#         self.assertFalse(self.moderator.has_perm(ADD, self.poll))
-#
-#     def test_add_ongoing(self):
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         self.poll.save()
-#         self.assertEqual("ongoing", self.poll.state)
-#         ADD = self.p("ADD")
-#         self.assertFalse(self.anon_user.has_perm(ADD, self.poll))
-#         self.assertFalse(self.participant_user.has_perm(ADD, self.poll))
-#         self.assertTrue(self.voter_user.has_perm(ADD, self.poll))
-#         self.assertTrue(self.voted_user.has_perm(ADD, self.poll))
-#         self.assertFalse(self.moderator.has_perm(ADD, self.poll))
-#
-#     def test_add_closed(self):
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         self.poll.close()
-#         self.poll.save()
-#         self.assertEqual("finished", self.poll.state)
-#         ADD = self.p("ADD")
-#         self.assertFalse(self.anon_user.has_perm(ADD, self.poll))
-#         self.assertFalse(self.participant_user.has_perm(ADD, self.poll))
-#         self.assertFalse(self.voter_user.has_perm(ADD, self.poll))
-#         self.assertFalse(self.voted_user.has_perm(ADD, self.poll))
-#         self.assertFalse(self.moderator.has_perm(ADD, self.poll))
-#
-#     # We don't need to test change for upcoming, no votes should exist :)
-#     def test_change_ongoing(self):
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         self.poll.save()
-#         self.assertEqual("ongoing", self.poll.state)
-#         CHANGE = self.p("CHANGE")
-#         self.assertFalse(self.anon_user.has_perm(CHANGE, self.vote))
-#         self.assertFalse(self.participant_user.has_perm(CHANGE, self.vote))
-#         self.assertFalse(self.voter_user.has_perm(CHANGE, self.vote))
-#         self.assertTrue(self.voted_user.has_perm(CHANGE, self.vote))
-#         self.assertFalse(self.moderator.has_perm(CHANGE, self.vote))
-#
-#     def test_change_closed(self):
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         self.poll.close()
-#         self.poll.save()
-#         self.assertEqual("finished", self.poll.state)
-#         CHANGE = self.p("CHANGE")
-#         self.assertFalse(self.anon_user.has_perm(CHANGE, self.vote))
-#         self.assertFalse(self.participant_user.has_perm(CHANGE, self.vote))
-#         self.assertFalse(self.voter_user.has_perm(CHANGE, self.vote))
-#         self.assertFalse(self.voted_user.has_perm(CHANGE, self.vote))
-#         self.assertFalse(self.moderator.has_perm(CHANGE, self.vote))
-#
-#     def test_delete_ongoing(self):
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         self.poll.save()
-#         self.assertEqual("ongoing", self.poll.state)
-#         DELETE = self.p("DELETE")
-#         self.assertFalse(self.anon_user.has_perm(DELETE, self.vote))
-#         self.assertFalse(self.participant_user.has_perm(DELETE, self.vote))
-#         self.assertFalse(self.voter_user.has_perm(DELETE, self.vote))
-#         self.assertTrue(self.voted_user.has_perm(DELETE, self.vote))
-#         self.assertFalse(self.moderator.has_perm(DELETE, self.vote))
-#
-#     def test_delete_closed(self):
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         self.poll.close()
-#         self.poll.save()
-#         self.assertEqual("finished", self.poll.state)
-#         DELETE = self.p("DELETE")
-#         self.assertFalse(self.anon_user.has_perm(DELETE, self.vote))
-#         self.assertFalse(self.participant_user.has_perm(DELETE, self.vote))
-#         self.assertFalse(self.voter_user.has_perm(DELETE, self.vote))
-#         self.assertFalse(self.voted_user.has_perm(DELETE, self.vote))
-#         self.assertFalse(self.moderator.has_perm(DELETE, self.vote))
-#
-#     def test_view(self):
-#         # View state always behaves the same way
-#         self.poll.upcoming()
-#         self.poll.ongoing()
-#         self.poll.save()
-#         self.assertEqual("ongoing", self.poll.state)
-#         VIEW = self.p("VIEW")
-#         self.assertFalse(self.anon_user.has_perm(VIEW, self.vote))
-#         self.assertFalse(self.participant_user.has_perm(VIEW, self.vote))
-#         self.assertFalse(self.voter_user.has_perm(VIEW, self.vote))
-#         self.assertTrue(self.voted_user.has_perm(VIEW, self.vote))
-#         self.assertFalse(self.moderator.has_perm(VIEW, self.vote))
+class SpeakerListTests(TestCase):
+
+    def setUp(self):
+        from voteit.speaker.models import SpeakerListSystem
+        from voteit.speaker.app.list_methods.simple import Simple
+
+        self.method = Simple.objects.create()
+        self.system = SpeakerListSystem.objects.create(method=self.method)
+        self.user_moderator = self.system.moderators.create(username="moderator")
+        self.user_speaker = self.system.speakers.create(username="in")
+        self.user_any = User.objects.create(username="jane")
+        self.list = self.system.speaker_lists.create()
+        #self.speaker = self.list.speaker_items.create(user=self.user_speaker_in_list)
+
+    def p(self, name):
+        from voteit.speaker.permissions import SpeakerListPermissions
+        return getattr(SpeakerListPermissions, name)
+
+    def test_add_speaker_list(self):
+        ADD = self.p("ADD")
+        self.assertTrue(self.user_moderator.has_perm(ADD, self.system))
+        self.assertFalse(self.user_speaker.has_perm(ADD, self.system))
+        self.assertFalse(self.user_any.has_perm(ADD, self.list))
+
+    def test_change_speaker_list(self):
+        CHANGE = self.p("CHANGE")
+        self.assertTrue(self.user_moderator.has_perm(CHANGE, self.list))
+        self.assertFalse(self.user_speaker.has_perm(CHANGE, self.list))
+        self.assertFalse(self.user_any.has_perm(CHANGE, self.list))
+
+    def test_delete_speaker_list(self):
+        DELETE = self.p("DELETE")
+        self.assertTrue(self.user_moderator.has_perm(DELETE, self.list))
+        self.assertFalse(self.user_speaker.has_perm(DELETE, self.list))
+        self.assertFalse(self.user_any.has_perm(DELETE, self.list))
+
+    def test_view_speaker_contextless(self):
+        VIEW = self.p("VIEW")
+        self.assertTrue(self.user_moderator.has_perm(VIEW, self.list))
+        self.assertTrue(self.user_speaker.has_perm(VIEW, self.list))
+        self.assertFalse(self.user_any.has_perm(VIEW, self.list))
+
+    def test_view_speaker_meeting(self):
+        VIEW = self.p("VIEW")
+        from voteit.meeting.models import Meeting
+        meeting = Meeting.objects.create()
+        self.system.meeting = meeting
+        self.system.save()
+        meeting_participant = meeting.participants.create()
+        self.assertTrue(self.user_moderator.has_perm(VIEW, self.list))
+        self.assertTrue(self.user_speaker.has_perm(VIEW, self.list))
+        self.assertFalse(self.user_any.has_perm(VIEW, self.list))
+        self.assertTrue(meeting_participant.has_perm(VIEW, self.list))
+
+
+class SpeakerListSystemTests(TestCase):
+
+    def setUp(self):
+        from voteit.speaker.models import SpeakerListSystem
+        from voteit.speaker.app.list_methods.simple import Simple
+        self.method = Simple.objects.create()
+        self.system = SpeakerListSystem.objects.create(method=self.method)
+        self.user_moderator = self.system.moderators.create(username="moderator")
+        self.user_speaker = self.system.speakers.create(username="in")
+        self.user_any = User.objects.create(username="jane")
+
+    def p(self, name):
+        from voteit.speaker.permissions import SpeakerSystemPermissions
+        return getattr(SpeakerSystemPermissions, name)
+
+    def test_add_system(self):
+        # FIXME We have no clue about contextless yet
+        from voteit.meeting.models import Meeting
+        ADD = self.p("ADD")
+        meeting = Meeting.objects.create()
+        self.system.meeting = meeting
+        self.system.save()
+        self.assertFalse(self.user_moderator.has_perm(ADD, meeting))
+        self.assertFalse(self.user_speaker.has_perm(ADD, meeting))
+        self.assertFalse(self.user_any.has_perm(ADD, meeting))
+        meeting.moderators.add(self.user_moderator)
+        meeting.save()
+        self.assertTrue(self.user_moderator.has_perm(ADD, meeting))
+
+    def test_change_system(self):
+        CHANGE = self.p("CHANGE")
+        self.assertTrue(self.user_moderator.has_perm(CHANGE, self.system))
+        self.assertFalse(self.user_speaker.has_perm(CHANGE, self.system))
+        self.assertFalse(self.user_any.has_perm(CHANGE, self.system))
+
+    def test_delete_system(self):
+        DELETE = self.p("DELETE")
+        self.assertTrue(self.user_moderator.has_perm(DELETE, self.system))
+        self.assertFalse(self.user_speaker.has_perm(DELETE, self.system))
+        self.assertFalse(self.user_any.has_perm(DELETE, self.system))
+
+    def test_view_system_contextless(self):
+        VIEW = self.p("VIEW")
+        self.assertTrue(self.user_moderator.has_perm(VIEW, self.system))
+        self.assertTrue(self.user_speaker.has_perm(VIEW, self.system))
+        self.assertFalse(self.user_any.has_perm(VIEW, self.system))
+
+    def test_view_system_meeting(self):
+        VIEW = self.p("VIEW")
+        from voteit.meeting.models import Meeting
+        meeting = Meeting.objects.create()
+        self.system.meeting = meeting
+        self.system.save()
+        meeting_participant = meeting.participants.create()
+        self.assertTrue(self.user_moderator.has_perm(VIEW, self.system))
+        self.assertTrue(self.user_speaker.has_perm(VIEW, self.system))
+        self.assertFalse(self.user_any.has_perm(VIEW, self.system))
+        self.assertTrue(meeting_participant.has_perm(VIEW, self.system))
