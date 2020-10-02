@@ -48,3 +48,24 @@ class AgendaItemTests(TestCase):
         prop2 = Proposal.objects.create()
         self.assertIn(prop, ai.get_proposals())
         self.assertNotIn(prop2, ai.get_proposals())
+
+    def test_rich_text(self):
+        ai = self._mk_one(
+            title='Test',
+            description='<script type="text/javascript" src="evil-site"></script><a>Test</a>'
+                        '<a href="/somewhere" data-user-id="123">Användarnamn</a>',
+        )
+        ai.full_clean()
+        self.assertIn('<user data-user-id="123"/>', ai.description.db_value)
+        self.assertIn('<a data-user-id="123">Unknown user</a>', str(ai.description))
+
+    def test_rich_text_existing_user(self):
+        from django.contrib.auth.models import User
+        ai = self._mk_one(
+            title='Test',
+            description='<script type="text/javascript" src="evil-site"></script><a>Test</a>'
+                        '<a href="/somewhere" data-user-id="1">Användarnamn</a>',
+        )
+        User.objects.create_user('admin', first_name='Test', last_name='Admin')
+        ai.full_clean()
+        self.assertIn('<a data-user-id="1" href="/user-info-url/1">Test Admin</a>', str(ai.description))

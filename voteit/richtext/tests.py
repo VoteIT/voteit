@@ -1,18 +1,22 @@
 from django.test import TestCase
 from lxml.html import tostring, fromstring
-from voteit.richtext.registries import richtext_converters
+
+from voteit.core.component import Registry
 
 from .registries import RichTextConverter
 
 
+richtext_test_converters = Registry(RichTextConverter)
+
+
 class TestRichTextField(TestCase):
-    @richtext_converters
+    @richtext_test_converters
     class TestSimpleConverter(RichTextConverter):
         strip_text = False
         internal_tag_name = 'b'
         external_tag_name = 'a'
 
-    @richtext_converters
+    @richtext_test_converters
     class TestSimpleConverter2(RichTextConverter):
         internal_tag_name = 'y'
         external_tag_name = 'x'
@@ -23,10 +27,10 @@ class TestRichTextField(TestCase):
         external_tag_name = 'a'
         allowed_attributes = 'data-user-id',
 
-        def get_text(self, element):
+        def get_text(self, element, context):
             return 'User Name'
 
-        def get_attributes(self, element):
+        def get_attributes(self, element, context):
             return {
                 'href': '/elsewhere'
             }
@@ -43,14 +47,12 @@ class TestRichTextField(TestCase):
             converter.to_external(document)
             self.assertInHTML(expected_external, tostring(document, encoding='unicode'))
         else:
-            RichTextConverter.convert_to_internal(document)
+            RichTextConverter.convert_to_internal(document, registry=richtext_test_converters)
             self.assertInHTML(expected_internal, tostring(document, encoding='unicode'))
-            RichTextConverter.convert_to_external(document)
+            RichTextConverter.convert_to_external(document, registry=richtext_test_converters)
             self.assertInHTML(expected_external, tostring(document, encoding='unicode'))
 
     def test_user_conversion(self):
-        from .registries import RichTextConverter, richtext_converters
-
         self._test_internal_external(
             input='<html><h2>A user</h2><p><a href="/somewhere" data-user-id="123">User thing</a></p></html>',
             expected_internal='<user data-user-id="123"></user>',
@@ -67,8 +69,7 @@ class TestRichTextField(TestCase):
         )
 
     def test_registry_all(self):
-        from .registries import richtext_converters
-        self.assertEqual(len(richtext_converters), 2)
+        self.assertEqual(len(richtext_test_converters), 2)
         self._test_internal_external(
             input='<html><a>Ada</a><x>Lovelace</x></html>',
             expected_internal='<b>Ada</b><y></y>',

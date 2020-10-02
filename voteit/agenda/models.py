@@ -6,6 +6,7 @@ from voteit.agenda.workflows import AgendaItemWf
 
 from voteit.core.models import BaseContent
 from voteit.meeting.models import Meeting
+from voteit.richtext.fields import RichTextField
 
 
 class AgendaItem(BaseContent):
@@ -24,6 +25,7 @@ class AgendaItem(BaseContent):
         verbose_name=_("Block new proposals"), default=False
     )
     order = models.PositiveSmallIntegerField(default=0)
+    description = RichTextField(null=True)
 
     class Meta:
         ordering = 'meeting', 'order',
