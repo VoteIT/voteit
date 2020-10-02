@@ -19,3 +19,6 @@ class ParticipantNumberTests(TestCase):
 
     def test_duplicate_pn(self):
         self.assertRaises(IntegrityError, self.system.numbers.create, user=self.user_no_pn, number=1)
+
+    def test_duplicate_user(self):
+        self.assertRaises(IntegrityError, self.system.numbers.create, user=self.user_pn, number=2)
