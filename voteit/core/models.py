@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from abc import ABCMeta
-from django.contrib.auth.models import User
+
+from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext as _
 
@@ -25,7 +26,7 @@ class BaseContent(models.Model):
     body = models.TextField(blank=True, default="")
     created = models.DateTimeField(editable=False, auto_now_add=True)
     author = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         editable=False,
         null=True,
@@ -33,7 +34,7 @@ class BaseContent(models.Model):
     )
     modified = models.DateTimeField(editable=False, auto_now=True)
     last_modified_by = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         editable=False,
         null=True,

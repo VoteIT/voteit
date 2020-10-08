@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union
 
 import rules
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
 from voteit.agenda.permissions import AgendaPermissions
 from voteit.agenda.rules import can_moderate_agendas_meeting
 from voteit.meeting.models import Meeting
@@ -10,7 +10,8 @@ from voteit.poll.abcs import Vote
 
 from voteit.poll.models import Poll
 from voteit.poll.workflows import PollWf
-from voteit.poll.permissions import PollPermissions, VotePermissions
+from voteit.poll.permissions import PollPermissions
+from voteit.poll.permissions import VotePermissions
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.agenda.models import AgendaItem
 
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @rules.predicate
-def is_voter(user: User, poll: Poll):
+def is_voter(user: AbstractUser, poll: Poll):
     return (
         poll.electoral_register is not None
         and poll.electoral_register.voters.filter(pk=user.pk).exists()
@@ -27,29 +28,29 @@ def is_voter(user: User, poll: Poll):
 
 
 @rules.predicate
-def is_poll_ongoing(user: User, poll: Poll):
+def is_poll_ongoing(user: AbstractUser, poll: Poll):
     return isinstance(poll, Poll) and poll.state == PollWf.ONGOING
 
 
 @rules.predicate
-def is_poll_in_permissive_state(user: User, poll: Poll):
+def is_poll_in_permissive_state(user: AbstractUser, poll: Poll):
     return isinstance(poll, Poll) and poll.state in PollWf.permissive_states
 
 
 @rules.predicate
-def is_not_private(user: User, poll: Poll):
+def is_not_private(user: AbstractUser, poll: Poll):
     return isinstance(poll, Poll) and poll.state != PollWf.PRIVATE
 
 
 @rules.predicate
-def is_vote_owner(user: User, vote: Vote):
+def is_vote_owner(user: AbstractUser, vote: Vote):
     """ The person who added the vote. """
     return isinstance(vote, Vote) and vote.user == user
 
 
 # Object permissions
 @rules.predicate
-def can_add_poll(user: User, instance: Union[AgendaItem, Meeting]):
+def can_add_poll(user: AbstractUser, instance: Union[AgendaItem, Meeting]):
     """ Polls can be added either to agenda items or to meetings directly.
         This check must be able to handle both contexts with a similar result.
     """
@@ -60,7 +61,7 @@ def can_add_poll(user: User, instance: Union[AgendaItem, Meeting]):
 
 
 @rules.predicate
-def can_change_poll(user: User, poll: Poll):
+def can_change_poll(user: AbstractUser, poll: Poll):
     # Note: Polls will always have a direct link to a meeting object,
     # so we don't need to care about the agenda item here.
     return (
@@ -71,7 +72,7 @@ def can_change_poll(user: User, poll: Poll):
 
 
 @rules.predicate
-def can_delete_poll(user: User, poll: Poll):
+def can_delete_poll(user: AbstractUser, poll: Poll):
     """ Deleting a poll is okay in any case. Since it's very visible to users it's not as
         troubling as being able to change a poll.
     """
@@ -81,7 +82,7 @@ def can_delete_poll(user: User, poll: Poll):
 
 
 @rules.predicate
-def can_view_poll(user: User, poll: Poll):
+def can_view_poll(user: AbstractUser, poll: Poll):
     """ All participants can view a poll, there's one exception: An agenda item might be private.
         In that case it should be viewable only by moderators.
         Essentially, the same permissions as view on meeting or agenda item applies.
@@ -105,7 +106,7 @@ rules.add_perm(PollPermissions.VIEW, can_view_poll)
 
 
 @rules.predicate
-def vote_is_poll_ongoing(user: User, vote: Vote):
+def vote_is_poll_ongoing(user: AbstractUser, vote: Vote):
     """ Delegate to is_poll_ongoing"""
     if isinstance(vote, Vote):
         try:

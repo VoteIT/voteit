@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -21,10 +21,10 @@ class Priority(ListMethod):
         ),
     )
 
-    def get_spoken_count(self, speaker_list: SpeakerList, user: User) -> int:
+    def get_spoken_count(self, speaker_list: SpeakerList, user: AbstractUser) -> int:
         return speaker_list.speaker_items.filter(order__isnull=True, user=user).count()
 
-    def get_cmp_val(self, speaker_list: SpeakerList, user: User) -> int:
+    def get_cmp_val(self, speaker_list: SpeakerList, user: AbstractUser) -> int:
         count = self.get_spoken_count(speaker_list, user)
         if self.max_times and count > self.max_times:
             return self.max_times

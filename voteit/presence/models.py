@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from django.contrib.auth.models import User
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.timezone import now
 from django_fsm import FSMField, transition
@@ -17,9 +18,14 @@ class Presence(models.Model):
     It's only possible to create/delete this if the presence_check is open.
     As an object, there's no usecase to allow change since it implies tampering with the system.
     """
-    user = models.ForeignKey(User, on_delete=models.PROTECT)
-    presence_check = models.ForeignKey("PresenceCheck", on_delete=models.CASCADE, related_name="presences")
-    created = models.DateTimeField(editable=False, auto_now_add=True)
+
+    user: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+    )
+    presence_check: PresenceCheck = models.ForeignKey(
+        "PresenceCheck", on_delete=models.CASCADE, related_name="presences"
+    )
+    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
 
     class Meta:
         constraints = [
@@ -42,13 +48,14 @@ class PresenceCheck(models.Model):
     It should be okay to delete the whole PresenceSystem though,
     since deleting is better than tampering :)
     """
+
     state: str = FSMField(
         default=PresenceCheckWf.initial,
         choices=PresenceCheckWf.choices(),
         protected=True,
     )
     present_users = models.ManyToManyField(
-        User, through=Presence, related_name="presences"
+        settings.AUTH_USER_MODEL, through=Presence, related_name="presences"
     )
     presence_system: PresenceSystem = models.ForeignKey(
         "PresenceSystem", on_delete=models.CASCADE, related_name="presence_checks"
@@ -73,6 +80,7 @@ class PresenceSystem(models.Model):
     Most of the permission checks for this system is delegated to the related meeting,
     so there's no separate role to run presence checks.
     """
+
     meeting: Optional[Meeting] = models.OneToOneField(
         Meeting, on_delete=models.CASCADE, null=True
     )

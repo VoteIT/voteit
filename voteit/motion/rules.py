@@ -1,24 +1,21 @@
 from __future__ import annotations
 
 import rules
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
+
 from voteit.core.rules import is_author
 from voteit.motion.permissions import MotionPermissions
 from voteit.motion.permissions import MotionProcessPermissions
 from voteit.motion.workflows import MotionProcessWf
 from voteit.motion.workflows import MotionWf
-
 from voteit.motion.models import MotionProcess
 from voteit.motion.models import Motion
-
-
-# Role definitions
 from voteit.organisation.models import Organisation
 from voteit.organisation.permissions import OrgPermissions
 
 
 @rules.predicate
-def is_mp_viewer(user: User, motion_process: MotionProcess):
+def is_mp_viewer(user: AbstractUser, motion_process: MotionProcess):
     """ User can view the process. """
     return (
         isinstance(motion_process, MotionProcess)
@@ -27,7 +24,7 @@ def is_mp_viewer(user: User, motion_process: MotionProcess):
 
 
 @rules.predicate
-def is_mp_mover(user: User, motion_process: MotionProcess):
+def is_mp_mover(user: AbstractUser, motion_process: MotionProcess):
     """ Someone who's has the role that enables them to submit motions.
     """
     return (
@@ -37,22 +34,21 @@ def is_mp_mover(user: User, motion_process: MotionProcess):
 
 
 @rules.predicate
-def is_mp_manager(user: User, motion_process: MotionProcess):
+def is_mp_manager(user: AbstractUser, motion_process: MotionProcess):
     return (
         isinstance(motion_process, MotionProcess)
         and motion_process.managers.filter(pk=user.pk).exists()
     )
 
 
-
 # MotionProcess permissions
 @rules.predicate
-def can_add_motion_process(user: User, organisation: Organisation):
+def can_add_motion_process(user: AbstractUser, organisation: Organisation):
     return user.has_perm(OrgPermissions.MANAGE, organisation)
 
 
 @rules.predicate
-def can_view_motion_process(user: User, motion_process: MotionProcess):
+def can_view_motion_process(user: AbstractUser, motion_process: MotionProcess):
     return motion_process.public or is_mp_viewer(user, motion_process)
 
 
@@ -65,7 +61,7 @@ rules.add_perm(MotionProcessPermissions.DELETE, is_mp_manager)
 
 # Motion permissions
 @rules.predicate
-def can_add_motion(user: User, motion_process: MotionProcess):
+def can_add_motion(user: AbstractUser, motion_process: MotionProcess):
     """ Is it possible for the current user to create a motion within this motionprocess?
     """
     if isinstance(motion_process, MotionProcess):
@@ -77,7 +73,7 @@ def can_add_motion(user: User, motion_process: MotionProcess):
 
 
 @rules.predicate
-def can_change_motion(user: User, motion: Motion):
+def can_change_motion(user: AbstractUser, motion: Motion):
     """ Change the text, add proposals etc.
     """
     return is_mp_manager(user, motion.motion_process) or (
@@ -88,7 +84,7 @@ def can_change_motion(user: User, motion: Motion):
 
 
 @rules.predicate
-def can_view_motion(user: User, motion: Motion):
+def can_view_motion(user: AbstractUser, motion: Motion):
     """ Motions can always be viewed by their author and managers.
         Other users may view motions in the state published, accepted or rejected if any of these are true:
         - The motion process is public
@@ -103,7 +99,7 @@ def can_view_motion(user: User, motion: Motion):
 
 
 @rules.predicate
-def can_submit_motion(user: User, motion: Motion):
+def can_submit_motion(user: AbstractUser, motion: Motion):
     """ Is the author of the motion able to submit it?
     """
     return (
@@ -114,7 +110,7 @@ def can_submit_motion(user: User, motion: Motion):
 
 
 @rules.predicate
-def can_retract_motion(user: User, motion: Motion):
+def can_retract_motion(user: AbstractUser, motion: Motion):
     """ Is the author of the motion able to submit it?
     """
     return (
@@ -125,7 +121,7 @@ def can_retract_motion(user: User, motion: Motion):
 
 
 @rules.predicate
-def can_manage_motion(user: User, motion: Motion):
+def can_manage_motion(user: AbstractUser, motion: Motion):
     return is_mp_manager(user, motion.motion_process)
 
 

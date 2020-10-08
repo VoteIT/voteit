@@ -1,5 +1,6 @@
 import rules
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
+
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.rules import is_participant
@@ -11,7 +12,7 @@ from voteit.presence.workflows import PresenceCheckWf
 
 
 @rules.predicate
-def can_add_presence_system(user: User, meeting: Meeting):
+def can_add_presence_system(user: AbstractUser, meeting: Meeting):
     """ Delegate check to moderate perm on meeting. """
     return isinstance(meeting, Meeting) and user.has_perm(
         MeetingPermissions.MODERATE, meeting
@@ -19,7 +20,7 @@ def can_add_presence_system(user: User, meeting: Meeting):
 
 
 @rules.predicate
-def can_manage_presence_system(user: User, system: PresenceSystem):
+def can_manage_presence_system(user: AbstractUser, system: PresenceSystem):
     """ Delegate check to moderate perm on meeting. """
 
     return isinstance(system, PresenceSystem) and user.has_perm(
@@ -28,7 +29,7 @@ def can_manage_presence_system(user: User, system: PresenceSystem):
 
 
 @rules.predicate
-def can_view_presence_system(user: User, system: PresenceSystem):
+def can_view_presence_system(user: AbstractUser, system: PresenceSystem):
     """ Delegate check to view perm on meeting. """
 
     return isinstance(system, PresenceSystem) and user.has_perm(
@@ -43,7 +44,7 @@ rules.add_perm(PresenceSystemPermissions.VIEW, can_view_presence_system)
 
 
 @rules.predicate
-def can_add_presence_check(user: User, system: PresenceSystem):
+def can_add_presence_check(user: AbstractUser, system: PresenceSystem):
     """ Delegate check to meeting. """
     return isinstance(system, PresenceSystem) and user.has_perm(
         MeetingPermissions.MODERATE, system.meeting
@@ -51,7 +52,7 @@ def can_add_presence_check(user: User, system: PresenceSystem):
 
 
 @rules.predicate
-def is_check_ongoing(user: User, presence_check: PresenceCheck):
+def is_check_ongoing(user: AbstractUser, presence_check: PresenceCheck):
     return (
         isinstance(presence_check, PresenceCheck)
         and presence_check.state == PresenceCheckWf.OPEN
@@ -59,7 +60,7 @@ def is_check_ongoing(user: User, presence_check: PresenceCheck):
 
 
 @rules.predicate
-def can_manage_presence_check(user: User, presence_check: PresenceCheck):
+def can_manage_presence_check(user: AbstractUser, presence_check: PresenceCheck):
     """ Delegate check to meeting. """
     return isinstance(presence_check, PresenceCheck) and user.has_perm(
         MeetingPermissions.MODERATE, presence_check.presence_system.meeting
@@ -67,7 +68,7 @@ def can_manage_presence_check(user: User, presence_check: PresenceCheck):
 
 
 @rules.predicate
-def can_view_presence_check(user: User, presence_check: PresenceCheck):
+def can_view_presence_check(user: AbstractUser, presence_check: PresenceCheck):
     """ Delegate check to meeting. """
     return isinstance(presence_check, PresenceCheck) and user.has_perm(
         MeetingPermissions.VIEW, presence_check.presence_system.meeting
@@ -83,7 +84,7 @@ rules.add_perm(PresenceCheckPermissions.VIEW, can_view_presence_check)
 
 
 @rules.predicate
-def can_add_presence(user: User, presence_check: PresenceCheck):
+def can_add_presence(user: AbstractUser, presence_check: PresenceCheck):
     return (
         isinstance(presence_check, PresenceCheck)
         and is_check_ongoing(user, presence_check)
@@ -95,7 +96,7 @@ def can_add_presence(user: User, presence_check: PresenceCheck):
 
 
 @rules.predicate
-def can_delete_presence(user: User, presence: Presence):
+def can_delete_presence(user: AbstractUser, presence: Presence):
     return (
         isinstance(presence, Presence)
         and is_check_ongoing(user, presence.presence_check)
@@ -107,7 +108,7 @@ def can_delete_presence(user: User, presence: Presence):
 
 
 @rules.predicate
-def can_view_presence(user: User, presence: Presence):
+def can_view_presence(user: AbstractUser, presence: Presence):
     # FIXME: We don't really know about the permissions that should be used for this
     # GDPR might change this behaviour
     return (

@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.db import models
 from django_fsm import FSMField
 from django_fsm import transition
@@ -33,7 +33,7 @@ class MotionProcess(BaseContent):
         default=False,
     )
     viewer = models.ManyToManyField(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_(
             "In case this process isn't public, add users who should be able to view here"
         ),
@@ -41,13 +41,13 @@ class MotionProcess(BaseContent):
         related_name="viewer_in_motionprocesses",
     )
     movers = models.ManyToManyField(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Users able to write motions - always able to view too."),
         blank=True,
         related_name="mover_in_motionprocesses",
     )
     managers = models.ManyToManyField(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Managers for the process"),
         blank=True,
         related_name="manager_in_motionprocesses",
@@ -61,7 +61,7 @@ class MotionProcess(BaseContent):
     def close(self):
         pass
 
-    def get_selected_motions_qs(self, states: List[str] = None):
+    def get_selected_motions_qs(self, states: List[str] = None) -> models.QuerySet:
         if states is None:
             states = [MotionWf.ACCEPTED]
         return self.motions.filter(state__in=states).order_by("created")
@@ -89,7 +89,9 @@ class Motion(BaseContent):
         MotionProcess, on_delete=models.CASCADE, related_name="motions"
     )
     body = models.TextField()
-    author = models.ForeignKey(User, on_delete=models.PROTECT, related_name="motions")
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="motions"
+    )
 
     @transition(
         field=state,

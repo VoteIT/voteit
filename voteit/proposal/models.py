@@ -1,4 +1,5 @@
-from django.contrib.auth.models import User
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django_fsm import FSMField, transition
 
@@ -12,7 +13,7 @@ class Proposal(BaseContent):
         default=ProposalWf.initial, choices=ProposalWf.choices(), protected=True
     )
     author = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         editable=True,
         null=True,

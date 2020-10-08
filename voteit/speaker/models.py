@@ -3,11 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Optional, Type
 
-from django.contrib.auth.models import User
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
-from django.db.models.signals import pre_save, post_save, post_delete
+from django.db.models.signals import post_delete
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
@@ -54,14 +56,14 @@ class SpeakerListSystem(models.Model):
     method_id: int = models.PositiveIntegerField(null=True)
     method: ListMethod = GenericForeignKey("method_type", "method_id")
     moderators = models.ManyToManyField(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("Users who may moderate the speaker lists"),
         blank=True,
         related_name="moderator_in_list_systems",
         editable=False,
     )
     speakers = models.ManyToManyField(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_(
             "Users who may ask to speak (i.e. enter a list) depending on if they're open or not"
         ),
@@ -90,7 +92,7 @@ class Speaker(models.Model):
     """ Information about a user who's entered a speaker list.
     """
 
-    user: User = models.ForeignKey(User, on_delete=models.PROTECT)
+    user: AbstractUser = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     list: SpeakerList = models.ForeignKey(
         "SpeakerList", on_delete=models.CASCADE, related_name="speaker_items"
     )
@@ -184,7 +186,7 @@ class SpeakerList(models.Model):
         AgendaItem, on_delete=models.CASCADE, null=True, related_name="speaker_lists"
     )
     speakers = models.ManyToManyField(
-        User, through=Speaker, related_name="speaker_lists"
+        settings.AUTH_USER_MODEL, through=Speaker, related_name="speaker_lists"
     )
 
     @property

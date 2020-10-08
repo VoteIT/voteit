@@ -1,5 +1,5 @@
 import rules
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 
@@ -17,7 +17,7 @@ from voteit.speaker.workflows import SpeakerListWf
 
 
 @rules.predicate
-def is_list_moderator(user: User, list_system: SpeakerListSystem) -> bool:
+def is_list_moderator(user: AbstractUser, list_system: SpeakerListSystem) -> bool:
     return (
         isinstance(list_system, SpeakerListSystem)
         and list_system.moderators.filter(pk=user.pk).exists()
@@ -25,7 +25,7 @@ def is_list_moderator(user: User, list_system: SpeakerListSystem) -> bool:
 
 
 @rules.predicate
-def is_list_speaker(user: User, list_system: SpeakerListSystem) -> bool:
+def is_list_speaker(user: AbstractUser, list_system: SpeakerListSystem) -> bool:
     return (
         isinstance(list_system, SpeakerListSystem)
         and list_system.speakers.filter(pk=user.pk).exists()
@@ -33,7 +33,7 @@ def is_list_speaker(user: User, list_system: SpeakerListSystem) -> bool:
 
 
 @rules.predicate
-def can_add_speaker(user: User, speaker_list: SpeakerList):
+def can_add_speaker(user: AbstractUser, speaker_list: SpeakerList):
     """
         Add a speaker to a list if:
         1. The list is open AND you're a speaker
@@ -49,7 +49,7 @@ def can_add_speaker(user: User, speaker_list: SpeakerList):
 
 
 @rules.predicate
-def can_change_speaker(user: User, speaker: Speaker):
+def can_change_speaker(user: AbstractUser, speaker: Speaker):
     """ Only moderators."""
     return isinstance(speaker, Speaker) and is_list_moderator(
         user, speaker.list.list_system
@@ -57,7 +57,7 @@ def can_change_speaker(user: User, speaker: Speaker):
 
 
 @rules.predicate
-def can_delete_speaker(user: User, speaker: Speaker):
+def can_delete_speaker(user: AbstractUser, speaker: Speaker):
     """ Users may delete themselves (remove from list) if they're queued,
         but never if they're speaking or if it's an old entry.
         Moderators can always delete.
@@ -69,7 +69,7 @@ def can_delete_speaker(user: User, speaker: Speaker):
 
 
 @rules.predicate
-def can_view_speaker(user: User, speaker: Speaker):
+def can_view_speaker(user: AbstractUser, speaker: Speaker):
     """ View permission on attached meeting, speakers or list moderators"""
     # FIXME: This might change a lot
     if isinstance(speaker, Speaker):
@@ -88,26 +88,26 @@ rules.add_perm(SpeakerPermissions.VIEW, can_view_speaker)
 
 
 @rules.predicate
-def can_add_speaker_list(user: User, list_system: SpeakerListSystem):
+def can_add_speaker_list(user: AbstractUser, list_system: SpeakerListSystem):
     return is_list_moderator(user, list_system)
 
 
 @rules.predicate
-def can_change_speaker_List(user: User, speaker_list: SpeakerList):
+def can_change_speaker_List(user: AbstractUser, speaker_list: SpeakerList):
     return isinstance(speaker_list, SpeakerList) and is_list_moderator(
         user, speaker_list.list_system
     )
 
 
 @rules.predicate
-def can_delete_speaker_list(user: User, speaker_list: SpeakerList):
+def can_delete_speaker_list(user: AbstractUser, speaker_list: SpeakerList):
     return isinstance(speaker_list, SpeakerList) and is_list_moderator(
         user, speaker_list.list_system
     )
 
 
 @rules.predicate
-def can_view_speaker_list(user: User, speaker_list: SpeakerList):
+def can_view_speaker_list(user: AbstractUser, speaker_list: SpeakerList):
     """ Delegate to speaker list system VIEW
     """
     return isinstance(speaker_list, SpeakerList) and user.has_perm(
@@ -122,7 +122,7 @@ rules.add_perm(SpeakerListPermissions.VIEW, can_view_speaker_list)
 
 
 @rules.predicate
-def can_add_system(user: User, context: Meeting):
+def can_add_system(user: AbstractUser, context: Meeting):
     if isinstance(context, Meeting):
         # FIXME might be a good idea to add other guards too
         return user.has_perm(MeetingPermissions.CHANGE, context)
@@ -130,17 +130,17 @@ def can_add_system(user: User, context: Meeting):
 
 
 @rules.predicate
-def can_change_system(user: User, system: SpeakerListSystem):
+def can_change_system(user: AbstractUser, system: SpeakerListSystem):
     return is_list_moderator(user, system)
 
 
 @rules.predicate
-def can_delete_system(user: User, system: SpeakerListSystem):
+def can_delete_system(user: AbstractUser, system: SpeakerListSystem):
     return is_list_moderator(user, system)
 
 
 @rules.predicate
-def can_view_system(user: User, system: SpeakerListSystem):
+def can_view_system(user: AbstractUser, system: SpeakerListSystem):
     if isinstance(system, SpeakerListSystem):
         return (
             is_list_speaker(user, system)

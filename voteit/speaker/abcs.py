@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from logging import getLogger
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, List
 
-from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericRelation
 from django.db.models import Max
 
@@ -12,7 +11,6 @@ from voteit.core.models import ABCModel
 
 if TYPE_CHECKING:
     from voteit.speaker.models import SpeakerListSystem
-    from voteit.speaker.models import Speaker
     from voteit.speaker.models import SpeakerList
 
 logger = getLogger(__name__)

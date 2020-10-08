@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod, ABCMeta
 from typing import List, Type, Set, Iterator
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
 from django.db.models import ManyToManyField
 from django.db.models import Model
 
@@ -59,7 +59,7 @@ class Role(ABC, metaclass=RoleMeta):
         self.m2m_relation = getattr(instance, self.m2m_field)
         # FIXME: Check that returned attr is a ManyRelatedManager class
 
-    def add(self, *users: List[User]):
+    def add(self, *users: List[AbstractUser]):
         """ Give a list of users this role, and if it depends on some other role,
             give the users that role too.
             Example: Discusser role requires someone to be able to view the meeting,
@@ -71,7 +71,7 @@ class Role(ABC, metaclass=RoleMeta):
             role = role_type(self.instance)
             role.add(*users)
 
-    def remove(self, *users: List[User]):
+    def remove(self, *users: List[AbstractUser]):
         """ Remove this role from a list of users.
             If the role that's removed is required by other roles, remove those as well.
         """
@@ -81,7 +81,7 @@ class Role(ABC, metaclass=RoleMeta):
             role = role_type(self.instance)
             role.remove(*users)
 
-    def __contains__(self, user: User):
+    def __contains__(self, user: AbstractUser):
         return self.m2m_relation.filter(pk=user.pk).exists()
 
     @classmethod
@@ -128,7 +128,7 @@ class RoleRegistry(Registry):
             if role.valid_for(instance):
                 yield role
 
-    def get_assigned_roles(self, instance: Model, user: User) -> Set:
+    def get_assigned_roles(self, instance: Model, user: AbstractUser) -> Set:
         """ Return all classes this user has in this instance.
         """
         results = set()
