@@ -26,6 +26,8 @@ class ModelsTestCase(TestCase):
         roles.Participant(self.meeting).add(self.user1, self.user2)
 
     def test_role_set(self):
+        with self.assertRaises(ValueError):
+            next(self.like_button.get_valid_roles(None, 'bad_mode'))
         self.assertEqual(self.like_button.role_set.count(), 1)
         self.assertEqual(self.accessible_button.role_set.count(), 2)
         self.assertIs(self.like_button.role_set.first().role, roles.Participant)

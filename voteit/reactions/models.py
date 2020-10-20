@@ -68,7 +68,8 @@ class ReactionButton(models.Model):
 
 class ReactionRoles(models.Model):
     """ Handles roles and their permissions for a specific button. """
-    MODES = ('view', 'change', 'list')
+    MODES = 'view', 'change', 'list',
+
     button = models.ForeignKey(ReactionButton, models.CASCADE, related_name='role_set')
     content_type = models.ForeignKey(ContentType, models.CASCADE)
     role = RoleField(Meeting, null=False, blank=False)
