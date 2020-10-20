@@ -2,19 +2,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import rules
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
 
 from voteit.core.rules import is_not_archived
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
-from voteit.meeting.workflows import MeetingWf
 
 if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
 
 
 @rules.predicate
-def is_participant(user: User, meeting: Meeting) -> bool:
+def is_participant(user: AbstractUser, meeting: Meeting) -> bool:
     return (
         isinstance(meeting, Meeting)
         and meeting.participants.filter(pk=user.pk).exists()
@@ -22,7 +21,7 @@ def is_participant(user: User, meeting: Meeting) -> bool:
 
 
 @rules.predicate
-def is_potential_voter(user: User, meeting: Meeting) -> bool:
+def is_potential_voter(user: AbstractUser, meeting: Meeting) -> bool:
     return (
         isinstance(meeting, Meeting)
         and meeting.potential_voters.filter(pk=user.pk).exists()
@@ -30,34 +29,34 @@ def is_potential_voter(user: User, meeting: Meeting) -> bool:
 
 
 @rules.predicate
-def is_moderator(user: User, meeting: Meeting) -> bool:
+def is_moderator(user: AbstractUser, meeting: Meeting) -> bool:
     return (
         isinstance(meeting, Meeting) and meeting.moderators.filter(pk=user.pk).exists()
     )
 
 
 @rules.predicate
-def is_discusser(user: User, meeting: Meeting) -> bool:
+def is_discusser(user: AbstractUser, meeting: Meeting) -> bool:
     return (
         isinstance(meeting, Meeting) and meeting.discussers.filter(pk=user.pk).exists()
     )
 
 
 @rules.predicate
-def is_proposer(user: User, meeting: Meeting) -> bool:
+def is_proposer(user: AbstractUser, meeting: Meeting) -> bool:
     return (
         isinstance(meeting, Meeting) and meeting.proposers.filter(pk=user.pk).exists()
     )
 
 
 @rules.predicate
-def is_public(user: User, meeting: Meeting) -> bool:
+def is_public(user: AbstractUser, meeting: Meeting) -> bool:
     return isinstance(meeting, Meeting) and meeting.public
 
 
 # Object permissions
 @rules.predicate
-def can_add_meeting(user: User, organisation: Organisation):
+def can_add_meeting(user: AbstractUser, organisation: Organisation):
     """ Meetings are added from organisations, so the check is against an organisation. """
     from voteit.organisation.rules import is_manager
     from voteit.organisation.rules import is_meeting_creator

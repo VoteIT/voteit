@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import TYPE_CHECKING, Generator
 
-from django.contrib.auth.models import User
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -37,7 +38,7 @@ class Meeting(BaseContent):
         verbose_name=_("Is this meeting viewable by anyone?"), default=False
     )
     participants = models.ManyToManyField(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_(
             "User can participate in some form. "
             "This is basically read permission, unless the process is public."
@@ -47,28 +48,28 @@ class Meeting(BaseContent):
         editable=False,
     )
     potential_voters = models.ManyToManyField(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("This user may become a voter in this meeting."),
         blank=True,
         related_name="potential_voter_in_meetings",
         editable=False,
     )
     discussers = models.ManyToManyField(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("User may add discussion posts."),
         blank=True,
         related_name="discusser_in_meetings",
         editable=False,
     )
     proposers = models.ManyToManyField(
-        User,
+        settings.AUTH_USER_MODEL,
         verbose_name=_("User may add proposals."),
         blank=True,
         related_name="proposer_in_meetings",
         editable=False,
     )
     moderators = models.ManyToManyField(
-        User, blank=True, related_name="moderator_in_meetings", editable=False
+        settings.AUTH_USER_MODEL, blank=True, related_name="moderator_in_meetings", editable=False
     )
     er_policy_type = models.ForeignKey(
         ContentType, on_delete=models.CASCADE, null=True, editable=False

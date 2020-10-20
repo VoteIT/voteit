@@ -11,7 +11,6 @@ __all__ = ("MPViewer", "MPMover", "MPManager")
 
 @roles
 class MPViewer(Role):
-    rule = is_mp_viewer
     model = MotionProcess
     m2m_field = "viewer"
     title = _("Motion process viewer")
@@ -20,7 +19,6 @@ class MPViewer(Role):
 
 @roles
 class MPMover(Role):
-    rule = is_mp_mover
     model = MotionProcess
     m2m_field = "movers"
     title = _("Motion process mover")
@@ -32,7 +30,6 @@ MPMover.add_requirement(MPViewer)
 
 @roles
 class MPManager(Role):
-    rule = is_mp_manager
     model = MotionProcess
     m2m_field = "managers"
     title = _("Motion process manager")

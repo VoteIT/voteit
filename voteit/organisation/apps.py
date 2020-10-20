@@ -9,3 +9,4 @@ class OrganisationConfig(AppConfig):
     def ready(self):
         # Make sure code is imported + registered
         from voteit.organisation import roles
+        from voteit.organisation import rules

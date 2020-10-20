@@ -4,7 +4,6 @@ from django.db import models
 from typing import List, Union, Type
 
 from voteit.core.models import ABCModel
-from voteit.core.role import get_valid_roles
 from voteit.core.role import Role
 from voteit.core.role import roles
 
@@ -38,7 +37,7 @@ class AccessPolicy(ABCModel):
         """
 
     def get_valid_roles(self) -> List[Type[Role]]:
-        return get_valid_roles(self.meeting)
+        return roles.get_valid_roles(self.meeting)
 
     def prep_roles(self, *role_list: List[Union[str, Type[Role]]]) -> List[Role]:
         """ Take a list of role classes or strings. Check that

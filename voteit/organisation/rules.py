@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 import rules
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
 
 from voteit.organisation.permissions import OrgPermissions
 
@@ -10,12 +10,12 @@ if TYPE_CHECKING:
 
 
 @rules.predicate
-def is_manager(user: User, organisation: Organisation):
+def is_manager(user: AbstractUser, organisation: Organisation):
     return organisation.managers.filter(pk=user.pk).exists()
 
 
 @rules.predicate
-def is_meeting_creator(user: User, organisation: Organisation):
+def is_meeting_creator(user: AbstractUser, organisation: Organisation):
     return organisation.meeting_creators.filter(pk=user.pk).exists()
 
 

@@ -5,7 +5,8 @@ from hashlib import sha512
 from json import dumps
 from logging import getLogger
 
-from django.contrib.auth.models import User
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -31,19 +32,23 @@ logger = getLogger(__name__)
 
 
 class VoterWeight(models.Model):
-    register = models.ForeignKey('ElectoralRegister', on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    register = models.ForeignKey("ElectoralRegister", on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     weight = models.PositiveIntegerField(default=1)
 
 
 class ElectoralRegister(models.Model):
     created = models.DateTimeField(editable=False, auto_now_add=True)
-    voters = models.ManyToManyField(User, through=VoterWeight, related_name="electoral_registers")
+    voters = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        through=VoterWeight,
+        related_name="electoral_registers",
+    )
     meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="electoral_registers", null=True
     )
 
-    def get_voter_weight(self, user: User) -> int:
+    def get_voter_weight(self, user: AbstractUser) -> int:
         """
         Allow votes to have a weight in some contexts.
         Will raise VoterWeight.DoesNotExist if user not in registry.
@@ -123,7 +128,12 @@ class Poll(BaseContent):
     def upcoming(self):
         pass
 
-    @transition(field=state, source=PollWf.UPCOMING, target=PollWf.ONGOING, conditions=[start_check])
+    @transition(
+        field=state,
+        source=PollWf.UPCOMING,
+        target=PollWf.ONGOING,
+        conditions=[start_check],
+    )
     def ongoing(self):
         self.started = now()
 

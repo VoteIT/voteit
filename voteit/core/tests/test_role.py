@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.dispatch import receiver
 from django.test import TestCase
 
 
@@ -9,25 +10,22 @@ class RoleTests(TestCase):
         self.user = User.objects.create(username="jane")
         self.meeting = Meeting.objects.create()
 
-    def tearDown(self):
-        from voteit.core.role import roles
-
-        roles.pop("helloclass", None)
-
     @property
     def _cut(self):
         from voteit.core.role import Role
 
         return Role
 
+    def setup_registry(self):
+        from voteit.core.role import RoleRegistry
+        return RoleRegistry(self._cut)
+
     @property
     def MeetingParticipant(self):
         """ Use this instead since Role is an abstract implementation. """
-        from voteit.meeting.rules import is_participant
         from voteit.meeting.models import Meeting
 
         class MeetingParticipant(self._cut):
-            rule = is_participant
             model = Meeting
             m2m_field = "participants"
             title = "Meeting participant"
@@ -35,19 +33,16 @@ class RoleTests(TestCase):
 
         return MeetingParticipant
 
-    def _register_helloclass(self):
-        from voteit.core.role import roles
-
-        @roles
+    def _register_helloclass(self, decorator):
+        @decorator
         class HelloClass(self.MeetingParticipant):
             pass
 
         return HelloClass
 
     def test_registration(self):
-        from voteit.core.role import roles
-
-        self._register_helloclass()
+        roles = self.setup_registry()
+        self._register_helloclass(roles)
         self.assertIn("meetingparticipant", roles)
 
     def test_wrong_instance_type(self):
@@ -66,31 +61,22 @@ class RoleTests(TestCase):
         participants.remove(self.user)
         self.assertNotIn(self.user, participants)
 
-    def test_rule(self):
-        participants = self.MeetingParticipant(self.meeting)
-        self.assertFalse(participants.allowed(self.user))
-        participants.add(self.user)
-        self.assertTrue(participants.allowed(self.user))
-
     def test_valid_roles(self):
-        from voteit.core.role import get_valid_roles
-
-        self.assertEqual(set(), set(get_valid_roles(object)))
-
-        HelloClass = self._register_helloclass()
-
-        self.assertIn(HelloClass, set(get_valid_roles(self.meeting)))
+        roles = self.setup_registry()
+        self.assertEqual(set(), set(roles.get_valid_roles(object)))
+        HelloClass = self._register_helloclass(roles)
+        self.assertIn(HelloClass, set(roles.get_valid_roles(self.meeting)))
 
     def test_assigned_roles(self):
-        from voteit.core.role import get_assigned_roles
+        roles = self.setup_registry()
 
-        HelloClass = self._register_helloclass()
+        HelloClass = self._register_helloclass(roles)
 
-        self.assertEqual(set(), set(get_assigned_roles(self.meeting, self.user)))
+        self.assertEqual(set(), set(roles.get_assigned_roles(self.meeting, self.user)))
 
         HelloClass(self.meeting).add(self.user)
 
-        self.assertIn(HelloClass, set(get_assigned_roles(self.meeting, self.user)))
+        self.assertIn(HelloClass, set(roles.get_assigned_roles(self.meeting, self.user)))
 
     def test_role_requirement_add(self):
         from voteit.meeting.roles import Participant
@@ -122,9 +108,44 @@ class RoleTests(TestCase):
 
     def test_role_requirement_other_kind_of_role(self):
         from voteit.organisation.roles import OrgManager
-        hello_cls = self._register_helloclass()
+        roles = self.setup_registry()
+        roles(OrgManager)
+        hello_cls = self._register_helloclass(roles)
         self.assertRaises(TypeError, hello_cls.add_requirement, OrgManager)
 
     def test_role_requirement_to_self(self):
-        hello_cls = self._register_helloclass()
+        roles = self.setup_registry()
+        hello_cls = self._register_helloclass(roles)
         self.assertRaises(ValueError, hello_cls.add_requirement, hello_cls)
+
+    def test_signal_role_added(self):
+        from voteit.core.signals import role_added
+        roles = self.setup_registry()
+        HelloClass = self._register_helloclass(roles)
+
+        L = []
+
+        @receiver(role_added, sender=HelloClass)
+        def my_listener(users=[], **kw):
+            L.extend(users)
+
+        hello = HelloClass(self.meeting)
+        hello.add(self.user)
+        self.assertIn(self.user, L)
+
+    def test_signal_role_removed(self):
+        from voteit.core.signals import role_removed
+        roles = self.setup_registry()
+        HelloClass = self._register_helloclass(roles)
+
+        L = []
+
+        @receiver(role_removed, sender=HelloClass)
+        def my_listener(users=[], **kw):
+            L.extend(users)
+
+        hello = HelloClass(self.meeting)
+        hello.add(self.user)
+        self.assertNotIn(self.user, L)
+        hello.remove(self.user)
+        self.assertIn(self.user, L)

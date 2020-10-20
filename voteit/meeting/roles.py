@@ -17,7 +17,6 @@ class Participant(Role):
     """ Someone who can view a meeting.
     """
 
-    rule = is_participant
     model = Meeting
     m2m_field = "participants"
     title = _("Meeting participant")
@@ -26,7 +25,6 @@ class Participant(Role):
 
 @roles
 class Moderator(Role):
-    rule = is_moderator
     model = Meeting
     m2m_field = "moderators"
     title = _("Meeting moderator")
@@ -38,7 +36,6 @@ Moderator.add_requirement(Participant)
 
 @roles
 class PotentialVoter(Role):
-    rule = is_potential_voter
     model = Meeting
     m2m_field = "potential_voters"
     title = _("Potential voter")
@@ -50,7 +47,6 @@ PotentialVoter.add_requirement(Participant)
 
 @roles
 class Discusser(Role):
-    rule = is_discusser
     model = Meeting
     m2m_field = "discussers"
     title = _("Discusser")
@@ -62,7 +58,6 @@ Discusser.add_requirement(Participant)
 
 @roles
 class Proposer(Role):
-    rule = is_proposer
     model = Meeting
     m2m_field = "proposers"
     title = _("Proposer")

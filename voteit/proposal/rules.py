@@ -1,27 +1,32 @@
 import rules
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
+
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rules import is_non_private_ai
-from voteit.core.rules import is_author, is_not_finished
-from voteit.meeting.rules import is_moderator, is_proposer, is_participant, is_public
+from voteit.core.rules import is_not_finished
+from voteit.core.rules import is_author
+from voteit.meeting.rules import is_moderator
+from voteit.meeting.rules import is_participant
+from voteit.meeting.rules import is_proposer
+from voteit.meeting.rules import is_public
 from voteit.proposal.models import Proposal
 from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
 
 
-def is_not_proposal_blocked(user: User, agenda_item: AgendaItem):
+def is_not_proposal_blocked(user: AbstractUser, agenda_item: AgendaItem):
     return isinstance(agenda_item, AgendaItem) and not agenda_item.block_proposals
 
 
-def is_not_used_in_poll(user: User, proposal: Proposal):
+def is_not_used_in_poll(user: AbstractUser, proposal: Proposal):
     return isinstance(proposal, Proposal) and proposal.polls.count() == 0
 
 
-def is_published(user: User, proposal: Proposal):
+def is_published(user: AbstractUser, proposal: Proposal):
     return isinstance(proposal, Proposal) and proposal.state in ProposalWf.PUBLISHED
 
 
-def can_add_proposal(user: User, agenda_item: AgendaItem):
+def can_add_proposal(user: AbstractUser, agenda_item: AgendaItem):
     """ Moderators can always add in agenda items that aren't closed. """
     if isinstance(agenda_item, AgendaItem) and is_not_finished(user, agenda_item):
         return is_moderator(user, agenda_item.meeting) or (
@@ -31,7 +36,7 @@ def can_add_proposal(user: User, agenda_item: AgendaItem):
         )
 
 
-def can_view_proposal(user: User, proposal: Proposal):
+def can_view_proposal(user: AbstractUser, proposal: Proposal):
     """ Currently discussions can't exist outside of agenda items and meeting. That might change.
     """
     try:
@@ -45,7 +50,7 @@ def can_view_proposal(user: User, proposal: Proposal):
     )
 
 
-def can_change_proposal(user: User, proposal: Proposal):
+def can_change_proposal(user: AbstractUser, proposal: Proposal):
     """ Users have traditionally not been able to change their posts in voteit. This should perhaps change.
     """
     # FIXME: Do we want versioning and allow changes here?
@@ -56,7 +61,7 @@ def can_change_proposal(user: User, proposal: Proposal):
     return is_not_finished(user, meeting) and is_moderator(user, meeting)
 
 
-def can_delete_proposal(user: User, proposal: Proposal):
+def can_delete_proposal(user: AbstractUser, proposal: Proposal):
     try:
         meeting = proposal.agenda_item.meeting  # Will catch None too
     except AttributeError:  # pragma: no coverage
@@ -68,7 +73,7 @@ def can_delete_proposal(user: User, proposal: Proposal):
     )
 
 
-def can_retract_proposal(user: User, proposal: Proposal):
+def can_retract_proposal(user: AbstractUser, proposal: Proposal):
     try:
         meeting = proposal.agenda_item.meeting  # Will catch None too
     except AttributeError:  # pragma: no coverage
