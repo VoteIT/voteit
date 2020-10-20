@@ -5,9 +5,10 @@ from django_fsm import FSMField, transition
 from voteit.core.models import BaseContent
 from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
+from voteit.reactions.mixins import Reactable
 
 
-class Proposal(BaseContent):
+class Proposal(BaseContent, Reactable):
     state = FSMField(
         default=ProposalWf.initial, choices=ProposalWf.choices(), protected=True
     )
