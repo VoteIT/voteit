@@ -2,6 +2,35 @@ from collections import UserDict
 
 
 class Registry(UserDict):
+    """ A simple dict registry for classes or other kind of factories.
+        Will validate abstract classes and subclasses.
+
+        Usage example:
+
+        >>> class AbstractFoo:
+        ...    pass
+
+        >>> foo_registry = Registry(AbstractFoo)
+
+        create a new class to register by class name
+
+        >>> @foo_registry
+        >>> class MyFoo(AbstractFoo):
+        ...     pass
+
+        Will be registered as "myfo"
+
+        You can either specify key by passing it to the decorator or using a name attribute.
+        The decorator has priority.
+
+        >>> @foo_registry("foo")
+        >>> class MyFoo(AbstractFoo):
+        ...     pass
+
+        >>> @foo_registry
+        >>> class MyFoo(AbstractFoo):
+        ...     name = "foo_fighters"
+    """
 
     def __init__(self, required):
         if not isinstance(required, type):  # pragma: no coverage
@@ -9,15 +38,18 @@ class Registry(UserDict):
         self.required = required
         super().__init__()
 
-    def __call__(self, factory):
-        if isinstance(factory, type):
-            # Class based
-            name = getattr(factory, 'name', factory.__name__.lower())
-        else:
-            # Object based
-            name = factory.name
-        self[name] = factory
-        return factory
+    def __call__(self, factory_or_name):
+        if isinstance(factory_or_name, str):
+            def _decorator(cls):
+                self[factory_or_name] = cls
+                return cls
+
+            return _decorator
+
+        # Class or instance
+        name = getattr(factory_or_name, 'name', factory_or_name.__name__.lower())
+        self[name] = factory_or_name
+        return factory_or_name
 
     def __setitem__(self, key:str, factory):
         if isinstance(factory, type):
