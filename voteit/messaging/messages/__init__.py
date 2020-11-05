@@ -43,4 +43,4 @@ class OutgoingErrorMessage(OutgoingPayload):
 
 def register():
     """ Just make sure all code is imported and registered. """
-    from . import channels, user, testing, agenda
+    from . import channels, user, testing, agenda, schema
