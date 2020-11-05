@@ -9,6 +9,9 @@ from voteit.proposal.workflows import ProposalWf
 from voteit.reactions.mixins import Reactable
 
 
+__all__ = 'Proposal',
+
+
 class Proposal(BaseContent, Reactable):
     state = FSMField(
         default=ProposalWf.initial, choices=ProposalWf.choices(), protected=True

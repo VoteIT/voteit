@@ -8,3 +8,4 @@ class ProposalConfig(AppConfig):
 
     def ready(self):
         from voteit.proposal import rules
+        from voteit.proposal import rest_api
