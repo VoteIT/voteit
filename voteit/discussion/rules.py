@@ -1,5 +1,5 @@
 import rules
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rules import is_non_private_ai
 from voteit.core.rules import is_author, is_not_archived
@@ -13,11 +13,11 @@ from voteit.meeting.rules import (
 from voteit.discussion.permissions import DiscussionPermissions
 
 
-def is_not_discussion_blocked(user: User, agenda_item: AgendaItem):
+def is_not_discussion_blocked(user: AbstractUser, agenda_item: AgendaItem):
     return isinstance(agenda_item, AgendaItem) and not agenda_item.block_discussion
 
 
-def can_add_discussion_post(user: User, agenda_item: AgendaItem):
+def can_add_discussion_post(user: AbstractUser, agenda_item: AgendaItem):
     """ Moderators can always add"""
     if isinstance(agenda_item, AgendaItem) and is_not_archived(
         user, agenda_item
@@ -29,7 +29,7 @@ def can_add_discussion_post(user: User, agenda_item: AgendaItem):
         )
 
 
-def can_view_discussion_post(user: User, discussion_post: DiscussionPost):
+def can_view_discussion_post(user: AbstractUser, discussion_post: DiscussionPost):
     """ Currently discussions can't exist outside of agenda items and meeting. That might change.
     """
     try:
@@ -43,7 +43,7 @@ def can_view_discussion_post(user: User, discussion_post: DiscussionPost):
     )
 
 
-def can_change_discussion_post(user: User, discussion_post: DiscussionPost):
+def can_change_discussion_post(user: AbstractUser, discussion_post: DiscussionPost):
     """ Users have traditionally not been able to change their posts in voteit. This should perhaps change.
     """
     # FIXME: Do we want versioning and allow changes here?
@@ -54,7 +54,7 @@ def can_change_discussion_post(user: User, discussion_post: DiscussionPost):
     return is_not_archived(user, meeting) and is_moderator(user, meeting)
 
 
-def can_delete_discussion_post(user: User, discussion_post: DiscussionPost):
+def can_delete_discussion_post(user: AbstractUser, discussion_post: DiscussionPost):
     try:
         meeting = discussion_post.agenda_item.meeting  # Will catch None too
     except AttributeError:  # pragma: no coverage

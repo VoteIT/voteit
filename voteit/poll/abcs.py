@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections import Counter
+from datetime import datetime
 from logging import getLogger
 from typing import TYPE_CHECKING
 from typing import Type
 
-from django.contrib.auth.models import User
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
 from django.db.models import UniqueConstraint
@@ -112,10 +114,12 @@ class MultipleWinnerPollMethod(PollMethod):
 
 
 class Vote(ABCModel):
-    user: User = models.ForeignKey(User, on_delete=models.PROTECT)
-    created = models.DateTimeField(editable=False, auto_now_add=True)
-    changed = models.DateTimeField(editable=False, auto_now=True)
-    abstain = models.BooleanField(default=False)
+    user: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+    )
+    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    changed: datetime = models.DateTimeField(editable=False, auto_now=True)
+    abstain: bool = models.BooleanField(default=False)
 
     @property
     @abstractmethod

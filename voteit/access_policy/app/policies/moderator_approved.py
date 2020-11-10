@@ -3,7 +3,8 @@ from __future__ import annotations
 from logging import getLogger
 from typing import List, Type, Union
 
-from django.contrib.auth.models import User
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django.db import models
@@ -25,7 +26,7 @@ class ModeratorApprovedAccess(AccessPolicy):
     name = "moderator_approved"
     title = _("Users apply for access, moderators approve manually")
 
-    def request_access(self, user: User, message: str = "") -> AccessRequest:
+    def request_access(self, user: AbstractUser, message: str = "") -> AccessRequest:
         #  FIXME: Block subsequent requests etc
         if AccessRequest.objects.filter(
             user=user, state=AcceptanceWf.UNHANDLED
@@ -55,13 +56,13 @@ class AccessRequest(models.Model):
         on_delete=models.CASCADE,
         related_name="access_requests",
     )
-    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     message = models.TextField(blank=True, null=True)
     moderator_message = models.TextField(blank=True, null=True)
     created = models.DateTimeField(editable=False, auto_now_add=True)
     handled_ts = models.DateTimeField(blank=True, null=True, editable=False)
     handled_by = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="+",
         blank=True,
@@ -79,7 +80,7 @@ class AccessRequest(models.Model):
     )
     def accept(
         self,
-        moderator_user: User,
+        moderator_user: AbstractUser,
         give_roles: List[Union[str, Type[Role]]],
         message: str = "",
     ):
@@ -98,7 +99,7 @@ class AccessRequest(models.Model):
         on_error=AcceptanceWf.UNHANDLED,
         permission=is_moderator,
     )
-    def reject(self, moderator_user: User, message: str = ""):
+    def reject(self, moderator_user: AbstractUser, message: str = ""):
         """ Moderator rejects request.
         """
         self._set_handled(moderator_user, message)
@@ -116,7 +117,7 @@ class AccessRequest(models.Model):
         self.handled_ts = None
         self.moderator_message = None
 
-    def _set_handled(self, moderator_user: User, message: str):
+    def _set_handled(self, moderator_user: AbstractUser, message: str):
         self.handled_by = moderator_user
         self.handled_ts = now()
         self.moderator_message = message
