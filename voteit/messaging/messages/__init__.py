@@ -3,7 +3,7 @@ from __future__ import annotations
 from logging import getLogger
 
 from pydantic import BaseModel, validator
-from typing import Optional
+from typing import Optional, Union
 
 logger = getLogger(__name__)
 
@@ -17,27 +17,27 @@ class IncomingPayload(BaseModel):
         p is the actual message in json.
     """
     t: str  # Type, for instance "client.subscribe"
-    p: str  # The actual message in json
+    p: dict  # The actual message
     i: Optional[str] = None  # A message id
     # Later on: ack
 
-    @validator("p")
-    def reasonable_payload(cls, v):
-        if not v:  # Empty payloads are probably okay for some messages
-            return v
-        if v.startswith("{") and v.endswith("}"):
-            return v
-        raise ValueError("Payload should start with '{' and end with '}'")
+    # @validator("p")
+    # def reasonable_payload(cls, v):
+    #     if not v:  # Empty payloads are probably okay for some messages
+    #         return v
+    #     if v.startswith("{") and v.endswith("}"):
+    #         return v
+    #     raise ValueError("Payload should start with '{' and end with '}'")
 
 
 class OutgoingPayload(BaseModel):
     t: str  # Type, for instance "client.subscribe"
-    p: str  # The actual message in json
+    p: dict  # The actual message in json
     i: Optional[str] = None  # A message id
 
 
 class OutgoingErrorMessage(OutgoingPayload):
-    e: Optional[str] = ""  # Errors?
+    e: Union[dict, str] = {}  # Errors?
     # FIXME: TBD
 
 

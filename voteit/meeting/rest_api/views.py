@@ -1,6 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from djangorestframework_fsm.viewset_mixins import get_drf_fsm_mixin
-from rest_framework import viewsets
+from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
@@ -19,6 +19,7 @@ class MeetingViewSet(
     # get_drf_fsm_mixin(Meeting, fieldname='state'),
     viewsets.ModelViewSet,
 ):
+    permission_classes = [permissions.AllowAny]  # FIXME No, ofc not!
     model = Meeting
     queryset = Meeting.objects.all()
     serializer_class = serializers.MeetingSerializer
@@ -43,9 +44,10 @@ class MeetingViewSet(
             ai.save()
         return Response(status=201)
 
-    def get_queryset(self):
-        if self.request.user.is_anonymous:
-            return self.queryset.none()
-        if self.request.user.is_superuser:
-            return self.queryset
-        return self.queryset.filter(participants=self.request.user)
+    # FIXME Uncomment this!
+    # def get_queryset(self):
+    #     if self.request.user.is_anonymous:
+    #         return self.queryset.none()
+    #     if self.request.user.is_superuser:
+    #         return self.queryset
+    #     return self.queryset.filter(participants=self.request.user)
