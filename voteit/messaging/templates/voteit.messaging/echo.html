@@ -37,7 +37,6 @@
 
         function connect () {
             if (typeof chatSocket != "undefined") {
-                // debugger;
                 chatSocket.close();
             }
 
@@ -50,7 +49,7 @@
             chatSocket.onmessage = function(e) {
                 console.log(e);
                 const data = JSON.parse(e.data);
-                document.querySelector('#chat-log').value += (String(data.p) + '\n');
+                document.querySelector('#chat-log').value += (JSON.stringify(data.p) + '\n');
             };
 
             chatSocket.onclose = function(e) {

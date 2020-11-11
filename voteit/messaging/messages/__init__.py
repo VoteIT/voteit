@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 from logging import getLogger
 
 from pydantic import BaseModel, validator
-from typing import Optional
+from typing import Optional, Dict
 
 logger = getLogger(__name__)
 
@@ -16,28 +17,20 @@ class IncomingPayload(BaseModel):
     """ Package received from websocket.
         p is the actual message in json.
     """
+    p: Optional[str]  # Incoming payload isn't parsed here
     t: str  # Type, for instance "client.subscribe"
-    p: str  # The actual message in json
     i: Optional[str] = None  # A message id
     # Later on: ack
 
-    @validator("p")
-    def reasonable_payload(cls, v):
-        if not v:  # Empty payloads are probably okay for some messages
-            return v
-        if v.startswith("{") and v.endswith("}"):
-            return v
-        raise ValueError("Payload should start with '{' and end with '}'")
-
 
 class OutgoingPayload(BaseModel):
+    p: Optional[Dict]
     t: str  # Type, for instance "client.subscribe"
-    p: str  # The actual message in json
     i: Optional[str] = None  # A message id
 
 
 class OutgoingErrorMessage(OutgoingPayload):
-    e: Optional[str] = ""  # Errors?
+    e: Optional[Dict] = {}  # Errors?
     # FIXME: TBD
 
 

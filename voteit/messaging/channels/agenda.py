@@ -36,5 +36,11 @@ class AgendaChannel(AbstractObjectChannel):
 @receiver(post_save, sender=AgendaItem)
 def agenda_change(instance=None, **kw):
     channel = AgendaChannel.from_instance(instance.meeting)
-    msg = AgendaUpdated(items=[{"pk": instance.pk, "title": instance.title}])
+    msg = AgendaUpdated(items=[{
+        'pk': instance.pk,
+        'state': instance.state,
+        'meeting_id': instance.meeting_id,
+        'title': instance.title,
+        'order': instance.order,
+    }])
     channel.sync_publish(msg)

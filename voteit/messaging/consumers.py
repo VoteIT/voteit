@@ -84,26 +84,26 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         # FIXME: A lot of error checking...
         incoming = None
         accept_message = False
-        base_payload = {}
+        # base_payload = {}
         message = None
         try:
             if text_data is None:
                 raise UnsupportedMessageType("Only text data accepted")
-            base_payload = json.loads(text_data)  # Encoding etc
-            incoming = IncomingPayload(**base_payload)
+            incoming = IncomingPayload.parse_raw(text_data)
             try:
                 msg_type = websocket_incoming_messages[incoming.t]
             except KeyError:
                 raise UnsupportedMessageType(
                     f"t was not one of {websocket_incoming_messages.keys()}"
                 )
+            #  FIXME: Not all sent data might be consumed, for instance if there's a typo on the incoming key of
+            #  something that isn't required. That data will silently be thrown away.
+            #  Do we want it to be logged or error in that case?
+
             if incoming.p:
                 payload = json.loads(incoming.p)
             else:
                 payload = {}
-            #  FIXME: Not all sent data might be consumed, for instance if there's a typo on the incoming key of
-            #  something that isn't required. That data will silently be thrown away.
-            #  Do we want it to be logged or error in that case?
             message = msg_type(**payload)
             accept_message = True
         except json.decoder.JSONDecodeError:
@@ -113,11 +113,12 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
                 print(f"Invalid json, either payload {text_data}")
             self.message_errors += 1
         except ValidationError as exc:
-            message_id = base_payload.get("i")
+            message_id = incoming and incoming.i or None
             if getattr(settings, "ECHO_WS_ERRORS", None):
-                await self.send_error(exc.json(), message_id=message_id)
+                await self.send_error(exc.errors(), message_id=message_id)
             if settings.DEBUG:
-                print(f"Message {message_id} payload error: {exc.errors()}")
+                print(f"Incoming message {message_id} payload error: {exc.errors()}")
+        #         raise
             self.message_errors += 1
         except UnsupportedMessageType:
             logger.debug(f"t was not one of {websocket_incoming_messages.keys()}")
@@ -179,11 +180,11 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         FIXME: TBD!
 
         :param message: Human readable error
-        :param type: error id
         :param message_id: Attach message id trace if this was caused by an incoming message
+        :param err_type: Type of error
         :return:
         """
         err_msg = OutgoingErrorMessage(
-            t=err_type, i=message_id, p=json.dumps({"message": message})
+            t=err_type, i=message_id, p={"message": message}
         )
         await self.send(text_data=err_msg.json())
