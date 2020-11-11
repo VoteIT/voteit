@@ -7,14 +7,14 @@ from voteit.proposal.rest_api.serializers import ProposalSerializer
 class AgendaListSerializer(serializers.ModelSerializer):
     class Meta:
         model = AgendaItem
-        fields = 'url', 'meeting', 'title', 'state', 'order',
+        fields = 'url', 'pk', 'meeting', 'title', 'state', 'order',
         read_only_fields = 'state', 'order',
 
 
 class AgendaItemSerializer(serializers.ModelSerializer):
-    proposals = ProposalSerializer(many=True, read_only=True)
+    # proposals = ProposalSerializer(many=True, read_only=True)
 
     class Meta:
         model = AgendaItem
-        fields = 'meeting', 'title', 'state', 'order', 'proposals',
+        fields = 'meeting', 'pk', 'title', 'body', 'state', 'order',  # 'proposals',
         read_only_fields = 'order',
