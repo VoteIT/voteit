@@ -81,7 +81,7 @@ class AbstractInternalMessage(AbstractConsumableMessage, AbstractTransmittableMe
             if isinstance(self, MessageType):
                 return {
                     "type": INTERNAL_MESSAGE,
-                    "p": self,
+                    "p": self.json(),
                     "t": mtype,
                     "i": message_id,
                 }
