@@ -84,12 +84,13 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         # FIXME: A lot of error checking...
         incoming = None
         accept_message = False
-        # base_payload = {}
+        base_payload = {}
         message = None
         try:
             if text_data is None:
                 raise UnsupportedMessageType("Only text data accepted")
-            incoming = IncomingPayload.parse_raw(text_data)
+            base_payload = json.loads(text_data)
+            incoming = IncomingPayload(**base_payload)
             try:
                 msg_type = websocket_incoming_messages[incoming.t]
             except KeyError:
@@ -99,11 +100,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             #  FIXME: Not all sent data might be consumed, for instance if there's a typo on the incoming key of
             #  something that isn't required. That data will silently be thrown away.
             #  Do we want it to be logged or error in that case?
-
-            if incoming.p:
-                payload = json.loads(incoming.p)
-            else:
-                payload = {}
+            payload = incoming.p or {}
             message = msg_type(**payload)
             accept_message = True
         except json.decoder.JSONDecodeError:
@@ -113,7 +110,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
                 print(f"Invalid json, either payload {text_data}")
             self.message_errors += 1
         except ValidationError as exc:
-            message_id = incoming and incoming.i or None
+            message_id = base_payload.get("i", None)
             if getattr(settings, "ECHO_WS_ERRORS", None):
                 await self.send_error(exc.errors(), message_id=message_id)
             if settings.DEBUG:

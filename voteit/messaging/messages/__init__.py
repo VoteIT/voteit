@@ -17,7 +17,7 @@ class IncomingPayload(BaseModel):
     """ Package received from websocket.
         p is the actual message in json.
     """
-    p: Optional[str]  # Incoming payload isn't parsed here
+    p: Optional[Dict]  # Incoming payload isn't parsed here
     t: str  # Type, for instance "client.subscribe"
     i: Optional[str] = None  # A message id
     # Later on: ack
