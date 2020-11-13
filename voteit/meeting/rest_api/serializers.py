@@ -7,7 +7,7 @@ from voteit.meeting import models
 class MeetingSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = models.Meeting
-        fields = 'url', 'title', 'state', 'start_time', 'end_time', 'public'
+        fields = 'url', 'pk', 'title', 'state', 'start_time', 'end_time', 'public'
 
 
 class MeetingDetailSerializer(serializers.ModelSerializer):
@@ -15,7 +15,7 @@ class MeetingDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Meeting
-        fields = 'title', 'state', 'start_time', 'end_time', 'public', 'agenda_items',
+        fields = 'title', 'pk', 'state', 'start_time', 'end_time', 'public', 'agenda_items',
 
 
 class AgendaOrderSerializer(serializers.Serializer):
