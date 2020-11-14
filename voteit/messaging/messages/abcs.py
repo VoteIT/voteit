@@ -78,7 +78,7 @@ class AbstractInternalMessage(AbstractConsumableMessage, AbstractTransmittableMe
         from voteit.messaging.registries import internal_messages
 
         for (mtype, MessageType) in internal_messages.items():
-            if isinstance(self, MessageType):
+            if self.__class__ == MessageType:
                 return {
                     "type": INTERNAL_MESSAGE,
                     "p": self.json(),
@@ -95,7 +95,7 @@ class AbstractOutgoingMessage(AbstractTransmittableMessage):
         from voteit.messaging.registries import websocket_outgoing_messages
 
         for (mtype, MessageType) in websocket_outgoing_messages.items():
-            if isinstance(self, MessageType):
+            if self.__class__ == MessageType:
                 payload = OutgoingPayload(p=self, t=mtype, i=message_id)
                 return {"type": WEBSOCKET_OUTGOING_NAME, "payload": payload.json()}
 
