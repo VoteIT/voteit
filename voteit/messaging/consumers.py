@@ -127,6 +127,9 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             logger.debug("Incoming: %s / %s", incoming.t, incoming.i)
             # Errors here too...? This is an application error in that case
             await message.consume(self, message_id=incoming.i)
+        else:
+            pass
+            #  FIXME: log error?
 
     async def websocket_send(self, event):
         """ Push data to the websocket. Any channels message with the type "websocket.send" will end up here.
