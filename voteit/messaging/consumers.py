@@ -1,6 +1,6 @@
 import json
 from logging import getLogger
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 from channels.auth import get_user
 from channels.exceptions import DenyConnection
@@ -155,7 +155,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         except KeyError:
             logger.debug(f"t was not one of {internal_messages.keys()}")
             raise
-        payload = json.loads(event["p"])
+        payload = event["p"]
         message_id = event["i"]
         try:
             message = msg_type(**payload)
@@ -171,7 +171,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
 
     async def send_error(
         self,
-        message: str,
+        message: Union[str, list],
         err_type: str = "error.unknown",
         message_id: Optional[str] = None,
     ):

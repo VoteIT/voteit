@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     from voteit.poll.models import ElectoralRegister
 
 
+__all__ = 'Meeting',
+
+
 class Meeting(BaseContent):
     state = FSMField(
         default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False

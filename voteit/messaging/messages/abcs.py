@@ -90,7 +90,7 @@ class AbstractInternalMessage(AbstractConsumableMessage, AbstractTransmittableMe
             if self.__class__ == MessageType:
                 return {
                     "type": INTERNAL_MESSAGE,
-                    "p": self.json(),  # json?
+                    "p": self.json(),
                     "t": mtype,
                     "i": message_id,
                     "s": state,
