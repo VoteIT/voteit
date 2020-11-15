@@ -23,7 +23,7 @@ class Hello(AbstractIncomingMessage):
     async def consume(self, consumer: WebsocketDemuxConsumer, message_id: str = None):
         greeting = f"Hello you too {consumer.user.username}!"
         msg = HelloResponse(greeting=greeting)
-        await msg.async_send(consumer.channel_name, message_id=message_id)
+        await msg.async_send(consumer.channel_name, message_id=message_id, state=MsgState.SUCCESS)
 
 
 @websocket_outgoing_messages("testing.hello")
@@ -34,7 +34,7 @@ class HelloResponse(AbstractOutgoingMessage):
 def greet_user(user, consumer_name, message_id=None):
     greeting = f"Welcome {user.username}!"
     msg = HelloResponse(greeting=greeting)
-    msg.send(consumer_name, message_id=message_id)
+    msg.send(consumer_name, message_id=message_id, state=MsgState.SUCCESS)
 
 
 @receiver(client_connect)
