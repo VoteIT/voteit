@@ -27,7 +27,7 @@ class GetSchema(AbstractIncomingMessage):
 
     async def consume(self, consumer: WebsocketDemuxConsumer, message_id: str = None):
         msg_type = websocket_incoming_messages[self.message_type]
-        msg = SendSchema(message_schema=msg_type.schema_json())
+        msg = SendSchema(message_schema=msg_type.schema())
         await msg.async_send(consumer.channel_name, message_id=message_id, success=True)
 
     class Config:
@@ -36,4 +36,4 @@ class GetSchema(AbstractIncomingMessage):
 
 @websocket_outgoing_messages("schema.send")
 class SendSchema(AbstractOutgoingMessage):
-    message_schema: str
+    message_schema: dict
