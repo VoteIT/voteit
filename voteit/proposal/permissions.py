@@ -1,8 +1,8 @@
 
 
 class ProposalPermissions:
-    ADD = "voteit.proposal.add_proposal"  # Checked against agenda item
-    CHANGE = "voteit.proposal.change_proposal"
-    DELETE = "voteit.proposal.delete_proposal"
-    VIEW = "voteit.proposal.view_proposal"
-    RETRACT = "voteit.proposal.retract_proposal"
+    ADD = "proposal.add_proposal"  # Checked against agenda item
+    CHANGE = "proposal.change_proposal"
+    DELETE = "proposal.delete_proposal"
+    VIEW = "proposal.view_proposal"
+    RETRACT = "proposal.retract_proposal"

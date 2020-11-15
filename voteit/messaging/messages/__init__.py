@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import json
 from logging import getLogger
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
 from typing import Optional, Dict
+
 
 logger = getLogger(__name__)
 
@@ -15,9 +15,9 @@ INTERNAL_MESSAGE = "internal.receive"
 
 class IncomingPayload(BaseModel):
     """ Package received from websocket.
-        p is the actual message in json.
+        p is the actual message.
     """
-    p: Optional[Dict]  # Incoming payload isn't parsed here
+    p: Optional[Dict]  # Incoming payload
     t: str  # Type, for instance "client.subscribe"
     i: Optional[str] = None  # A message id
     # Later on: ack
@@ -30,8 +30,7 @@ class OutgoingPayload(BaseModel):
 
 
 class OutgoingErrorMessage(OutgoingPayload):
-    e: Optional[Dict] = {}  # Errors?
-    # FIXME: TBD
+    e: Optional[Dict] = {}  # FIXME: I have no clue yet - TBD ;)
 
 
 def register():
