@@ -9,6 +9,9 @@ from voteit.meeting.models import Meeting
 from voteit.richtext.fields import RichTextField
 
 
+__all__ = 'AgendaItem',
+
+
 class AgendaItem(BaseContent):
     state = FSMField(
         default=AgendaItemWf.initial,

@@ -1,0 +1,51 @@
+from django.contrib.auth.models import User
+from rest_framework.reverse import reverse
+from rest_framework.test import APITestCase
+from voteit.proposal.permissions import ProposalPermissions
+
+
+class ProposalTestCase(APITestCase):
+    def setUp(self) -> None:
+        from voteit.meeting.models import Meeting
+        from voteit.agenda.models import AgendaItem
+        self.meeting: Meeting = Meeting.objects.create(
+            title='Test meeting', state='ongoing'
+        )
+        self.agenda_item: AgendaItem = AgendaItem.objects.create(
+            title='Agenda item', meeting=self.meeting, state='ongoing'
+        )
+        self.participant: User = User.objects.create_user('participant')
+        self.moderator: User = User.objects.create_user('moderator')
+        self.proposer: User = User.objects.create_user('proposer')
+        self.outsider: User = User.objects.create_user('outsider')
+        self.meeting.participants.set([self.participant, self.moderator, self.proposer])
+        self.meeting.moderators.add(self.moderator)
+        self.meeting.proposers.add(self.proposer)
+
+    def test_create(self):
+        url = reverse('proposal-list')
+        data = {
+            'title': 'My proposal',
+            'agenda_item': self.agenda_item.pk,
+        }
+        for user, status in (
+            (None, 403),
+            (self.moderator, 201),
+            (self.proposer, 201),
+            (self.participant, 403),
+        ):
+            if user:
+                self.client.force_login(user)
+            response = self.client.post(url, data)
+            self.assertEqual(response.status_code, status)
+
+    def test_agenda_item_ne(self):
+        url = reverse('proposal-list')
+        data = {
+            'title': 'My proposal',
+            'agenda_item': 1000,
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json().get('detail'), 'Agenda item not found')

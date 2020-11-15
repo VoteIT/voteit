@@ -26,7 +26,7 @@ class AbstractMessage(BaseModel, ABC):
 
 
 class AbstractConsumableMessage(AbstractMessage):
-    """ A message that's ment to be consumed when it's deserialized.
+    """ A message that's meant to be consumed when it's deserialized.
     """
     @abstractmethod
     async def consume(self, consumer: WebsocketDemuxConsumer, message_id: str = None):
@@ -34,7 +34,7 @@ class AbstractConsumableMessage(AbstractMessage):
 
 
 class AbstractTransmittableMessage(AbstractMessage):
-    """ A message that's ment to be serialized and transmitted somewhere.
+    """ A message that's meant to be serialized and transmitted somewhere.
         Note the difference in sync and async methods.
     """
     @abstractmethod
@@ -65,7 +65,7 @@ class AbstractTransmittableMessage(AbstractMessage):
 
 
 class AbstractIncomingMessage(AbstractConsumableMessage):
-    """ A message received via websocket. It's then consumed within the consumer context.
+    """ A message received from websocket. It's then consumed within the consumer context.
     """
 
 
@@ -78,7 +78,7 @@ class AbstractInternalMessage(AbstractConsumableMessage, AbstractTransmittableMe
         from voteit.messaging.registries import internal_messages
 
         for (mtype, MessageType) in internal_messages.items():
-            if isinstance(self, MessageType):
+            if self.__class__ == MessageType:
                 return {
                     "type": INTERNAL_MESSAGE,
                     "p": self.json(),
@@ -95,8 +95,8 @@ class AbstractOutgoingMessage(AbstractTransmittableMessage):
         from voteit.messaging.registries import websocket_outgoing_messages
 
         for (mtype, MessageType) in websocket_outgoing_messages.items():
-            if isinstance(self, MessageType):
-                payload = OutgoingPayload(p=self.json(), t=mtype, i=message_id)
+            if self.__class__ == MessageType:
+                payload = OutgoingPayload(p=self, t=mtype, i=message_id)
                 return {"type": WEBSOCKET_OUTGOING_NAME, "payload": payload.json()}
 
         raise KeyError(

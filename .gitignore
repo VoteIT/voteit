@@ -1,4 +1,5 @@
 .coverage
 *.pyc
 *.egg-info
-migrations
+!voteit/*/migrations/__init__.py
+voteit/*/migrations/*

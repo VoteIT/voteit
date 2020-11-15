@@ -37,7 +37,6 @@
 
         function connect () {
             if (typeof chatSocket != "undefined") {
-                // debugger;
                 chatSocket.close();
             }
 
@@ -50,7 +49,7 @@
             chatSocket.onmessage = function(e) {
                 console.log(e);
                 const data = JSON.parse(e.data);
-                document.querySelector('#chat-log').value += (String(data.p) + '\n');
+                document.querySelector('#chat-log').value += (JSON.stringify(data.p) + '\n');
             };
 
             chatSocket.onclose = function(e) {
@@ -71,9 +70,10 @@
 
             document.querySelector('#message-submit').onclick = function(e) {
                 const messageInputDom = document.querySelector('#message-input');
-                const message = messageInputDom.value;
-
-
+                var message = {};
+                if (messageInputDom.value) {
+                    var message = JSON.parse(messageInputDom.value); // To avoid dual encoding of payload
+                }
                 const msg_id = Math.floor(Math.random() * 10000);
                 console.log("Msg id: ", msg_id);
                 chatSocket.send(JSON.stringify({
@@ -81,7 +81,6 @@
                     't': document.querySelector('#t-input').value,
                     'i': msg_id
                 }));
-                // messageInputDom.value = '';
             };
 
         }
