@@ -8,7 +8,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from pydantic import BaseModel
 
-from voteit.messaging.messages import OutgoingPayload
+from voteit.messaging.messages import OutgoingPayload, MsgState
 from voteit.messaging.messages import WEBSOCKET_OUTGOING_NAME
 from voteit.messaging.messages import INTERNAL_MESSAGE
 
@@ -41,34 +41,61 @@ class AbstractTransmittableMessage(AbstractMessage):
     """
 
     @abstractmethod
-    def format_payload(self, message_id: Optional[str], state=""):
+    def format_payload(
+        self, message_id: Optional[str], state: str = "", success: Optional[bool] = None
+    ):
         pass
 
     async def async_send(
-        self, channel: str, message_id: Optional[str] = None, state=""
+        self,
+        channel: str,
+        message_id: Optional[str] = None,
+        state="",
+        success: Optional[bool] = None,
     ):
-        payload = self.format_payload(message_id, state=state)
+        """
+        :param channel: ID of the channel to send this to
+        :param message_id:
+        :param state: MsgState, one letter
+        :param success:
+        :return:
+        """
+        payload = self.format_payload(message_id, state=state, success=success)
         channel_layer = get_channel_layer()
         await channel_layer.send(channel, payload)
 
     async def async_group_send(
-        self, channel: str, message_id: Optional[str] = None, state: str = ""
+        self,
+        channel: str,
+        message_id: Optional[str] = None,
+        state: str = "",
+        success: Optional[bool] = None,
     ):
-        payload = self.format_payload(message_id, state=state)
+        payload = self.format_payload(message_id, state=state, success=success)
         channel_layer = get_channel_layer()
         print("Async sending to: ", channel)
         await channel_layer.group_send(channel, payload)
 
-    def send(self, channel: str, message_id: Optional[str] = None, state: str = ""):
-        payload = self.format_payload(message_id, state=state)
+    def send(
+        self,
+        channel: str,
+        message_id: Optional[str] = None,
+        state: str = "",
+        success: Optional[bool] = None,
+    ):
+        payload = self.format_payload(message_id, state=state, success=success)
         channel_layer = get_channel_layer()
         print("Sending to: ", channel)
         async_to_sync(channel_layer.send)(channel, payload)
 
     def group_send(
-        self, channel: str, message_id: Optional[str] = None, state: str = ""
+        self,
+        channel: str,
+        message_id: Optional[str] = None,
+        state: str = "",
+        success: Optional[bool] = None,
     ):
-        payload = self.format_payload(message_id, state=state)
+        payload = self.format_payload(message_id, state=state, success=success)
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(channel, payload)
 
@@ -83,8 +110,16 @@ class AbstractInternalMessage(AbstractConsumableMessage, AbstractTransmittableMe
         If this type of message is received via websocket, it will cause an error.
     """
 
-    def format_payload(self, message_id: Optional[str], state: str = ""):
+    def format_payload(
+        self, message_id: Optional[str], state: str = "", success: Optional[bool] = None
+    ):
         from voteit.messaging.registries import internal_messages
+
+        if success is not None:
+            if success:
+                state = MsgState.SUCCESS
+            else:
+                state = MsgState.FAILED
 
         for (mtype, MessageType) in internal_messages.items():
             if self.__class__ == MessageType:
@@ -101,8 +136,16 @@ class AbstractInternalMessage(AbstractConsumableMessage, AbstractTransmittableMe
 
 
 class AbstractOutgoingMessage(AbstractTransmittableMessage):
-    def format_payload(self, message_id: Optional[str], state: str = ""):
+    def format_payload(
+        self, message_id: Optional[str], state: str = "", success: Optional[bool] = None
+    ):
         from voteit.messaging.registries import websocket_outgoing_messages
+
+        if success is not None:
+            if success:
+                state = MsgState.SUCCESS
+            else:
+                state = MsgState.FAILED
 
         for (mtype, MessageType) in websocket_outgoing_messages.items():
             if self.__class__ == MessageType:

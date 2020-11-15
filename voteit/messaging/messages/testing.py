@@ -74,11 +74,11 @@ def count_to_num(consumer_name:str, num:int, message_id: str, fail:Optional[int]
     for i in range(1, num):
         if fail and fail == i:
             msg = ProgressNum(curr=i, total=num, msg=f"Deliberate fail at {fail}")
-            msg.send(consumer_name, message_id, state=MsgState.FAILED)
+            msg.send(consumer_name, message_id, success=False)
             return
         else:
             msg = ProgressNum(curr=i, total=num)
             msg.send(consumer_name, message_id, state=MsgState.RUNNING)
         sleep(1)
     msg = ProgressNum(curr=num, total=num, msg="All done!")
-    msg.send(consumer_name, message_id, state=MsgState.SUCCESS)
+    msg.send(consumer_name, message_id, success=True)
