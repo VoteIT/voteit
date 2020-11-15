@@ -8,6 +8,9 @@ from voteit.core.models import BaseContent
 from voteit.meeting.models import Meeting
 
 
+__all__ = 'AgendaItem',
+
+
 class AgendaItem(BaseContent):
     state = FSMField(
         default=AgendaItemWf.initial,

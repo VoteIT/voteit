@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from logging import getLogger
 
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
 from voteit.agenda.models import AgendaItem
+from voteit.agenda.rest_api.serializers import AgendaItemSerializer
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.messaging.channels.abcs import AbstractObjectChannel
-from voteit.messaging.messages.agenda import AgendaUpdated
+from voteit.messaging.messages.agenda import AgendaUpdated, AgendaDeleted
 from voteit.messaging.registries import channel_registry
 
 
@@ -35,12 +36,14 @@ class AgendaChannel(AbstractObjectChannel):
 
 @receiver(post_save, sender=AgendaItem)
 def agenda_change(instance=None, **kw):
+    print(instance)  # FIXME Remove
     channel = AgendaChannel.from_instance(instance.meeting)
-    msg = AgendaUpdated(items=[{
-        'pk': instance.pk,
-        'state': instance.state,
-        'meeting_id': instance.meeting_id,
-        'title': instance.title,
-        'order': instance.order,
-    }])
+    msg = AgendaUpdated(items=[AgendaItemSerializer(instance).data])
+    channel.sync_publish(msg)
+
+
+@receiver(post_delete, sender=AgendaItem)
+def agenda_delete(instance=None, **kw):
+    channel = AgendaChannel.from_instance(instance.meeting)
+    msg = AgendaDeleted(items=[AgendaItemSerializer(instance).data])
     channel.sync_publish(msg)
