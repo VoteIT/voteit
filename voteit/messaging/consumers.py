@@ -1,6 +1,6 @@
 import json
 from logging import getLogger
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional, List
 
 from channels.auth import get_user
 from channels.exceptions import DenyConnection
@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from voteit.messaging.exceptions import UnsupportedMessageType
 from voteit.messaging.jobs import signal_websocket_connect
 from voteit.messaging.jobs import signal_websocket_close
-from voteit.messaging.messages import IncomingPayload
+from voteit.messaging.messages import IncomingPayload, MsgState
 from voteit.messaging.messages import OutgoingErrorMessage
 from voteit.messaging.registries import internal_messages
 from voteit.messaging.registries import websocket_incoming_messages
@@ -104,21 +104,19 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             message = msg_type(**payload)
             accept_message = True
         except json.decoder.JSONDecodeError:
-            if getattr(settings, "ECHO_WS_ERRORS", None):
-                await self.send_error("Invalid json")
+            await self.send_error("Invalid json", err_type="error.json")
             if settings.DEBUG:
                 print(f"Invalid json, either payload {text_data}")
             self.message_errors += 1
         except ValidationError as exc:
             message_id = base_payload.get("i", None)
-            if getattr(settings, "ECHO_WS_ERRORS", None):
-                await self.send_error(exc.errors(), message_id=message_id)
+            await self.send_error("Validation fail", message_id=message_id, errors=exc.errors())
             if settings.DEBUG:
                 print(f"Incoming message {message_id} payload error: {exc.errors()}")
-        #         raise
-            self.message_errors += 1
         except UnsupportedMessageType:
+            message_id = base_payload.get("i", None)
             logger.debug(f"t was not one of {websocket_incoming_messages.keys()}")
+            await self.send_error("Unsupported message type", message_id=message_id, err_type="error.message_type")
             self.message_errors += 1
         finally:
             if self.message_errors > 10:
@@ -171,20 +169,25 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
 
     async def send_error(
         self,
-        message: Union[str, list],
+        message: str,
         err_type: str = "error.unknown",
         message_id: Optional[str] = None,
+        errors: List = [],
     ):
         """
         Send error to websocket
         FIXME: TBD!
-
         :param message: Human readable error
         :param message_id: Attach message id trace if this was caused by an incoming message
         :param err_type: Type of error
+        :param errors: Error structure, if applicable.
         :return:
         """
+        payload = {
+            "message": message,
+            "errors": errors
+        }
         err_msg = OutgoingErrorMessage(
-            t=err_type, i=message_id, p={"message": message}
+            t=err_type, i=message_id, p=payload, s=MsgState.FAILED
         )
         await self.send(text_data=err_msg.json())
