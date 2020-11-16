@@ -10,6 +10,9 @@ from voteit.poll.abcs import PollMethod, Vote
 from voteit.poll.registries import poll_methods
 
 
+__all__ = ("SimpleVote", "Simple")
+
+
 class SimpleVote(Vote):
     APPROVE = 1
     DENY = 2

@@ -11,6 +11,9 @@ from voteit.poll.abcs import RankedVote
 from voteit.poll.registries import poll_methods
 
 
+__all__ = ("ScottishSTVVote", "ScottishSTV")
+
+
 class ScottishSTVVote(RankedVote):
     method = models.ForeignKey(
         'poll.ScottishSTV', on_delete=models.CASCADE, related_name='vote_set'
