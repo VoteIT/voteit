@@ -75,14 +75,14 @@ class Poll(BaseContent):
     closed = models.DateTimeField(editable=False, null=True)
     initial_electoral_register = models.ForeignKey(
         "ElectoralRegister",
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         editable=False,
         null=True,
         related_name="polls_initial",
     )
     electoral_register: ElectoralRegister = models.ForeignKey(
         "ElectoralRegister",
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         editable=False,
         null=True,
         related_name="polls",
