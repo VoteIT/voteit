@@ -12,3 +12,7 @@ class ERAdmin(admin.ModelAdmin):
 @admin.register(Poll)
 class PollAdmin(FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = ["state"]
+    list_display = "title", "state"
+    list_filter = "state", "agenda_item"
+    search_fields = "title", "body", "agenda_item__title", "agenda_item__meeting__title"
+    exclude = "state", "method_type", "method_id"
