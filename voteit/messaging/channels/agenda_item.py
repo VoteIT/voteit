@@ -10,8 +10,8 @@ from voteit.agenda.permissions import AgendaPermissions
 from voteit.discussion.models import DiscussionPost
 from voteit.discussion.rest_api.serializers import DiscussionPostDetailSerializer
 from voteit.messaging.channels.abcs import AbstractObjectChannel
-from voteit.messaging.messages.discussion_post import DiscussionPostUpdated
-from voteit.messaging.messages.proposal import ProposalUpdated, ProposalDeleted
+from voteit.messaging.messages.discussion_post import DiscussionPostChanged, DiscussionPostAdded, DiscussionPostDeleted
+from voteit.messaging.messages.proposal import ProposalChanged, ProposalDeleted, ProposalAdded
 from voteit.messaging.registries import channel_registry
 from voteit.proposal.models import Proposal
 from voteit.proposal.rest_api.serializers import ProposalDetailSerializer
@@ -44,28 +44,44 @@ class AgendaItemChannel(AbstractObjectChannel):
 
 
 @receiver(post_save, sender=Proposal)
-def proposal_change(instance=None, **kw):
+def proposal_updated(instance=None, created=None, **kw):
     if instance.agenda_item is None:
         return
     channel = AgendaItemChannel.from_instance(instance.agenda_item)
-    msg = ProposalUpdated(items=[ProposalDetailSerializer(instance).data])
+    data = ProposalDetailSerializer(instance).data
+    if created:
+        msg = ProposalAdded(item=data)
+    else:
+        msg = ProposalChanged(item=data)
     channel.sync_publish(msg)
 
 
 @receiver(post_save, sender=DiscussionPost)
-def discussion_post_change(instance=None, **kw):
+def discussion_post_change(instance=None, created=None, **kw):
     if instance.agenda_item is None:
         return
     channel = AgendaItemChannel.from_instance(instance.agenda_item)
-    msg = DiscussionPostUpdated(items=[DiscussionPostDetailSerializer(instance).data])
+    data = DiscussionPostDetailSerializer(instance).data
+    if created:
+        msg = DiscussionPostAdded(item=data)
+    else:
+        msg = DiscussionPostChanged(item=data)
     channel.sync_publish(msg)
 
 
 @receiver(post_delete, sender=Proposal)
-@receiver(post_delete, sender=DiscussionPost)
 def proposal_delete(instance=None, **kw):
     if instance.agenda_item is None:
         return
     channel = AgendaItemChannel.from_instance(instance.agenda_item)
-    msg = ProposalDeleted(items=[instance.pk])
+    msg = ProposalDeleted(pk=instance.pk)
+    channel.sync_publish(msg)
+
+
+@receiver(post_delete, sender=DiscussionPost)
+def discussion_post_delete(instance=None, **kw):
+    if instance.agenda_item is None:
+        return
+    channel = AgendaItemChannel.from_instance(instance.agenda_item)
+    msg = DiscussionPostDeleted(pk=instance.pk)
     channel.sync_publish(msg)

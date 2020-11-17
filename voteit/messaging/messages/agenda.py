@@ -1,13 +1,17 @@
-from voteit.messaging.messages.abcs import AbstractOutgoingMessage
+from voteit.messaging.messages.abcs import ObjectAdded, ObjectChanged, ObjectDeleted
 from voteit.messaging.registries import websocket_outgoing_messages
 
-# FIXME: This is a stub
+
+@websocket_outgoing_messages("agenda.added")
+class AgendaAdded(ObjectAdded):
+    pass
+
 
 @websocket_outgoing_messages("agenda.changed")
-class AgendaUpdated(AbstractOutgoingMessage):
-    items: list
+class AgendaChanged(ObjectChanged):
+    pass
 
 
 @websocket_outgoing_messages("agenda.deleted")
-class AgendaDeleted(AbstractOutgoingMessage):
-    items: list
+class AgendaDeleted(ObjectDeleted):
+    pass

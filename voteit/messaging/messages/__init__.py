@@ -42,7 +42,7 @@ class OutgoingErrorMessage(OutgoingPayload):
 
 def register():
     """ Just make sure all code is imported and registered. """
-    from . import channels, user, agenda, schema, progress, discussion_post, proposal
+    from . import channels, user, agenda, schema, progress, discussion_post, proposal, poll
     from django.conf import settings
 
     if settings.DEBUG:

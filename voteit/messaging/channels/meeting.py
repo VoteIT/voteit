@@ -10,9 +10,11 @@ from voteit.agenda.rest_api.serializers import AgendaItemSerializer
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.messaging.channels.abcs import AbstractObjectChannel
-from voteit.messaging.messages.agenda import AgendaUpdated, AgendaDeleted
+from voteit.messaging.messages.agenda import AgendaDeleted, AgendaAdded, AgendaChanged
+from voteit.messaging.messages.poll import PollAdded, PollChanged, PollDeleted
 from voteit.messaging.registries import channel_registry
-
+from voteit.poll.models import Poll
+from voteit.poll.rest_api.serializers import PollDetailSerializer
 
 logger = getLogger(__name__)
 
@@ -63,10 +65,14 @@ class ModeratorChannel(AbstractObjectChannel):
 # FIXME: Split updates on state change for moderators or regular users. Essentially an instance made private
 
 @receiver(post_save, sender=AgendaItem)
-def agenda_change(instance=None, **kw):
+def agenda_change(instance=None, created=None, **kw):
     print(instance)  # FIXME Remove
     channel = MeetingChannel.from_instance(instance.meeting)
-    msg = AgendaUpdated(items=[AgendaItemSerializer(instance).data])
+    data = AgendaItemSerializer(instance).data
+    if created:
+        msg = AgendaAdded(item=data)
+    else:
+        msg = AgendaChanged(item=data)
     channel.sync_publish(msg)
 
 
@@ -74,5 +80,25 @@ def agenda_change(instance=None, **kw):
 def agenda_delete(instance=None, **kw):
     channel = MeetingChannel.from_instance(instance.meeting)
     # FIXME: Create a serializer that only sends primary keys?
-    msg = AgendaDeleted(items=[instance.pk])
+    msg = AgendaDeleted(pk=instance.pk)
     channel.sync_publish(msg)
+
+
+@receiver(post_save, sender=Poll)
+def poll_change(instance=None, created=None, **kw):
+    if instance.meeting is not None:
+        channel = MeetingChannel.from_instance(instance.meeting)
+        data = PollDetailSerializer(instance).data
+        if created:
+            msg = PollAdded(item=data)
+        else:
+            msg = PollChanged(item=data)
+        channel.sync_publish(msg)
+
+
+@receiver(post_delete, sender=Poll)
+def poll_delete(instance=None, **kw):
+    if instance.meeting is not None:
+        channel = MeetingChannel.from_instance(instance.meeting)
+        msg = PollDeleted(pk=instance.pk)
+        channel.sync_publish(msg)

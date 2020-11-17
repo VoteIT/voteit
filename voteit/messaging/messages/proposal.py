@@ -1,13 +1,17 @@
-from voteit.messaging.messages.abcs import AbstractOutgoingMessage
+from voteit.messaging.messages.abcs import ObjectAdded, ObjectChanged, ObjectDeleted
 from voteit.messaging.registries import websocket_outgoing_messages
 
-# FIXME: This is a stub
+
+@websocket_outgoing_messages("proposal.added")
+class ProposalAdded(ObjectAdded):
+    pass
+
 
 @websocket_outgoing_messages("proposal.changed")
-class ProposalUpdated(AbstractOutgoingMessage):
-    items: list
+class ProposalChanged(ObjectChanged):
+    pass
 
 
 @websocket_outgoing_messages("proposal.deleted")
-class ProposalDeleted(AbstractOutgoingMessage):
-    items: list
+class ProposalDeleted(ObjectDeleted):
+    pass

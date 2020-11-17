@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Dict
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -155,3 +155,15 @@ class AbstractOutgoingMessage(AbstractTransmittableMessage):
         raise KeyError(
             f"{self.__class__} not found in websocket_outgoing_messages registry, register the message type there first"
         )
+
+
+class ObjectAdded(AbstractOutgoingMessage):
+    item: Dict
+
+
+class ObjectChanged(AbstractOutgoingMessage):
+    item: Dict
+
+
+class ObjectDeleted(AbstractOutgoingMessage):
+    pk: int
