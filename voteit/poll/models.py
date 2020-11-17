@@ -112,6 +112,11 @@ class Poll(BaseContent):
             )
         ]
 
+    # def get_voted_weight(self) -> int:
+    # FIXME: DO this properly! /robinharms
+    #     users = self.method.vote_set.values_list("user", flat=True)
+    #     return self.electoral_register.voterweight_set.filter(user__in=users).aggregate(Sum("weight"))["weight__sum"]
+
     def start_check(self) -> bool:
         """ Check that this poll could be started. A very basic check for the most obvious things.
             Note that it's used as a transition condition, so it must return True if everything is ok!

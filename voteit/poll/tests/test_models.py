@@ -221,5 +221,4 @@ class VoteWeightTests(TestCase):
         self.assertEqual(self.er.get_voter_weight(self.user3), 3)
 
     def test_get_total_vote_weight(self):
-
         self.assertEqual(5, self.er.get_total_vote_weight())
