@@ -1,4 +1,4 @@
 
 
 def register():
-    from . import meeting, user
+    from . import meeting, user, agenda_item, poll

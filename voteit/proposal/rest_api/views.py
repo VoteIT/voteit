@@ -4,7 +4,7 @@ from rest_framework import viewsets
 from voteit.agenda.models import AgendaItem
 from voteit.core.rest_api.mixins import SerializerClassesMixin, CreateModelPermissionsMixin
 
-from voteit.proposal.models import *
+from voteit.proposal.models import Proposal
 
 from . import serializers
 
@@ -21,7 +21,10 @@ class ProposalViewSet(
 ):
     model = Proposal
     queryset = Proposal.objects.all()
-    serializer_class = serializers.ProposalSerializer
+    serializer_class = serializers.ProposalDetailSerializer
+    serializer_classes = {
+        'list': serializers.ProposalListSerializer,
+    }
     filter_backends = DjangoFilterBackend,
     filterset_fields = 'agenda_item', 'agenda_item__meeting',
     context_queryset = AgendaItem.objects.all()

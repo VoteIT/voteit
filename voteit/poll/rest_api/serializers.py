@@ -13,6 +13,7 @@ class PollListSerializer(serializers.ModelSerializer):
 
 
 class PollDetailSerializer(serializers.ModelSerializer):
+    # Note: This won't have access to the request object, so no url things here!
     class Meta:
         model = models.Poll
         fields = "pk", "title", "agenda_item", "state"

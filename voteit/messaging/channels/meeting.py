@@ -73,5 +73,6 @@ def agenda_change(instance=None, **kw):
 @receiver(post_delete, sender=AgendaItem)
 def agenda_delete(instance=None, **kw):
     channel = MeetingChannel.from_instance(instance.meeting)
-    msg = AgendaDeleted(items=[AgendaItemSerializer(instance).data])
+    # FIXME: Create a serializer that only sends primary keys?
+    msg = AgendaDeleted(items=[instance.pk])
     channel.sync_publish(msg)

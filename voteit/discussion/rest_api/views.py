@@ -17,7 +17,10 @@ class DiscussionPostViewSet(
 ):
     model = DiscussionPost
     queryset = DiscussionPost.objects.all()
-    serializer_class = serializers.DiscussionPostSerializer
+    serializer_class = serializers.DiscussionPostDetailSerializer
+    serializer_classes = {
+        'list': serializers.DiscussionPostListSerializer,
+    }
     filter_backends = DjangoFilterBackend,
     filterset_fields = 'agenda_item', 'agenda_item__meeting',
     context_queryset = AgendaItem.objects.all()
