@@ -8,7 +8,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from pydantic import BaseModel
 
-from voteit.messaging.messages import OutgoingPayload
+from voteit.messaging.messages import OutgoingPayload, MsgState
 from voteit.messaging.messages import WEBSOCKET_OUTGOING_NAME
 from voteit.messaging.messages import INTERNAL_MESSAGE
 
@@ -22,12 +22,14 @@ logger = getLogger(__name__)
 class AbstractMessage(BaseModel, ABC):
     """ Any kind of message being passed through channels/websockets
     """
+
     pass
 
 
 class AbstractConsumableMessage(AbstractMessage):
     """ A message that's meant to be consumed when it's deserialized.
     """
+
     @abstractmethod
     async def consume(self, consumer: WebsocketDemuxConsumer, message_id: str = None):
         pass
@@ -37,29 +39,63 @@ class AbstractTransmittableMessage(AbstractMessage):
     """ A message that's meant to be serialized and transmitted somewhere.
         Note the difference in sync and async methods.
     """
+
     @abstractmethod
-    def format_payload(self, message_id: Optional[str]):
+    def format_payload(
+        self, message_id: Optional[str], state: str = "", success: Optional[bool] = None
+    ):
         pass
 
-    async def async_send(self, channel: str, message_id=None):
-        payload = self.format_payload(message_id)
+    async def async_send(
+        self,
+        channel: str,
+        message_id: Optional[str] = None,
+        state="",
+        success: Optional[bool] = None,
+    ):
+        """
+        :param channel: ID of the channel to send this to
+        :param message_id:
+        :param state: MsgState, one letter
+        :param success:
+        :return:
+        """
+        payload = self.format_payload(message_id, state=state, success=success)
         channel_layer = get_channel_layer()
         await channel_layer.send(channel, payload)
 
-    async def async_group_send(self, channel: str, message_id=None):
-        payload = self.format_payload(message_id)
+    async def async_group_send(
+        self,
+        channel: str,
+        message_id: Optional[str] = None,
+        state: str = "",
+        success: Optional[bool] = None,
+    ):
+        payload = self.format_payload(message_id, state=state, success=success)
         channel_layer = get_channel_layer()
         print("Async sending to: ", channel)
         await channel_layer.group_send(channel, payload)
 
-    def send(self, channel: str, message_id=None):
-        payload = self.format_payload(message_id)
+    def send(
+        self,
+        channel: str,
+        message_id: Optional[str] = None,
+        state: str = "",
+        success: Optional[bool] = None,
+    ):
+        payload = self.format_payload(message_id, state=state, success=success)
         channel_layer = get_channel_layer()
         print("Sending to: ", channel)
         async_to_sync(channel_layer.send)(channel, payload)
 
-    def group_send(self, channel: str, message_id=None):
-        payload = self.format_payload(message_id)
+    def group_send(
+        self,
+        channel: str,
+        message_id: Optional[str] = None,
+        state: str = "",
+        success: Optional[bool] = None,
+    ):
+        payload = self.format_payload(message_id, state=state, success=success)
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(channel, payload)
 
@@ -74,8 +110,16 @@ class AbstractInternalMessage(AbstractConsumableMessage, AbstractTransmittableMe
         If this type of message is received via websocket, it will cause an error.
     """
 
-    def format_payload(self, message_id: Optional[str]):
+    def format_payload(
+        self, message_id: Optional[str], state: str = "", success: Optional[bool] = None
+    ):
         from voteit.messaging.registries import internal_messages
+
+        if success is not None:
+            if success:
+                state = MsgState.SUCCESS
+            else:
+                state = MsgState.FAILED
 
         for (mtype, MessageType) in internal_messages.items():
             if self.__class__ == MessageType:
@@ -84,6 +128,7 @@ class AbstractInternalMessage(AbstractConsumableMessage, AbstractTransmittableMe
                     "p": self.json(),
                     "t": mtype,
                     "i": message_id,
+                    "s": state,
                 }
         raise KeyError(
             f"{self.__class__} not found in internal_messages registry, register the message type there first"
@@ -91,12 +136,20 @@ class AbstractInternalMessage(AbstractConsumableMessage, AbstractTransmittableMe
 
 
 class AbstractOutgoingMessage(AbstractTransmittableMessage):
-    def format_payload(self, message_id: Optional[str]):
+    def format_payload(
+        self, message_id: Optional[str], state: str = "", success: Optional[bool] = None
+    ):
         from voteit.messaging.registries import websocket_outgoing_messages
+
+        if success is not None:
+            if success:
+                state = MsgState.SUCCESS
+            else:
+                state = MsgState.FAILED
 
         for (mtype, MessageType) in websocket_outgoing_messages.items():
             if self.__class__ == MessageType:
-                payload = OutgoingPayload(p=self, t=mtype, i=message_id)
+                payload = OutgoingPayload(p=self, t=mtype, i=message_id, s=state)
                 return {"type": WEBSOCKET_OUTGOING_NAME, "payload": payload.json()}
 
         raise KeyError(

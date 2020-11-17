@@ -59,11 +59,11 @@ class AbstractChannel(ABC):
             self.channel_name,
         )
         assert isinstance(message, AbstractTransmittableMessage)
-        payload = message.format_payload(message_id)
+        payload = message.format_payload(message_id, success=True)
         await self.channel_layer.group_send(self.channel_name, payload)
 
     def sync_publish(self, message: AbstractTransmittableMessage, message_id=None, **kwargs):
-        async_to_sync(self.publish)(message, message_id=message_id, **kwargs)
+        async_to_sync(self.publish)(message, message_id=message_id, success=True, **kwargs)
 
     async def leave(self, message_id=None, **kwargs):
         assert self.consumer_channel

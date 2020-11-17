@@ -20,13 +20,20 @@ class IncomingPayload(BaseModel):
     p: Optional[Dict]  # Incoming payload
     t: str  # Type, for instance "client.subscribe"
     i: Optional[str] = None  # A message id
-    # Later on: ack
+
+
+class MsgState:
+    SUCCESS = "s"
+    FAILED = "f"
+    WAITING = "w"
+    RUNNING = "r"
 
 
 class OutgoingPayload(BaseModel):
     p: Optional[Dict]
     t: str  # Type, for instance "client.subscribe"
     i: Optional[str] = None  # A message id
+    s: str = ""  # State
 
 
 class OutgoingErrorMessage(OutgoingPayload):
@@ -35,4 +42,8 @@ class OutgoingErrorMessage(OutgoingPayload):
 
 def register():
     """ Just make sure all code is imported and registered. """
-    from . import channels, user, testing, agenda, schema
+    from . import channels, user, agenda, schema, progress
+    from django.conf import settings
+
+    if settings.DEBUG:
+        from . import testing
