@@ -205,7 +205,6 @@ class VoteWeightTests(TestCase):
     def test_poll_result(self):
         from voteit.poll.app.polls.simple import SimpleVote
         from voteit.proposal.models import Proposal
-        from voteit.proposal.workflows import ProposalWf
         self.poll.proposals.add(Proposal.objects.create(title='Abc123', body='I propose!'))
         self.poll.upcoming()
         self.poll.ongoing()
@@ -217,6 +216,10 @@ class VoteWeightTests(TestCase):
         # FIXME: Make this work :)
         # self.assertEqual(self.poll.proposals.first().state, ProposalWf.DENIED)
 
-    def test_weight(self):
+    def test_get_voter_weight(self):
         self.assertEqual(self.er.get_voter_weight(self.user1), 1)
         self.assertEqual(self.er.get_voter_weight(self.user3), 3)
+
+    def test_get_total_vote_weight(self):
+
+        self.assertEqual(5, self.er.get_total_vote_weight())

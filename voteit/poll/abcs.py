@@ -124,7 +124,7 @@ class Vote(ABCModel):
     @property
     @abstractmethod
     def method(self) -> PollMethod:
-        """ A relation to the poll_method used, for instance:
+        """ A relation to the poll method used, for instance:
             method = models.ForeignKey(Simple, on_delete=models.CASCADE, related_name="vote_set")
         """
         pass

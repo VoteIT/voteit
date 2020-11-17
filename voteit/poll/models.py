@@ -10,7 +10,7 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.db.models import UniqueConstraint
+from django.db.models import UniqueConstraint, Sum
 from django.dispatch import receiver
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
@@ -54,6 +54,10 @@ class ElectoralRegister(models.Model):
         Will raise VoterWeight.DoesNotExist if user not in registry.
         """
         return self.voterweight_set.get(user=user).weight
+
+    def get_total_vote_weight(self) -> int:
+        # FIXME: Is this the correct method? :)
+        return self.voterweight_set.aggregate(Sum("weight"))["weight__sum"]
 
 
 class Poll(BaseContent):
