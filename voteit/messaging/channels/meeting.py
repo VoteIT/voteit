@@ -19,7 +19,12 @@ logger = getLogger(__name__)
 
 @channel_registry("meeting")
 class MeetingChannel(AbstractObjectChannel):
-    """ This contains generic messages for the meeting. Agenda updates etc.
+    """ This contains generic messages for the meeting.
+
+        Transport for
+        - Polls
+        - Agenda (The title and order of agenda items)
+        - Anything public related to the meeting
     """
     logger = logger
     Model = Meeting
@@ -37,6 +42,10 @@ class MeetingChannel(AbstractObjectChannel):
 @channel_registry("moderator")
 class ModeratorChannel(AbstractObjectChannel):
     """ Moderator specific messages
+
+        Transport for:
+        - private agenda items
+        - Updates for things that only moderators need to know (The number of present users for instance)
     """
     logger = logger
     Model = Meeting
