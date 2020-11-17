@@ -1,10 +1,10 @@
 
 
 class PollPermissions:
-    ADD = "voteit.poll.add_poll"  # Checked against meeting or org
-    CHANGE = "voteit.poll.change_poll"
-    DELETE = "voteit.poll.delete_poll"
-    VIEW = "voteit.poll.view_poll"
+    ADD = "poll.add_poll"  # Checked against meeting or org
+    CHANGE = "poll.change_poll"
+    DELETE = "poll.delete_poll"
+    VIEW = "poll.view_poll"
 
 
 class VotePermissions:
@@ -12,7 +12,7 @@ class VotePermissions:
         Add is checked against a poll, and change/delete is checked against an existing vote.
         They should always yield the same result.
     """
-    ADD = "voteit.poll.add_vote"
-    CHANGE = "voteit.poll.change_vote"
-    DELETE = "voteit.poll.delete_vote"
-    VIEW = "voteit.poll.view_vote"
+    ADD = "vote.add_vote"
+    CHANGE = "vote.change_vote"
+    DELETE = "vote.delete_vote"
+    VIEW = "vote.view_vote"

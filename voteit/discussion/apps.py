@@ -3,8 +3,9 @@ from django.utils.translation import gettext_lazy as _
 
 
 class DiscussionConfig(AppConfig):
-    name = 'voteit.discussion'
-    verbose_name = _('Discussion')
+    name = "voteit.discussion"
+    verbose_name = _("Discussion")
 
     def ready(self):
         from voteit.discussion import rules
+        from voteit.discussion import rest_api

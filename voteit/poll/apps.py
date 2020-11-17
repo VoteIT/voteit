@@ -10,3 +10,4 @@ class PollConfig(AppConfig):
         from voteit.poll.app import polls
         from voteit.poll.app import er_policys
         from voteit.poll import rules
+        from voteit.poll import rest_api
