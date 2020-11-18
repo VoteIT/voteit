@@ -19,7 +19,6 @@ class MeetingViewSet(
     # get_drf_fsm_mixin(Meeting, fieldname='state'),
     viewsets.ModelViewSet,
 ):
-    permission_classes = [permissions.AllowAny]  # FIXME No, ofc not!
     model = Meeting
     queryset = Meeting.objects.all()
     serializer_class = serializers.MeetingSerializer
@@ -44,10 +43,7 @@ class MeetingViewSet(
             ai.save()
         return Response(status=201)
 
-    # FIXME Uncomment this!
-    # def get_queryset(self):
-    #     if self.request.user.is_anonymous:
-    #         return self.queryset.none()
-    #     if self.request.user.is_superuser:
-    #         return self.queryset
-    #     return self.queryset.filter(participants=self.request.user)
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return self.queryset
+        return self.queryset.filter(participants=self.request.user)
