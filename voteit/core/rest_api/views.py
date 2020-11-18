@@ -23,7 +23,7 @@ class DevLogin(GenericViewSet, CreateModelMixin):
         try:
             admin_user = User.objects.get(username='admin')
         except User.DoesNotExist:
-            admin_user = User.objects.create_user('admin', None, 'admin', is_superuser=True)
+            admin_user = User.objects.create_user('admin', None, 'admin', is_superuser=True, is_staff=True)
         token, created = Token.objects.get_or_create(user=admin_user)
         return Response({
             'key': token.key
