@@ -1,4 +1,4 @@
-from voteit.messaging.messages.abcs import ObjectAdded, ObjectChanged, ObjectDeleted
+from voteit.messaging.messages.abcs import ObjectAdded, ObjectChanged, ObjectDeleted, AbstractOutgoingMessage
 from voteit.messaging.registries import websocket_outgoing_messages
 
 
@@ -15,3 +15,9 @@ class PollChanged(ObjectChanged):
 @websocket_outgoing_messages("poll.deleted")
 class PollDeleted(ObjectDeleted):
     pass
+
+
+@websocket_outgoing_messages("poll.status")
+class PollStatus(AbstractOutgoingMessage):
+    voted: int
+    total: int

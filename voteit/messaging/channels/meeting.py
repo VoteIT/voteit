@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from logging import getLogger
 
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
 from voteit.agenda.models import AgendaItem
@@ -76,7 +76,7 @@ def agenda_change(instance=None, created=None, **kw):
     channel.sync_publish(msg)
 
 
-@receiver(post_delete, sender=AgendaItem)
+@receiver(pre_delete, sender=AgendaItem)
 def agenda_delete(instance=None, **kw):
     channel = MeetingChannel.from_instance(instance.meeting)
     # FIXME: Create a serializer that only sends primary keys?
@@ -96,7 +96,7 @@ def poll_change(instance=None, created=None, **kw):
         channel.sync_publish(msg)
 
 
-@receiver(post_delete, sender=Poll)
+@receiver(pre_delete, sender=Poll)
 def poll_delete(instance=None, **kw):
     if instance.meeting is not None:
         channel = MeetingChannel.from_instance(instance.meeting)

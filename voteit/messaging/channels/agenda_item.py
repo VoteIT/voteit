@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from logging import getLogger
 
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
 from voteit.agenda.models import AgendaItem
@@ -69,7 +69,7 @@ def discussion_post_change(instance=None, created=None, **kw):
     channel.sync_publish(msg)
 
 
-@receiver(post_delete, sender=Proposal)
+@receiver(pre_delete, sender=Proposal)
 def proposal_delete(instance=None, **kw):
     if instance.agenda_item is None:
         return
@@ -78,7 +78,7 @@ def proposal_delete(instance=None, **kw):
     channel.sync_publish(msg)
 
 
-@receiver(post_delete, sender=DiscussionPost)
+@receiver(pre_delete, sender=DiscussionPost)
 def discussion_post_delete(instance=None, **kw):
     if instance.agenda_item is None:
         return
