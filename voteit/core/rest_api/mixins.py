@@ -19,7 +19,6 @@ class SerializerClassesMixin:
 
 
 class CreateModelPermissionsMixin(CreateModelMixin):
-    permission_classes = IsAuthenticated, DjangoObjectPermissions
     context_queryset: QuerySet
     context_lookup_kwarg: str
     context_lookup_field: str = 'pk'

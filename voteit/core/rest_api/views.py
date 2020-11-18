@@ -1,5 +1,8 @@
+from typing import Type
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import permissions
 from rest_framework.authtoken.models import Token
 from rest_framework.mixins import CreateModelMixin
@@ -19,10 +22,10 @@ class DevLogin(GenericViewSet, CreateModelMixin):
     serializer_class = Serializer
 
     def create(self, request, *args, **kwargs):
-        User: AbstractUser = get_user_model()
+        User: Type[AbstractUser] = get_user_model()
         try:
             admin_user = User.objects.get(username='admin')
-        except User.DoesNotExist:
+        except ObjectDoesNotExist:
             admin_user = User.objects.create_user('admin', None, 'admin', is_superuser=True, is_staff=True)
         token, created = Token.objects.get_or_create(user=admin_user)
         return Response({

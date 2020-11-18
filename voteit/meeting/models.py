@@ -4,7 +4,6 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Generator
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -98,9 +97,9 @@ class Meeting(BaseContent):
         if only_active:
             query["active"] = True
         for ap in access_policies.values():
-            qs = ap.objects.filter(meeting=self, **query)
-            if qs:
-                yield qs.first()  # All of them are 1-1 relations
+            obj = ap.objects.filter(meeting=self, **query).first()
+            if obj:
+                yield obj  # All of them are 1-1 relations
 
     @transition(
         field=state,
