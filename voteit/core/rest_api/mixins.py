@@ -3,7 +3,7 @@ from typing import Dict
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.query import QuerySet
 from rest_framework.mixins import CreateModelMixin
-from rest_framework.permissions import DjangoObjectPermissions
+from rest_framework.permissions import DjangoObjectPermissions, IsAuthenticated
 from rest_framework.serializers import Serializer
 
 
@@ -19,7 +19,7 @@ class SerializerClassesMixin:
 
 
 class CreateModelPermissionsMixin(CreateModelMixin):
-    permission_classes = [DjangoObjectPermissions]
+    permission_classes = IsAuthenticated, DjangoObjectPermissions
     context_queryset: QuerySet
     context_lookup_kwarg: str
     context_lookup_field: str = 'pk'
