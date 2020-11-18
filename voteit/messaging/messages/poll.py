@@ -19,5 +19,6 @@ class PollDeleted(ObjectDeleted):
 
 @websocket_outgoing_messages("poll.status")
 class PollStatus(AbstractOutgoingMessage):
+    pk: int
     voted: int
     total: int

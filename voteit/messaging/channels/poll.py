@@ -44,6 +44,7 @@ def vote_added(instance=None, created=None, **kw):
     # We don't have to count updated votes!
     if created and isinstance(instance, Vote) and instance.method is not None:
         msg = PollStatus(
+            pk=instance.pk,
             voted=instance.method.vote_set.count(),
             total=instance.method.poll.electoral_register.voters.count(),
         )
