@@ -9,7 +9,7 @@ __all__ = ("DiscussionPostListSerializer", "DiscussionPostDetailSerializer")
 class DiscussionPostListSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.DiscussionPost
-        fields = "url", "title", "agenda_item"
+        fields = "url", "pk", "title", "agenda_item", "author"
 
 
 class DiscussionPostDetailSerializer(BaseModelSerializer):

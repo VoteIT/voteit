@@ -92,6 +92,7 @@ class AgendaItem(BaseContent):
     @transition(
         field=state,
         target=AgendaItemWf.ARCHIVED,
+        source='*',
         permission="__not_allowed__",  # Handled by scripts
     )
     def archive(self):
