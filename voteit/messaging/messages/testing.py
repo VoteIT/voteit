@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from time import sleep
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, List
 
+from django.db.models import F
 from django.dispatch import receiver
 from django_rq import job
 from pydantic import validator
 from voteit.messaging.messages import MsgState
 from voteit.messaging.messages.abcs import AbstractIncomingMessage, AbstractOutgoingMessage
 from voteit.messaging.messages.progress import ProgressNum
+from voteit.messaging.models import Connection
 from voteit.messaging.registries import websocket_incoming_messages, websocket_outgoing_messages
 from voteit.messaging.signals import client_connect
 
@@ -81,4 +83,23 @@ def count_to_num(consumer_name:str, num:int, message_id: str, fail:Optional[int]
             msg.send(consumer_name, message_id, state=MsgState.RUNNING)
         sleep(1)
     msg = ProgressNum(curr=num, total=num, msg="All done!")
+    msg.send(consumer_name, message_id, success=True)
+
+
+@websocket_incoming_messages("testing.online_users")
+class OnlineUsers(AbstractIncomingMessage):
+
+    async def consume(self, consumer: WebsocketDemuxConsumer, message_id: str = None):
+        get_online_users.delay(consumer_name=consumer.channel_name, message_id=message_id)
+
+
+@websocket_outgoing_messages("testing.online_users")
+class OnlineUsersResponse(AbstractOutgoingMessage):
+    users: List[int]
+
+
+@job("default", timeout=5)
+def get_online_users(consumer_name: str, message_id: str):
+    users = Connection.objects.filter(online=True).distinct("user").values_list("user", flat=True)
+    msg = OnlineUsersResponse(users=list(users))
     msg.send(consumer_name, message_id, success=True)
