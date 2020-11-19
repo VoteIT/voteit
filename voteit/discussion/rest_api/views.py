@@ -27,8 +27,6 @@ class DiscussionPostViewSet(
     context_lookup_kwarg = 'agenda_item'
 
     def get_queryset(self):
-        if self.request.user.is_anonymous:
-            return self.queryset.none()
         if self.request.user.is_superuser:
             return self.queryset
         # TODO: Filter out private ai:s
