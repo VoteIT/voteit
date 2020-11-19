@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.discussion import models
 
 
@@ -11,7 +12,7 @@ class DiscussionPostListSerializer(serializers.ModelSerializer):
         fields = "url", "title", "agenda_item"
 
 
-class DiscussionPostDetailSerializer(serializers.ModelSerializer):
+class DiscussionPostDetailSerializer(BaseModelSerializer):
     # Note: This won't have access to the request, so no url thingies here!
     class Meta:
         model = models.DiscussionPost
