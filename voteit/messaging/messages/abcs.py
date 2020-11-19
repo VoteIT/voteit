@@ -157,6 +157,19 @@ class AbstractOutgoingMessage(AbstractTransmittableMessage):
         )
 
 
+class AddObject(AbstractIncomingMessage):
+    data: Dict
+
+
+class ChangeObject(AbstractIncomingMessage):
+    pk: int
+    data: Dict
+
+
+class DeleteObject(AbstractIncomingMessage):
+    pk: int
+
+
 class ObjectAdded(AbstractOutgoingMessage):
     item: Dict
 
