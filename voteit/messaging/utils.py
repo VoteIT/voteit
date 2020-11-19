@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from django.utils.timezone import now
 from voteit.messaging.models import Connection
 
 logger = getLogger(__name__)
 
 if TYPE_CHECKING:
     from voteit.core.component import Registry
+    from django.db.models import QuerySet
 
 
 def get_channel_registry() -> Registry:
@@ -23,3 +28,43 @@ def update_user_status(user, channel_name, online=True):
     conn.online=online
     conn.save()
     return conn
+
+
+def cleanup_connection_status(secs=180):
+    """ Check connections marked as active and make sure they're still active. """
+    # Note: This assumes channels_redis backend
+    since = now() - timedelta(seconds=secs)
+    qs = Connection.objects.filter(online=True, last_action__lt=since)
+    channel_names = set(qs.values_list("channel_name", flat=True))
+    found = async_to_sync(check_redis_keys)(channel_names)
+    to_remove = channel_names - found
+    if to_remove:
+        logger.debug("Changing connection status of %s objects", len(to_remove))
+        Connection.objects.filter(online=True, channel_name__in=to_remove).update(online=False)
+    else:
+        logger.debug("No expired connections found")
+
+
+def get_old_connections(hours=24) -> QuerySet:
+    """ Get old connection items, suitable for dumping somewhere else or simply deleting. """
+    since = now() - timedelta(hours=hours)
+    return Connection.objects.filter(online=False, last_action__lt=since)
+
+
+def cleanup_old_connections(hours=24):
+    """ Delete connection info from db.
+        It might be a good idea to store some of the information before deleting. """
+    qs = get_old_connections(hours)
+    qs.delete()
+
+
+async def check_redis_keys(keys) -> set:
+    """ Return a set of keys that exist."""
+    channel_layer = get_channel_layer()
+    found = set()
+    # FIXME: There's no stable API to get a sensible connection index from the pool in channel layer right now :(
+    async with channel_layer.connection(0) as connection:
+        for k in keys:
+            if await connection.exists(k):
+                found.add(k)
+    return found
