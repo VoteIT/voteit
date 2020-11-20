@@ -31,9 +31,14 @@ class AgendaViewSet(
         # TODO: Filter out private ai:s
         return self.queryset.filter(meeting__participants=self.request.user)
 
-    # TODO permission class
+    # TODO Figure out permission class (could be IsAuthenticated)
+    # TODO Tests
+    # TODO Move to mixin
     @action(methods=['post', 'get'], detail=True, permission_classes=[permissions.IsAdminUser])
     def transitions(self, request, pk):
+        """ Generic transitions action for 'state' field.
+            Checks against available transitions for current user before calling.
+        """
         instance = self.get_object()
         available_transitions = [t.name for t in instance.get_available_user_state_transitions(request.user)]
         if request.method == 'GET':
@@ -50,4 +55,5 @@ class AgendaViewSet(
 
             getattr(instance, name)()
             instance.save()
+            # TODO Possibly return serialized object, but strictly speaking not necessary.
             return Response(status=201)
