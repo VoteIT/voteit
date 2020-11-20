@@ -42,4 +42,5 @@ def signal_websocket_close(
         consumer_name=consumer_name,
         close_code=close_code,
     )
-    update_user_status(user, channel_name=consumer_name, online=False)
+    if user_pk:
+        update_user_status(user, channel_name=consumer_name, online=False)

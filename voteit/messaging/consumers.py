@@ -1,13 +1,17 @@
 import json
+from contextlib import suppress
 from logging import getLogger
 from typing import TYPE_CHECKING, Optional, List
 
 from channels.auth import get_user
+from channels.db import database_sync_to_async
 from channels.exceptions import DenyConnection
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ObjectDoesNotExist
 from pydantic import ValidationError
+from rest_framework.authtoken.models import Token
 
 from voteit.messaging.exceptions import UnsupportedMessageType
 from voteit.messaging.jobs import signal_websocket_connect
@@ -44,20 +48,16 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
         connection_token = self.scope["url_route"]["kwargs"]["connection_token"]
-        # FIXME: Check connection token against storage. Redis, db?
-        await self.refresh_user()
-        self.user_pk = (
-            self.user.pk
-        )  # Save for later use in case of invalidation of the user object
+        self.user = await database_sync_to_async(self.get_token_user)(key=connection_token)
+        if self.user is None:
+            logger.debug("Invalid token, closing connection")
+            raise DenyConnection()
+        # When using session auth instead of token:
+        # await self.refresh_user()
+        self.user_pk = self.user.pk  # Save for later use in case of invalidation of the user object
         logger.debug(
             "Connection for user: %s with token '%s'", self.user, connection_token
         )
-        if not isinstance(self.user, AbstractUser):
-            logger.debug("Anonymous user kicked")
-            raise DenyConnection()
-        if connection_token == "invalid":  # FIXME: Just for testing
-            logger.debug("Invalid token, closing connection")
-            raise DenyConnection()
         await self.accept()
         logger.debug("Connection accepted for user %s (%s)", self.user, self.user.pk)
         signal_websocket_connect.delay(
@@ -76,8 +76,12 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             user_pk=self.user_pk, consumer_name=self.channel_name, close_code=close_code
         )
 
-    async def refresh_user(self):
-        self.user = await get_user(self.scope)
+    def get_token_user(self, key: str) -> Optional[AbstractUser]:
+        with suppress(ObjectDoesNotExist):
+            return Token.objects.get(key=key).user
+
+    # async def refresh_user(self):
+    #     self.user = await get_user(self.scope)
 
     async def receive(self, text_data:str=None, bytes_data=None):
         """ Receive from websocket """
