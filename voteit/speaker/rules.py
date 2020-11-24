@@ -6,6 +6,7 @@ from voteit.meeting.permissions import MeetingPermissions
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import Speaker
+from voteit.speaker.roles import ROLE_LIST_MODERATOR, ROLE_SPEAKER
 from voteit.speaker.permissions import (
     SpeakerListPermissions,
     SpeakerPermissions,
@@ -18,17 +19,15 @@ from voteit.speaker.workflows import SpeakerListWf
 
 @rules.predicate
 def is_list_moderator(user: AbstractUser, list_system: SpeakerListSystem) -> bool:
-    return (
-        isinstance(list_system, SpeakerListSystem)
-        and list_system.moderators.filter(pk=user.pk).exists()
+    return isinstance(list_system, SpeakerListSystem) and list_system.has_roles(
+        user, ROLE_LIST_MODERATOR
     )
 
 
 @rules.predicate
 def is_list_speaker(user: AbstractUser, list_system: SpeakerListSystem) -> bool:
-    return (
-        isinstance(list_system, SpeakerListSystem)
-        and list_system.speakers.filter(pk=user.pk).exists()
+    return isinstance(list_system, SpeakerListSystem) and list_system.has_roles(
+        user, ROLE_SPEAKER
     )
 
 

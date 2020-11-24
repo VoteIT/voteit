@@ -18,7 +18,9 @@ logger = getLogger(__name__)
 
 class ListMethod(ABCModel):
     list_system_rel = GenericRelation(
-        "speaker.SpeakerListSystem", object_id_field="method_id", content_type_field="method_type"
+        "speaker.SpeakerListSystem",
+        object_id_field="method_id",
+        content_type_field="method_type",
     )
 
     class Meta:
@@ -46,13 +48,17 @@ class ListMethod(ABCModel):
             Make sure to include the safe speakers!
         """
         new_order = [x.pk for x in speaker_list.safe_speakers_qs().all()]
-        result = speaker_list.speaker_items.filter(order__isnull=False, safe_pos=True).aggregate(Max("order"))
+        result = speaker_list.speaker_items.filter(
+            order__isnull=False, safe_pos=True
+        ).aggregate(Max("order"))
         max_order = result["order__max"]
         if max_order is None:
             start_order = 1
         else:
             start_order = max_order + 1
-        for order, speaker in enumerate(speaker_list.speakers_unsafe_created_qs().all(), start_order):
+        for order, speaker in enumerate(
+            speaker_list.speakers_unsafe_created_qs().all(), start_order
+        ):
             speaker.order = order
             speaker.save()
             new_order.append(speaker.pk)

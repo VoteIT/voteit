@@ -16,6 +16,7 @@ from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField, transition
 
 from voteit.agenda.models import AgendaItem
+from voteit.core.models import Roles, RoleContextMixin
 from voteit.meeting.models import Meeting
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.signals import list_updated
@@ -36,7 +37,14 @@ if TYPE_CHECKING:
 # FIXME: SpeakerListSystems (SLS) should be able to relate to another SLS, causing all settings
 # to be shared between them.
 
-class SpeakerListSystem(models.Model):
+
+class SpeakerSystemRoles(Roles):
+    context: SpeakerListSystem = models.ForeignKey(
+        "SpeakerListSystem", on_delete=models.CASCADE
+    )
+
+
+class SpeakerListSystem(RoleContextMixin):
     """ All speaker list things relate here, while this in turn might relate to a meeting.
         A list system has its own rules and moderators.
     """
@@ -55,22 +63,22 @@ class SpeakerListSystem(models.Model):
     )
     method_id: int = models.PositiveIntegerField(null=True)
     method: ListMethod = GenericForeignKey("method_type", "method_id")
-    moderators = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        verbose_name=_("Users who may moderate the speaker lists"),
-        blank=True,
-        related_name="moderator_in_list_systems",
-        editable=False,
-    )
-    speakers = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        verbose_name=_(
-            "Users who may ask to speak (i.e. enter a list) depending on if they're open or not"
-        ),
-        blank=True,
-        related_name="speaker_in_list_systems",
-        editable=False,
-    )
+    # moderators = models.ManyToManyField(
+    #     settings.AUTH_USER_MODEL,
+    #     verbose_name=_("Users who may moderate the speaker lists"),
+    #     blank=True,
+    #     related_name="moderator_in_list_systems",
+    #     editable=False,
+    # )
+    # speakers = models.ManyToManyField(
+    #     settings.AUTH_USER_MODEL,
+    #     verbose_name=_(
+    #         "Users who may ask to speak (i.e. enter a list) depending on if they're open or not"
+    #     ),
+    #     blank=True,
+    #     related_name="speaker_in_list_systems",
+    #     editable=False,
+    # )
     safe_positions = models.PositiveSmallIntegerField(
         verbose_name=_(
             "When a list is active, mark the top X positions as safe automatically. "
@@ -87,12 +95,16 @@ class SpeakerListSystem(models.Model):
         related_name="active_list_system",
     )
 
+    roles_cls = SpeakerSystemRoles
+
 
 class Speaker(models.Model):
     """ Information about a user who's entered a speaker list.
     """
 
-    user: AbstractUser = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    user: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+    )
     list: SpeakerList = models.ForeignKey(
         "SpeakerList", on_delete=models.CASCADE, related_name="speaker_items"
     )
@@ -223,7 +235,13 @@ class SpeakerList(models.Model):
             if self.active_list_system.exists():
                 system = self.active_list_system.get()
                 safe_pos = system.safe_positions
-                if safe_pos and safe_pos > self.speaker_items.filter(order__isnull=False, safe_pos=True).count():
+                if (
+                    safe_pos
+                    and safe_pos
+                    > self.speaker_items.filter(
+                        order__isnull=False, safe_pos=True
+                    ).count()
+                ):
                     # FIXME: Do something smarter
                     for speaker in self.speakers_qs()[:safe_pos]:
                         if not speaker.safe_pos:
@@ -259,4 +277,6 @@ class SpeakerList(models.Model):
         )
 
     def speakers_unsafe_created_qs(self) -> models.QuerySet:
-        return self.speaker_items.filter(order__isnull=False, safe_pos=False).order_by("created")
+        return self.speaker_items.filter(order__isnull=False, safe_pos=False).order_by(
+            "created"
+        )

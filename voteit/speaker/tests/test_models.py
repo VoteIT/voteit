@@ -76,14 +76,23 @@ class SpeakerListTests(TestCase):
         )
 
     def test_current_order(self):
-        self.assertEqual([1, 2, 3], self.speaker_list.current_order())
+        self.assertEqual(
+            [self.speaker_one.pk, self.speaker_two.pk, self.speaker_three.pk],
+            self.speaker_list.current_order(),
+        )
 
     def test_reorder(self):
-        self.assertEqual([1, 2, 3], self.speaker_list.reorder())
+        self.assertEqual(
+            [self.speaker_one.pk, self.speaker_two.pk, self.speaker_three.pk],
+            self.speaker_list.reorder(),
+        )
         # Change timestamp...
         self.speaker_one.created = now()
         self.speaker_one.save()
-        self.assertEqual([2, 3, 1], self.speaker_list.reorder())
+        self.assertEqual(
+            [self.speaker_two.pk, self.speaker_three.pk, self.speaker_one.pk],
+            self.speaker_list.reorder(),
+        )
 
     def test_reorder_signals_on_change(self):
         from voteit.speaker.signals import list_updated
@@ -104,20 +113,32 @@ class SpeakerListTests(TestCase):
         self.speaker_list.reorder()
 
         self.assertTrue(L)
-        self.assertEqual([2, 3, 1], L[0])  # First event
+        self.assertEqual(
+            [self.speaker_two.pk, self.speaker_three.pk, self.speaker_one.pk], L[0]
+        )  # First event
 
     def test_safe_pos_overrides_order(self):
         self.speaker_two.safe_pos = True
         self.speaker_two.save()
-        self.assertEqual([2, 1, 3], self.speaker_list.current_order())
+
+        self.assertEqual(
+            [self.speaker_two.pk, self.speaker_one.pk, self.speaker_three.pk],
+            self.speaker_list.current_order(),
+        )
         self.speaker_three.safe_pos = True
         self.speaker_three.save()
         self.speaker_list.reorder()
-        self.assertEqual([2, 3, 1], self.speaker_list.current_order())
+        self.assertEqual(
+            [self.speaker_two.pk, self.speaker_three.pk, self.speaker_one.pk],
+            self.speaker_list.current_order(),
+        )
         self.speaker_two.safe_pos = False
         self.speaker_two.save()
         self.speaker_list.reorder()
-        self.assertEqual([3, 1, 2], self.speaker_list.current_order())
+        self.assertEqual(
+            [self.speaker_three.pk, self.speaker_one.pk, self.speaker_two.pk],
+            self.speaker_list.current_order(),
+        )
 
     def test_safe_pos_updated_on_reorder(self):
         self.system.safe_positions = 1
@@ -141,12 +162,15 @@ class SpeakerListTests(TestCase):
 
         self.speaker_two.delete()
         self.assertTrue(L)
-        self.assertEqual([1, 3], L[0])  # First event
+        self.assertEqual(
+            [self.speaker_one.pk, self.speaker_three.pk], L[0]
+        )  # First event
 
     def test_reoder_invoked_on_delete(self):
-        from voteit.speaker.signals import list_updated
-        from voteit.speaker.models import SpeakerList
         self.speaker_one.created = now()  # Now later than the 3rd speaker
         self.speaker_one.save()
         self.speaker_two.delete()
-        self.assertEqual([3, 1], self.speaker_list.current_order())
+        self.assertEqual(
+            [self.speaker_three.pk, self.speaker_one.pk],
+            self.speaker_list.current_order(),
+        )
