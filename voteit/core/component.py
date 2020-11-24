@@ -40,6 +40,7 @@ class Registry(UserDict):
 
     def __call__(self, factory_or_name):
         if isinstance(factory_or_name, str):
+
             def _decorator(cls):
                 self[factory_or_name] = cls
                 return cls
@@ -47,21 +48,25 @@ class Registry(UserDict):
             return _decorator
 
         # Class or instance
-        name = getattr(factory_or_name, 'name', factory_or_name.__name__.lower())
+        name = getattr(factory_or_name, "name", factory_or_name.__name__.lower())
         self[name] = factory_or_name
         return factory_or_name
 
-    def __setitem__(self, key:str, factory):
+    def __setitem__(self, key: str, factory):
         if isinstance(factory, type):
             # Class based factory
             if not issubclass(factory, self.required):
                 raise TypeError(f"{factory} isn't any of the required: {self.required}")
-            abs_methods = getattr(factory, '__abstractmethods__', None)
+            abs_methods = getattr(factory, "__abstractmethods__", None)
             if abs_methods:
                 missing = "', '".join(abs_methods)
-                raise TypeError(f"{factory} doesn't implement the required abstract methods: '{missing}'")
+                raise TypeError(
+                    f"{factory} doesn't implement the required abstract methods: '{missing}'"
+                )
         else:
             # Object based
             if not isinstance(factory, self.required):
-                raise TypeError(f"{factory} isn't an instance of the required: {self.required}")
+                raise TypeError(
+                    f"{factory} isn't an instance of the required: {self.required}"
+                )
         super().__setitem__(key, factory)

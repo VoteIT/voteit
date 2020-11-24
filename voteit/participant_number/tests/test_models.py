@@ -7,10 +7,10 @@ User = get_user_model()
 
 
 class ParticipantNumberTests(TestCase):
-
     def setUp(self):
         from voteit.meeting.models import Meeting
         from voteit.participant_number.models import PNSystem
+
         self.meeting = Meeting.objects.create()
         self.user_pn = User.objects.create(username="pn")
         self.user_no_pn = User.objects.create(username="404")
@@ -24,7 +24,11 @@ class ParticipantNumberTests(TestCase):
         self.assertIsNone(self.system.get_user(2))
 
     def test_duplicate_pn(self):
-        self.assertRaises(IntegrityError, self.system.numbers.create, user=self.user_no_pn, number=1)
+        self.assertRaises(
+            IntegrityError, self.system.numbers.create, user=self.user_no_pn, number=1
+        )
 
     def test_duplicate_user(self):
-        self.assertRaises(IntegrityError, self.system.numbers.create, user=self.user_pn, number=2)
+        self.assertRaises(
+            IntegrityError, self.system.numbers.create, user=self.user_pn, number=2
+        )

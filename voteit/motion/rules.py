@@ -20,8 +20,8 @@ from voteit.organisation.permissions import OrgPermissions
 @rules.predicate
 def is_mp_viewer(user: AbstractUser, motion_process: MotionProcess):
     """ User can view the process. """
-    return (
-        isinstance(motion_process, MotionProcess) and motion_process.has_roles(user, ROLE_MP_VIEWER)
+    return isinstance(motion_process, MotionProcess) and motion_process.has_roles(
+        user, ROLE_MP_VIEWER
     )
 
 
@@ -29,15 +29,15 @@ def is_mp_viewer(user: AbstractUser, motion_process: MotionProcess):
 def is_mp_mover(user: AbstractUser, motion_process: MotionProcess):
     """ Someone who's has the role that enables them to submit motions.
     """
-    return (
-        isinstance(motion_process, MotionProcess) and motion_process.has_roles(user, ROLE_MP_MOVER)
+    return isinstance(motion_process, MotionProcess) and motion_process.has_roles(
+        user, ROLE_MP_MOVER
     )
 
 
 @rules.predicate
 def is_mp_manager(user: AbstractUser, motion_process: MotionProcess):
-    return (
-        isinstance(motion_process, MotionProcess) and motion_process.has_roles(user, ROLE_MP_MANAGER)
+    return isinstance(motion_process, MotionProcess) and motion_process.has_roles(
+        user, ROLE_MP_MANAGER
     )
 
 

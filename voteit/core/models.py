@@ -39,7 +39,9 @@ class RoleContextMixin(ABCModel):
 
     def add_roles(self, user: AbstractUser, *roles: Role) -> Optional[Set[Role]]:
         assert isinstance(user, AbstractUser)
-        roles_model, created = self.roles_cls.objects.get_or_create(user=user, context=self)
+        roles_model, created = self.roles_cls.objects.get_or_create(
+            user=user, context=self
+        )
         roles_model.add(*roles)
 
     def remove_roles(self, user: AbstractUser, *roles: Role) -> Optional[Set[Role]]:
@@ -49,10 +51,14 @@ class RoleContextMixin(ABCModel):
             return roles_model.remove(*roles)
 
     def has_roles(self, user: AbstractUser, *roles: Role) -> bool:
-        return self.roles_cls.objects.filter(user=user, context=self, assigned__contains=roles).exists()
+        return self.roles_cls.objects.filter(
+            user=user, context=self, assigned__contains=roles
+        ).exists()
 
     def has_any_roles(self, user: AbstractUser, *roles: Role) -> bool:
-        return self.roles_cls.objects.filter(user=user, context=self, assigned__overlap=roles).exists()
+        return self.roles_cls.objects.filter(
+            user=user, context=self, assigned__overlap=roles
+        ).exists()
 
     class Meta:
         abstract = True
@@ -60,6 +66,7 @@ class RoleContextMixin(ABCModel):
 
 class Roles(ABCModel):
     """ Context for role assignments"""
+
     valid_roles: Dict = None  # Don't instantiate set here!
     # It's a good idea to override the user relation to have a sane related_name
     user: AbstractUser = models.ForeignKey(
@@ -67,8 +74,7 @@ class Roles(ABCModel):
         on_delete=models.CASCADE,
         related_name="roles_%(app_label)s_%(class)s",
     )
-    assigned: List = ArrayField(models.CharField(max_length=20), default = tuple)
-
+    assigned: List = ArrayField(models.CharField(max_length=20), default=tuple)
 
     @property
     @abstractmethod
@@ -130,7 +136,9 @@ class Roles(ABCModel):
                 x = self.valid_roles[x]
             else:
                 assert isinstance(x, Role), f"{x} is not an instance of Role"
-            assert x.name in self.valid_roles, f"{x} is not a valid role for this context"
+            assert (
+                x.name in self.valid_roles
+            ), f"{x} is not a valid role for this context"
             found.add(x)
         return found
 
@@ -140,7 +148,9 @@ class Roles(ABCModel):
         """
         for role in roles:
             assert isinstance(role, Role)
-            assert role.roles_cls is None, "Role already assigned as valid choice on another Roles model"
+            assert (
+                role.roles_cls is None
+            ), "Role already assigned as valid choice on another Roles model"
             role.roles_cls = cls
             if cls.valid_roles is None:
                 cls.valid_roles = {}
@@ -177,7 +187,6 @@ class Roles(ABCModel):
     #             continue
     #         if role in other.requires:
     #             yield other
-
 
 
 class BaseContent(models.Model):

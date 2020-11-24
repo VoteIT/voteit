@@ -23,20 +23,17 @@ if TYPE_CHECKING:
     from voteit.poll.models import ElectoralRegister
 
 
-__all__ = 'Meeting', "MeetingRoles"
+__all__ = "Meeting", "MeetingRoles"
 
 
 class MeetingRoles(Roles):
     """ Contains assigned meeting roles for a specific meeting and user"""
-    user:AbstractUser = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="meeting_roles",
+
+    user: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="meeting_roles"
     )
     context: Meeting = models.ForeignKey(
-        "Meeting",
-        on_delete=models.CASCADE,
-        related_name="roles"
+        "Meeting", on_delete=models.CASCADE, related_name="roles"
     )
 
 
@@ -53,44 +50,6 @@ class Meeting(BaseContent, RoleContextMixin):
     public = models.BooleanField(
         verbose_name=_("Is this meeting viewable by anyone?"), default=False
     )
-
-    roles_cls = MeetingRoles
-
-
-    # participants = models.ManyToManyField(
-    #     settings.AUTH_USER_MODEL,
-    #     verbose_name=_(
-    #         "User can participate in some form. "
-    #         "This is basically read permission, unless the process is public."
-    #     ),
-    #     blank=True,
-    #     related_name="participant_in_meetings",
-    #     editable=False,
-    # )
-    # potential_voters = models.ManyToManyField(
-    #     settings.AUTH_USER_MODEL,
-    #     verbose_name=_("This user may become a voter in this meeting."),
-    #     blank=True,
-    #     related_name="potential_voter_in_meetings",
-    #     editable=False,
-    # )
-    # discussers = models.ManyToManyField(
-    #     settings.AUTH_USER_MODEL,
-    #     verbose_name=_("User may add discussion posts."),
-    #     blank=True,
-    #     related_name="discusser_in_meetings",
-    #     editable=False,
-    # )
-    # proposers = models.ManyToManyField(
-    #     settings.AUTH_USER_MODEL,
-    #     verbose_name=_("User may add proposals."),
-    #     blank=True,
-    #     related_name="proposer_in_meetings",
-    #     editable=False,
-    # )
-    # moderators = models.ManyToManyField(
-    #     settings.AUTH_USER_MODEL, blank=True, related_name="moderator_in_meetings", editable=False
-    # )
     er_policy_type = models.ForeignKey(
         ContentType, on_delete=models.CASCADE, null=True, editable=False
     )
@@ -104,6 +63,8 @@ class Meeting(BaseContent, RoleContextMixin):
         related_name="meetings",
     )
     archive_after = models.DateTimeField(null=True, editable=False)
+
+    roles_cls = MeetingRoles
 
     def get_latest_er(self) -> ElectoralRegister:
         return (
@@ -168,9 +129,7 @@ class Meeting(BaseContent, RoleContextMixin):
         self.archive_after = None
 
     @transition(
-        field=state,
-        target=MeetingWf.ARCHIVED,
-        permission="__not_allowed_manually__",
+        field=state, target=MeetingWf.ARCHIVED, permission="__not_allowed_manually__"
     )
     def archive(self):
         with transaction.atomic():

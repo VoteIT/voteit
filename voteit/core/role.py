@@ -37,7 +37,9 @@ class Role:
             self.roles_cls is not None
         ), "Assign this role to a Roles context first, for instance MeetingRoles"
         assert isinstance(role, Role)
-        assert role.roles_cls == self.roles_cls, "Requirements context (roles_cls) doesn't match"
+        assert (
+            role.roles_cls == self.roles_cls
+        ), "Requirements context (roles_cls) doesn't match"
         self.requires.add(role)
 
     def __repr__(self):

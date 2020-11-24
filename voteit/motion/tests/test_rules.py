@@ -6,7 +6,6 @@ from voteit.motion.permissions import MotionProcessPermissions as MPP
 
 
 class MotionProcessRulesTests(TestCase):
-
     def setUp(self):
         from voteit.motion.models import MotionProcess, MotionProcessRoles
 
@@ -27,16 +26,19 @@ class MotionProcessRulesTests(TestCase):
 
     def test_is_mp_viewer(self):
         from voteit.motion.rules import is_mp_viewer
+
         self.assertFalse(is_mp_viewer(self.any_user, self.mp))
         self.assertTrue(is_mp_viewer(self.viewer_user, self.mp))
 
     def test_is_mp_mover(self):
         from voteit.motion.rules import is_mp_mover
+
         self.assertFalse(is_mp_mover(self.any_user, self.mp))
         self.assertTrue(is_mp_mover(self.mover_user, self.mp))
 
     def test_is_mp_manager(self):
         from voteit.motion.rules import is_mp_manager
+
         self.assertFalse(is_mp_manager(self.any_user, self.mp))
         self.assertTrue(is_mp_manager(self.manager_user, self.mp))
 
@@ -79,7 +81,6 @@ class MotionProcessRulesTests(TestCase):
 
 
 class MotionRulesTests(TestCase):
-
     def setUp(self):
         from voteit.motion.models import MotionProcess, MotionProcessRoles
 
@@ -147,11 +148,15 @@ class MotionRulesTests(TestCase):
     def test_can_submit_motion(self):
         self.assertFalse(self.any_user.has_perm(MP.SUBMIT, self.motion))
         self.assertTrue(self.mover_user.has_perm(MP.SUBMIT, self.motion))
-        self.assertFalse(self.manager_user.has_perm(MP.SUBMIT, self.motion))  # Moderators publish!
+        self.assertFalse(
+            self.manager_user.has_perm(MP.SUBMIT, self.motion)
+        )  # Moderators publish!
         self.mp.close()  # No submissions allowed if it's not open
         self.assertFalse(self.any_user.has_perm(MP.SUBMIT, self.motion))
         self.assertFalse(self.mover_user.has_perm(MP.SUBMIT, self.motion))
-        self.assertFalse(self.manager_user.has_perm(MP.SUBMIT, self.motion))  # Moderators publish!
+        self.assertFalse(
+            self.manager_user.has_perm(MP.SUBMIT, self.motion)
+        )  # Moderators publish!
 
     def test_can_retract_motion(self):
         self.assertFalse(self.any_user.has_perm(MP.RETRACT, self.motion))

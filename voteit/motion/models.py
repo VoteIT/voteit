@@ -18,15 +18,14 @@ from voteit.motion.permissions import MotionPermissions as MP
 
 class MotionProcessRoles(Roles):
     """ Contains assigned meeting roles for a specific meeting and user"""
-    user:AbstractUser = models.ForeignKey(
+
+    user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="motion_process_roles",
     )
     context: MotionProcess = models.ForeignKey(
-        "MotionProcess",
-        on_delete=models.CASCADE,
-        related_name="roles"
+        "MotionProcess", on_delete=models.CASCADE, related_name="roles"
     )
 
 

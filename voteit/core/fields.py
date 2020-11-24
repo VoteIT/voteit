@@ -9,7 +9,7 @@ from voteit.core.role import Role
 
 
 class RoleField(models.CharField):
-    description = 'VoteIT single role field'
+    description = "VoteIT single role field"
 
     def __init__(self, roles_cls, *args, **kwargs):
         kwargs.setdefault("max_length", 20)
@@ -20,7 +20,7 @@ class RoleField(models.CharField):
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
         # del kwargs['max_length']
-        kwargs['roles_cls'] = self.roles_cls
+        kwargs["roles_cls"] = self.roles_cls
         return name, path, args, kwargs
 
     def from_db_value(self, value, expression, connection):
@@ -38,7 +38,7 @@ class RoleField(models.CharField):
         if isinstance(value, Role):
             value = value.name
         if value not in self.roles_cls.valid_roles:
-            raise ValidationError(f'Invalid role for {self.roles_cls}')
+            raise ValidationError(f"Invalid role for {self.roles_cls}")
 
     def get_prep_value(self, value):
         if isinstance(value, Role):
