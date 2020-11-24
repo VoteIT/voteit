@@ -1,21 +1,24 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 
 class AutoBeforePollTests(TestCase):
     def setUp(self):
         from voteit.poll.models import Poll
         from voteit.meeting.models import Meeting
+        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
         from voteit.poll.app.polls.simple import Simple
 
         self.meeting = Meeting.objects.create()
         self.meeting.er_policy = self.ABF.objects.create()
         self.user1 = User.objects.create(username="one")
         self.user2 = User.objects.create(username="two")
-        self.meeting.potential_voters.add(self.user1, self.user2)
-        self.poll = Poll.objects.create(meeting=self.meeting)
-        self.poll.method = Simple.objects.create()
-        self.poll.save()
+        self.meeting.add_roles(self.user1, ROLE_POTENTIAL_VOTER)
+        self.meeting.add_roles(self.user2, ROLE_POTENTIAL_VOTER)
+        self.poll = Poll.objects.create(
+            meeting=self.meeting, method=Simple.objects.create()
+        )
 
     @property
     def ABF(self):
@@ -40,7 +43,7 @@ class AutoBeforePollTests(TestCase):
     def test_new_er_on_start_if_new_users(self):
         first_er = self.meeting.er_policy.create_er(self.meeting)
         user3 = User.objects.create(username="three")
-        self.meeting.potential_voters.add(user3)
+        self.meeting.add_roles(user3, ROLE_POTENTIAL_VOTER)
         self.poll.upcoming()
         self.assertNotEqual(first_er, self.poll.electoral_register)
         self.assertEqual(
@@ -64,7 +67,7 @@ class AutoBeforePollTests(TestCase):
         first_er = self.meeting.er_policy.create_er(self.meeting)
         self.poll.electoral_register = first_er
         user3 = User.objects.create(username="three")
-        self.meeting.potential_voters.add(user3)
+        self.meeting.add_roles(user3, "potential_voter")
         self.poll.upcoming()
         self.assertNotEqual(first_er, self.poll.electoral_register)
         self.assertEqual(

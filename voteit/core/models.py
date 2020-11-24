@@ -50,15 +50,40 @@ class RoleContextMixin(ABCModel):
         if roles_model is not None:
             return roles_model.remove(*roles)
 
-    def has_roles(self, user: AbstractUser, *roles: Role) -> bool:
+    def has_roles(self, user: AbstractUser, *roles: Any[str, Role]) -> bool:
+        q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
-            user=user, context=self, assigned__contains=roles
+            user=user, context=self, assigned__contains=q
         ).exists()
 
-    def has_any_roles(self, user: AbstractUser, *roles: Role) -> bool:
+    def has_any_roles(self, user: AbstractUser, *roles: Any[str, Role]) -> bool:
+        q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
-            user=user, context=self, assigned__overlap=roles
+            user=user, context=self, assigned__overlap=q
         ).exists()
+
+    def get_userids_with_roles(self, *roles: Any[str, Role]):
+        q = self.roles_to_strings(*roles)
+        return self.roles_cls.objects.filter(
+            context=self, assigned__contains=q
+        ).values_list("user", flat=True)
+
+    def get_userids_with_any_roles(self, *roles):
+        q = self.roles_to_strings(*roles)
+        return self.roles_cls.objects.filter(
+            context=self, assigned__overlap=q
+        ).values_list("user", flat=True)
+
+    def roles_to_strings(self, *roles):
+        r = []
+        for role in roles:
+            if isinstance(role, Role):
+                r.append(role.name)
+            elif isinstance(role, str):
+                r.append(role)
+            else:
+                raise ValueError(f"{role} is not a str or Role object")
+        return r
 
     class Meta:
         abstract = True

@@ -51,4 +51,3 @@ class AccessPolicy(ABCModel):
                 raise ValueError(f"{role} is not assignable to meetings or not a role.")
             results.append(role)
         return results
-

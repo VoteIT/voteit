@@ -56,7 +56,9 @@ class AccessRequest(models.Model):
         on_delete=models.CASCADE,
         related_name="access_requests",
     )
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
     message = models.TextField(blank=True, null=True)
     moderator_message = models.TextField(blank=True, null=True)
     created = models.DateTimeField(editable=False, auto_now_add=True)

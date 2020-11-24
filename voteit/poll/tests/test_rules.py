@@ -3,35 +3,39 @@ from django.test import TestCase
 
 
 class PollRulesTests(TestCase):
-
     def setUp(self):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
         from voteit.poll.app.polls.simple import Simple
         from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import Moderator
+
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create(meeting=self.meeting)
         self.ai.upcoming()
-        self.poll = Poll.objects.create(method=Simple.objects.create(), agenda_item=self.ai, meeting=self.meeting)
+        self.poll = Poll.objects.create(
+            method=Simple.objects.create(), agenda_item=self.ai, meeting=self.meeting
+        )
         self.poll.proposals.create()
         self.er = ElectoralRegister.objects.create()
         self.poll.electoral_register = self.er
         self.poll.save()
         self.anon_user = User.objects.create(username="anon")
-        self.participant_user = self.meeting.participants.create(username="participant")
+        self.participant_user = User.objects.create(username="participant")
+        self.meeting.add_roles(self.participant_user, "participant")
         self.voter_user = self.er.voters.create(username="voter")
         # Voters should always be participants too
-        self.meeting.participants.add(self.voter_user)
-        self.moderator = self.meeting.moderators.create(username="moderator")
-        Moderator(self.meeting).add(self.moderator)
+        self.meeting.add_roles(self.voter_user, "participant")
+        self.moderator = User.objects.create(username="moderator")
+        self.meeting.add_roles(self.moderator, "moderator")
 
     def p(self, perm):
         from voteit.poll.permissions import PollPermissions
+
         return getattr(PollPermissions, perm)
 
     def test_is_voter(self):
         from voteit.poll.rules import is_voter
+
         self.assertFalse(is_voter(self.anon_user, self.poll))
         self.assertTrue(is_voter(self.voter_user, self.poll))
 
@@ -181,35 +185,40 @@ class PollRulesTests(TestCase):
 
 
 class VoteRulesTests(TestCase):
-
     def setUp(self):
         # from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
         from voteit.poll.app.polls.simple import Simple
         from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import Moderator
+
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create(meeting=self.meeting)
         self.ai.ongoing()
         self.method = Simple.objects.create()
-        self.poll = self.method.poll_rel.create(agenda_item=self.ai, meeting=self.meeting)
+        self.poll = self.method.poll_rel.create(
+            agenda_item=self.ai, meeting=self.meeting
+        )
         self.poll.proposals.create()
         self.er = ElectoralRegister.objects.create()
         self.poll.electoral_register = self.er
         self.poll.save()
         self.anon_user = User.objects.create(username="anon")
-        self.participant_user = self.meeting.participants.create(username="participant")
+        self.participant_user = User.objects.create(username="participant")
+        self.meeting.add_roles(self.participant_user, "participant")
         self.voter_user = self.er.voters.create(username="voter")
         self.voted_user = self.er.voters.create(username="voted")
         # Voters should always be participants too
-        self.meeting.participants.add(self.voter_user, self.voted_user)
-        self.moderator = self.meeting.moderators.create(username="moderator")
-        Moderator(self.meeting).add(self.moderator)
+        self.meeting.add_roles(self.voter_user, "participant")
+        self.meeting.add_roles(self.voted_user, "participant")
+
+        self.moderator = User.objects.create(username="moderator")
+        self.meeting.add_roles(self.moderator, "moderator")
         # And the voted user have voted of course :)
         self.vote = self.method.vote_set.create(choice=1, user=self.voted_user)
 
     def p(self, perm):
         from voteit.poll.permissions import VotePermissions
+
         return getattr(VotePermissions, perm)
 
     def test_add_upcoming(self):
