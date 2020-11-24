@@ -7,13 +7,12 @@ from django.test import TestCase
 class ModeratorApprovedTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import Moderator
+        from voteit.meeting.roles import ROLE_MODERATOR
         from voteit.access_policy.app.policies.moderator_approved import ModeratorApprovedAccess
 
         self.meeting = Meeting.objects.create()
         self.moderator = User.objects.create(username="moderator")
-        moderators = Moderator(self.meeting)
-        moderators.add(self.moderator)
+        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
         self.user = User.objects.create(username="user")
         self.ap = ModeratorApprovedAccess.objects.create(meeting=self.meeting)
 
@@ -33,13 +32,12 @@ class ModeratorApprovedTests(TestCase):
 class AccessRequestTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import Moderator
+        from voteit.meeting.roles import ROLE_MODERATOR
         from voteit.access_policy.app.policies.moderator_approved import ModeratorApprovedAccess
 
         self.meeting = Meeting.objects.create()
         self.moderator = User.objects.create(username="moderator")
-        moderators = Moderator(self.meeting)
-        moderators.add(self.moderator)
+        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
         self.user = User.objects.create(username="user")
         self.ap = ModeratorApprovedAccess.objects.create(meeting=self.meeting)
 

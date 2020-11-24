@@ -1,5 +1,9 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django_fsm import has_transition_perm
+
+from voteit.motion.roles import ROLE_MP_MANAGER, ROLE_MP_MOVER, ROLE_MP_VIEWER
+User = get_user_model()
 
 
 class MotionProcessTests(TestCase):
@@ -10,8 +14,11 @@ class MotionProcessTests(TestCase):
 
     def _export_fixture(self):
         from voteit.meeting.models import Meeting
-        self.jane = self.mp.movers.create(username="jane")
-        self.tarzan = self.mp.movers.create(username="tarzan")
+        # from voteit.motion.models import MotionProcessRoles
+        self.jane = User.objects.create(username="jane")
+        self.tarzan = User.objects.create(username="tarzan")
+        self.mp.add_roles(self.jane, ROLE_MP_MOVER)
+        self.mp.add_roles(self.tarzan, ROLE_MP_MOVER)
         self.m1 = self.mp.motions.create(author=self.jane, title="Equal rights for all", body="It's time for a change")
         self.m1.publish()
         self.m1.accept()
@@ -32,8 +39,10 @@ class MotionProcessTests(TestCase):
         self.assertEqual("closed", self.mp.state)
 
     def test_transition_permissions(self):
-        manager = self.mp.managers.create(username="manager")
-        mover = self.mp.movers.create(username="mover")
+        manager = User.objects.create(username="manager")
+        mover = User.objects.create(username="mover")
+        self.mp.add_roles(manager, ROLE_MP_MANAGER)
+        self.mp.add_roles(mover, ROLE_MP_MOVER)
         self.assertFalse(has_transition_perm(self.mp.open, mover))
         self.assertFalse(has_transition_perm(self.mp.close, mover))
         self.assertTrue(has_transition_perm(self.mp.open, manager))

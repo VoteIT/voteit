@@ -8,8 +8,11 @@ from voteit.motion.permissions import MotionPermissions
 from voteit.motion.permissions import MotionProcessPermissions
 from voteit.motion.workflows import MotionProcessWf
 from voteit.motion.workflows import MotionWf
-from voteit.motion.models import MotionProcess
+from voteit.motion.models import MotionProcess, MotionProcessRoles
 from voteit.motion.models import Motion
+from voteit.motion.roles import ROLE_MP_MANAGER
+from voteit.motion.roles import ROLE_MP_MOVER
+from voteit.motion.roles import ROLE_MP_VIEWER
 from voteit.organisation.models import Organisation
 from voteit.organisation.permissions import OrgPermissions
 
@@ -18,8 +21,7 @@ from voteit.organisation.permissions import OrgPermissions
 def is_mp_viewer(user: AbstractUser, motion_process: MotionProcess):
     """ User can view the process. """
     return (
-        isinstance(motion_process, MotionProcess)
-        and motion_process.viewer.filter(pk=user.pk).exists()
+        isinstance(motion_process, MotionProcess) and motion_process.has_roles(user, ROLE_MP_VIEWER)
     )
 
 
@@ -28,16 +30,14 @@ def is_mp_mover(user: AbstractUser, motion_process: MotionProcess):
     """ Someone who's has the role that enables them to submit motions.
     """
     return (
-        isinstance(motion_process, MotionProcess)
-        and motion_process.movers.filter(pk=user.pk).exists()
+        isinstance(motion_process, MotionProcess) and motion_process.has_roles(user, ROLE_MP_MOVER)
     )
 
 
 @rules.predicate
 def is_mp_manager(user: AbstractUser, motion_process: MotionProcess):
     return (
-        isinstance(motion_process, MotionProcess)
-        and motion_process.managers.filter(pk=user.pk).exists()
+        isinstance(motion_process, MotionProcess) and motion_process.has_roles(user, ROLE_MP_MANAGER)
     )
 
 

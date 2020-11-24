@@ -1,13 +1,20 @@
+from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
+from django.db import IntegrityError
 from django.test import TestCase
-from voteit.discussion.models import DiscussionPost
-from voteit.meeting import roles
-from voteit.proposal.models import Proposal
 
-from voteit.reactions.models import *
+from voteit.meeting.roles import ROLE_PARTICIPANT
+
+User = get_user_model()
 
 
 class ModelsTestCase(TestCase):
-    def setUp(self) -> None:
+    def setUp(self):
+        from voteit.discussion.models import DiscussionPost
+        from voteit.meeting.models import Meeting, MeetingRoles
+        from voteit.proposal.models import Proposal
+        from voteit.reactions.models import ReactionButton
+
         self.meeting = Meeting.objects.create(title='Test meeting')
         self.prop1: Proposal = Proposal.objects.create()
         self.prop2 = Proposal.objects.create()
@@ -16,21 +23,24 @@ class ModelsTestCase(TestCase):
         self.dislike_button = ReactionButton.objects.create(title='Dislike', icon='thumb_up', color='danger', meeting=self.meeting)
         self.accessible_button = ReactionButton.objects.create(title='Accessible', icon='accessible', color='primary', meeting=self.meeting)
         content_types = ContentType.objects.get_for_models(Proposal, DiscussionPost)
-        self.like_button.role_set.create(content_type=content_types[Proposal], change=True, role=roles.Participant)
-        self.dislike_button.role_set.create(content_type=content_types[Proposal], change=True, role=roles.Participant)
+        self.like_button.role_set.create(content_type=content_types[Proposal], change=True, role=ROLE_PARTICIPANT)
+        self.dislike_button.role_set.create(content_type=content_types[Proposal], change=True, role=ROLE_PARTICIPANT)
         for ct in content_types.values():
-            self.accessible_button.role_set.create(content_type=ct, change=True, role=roles.Participant)
+            self.accessible_button.role_set.create(content_type=ct, change=True, role=ROLE_PARTICIPANT)
         self.user1 = User.objects.create_user('user1')
         self.user2 = User.objects.create_user('user2')
         # Make users participants
-        roles.Participant(self.meeting).add(self.user1, self.user2)
+        user1_roles = MeetingRoles.objects.create(meeting=self.meeting, user=self.user1)
+        user1_roles.add(ROLE_PARTICIPANT)
+        user2_roles = MeetingRoles.objects.create(meeting=self.meeting, user=self.user2)
+        user2_roles.add(ROLE_PARTICIPANT)
 
     def test_role_set(self):
         with self.assertRaises(ValueError):
             next(self.like_button.get_valid_roles(None, 'bad_mode'))
         self.assertEqual(self.like_button.role_set.count(), 1)
         self.assertEqual(self.accessible_button.role_set.count(), 2)
-        self.assertIs(self.like_button.role_set.first().role, roles.Participant)
+        self.assertIs(self.like_button.role_set.first().role, ROLE_PARTICIPANT)
 
     def test_unique(self):
         from django.db import IntegrityError

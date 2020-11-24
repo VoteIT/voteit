@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django_fsm import FSMField
 from django_fsm import transition
 from django.utils.translation import gettext_lazy as _
 from typing import List
 
-from voteit.core.models import BaseContent
+from voteit.core.models import BaseContent, Roles, RoleContextMixin
 from voteit.meeting.models import Meeting
 from voteit.motion.workflows import MotionProcessWf
 from voteit.motion.workflows import MotionWf
@@ -13,7 +16,21 @@ from voteit.motion.permissions import MotionProcessPermissions as MPP
 from voteit.motion.permissions import MotionPermissions as MP
 
 
-class MotionProcess(BaseContent):
+class MotionProcessRoles(Roles):
+    """ Contains assigned meeting roles for a specific meeting and user"""
+    user:AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="motion_process_roles",
+    )
+    context: MotionProcess = models.ForeignKey(
+        "MotionProcess",
+        on_delete=models.CASCADE,
+        related_name="roles"
+    )
+
+
+class MotionProcess(BaseContent, RoleContextMixin):
     state = FSMField(
         default=MotionProcessWf.initial,
         choices=MotionProcessWf.choices(),
@@ -32,26 +49,8 @@ class MotionProcess(BaseContent):
         ),
         default=False,
     )
-    viewer = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        verbose_name=_(
-            "In case this process isn't public, add users who should be able to view here"
-        ),
-        blank=True,
-        related_name="viewer_in_motionprocesses",
-    )
-    movers = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        verbose_name=_("Users able to write motions - always able to view too."),
-        blank=True,
-        related_name="mover_in_motionprocesses",
-    )
-    managers = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        verbose_name=_("Managers for the process"),
-        blank=True,
-        related_name="manager_in_motionprocesses",
-    )
+
+    roles_cls = MotionProcessRoles
 
     @transition(field=state, target=MotionProcessWf.OPEN, permission=MPP.MANAGE)
     def open(self):

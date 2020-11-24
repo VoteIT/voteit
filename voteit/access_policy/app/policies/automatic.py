@@ -31,5 +31,5 @@ class AutomaticAccess(AccessPolicy):
         return []
 
     def assign(self, user: AbstractUser):
-        for role in self.get_role_instances():
-            role.add(user)
+        roles = self.get_role_instances()
+        self.meeting.add_roles(user, *roles)

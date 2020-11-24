@@ -18,4 +18,3 @@ class OrganisationTests(TestCase):
         org = self.Organisation.objects.create()
         meeting = self.Meeting.objects.create(organisation=org)
         self.assertEqual(org, meeting.organisation)
-

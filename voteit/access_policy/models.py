@@ -1,11 +1,11 @@
 from abc import abstractmethod
 
 from django.db import models
-from typing import List, Union, Type
+from typing import List, Union
 
 from voteit.core.models import ABCModel
 from voteit.core.role import Role
-from voteit.core.role import roles
+from voteit.meeting.roles import MeetingRoles
 
 
 class AccessPolicy(ABCModel):
@@ -36,10 +36,7 @@ class AccessPolicy(ABCModel):
         """ Human readable name
         """
 
-    def get_valid_roles(self) -> List[Type[Role]]:
-        return roles.get_valid_roles(self.meeting)
-
-    def prep_roles(self, *role_list: List[Union[str, Type[Role]]]) -> List[Role]:
+    def prep_roles(self, *role_list: List[Union[str, Role]]) -> List[Role]:
         """ Take a list of role classes or strings. Check that
             they're valid for a meeting context and return the role instance for
             this specific meeting.
@@ -47,9 +44,11 @@ class AccessPolicy(ABCModel):
         results = []
         for role in role_list:
             if isinstance(role, str):
-                role = roles[role]
-            if role.valid_for(self.meeting):
-                results.append(role(self.meeting))
+                role = MeetingRoles.valid_roles[role]
+            elif isinstance(role, Role):
+                assert role.name in MeetingRoles.valid_roles
             else:  # pragma: no cover
-                raise ValueError(f"Role {role} is not assignable to meetings.")
+                raise ValueError(f"{role} is not assignable to meetings or not a role.")
+            results.append(role)
         return results
+

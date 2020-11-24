@@ -87,8 +87,8 @@ class AccessRequest(models.Model):
         """ Moderator accepts a request and sets some roles to a user.
         """
         roles_to_handle = self.access_policy.prep_roles(*give_roles)
-        for role in roles_to_handle:
-            role.add(self.user)
+        meeting = self.access_policy.meeting
+        meeting.add_roles(self.user, *roles_to_handle)
         self.roles_given = ",".join([x.name for x in roles_to_handle])
         self._set_handled(moderator_user, message)
 

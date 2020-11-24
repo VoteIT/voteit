@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Generator
 
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
@@ -13,8 +14,7 @@ from django.utils.timezone import now
 from django.utils.translation import gettext as _
 from django_fsm import FSMField, transition
 
-from voteit.access_policy.registries import access_policies
-from voteit.core.models import BaseContent
+from voteit.core.models import BaseContent, Roles, RoleContextMixin
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 
@@ -23,10 +23,24 @@ if TYPE_CHECKING:
     from voteit.poll.models import ElectoralRegister
 
 
-__all__ = 'Meeting',
+__all__ = 'Meeting', "MeetingRoles"
 
 
-class Meeting(BaseContent):
+class MeetingRoles(Roles):
+    """ Contains assigned meeting roles for a specific meeting and user"""
+    user:AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="meeting_roles",
+    )
+    context: Meeting = models.ForeignKey(
+        "Meeting",
+        on_delete=models.CASCADE,
+        related_name="roles"
+    )
+
+
+class Meeting(BaseContent, RoleContextMixin):
     state = FSMField(
         default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False
     )
@@ -39,40 +53,44 @@ class Meeting(BaseContent):
     public = models.BooleanField(
         verbose_name=_("Is this meeting viewable by anyone?"), default=False
     )
-    participants = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        verbose_name=_(
-            "User can participate in some form. "
-            "This is basically read permission, unless the process is public."
-        ),
-        blank=True,
-        related_name="participant_in_meetings",
-        editable=False,
-    )
-    potential_voters = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        verbose_name=_("This user may become a voter in this meeting."),
-        blank=True,
-        related_name="potential_voter_in_meetings",
-        editable=False,
-    )
-    discussers = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        verbose_name=_("User may add discussion posts."),
-        blank=True,
-        related_name="discusser_in_meetings",
-        editable=False,
-    )
-    proposers = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        verbose_name=_("User may add proposals."),
-        blank=True,
-        related_name="proposer_in_meetings",
-        editable=False,
-    )
-    moderators = models.ManyToManyField(
-        settings.AUTH_USER_MODEL, blank=True, related_name="moderator_in_meetings", editable=False
-    )
+
+    roles_cls = MeetingRoles
+
+
+    # participants = models.ManyToManyField(
+    #     settings.AUTH_USER_MODEL,
+    #     verbose_name=_(
+    #         "User can participate in some form. "
+    #         "This is basically read permission, unless the process is public."
+    #     ),
+    #     blank=True,
+    #     related_name="participant_in_meetings",
+    #     editable=False,
+    # )
+    # potential_voters = models.ManyToManyField(
+    #     settings.AUTH_USER_MODEL,
+    #     verbose_name=_("This user may become a voter in this meeting."),
+    #     blank=True,
+    #     related_name="potential_voter_in_meetings",
+    #     editable=False,
+    # )
+    # discussers = models.ManyToManyField(
+    #     settings.AUTH_USER_MODEL,
+    #     verbose_name=_("User may add discussion posts."),
+    #     blank=True,
+    #     related_name="discusser_in_meetings",
+    #     editable=False,
+    # )
+    # proposers = models.ManyToManyField(
+    #     settings.AUTH_USER_MODEL,
+    #     verbose_name=_("User may add proposals."),
+    #     blank=True,
+    #     related_name="proposer_in_meetings",
+    #     editable=False,
+    # )
+    # moderators = models.ManyToManyField(
+    #     settings.AUTH_USER_MODEL, blank=True, related_name="moderator_in_meetings", editable=False
+    # )
     er_policy_type = models.ForeignKey(
         ContentType, on_delete=models.CASCADE, null=True, editable=False
     )
@@ -93,6 +111,8 @@ class Meeting(BaseContent):
         )
 
     def get_access_policies(self, only_active=True) -> Generator[AccessPolicy]:
+        from voteit.access_policy.registries import access_policies
+
         query = {}
         if only_active:
             query["active"] = True

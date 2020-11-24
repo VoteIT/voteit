@@ -1,13 +1,25 @@
+from __future__ import annotations
+
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-from voteit.core.models import BaseContent
+from voteit.core.models import BaseContent, Roles, RoleContextMixin
 
 
-class Organisation(BaseContent):
-    managers = models.ManyToManyField(
-        settings.AUTH_USER_MODEL, blank=True, related_name="manager_in_orgs"
+class OrganisationRoles(Roles):
+    """ Contains assigned meeting roles for a specific meeting and user"""
+    user:AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="organisation_roles",
     )
-    meeting_creators = models.ManyToManyField(
-        settings.AUTH_USER_MODEL, blank=True, related_name="meeting_creator_in_orgs"
+    context: Organisation = models.ForeignKey(
+        "Organisation",
+        on_delete=models.CASCADE,
+        related_name="roles"
     )
+
+
+class Organisation(BaseContent, RoleContextMixin):
+    roles_cls = OrganisationRoles

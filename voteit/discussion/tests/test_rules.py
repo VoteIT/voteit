@@ -5,19 +5,22 @@ from django.test import TestCase
 class RulesTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import Moderator
-        from voteit.meeting.roles import Discusser
+        from voteit.meeting.roles import ROLE_MODERATOR
+        from voteit.meeting.roles import ROLE_DISCUSSER
+        from voteit.meeting.roles import ROLE_PARTICIPANT
 
         self.meeting = Meeting.objects.create()
         self.anon_user = User.objects.create(username="anon")
-        self.participant = self.meeting.participants.create(username="participant")
-        self.moderator = self.meeting.moderators.create(username="moderator")
-        Moderator(self.meeting).add(self.moderator)
-        self.discusser = self.meeting.discussers.create(username="discusser")
-        self.discusser_author = self.meeting.discussers.create(
+        self.participant = User.objects.create(username="participant")
+        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
+        self.moderator = User.objects.create(username="moderator")
+        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
+        self.discusser = User.objects.create(username="discusser")
+        self.discusser_author = User.objects.create(
             username="discusser_author"
         )
-        Discusser(self.meeting).add(self.discusser, self.discusser_author)
+        self.meeting.add_roles(self.discusser, ROLE_DISCUSSER)
+        self.meeting.add_roles(self.discusser_author, ROLE_DISCUSSER)
         self.ai = self.meeting.agenda_items.create()
         self.ai.upcoming()
         self.ai.save()

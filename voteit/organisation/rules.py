@@ -4,19 +4,19 @@ import rules
 from django.contrib.auth.models import AbstractUser
 
 from voteit.organisation.permissions import OrgPermissions
-
+from voteit.organisation.roles import ROLE_ORG_MANAGER, ROLE_MEETING_CREATOR
+from voteit.organisation.models import Organisation
 if TYPE_CHECKING:
-    from voteit.organisation.models import Organisation
-
+    pass
 
 @rules.predicate
 def is_manager(user: AbstractUser, organisation: Organisation):
-    return organisation.managers.filter(pk=user.pk).exists()
+    return (isinstance(organisation, Organisation) and organisation.has_roles(user, ROLE_ORG_MANAGER))
 
 
 @rules.predicate
 def is_meeting_creator(user: AbstractUser, organisation: Organisation):
-    return organisation.meeting_creators.filter(pk=user.pk).exists()
+    return (isinstance(organisation, Organisation) and organisation.has_roles(user, ROLE_MEETING_CREATOR))
 
 
 # Object permissions

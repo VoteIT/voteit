@@ -8,6 +8,7 @@ class ProposalTestCase(APITestCase):
     def setUp(self) -> None:
         from voteit.meeting.models import Meeting
         from voteit.agenda.models import AgendaItem
+        from voteit.meeting.roles import ROLE_PROPOSER, ROLE_MODERATOR, ROLE_PARTICIPANT
         self.meeting: Meeting = Meeting.objects.create(
             title='Test meeting', state='ongoing'
         )
@@ -18,9 +19,9 @@ class ProposalTestCase(APITestCase):
         self.moderator: User = User.objects.create_user('moderator')
         self.proposer: User = User.objects.create_user('proposer')
         self.outsider: User = User.objects.create_user('outsider')
-        self.meeting.participants.set([self.participant, self.moderator, self.proposer])
-        self.meeting.moderators.add(self.moderator)
-        self.meeting.proposers.add(self.proposer)
+        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
+        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
+        self.meeting.add_roles(self.proposer, ROLE_PROPOSER)
 
     def test_create(self):
         url = reverse('proposal-list')

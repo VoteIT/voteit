@@ -1,6 +1,8 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from voteit.meeting.roles import ROLE_PARTICIPANT
+
 
 class AutomaticAPTests(TestCase):
     def setUp(self):
@@ -23,27 +25,14 @@ class AutomaticAPTests(TestCase):
         self.assertEqual("participant", auto_ap.roles_given)
 
     def test_assign(self):
-        from voteit.meeting.roles import Participant
 
         auto_ap = self._cut.objects.create(
             meeting=self.meeting, active=True
         )
-        participants = Participant(self.meeting)
-        self.assertNotIn(self.user, participants)
+        # participants = Participant(self.meeting)
+        self.assertFalse(self.meeting.has_roles(self.user, ROLE_PARTICIPANT))
         auto_ap.assign(self.user)
-        self.assertNotIn(self.user, participants)
+        self.assertFalse(self.meeting.has_roles(self.user, ROLE_PARTICIPANT))
         auto_ap.set_given_roles("participant")
         auto_ap.assign(self.user)
-        self.assertIn(self.user, participants)
-
-    def test_get_valid_roles(self):
-        from voteit.core.role import Role
-        from voteit.meeting.roles import Participant
-
-        auto_ap = self._cut.objects.create(
-            meeting=self.meeting, active=True
-        )
-        roles = auto_ap.get_valid_roles()
-        self.assertIn(Participant, roles)
-        for role in roles:
-            self.assertTrue(issubclass(role, Role))
+        self.assertTrue(self.meeting.has_roles(self.user, ROLE_PARTICIPANT))

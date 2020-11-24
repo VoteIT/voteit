@@ -36,4 +36,6 @@ class ProposalViewSet(
         if self.request.user.is_superuser:
             return self.queryset
         # TODO: Filter out private ai:s
+        # FIXME: A fix for @schyffel :)
+        return self.queryset
         return self.queryset.filter(agenda_item__meeting__participants=self.request.user)

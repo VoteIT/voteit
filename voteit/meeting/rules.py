@@ -7,6 +7,11 @@ from django.contrib.auth.models import AbstractUser
 from voteit.core.rules import is_not_archived
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.roles import ROLE_PROPOSER
+from voteit.meeting.roles import ROLE_DISCUSSER
 
 if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
@@ -14,39 +19,29 @@ if TYPE_CHECKING:
 
 @rules.predicate
 def is_participant(user: AbstractUser, meeting: Meeting) -> bool:
-    return (
-        isinstance(meeting, Meeting)
-        and meeting.participants.filter(pk=user.pk).exists()
-    )
+    return isinstance(meeting, Meeting) and meeting.has_roles(user, ROLE_PARTICIPANT)
 
 
 @rules.predicate
 def is_potential_voter(user: AbstractUser, meeting: Meeting) -> bool:
-    return (
-        isinstance(meeting, Meeting)
-        and meeting.potential_voters.filter(pk=user.pk).exists()
+    return isinstance(meeting, Meeting) and meeting.has_roles(
+        user, ROLE_POTENTIAL_VOTER
     )
 
 
 @rules.predicate
 def is_moderator(user: AbstractUser, meeting: Meeting) -> bool:
-    return (
-        isinstance(meeting, Meeting) and meeting.moderators.filter(pk=user.pk).exists()
-    )
+    return isinstance(meeting, Meeting) and meeting.has_roles(user, ROLE_MODERATOR)
 
 
 @rules.predicate
 def is_discusser(user: AbstractUser, meeting: Meeting) -> bool:
-    return (
-        isinstance(meeting, Meeting) and meeting.discussers.filter(pk=user.pk).exists()
-    )
+    return isinstance(meeting, Meeting) and meeting.has_roles(user, ROLE_DISCUSSER)
 
 
 @rules.predicate
 def is_proposer(user: AbstractUser, meeting: Meeting) -> bool:
-    return (
-        isinstance(meeting, Meeting) and meeting.proposers.filter(pk=user.pk).exists()
-    )
+    return isinstance(meeting, Meeting) and meeting.has_roles(user, ROLE_PROPOSER)
 
 
 @rules.predicate

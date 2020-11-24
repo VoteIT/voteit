@@ -6,7 +6,7 @@ from voteit.organisation.models import Organisation
 
 @admin.register(Organisation)
 class OrganisationAdmin(admin.ModelAdmin):
-    autocomplete_fields = 'managers', 'meeting_creators',
+    #autocomplete_fields = 'managers', 'meeting_creators',
     search_fields = 'title',
     list_display = 'title', 'meeting_count',
 

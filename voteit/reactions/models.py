@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from voteit.core.fields import RoleField
 from voteit.core.models import BaseContent
 from voteit.core.role import Role
-from voteit.meeting.models import Meeting
+from voteit.meeting.models import Meeting, MeetingRoles
 
 
 class ReactionButton(models.Model):
@@ -51,7 +51,7 @@ class ReactionButton(models.Model):
         if mode not in ReactionRoles.MODES:
             raise ValueError(f'Invalid permission mode. Must be one of {ReactionRoles.MODES}')
         for reaction_role in self.role_set.filter(content_type=ct, **{mode: True}):
-            yield reaction_role.role(self.meeting)
+            yield MeetingRoles.valid_roles[reaction_role.role.name]
 
     class Manager(models.Manager):
         def counts_for_object(self, obj):
@@ -72,7 +72,7 @@ class ReactionRoles(models.Model):
 
     button = models.ForeignKey(ReactionButton, models.CASCADE, related_name='role_set')
     content_type = models.ForeignKey(ContentType, models.CASCADE)
-    role = RoleField(Meeting, null=False, blank=False)
+    role = RoleField(MeetingRoles, null=False, blank=False)
     view = models.BooleanField(default=True)
     change = models.BooleanField(default=True)
     list = models.BooleanField(default=False)
@@ -94,7 +94,7 @@ class Reaction(models.Model):
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         valid_roles = self.button.get_valid_roles(self.content_type, 'change')
-        if not any(self.user in role for role in valid_roles):
+        if not MeetingRoles.objects.filter(assigned__overlap=[x.name for x in valid_roles]).exists():
             raise IntegrityError()
         super().save(force_insert, force_update, using, update_fields)
 

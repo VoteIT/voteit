@@ -8,16 +8,22 @@ from voteit.motion.permissions import MotionProcessPermissions as MPP
 class MotionProcessRulesTests(TestCase):
 
     def setUp(self):
-        from voteit.motion.models import MotionProcess
-        from voteit.motion.roles import MPManager
-        from voteit.motion.roles import MPMover
+        from voteit.motion.models import MotionProcess, MotionProcessRoles
+
         self.mp = MotionProcess.objects.create()
+
         self.any_user = User.objects.create(username="any")
-        self.manager_user = self.mp.managers.create(username="manager")
-        MPManager(self.mp).add(self.manager_user)  # Make sure required roles happen
-        self.mover_user = self.mp.movers.create(username="mover")
-        MPMover(self.mp).add(self.mover_user)
-        self.viewer_user = self.mp.viewer.create(username="viewer")
+
+        manager = MotionProcessRoles.valid_roles["mp_manager"]
+        mover = MotionProcessRoles.valid_roles["mp_mover"]
+        viewer = MotionProcessRoles.valid_roles["mp_viewer"]
+
+        self.manager_user = User.objects.create(username="manager")
+        self.mp.add_roles(self.manager_user, manager)
+        self.mover_user = User.objects.create(username="mover")
+        self.mp.add_roles(self.mover_user, mover)
+        self.viewer_user = User.objects.create(username="viewer")
+        self.mp.add_roles(self.viewer_user, viewer)
 
     def test_is_mp_viewer(self):
         from voteit.motion.rules import is_mp_viewer
@@ -75,17 +81,23 @@ class MotionProcessRulesTests(TestCase):
 class MotionRulesTests(TestCase):
 
     def setUp(self):
-        from voteit.motion.models import MotionProcess
-        from voteit.motion.roles import MPManager
-        from voteit.motion.roles import MPMover
+        from voteit.motion.models import MotionProcess, MotionProcessRoles
+
+        manager = MotionProcessRoles.valid_roles["mp_manager"]
+        mover = MotionProcessRoles.valid_roles["mp_mover"]
+        viewer = MotionProcessRoles.valid_roles["mp_viewer"]
+
         self.mp = MotionProcess.objects.create()
         self.any_user = User.objects.create(username="any")
-        self.manager_user = self.mp.managers.create(username="manager")
-        MPManager(self.mp).add(self.manager_user)  # Handle required roles
-        self.mover_user = self.mp.movers.create(username="mover")
-        self.mover_other_user = self.mp.movers.create(username="other_mover")
-        MPMover(self.mp).add(self.mover_user, self.mover_other_user)
-        self.viewer_user = self.mp.viewer.create(username="viewer")
+        self.manager_user = User.objects.create(username="manager")
+        self.mp.add_roles(self.manager_user, manager)
+        self.mover_user = User.objects.create(username="mover")
+        self.mp.add_roles(self.mover_user, mover)
+        self.mover_other_user = User.objects.create(username="other_mover")
+        self.mp.add_roles(self.mover_other_user, mover)
+        self.viewer_user = User.objects.create(username="viewer")
+        self.mp.add_roles(self.viewer_user, viewer)
+
         self.motion = self.mp.motions.create(author=self.mover_user)
 
     def test_can_change_motion(self):

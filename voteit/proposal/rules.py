@@ -23,7 +23,7 @@ def is_not_used_in_poll(user: AbstractUser, proposal: Proposal):
 
 
 def is_published(user: AbstractUser, proposal: Proposal):
-    return isinstance(proposal, Proposal) and proposal.state in ProposalWf.PUBLISHED
+    return isinstance(proposal, Proposal) and proposal.state == ProposalWf.PUBLISHED
 
 
 def can_add_proposal(user: AbstractUser, agenda_item: AgendaItem):

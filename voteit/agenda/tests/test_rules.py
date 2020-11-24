@@ -5,10 +5,13 @@ from django.test import TestCase
 class RulesTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
+        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
         self.meeting = Meeting.objects.create()
         self.anon_user = User.objects.create(username="anon")
-        self.participant = self.meeting.participants.create(username="participant")
-        self.moderator = self.meeting.moderators.create(username="moderator")
+        self.participant = User.objects.create(username="participant")
+        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
+        self.moderator = User.objects.create(username="moderator")
+        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
         self.ai = self.meeting.agenda_items.create()
         self.ai.upcoming()
         self.ai.save()
