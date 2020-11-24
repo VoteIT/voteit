@@ -1,15 +1,19 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+User = get_user_model()
 
 class PresenceSystemTests(TestCase):
     def setUp(self):
         from voteit.presence.models import PresenceSystem
         from voteit.meeting.models import Meeting
+        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
         self.meeting = Meeting.objects.create()
         self.system = PresenceSystem.objects.create(meeting=self.meeting)
-        self.moderator = self.meeting.moderators.create(username="moderator")
-        self.participant = self.meeting.participants.create(username="participant")
+        self.moderator = User.objects.create(username="moderator")
+        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
+        self.participant = User.objects.create(username="participant")
+        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
         self.anon_user = User.objects.create(username="anon")
 
     @property
@@ -46,11 +50,14 @@ class PresenceCheckTests(TestCase):
     def setUp(self):
         from voteit.presence.models import PresenceSystem
         from voteit.meeting.models import Meeting
+        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
         self.meeting = Meeting.objects.create()
         self.system = PresenceSystem.objects.create(meeting=self.meeting)
         self.presence_check = self.system.presence_checks.create()
-        self.moderator = self.meeting.moderators.create(username="moderator")
-        self.participant = self.meeting.participants.create(username="participant")
+        self.moderator = User.objects.create(username="moderator")
+        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
+        self.participant = User.objects.create(username="participant")
+        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
         self.anon_user = User.objects.create(username="anon")
 
     @property
@@ -109,13 +116,17 @@ class PresenceTests(TestCase):
     def setUp(self):
         from voteit.presence.models import PresenceSystem
         from voteit.meeting.models import Meeting
+        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
         self.meeting = Meeting.objects.create()
         self.system = PresenceSystem.objects.create(meeting=self.meeting)
         self.presence_check = self.system.presence_checks.create()
-        self.moderator = self.meeting.moderators.create(username="moderator")
-        self.participant = self.meeting.participants.create(username="participant")
-        self.present_participant = self.meeting.participants.create(username="present_participant")
+        self.moderator = User.objects.create(username="moderator")
+        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
+        self.participant = User.objects.create(username="participant")
+        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
         self.anon_user = User.objects.create(username="anon")
+        self.present_participant = User.objects.create(username="present_participant")
+        self.meeting.add_roles(self.present_participant, ROLE_PARTICIPANT)
         self.presence = self.presence_check.presences.create(user=self.present_participant)
 
     @property

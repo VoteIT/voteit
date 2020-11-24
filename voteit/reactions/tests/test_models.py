@@ -30,10 +30,8 @@ class ModelsTestCase(TestCase):
         self.user1 = User.objects.create_user('user1')
         self.user2 = User.objects.create_user('user2')
         # Make users participants
-        user1_roles = MeetingRoles.objects.create(meeting=self.meeting, user=self.user1)
-        user1_roles.add(ROLE_PARTICIPANT)
-        user2_roles = MeetingRoles.objects.create(meeting=self.meeting, user=self.user2)
-        user2_roles.add(ROLE_PARTICIPANT)
+        self.meeting.add_roles(self.user1, ROLE_PARTICIPANT)
+        self.meeting.add_roles(self.user2, ROLE_PARTICIPANT)
 
     def test_role_set(self):
         with self.assertRaises(ValueError):
