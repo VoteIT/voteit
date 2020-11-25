@@ -186,33 +186,6 @@ class Roles(ABCModel):
             role = role.name
         return role in self.assigned
 
-    # def get_valid_roles(self, instance: Model) -> Iterator[Type[Role]]:
-    #     """ Return all role classes that might be assigned to this instance.
-    #     """
-    #     for role in self.values():
-    #         if role.valid_for(instance):
-    #             yield role
-
-    # def get_assigned_roles(self, instance: Model, user: AbstractUser) -> Set:
-    #     """ Return all classes this user has in this instance.
-    #     """
-    #     results = set()
-    #     for role in self.get_valid_roles(instance):
-    #         if user in role(instance):
-    #             results.add(role)
-    #     return results
-
-    # def get_reverse_required(
-    #     self, instance: Model, role: Type[Role]
-    # ) -> Iterator[Type[Role]]:
-    #     """ Figure out which other roles depend on this one.
-    #     """
-    #     for other in self.get_valid_roles(instance):
-    #         if other is role:
-    #             continue
-    #         if role in other.requires:
-    #             yield other
-
 
 class BaseContent(models.Model):
     title = models.CharField(max_length=200)
