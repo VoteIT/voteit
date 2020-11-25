@@ -49,11 +49,12 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         connection_token = self.scope["url_route"]["kwargs"]["connection_token"]
         self.user = await database_sync_to_async(self.get_token_user)(key=connection_token)
+        if self.user is None:  # FIXME: get_user ie refresh_user is the correct way to go
+            await self.refresh_user()
         if self.user is None:
             logger.debug("Invalid token, closing connection")
             raise DenyConnection()
         # When using session auth instead of token:
-        # await self.refresh_user()
         self.user_pk = self.user.pk  # Save for later use in case of invalidation of the user object
         logger.debug(
             "Connection for user: %s with token '%s'", self.user, connection_token
@@ -80,8 +81,8 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         with suppress(ObjectDoesNotExist):
             return Token.objects.get(key=key).user
 
-    # async def refresh_user(self):
-    #     self.user = await get_user(self.scope)
+    async def refresh_user(self):
+        self.user = await get_user(self.scope)
 
     async def receive(self, text_data:str=None, bytes_data=None):
         """ Receive from websocket """

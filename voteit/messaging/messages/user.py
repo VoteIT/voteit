@@ -44,6 +44,7 @@ class ConnectionsCounted(AbstractOutgoingMessage):
 
 @websocket_incoming_messages("user.connection_count")
 class ConnectionCount(AbstractIncomingMessage):
+    # Note: This doesn't give an accurate count since consumer hashes stay in groups for all abnormal disconnects.
     async def consume(self, consumer: WebsocketDemuxConsumer, message_id: str = None):
         channel = UserChannel.from_instance(consumer.user)
         group = channel.channel_name

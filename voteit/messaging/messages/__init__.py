@@ -17,6 +17,7 @@ class IncomingPayload(BaseModel):
     """ Package received from websocket.
         p is the actual message.
     """
+
     p: Optional[Dict]  # Incoming payload
     t: str  # Type, for instance "client.subscribe"
     i: Optional[str] = None  # A message id
@@ -42,7 +43,17 @@ class OutgoingErrorMessage(OutgoingPayload):
 
 def register():
     """ Just make sure all code is imported and registered. """
-    from . import channels, user, agenda, schema, progress, discussion_post, proposal, poll
+    from . import (
+        channels,
+        user,
+        agenda,
+        schema,
+        progress,
+        discussion_post,
+        proposal,
+        poll,
+        roles,
+    )
     from django.conf import settings
 
     if settings.DEBUG:
