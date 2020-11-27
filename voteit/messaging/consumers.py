@@ -10,6 +10,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ObjectDoesNotExist
+from django_rq import get_queue
 from pydantic import ValidationError
 from rest_framework.authtoken.models import Token
 
@@ -18,6 +19,8 @@ from voteit.messaging.jobs import signal_websocket_connect
 from voteit.messaging.jobs import signal_websocket_close
 from voteit.messaging.messages import IncomingPayload, MsgState
 from voteit.messaging.messages import OutgoingErrorMessage
+from voteit.messaging.messages.abcs import AbstractJobMessage
+from voteit.messaging.messages import MessageContext
 from voteit.messaging.registries import internal_messages
 from voteit.messaging.registries import websocket_incoming_messages
 
@@ -32,9 +35,11 @@ if TYPE_CHECKING:
 # All clients won't send close signal, since they might just loose connection or go away for another reason.
 # FIXME: Test full channels
 
+
 class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
     """ Demultiplexing consumer.
     """
+
     # User model, don't trust this since it will be wiped during logout procedure.
     user: Optional[AbstractUser] = None
     # The users pk associated with the connection. No anon connections are allowed at this time.
@@ -45,17 +50,25 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
     channel_name: str
     # Errors count, when these stack the sane response would be to simply disconnect
     message_errors: int = 0
+    # For testing injection
+    message_registry = websocket_incoming_messages
 
     async def connect(self):
         connection_token = self.scope["url_route"]["kwargs"]["connection_token"]
-        self.user = await database_sync_to_async(self.get_token_user)(key=connection_token)
-        if self.user is None:  # FIXME: get_user ie refresh_user is the correct way to go
+        self.user = await database_sync_to_async(self.get_token_user)(
+            key=connection_token
+        )
+        if (
+            self.user is None
+        ):  # FIXME: get_user ie refresh_user is the correct way to go
             await self.refresh_user()
         if self.user is None:
             logger.debug("Invalid token, closing connection")
             raise DenyConnection()
         # When using session auth instead of token:
-        self.user_pk = self.user.pk  # Save for later use in case of invalidation of the user object
+        self.user_pk = (
+            self.user.pk
+        )  # Save for later use in case of invalidation of the user object
         logger.debug(
             "Connection for user: %s with token '%s'", self.user, connection_token
         )
@@ -80,11 +93,12 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
     def get_token_user(self, key: str) -> Optional[AbstractUser]:
         with suppress(ObjectDoesNotExist):
             return Token.objects.get(key=key).user
+        return None
 
     async def refresh_user(self):
         self.user = await get_user(self.scope)
 
-    async def receive(self, text_data:str=None, bytes_data=None):
+    async def receive(self, text_data: str = None, bytes_data=None):
         """ Receive from websocket """
         # FIXME: A lot of error checking...
         incoming = None
@@ -97,16 +111,22 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             base_payload = json.loads(text_data)
             incoming = IncomingPayload(**base_payload)
             try:
-                msg_type = websocket_incoming_messages[incoming.t]
+                msg_type = self.message_registry[incoming.t]
             except KeyError:
                 raise UnsupportedMessageType(
-                    f"t was not one of {websocket_incoming_messages.keys()}"
+                    f"t was not one of {self.message_registry.keys()}"
                 )
             #  FIXME: Not all sent data might be consumed, for instance if there's a typo on the incoming key of
             #  something that isn't required. That data will silently be thrown away.
             #  Do we want it to be logged or error in that case?
             payload = incoming.p or {}
-            message = msg_type(**payload)
+            mc = MessageContext(
+                consumer_name=self.channel_name,
+                message_id=incoming.i,
+                user_pk=self.user_pk,
+                type=incoming.t,
+            )
+            message = msg_type(mc=mc, **payload)
             accept_message = True
         except json.decoder.JSONDecodeError:
             await self.send_error("Invalid json", err_type="error.json")
@@ -115,21 +135,27 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             self.message_errors += 1
         except ValidationError as exc:
             message_id = base_payload.get("i", None)
-            await self.send_error("Validation fail", message_id=message_id, errors=exc.errors())
+            await self.send_error(
+                "Validation fail", message_id=message_id, errors=exc.errors()
+            )
             if settings.DEBUG:
                 print(f"Incoming message {message_id} payload error: {exc.errors()}")
         except UnsupportedMessageType:
             message_id = base_payload.get("i", None)
-            logger.debug(f"t was not one of {websocket_incoming_messages.keys()}")
-            await self.send_error("Unsupported message type", message_id=message_id, err_type="error.message_type")
+            logger.debug(f"t was not one of {self.message_registry.keys()}")
+            await self.send_error(
+                "Unsupported message type",
+                message_id=message_id,
+                err_type="error.message_type",
+            )
             self.message_errors += 1
         finally:
             if self.message_errors > 10:
                 await self.close(1007)
         if incoming is not None and message is not None and accept_message:
-            logger.debug("Incoming: %s / %s", incoming.t, incoming.i)
+            logger.debug("Consuming incoming: %s / %s", incoming.t, incoming.i)
+            await message.consume(self)
             # Errors here too...? This is an application error in that case
-            await message.consume(self, message_id=incoming.i)
         else:
             pass
             #  FIXME: log error?
@@ -188,10 +214,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         :param errors: Error structure, if applicable.
         :return:
         """
-        payload = {
-            "message": message,
-            "errors": errors
-        }
+        payload = {"message": message, "errors": errors}
         err_msg = OutgoingErrorMessage(
             t=err_type, i=message_id, p=payload, s=MsgState.FAILED
         )

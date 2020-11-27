@@ -23,6 +23,13 @@ class IncomingPayload(BaseModel):
     i: Optional[str] = None  # A message id
 
 
+class MessageContext(BaseModel):
+    consumer_name: str
+    message_id: Optional[str]
+    user_pk: int
+    type: str
+
+
 class MsgState:
     SUCCESS = "s"
     FAILED = "f"
