@@ -134,6 +134,9 @@ class Roles(ABCModel):
             self.save()
             role_objs = [self.valid_roles[x] for x in remove_roles]
             roles_removed.send(sender=self.__class__, instance=self, roles=role_objs)
+            # Cleanup roles if all were removed
+            if not self.assigned:
+                self.delete()
             return role_objs
         return None
 

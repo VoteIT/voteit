@@ -108,3 +108,13 @@ class RolesTests(TestCase):
         self.roles.remove(participant)
         self.assertIn(proposer, L)
         self.assertIn(participant, L)
+
+    def test_roles_object_removed_when_assignment_empty(self):
+        from voteit.meeting.models import MeetingRoles
+
+        participant = self.ROLES["participant"]
+
+        self.roles.add(participant)
+        self.roles.remove(participant)
+        # Roles deleted
+        self.assertFalse(MeetingRoles.objects.filter(user=self.user, context=self.meeting).exists())
