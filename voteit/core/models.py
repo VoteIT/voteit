@@ -8,7 +8,7 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils.translation import gettext as _
-from typing import List, Type, Set, Optional, Dict, Any
+from typing import List, Type, Set, Optional, Dict, Union
 
 from voteit.core.role import Role
 from voteit.core.signals import roles_added, roles_removed
@@ -50,19 +50,19 @@ class RoleContextMixin(ABCModel):
         if roles_model is not None:
             return roles_model.remove(*roles)
 
-    def has_roles(self, user: AbstractUser, *roles: Any[str, Role]) -> bool:
+    def has_roles(self, user: AbstractUser, *roles: Union[str, Role]) -> bool:
         q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
             user=user, context=self, assigned__contains=q
         ).exists()
 
-    def has_any_roles(self, user: AbstractUser, *roles: Any[str, Role]) -> bool:
+    def has_any_roles(self, user: AbstractUser, *roles: Union[str, Role]) -> bool:
         q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
             user=user, context=self, assigned__overlap=q
         ).exists()
 
-    def get_userids_with_roles(self, *roles: Any[str, Role]):
+    def get_userids_with_roles(self, *roles: Union[str, Role]):
         q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
             context=self, assigned__contains=q
@@ -154,7 +154,7 @@ class Roles(ABCModel):
                 required.add(role)
         return required
 
-    def validate_roles(self, *roles: Any[Role, str]) -> Set[Role]:
+    def validate_roles(self, *roles: Union[Role, str]) -> Set[Role]:
         found = set()
         for x in roles:
             if isinstance(x, str):
@@ -181,7 +181,7 @@ class Roles(ABCModel):
                 cls.valid_roles = {}
             cls.valid_roles[role.name] = role
 
-    def __contains__(self, role: Any[Role, str]):
+    def __contains__(self, role: Union[Role, str]):
         if isinstance(role, Role):
             role = role.name
         return role in self.assigned
