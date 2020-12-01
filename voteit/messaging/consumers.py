@@ -1,7 +1,7 @@
 import json
 from contextlib import suppress
 from logging import getLogger
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Dict, Union
 
 from channels.auth import get_user
 from channels.db import database_sync_to_async
@@ -10,19 +10,22 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ObjectDoesNotExist
-from django_rq import get_queue
 from pydantic import ValidationError
 from rest_framework.authtoken.models import Token
+from voteit.messaging.abcs import BaseIncomingMessage, DeferredJob, AsyncRunnable
+from voteit.messaging.envelopes import (
+    IncomingEnvelope,
+    InternalEnvelope,
+    OutgoingEnvelope,
+)
 
 from voteit.messaging.exceptions import UnsupportedMessageType
 from voteit.messaging.jobs import signal_websocket_connect
 from voteit.messaging.jobs import signal_websocket_close
 from voteit.messaging.messages import IncomingPayload, MsgState
 from voteit.messaging.messages import OutgoingErrorMessage
-from voteit.messaging.messages.abcs import AbstractJobMessage
-from voteit.messaging.messages import MessageContext
-from voteit.messaging.registries import internal_messages
-from voteit.messaging.registries import websocket_incoming_messages
+from voteit.messaging.registries import outgoing_messages
+from voteit.messaging.registries import incoming_messages
 
 logger = getLogger(__name__)
 
@@ -51,7 +54,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
     # Errors count, when these stack the sane response would be to simply disconnect
     message_errors: int = 0
     # For testing injection
-    message_registry = websocket_incoming_messages
+    message_registry = incoming_messages
 
     async def connect(self):
         connection_token = self.scope["url_route"]["kwargs"]["connection_token"]
@@ -98,105 +101,99 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
     async def refresh_user(self):
         self.user = await get_user(self.scope)
 
+    async def handle_message(self, message: Union[AsyncRunnable, DeferredJob]):
+        # FIXME: How do we handle errors here?
+        act = 0
+        if isinstance(message, AsyncRunnable):
+            await message.run()
+            act += 1
+        if isinstance(message, DeferredJob):
+            await message.pre_queue(self)
+            message.enqueue()
+            act += 1
+        if not act:
+            raise TypeError(
+                f"{message} must be an instance of either {AsyncRunnable} or {DeferredJob}"
+            )
+
     async def receive(self, text_data: str = None, bytes_data=None):
         """ Receive from websocket """
-        # FIXME: A lot of error checking...
-        incoming = None
-        accept_message = False
-        base_payload = {}
-        message = None
+        if text_data is None:
+            # Connection will die
+            raise UnsupportedMessageType("Only text data accepted")
         try:
-            if text_data is None:
-                raise UnsupportedMessageType("Only text data accepted")
             base_payload = json.loads(text_data)
-            incoming = IncomingPayload(**base_payload)
-            try:
-                msg_type = self.message_registry[incoming.t]
-            except KeyError:
-                raise UnsupportedMessageType(
-                    f"t was not one of {self.message_registry.keys()}"
-                )
-            #  FIXME: Not all sent data might be consumed, for instance if there's a typo on the incoming key of
-            #  something that isn't required. That data will silently be thrown away.
-            #  Do we want it to be logged or error in that case?
-            payload = incoming.p or {}
-            mc = MessageContext(
-                consumer_name=self.channel_name,
-                message_id=incoming.i,
-                user_pk=self.user_pk,
-                type=incoming.t,
-            )
-            message = msg_type(mc=mc, **payload)
-            accept_message = True
         except json.decoder.JSONDecodeError:
             await self.send_error("Invalid json", err_type="error.json")
             if settings.DEBUG:
                 print(f"Invalid json, either payload {text_data}")
             self.message_errors += 1
+            return await self.post_receive()
+        try:
+            envelope = IncomingEnvelope(**base_payload)
         except ValidationError as exc:
-            message_id = base_payload.get("i", None)
             await self.send_error(
-                "Validation fail", message_id=message_id, errors=exc.errors()
-            )
-            if settings.DEBUG:
-                print(f"Incoming message {message_id} payload error: {exc.errors()}")
-        except UnsupportedMessageType:
-            message_id = base_payload.get("i", None)
-            logger.debug(f"t was not one of {self.message_registry.keys()}")
-            await self.send_error(
-                "Unsupported message type",
-                message_id=message_id,
-                err_type="error.message_type",
+                "Validation fail",
+                message_id=base_payload.get("i", None),
+                errors=exc.errors(),
             )
             self.message_errors += 1
-        finally:
-            if self.message_errors > 10:
-                await self.close(1007)
-        if incoming is not None and message is not None and accept_message:
-            logger.debug("Consuming incoming: %s / %s", incoming.t, incoming.i)
-            await message.consume(self)
-            # Errors here too...? This is an application error in that case
-        else:
-            pass
-            #  FIXME: log error?
+            return await self.post_receive()
+        message = BaseIncomingMessage.from_consumer(self, envelope)
+        await self.handle_message(message)
 
-    async def websocket_send(self, event):
+    async def websocket_send(self, event: Dict):
         """ Push data to the websocket. Any channels message with the type "websocket.send" will end up here.
             But don't use this method directly,
             send messages that are registered within registries.websocket_outgoing_messages
         """
-        print(f"{self.channel_name} sent: {event}")
-        payload = event["payload"]
+        message = OutgoingEnvelope(**event)
+        payload = message.json(exclude={"type"})
+        logger.debug("%s sent: %s", self.channel_name, payload)
         # Send message to WebSocket
         await self.send(text_data=payload)
 
-    async def internal_receive(self, event):
-        """ Receive internal messages with the type internal.receive
-            Event should be:
-            {"type": INTERNAL_MESSAGE, "payload": self.json(), "t": mtype, "i": message_id},
+    async def post_receive(self):
+        logger.debug(
+            "Consumer %s caused too many errors, disconnecting", self.channel_name
+        )
+        if self.message_errors > 10:
+            await self.close(1007)
 
-            See AbstractInternalMessage
+    async def internal_receive(self, event: Dict):
+        """ Handle incoming internal messages. Incoming messages are dicts corresponding to InternalEnvelope. """
+        envelope = InternalEnvelope(**event)
+        message = BaseIncomingMessage.from_consumer(self, envelope)
+        await self.handle_message(message)
 
-        """
-        # print(f"Internal message: {event}")
-        try:
-            msg_type = internal_messages[event["t"]]
-        except KeyError:
-            logger.debug(f"t was not one of {internal_messages.keys()}")
-            raise
-        payload = event["p"]
-        message_id = event["i"]
-        try:
-            message = msg_type(**payload)
-        except ValidationError as exc:
-            if settings.DEBUG:
-                print(f"Message {message_id} payload error: {exc.errors()}")
-            else:
-                raise
-            return
-        logger.debug("Internal: %s / %s", event["t"], message_id)
-
-        await message.consume(self, message_id=message_id)  # Errors here too...?
+    # async def _internal_receive(self, event):
+    #     """ Receive internal messages with the type internal.receive
+    #         Event should be:
+    #         {"type": INTERNAL_MESSAGE, "payload": self.json(), "t": mtype, "i": message_id},
+    #
+    #         See AbstractInternalMessage
+    #
+    #     """
+    #     # print(f"Internal message: {event}")
+    #
+    #     try:
+    #         msg_type = internal_messages[event["t"]]
+    #     except KeyError:
+    #         logger.debug(f"t was not one of {internal_messages.keys()}")
+    #         raise
+    #     payload = event["p"]
+    #     message_id = event["i"]
+    #     try:
+    #         message = msg_type(**payload)
+    #     except ValidationError as exc:
+    #         if settings.DEBUG:
+    #             print(f"Message {message_id} payload error: {exc.errors()}")
+    #         else:
+    #             raise
+    #         return
+    #     logger.debug("Internal: %s / %s", event["t"], message_id)
+    #
+    #     await message.consume(self, message_id=message_id)  # Errors here too...?
 
     async def send_error(
         self,

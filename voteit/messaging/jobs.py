@@ -1,12 +1,14 @@
 from logging import getLogger
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django_rq import job
-from typing import List
+from typing import List, Dict
 from django.utils.translation import gettext as _
 
 from voteit.core.queues import DEFAULT_QUEUE
-from voteit.messaging.registries import websocket_incoming_messages
+from voteit.messaging.abcs import DeferredJob
+from voteit.messaging.registries import incoming_messages
 from voteit.messaging.signals import client_connect, client_close
 from voteit.messaging.utils import update_user_status
 
@@ -20,12 +22,22 @@ def handle_job_message(msg_type, msg_data):
     """ """
     # Die here on validation errors - everything should already be validated
     #
-    message = websocket_incoming_messages[msg_type](**msg_data)
+    message = incoming_messages[msg_type](**msg_data)
     # FIXME catch errors and do handling here
     message.job()
 
 
-@job(DEFAULT_QUEUE, timeout=5)
+@job(DEFAULT_QUEUE, timeout=30)
+def run_job(msg_data: Dict, mm_data: Dict, atomic=True):
+    instance = DeferredJob.from_job(msg_data, mm_data)
+    if atomic:
+        with transaction.atomic():
+            instance.run_job()
+    else:
+        instance.run_job()
+
+
+@job(DEFAULT_QUEUE, timeout=50)
 def signal_websocket_connect(user_pk: int = None, consumer_name: str = ""):
     user = User.objects.filter(pk=user_pk).first()
     logger.debug("%s connected consumer %s", user_pk, consumer_name)

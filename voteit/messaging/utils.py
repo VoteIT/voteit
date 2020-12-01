@@ -18,14 +18,29 @@ if TYPE_CHECKING:
 
 def get_channel_registry() -> Registry:
     from voteit.messaging.registries import channel_registry
+
     return channel_registry
+
+
+def get_incoming_registry() -> Registry:
+    from voteit.messaging.registries import incoming_messages
+
+    return incoming_messages
+
+
+def get_outgoing_registry() -> Registry:
+    from voteit.messaging.registries import outgoing_messages
+
+    return outgoing_messages
 
 
 def update_user_status(user, channel_name, online=True):
     """ This is sync code so don't call this in any async context!
     """
-    conn, created = Connection.objects.get_or_create(user=user, channel_name=channel_name)
-    conn.online=online
+    conn, created = Connection.objects.get_or_create(
+        user=user, channel_name=channel_name
+    )
+    conn.online = online
     conn.save()
     return conn
 
@@ -40,7 +55,9 @@ def cleanup_connection_status(secs=180):
     to_remove = channel_names - found
     if to_remove:
         logger.debug("Changing connection status of %s objects", len(to_remove))
-        Connection.objects.filter(online=True, channel_name__in=to_remove).update(online=False)
+        Connection.objects.filter(online=True, channel_name__in=to_remove).update(
+            online=False
+        )
     else:
         logger.debug("No expired connections found")
 

@@ -14,8 +14,8 @@ from pydantic import BaseModel
 from voteit.core.queues import DEFAULT_QUEUE
 
 from voteit.messaging.messages import OutgoingPayload, MsgState
-from voteit.messaging.messages import WEBSOCKET_OUTGOING_NAME
-from voteit.messaging.messages import INTERNAL_MESSAGE
+from voteit.messaging import WEBSOCKET_OUTGOING
+from voteit.messaging import INTERNAL_MESSAGE
 from voteit.messaging.messages import MessageContext
 
 if TYPE_CHECKING:
@@ -197,11 +197,7 @@ class AbstractInternalMessage(AbstractConsumerMessage, AbstractTransmittableMess
     ):
         from voteit.messaging.registries import internal_messages
 
-        if success is not None:
-            if success:
-                state = MsgState.SUCCESS
-            else:
-                state = MsgState.FAILED
+        from_job
 
         for (mtype, MessageType) in internal_messages.items():
             if self.__class__ == MessageType:

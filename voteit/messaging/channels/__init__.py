@@ -1,4 +1,5 @@
 
 
 def register():
-    from . import meeting, user, agenda_item, poll
+    pass
+    # from . import meeting, user, agenda_item, poll
