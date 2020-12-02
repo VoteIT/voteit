@@ -1,4 +1,5 @@
 from collections import UserDict
+from inspect import isclass, isfunction
 
 
 class Registry(UserDict):
@@ -47,8 +48,16 @@ class Registry(UserDict):
 
             return _decorator
 
-        # Class or instance
-        name = getattr(factory_or_name, "name", factory_or_name.__name__.lower())
+        # Class, function or instance
+        if isclass(factory_or_name):
+            name = getattr(factory_or_name, "name", factory_or_name.__name__.lower())
+        elif isfunction(factory_or_name):
+            raise ValueError("Assign name to a function through the decorator: decorator('<name>')")
+        else:
+            # Probably an instance, what do we know :)
+            assert hasattr(factory_or_name, "__class__")
+            name = getattr(factory_or_name, "name", factory_or_name.__class__.__name__.lower())
+
         self[name] = factory_or_name
         return factory_or_name
 
