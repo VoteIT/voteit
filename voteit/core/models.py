@@ -120,7 +120,7 @@ class Roles(ABCModel):
         abstract = True
         unique_together = (("user", "context"),)
 
-    def add(self, *roles: Role) -> Optional[Set[Role]]:
+    def add(self, *roles: Union[Role, str]) -> Optional[Set[Role]]:
         checked = self.validate_roles(*roles)
         assigned = set(self.assigned)
         query_add = set([x.name for x in self.get_required_roles(*checked)])
@@ -133,7 +133,7 @@ class Roles(ABCModel):
             return role_objs
         return None
 
-    def remove(self, *roles: Role) -> Optional[Set[Role]]:
+    def remove(self, *roles: Union[Role, str]) -> Optional[Set[Role]]:
         checked = self.validate_roles(*roles)
         assigned = set(self.assigned)
         query_remove = set([x.name for x in self.get_reverse_required_roles(*checked)])
