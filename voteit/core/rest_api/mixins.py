@@ -20,7 +20,7 @@ class SerializerClassesMixin:
 
 class CreateModelPermissionsMixin(CreateModelMixin):
     context_queryset: QuerySet
-    context_lookup_kwarg: str
+    context_lookup_kwarg: str = 'context'
     context_lookup_field: str = 'pk'
     _ignore_model_permissions = True
 

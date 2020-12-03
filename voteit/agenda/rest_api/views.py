@@ -50,7 +50,7 @@ class AgendaViewSet(
             if name not in available_transitions:
                 return Response({
                     'error': f'Invalid transition: {name}',
-                    'available_transitions': available_transitions.keys()
+                    'available_transitions': available_transitions
                 }, status=400)
 
             getattr(instance, name)()

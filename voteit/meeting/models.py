@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Generator
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -24,6 +25,9 @@ if TYPE_CHECKING:
 
 
 __all__ = "Meeting", "MeetingRoles"
+
+
+UserModel = get_user_model()
 
 
 class MeetingRoles(Roles):
@@ -65,6 +69,7 @@ class Meeting(BaseContent, RoleContextMixin):
     archive_after = models.DateTimeField(null=True, editable=False)
 
     roles_cls = MeetingRoles
+    participants = models.ManyToManyField(UserModel, through=MeetingRoles)
 
     def get_latest_er(self) -> ElectoralRegister:
         return (

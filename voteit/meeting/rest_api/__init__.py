@@ -6,3 +6,8 @@ router.register(
     'meetings', MeetingViewSet,
     basename='meeting'
 )
+
+router.register(
+    'meeting-roles', MeetingRolesViewSet,
+    basename='meeting-roles'
+)
