@@ -42,13 +42,22 @@ class RoleContextMixin(ABCModel):
         roles_model, created = self.roles_cls.objects.get_or_create(
             user=user, context=self
         )
-        roles_model.add(*roles)
+        return roles_model.add(*roles)
 
     def remove_roles(self, user: AbstractUser, *roles: Role) -> Optional[Set[Role]]:
         assert isinstance(user, AbstractUser)
         roles_model = self.roles_cls.objects.filter(user=user, context=self).first()
         if roles_model is not None:
             return roles_model.remove(*roles)
+
+    def get_roles(self, user: AbstractUser) -> Optional[Set[Role]]:
+        roles_model = self.roles_cls.objects.filter(user=user, context=self).first()
+        if roles_model is not None:
+            # Note, may raise AssertionError if some roles are invalid
+            roles = roles_model.validate_roles(*roles_model.assigned)
+            if roles:
+                return roles
+        return None
 
     def has_roles(self, user: AbstractUser, *roles: Union[str, Role]) -> bool:
         q = self.roles_to_strings(*roles)
@@ -92,7 +101,7 @@ class RoleContextMixin(ABCModel):
 class Roles(ABCModel):
     """ Context for role assignments"""
 
-    valid_roles: Dict = None  # Don't instantiate set here!
+    valid_roles: Dict = None  # Don't instantiate dict here!
     # It's a good idea to override the user relation to have a sane related_name
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,

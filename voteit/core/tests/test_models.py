@@ -15,6 +15,13 @@ class RolesTests(TestCase):
         self.roles = MeetingRoles.objects.create(user=self.user, context=self.meeting)
         self.ROLES = MeetingRoles.valid_roles
 
+    def test_get_roles(self):
+        participant = self.ROLES["participant"]
+        self.assertIsNone(self.meeting.get_roles(self.user))
+        self.roles.add(participant)
+        self.roles.save()
+        self.assertEqual({participant}, self.meeting.get_roles(self.user))
+
     def test_get_required_roles(self):
         participant = self.ROLES["participant"]
         proposer = self.ROLES["proposer"]
