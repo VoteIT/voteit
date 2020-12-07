@@ -19,8 +19,13 @@ class CoreDocTests(TestCase):
         # self._doctest_file("narrative.md")
 
 
-# def load_tests(loader, tests, ignore):
-#     from voteit.core import role
-#     opts = doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS | doctest.FAIL_FAST
-#     tests.addTests(doctest.DocTestSuite(role, optionflags=opts))
-#     return tests
+def load_tests(loader, tests, ignore):
+    from voteit.core import role
+    from voteit.core import permission
+    from voteit.core import predicate
+
+    mods_to_test = [role, permission, predicate]
+    opts = doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS | doctest.FAIL_FAST
+    for x in mods_to_test:
+        tests.addTests(doctest.DocTestSuite(x, optionflags=opts))
+    return tests
