@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Type, Set, TYPE_CHECKING, List
 
-from pydantic import Field, BaseModel
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from voteit.core.models import Roles
@@ -12,7 +12,7 @@ class Role:
     title: str
     description: str
     requires: Set[Role]
-    roles_cls: Type[Roles] = Field
+    roles_cls: Type[Roles]
 
     def __init__(self, name, title=None, description=""):
         self.name = name

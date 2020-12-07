@@ -42,13 +42,22 @@ class RoleContextMixin(ABCModel):
         roles_model, created = self.roles_cls.objects.get_or_create(
             user=user, context=self
         )
-        roles_model.add(*roles)
+        return roles_model.add(*roles)
 
     def remove_roles(self, user: AbstractUser, *roles: Role) -> Optional[Set[Role]]:
         assert isinstance(user, AbstractUser)
         roles_model = self.roles_cls.objects.filter(user=user, context=self).first()
         if roles_model is not None:
             return roles_model.remove(*roles)
+
+    def get_roles(self, user: AbstractUser) -> Optional[Set[Role]]:
+        roles_model = self.roles_cls.objects.filter(user=user, context=self).first()
+        if roles_model is not None:
+            # Note, may raise AssertionError if some roles are invalid
+            roles = roles_model.validate_roles(*roles_model.assigned)
+            if roles:
+                return roles
+        return None
 
     def has_roles(self, user: AbstractUser, *roles: Union[str, Role]) -> bool:
         q = self.roles_to_strings(*roles)
@@ -92,7 +101,7 @@ class RoleContextMixin(ABCModel):
 class Roles(ABCModel):
     """ Context for role assignments"""
 
-    valid_roles: Dict = None  # Don't instantiate set here!
+    valid_roles: Dict = None  # Don't instantiate dict here!
     # It's a good idea to override the user relation to have a sane related_name
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -111,7 +120,7 @@ class Roles(ABCModel):
         abstract = True
         unique_together = (("user", "context"),)
 
-    def add(self, *roles: Role) -> Optional[Set[Role]]:
+    def add(self, *roles: Union[Role, str]) -> Optional[Set[Role]]:
         checked = self.validate_roles(*roles)
         assigned = set(self.assigned)
         query_add = set([x.name for x in self.get_required_roles(*checked)])
@@ -124,7 +133,7 @@ class Roles(ABCModel):
             return role_objs
         return None
 
-    def remove(self, *roles: Role) -> Optional[Set[Role]]:
+    def remove(self, *roles: Union[Role, str]) -> Optional[Set[Role]]:
         checked = self.validate_roles(*roles)
         assigned = set(self.assigned)
         query_remove = set([x.name for x in self.get_reverse_required_roles(*checked)])
@@ -134,6 +143,9 @@ class Roles(ABCModel):
             self.save()
             role_objs = [self.valid_roles[x] for x in remove_roles]
             roles_removed.send(sender=self.__class__, instance=self, roles=role_objs)
+            # Cleanup roles if all were removed
+            if not self.assigned:
+                self.delete()
             return role_objs
         return None
 
