@@ -4,9 +4,9 @@ from voteit.messaging import INTERNAL_MESSAGE, WEBSOCKET_OUTGOING
 
 
 class BaseEnvelope(BaseModel):
-    p: Dict
+    p: Dict = dict()
     t: str
-    i: Optional[str]
+    i: Optional[str] = None
 
 
 class IncomingEnvelope(BaseEnvelope):
