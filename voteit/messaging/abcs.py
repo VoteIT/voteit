@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from logging import getLogger
+from typing import Optional, TYPE_CHECKING, Type, Dict, Union, Any
 
 from asgiref.sync import async_to_sync
 from channels import DEFAULT_CHANNEL_LAYER
 from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
+from django.db import models
 from django.db.models import Model
 from django.utils.functional import cached_property
+from django.utils.translation import gettext as _
 from pydantic import validator
 from pydantic.main import BaseModel
-from typing import Optional, Type, Dict, Union, TYPE_CHECKING, Any
 
 from voteit.core.queues import DEFAULT_QUEUE
 from voteit.messaging import (
@@ -26,11 +29,17 @@ from voteit.messaging.envelopes import (
     InternalEnvelope,
     OutgoingEnvelope,
 )
-
-from voteit.messaging.utils import get_incoming_registry, get_outgoing_registry
+from voteit.messaging.utils import get_incoming_registry
+from voteit.messaging.utils import get_outgoing_registry
 
 if TYPE_CHECKING:
     from voteit.core.component import Registry
+    from channels_redis.core import RedisChannelLayer
+    from voteit.messaging.consumers import WebsocketDemuxConsumer
+
+
+logger = getLogger(__name__)
+
 
 User = get_user_model()
 
@@ -89,6 +98,13 @@ class MessageABC(ABC):
     def get_registry() -> Registry:
         """ The used registry for this type.
         """
+
+    @classmethod
+    @abstractmethod
+    def from_message(
+        cls, message: MessageABC, type_name=None, **kwargs
+    ) -> MessageABC:
+        pass
 
     @cached_property
     def user(self) -> Optional[AbstractUser]:
@@ -167,6 +183,18 @@ class BaseIncomingMessage(MessageABC):
         inst.user = consumer.user  # This will be the same anyway
         return inst
 
+    @classmethod
+    def from_message(
+        cls, message: MessageABC, type_name=None, **kwargs
+    ) -> BaseIncomingMessage:
+        if type_name is None:
+            assert (
+                cls.name is not None
+            ), "You need to specify type name, this is an abstract class"
+            type_name = cls.name
+        mm = IncomingMeta(type=type_name, **message.mm.dict(exclude={"type"}))
+        return cls.get_registry()[type_name](mm, kwargs)
+
     @staticmethod
     def get_registry() -> Registry:
         return get_incoming_registry()
@@ -182,8 +210,8 @@ class BaseOutgoingMessage(MessageABC):
         return get_outgoing_registry()
 
     @classmethod
-    def from_incoming(
-        cls, message: BaseIncomingMessage, type_name=None, **kwargs
+    def from_message(
+        cls, message: MessageABC, type_name=None, **kwargs
     ) -> BaseOutgoingMessage:
         if type_name is None:
             assert (
@@ -233,7 +261,7 @@ class ContextMessageABC(MessageABC):
 
     @property
     @abstractmethod
-    def Model(self) -> Type[Model]:
+    def model(self) -> Type[Model]:
         pass
 
     def allowed(self) -> bool:
@@ -247,7 +275,7 @@ class ContextMessageABC(MessageABC):
 
     @cached_property
     def context(self) -> Model:
-        return self.Model.objects.get(pk=self.data.pk)
+        return self.model.objects.get(pk=self.data.pk)
 
 
 class AsyncRunnable(BaseIncomingMessage, ABC):
@@ -257,7 +285,7 @@ class AsyncRunnable(BaseIncomingMessage, ABC):
     """
 
     @abstractmethod
-    async def run(self):
+    async def run(self, consumer: WebsocketDemuxConsumer):
         pass
 
 
@@ -314,7 +342,7 @@ class DeferredJob(BaseIncomingMessage, ABC):
         # )
 
     @classmethod
-    def from_job(cls, msg_data, mm_data):
+    def from_job(cls, msg_data, mm_data) -> DeferredJob:
         mm = IncomingMeta(**mm_data)
         msg_cls = cls.get_registry()[mm.type]
         instance = msg_cls(mm, msg_data)
@@ -325,3 +353,204 @@ class DeferredJob(BaseIncomingMessage, ABC):
     def run_job(self):
         """ Run this within the worker to do the actual job"""
         pass
+
+
+class ErrorSchema(BaseModel):
+    msg: Optional[str]
+
+
+class BaseError(BaseOutgoingMessage, Exception):
+    schema = ErrorSchema
+    data: ErrorSchema
+    default_msg = _("An unknown error occurred")
+
+    @classmethod
+    def create(
+        cls,
+        type_name=None,
+        message_id=None,
+        consumer_name=None,
+        user_pk=None,
+        msg=None,
+        **kwargs,
+    ):
+        inst = super().create(
+            type_name=type_name,
+            message_id=message_id,
+            consumer_name=consumer_name,
+            user_pk=user_pk,
+            **kwargs,
+        )
+        assert isinstance(inst, BaseError), f"Error is not inherited from {BaseError}"
+        assert inst.name.startswith("error."), "Error names must start with 'error.'"
+        if msg is None and inst.default_msg is not None:
+            msg = inst.default_msg
+        inst.data.msg = msg
+        return inst
+
+    async def async_send_outgoing(
+        self,
+        channel_name: str,
+        state: Optional[str] = None,
+        success: Optional[bool] = False,
+        group: bool = False,
+    ):
+        """ Override and default to error."""
+        if state is not None:
+            assert state == self.FAILED, "Error messages must be sent as failed state"
+        assert not success, "Error messages must be sent as failed state"
+        await super().async_send_outgoing(channel_name, success=False, group=group)
+
+
+class AbstractChannel(ABC):
+    """ Classic publish/subscribe pattern. This represents a channel that a consumer (websocket connection)
+        can subscribe to.
+    """
+
+    logger = logger
+    channel_layer: RedisChannelLayer  # FIXME?
+    consumer_channel: Optional[str]
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """ The name of the channel factory, not the specific channel name. """
+        pass
+
+    @property
+    @abstractmethod
+    def channel_name(self) -> str:
+        """ Return name of this channel, probably based on the primary key of an object"""
+        pass
+
+    def __init__(
+        self,
+        consumer_channel: Optional[str] = None,
+        channel_layer: Optional[RedisChannelLayer] = None,
+    ):
+        self.channel_layer = channel_layer and channel_layer or get_channel_layer()
+        self.consumer_channel = consumer_channel
+
+    @classmethod
+    def from_consumer(cls, consumer: WebsocketDemuxConsumer, channel_name=None):
+        return cls(
+            consumer_channel=consumer.channel_name, channel_layer=consumer.channel_layer
+        )
+
+    async def async_subscribe(self, consumer_channel=None):
+        if consumer_channel is None:
+            consumer_channel = self.consumer_channel
+        assert consumer_channel
+        self.logger.debug("Subscribed to %s", self.channel_name)
+        await self.channel_layer.group_add(self.channel_name, consumer_channel)
+
+    def subscribe(self, consumer_channel=None):
+        async_to_sync(self.async_subscribe)(consumer_channel=consumer_channel)
+
+    async def async_publish(self, message: MessageABC, internal=False, **kwargs):
+        self.logger.debug("Publish to %s", self.channel_name)
+        assert isinstance(message, MessageABC)
+        if internal:
+            await message.async_send_internal(self.channel_name, group=True)
+        else:
+            await message.async_send_outgoing(self.channel_name, group=True, **kwargs)
+
+    def publish(self, message: MessageABC, internal=False, **kwargs):
+        async_to_sync(self.async_publish)(message, internal=internal, **kwargs)
+
+    async def async_leave(self, consumer_channel=None):
+        if consumer_channel is None:
+            consumer_channel = self.consumer_channel
+        assert consumer_channel
+        self.logger.debug("Left %s", self.channel_name)
+        await self.channel_layer.group_discard(self.channel_name, consumer_channel)
+
+    def leave(self, consumer_channel=None):
+        async_to_sync(self.async_leave)(consumer_channel=consumer_channel)
+
+
+class AbstractObjectChannel(AbstractChannel):
+    """ A channel that has to do with a specific object. For instance, the agenda channel is related to a meeting.
+    """
+
+    logger = logger
+    pk: int  # Primary key of the object that this channel is about
+
+    def __init__(
+        self,
+        pk: int,
+        consumer_channel: Optional[str] = None,
+        channel_layer: Optional[RedisChannelLayer] = None,
+    ):
+        self.pk = pk
+        super(AbstractObjectChannel, self).__init__(consumer_channel, channel_layer)
+
+    @property
+    def channel_name(self) -> str:
+        return f"{self.name}_{self.pk}"
+
+    @property
+    @abstractmethod
+    def model(self) -> models.Model:
+        """ Set as property on subclass. Model should be the type of model this object channel is for."""
+        pass
+
+    @property
+    @abstractmethod
+    def permission(self) -> str:
+        """ Set as property on subclass. The permission to evaluate subscribe commands against."""
+        pass
+
+    @classmethod
+    def from_pk(
+        cls, pk: int, consumer_channel: Optional[str] = None
+    ) -> AbstractObjectChannel:
+        return cls(pk, consumer_channel)
+
+    @classmethod
+    def from_instance(
+        cls, instance: models.Model, consumer_channel: Optional[str] = None
+    ) -> AbstractObjectChannel:
+        assert isinstance(instance, cls.model), f"Instance must be a {cls.model}"
+        inst = cls.from_pk(instance.pk, consumer_channel)
+        inst.context = instance
+        return inst
+
+    @cached_property
+    def context(self) -> models.Model:
+        try:
+            return self.model.objects.get(pk=self.pk)
+        except self.model.DoesNotExist:
+            raise BaseError.create(
+                type_name="error.not_found",
+                consumer_name=self.consumer_channel,
+                msg=_("Context for this channel doesn't exist"),
+            )
+
+    def allow_subscribe(self, user):
+        """ Call this before subscribing. Due to sync/async and the complexity of
+            permissions this won't be enforced before calling subscribe.
+        """
+        if user is None:
+            return False
+        if self.context is None:
+            return False
+        if self.permission is None:
+            return True
+        return user.has_perm(self.permission, self.context)
+
+    def allow_publish(self, user):
+        """ Override and call this before publishing. Due to sync/async and the complexity of
+            permissions this won't be enforced before calling publish.
+
+            Defaulting to false is ok here
+        """
+        return False
+
+    def allow_leave(self, user):
+        """ Override and call this before leaving. Due to sync/async and the complexity of
+            permissions this won't be enforced before calling leave.
+
+            Leave shouldn't require the same permission checks so we'll settle on allowing this as default.
+        """
+        return True

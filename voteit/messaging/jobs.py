@@ -6,7 +6,7 @@ from django_rq import job
 from typing import Dict
 
 from voteit.core.queues import DEFAULT_QUEUE
-from voteit.messaging.abcs import DeferredJob
+from voteit.messaging.abcs import DeferredJob, BaseError
 from voteit.messaging.signals import client_connect, client_close
 from voteit.messaging.utils import update_user_status
 
@@ -18,11 +18,17 @@ User = get_user_model()
 @job(DEFAULT_QUEUE, timeout=30)
 def run_job(msg_data: Dict, mm_data: Dict, atomic=True):
     instance = DeferredJob.from_job(msg_data, mm_data)
-    if atomic:
-        with transaction.atomic():
+    try:
+        if atomic:
+            with transaction.atomic():
+                instance.run_job()
+        else:
             instance.run_job()
-    else:
-        instance.run_job()
+    except BaseError as err:  # Catchable, nice errors
+        # Attach other things to error in case they aren't there
+        if err.mm.message_id is None:
+            err.mm.message_id = instance.mm.message_id
+        err.send_outgoing(instance.mm.consumer_name)
 
 
 @job(DEFAULT_QUEUE, timeout=50)

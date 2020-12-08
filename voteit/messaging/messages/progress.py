@@ -1,15 +1,20 @@
-#from voteit.messaging.messages.abcs import AbstractOutgoingMessage
 from pydantic import BaseModel
-from voteit.messaging.registries import outgoing_messages
+from typing import Optional
+
+from voteit.messaging.decorators import outgoing
 from voteit.messaging.abcs import BaseOutgoingMessage
 
 # So should we have an initializer that's a special message, or simply
 # have the first status update (and all subsequent ones) contain all information?
-@outgoing_messages
+
+class ProgressSchema(BaseModel):
+    curr: int
+    total: int
+    msg: Optional[str]
+
+
+@outgoing
 class ProgressNum(BaseOutgoingMessage):
     name = "progress.num"
-
-    class schema(BaseModel):
-        curr: int
-        total: int
-        msg: str = ""
+    schema = ProgressSchema
+    data: ProgressSchema

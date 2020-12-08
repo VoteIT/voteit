@@ -10,3 +10,5 @@ class AgendaConfig(AppConfig):
         # Make sure rules are loaded
         from voteit.agenda import rules
         from voteit.agenda import rest_api
+        from voteit.agenda import channels
+        from voteit.agenda import messages

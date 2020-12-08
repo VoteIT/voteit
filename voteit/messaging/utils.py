@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
 from voteit.messaging.models import Connection
 
@@ -45,11 +46,16 @@ def update_user_status(user, channel_name, online=True):
     return conn
 
 
-def cleanup_connection_status(secs=180):
+def cleanup_connection_status(secs=180, only_user:Optional[AbstractUser]=None):
     """ Check connections marked as active and make sure they're still active. """
     # Note: This assumes channels_redis backend
     since = now() - timedelta(seconds=secs)
-    qs = Connection.objects.filter(online=True, last_action__lt=since)
+    query = dict(
+        online=True, last_action__lt=since
+    )
+    if only_user:
+        query["user"] = only_user
+    qs = Connection.objects.filter(**query)
     channel_names = set(qs.values_list("channel_name", flat=True))
     found = async_to_sync(check_redis_keys)(channel_names)
     to_remove = channel_names - found

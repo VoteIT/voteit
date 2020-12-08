@@ -20,3 +20,16 @@ class Connection(models.Model):
 
     class Meta:
         unique_together = (("user", "channel_name"),)
+
+
+# FIXME:
+# class Subscription(models.Model):
+#     """ Keep track of subscriptions for this connection. When deleted, make sure connections are cleaned up.
+#     """
+#     connection = models.ForeignKey(Connection, on_delete=models.CASCADE, related_name="connections")
+#     channel_name = models.CharField(verbose_name=_("Channel name for the subscription"), max_length=150)
+#
+#     class Meta:
+#         unique_together = (("connection", "channel_name"),)
+#
+# @

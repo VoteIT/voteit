@@ -11,6 +11,7 @@ from voteit.messaging.messages.progress import ProgressNum
 from voteit.messaging.models import Connection
 from voteit.messaging.registries import incoming_messages, outgoing_messages
 from voteit.messaging.signals import client_connect
+from voteit.messaging.utils import cleanup_connection_status
 
 if TYPE_CHECKING:
     from voteit.messaging.consumers import WebsocketDemuxConsumer
@@ -20,9 +21,9 @@ if TYPE_CHECKING:
 class Hello(AsyncRunnable):
     name = "testing.hello"
 
-    async def run(self):
+    async def run(self, consumer):
         greeting = f"Hello you too {self.user.username}!"
-        msg = HelloResponse.from_incoming(self, greeting=greeting)
+        msg = HelloResponse.from_message(self, greeting=greeting)
         await msg.async_send_outgoing(self.mm.consumer_name, success=True)
 
 
@@ -68,7 +69,7 @@ class Count(DeferredJob):
     data: CountSchema
 
     async def pre_queue(self, consumer: WebsocketDemuxConsumer):
-        msg = ProgressNum.from_incoming(
+        msg = ProgressNum.from_message(
             self,
             curr=0,
             total=self.data.num,
@@ -83,21 +84,21 @@ class Count(DeferredJob):
         text = f"Let's count to {num}!"
         if self.data.fail:
             text += f" ...But fail at {fail}"
-        msg = ProgressNum.from_incoming(self, curr=0, total=num, msg=text)
+        msg = ProgressNum.from_message(self, curr=0, total=num, msg=text)
         msg.send_outgoing(self.mm.consumer_name, state=self.RUNNING)
         sleep(1)
         for i in range(1, num):
             if fail and fail == i:
-                msg = ProgressNum.from_incoming(
+                msg = ProgressNum.from_message(
                     self, curr=i, total=self.num, msg=f"Deliberate fail at {self.fail}"
                 )
                 msg.send_outgoing(self.mm.consumer_name, success=False)
                 return
             else:
-                msg = ProgressNum.from_incoming(self, curr=i, total=num)
+                msg = ProgressNum.from_message(self, curr=i, total=num)
                 msg.send_outgoing(self.mm.consumer_name, state=self.RUNNING)
             sleep(1)
-        msg = ProgressNum.from_incoming(self, curr=num, total=num, msg="All done!")
+        msg = ProgressNum.from_message(self, curr=num, total=num, msg="All done!")
         msg.send_outgoing(self.mm.consumer_name, success=True)
 
 
@@ -106,12 +107,13 @@ class OnlineUsers(DeferredJob):
     name = "testing.online_users"
 
     def run_job(self):
+        cleanup_connection_status()
         users = (
             Connection.objects.filter(online=True)
             .distinct("user")
             .values_list("user", flat=True)
         )
-        msg = OnlineUsersResponse.from_incoming(self, users=list(users))
+        msg = OnlineUsersResponse.from_message(self, users=list(users))
         msg.send_outgoing(self.mm.consumer_name, success=True)
 
 
