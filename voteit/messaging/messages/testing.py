@@ -90,7 +90,7 @@ class Count(DeferredJob):
         for i in range(1, num):
             if fail and fail == i:
                 msg = ProgressNum.from_message(
-                    self, curr=i, total=self.num, msg=f"Deliberate fail at {self.fail}"
+                    self, curr=i, total=num, msg=f"Deliberate fail at {fail}"
                 )
                 msg.send_outgoing(self.mm.consumer_name, success=False)
                 return
