@@ -1,39 +1,66 @@
-# from __future__ import annotations
-#
-# from typing import TYPE_CHECKING
-#
-# from pydantic import validator
-#
-# from voteit.messaging.registries import websocket_incoming_messages, websocket_outgoing_messages
-# from voteit.messaging.messages.abcs import AbstractIncomingMessage, AbstractOutgoingMessage
-#
-# if TYPE_CHECKING:
-#     from voteit.messaging.consumers import WebsocketDemuxConsumer
-#
-#
-# @websocket_incoming_messages("schema.get")
-# class GetSchema(AbstractIncomingMessage):
-#     """ Request json_schema for a specific message type.
-#         Must be in websocket_incoming_messages registry.
-#     """
-#     message_type: str
-#
-#     @validator("message_type")
-#     def check_message_type(cls, v):
-#         v = v.lower()
-#         if v not in websocket_incoming_messages:
-#             raise ValueError(f"'{v}' is not registered as an incoming message type")
-#         return v
-#
-#     async def consume(self, consumer: WebsocketDemuxConsumer, message_id: str = None):
-#         msg_type = websocket_incoming_messages[self.message_type]
-#         msg = SendSchema(message_schema=msg_type.schema())
-#         await msg.async_send(consumer.channel_name, message_id=message_id, success=True)
-#
-#     class Config:
-#         title = "Get schema"
-#
-#
-# @websocket_outgoing_messages("schema.send")
-# class SendSchema(AbstractOutgoingMessage):
-#     message_schema: dict
+from pydantic import validator
+from pydantic.main import BaseModel
+from typing import Dict
+
+from voteit.messaging.abcs import AsyncRunnable, BaseOutgoingMessage
+from voteit.messaging.registries import incoming_messages, outgoing_messages
+
+
+class GetSchema(BaseModel):
+    message_type: str
+
+    @validator("message_type")
+    def check_message_type(cls, v):
+        v = v.lower()
+        if v not in cls.Config.registry:
+            raise ValueError(f"'{v}' is not registered as a message type")
+        return v
+
+
+class GetIncomingSchema(GetSchema):
+    class Config:
+        registry = incoming_messages
+
+
+class GetOutgoingSchema(GetSchema):
+    class Config:
+        registry = outgoing_messages
+
+
+@incoming_messages
+class GetSchemaIncomingCommand(AsyncRunnable):
+    name = "schema.get_incoming"
+    schema = GetIncomingSchema
+    data: GetIncomingSchema
+
+    async def run(self, consumer):
+        inspected_message = incoming_messages[self.data.message_type]
+        response = SendSchema.from_message(
+            self, message_schema=inspected_message.schema.schema()
+        )
+        await response.async_send_outgoing(consumer.channel_name, success=True)
+
+
+@incoming_messages
+class GetSchemaOutgoingCommand(AsyncRunnable):
+    name = "schema.get_outgoing"
+    schema = GetOutgoingSchema
+    data: GetOutgoingSchema
+
+    async def run(self, consumer):
+        inspected_message = outgoing_messages[self.data.message_type]
+        response = SendSchema.from_message(
+            self, message_schema=inspected_message.schema.schema()
+        )
+        await response.async_send_outgoing(consumer.channel_name, success=True)
+
+
+class SchemaResponse(BaseModel):
+    message_schema: Dict
+
+
+@outgoing_messages
+class SendSchema(BaseOutgoingMessage):
+    name = "schema.response"
+    schema = SchemaResponse
+    data: SchemaResponse
