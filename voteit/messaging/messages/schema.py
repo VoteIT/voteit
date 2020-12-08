@@ -6,25 +6,27 @@ from voteit.messaging.abcs import AsyncRunnable, BaseOutgoingMessage
 from voteit.messaging.registries import incoming_messages, outgoing_messages
 
 
-class GetSchema(BaseModel):
+
+class GetIncomingSchema(BaseModel):
     message_type: str
 
     @validator("message_type")
     def check_message_type(cls, v):
         v = v.lower()
-        if v not in cls.Config.registry:
-            raise ValueError(f"'{v}' is not registered as a message type")
+        if v not in incoming_messages:
+            raise ValueError(f"'{v}' is not registered as an incoming message type")
         return v
 
 
-class GetIncomingSchema(GetSchema):
-    class Config:
-        registry = incoming_messages
+class GetOutgoingSchema(BaseModel):
+    message_type: str
 
-
-class GetOutgoingSchema(GetSchema):
-    class Config:
-        registry = outgoing_messages
+    @validator("message_type")
+    def check_message_type(cls, v):
+        v = v.lower()
+        if v not in outgoing_messages:
+            raise ValueError(f"'{v}' is not registered as an outgoing message type")
+        return v
 
 
 @incoming_messages
