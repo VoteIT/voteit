@@ -7,6 +7,7 @@ from voteit.messaging.abcs import BaseOutgoingMessage
 # So should we have an initializer that's a special message, or simply
 # have the first status update (and all subsequent ones) contain all information?
 
+
 class ProgressSchema(BaseModel):
     curr: int
     total: int

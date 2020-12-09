@@ -2,9 +2,10 @@ from pydantic import validator
 from pydantic.main import BaseModel
 from typing import Dict
 
-from voteit.messaging.abcs import AsyncRunnable, BaseOutgoingMessage
-from voteit.messaging.registries import incoming_messages, outgoing_messages
-
+from voteit.messaging.abcs import AsyncRunnable
+from voteit.messaging.abcs import BaseOutgoingMessage
+from voteit.messaging.registries import incoming_messages
+from voteit.messaging.registries import outgoing_messages
 
 
 class GetIncomingSchema(BaseModel):

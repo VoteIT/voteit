@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING
 
 from channels.auth import logout
 from pydantic.main import BaseModel
-from voteit.messaging.abcs import BaseIncomingMessage, DeferredJob, AsyncRunnable, BaseOutgoingMessage
+
+from voteit.messaging.abcs import AsyncRunnable
+from voteit.messaging.abcs import BaseOutgoingMessage
+from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.channels.user import UserChannel
 from voteit.messaging.decorators import incoming, outgoing
 from voteit.messaging.models import Connection
@@ -34,6 +37,7 @@ class LogoutConnection(AsyncRunnable):
         # reset user?
         await consumer.close(1000)
 
+
 @incoming
 class ConnectionCount(DeferredJob):
     name = "user.connection_count"
@@ -54,6 +58,7 @@ class ConnectionsCounted(BaseOutgoingMessage):
     name = "user.connections_counted"
     schema = ConnectionsCountedSchema
     data: ConnectionsCountedSchema
+
 
 # @websocket_incoming_messages("user.connection_count")
 # class ConnectionCount(AbstractIncomingMessage):
