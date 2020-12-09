@@ -41,7 +41,8 @@ def update_user_status(user, channel_name, online=True):
     conn, created = Connection.objects.get_or_create(
         user=user, channel_name=channel_name
     )
-    conn.online = online
+    if online is not None:  # We might not know
+        conn.online = online
     conn.save()
     return conn
 

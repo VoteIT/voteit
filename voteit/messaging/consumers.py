@@ -1,5 +1,6 @@
 import json
 from contextlib import suppress
+from datetime import datetime
 from logging import getLogger
 from typing import TYPE_CHECKING, Optional, Dict, Union
 
@@ -8,8 +9,10 @@ from channels.db import database_sync_to_async
 from channels.exceptions import DenyConnection
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils.timezone import now
 from pydantic import ValidationError
 from rest_framework.authtoken.models import Token
 
@@ -20,11 +23,10 @@ from voteit.messaging.envelopes import IncomingEnvelope
 from voteit.messaging.envelopes import InternalEnvelope
 from voteit.messaging.envelopes import OutgoingEnvelope
 from voteit.messaging.exceptions import UnsupportedMessageType
-from voteit.messaging.jobs import signal_websocket_connect
-from voteit.messaging.jobs import signal_websocket_close
 from voteit.messaging.errors import BaseError
 from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.registries import incoming_messages
+from voteit.messaging.signals import client_connect, client_close
 
 logger = getLogger(__name__)
 
@@ -32,10 +34,15 @@ if TYPE_CHECKING:
     pass
 
 
+User = get_user_model()
+
 # FIXME: We might need to check if channels properly cleans up groups
 # They could fill up with messages fast in case no one is there to receive them.
 # All clients won't send close signal, since they might just loose connection or go away for another reason.
 # FIXME: Test full channels
+
+# FIXME: Query consumer for last action
+# FIXME Store subscriptions
 
 
 class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
@@ -54,31 +61,31 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
     message_errors: int = 0
     # For testing injection
     message_registry = incoming_messages
+    # Last sent
+    last_sent: datetime
+    last_recv: datetime
 
     async def connect(self):
         connection_token = self.scope["url_route"]["kwargs"]["connection_token"]
-        self.user = await database_sync_to_async(self.get_token_user)(
-            key=connection_token
-        )
-        if (
-            self.user is None
-        ):  # FIXME: get_user ie refresh_user is the correct way to go
+        self.user = await self.get_token_user(key=connection_token)
+        if self.user is None:
+            # FIXME: get_user ie refresh_user is the correct way to go
+            # When using session auth instead of token:
             await self.refresh_user()
         if self.user is None:
             logger.debug("Invalid token, closing connection")
             raise DenyConnection()
-        # When using session auth instead of token:
-        self.user_pk = (
-            self.user.pk
-        )  # Save for later use in case of invalidation of the user object
+        # Save for later use in case of invalidation of the user object
+        self.user_pk = self.user.pk
+        # And mark action
+        self.last_sent = self.last_recv = now()
         logger.debug(
             "Connection for user: %s with token '%s'", self.user, connection_token
         )
         await self.accept()
         logger.debug("Connection accepted for user %s (%s)", self.user, self.user.pk)
-        signal_websocket_connect.delay(
-            user_pk=self.user_pk, consumer_name=self.channel_name
-        )
+        # This is sync code, so if we need to add lots of stuff here move this to a job
+        await self.signal_connect()
 
     async def disconnect(self, close_code):
         # https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent
@@ -86,19 +93,22 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             logger.debug(
                 "Disconnect user pk %s with close code %s", self.user_pk, close_code
             )
+            # We only need to signal disconnect for an actual user
+            await self.signal_disconnect(close_code)
         else:
             logger.debug("Disconnect was from anon, close code %s", close_code)
-        signal_websocket_close.delay(
-            user_pk=self.user_pk, consumer_name=self.channel_name, close_code=close_code
-        )
+        # This is sync code, so if we need to add lots of stuff here move this to a job
 
+    @database_sync_to_async
     def get_token_user(self, key: str) -> Optional[AbstractUser]:
         with suppress(ObjectDoesNotExist):
             return Token.objects.get(key=key).user
         return None
 
     async def refresh_user(self):
-        self.user = await get_user(self.scope)
+        user = await get_user(self.scope)
+        if user.pk is not None:
+            self.user = user
 
     async def handle_message(self, message: Union[AsyncRunnable, DeferredJob]):
         # FIXME: How do we handle errors here?
@@ -138,6 +148,8 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             await self.send_error(err)
             self.message_errors += 1
             return await self.post_error()
+        # Valid enough to mark as something incoming anyway
+        self.last_recv = now()
         # Validate the payload
         try:
             message = BaseIncomingMessage.from_consumer(self, envelope)
@@ -162,6 +174,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         message = OutgoingEnvelope(**event)
         payload = message.json(exclude={"type"})
         logger.debug("%s sent: %s", self.channel_name, payload)
+        self.last_sent = now()
         # Send message to WebSocket
         await self.send(text_data=payload)
 
@@ -198,3 +211,27 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         payload = envelope.json()
         logger.debug("Error sent: %s", payload)
         await self.send(text_data=payload)
+
+    @database_sync_to_async
+    def signal_connect(self):
+        print("Signal CONNECT")
+        client_connect.send(
+            sender=None,
+            user=self.user,
+            user_pk=self.user_pk,
+            consumer_name=self.channel_name,
+        )
+
+    @database_sync_to_async
+    def signal_disconnect(self, close_code: int):
+        if self.user is None or self.user.pk != self.user_pk:
+            user = User.objects.get(pk=self.user_pk)
+        else:
+            user = self.user
+        client_close.send(
+            sender=None,
+            user=user,
+            user_pk=self.user_pk,
+            consumer_name=self.channel_name,
+            close_code=close_code,
+        )

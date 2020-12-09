@@ -29,7 +29,8 @@ class LogoutCommand(AsyncRunnable):
 
 @incoming
 class LogoutConnection(AsyncRunnable):
-    name = "user.connection"
+    name = "user.logout_connection"
+    # FIXME Should be internal message
 
     async def run(self, consumer: WebsocketDemuxConsumer):
         print("Got logout command")
