@@ -139,7 +139,6 @@ class MessageABC(ABC):
                 state = self.SUCCESS
             else:
                 state = self.FAILED
-        print(f" mm.type is: {self.mm.type} of class {self}")
         envelope = OutgoingEnvelope(
             p=self.data, i=self.mm.message_id, t=self.mm.type, s=state
         )

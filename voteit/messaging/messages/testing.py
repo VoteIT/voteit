@@ -45,7 +45,6 @@ def greet_user(user, consumer_name, message_id=None):
 
 @receiver(client_connect)
 def say_hello_at_connect(user, consumer_name, **kw):
-    print("Saying hello")
     greet_user(user, consumer_name)
 
 
@@ -78,7 +77,6 @@ class Count(BaseIncomingMessage, DeferredJob):
         await msg.async_send_outgoing(consumer.channel_name, state=self.WAITING)
 
     def run_job(self):
-        print("Running!")
         num = self.data.num
         fail = self.data.fail
         text = f"Let's count to {num}!"

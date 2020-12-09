@@ -214,7 +214,6 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def signal_connect(self):
-        print("Signal CONNECT")
         client_connect.send(
             sender=None,
             user=self.user,
