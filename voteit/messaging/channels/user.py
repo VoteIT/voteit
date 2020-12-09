@@ -7,8 +7,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.dispatch import receiver
 
-from voteit.messaging.channels.abcs import AbstractObjectChannel
-from voteit.messaging.registries import channel_registry
+from voteit.messaging.abcs import AbstractObjectChannel
+from voteit.messaging.decorators import channel
 from voteit.messaging.signals import client_connect, client_close
 
 if TYPE_CHECKING:
@@ -17,13 +17,11 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-@channel_registry("user")
+@channel
 class UserChannel(AbstractObjectChannel):
-    Model = get_user_model()
-
-    @property
-    def channel_name(self):
-        return f"user_{self.pk}"
+    model = get_user_model()
+    permission = None
+    name = "user"
 
     def allow_publish(self, user):
         return user.pk == self.pk
@@ -33,9 +31,9 @@ class UserChannel(AbstractObjectChannel):
 
 
 @receiver(client_connect)
-def subscribe_client_to_users_channel(user:AbstractUser, consumer_name:str, user_pk:int, **kw):
+def subscribe_client_to_users_channel(user:AbstractUser, consumer_name:str, **kw):
     user_channel = UserChannel.from_instance(user, consumer_channel=consumer_name)
-    user_channel.sync_subscribe()
+    user_channel.subscribe()
 
 
 @receiver(client_close)
@@ -44,4 +42,4 @@ def cleanup_users_channel(user:Optional[AbstractUser], consumer_name:str, user_p
         so don't trust the user arg here!
     """
     user_channel = UserChannel.from_pk(user_pk, consumer_channel=consumer_name)
-    user_channel.sync_leave()
+    user_channel.leave()

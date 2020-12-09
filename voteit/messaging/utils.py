@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
 from voteit.messaging.models import Connection
 
@@ -18,29 +19,52 @@ if TYPE_CHECKING:
 
 def get_channel_registry() -> Registry:
     from voteit.messaging.registries import channel_registry
+
     return channel_registry
+
+
+def get_incoming_registry() -> Registry:
+    from voteit.messaging.registries import incoming_messages
+
+    return incoming_messages
+
+
+def get_outgoing_registry() -> Registry:
+    from voteit.messaging.registries import outgoing_messages
+
+    return outgoing_messages
 
 
 def update_user_status(user, channel_name, online=True):
     """ This is sync code so don't call this in any async context!
     """
-    conn, created = Connection.objects.get_or_create(user=user, channel_name=channel_name)
-    conn.online=online
+    conn, created = Connection.objects.get_or_create(
+        user=user, channel_name=channel_name
+    )
+    if online is not None:  # We might not know
+        conn.online = online
     conn.save()
     return conn
 
 
-def cleanup_connection_status(secs=180):
+def cleanup_connection_status(secs=180, only_user:Optional[AbstractUser]=None):
     """ Check connections marked as active and make sure they're still active. """
     # Note: This assumes channels_redis backend
     since = now() - timedelta(seconds=secs)
-    qs = Connection.objects.filter(online=True, last_action__lt=since)
+    query = dict(
+        online=True, last_action__lt=since
+    )
+    if only_user:
+        query["user"] = only_user
+    qs = Connection.objects.filter(**query)
     channel_names = set(qs.values_list("channel_name", flat=True))
     found = async_to_sync(check_redis_keys)(channel_names)
     to_remove = channel_names - found
     if to_remove:
         logger.debug("Changing connection status of %s objects", len(to_remove))
-        Connection.objects.filter(online=True, channel_name__in=to_remove).update(online=False)
+        Connection.objects.filter(online=True, channel_name__in=to_remove).update(
+            online=False
+        )
     else:
         logger.debug("No expired connections found")
 

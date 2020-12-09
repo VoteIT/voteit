@@ -1,5 +1,4 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from djangorestframework_fsm.viewset_mixins import get_drf_fsm_mixin
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter

@@ -9,17 +9,17 @@ from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import AgendaItemSerializer
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
-from voteit.messaging.channels.abcs import AbstractObjectChannel
-from voteit.messaging.messages.agenda import AgendaDeleted, AgendaAdded, AgendaChanged
-from voteit.messaging.messages.poll import PollAdded, PollChanged, PollDeleted
-from voteit.messaging.registries import channel_registry
+from voteit.messaging.abcs import AbstractObjectChannel
+from voteit.agenda.messages import AgendaDeleted, AgendaAdded, AgendaChanged
+from voteit.messaging.decorators import channel
+from voteit.poll.messages import PollAdded, PollChanged, PollDeleted
 from voteit.poll.models import Poll
 from voteit.poll.rest_api.serializers import PollDetailSerializer
 
 logger = getLogger(__name__)
 
 
-@channel_registry("meeting")
+@channel
 class MeetingChannel(AbstractObjectChannel):
     """ This contains generic messages for the meeting.
 
@@ -28,20 +28,13 @@ class MeetingChannel(AbstractObjectChannel):
         - Agenda (The title and order of agenda items)
         - Anything public related to the meeting
     """
+    name="meeting"
     logger = logger
-    Model = Meeting
-
-    @property
-    def channel_name(self) -> str:
-        """ Return name of this channel based on the primary key of an object"""
-        return f"meeting_{self.pk}"
-
-    def allow_subscribe(self, user):
-        instance = self.get_instance()
-        return user.has_perm(MeetingPermissions.VIEW, instance)
+    model = Meeting
+    permission = MeetingPermissions.VIEW
 
 
-@channel_registry("moderator")
+@channel
 class ModeratorChannel(AbstractObjectChannel):
     """ Moderator specific messages
 
@@ -49,17 +42,10 @@ class ModeratorChannel(AbstractObjectChannel):
         - private agenda items
         - Updates for things that only moderators need to know (The number of present users for instance)
     """
+    name="moderator"
     logger = logger
-    Model = Meeting
-
-    @property
-    def channel_name(self) -> str:
-        """ Return name of this channel based on the primary key of an object"""
-        return f"moderator_{self.pk}"
-
-    def allow_subscribe(self, user):
-        instance = self.get_instance()
-        return user.has_perm(MeetingPermissions.MODERATE, instance)
+    model = Meeting
+    permission = MeetingPermissions.MODERATE
 
 
 # FIXME: Split updates on state change for moderators or regular users. Essentially an instance made private
@@ -67,38 +53,38 @@ class ModeratorChannel(AbstractObjectChannel):
 @receiver(post_save, sender=AgendaItem)
 def agenda_change(instance=None, created=None, **kw):
     print(instance)  # FIXME Remove
-    channel = MeetingChannel.from_instance(instance.meeting)
+    ch = MeetingChannel.from_instance(instance.meeting)
     data = AgendaItemSerializer(instance).data
     if created:
-        msg = AgendaAdded(item=data)
+        msg = AgendaAdded.create(item=data)
     else:
-        msg = AgendaChanged(item=data)
-    channel.sync_publish(msg)
+        msg = AgendaChanged.create(item=data)
+    ch.publish(msg)
 
 
 @receiver(pre_delete, sender=AgendaItem)
 def agenda_delete(instance=None, **kw):
-    channel = MeetingChannel.from_instance(instance.meeting)
+    ch = MeetingChannel.from_instance(instance.meeting)
     # FIXME: Create a serializer that only sends primary keys?
-    msg = AgendaDeleted(pk=instance.pk)
-    channel.sync_publish(msg)
+    msg = AgendaDeleted.create(pk=instance.pk)
+    ch.publish(msg)
 
 
 @receiver(post_save, sender=Poll)
 def poll_change(instance=None, created=None, **kw):
     if instance.meeting is not None:
-        channel = MeetingChannel.from_instance(instance.meeting)
+        ch = MeetingChannel.from_instance(instance.meeting)
         data = PollDetailSerializer(instance).data
         if created:
-            msg = PollAdded(item=data)
+            msg = PollAdded.create(item=data)
         else:
-            msg = PollChanged(item=data)
-        channel.sync_publish(msg)
+            msg = PollChanged.create(item=data)
+        ch.publish(msg)
 
 
 @receiver(pre_delete, sender=Poll)
 def poll_delete(instance=None, **kw):
     if instance.meeting is not None:
-        channel = MeetingChannel.from_instance(instance.meeting)
-        msg = PollDeleted(pk=instance.pk)
-        channel.sync_publish(msg)
+        ch = MeetingChannel.from_instance(instance.meeting)
+        msg = PollDeleted.create(pk=instance.pk)
+        ch.publish(msg)

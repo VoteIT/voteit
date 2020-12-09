@@ -12,3 +12,4 @@ class MessagingConfig(AppConfig):
         messages.register()
         from voteit.messaging import channels
         channels.register()
+        from voteit.messaging import signals

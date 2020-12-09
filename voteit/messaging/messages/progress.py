@@ -1,11 +1,21 @@
-from voteit.messaging.messages.abcs import AbstractOutgoingMessage
-from voteit.messaging.registries import websocket_outgoing_messages
+from pydantic import BaseModel
+from typing import Optional
+
+from voteit.messaging.decorators import outgoing
+from voteit.messaging.abcs import BaseOutgoingMessage
 
 # So should we have an initializer that's a special message, or simply
 # have the first status update (and all subsequent ones) contain all information?
 
-@websocket_outgoing_messages("progress.num")
-class ProgressNum(AbstractOutgoingMessage):
+
+class ProgressSchema(BaseModel):
     curr: int
     total: int
-    msg: str = ""
+    msg: Optional[str]
+
+
+@outgoing
+class ProgressNum(BaseOutgoingMessage):
+    name = "progress.num"
+    schema = ProgressSchema
+    data: ProgressSchema
