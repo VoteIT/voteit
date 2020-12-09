@@ -7,8 +7,9 @@ from typing import Dict
 
 from voteit.core.queues import DEFAULT_QUEUE
 from voteit.messaging.abcs import DeferredJob, BaseError
-#from voteit.messaging.signals import client_connect, client_close
-#from voteit.messaging.utils import update_user_status
+
+# from voteit.messaging.signals import client_connect, client_close
+# from voteit.messaging.utils import update_user_status
 from voteit.messaging.utils import update_user_status
 
 logger = getLogger(__name__)
@@ -17,8 +18,9 @@ User = get_user_model()
 
 
 @job(DEFAULT_QUEUE, timeout=30)
-def run_job(msg_data: Dict, mm_data: Dict, atomic=True):
-    instance = DeferredJob.from_job(msg_data, mm_data)
+def run_job(msg_data: Dict, mm_data: Dict, incoming=True, atomic=True):
+
+    instance = DeferredJob.from_job(msg_data, mm_data, incoming=incoming)
     if instance.user is not None and instance.mm.consumer_name is not None:
         # Since this action is regarding this user connection, we're assuming we can update here
         # We don't know if the user is online still though

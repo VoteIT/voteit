@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from logging import getLogger
-from typing import Optional, TYPE_CHECKING, Type, Dict, Union, Any
+from typing import Optional, TYPE_CHECKING, Type, Dict, Union
 
 from asgiref.sync import async_to_sync
 from channels import DEFAULT_CHANNEL_LAYER
@@ -13,7 +13,6 @@ from django.db import models
 from django.db.models import Model
 from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
-from pydantic import validator
 from pydantic.main import BaseModel
 
 from voteit.core.queues import DEFAULT_QUEUE
@@ -46,29 +45,10 @@ User = get_user_model()
 
 class MessageMeta(BaseModel):
     message_id: Optional[str]
-    type: str
+    type: str  # Validation is handled by the envelope instead
     user_pk: Optional[int]
     consumer_name: Optional[str]
-
-
-class IncomingMeta(MessageMeta):
     internal: bool = False
-
-    @validator("type")
-    def validate_type(cls, v):
-        registry = get_incoming_registry()
-        if v not in registry:
-            raise ValueError("No such message type")
-        return v
-
-
-class OutgoingMeta(MessageMeta):
-    @validator("type")
-    def validate_type(cls, v):
-        registry = get_outgoing_registry()
-        if v not in registry:
-            raise ValueError("No such message type")
-        return v
 
 
 class NoPayload(BaseModel):
@@ -76,7 +56,7 @@ class NoPayload(BaseModel):
 
 
 class MessageABC(ABC):
-    mm: Union[IncomingMeta, OutgoingMeta]
+    mm: MessageMeta
     data: BaseModel
     registry: Registry
     channel_layer_name: str = DEFAULT_CHANNEL_LAYER
@@ -101,10 +81,12 @@ class MessageABC(ABC):
 
     @classmethod
     @abstractmethod
-    def from_message(
-        cls, message: MessageABC, type_name=None, **kwargs
-    ) -> MessageABC:
+    def from_message(cls, message: MessageABC, type_name=None, **kwargs) -> MessageABC:
         pass
+
+    def __init__(self, mm: Union[Dict, MessageMeta], data: Dict):
+        self.mm = isinstance(mm, MessageMeta) and mm or MessageMeta(**mm)
+        self.data = self.schema(**data)
 
     @cached_property
     def user(self) -> Optional[AbstractUser]:
@@ -121,7 +103,12 @@ class MessageABC(ABC):
         return async_to_sync(self.async_send_internal)(channel_name, group=group)
 
     async def async_send_internal(self, channel_name: str, group: bool = False):
-        envelope = InternalEnvelope(p=self.data, i=self.mm.message_id, t=self.mm.type)
+        envelope = InternalEnvelope(
+            p=self.data,
+            i=self.mm.message_id,
+            t=self.mm.type,
+            incoming=isinstance(self, BaseIncomingMessage),
+        )
         if group:
             await self.channel_layer.group_send(channel_name, envelope.dict())
         else:
@@ -161,17 +148,11 @@ class MessageABC(ABC):
         else:
             await self.channel_layer.send(channel_name, envelope.dict())
 
-
-class BaseIncomingMessage(MessageABC):
-    def __init__(self, mm: Union[Dict, IncomingMeta], data: Dict):
-        self.mm = isinstance(mm, IncomingMeta) and mm or IncomingMeta(**mm)
-        self.data = self.schema(**data)
-
     @classmethod
     def from_consumer(
         cls, consumer, envelope: Union[IncomingEnvelope, InternalEnvelope]
     ):
-        mm = IncomingMeta(
+        mm = MessageMeta(
             consumer_name=consumer.channel_name,
             user_pk=consumer.user.pk,
             message_id=envelope.i,
@@ -184,6 +165,36 @@ class BaseIncomingMessage(MessageABC):
         return inst
 
     @classmethod
+    def create(
+        cls, type_name=None, message_id=None, consumer_name=None, user_pk=None, **kwargs
+    ):
+        if type_name is None:
+            assert (
+                cls.name is not None
+            ), "You need to specify type name, this is an abstract class"
+            type_name = cls.name
+        mm = MessageMeta(
+            type=type_name,
+            message_id=message_id,
+            consumer_name=consumer_name,
+            user_pk=user_pk,
+        )
+        return cls.get_registry()[type_name](mm, kwargs)
+
+
+class BaseIncomingMessage(MessageABC, ABC):
+    """ A message that might be received from websocket or picked up internally.
+
+        Only these kinds of messages can be received through sockets.
+
+        It's registered in the incoming registry and works as an API.
+    """
+
+    @staticmethod
+    def get_registry() -> Registry:
+        return get_incoming_registry()
+
+    @classmethod
     def from_message(
         cls, message: MessageABC, type_name=None, **kwargs
     ) -> BaseIncomingMessage:
@@ -192,18 +203,14 @@ class BaseIncomingMessage(MessageABC):
                 cls.name is not None
             ), "You need to specify type name, this is an abstract class"
             type_name = cls.name
-        mm = IncomingMeta(type=type_name, **message.mm.dict(exclude={"type"}))
+        mm = MessageMeta(type=type_name, **message.mm.dict(exclude={"type"}))
         return cls.get_registry()[type_name](mm, kwargs)
 
-    @staticmethod
-    def get_registry() -> Registry:
-        return get_incoming_registry()
 
-
-class BaseOutgoingMessage(MessageABC):
-    def __init__(self, mm: Union[Dict, OutgoingMeta], data: Dict):
-        self.mm = isinstance(mm, OutgoingMeta) and mm or OutgoingMeta(**mm)
-        self.data = self.schema(**data)
+class BaseOutgoingMessage(MessageABC, ABC):
+    """ A message that may be transmitted and processed within the consumer or delegated and sent to the websocket.
+        These kind of messages are registered as outgoing and should be treated as expected responses.
+    """
 
     @staticmethod
     def get_registry() -> Registry:
@@ -218,67 +225,50 @@ class BaseOutgoingMessage(MessageABC):
                 cls.name is not None
             ), "You need to specify type name, this is an abstract class"
             type_name = cls.name
-        mm = OutgoingMeta(type=type_name, **message.mm.dict(exclude={"type"}))
-        return cls.get_registry()[type_name](mm, kwargs)
-
-    @classmethod
-    def create(
-        cls, type_name=None, message_id=None, consumer_name=None, user_pk=None, **kwargs
-    ):
-        if type_name is None:
-            assert (
-                cls.name is not None
-            ), "You need to specify type name, this is an abstract class"
-            type_name = cls.name
-        mm = OutgoingMeta(
-            type=type_name,
-            message_id=message_id,
-            consumer_name=consumer_name,
-            user_pk=user_pk,
-        )
+        mm = MessageMeta(type=type_name, **message.mm.dict(exclude={"type"}))
         return cls.get_registry()[type_name](mm, kwargs)
 
 
-class ContextSchema(BaseModel):
-    """ Use this as a mixin for your schema if it's for a specific model. """
+# class ContextSchema(BaseModel):
+#     """ Use this as a mixin for your schema if it's for a specific model. """
+#
+#     pk: int
+#
+#
+# class ContextMessageABC(MessageABC):
+#     """ This is used on a specific database instance and may have a permission. """
+#
+#     schema: Type[ContextSchema]
+#
+#     def __new__(cls, *args, **kwargs):
+#         assert issubclass(cls.schema, ContextSchema)
+#         return cls.__new__(*args, **kwargs)
+#
+#     @property
+#     @abstractmethod
+#     def permission(self) -> Optional[str]:
+#         pass
+#
+#     @property
+#     @abstractmethod
+#     def model(self) -> Type[Model]:
+#         pass
+#
+#     def allowed(self) -> bool:
+#         if self.user is None:
+#             return False
+#         if self.context is None:
+#             return False
+#         if self.permission is None:
+#             return True
+#         return self.user.has_perm(self.permission, self.context)
+#
+#     @cached_property
+#     def context(self) -> Model:
+#         return self.model.objects.get(pk=self.data.pk)
 
-    pk: int
 
-
-class ContextMessageABC(MessageABC):
-    """ This is used on a specific database instance and may have a permission. """
-
-    schema: Type[ContextSchema]
-
-    def __new__(cls, *args, **kwargs):
-        assert issubclass(cls.schema, ContextSchema)
-        return cls.__new__(*args, **kwargs)
-
-    @property
-    @abstractmethod
-    def permission(self) -> Optional[str]:
-        pass
-
-    @property
-    @abstractmethod
-    def model(self) -> Type[Model]:
-        pass
-
-    def allowed(self) -> bool:
-        if self.user is None:
-            return False
-        if self.context is None:
-            return False
-        if self.permission is None:
-            return True
-        return self.user.has_perm(self.permission, self.context)
-
-    @cached_property
-    def context(self) -> Model:
-        return self.model.objects.get(pk=self.data.pk)
-
-
-class AsyncRunnable(BaseIncomingMessage, ABC):
+class AsyncRunnable(ABC):
     """ This message is ment to be processed within the consumer.
         It mustn't be blocking or run database queries.
         Anything locking up the consumer will cause it to stop processing messages for that user.
@@ -289,19 +279,20 @@ class AsyncRunnable(BaseIncomingMessage, ABC):
         pass
 
 
-class DeferredJob(BaseIncomingMessage, ABC):
-    """ Command/query can be deferred to a job queue."""
+class DeferredJob(ABC):
+    """ Command/query can be deferred to a job queue.
+        Must be used together with BaseIncomingMessage or BaseOutgoingMessage"""
 
-    queue = DEFAULT_QUEUE
-    job_timeout = 7
-    autocommit = True
-    is_async = True
+    # queue = DEFAULT_QUEUE
+    # job_timeout = 7
+    # autocommit = True
+    # is_async = True
     job_func = "voteit.messaging.jobs.handle_job_message"
-    job_atomic = True
+    # job_atomic = True
     on_worker = False
     # Markers for type checking
-    mm: IncomingMeta
-    data: Any  # But really the schema
+    mm: MessageMeta
+    data: BaseModel  # But really the schema
 
     async def pre_queue(self, consumer):
         """ Do something before entering the queue. Only applies to when the consumer receives the message.
@@ -312,7 +303,12 @@ class DeferredJob(BaseIncomingMessage, ABC):
         # FIXME: Queues and django_rq are kind of a mess right now
         from voteit.messaging.jobs import run_job
 
-        run_job.delay(msg_data=self.data.dict(), mm_data=self.mm.dict(), atomic=True)
+        run_job.delay(
+            msg_data=self.data.dict(),
+            mm_data=self.mm.dict(),
+            incoming=isinstance(self, BaseIncomingMessage),
+            atomic=True,
+        )
 
         # kwargs = dict(
         #     atomic=self.job_atomic,
@@ -342,9 +338,16 @@ class DeferredJob(BaseIncomingMessage, ABC):
         # )
 
     @classmethod
-    def from_job(cls, msg_data, mm_data) -> DeferredJob:
-        mm = IncomingMeta(**mm_data)
-        msg_cls = cls.get_registry()[mm.type]
+    def from_job(
+        cls, msg_data, mm_data, incoming=True
+    ) -> Union[DeferredJob, MessageABC]:
+        if incoming:
+            registry = get_incoming_registry()
+        else:
+            registry = get_outgoing_registry()
+        mm = MessageMeta(**mm_data)
+        # Key error here would be a programming error, not a validation error
+        msg_cls = registry[mm.type]
         instance = msg_cls(mm, msg_data)
         instance.on_worker = True
         return instance
@@ -359,7 +362,7 @@ class ErrorSchema(BaseModel):
     msg: Optional[str]
 
 
-class BaseError(BaseOutgoingMessage, Exception):
+class BaseError(BaseOutgoingMessage, Exception, ABC):
     schema = ErrorSchema
     data: ErrorSchema
     default_msg = _("An unknown error occurred")

@@ -4,7 +4,7 @@ from pydantic import validator, BaseModel
 from typing import TYPE_CHECKING
 from django.utils.translation import gettext as _
 
-from voteit.messaging.abcs import DeferredJob, MessageABC, BaseOutgoingMessage
+from voteit.messaging.abcs import DeferredJob, MessageABC, BaseOutgoingMessage, BaseIncomingMessage
 from voteit.messaging.errors import UnauthorizedError, NotFoundError
 from voteit.messaging.registries import incoming_messages
 from voteit.messaging.registries import outgoing_messages
@@ -34,7 +34,7 @@ class ChannelSchema(BaseModel):
         return v
 
 
-class BaseChannelCommand(MessageABC):
+class BaseChannelCommand(BaseIncomingMessage):
     def get_channel(
         self, channel_type: str, pk: int, consumer_name: str
     ) -> AbstractObjectChannel:
@@ -44,7 +44,7 @@ class BaseChannelCommand(MessageABC):
 
 
 @incoming_messages
-class Subscribe(DeferredJob, BaseChannelCommand):
+class Subscribe(BaseChannelCommand, DeferredJob):
     name = SUBSCRIBE
     schema = ChannelSchema
     data: ChannelSchema
@@ -66,7 +66,7 @@ class Subscribe(DeferredJob, BaseChannelCommand):
 
 
 @incoming_messages
-class Leave(DeferredJob, BaseChannelCommand):
+class Leave(BaseChannelCommand, DeferredJob):
     name = LEAVE
     schema = ChannelSchema
     data: ChannelSchema

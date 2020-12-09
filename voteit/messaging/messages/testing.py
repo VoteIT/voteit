@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Optional, List
 from django.dispatch import receiver
 from pydantic import validator, BaseModel
 
-from voteit.messaging.abcs import BaseOutgoingMessage, DeferredJob, AsyncRunnable
+from voteit.messaging.abcs import BaseOutgoingMessage, DeferredJob, AsyncRunnable, BaseIncomingMessage
 from voteit.messaging.messages.progress import ProgressNum
 from voteit.messaging.models import Connection
 from voteit.messaging.registries import incoming_messages, outgoing_messages
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 @incoming_messages
-class Hello(AsyncRunnable):
+class Hello(BaseIncomingMessage, AsyncRunnable):
     name = "testing.hello"
 
     async def run(self, consumer):
@@ -63,7 +63,7 @@ class CountSchema(BaseModel):
 
 
 @incoming_messages
-class Count(DeferredJob):
+class Count(BaseIncomingMessage, DeferredJob):
     name = "testing.count"
     schema = CountSchema
     data: CountSchema
@@ -103,7 +103,7 @@ class Count(DeferredJob):
 
 
 @incoming_messages
-class OnlineUsers(DeferredJob):
+class OnlineUsers(BaseIncomingMessage, DeferredJob):
     name = "testing.online_users"
 
     def run_job(self):

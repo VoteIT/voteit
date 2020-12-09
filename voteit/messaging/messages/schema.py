@@ -3,6 +3,7 @@ from pydantic.main import BaseModel
 from typing import Dict
 
 from voteit.messaging.abcs import AsyncRunnable
+from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.registries import incoming_messages
 from voteit.messaging.registries import outgoing_messages
@@ -31,7 +32,7 @@ class GetOutgoingSchema(BaseModel):
 
 
 @incoming_messages
-class GetSchemaIncomingCommand(AsyncRunnable):
+class GetSchemaIncomingCommand(BaseIncomingMessage, AsyncRunnable):
     name = "schema.get_incoming"
     schema = GetIncomingSchema
     data: GetIncomingSchema
@@ -45,7 +46,7 @@ class GetSchemaIncomingCommand(AsyncRunnable):
 
 
 @incoming_messages
-class GetSchemaOutgoingCommand(AsyncRunnable):
+class GetSchemaOutgoingCommand(BaseIncomingMessage, AsyncRunnable):
     name = "schema.get_outgoing"
     schema = GetOutgoingSchema
     data: GetOutgoingSchema

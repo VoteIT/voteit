@@ -5,7 +5,11 @@ from typing import TYPE_CHECKING
 from channels.auth import logout
 from pydantic.main import BaseModel
 
-from voteit.messaging.abcs import AsyncRunnable
+from voteit.messaging.abcs import (
+    AsyncRunnable,
+    BaseIncomingMessage,
+    BaseOutgoingMessage,
+)
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.channels.user import UserChannel
@@ -18,19 +22,18 @@ if TYPE_CHECKING:
 
 
 @incoming
-class LogoutCommand(AsyncRunnable):
+class LogoutCommand(BaseIncomingMessage, AsyncRunnable):
     name = "user.logout"
 
     async def run(self, consumer: WebsocketDemuxConsumer):
         channel = UserChannel.from_instance(consumer.user, consumer.channel_name)
         msg = LogoutConnection.from_message(self)
-        await channel.async_publish(msg)
+        await channel.async_publish(msg, internal=True)
 
 
-@incoming
-class LogoutConnection(AsyncRunnable):
+@outgoing
+class LogoutConnection(BaseOutgoingMessage, AsyncRunnable):
     name = "user.logout_connection"
-    # FIXME Should be internal message
 
     async def run(self, consumer: WebsocketDemuxConsumer):
         print("Got logout command")
@@ -40,7 +43,7 @@ class LogoutConnection(AsyncRunnable):
 
 
 @incoming
-class ConnectionCount(DeferredJob):
+class ConnectionCount(BaseIncomingMessage, DeferredJob):
     name = "user.connection_count"
 
     def run_job(self):
