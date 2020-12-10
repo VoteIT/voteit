@@ -98,7 +98,7 @@ class MeetingRolesViewSet(
         role_serializer.is_valid(raise_exception=True)
         role_name = role_serializer.data['role']
         instance.add(role_name)
-        return Response(status=201)
+        return Response(serializers.MeetingRolesSerializer(instance=instance).data)
 
     # TODO Permissions
     @action(methods=['post'], detail=True, url_path='remove-role')
@@ -112,4 +112,4 @@ class MeetingRolesViewSet(
                 'role': ['Removing yourself as moderator is not allowed.']
             }, status=400)
         instance.remove(role_name)
-        return Response(status=201)
+        return Response(serializers.MeetingRolesSerializer(instance=instance).data)
