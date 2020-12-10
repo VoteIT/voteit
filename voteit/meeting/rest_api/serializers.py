@@ -3,9 +3,11 @@ from typing import Type, Optional, List
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError
 from rest_framework import serializers
 from voteit.agenda.rest_api.serializers import AgendaListSerializer
 from voteit.core.models import Roles
+from voteit.core.rest_api.serializers import UserSerializer
 
 from voteit.meeting import models
 
@@ -42,24 +44,22 @@ class AgendaOrderSerializer(serializers.Serializer):
     order = serializers.CharField()
 
 
-class ParticipantSerializer(serializers.ModelSerializer):
-    full_name = serializers.SerializerMethodField()
-
-    def get_full_name(self, instance: UserModel):
-        return instance.get_full_name()
-
-    class Meta:
-        model = UserModel
-        fields = 'pk', 'full_name',
-
-
 class MeetingRolesSerializer(serializers.ModelSerializer):
-    meeting = serializers.IntegerField(source='context_id')
-    user = ParticipantSerializer()
+    meeting = serializers.IntegerField(source='context_id', read_only=True)
+    user = UserSerializer(read_only=True)
 
     class Meta:
         model = models.MeetingRoles
         fields = 'pk', 'user', 'meeting', 'assigned'
+
+
+class MeetingAddParticipantSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField()
+    meeting_id = serializers.IntegerField(source='context_id')
+
+    class Meta:
+        model = models.MeetingRoles
+        fields = 'user_id', 'meeting_id'
 
 
 class RoleValidator:

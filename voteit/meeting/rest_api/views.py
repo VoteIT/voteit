@@ -1,5 +1,5 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
@@ -58,7 +58,8 @@ class MeetingRolesViewSet(
     queryset = MeetingRoles.objects.all()
     serializer_classes = {
         'add_role': serializers.RoleSerializer,
-        'remove_role': serializers.RoleSerializer
+        'remove_role': serializers.RoleSerializer,
+        'create': serializers.MeetingAddParticipantSerializer,
     }
     serializer_class = serializers.MeetingRolesSerializer
     filter_backends = DjangoFilterBackend,
@@ -73,6 +74,22 @@ class MeetingRolesViewSet(
             context__participants=self.request.user,
         )
 
+    def create(self, request):
+        """ Gets or creates role using meeting_id and user_id
+            Returns using MeetingRolesSerializer()
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        roles, created = MeetingRoles.objects.get_or_create(
+            context_id = serializer.data.get('meeting_id'),
+            user_id = serializer.data.get('user_id'),
+        )
+        serializer = serializers.MeetingRolesSerializer(roles)
+        headers = self.get_success_headers(serializer.data)
+        if created:
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(serializer.data, headers=headers)
+
     # TODO Permissions
     @action(methods=['post'], detail=True, url_path='add-role')
     def add_role(self, request, pk):
@@ -81,7 +98,7 @@ class MeetingRolesViewSet(
         role_serializer.is_valid(raise_exception=True)
         role_name = role_serializer.data['role']
         instance.add(role_name)
-        return Response(status=201)
+        return Response(serializers.MeetingRolesSerializer(instance=instance).data)
 
     # TODO Permissions
     @action(methods=['post'], detail=True, url_path='remove-role')
@@ -95,4 +112,4 @@ class MeetingRolesViewSet(
                 'role': ['Removing yourself as moderator is not allowed.']
             }, status=400)
         instance.remove(role_name)
-        return Response(status=201)
+        return Response(serializers.MeetingRolesSerializer(instance=instance).data)
