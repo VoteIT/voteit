@@ -4,8 +4,11 @@ from pydantic import validator, BaseModel
 from typing import TYPE_CHECKING
 from django.utils.translation import gettext as _
 
-from voteit.messaging.abcs import DeferredJob, MessageABC, BaseOutgoingMessage, BaseIncomingMessage
-from voteit.messaging.errors import UnauthorizedError, NotFoundError
+from voteit.messaging.abcs import DeferredJob
+from voteit.messaging.abcs import BaseOutgoingMessage
+from voteit.messaging.abcs import BaseIncomingMessage
+from voteit.messaging.errors import NotFoundError
+from voteit.messaging.errors import UnauthorizedError
 from voteit.messaging.registries import incoming_messages
 from voteit.messaging.registries import outgoing_messages
 from voteit.messaging.utils import get_channel_registry
