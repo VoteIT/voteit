@@ -1,118 +1,137 @@
-# from __future__ import annotations
-#
-# from typing import List
-#
-# from django.contrib.auth import get_user_model
-# from pydantic import validator
-# from django.utils.translation import gettext as _
-# from voteit.core.role import RoleOutput
-#
-# from voteit.meeting.models import Meeting
-# from voteit.meeting.permissions import MeetingPermissions
-# from voteit.messaging.messages.abcs import AbstractContextJobMessage, ContextJobDefault, AbstractConsumerMessage, AbstractOutgoingMessage
-# from voteit.messaging.messages.text import TextMessage
-# from voteit.messaging.registries import websocket_incoming_messages, websocket_outgoing_messages
-# from voteit.core.models import RoleContextMixin, Role
-# from voteit.speaker.models import SpeakerListSystem
-#
-#
-# User = get_user_model()
-#
-#
-# class ChangeRolesBase(AbstractContextJobMessage):
-#     userids: List[int]  # Validation deferred to job
-#     roles: List[str]
-#
-#     @validator("roles")
-#     def validate_roles(cls, v: List[str]):
-#         if issubclass(cls.Job.model, RoleContextMixin):
-#             ValueError(f"{cls} isn't configured correctly, it needs a Job.model")
-#         valid = cls.Job.model.roles_cls.valid_roles
-#         for role in v:
-#             if role not in valid:
-#                 raise ValueError(f"{role} is not a valid role for {cls.Job.model}")
-#         return v
-#
-#     def job(self):
-#         user = self.get_user()
-#         context = self.get_context()
-#         if self.allowed(user, context):
-#             users_qs = User.objects.filter(pk__in=self.userids)
-#             if len(self.userids) != users_qs.count():
-#                 msg = TextMessage(message=_("Some userids don't exist"))
-#                 msg.send(
-#                     channel=self.mc.consumer_name,
-#                     message_id=self.mc.message_id,
-#                     success=False,
-#                 )
-#                 return
-#             if self.Job.action == "add":
-#                 method = context.add_roles
-#                 text = _("Added %(count)s" % {"count": len(self.userids)})
-#             elif self.Job.action == "remove":
-#                 method = context.remove_roles
-#                 text = _("Removed %(count)s" % {"count": len(self.userids)})
-#             else:
-#                 raise ValueError("Action must be 'add' or 'remove'")
-#             for usr in User.objects.filter(pk__in=self.userids):
-#                 method(usr, *self.roles)
-#             msg = TextMessage(message=text)
-#             msg.send(
-#                 channel=self.mc.consumer_name,
-#                 message_id=self.mc.message_id,
-#                 success=True,
-#             )
-#         else:  # Not allowed
-#             msg = TextMessage(message="Not allowed")
-#             msg.send(
-#                 channel=self.mc.consumer_name,
-#                 message_id=self.mc.message_id,
-#                 success=False,
-#             )
-#
-#
-# @websocket_incoming_messages("meeting.roles.add")
-# class AddMeetingRoles(ChangeRolesBase):
-#     class Job(ContextJobDefault):
-#         model = Meeting
-#         action = "add"
-#         permission = MeetingPermissions.CHANGE
-#
-#
-# @websocket_incoming_messages("meeting.roles.remove")
-# class RemoveMeetingRoles(ChangeRolesBase):
-#     class Job(ContextJobDefault):
-#         model = Meeting
-#         action = "remove"
-#         permission = MeetingPermissions.CHANGE
-#
-#
-# # ETC...
-#
-#
-# class AvailableRolesBase(AbstractConsumerMessage):
-#     async def consume(self, consumer):
-#         valid = self.Job.model.roles_cls.valid_roles
-#         roles = [r.as_output() for r in valid.values()]
-#         msg = ResponseAvailableRoles(role_ids=list(valid), roles=roles)
-#         await msg.async_send(consumer.channel_name, message_id=self.mc.message_id, success=True)
-#
-# @websocket_outgoing_messages("roles.available")
-# class ResponseAvailableRoles(AbstractOutgoingMessage):
-#     role_ids: List[str]
-#     roles: List[RoleOutput]
-#
-#
-# @websocket_incoming_messages("meeting.roles.available")
-# class AvailableMeetingRoles(AvailableRolesBase):
-#     class Job:
-#         model = Meeting
-#
-#
-# @websocket_incoming_messages("speaker_list_system.roles.available")
-# class AvailableSpeakerSystemRoles(AvailableRolesBase):
-#     class Job:
-#         model = SpeakerListSystem
-#
-#
-# # ETC all other contexts
+from __future__ import annotations
+
+from abc import abstractmethod, ABC
+from typing import List, Type
+
+from django.contrib.auth import get_user_model
+from django.db import models
+from django.utils.translation import gettext as _
+from pydantic import BaseModel
+
+from voteit.core.models import RoleContextMixin
+from voteit.core.schemas import RoleOutput
+from voteit.meeting.models import Meeting
+from voteit.meeting.permissions import MeetingPermissions
+from voteit.messaging.abcs import (
+    BaseIncomingMessage,
+    DeferredJob,
+    ContextAction,
+    ContextSchema,
+    BaseOutgoingMessage,
+)
+from voteit.messaging.decorators import incoming, outgoing
+from voteit.messaging.errors import UnauthorizedError
+from voteit.messaging.errors import ValidationErrorMsg
+from voteit.messaging.messages.text import TextResponse
+
+
+User = get_user_model()
+
+
+class ChangeRolesSchema(ContextSchema):
+    userids: List[int]
+    roles: List[str]
+    # We have no clue of roles are valid here
+
+
+class BaseRoles(BaseIncomingMessage, DeferredJob, ContextAction):
+    schema = ChangeRolesSchema
+    data: ChangeRolesSchema
+
+    @property
+    @abstractmethod
+    def model(self) -> Type[RoleContextMixin]:
+        pass
+
+    def validate_and_fetch(self) -> models.QuerySet:
+        # Roles
+        assert isinstance(self.context, RoleContextMixin)
+        invalid = set(self.data.roles) - self.context.filter_valid_roles(
+            *self.data.roles
+        )
+        if invalid:
+            raise ValidationErrorMsg.from_message(
+                self,
+                msg=_("Invalid roles"),
+                errors=[
+                    {
+                        "loc": ("roles",),
+                        "msg": _("Invalid: %(roles)s" % {"roles": invalid}),
+                        "type": "value.error",
+                    }
+                ],
+            )
+        # Permission
+        if not self.allowed():
+            raise UnauthorizedError.from_message(
+                self,
+                permission=self.permission,
+                msg=_("You're not allowed to change roles"),
+            )
+        # Users
+        users_qs = User.objects.filter(pk__in=self.data.userids)
+        if len(self.data.userids) != users_qs.count():
+            raise ValidationErrorMsg.from_message(
+                self,
+                msg=_("Some users don't exist, aborting"),
+                errors=[{"loc": ("userids",), "msg": "Invalid", "type": "value.error"}],
+            )
+        return users_qs
+
+
+class BaseAddRoles(BaseRoles, ABC):
+    def run_job(self):
+        users_qs = self.validate_and_fetch()
+        for user in users_qs:
+            self.context.add_roles(user, *self.data.roles)
+        response = TextResponse.from_message(self, msg="Added")
+        response.send_outgoing(self.mm.consumer_name, success=True)
+
+
+class BaseRemoveRoles(BaseRoles, ABC):
+    def run_job(self):
+        users_qs = self.validate_and_fetch()
+        for user in users_qs:
+            self.context.remove_roles(user, *self.data.roles)
+        response = TextResponse.from_message(self, msg="Removed")
+        response.send_outgoing(self.mm.consumer_name, success=True)
+
+
+@incoming
+class AddMeetingRoles(BaseAddRoles):
+    name = "meeting.roles.add"
+    model = Meeting
+    permission = MeetingPermissions.CHANGE
+
+
+@incoming
+class RemoveMeetingRoles(BaseRemoveRoles):
+    name = "meeting.roles.remove"
+    model = Meeting
+    permission = MeetingPermissions.CHANGE
+
+
+class BaseAvailableRoles(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
+    def run_job(self):
+        assert isinstance(self.context, RoleContextMixin)
+        roles = [x.output() for x in self.context.roles_cls.valid_roles.values()]
+        response = AvailableRolesResponse.from_message(self, roles=roles)
+        response.send_outgoing(self.mm.consumer_name, success=True)
+
+
+@incoming
+class AvailableMeetingRoles(BaseAvailableRoles):
+    name = "meeting.roles.available"
+    model = Meeting
+    permission = None
+
+
+class AvailableRolesSchema(BaseModel):
+    roles: List[RoleOutput]
+
+
+@outgoing
+class AvailableRolesResponse(BaseOutgoingMessage):
+    name = "roles.available"
+    schema = AvailableRolesSchema
+    data: AvailableRolesSchema

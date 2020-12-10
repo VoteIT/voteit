@@ -33,7 +33,7 @@ class RoleContextMixin(ABCModel):
 
     @property
     @abstractmethod
-    def roles_cls(self):
+    def roles_cls(self) -> Roles:
         """ Return the Roles class that this context uses.
         """
 
@@ -93,6 +93,10 @@ class RoleContextMixin(ABCModel):
             else:
                 raise ValueError(f"{role} is not a str or Role object")
         return r
+
+    def filter_valid_roles(self, *roles:Union[Role, str]) -> Set[str]:
+        items = self.roles_to_strings(*roles)
+        return set([x for x in items if x in self.roles_cls.valid_roles])
 
     class Meta:
         abstract = True

@@ -9,3 +9,4 @@ class CoreConfig(AppConfig):
     def ready(self):
         from voteit.core import rules
         from voteit.core import signals
+        from voteit.core import messages

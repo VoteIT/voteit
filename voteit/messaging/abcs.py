@@ -228,45 +228,6 @@ class BaseOutgoingMessage(MessageABC, ABC):
         return cls.get_registry()[type_name](mm, kwargs)
 
 
-# class ContextSchema(BaseModel):
-#     """ Use this as a mixin for your schema if it's for a specific model. """
-#
-#     pk: int
-#
-#
-# class ContextMessageABC(MessageABC):
-#     """ This is used on a specific database instance and may have a permission. """
-#
-#     schema: Type[ContextSchema]
-#
-#     def __new__(cls, *args, **kwargs):
-#         assert issubclass(cls.schema, ContextSchema)
-#         return cls.__new__(*args, **kwargs)
-#
-#     @property
-#     @abstractmethod
-#     def permission(self) -> Optional[str]:
-#         pass
-#
-#     @property
-#     @abstractmethod
-#     def model(self) -> Type[Model]:
-#         pass
-#
-#     def allowed(self) -> bool:
-#         if self.user is None:
-#             return False
-#         if self.context is None:
-#             return False
-#         if self.permission is None:
-#             return True
-#         return self.user.has_perm(self.permission, self.context)
-#
-#     @cached_property
-#     def context(self) -> Model:
-#         return self.model.objects.get(pk=self.data.pk)
-
-
 class AsyncRunnable(ABC):
     """ This message is ment to be processed within the consumer.
         It mustn't be blocking or run database queries.
@@ -357,6 +318,57 @@ class DeferredJob(ABC):
         pass
 
 
+class ContextSchema(BaseModel):
+    """ Default context schema, feel free to override. """
+    pk: int
+
+
+class ContextAction(MessageABC, ABC):
+    """ An action performed on a specific context.
+        It has a permission and a model. The schema itself must contain 'pk' that will be
+        used for lookup of the context to perform the action on.
+
+        Note that it only works as a placeholder for an action, the code itself should be constructed by
+        combining it with DeferredJob and must also inherit BaseIncomingMessage or BaseOutgoingMessage
+    """
+    schema = ContextSchema
+    data: ContextSchema
+
+    @property
+    @abstractmethod
+    def permission(self) -> Optional[str]:
+        """ Text permission, None means allow any. """
+        pass
+
+    @property
+    @abstractmethod
+    def model(self) -> Type[Model]:
+        pass
+
+    def allowed(self) -> bool:
+        if self.user is None:
+            return False
+        if self.context is None:
+            return False
+        if self.permission is None:
+            return True
+        return self.user.has_perm(self.permission, self.context)
+
+    @cached_property
+    def context(self) -> Model:
+        try:
+            return self.model.objects.get(pk=self.data.pk)
+        except self.model.DoesNotExist:
+            raise BaseError.create(
+                type_name="error.not_found",
+                consumer_name=self.mm.consumer_name,
+                msg=_(
+                    "No %(context)s with pk %(pk)s"
+                    % {"context": self.model, "pk": self.data.pk}
+                ),
+            )
+
+
 class ErrorSchema(BaseModel):
     msg: Optional[str]
 
@@ -443,14 +455,14 @@ class AbstractChannel(ABC):
         if consumer_channel is None:
             consumer_channel = self.consumer_channel
         assert consumer_channel
-        self.logger.debug("Subscribed to %s", self.channel_name)
+        # self.logger.debug("Subscribed to %s", self.channel_name)
         await self.channel_layer.group_add(self.channel_name, consumer_channel)
 
     def subscribe(self, consumer_channel=None):
         async_to_sync(self.async_subscribe)(consumer_channel=consumer_channel)
 
     async def async_publish(self, message: MessageABC, internal=False, **kwargs):
-        self.logger.debug("Publish to %s", self.channel_name)
+        # self.logger.debug("Publish to %s", self.channel_name)
         assert isinstance(message, MessageABC)
         if internal:
             await message.async_send_internal(self.channel_name, group=True)
@@ -464,7 +476,7 @@ class AbstractChannel(ABC):
         if consumer_channel is None:
             consumer_channel = self.consumer_channel
         assert consumer_channel
-        self.logger.debug("Left %s", self.channel_name)
+        # self.logger.debug("Left %s", self.channel_name)
         await self.channel_layer.group_discard(self.channel_name, consumer_channel)
 
     def leave(self, consumer_channel=None):
