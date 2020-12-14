@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-
 User = get_user_model()
 
 
@@ -11,14 +10,17 @@ class Connection(models.Model):
         Since channels doesn't handle any kind of cleanup, it's important to check these now and then.
     """
 
-    user = models.ForeignKey(
+    user: User = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="user_connections"
     )
     # device_id = models.CharField(max_lenght=100)
-    channel_name = models.CharField(
+    channel_name: str = models.CharField(
         verbose_name=_("Consumers own channel name"), max_length=100
     )
-    online = models.BooleanField(default=True)
+    # Is this considered to be online?
+    online: bool = models.BooleanField(default=True)
+    # Did this connection disappear without closing properly?
+    awol: bool = models.BooleanField(default=False)
     # IP?
     first_seen = models.DateTimeField(
         auto_now_add=True, verbose_name=_("When the connection was made")
@@ -38,15 +40,23 @@ class Connection(models.Model):
         unique_together = (("user", "channel_name"),)
 
 
+# FIXME Cleanup of channels should preferably be handled by the same iface as channels uses
 # class Subscription(models.Model):
-#     """ Keep track of subscriptions for this connection. When deleted, make sure connections are cleaned up.
+#     """ Keep track of object subscriptions for this connection.
+#
 #     """
-#     connection = models.ForeignKey(Connection, on_delete=models.CASCADE, related_name="connections")
-#     channel_name = models.CharField(verbose_name=_("Channel name for the group subscription"), max_length=150)
+#     connection: Connection = models.ForeignKey(Connection, on_delete=models.CASCADE, related_name="subscriptions")
+#     obj_pk: int = models.IntegerField(verbose_name=_("PK of the object the channel type is for"))
+#     channel_type: str = models.CharField(verbose_name=_("Channel type"), max_length=20)
 #     # This may need channel layer too
 #
 #     class Meta:
-#         unique_together = (("connection", "channel_name"),)
+#         unique_together = (("connection", "obj_pk", "channel_type"),)
 #
-#     def cleanup(self):
-#         pass
+#     def get_channel(self) -> Optional[AbstractObjectChannel]:
+#         cr = get_channel_registry()
+#         if self.channel_type in cr:
+#             ch_type = cr[self.channel_type]
+#             if issubclass(ch_type, AbstractObjectChannel):
+#                 return ch_type.from_pk(self.obj_pk, consumer_channel=self.connection.channel_name)
+#         return None
