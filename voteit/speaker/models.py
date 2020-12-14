@@ -16,6 +16,7 @@ from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField, transition
 
 from voteit.agenda.models import AgendaItem
+from voteit.core.abcs import MeetingContext
 from voteit.core.models import Roles, RoleContextMixin
 from voteit.meeting.models import Meeting
 from voteit.speaker.permissions import SpeakerListPermissions
@@ -38,13 +39,17 @@ if TYPE_CHECKING:
 # to be shared between them.
 
 
-class SpeakerSystemRoles(Roles):
+class SpeakerSystemRoles(Roles, MeetingContext):
     context: SpeakerListSystem = models.ForeignKey(
         "SpeakerListSystem", on_delete=models.CASCADE
     )
 
+    @property
+    def meeting(self) -> Optional[Meeting]:
+        return self.context.meeting
 
-class SpeakerListSystem(RoleContextMixin):
+
+class SpeakerListSystem(RoleContextMixin, MeetingContext):
     """ All speaker list things relate here, while this in turn might relate to a meeting.
         A list system has its own rules and moderators.
     """
@@ -55,7 +60,7 @@ class SpeakerListSystem(RoleContextMixin):
         ),
         default=False,
     )
-    meeting: Meeting = models.ForeignKey(
+    meeting: Optional[Meeting] = models.ForeignKey(
         Meeting, verbose_name=_("Related meeting"), on_delete=models.CASCADE, null=True
     )
     method_type: str = models.ForeignKey(

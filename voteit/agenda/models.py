@@ -3,6 +3,7 @@ from django_fsm import FSMField, transition
 from django.utils.translation import gettext as _
 from voteit.agenda.permissions import AgendaPermissions
 from voteit.agenda.workflows import AgendaItemWf
+from voteit.core.abcs import MeetingContext
 
 from voteit.core.models import BaseContent
 from voteit.meeting.models import Meeting
@@ -11,7 +12,7 @@ from voteit.meeting.models import Meeting
 __all__ = 'AgendaItem',
 
 
-class AgendaItem(BaseContent):
+class AgendaItem(BaseContent, MeetingContext):
     state = FSMField(
         default=AgendaItemWf.initial,
         choices=AgendaItemWf.choices(),

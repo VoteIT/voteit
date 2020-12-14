@@ -203,7 +203,7 @@ class Roles(ABCModel):
         return role in self.assigned
 
 
-class BaseContent(models.Model):
+class BaseContent(ABCModel):
     title = models.CharField(max_length=200)
     body = models.TextField(blank=True, default="")
     created = models.DateTimeField(editable=False, auto_now_add=True)

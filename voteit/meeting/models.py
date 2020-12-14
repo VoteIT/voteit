@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
 from django_fsm import FSMField, transition
+from voteit.core.abcs import MeetingContext
 
 from voteit.core.models import BaseContent, Roles, RoleContextMixin
 from voteit.meeting.permissions import MeetingPermissions
@@ -30,7 +31,7 @@ __all__ = "Meeting", "MeetingRoles"
 UserModel = get_user_model()
 
 
-class MeetingRoles(Roles):
+class MeetingRoles(Roles, MeetingContext):
     """ Contains assigned meeting roles for a specific meeting and user"""
 
     user: AbstractUser = models.ForeignKey(
@@ -40,8 +41,12 @@ class MeetingRoles(Roles):
         "Meeting", on_delete=models.CASCADE, related_name="roles"
     )
 
+    @property
+    def meeting(self) -> Meeting:
+        return self.context
 
-class Meeting(BaseContent, RoleContextMixin):
+
+class Meeting(BaseContent, RoleContextMixin, MeetingContext):
     state = FSMField(
         default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False
     )
@@ -146,3 +151,8 @@ class Meeting(BaseContent, RoleContextMixin):
 
     def archiving_allowed(self):
         pass
+
+    @property
+    def meeting(self) -> Meeting:
+        """ To fullfill the MeetingContext ABC."""
+        return self

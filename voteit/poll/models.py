@@ -15,7 +15,9 @@ from django.dispatch import receiver
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField, transition, post_transition
-from voteit.core.models import BaseContent
+from typing import Optional
+from voteit.core.abcs import MeetingContext
+from voteit.core.models import BaseContent, ABCModel
 from voteit.meeting.models import Meeting
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import (
@@ -37,14 +39,14 @@ class VoterWeight(models.Model):
     weight = models.PositiveIntegerField(default=1)
 
 
-class ElectoralRegister(models.Model):
+class ElectoralRegister(ABCModel, MeetingContext):
     created = models.DateTimeField(editable=False, auto_now_add=True)
     voters = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         through=VoterWeight,
         related_name="electoral_registers",
     )
-    meeting = models.ForeignKey(
+    meeting: Optional[Meeting] = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="electoral_registers", null=True
     )
 
@@ -60,11 +62,11 @@ class ElectoralRegister(models.Model):
         return self.voterweight_set.aggregate(Sum("weight"))["weight__sum"]
 
 
-class Poll(BaseContent):
+class Poll(BaseContent, MeetingContext):
     state = FSMField(default=PollWf.initial, choices=PollWf.choices(), protected=True)
     title = models.CharField(max_length=70)
     description = models.CharField(max_length=200)
-    meeting = models.ForeignKey(
+    meeting: Optional[Meeting] = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="polls", null=True
     )
     agenda_item = models.ForeignKey(
