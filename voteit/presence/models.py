@@ -8,6 +8,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.timezone import now
 from django_fsm import FSMField, transition
+from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
 from voteit.presence.workflows import PresenceCheckWf
 
@@ -70,7 +71,7 @@ class PresenceCheck(models.Model):
         self.closed = now()
 
 
-class PresenceSystem(models.Model):
+class PresenceSystem(MeetingContext):
     """
     The presence system has a 1-1 relation to a meeting.
     It acts as a container for all other objects.
