@@ -1,31 +1,17 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
-from inspect import isclass
+from abc import abstractmethod
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils.translation import gettext as _
-from typing import List, Type, Set, Optional, Dict, Union
+from typing import List, Set, Optional, Dict, Union
 
+from voteit.core.abcs import ABCModel
 from voteit.core.role import Role
 from voteit.core.signals import roles_added, roles_removed
-
-
-class _AbstractModelMeta(ABCMeta, type(models.Model)):
-    pass
-
-
-class ABCModel(models.Model, metaclass=_AbstractModelMeta):
-    """ Abstract classes based on ABCMeta don't work in django -
-        this is a workaround to make them behave correctly.
-        Remove this as soon as it's fixed in django.
-    """
-
-    class Meta:
-        abstract = True
 
 
 class RoleContextMixin(ABCModel):

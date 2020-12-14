@@ -39,7 +39,7 @@ class VoterWeight(models.Model):
     weight = models.PositiveIntegerField(default=1)
 
 
-class ElectoralRegister(ABCModel, MeetingContext):
+class ElectoralRegister(MeetingContext):
     created = models.DateTimeField(editable=False, auto_now_add=True)
     voters = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
