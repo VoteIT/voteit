@@ -9,6 +9,7 @@ from channels.layers import get_channel_layer
 from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
 from voteit.messaging.models import Connection
+from voteit.messaging.signals import connection_terminated
 
 logger = getLogger(__name__)
 
@@ -35,25 +36,35 @@ def get_outgoing_registry() -> Registry:
     return outgoing_messages
 
 
-def update_user_status(user, channel_name, online=True):
+def update_connection_status(
+    user: AbstractUser,
+    channel_name: str,
+    online: Optional[bool] = True,
+    awol: Optional[bool] = None,
+) -> Connection:
     """ This is sync code so don't call this in any async context!
     """
     conn, created = Connection.objects.get_or_create(
         user=user, channel_name=channel_name
     )
+    send_signal = False
     if online is not None:  # We might not know
+        if conn.online == True and online == False:
+            send_signal = True
         conn.online = online
+    if awol is not None:
+        conn.awol = awol
     conn.save()
+    if send_signal:
+        connection_terminated.send(sender=Connection, connection=conn, awol=conn.awol)
     return conn
 
 
-def cleanup_connection_status(secs=180, only_user:Optional[AbstractUser]=None):
+def cleanup_connection_status(secs=180, only_user: Optional[AbstractUser] = None):
     """ Check connections marked as active and make sure they're still active. """
     # Note: This assumes channels_redis backend
     since = now() - timedelta(seconds=secs)
-    query = dict(
-        online=True, last_action__lt=since
-    )
+    query = dict(online=True, last_action__lt=since)
     if only_user:
         query["user"] = only_user
     qs = Connection.objects.filter(**query)
@@ -61,10 +72,16 @@ def cleanup_connection_status(secs=180, only_user:Optional[AbstractUser]=None):
     found = async_to_sync(check_redis_keys)(channel_names)
     to_remove = channel_names - found
     if to_remove:
-        logger.debug("Changing connection status of %s objects", len(to_remove))
-        Connection.objects.filter(online=True, channel_name__in=to_remove).update(
-            online=False
-        )
+        # logger.debug("Changing connection status of %s objects", len(to_remove))
+        qs = Connection.objects.filter(online=True, channel_name__in=to_remove)
+        logger.debug("Changing connection status of %s objects", qs.count())
+        for conn in qs:
+            conn.online = False
+            conn.awol = True
+            connection_terminated.send(
+                sender=Connection, connection=conn, awol=conn.awol
+            )
+            conn.save()
     else:
         logger.debug("No expired connections found")
 
@@ -83,7 +100,8 @@ def cleanup_old_connections(hours=24):
 
 
 async def check_redis_keys(keys) -> set:
-    """ Return a set of keys that exist."""
+    """ Return a set of keys that exist. For instance the consumer channel name.
+    """
     channel_layer = get_channel_layer()
     found = set()
     # FIXME: There's no stable API to get a sensible connection index from the pool in channel layer right now :(

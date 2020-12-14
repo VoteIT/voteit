@@ -37,7 +37,7 @@
 
         function connect () {
             if (typeof chatSocket != "undefined") {
-                chatSocket.close();
+                chatSocket.close(1000);
             }
 
             chatSocket = new WebSocket(

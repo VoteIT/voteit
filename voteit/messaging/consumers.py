@@ -27,6 +27,7 @@ from voteit.messaging.errors import BaseError
 from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.registries import incoming_messages
 from voteit.messaging.signals import client_connect, client_close
+from voteit.messaging.utils import update_connection_status
 
 logger = getLogger(__name__)
 
@@ -85,6 +86,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         await self.accept()
         logger.debug("Connection accepted for user %s (%s)", self.user, self.user.pk)
         # This is sync code, so if we need to add lots of stuff here move this to a job
+
         await self.signal_connect()
 
     async def disconnect(self, close_code):
@@ -214,11 +216,15 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def signal_connect(self):
+        conn = None
+        if self.user is not None:
+            conn = update_connection_status(self.user, channel_name=self.channel_name, online=True)
         client_connect.send(
             sender=None,
             user=self.user,
             user_pk=self.user_pk,
             consumer_name=self.channel_name,
+            connection=conn,
         )
 
     @database_sync_to_async
@@ -227,10 +233,14 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             user = User.objects.get(pk=self.user_pk)
         else:
             user = self.user
+        conn = None
+        if user is not None:
+            conn = update_connection_status(user, channel_name=self.channel_name, online=False)
         client_close.send(
             sender=None,
             user=user,
             user_pk=self.user_pk,
             consumer_name=self.channel_name,
             close_code=close_code,
+            connection=conn,
         )

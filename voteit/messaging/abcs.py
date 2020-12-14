@@ -320,6 +320,7 @@ class DeferredJob(ABC):
 
 class ContextSchema(BaseModel):
     """ Default context schema, feel free to override. """
+
     pk: int
 
 
@@ -331,6 +332,7 @@ class ContextAction(MessageABC, ABC):
         Note that it only works as a placeholder for an action, the code itself should be constructed by
         combining it with DeferredJob and must also inherit BaseIncomingMessage or BaseOutgoingMessage
     """
+
     schema = ContextSchema
     data: ContextSchema
 
