@@ -23,3 +23,10 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserModel
         fields = 'pk', 'username', 'full_name', 'first_name', 'last_name',
+
+
+class TransitionSerializer(serializers.Serializer):
+    transition = serializers.CharField(max_length=20)
+
+    class Meta:
+        fields = "transition",

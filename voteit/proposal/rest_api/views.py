@@ -1,8 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from djangorestframework_fsm.viewset_mixins import get_drf_fsm_mixin
 from rest_framework import viewsets
 from voteit.agenda.models import AgendaItem
-from voteit.core.rest_api.mixins import SerializerClassesMixin, CreateModelPermissionsMixin
+from voteit.core.rest_api.mixins import CreateModelPermissionsMixin, TransitionsMixin
 
 from voteit.proposal.models import Proposal
 
@@ -13,9 +12,7 @@ __all__ = ['ProposalViewSet']
 
 
 class ProposalViewSet(
-    SerializerClassesMixin,
-    # TODO: Permissions for fsm mixin
-    # get_drf_fsm_mixin(Proposal, fieldname='state'),
+    TransitionsMixin,
     CreateModelPermissionsMixin,
     viewsets.ModelViewSet
 ):
@@ -37,5 +34,5 @@ class ProposalViewSet(
             return self.queryset
         # TODO: Filter out private ai:s
         # FIXME: A fix for @schyffel :)
-        return self.queryset
+        # return self.queryset
         return self.queryset.filter(agenda_item__meeting__participants=self.request.user)
