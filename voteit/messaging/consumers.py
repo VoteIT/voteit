@@ -13,9 +13,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
+from django_rq import get_queue
 from pydantic import ValidationError
 from rest_framework.authtoken.models import Token
 
+from voteit.core.queues import TESTING_QUEUE, DEFAULT_QUEUE
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.abcs import AsyncRunnable
@@ -25,6 +27,7 @@ from voteit.messaging.envelopes import OutgoingEnvelope
 from voteit.messaging.exceptions import UnsupportedMessageType
 from voteit.messaging.errors import BaseError
 from voteit.messaging.errors import ValidationErrorMsg
+from voteit.messaging.jobs import signal_websocket_connect, signal_websocket_close
 from voteit.messaging.registries import incoming_messages
 from voteit.messaging.signals import client_connect, client_close
 from voteit.messaging.utils import update_connection_status
@@ -65,14 +68,19 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
     # Last sent
     last_sent: datetime
     last_recv: datetime
+    # testing injection, changes queues etc
+    # testing: bool = False
 
     async def connect(self):
-        connection_token = self.scope["url_route"]["kwargs"]["connection_token"]
+        try:
+            connection_token = self.scope["url_route"]["kwargs"]["connection_token"]
+        except KeyError:
+            connection_token = None
         self.user = await self.get_token_user(key=connection_token)
         if self.user is None:
             # FIXME: get_user ie refresh_user is the correct way to go
             # When using session auth instead of token:
-            await self.refresh_user()
+            self.user = await self.refresh_user()
         if self.user is None:
             logger.debug("Invalid token, closing connection")
             raise DenyConnection()
@@ -85,9 +93,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         )
         await self.accept()
         logger.debug("Connection accepted for user %s (%s)", self.user, self.user.pk)
-        # This is sync code, so if we need to add lots of stuff here move this to a job
-
-        await self.signal_connect()
+        self.dispatch_connect()
 
     async def disconnect(self, close_code):
         # https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent
@@ -96,21 +102,23 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
                 "Disconnect user pk %s with close code %s", self.user_pk, close_code
             )
             # We only need to signal disconnect for an actual user
-            await self.signal_disconnect(close_code)
+            self.dispatch_close(close_code)
         else:
             logger.debug("Disconnect was from anon, close code %s", close_code)
-        # This is sync code, so if we need to add lots of stuff here move this to a job
 
+    # NOTE! database_sync_to_async doesn't work in tests - use mock to override
     @database_sync_to_async
     def get_token_user(self, key: str) -> Optional[AbstractUser]:
         with suppress(ObjectDoesNotExist):
             return Token.objects.get(key=key).user
         return None
 
-    async def refresh_user(self):
+    # NOTE! database_sync_to_async doesn't work in tests - use mock to override
+    async def refresh_user(self) -> Optional[User]:
         user = await get_user(self.scope)
         if user.pk is not None:
             self.user = user
+            return user
 
     async def handle_message(self, message: Union[AsyncRunnable, DeferredJob]):
         # FIXME: How do we handle errors here?
@@ -120,7 +128,8 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             act += 1
         if isinstance(message, DeferredJob):
             await message.pre_queue(self)
-            message.enqueue()
+            queue = self.get_queue(message)
+            message.enqueue(queue=queue)
             act += 1
         if not act:
             # This shuldn't be caught since it's a programming errors
@@ -214,33 +223,32 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         logger.debug("Error sent: %s", payload)
         await self.send(text_data=payload)
 
-    @database_sync_to_async
-    def signal_connect(self):
-        conn = None
-        if self.user is not None:
-            conn = update_connection_status(self.user, channel_name=self.channel_name, online=True)
-        client_connect.send(
-            sender=None,
-            user=self.user,
+    def dispatch_connect(self):
+        """ The connect signal even will be fired in a worker instead,
+            since the sync calls to db aren't great to mix with async code.
+            Currently channels testing doesn't work very well with database_sync_to_async. (2020-12 /Robin)
+        """
+        queue = self.get_queue(DEFAULT_QUEUE)
+        return queue.enqueue(
+            signal_websocket_connect,
             user_pk=self.user_pk,
             consumer_name=self.channel_name,
-            connection=conn,
         )
 
-    @database_sync_to_async
-    def signal_disconnect(self, close_code: int):
-        if self.user is None or self.user.pk != self.user_pk:
-            user = User.objects.get(pk=self.user_pk)
-        else:
-            user = self.user
-        conn = None
-        if user is not None:
-            conn = update_connection_status(user, channel_name=self.channel_name, online=False)
-        client_close.send(
-            sender=None,
-            user=user,
+    def dispatch_close(self, close_code):
+        """ Ask as worker to signal instead of doing it here.
+        """
+        queue = self.get_queue(DEFAULT_QUEUE)
+        return queue.enqueue(
+            signal_websocket_close,
             user_pk=self.user_pk,
             consumer_name=self.channel_name,
             close_code=close_code,
-            connection=conn,
         )
+
+    def get_queue(self, item: Union[str, DeferredJob]):
+        if isinstance(item, str):
+            return get_queue(name=item)
+        elif isinstance(item, DeferredJob):
+            return get_queue(name=item.queue)
+        raise TypeError("Must be queue name as string or DeferredJob")

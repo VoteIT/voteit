@@ -243,7 +243,7 @@ class DeferredJob(ABC):
     """ Command/query can be deferred to a job queue.
         Must be used together with BaseIncomingMessage or BaseOutgoingMessage"""
 
-    # queue = DEFAULT_QUEUE
+    queue = DEFAULT_QUEUE
     # job_timeout = 7
     # autocommit = True
     # is_async = True
@@ -259,16 +259,19 @@ class DeferredJob(ABC):
             It's a good idea to avoid using this if it's not needed.
         """
 
-    def enqueue(self):
+    def enqueue(self, queue=None):
         # FIXME: Queues and django_rq are kind of a mess right now
         from voteit.messaging.jobs import run_job
-
-        run_job.delay(
+        kwargs = dict(
             msg_data=self.data.dict(),
             mm_data=self.mm.dict(),
             incoming=isinstance(self, BaseIncomingMessage),
             atomic=True,
         )
+        if queue:
+            return queue.enqueue(run_job, **kwargs)
+        # Job-decorated queue
+        return run_job.delay(**kwargs)
 
         # kwargs = dict(
         #     atomic=self.job_atomic,
@@ -276,10 +279,7 @@ class DeferredJob(ABC):
         #      mm_data=self.mm.dict(),
         # )
         # queue = get_queue(name=self.queue, is_async=self.is_async, serializer=JSONSerializer)
-        # job = Job.create("voteit.messaging.jobs.run_job", timeout=self.job_timeout, kwargs=kwargs)
         # queue.enqueue("voteit.messaging.jobs.run_job", timeout=self.job_timeout, kwargs=kwargs)
-
-        # queue.enqueue(job)
 
         # queue = get_queue(
         #     self.queue,
