@@ -62,12 +62,7 @@ class BaseRoles(BaseIncomingMessage, DeferredJob, ContextAction):
                 ],
             )
         # Permission
-        if not self.allowed():
-            raise UnauthorizedError.from_message(
-                self,
-                permission=self.permission,
-                msg=_("You're not allowed to change roles"),
-            )
+        self.assert_perm(msg=_("You're not allowed to change roles"))
         # Users
         users_qs = User.objects.filter(pk__in=self.data.userids)
         if len(self.data.userids) != users_qs.count():

@@ -370,6 +370,15 @@ class ContextAction(MessageABC, ABC):
                 ),
             )
 
+    def assert_perm(self, msg=None):
+        if not self.allowed():
+            raise BaseError.from_message(
+                self,
+                type_name="error.unauthorized",  # Constant?
+                permission=self.permission,
+                msg=msg,  # None is default
+            )
+
 
 class ErrorSchema(BaseModel):
     msg: Optional[str]
