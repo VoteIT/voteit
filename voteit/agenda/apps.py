@@ -7,7 +7,6 @@ class AgendaConfig(AppConfig):
     verbose_name = _('Agenda')
 
     def ready(self):
-        # Make sure rules are loaded
         from voteit.agenda import rules
         from voteit.agenda import rest_api
         from voteit.agenda import channels
