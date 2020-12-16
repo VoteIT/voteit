@@ -84,8 +84,18 @@ class MessageABC(ABC):
     def from_message(cls, message: MessageABC, type_name=None, **kwargs) -> MessageABC:
         pass
 
-    def __init__(self, mm: Union[Dict, MessageMeta], data: Dict):
-        self.mm = isinstance(mm, MessageMeta) and mm or MessageMeta(**mm)
+    def __init__(
+        self, mm: Union[Dict, MessageMeta], data: Optional[Dict] = None, **kwargs
+    ):
+        if isinstance(mm, MessageMeta):
+            self.mm = mm
+        else:
+            assert isinstance(self.name, str), "Name attribute is not set as a string"
+            mm['type'] = self.name
+            self.mm = MessageMeta(**mm)
+        if data is None:
+            data = {}
+        data.update(kwargs)
         self.data = self.schema(**data)
 
     @cached_property
@@ -262,6 +272,7 @@ class DeferredJob(ABC):
     def enqueue(self, queue=None):
         # FIXME: Queues and django_rq are kind of a mess right now
         from voteit.messaging.jobs import run_job
+
         kwargs = dict(
             msg_data=self.data.dict(),
             mm_data=self.mm.dict(),

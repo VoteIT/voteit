@@ -18,6 +18,7 @@ roles_removed = Signal(providing_args=["sender", "instance", "roles"])
 def _publish(instance, msg):
     from voteit.meeting.channels import MeetingChannel
     from voteit.messaging.channels.user import UserChannel
+
     if isinstance(instance, MeetingContext):
         meeting = instance.meeting
         if meeting is not None:
@@ -31,19 +32,23 @@ def _publish(instance, msg):
 
 @receiver(roles_added)
 def push_roles_added(instance: Roles, roles: List[Role], **kwargs):
-    msg = RolesAdded.create(
+    msg = RolesAdded(
+        dict(),
         roles=instance.context.roles_to_strings(*roles),
         pk=instance.context.pk,
         model=instance.context.__class__.__name__,
+        user_pk=instance.user.pk,
     )
     _publish(instance, msg)
 
 
 @receiver(roles_removed)
 def push_roles_removed(instance: Roles, roles: List[Role], **kwargs):
-    msg = RolesRemoved.create(
+    msg = RolesRemoved(
+        dict(),
         roles=instance.context.roles_to_strings(*roles),
         pk=instance.context.pk,
         model=instance.context.__class__.__name__,
+        user_pk=instance.user.pk,
     )
     _publish(instance, msg)
