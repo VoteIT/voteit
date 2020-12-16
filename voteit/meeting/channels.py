@@ -56,9 +56,9 @@ def agenda_change(instance=None, created=None, **kw):
     ch = MeetingChannel.from_instance(instance.meeting)
     data = AgendaItemSerializer(instance).data
     if created:
-        msg = AgendaAdded.create(item=data)
+        msg = AgendaAdded({}, **data)
     else:
-        msg = AgendaChanged.create(item=data)
+        msg = AgendaChanged({}, **data)
     ch.publish(msg)
 
 
@@ -66,7 +66,7 @@ def agenda_change(instance=None, created=None, **kw):
 def agenda_delete(instance=None, **kw):
     ch = MeetingChannel.from_instance(instance.meeting)
     # FIXME: Create a serializer that only sends primary keys?
-    msg = AgendaDeleted.create(pk=instance.pk)
+    msg = AgendaDeleted({}, pk=instance.pk)
     ch.publish(msg)
 
 
@@ -76,9 +76,9 @@ def poll_change(instance=None, created=None, **kw):
         ch = MeetingChannel.from_instance(instance.meeting)
         data = PollDetailSerializer(instance).data
         if created:
-            msg = PollAdded.create(item=data)
+            msg = PollAdded({}, **data)
         else:
-            msg = PollChanged.create(item=data)
+            msg = PollChanged({}, **data)
         ch.publish(msg)
 
 
@@ -86,5 +86,5 @@ def poll_change(instance=None, created=None, **kw):
 def poll_delete(instance=None, **kw):
     if instance.meeting is not None:
         ch = MeetingChannel.from_instance(instance.meeting)
-        msg = PollDeleted.create(pk=instance.pk)
+        msg = PollDeleted({}, pk=instance.pk)
         ch.publish(msg)

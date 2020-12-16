@@ -51,9 +51,9 @@ def proposal_updated(instance=None, created=None, **kw):
     ch = AgendaItemChannel.from_instance(instance.agenda_item)
     data = ProposalDetailSerializer(instance).data
     if created:
-        msg = ProposalAdded.create(item=data)
+        msg = ProposalAdded({}, **data)
     else:
-        msg = ProposalChanged.create(item=data)
+        msg = ProposalChanged({}, **data)
     ch.publish(msg)
 
 
@@ -64,9 +64,9 @@ def discussion_post_change(instance=None, created=None, **kw):
     ch = AgendaItemChannel.from_instance(instance.agenda_item)
     data = DiscussionPostDetailSerializer(instance).data
     if created:
-        msg = DiscussionPostAdded.create(item=data)
+        msg = DiscussionPostAdded({}, **data)
     else:
-        msg = DiscussionPostChanged.create(item=data)
+        msg = DiscussionPostChanged({}, **data)
     ch.publish(msg)
 
 
@@ -75,7 +75,7 @@ def proposal_delete(instance=None, **kw):
     if instance.agenda_item is None:
         return
     ch = AgendaItemChannel.from_instance(instance.agenda_item)
-    msg = ProposalDeleted.create(pk=instance.pk)
+    msg = ProposalDeleted({}, pk=instance.pk)
     ch.publish(msg)
 
 
@@ -84,5 +84,5 @@ def discussion_post_delete(instance=None, **kw):
     if instance.agenda_item is None:
         return
     ch = AgendaItemChannel.from_instance(instance.agenda_item)
-    msg = DiscussionPostDeleted.create(pk=instance.pk)
+    msg = DiscussionPostDeleted({}, pk=instance.pk)
     ch.publish(msg)

@@ -13,7 +13,11 @@ from voteit.messaging.messages.text import TextResponse
 
 
 class AddedOrUpdatedSchema(BaseModel):
-    item: Dict
+    pk: int
+
+    class Config:
+        extra = "allow"
+        arbitrary_types_allowed = True
 
 
 class DeletedSchema(BaseModel):
