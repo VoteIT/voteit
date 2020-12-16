@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -8,23 +11,25 @@ from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
 from voteit.reactions.mixins import Reactable
 
+if TYPE_CHECKING:
+    from voteit.agenda.models import AgendaItem
 
-__all__ = 'Proposal',
+__all__ = ("Proposal",)
 
 
 class Proposal(BaseContent, Reactable):
-    state = FSMField(
+    state: str = FSMField(
         default=ProposalWf.initial, choices=ProposalWf.choices(), protected=True
     )
-    author = models.ForeignKey(
+    author: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         editable=True,
         null=True,
         related_name="proposals",
     )
-    prop_id = models.CharField(max_length=50)
-    agenda_item = models.ForeignKey(
+    prop_id: str = models.CharField(max_length=50)
+    agenda_item: AgendaItem = models.ForeignKey(
         "agenda.AgendaItem",
         on_delete=models.CASCADE,
         null=True,
