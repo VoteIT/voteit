@@ -28,6 +28,7 @@ class AddAgendaItem(BaseAddObject):
     name = "agenda.add"
     permission = AgendaPermissions.ADD
     model = Meeting  # This is the context for the action!
+    add_model = AgendaItem
 
 
 @incoming

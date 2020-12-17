@@ -1,5 +1,6 @@
-from abc import ABC
-from typing import Dict
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import Dict, Type, TYPE_CHECKING
 
 from pydantic.main import BaseModel
 from django.utils.translation import gettext as _
@@ -10,6 +11,9 @@ from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.abcs import ContextAction
 from voteit.messaging.messages.text import TextResponse
+
+if TYPE_CHECKING:
+    from django.db.models import Model
 
 
 class AddedOrUpdatedSchema(BaseModel):
@@ -52,13 +56,20 @@ class BaseAddObject(BaseObjectAction, ABC):
     schema = GenericObjectSchema
     data: GenericObjectSchema
 
+    @property
+    @abstractmethod
+    def add_model(self) -> Type[Model]:
+        """ The model used for creation of the added object.
+            note that cls.model is the context where it will be added.
+        """
+
     def run_job(self):
         self.assert_perm(
-            msg=_("You're not allowed to add %(ctype)s here" % {"ctype": self.model})
+            msg=_("You're not allowed to add %(ctype)s here" % {"ctype": self.add_model})
         )
-        if isinstance(self.model, BaseContent):
+        if issubclass(self.add_model, BaseContent):
             self.data.kwargs.setdefault("author", self.user)
-        self.model.objects.create(**self.data.kwargs)
+        self.add_model.objects.create(**self.data.kwargs)
         response = TextResponse.from_message(self, msg="Added")
         response.send_outgoing(self.mm.consumer_name, success=True)
 

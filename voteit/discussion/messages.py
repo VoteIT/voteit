@@ -28,6 +28,7 @@ class AddDiscussionPost(BaseAddObject):
     name = "discussion_post.add"
     permission = DiscussionPermissions.ADD
     model = AgendaItem  # This is the context for the action!
+    add_model = DiscussionPost
 
 
 @incoming
