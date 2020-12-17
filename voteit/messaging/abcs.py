@@ -375,6 +375,7 @@ class ContextAction(MessageABC, ABC):
             raise BaseError.create(
                 type_name="error.not_found",
                 consumer_name=self.mm.consumer_name,
+                permission=self.permission,
                 msg=_(
                     "No %(context)s with pk %(pk)s"
                     % {"context": self.model, "pk": self.data.pk}

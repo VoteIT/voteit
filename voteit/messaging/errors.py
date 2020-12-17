@@ -1,7 +1,7 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 
-from pydantic import ValidationError
 from django.utils.translation import gettext as _
+from voteit.core.permission import Permission
 from voteit.messaging.abcs import BaseError, ErrorSchema
 from voteit.messaging.decorators import outgoing
 
@@ -24,12 +24,16 @@ class ValidationErrorMsg(BaseError):
 
 
 class UnauthorizedSchema(ErrorSchema):
-    permission:str
+    permission: Optional[Union[str, Permission]]
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 @outgoing
 class UnauthorizedError(BaseError):
     """ Pretty much HTTP 403 """
+
     name = "error.unauthorized"
     schema = UnauthorizedSchema
     data: UnauthorizedSchema
@@ -39,5 +43,6 @@ class UnauthorizedError(BaseError):
 @outgoing
 class NotFoundError(BaseError):
     """ Pretty much HTTP 404 """
+
     name = "error.not_found"
     default_msg = _("Not found")
