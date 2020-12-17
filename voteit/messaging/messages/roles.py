@@ -6,7 +6,7 @@ from typing import List, Type, Optional, Set, Dict
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext as _
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from voteit.core.models import RoleContextMixin
 from voteit.core.schemas import RoleOutput
@@ -107,13 +107,16 @@ class RemoveMeetingRoles(BaseRemoveRoles):
 
 
 class GetMeetingRolesSchema(BaseModel):
-    pk: int  # The meeting we want to know about
-    filter_userids: Optional[List[int]]
+    pk: int = Field(title="Meeting pk")
+    filter_userids: Optional[List[int]] = Field(
+        title="If set: Only check these userids"
+    )
 
 
 @incoming
 class GetMeetingRoles(BaseIncomingMessage, DeferredJob, ContextAction):
     """ Transmits a dict looking like AssignedResponseSchema with user_pk and assigned roles. """
+
     name = "meeting.roles.get"
     model = Meeting
     permission = MeetingPermissions.VIEW
@@ -137,7 +140,11 @@ class GetMeetingRoles(BaseIncomingMessage, DeferredJob, ContextAction):
 class AssignedResponseSchema(BaseModel):
     """ Return a dict with assigned roles where key is user_pk and value is a list of roles as strings
     """
-    items: Dict[int, List[str]]
+
+    items: Dict[int, List[str]] = Field(
+        title="Assigned roles",
+        description="Key is user_pk and value the assigned roles.",
+    )
 
 
 @outgoing
@@ -154,6 +161,7 @@ class BaseAvailableRoles(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
         response = AvailableRolesResponse.from_message(self, roles=roles)
         response.send_outgoing(self.mm.consumer_name, success=True)
         return response
+
 
 @incoming
 class AvailableMeetingRoles(BaseAvailableRoles):
