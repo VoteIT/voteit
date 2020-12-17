@@ -22,7 +22,6 @@ class MeetingRolesTests(TestCase):
         msg = GetMeetingRoles({}, pk=self.meeting.pk)
         self.assertRaises(UnauthorizedError, msg.run_job)
 
-    # @patch("voteit.messaging.messages.roles.AssignedMeetingRolesResponse", "send_outgoing")
     def test_get_meeting_roles(self):
         self.meeting.add_roles(self.user_a, "participant", "moderator")
         from voteit.messaging.messages.roles import GetMeetingRoles
@@ -38,7 +37,7 @@ class MeetingRolesTests(TestCase):
             res_dict = response.data.dict()
             self.assertEqual(1, len(res_dict["items"]))
             res_items = res_dict["items"]
+            self.assertIn(self.user_a.pk, res_items)
             self.assertEqual(
-                {self.user_a.pk: ['participant', 'moderator']},
-                res_items,
+                {"participant", "moderator"}, set(res_items[self.user_a.pk])
             )
