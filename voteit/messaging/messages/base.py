@@ -85,5 +85,5 @@ class BaseDeleteObject(BaseObjectAction, ABC):
             msg=_("You're not allowed to delete %(ctype)s here" % {"ctype": self.model})
         )
         self.context.delete()
-        response = TextResponse.from_message(self, message="Deleted")
+        response = TextResponse.from_message(self, msg="Deleted")
         response.send_outgoing(self.mm.consumer_name, success=True)
