@@ -24,7 +24,6 @@ from voteit.messaging.abcs import AsyncRunnable
 from voteit.messaging.envelopes import IncomingEnvelope
 from voteit.messaging.envelopes import InternalEnvelope
 from voteit.messaging.envelopes import OutgoingEnvelope
-from voteit.messaging.exceptions import UnsupportedMessageType
 from voteit.messaging.errors import BaseError
 from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.jobs import signal_websocket_connect, signal_websocket_close
@@ -65,9 +64,10 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
     message_errors: int = 0
     # For testing injection
     message_registry = incoming_messages
-    # Last sent
-    last_sent: datetime
-    last_recv: datetime
+    # Last sent, received
+    last_sent: datetime = None
+    last_recv: datetime = None
+    last_error: Optional[datetime] = None
     # testing injection, changes queues etc
     # testing: bool = False
 
@@ -141,14 +141,15 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         """ Receive from websocket """
         if text_data is None:
             # Connection will die
-            raise UnsupportedMessageType("Only text data accepted")
+            raise ValueError("Only text data accepted")  # Maybe another exception or catch this?
         # Basic json load
         try:
             base_payload = json.loads(text_data)
         except json.decoder.JSONDecodeError:
             if settings.DEBUG:
-                print(f"Invalid json, either payload {text_data}")
+                print(f"Invalid json: {text_data}")
             self.message_errors += 1
+            self.last_error = now()
             return await self.post_error()
         # Wrap in message envelope
         try:
@@ -185,9 +186,9 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         message = OutgoingEnvelope(**event)
         payload = message.json(exclude={"type"})
         logger.debug("%s sent: %s", self.channel_name, payload)
-        self.last_sent = now()
         # Send message to WebSocket
         await self.send(text_data=payload)
+        self.last_sent = now()
 
     async def post_error(self):
         """ Things that might need to be cleaned up or handled after an incoming message has caused an error.
@@ -215,6 +216,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
 
             Any error occurring within the consumer should be handled this way.
         """
+        self.last_error = now()
         assert isinstance(error, BaseError)
         envelope = OutgoingEnvelope(
             p=error.data, i=error.mm.message_id, t=error.mm.type, s=error.FAILED

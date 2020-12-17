@@ -1,8 +1,10 @@
+import json
+from datetime import datetime
 from unittest import mock
 
 from django.dispatch import receiver
 from django.test import TestCase
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from rq import SimpleWorker
 from asgiref.sync import async_to_sync, sync_to_async
 from channels.testing import WebsocketCommunicator
@@ -17,12 +19,13 @@ from voteit.messaging.registries import incoming_messages
 User = get_user_model()
 
 
-class ConsumerIntegrationTests(TestCase):
+class ConsumerTests(TestCase):
     _connected = False
 
     def setUp(self):
         self.user = User.objects.create(username="sockety")
         self.fakeredis_conn = FakeRedis()
+        from voteit.messaging.messages import testing  # To enable testing messages
         super().setUp()
 
     def tearDown(self):
@@ -172,13 +175,65 @@ class ConsumerIntegrationTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual("jane", self.user.username)
 
+    async def test_receive_bad_data_type(self):
+        consumer = self._mk_one()
+        with self.assertRaises(ValueError):
+            await consumer.receive(bytes_data=b"hsfsfsi")
+
+    async def test_receive_bad_json(self):
+        consumer = self._mk_one()
+        self.assertIsNone(consumer.last_error)
+        await consumer.receive("hsfsfsi")
+        self.assertIsInstance(consumer.last_error, datetime)
+
+    async def test_receive_payload_validation_error(self):
+        await self.fixture()
+        consumer = self.consumer
+        original = consumer.send_error
+        # Wrap in mock but still run the code
+        consumer.send_error = mock.AsyncMock(side_effect=original)
+        self.assertIsNone(consumer.last_error)
+        msg = json.dumps({"t": "testing.count", "p": {"num": "a"}})
+        await consumer.receive(msg)
+        self.assertIsInstance(consumer.last_error, datetime)
+        self.assertTrue(consumer.send_error.called)
+
+    async def test_receive_last_recv(self):
+        await self.fixture()
+        consumer = self.consumer
+        self.assertIsInstance(consumer.last_recv, datetime)
+        last_recv = consumer.last_recv
+        payload = json.dumps({"t": "testing.hello"})
+        await consumer.receive(payload)
+        self.assertNotEqual(last_recv, consumer.last_recv)
+
+    async def test_websocket_send_bad_msg_type(self):
+        consumer = self._mk_one()
+        msg = {"Hello": "There!", "t": "i don't exist"}
+        with self.assertRaises(ValidationError):
+            await consumer.websocket_send(msg)
+
+    async def test_websocket_send(self):
+        await self.fixture()
+        consumer = self.consumer
+        last_sent = consumer.last_sent
+        msg = {"t": "testing.hello", "p": {"greeting": "Hello!"}}
+        await consumer.websocket_send(msg)
+        self.assertGreater(consumer.last_sent, last_sent)
+
+    async def test_receive_hello(self):
+        await self.fixture()
+        consumer = self.consumer
+        msg = json.dumps({"t": "testing.hello"})
+        await consumer.receive(msg)
+        response = await self.communicator.receive_from()
+        self.assertEqual(
+            '{"p": {"greeting": "Hello you too sockety!"}, "t": "testing.hello", "i": null, "s": "s"}',
+            response
+        )
 
 
-    # FIXME:
-    # test queue selecton!
-    # async def test_receive_bad_data(self):
-    #     pass
-    #
+    # FIXME
     # async def test_websocket_send(self):
     #     pass
     #
