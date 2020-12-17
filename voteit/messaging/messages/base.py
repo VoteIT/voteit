@@ -59,7 +59,7 @@ class BaseAddObject(BaseObjectAction, ABC):
         if isinstance(self.model, BaseContent):
             self.data.kwargs.setdefault("author", self.user)
         self.model.objects.create(**self.data.kwargs)
-        response = TextResponse.from_message(self, message="Added")
+        response = TextResponse.from_message(self, msg="Added")
         response.send_outgoing(self.mm.consumer_name, success=True)
 
 
@@ -73,7 +73,7 @@ class BaseChangeObject(BaseObjectAction, ABC):
         )
         self.context.update(**self.data.kwargs)
         self.context.save()
-        response = TextResponse.from_message(self, message="Changed")
+        response = TextResponse.from_message(self, msg="Changed")
         response.send_outgoing(self.mm.consumer_name, success=True)
 
 
