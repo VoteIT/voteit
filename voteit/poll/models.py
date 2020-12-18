@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from collections import Counter
 from hashlib import sha512
 from json import dumps
@@ -12,6 +13,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import UniqueConstraint, Sum
 from django.dispatch import receiver
+from django.utils.text import slugify
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField, transition, post_transition
@@ -239,6 +241,18 @@ class Poll(BaseContent, MeetingContext):
         return self.method.get_result()
 
     def save(self, **kw):
+        """ Make sure meeting is set, from agenda_items meeting.
+            Also set title automatically. """
+        if self.pk is None:
+            if self.meeting is None:
+                self.meeting = self.agenda_item.meeting
+            if not self.title:
+                # Create a unique slugified title
+                base = slugify(self.agenda_item.title)
+                for x in itertools.count(1):
+                    self.title = f'{base}-{x}'
+                    if not self.meeting.polls.filter(title=self.title).exists():
+                        break
         if self.method is not None:
             if not isinstance(self.method, PollMethod):
                 # FIXME: Probably something Django-ish instead
