@@ -20,6 +20,7 @@ class PollViewSet(
     serializer_class = serializers.PollDetailSerializer
     serializer_classes = {
         'list': serializers.PollListSerializer,
+        'create': serializers.PollCreateSerializer,
     }
     filter_backends = DjangoFilterBackend,
     filterset_fields = 'agenda_item', 'agenda_item__meeting',
