@@ -17,7 +17,8 @@ from django_rq import get_queue
 from pydantic import ValidationError
 from rest_framework.authtoken.models import Token
 
-from voteit.core.queues import TESTING_QUEUE, DEFAULT_QUEUE
+from voteit.core.queues import DEFAULT_QUEUE
+from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.abcs import AsyncRunnable
@@ -26,10 +27,10 @@ from voteit.messaging.envelopes import InternalEnvelope
 from voteit.messaging.envelopes import OutgoingEnvelope
 from voteit.messaging.errors import BaseError
 from voteit.messaging.errors import ValidationErrorMsg
-from voteit.messaging.jobs import signal_websocket_connect, signal_websocket_close
-from voteit.messaging.registries import incoming_messages
-from voteit.messaging.signals import client_connect, client_close
-from voteit.messaging.utils import update_connection_status
+from voteit.messaging.jobs import signal_websocket_connect
+from voteit.messaging.jobs import signal_websocket_close
+from voteit.messaging.messages.channels import ChannelSubscription
+
 
 logger = getLogger(__name__)
 
@@ -45,7 +46,6 @@ User = get_user_model()
 # FIXME: Test full channels
 
 # FIXME: Query consumer for last action
-# FIXME Store subscriptions
 
 
 class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
@@ -62,14 +62,17 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
     channel_name: str
     # Errors count, when these stack the sane response would be to simply disconnect
     message_errors: int = 0
-    # For testing injection
-    message_registry = incoming_messages
     # Last sent, received
     last_sent: datetime = None
     last_recv: datetime = None
     last_error: Optional[datetime] = None
     # testing injection, changes queues etc
     # testing: bool = False
+    protected_subscriptions: Dict[str, ChannelSubscription]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.protected_subscriptions = {}
 
     async def connect(self):
         try:
@@ -120,7 +123,14 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             self.user = user
             return user
 
-    async def handle_message(self, message: Union[AsyncRunnable, DeferredJob]):
+    async def handle_message(
+        self, message: Union[AsyncRunnable, DeferredJob], require_action: bool = True
+    ):
+        """
+        :param message: Outgoing or incoming message
+        :param require_action: Cause an exception of the message wasn't acted upon.
+        :return: 
+        """
         # FIXME: How do we handle errors here?
         act = 0
         if isinstance(message, AsyncRunnable):
@@ -131,8 +141,8 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             queue = self.get_queue(message)
             message.enqueue(queue=queue)
             act += 1
-        if not act:
-            # This shuldn't be caught since it's a programming errors
+        if not act and require_action:
+            # This shouldn't be caught since it's a programming error
             raise TypeError(
                 f"{message} must be an instance of either {AsyncRunnable} or {DeferredJob}"
             )
@@ -141,7 +151,9 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         """ Receive from websocket """
         if text_data is None:
             # Connection will die
-            raise ValueError("Only text data accepted")  # Maybe another exception or catch this?
+            raise ValueError(
+                "Only text data accepted"
+            )  # Maybe another exception or catch this?
         # Basic json load
         try:
             base_payload = json.loads(text_data)
@@ -183,8 +195,10 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             But don't use this method directly,
             send messages that are registered within registries.outgoing_messages
         """
-        message = OutgoingEnvelope(**event)
-        payload = message.json(exclude={"type"})
+        envelope = OutgoingEnvelope(**event)
+        message = BaseOutgoingMessage.from_consumer(self, envelope)
+        await self.handle_message(message, require_action=False)
+        payload = envelope.json(exclude={"type"})
         logger.debug("%s sent: %s", self.channel_name, payload)
         # Send message to WebSocket
         await self.send(text_data=payload)
@@ -208,7 +222,10 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         # This may cause validation errors, but that message shouldn't exist in that case it was resent from
         # backend and not from the user.
         # Crash and burn is okay here...
-        message = BaseIncomingMessage.from_consumer(self, envelope)
+        if envelope.incoming:
+            message = BaseIncomingMessage.from_consumer(self, envelope)
+        else:
+            message = BaseOutgoingMessage.from_consumer(self, envelope)
         await self.handle_message(message)
 
     async def send_error(self, error: BaseError):
@@ -254,3 +271,9 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         elif isinstance(item, DeferredJob):
             return get_queue(name=item.queue)
         raise TypeError("Must be queue name as string or DeferredJob")
+
+    def mark_subscribed(self, subscription: ChannelSubscription):
+        self.protected_subscriptions[subscription.channel_name] = subscription
+
+    def mark_left(self, subscription: ChannelSubscription):
+        self.protected_subscriptions.pop(subscription.channel_name, None)

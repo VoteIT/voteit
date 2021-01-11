@@ -7,11 +7,10 @@ from pydantic.main import BaseModel
 
 from voteit.messaging.abcs import (
     AsyncRunnable,
+    DeferredJob,
     BaseIncomingMessage,
     BaseOutgoingMessage,
 )
-from voteit.messaging.abcs import BaseOutgoingMessage
-from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.channels.user import UserChannel
 from voteit.messaging.decorators import incoming, outgoing
 from voteit.messaging.models import Connection
@@ -40,6 +39,14 @@ class LogoutConnection(BaseOutgoingMessage, AsyncRunnable):
         await logout(consumer.scope)
         # reset user?
         await consumer.close(1000)
+
+
+@outgoing
+class RefreshUser(BaseOutgoingMessage, AsyncRunnable):
+    name = "user.refresh"
+
+    async def run(self, consumer: WebsocketDemuxConsumer):
+        await consumer.refresh_user()
 
 
 @incoming

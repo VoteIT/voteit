@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod, ABC
-from typing import List, Type, Optional, Set, Dict
+from typing import List, Type, Optional, Dict
 
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -19,9 +19,10 @@ from voteit.messaging.abcs import (
     ContextSchema,
     BaseOutgoingMessage,
 )
+from voteit.messaging.channels.user import UserChannel
 from voteit.messaging.decorators import incoming, outgoing
-from voteit.messaging.errors import UnauthorizedError
 from voteit.messaging.errors import ValidationErrorMsg
+from voteit.messaging.messages.channels import RecheckChannelSubscriptions
 from voteit.messaging.messages.text import TextResponse
 
 
@@ -79,17 +80,25 @@ class BaseAddRoles(BaseRoles, ABC):
         users_qs = self.validate_and_fetch()
         for user in users_qs:
             self.context.add_roles(user, *self.data.roles)
-        response = TextResponse.from_message(self, msg="Added")
-        response.send_outgoing(self.mm.consumer_name, success=True)
+        if self.mm.consumer_name:  # If this is a script, consumer_name will be None
+            response = TextResponse.from_message(self, msg="Added")
+            response.send_outgoing(self.mm.consumer_name, success=True)
 
 
 class BaseRemoveRoles(BaseRoles, ABC):
     def run_job(self):
         users_qs = self.validate_and_fetch()
+        notify_users = set()
         for user in users_qs:
-            self.context.remove_roles(user, *self.data.roles)
-        response = TextResponse.from_message(self, msg="Removed")
-        response.send_outgoing(self.mm.consumer_name, success=True)
+            if self.context.remove_roles(user, *self.data.roles):
+                notify_users.add(user)
+        if self.mm.consumer_name:  # If this is a script, consumer_name will be None
+            response = TextResponse.from_message(self, msg="Removed")
+            response.send_outgoing(self.mm.consumer_name, success=True)
+        msg = RecheckChannelSubscriptions()
+        for user in notify_users:
+            user_channel = UserChannel.from_instance(user)
+            user_channel.publish(msg, internal=True)
 
 
 @incoming

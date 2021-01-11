@@ -26,8 +26,7 @@ class UserChannel(AbstractObjectChannel):
     def allow_publish(self, user):
         return user.pk == self.pk
 
-    def allow_subscribe(self, user):
-        return user.pk == self.pk
+    allow_subscribe = allow_leave = allow_publish
 
 
 @receiver(client_connect)

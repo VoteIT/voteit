@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from pydantic import validator, BaseModel
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 from django.utils.translation import gettext as _
 
-from voteit.messaging.abcs import DeferredJob
+from voteit.messaging.abcs import DeferredJob, AsyncRunnable
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.errors import NotFoundError
@@ -12,9 +12,10 @@ from voteit.messaging.errors import UnauthorizedError
 from voteit.messaging.registries import incoming_messages
 from voteit.messaging.registries import outgoing_messages
 from voteit.messaging.utils import get_channel_registry
+from voteit.messaging.abcs import AbstractObjectChannel
 
 if TYPE_CHECKING:
-    from voteit.messaging.abcs import AbstractObjectChannel
+    from voteit.messaging.consumers import WebsocketDemuxConsumer
 
 
 SUBSCRIBE = "channel.subscribe"
@@ -32,9 +33,16 @@ class ChannelSchema(BaseModel):
     def real_channel_type(cls, v):
         cr = get_channel_registry()
         v = v.lower()
-        if v not in cr:
+        if v not in cr:  # pragma: no cover
             raise ValueError(f"'{v}' is not a valid channel")
         return v
+
+
+class ChannelSubscription(ChannelSchema):
+    """ Track subscriptions to protected channels.
+    """
+
+    channel_name: str
 
 
 class BaseChannelCommand(BaseIncomingMessage):
@@ -52,20 +60,19 @@ class Subscribe(BaseChannelCommand, DeferredJob):
     schema = ChannelSchema
     data: ChannelSchema
 
-    def run_job(self):
+    def run_job(self) -> Subscribed:
         channel = self.get_channel(
             self.data.channel_type, self.data.pk, self.mm.consumer_name
         )
         if channel.allow_subscribe(self.user):
             channel.subscribe()
-            msg = Subscribed.from_message(self)
-            msg.send_outgoing(self.mm.consumer_name, success=True)
-        else:
-            raise UnauthorizedError.from_message(
-                self,
-                permission=channel.permission,
-                msg=_("You're not allowed to subscribe to this channel"),
+            msg = Subscribed.from_message(
+                self, channel_name=channel.channel_name, **self.data.dict()
             )
+            msg.send_outgoing(self.mm.consumer_name, success=True)
+            return msg
+        else:
+            raise UnauthorizedError.from_message(self)
 
 
 @incoming_messages
@@ -74,32 +81,81 @@ class Leave(BaseChannelCommand, DeferredJob):
     schema = ChannelSchema
     data: ChannelSchema
 
-    def run_job(self):
+    def run_job(self) -> Left:
         channel = self.get_channel(
             self.data.channel_type, self.data.pk, self.mm.consumer_name
         )
         if channel.context is None:
-            raise NotFoundError.from_message(
-                self,
-                msg=_("Context doesn't exist"),
-            )
+            raise NotFoundError.from_message(self, msg=_("Context doesn't exist"))
         if channel.allow_leave(self.user):
-            channel.subscribe()
-            msg = Left.from_message(self)
+            channel.leave()
+            msg = Left.from_message(self, channel_name=channel.channel_name, **self.data.dict())
             msg.send_outgoing(self.mm.consumer_name, success=True)
+            return msg
         else:
             raise UnauthorizedError.from_message(
                 self,
-                permission=channel.permission,
-                msg=_("You're not allowed to leave to this channel"),  # Hotel California...
+                permission=None,  # We don't know here, add perm?
+                msg=_(
+                    "You're not allowed to leave to this channel"
+                ),  # Hotel California...
             )
 
 
 @outgoing_messages
-class Subscribed(BaseOutgoingMessage):
+class Subscribed(BaseOutgoingMessage, AsyncRunnable):
     name = SUBSCRIBED
+    schema = ChannelSubscription
+    data: ChannelSubscription
+
+    async def run(self, consumer: WebsocketDemuxConsumer):
+        consumer.mark_subscribed(self.data)
 
 
 @outgoing_messages
-class Left(BaseOutgoingMessage):
+class Left(BaseOutgoingMessage, AsyncRunnable):
     name = LEFT
+    schema = ChannelSubscription
+    data: ChannelSubscription
+
+    async def run(self, consumer: WebsocketDemuxConsumer):
+        consumer.mark_left(self.data)
+
+
+class RecheckSubscriptionsSchema(BaseModel):
+    subscriptions: List[ChannelSubscription] = []
+    consumer_name: Optional[str]
+
+
+@outgoing_messages
+class RecheckChannelSubscriptions(BaseOutgoingMessage, DeferredJob):
+    """ Send this as an internal message to ask the consumer to
+        recheck that it's authorized to subscribe to different channels.
+    """
+
+    name = "channel.recheck"
+    schema = RecheckSubscriptionsSchema
+    data: RecheckSubscriptionsSchema
+
+    async def pre_queue(self, consumer: WebsocketDemuxConsumer):
+        self.data.consumer_name = (
+            consumer.channel_name
+        )  # It might be sent by someone else
+        self.data.subscriptions.extend(consumer.protected_subscriptions.values())
+
+    @property
+    def should_run(self) -> bool:
+        return bool(self.data.subscriptions)
+
+    def run_job(self):
+        cr = get_channel_registry()
+        # We don't really know if someone is subscribing due to how channels work, but we won't resubscribe
+        for cs in self.data.subscriptions:
+            ch_class = cr[cs.channel_type]
+            if not issubclass(ch_class, AbstractObjectChannel):
+                continue
+            ch = ch_class.from_pk(cs.pk, self.data.consumer_name)
+            if not ch.allow_subscribe(self.user):
+                ch.leave()
+                msg = Left.from_message(self, channel_name=ch.channel_name, channel_type=cs.channel_type, pk=cs.pk)
+                msg.send_outgoing(self.mm.consumer_name, success=True)

@@ -85,8 +85,10 @@ class MessageABC(ABC):
         pass
 
     def __init__(
-        self, mm: Union[Dict, MessageMeta], data: Optional[Dict] = None, **kwargs
+        self, mm: Union[Dict, MessageMeta] = None, data: Optional[Dict] = None, **kwargs
     ):
+        if mm is None:
+            mm = {}
         if isinstance(mm, MessageMeta):
             self.mm = mm
         else:
@@ -159,7 +161,7 @@ class MessageABC(ABC):
 
     @classmethod
     def from_consumer(
-        cls, consumer, envelope: Union[IncomingEnvelope, InternalEnvelope]
+        cls, consumer, envelope: Union[IncomingEnvelope, InternalEnvelope, OutgoingEnvelope]
     ):
         mm = MessageMeta(
             consumer_name=consumer.channel_name,
@@ -263,8 +265,9 @@ class DeferredJob(ABC):
     # Markers for type checking
     mm: MessageMeta
     data: BaseModel  # But really the schema
+    should_run:bool = True  # Mark as false to abort run
 
-    async def pre_queue(self, consumer):
+    async def pre_queue(self, consumer: WebsocketDemuxConsumer):
         """ Do something before entering the queue. Only applies to when the consumer receives the message.
             It's a good idea to avoid using this if it's not needed.
         """
@@ -272,7 +275,8 @@ class DeferredJob(ABC):
     def enqueue(self, queue=None):
         # FIXME: Queues and django_rq are kind of a mess right now
         from voteit.messaging.jobs import run_job
-
+        if not self.should_run:
+            return
         kwargs = dict(
             msg_data=self.data.dict(),
             mm_data=self.mm.dict(),

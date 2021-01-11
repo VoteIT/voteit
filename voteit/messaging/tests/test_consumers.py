@@ -26,19 +26,24 @@ class ConsumerTests(TestCase):
         self.user = User.objects.create(username="sockety")
         self.fakeredis_conn = FakeRedis()
         from voteit.messaging.messages import testing  # To enable testing messages
+
         super().setUp()
 
     def tearDown(self):
         super().tearDown()
         # mock patch is probably the right way to do this
-        incoming_messages.pop("testing", None)
+        incoming_messages.pop("tester", None)
         if self._connected:
             async_to_sync(self.communicator.disconnect)()
 
-    def _mk_one(self):
+    @property
+    def _cut(self):
         from voteit.messaging.consumers import WebsocketDemuxConsumer
 
-        consumer = WebsocketDemuxConsumer()
+        return WebsocketDemuxConsumer
+
+    def _mk_one(self):
+        consumer = self._cut()
         consumer.refresh_user = mock.AsyncMock(return_value=self.user)
         consumer.get_queue = mock.MagicMock(
             return_value=get_queue(name=TESTING_QUEUE, connection=self.fakeredis_conn)
@@ -229,9 +234,20 @@ class ConsumerTests(TestCase):
         response = await self.communicator.receive_from()
         self.assertEqual(
             '{"p": {"greeting": "Hello you too sockety!"}, "t": "testing.hello", "i": null, "s": "s"}',
-            response
+            response,
         )
 
+    async def test_outgoing_with_action(self):
+        from voteit.messaging.messages.user import RefreshUser
+
+        consumer = self._cut()
+        consumer.channel_name = "abc"
+        consumer.user = self.user
+        consumer.refresh_user = mock.AsyncMock(return_value=None)
+        msg = RefreshUser.create()
+        envelope = {"p": msg.data.dict(), "t": msg.name}
+        await consumer.internal_receive(envelope)
+        self.assertTrue(consumer.refresh_user.called)
 
     # FIXME
     # async def test_websocket_send(self):
