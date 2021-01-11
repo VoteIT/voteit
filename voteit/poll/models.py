@@ -244,9 +244,10 @@ class Poll(BaseContent, MeetingContext):
         """ Make sure meeting is set, from agenda_items meeting.
             Also set title automatically. """
         if self.pk is None:
-            if self.meeting is None:
+            # FIXME: This "helper" seems to cause a lot more problems than it's worth... :( /Robin
+            if self.meeting is None and getattr(self.agenda_item, "meeting", None) is not None:
                 self.meeting = self.agenda_item.meeting
-            if not self.title:
+            if not self.title and self.agenda_item is not None and self.meeting is not None:
                 # Create a unique slugified title
                 base = slugify(self.agenda_item.title)
                 for x in itertools.count(1):

@@ -46,7 +46,10 @@ class PollDetailSerializer(serializers.ModelSerializer):
         return 0
 
     def get_voted(self, instance):
-        return instance.method.vote_set.count()
+        # FIXME: Seems to be called too soon?
+        if instance.method is not None:
+            return instance.method.vote_set.count()
+        return 0
 
     # Note: This won't have access to the request object, so no url things here!
     class Meta:
