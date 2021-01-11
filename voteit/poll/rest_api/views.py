@@ -1,7 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, permissions
 from voteit.agenda.models import AgendaItem
-from voteit.core.rest_api.mixins import SerializerClassesMixin, CreateModelPermissionsMixin
+from voteit.core.rest_api.mixins import SerializerClassesMixin, CreateModelPermissionsMixin, TransitionsMixin
 from voteit.poll.models import Poll
 
 from . import serializers
@@ -11,6 +11,7 @@ __all__ = ['PollViewSet']
 
 
 class PollViewSet(
+    TransitionsMixin,
     SerializerClassesMixin,
     CreateModelPermissionsMixin,
     viewsets.ModelViewSet
