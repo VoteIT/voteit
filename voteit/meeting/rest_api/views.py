@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
-from voteit.core.rest_api.mixins import SerializerClassesMixin
+from voteit.core.rest_api.mixins import SerializerClassesMixin, CreateModelPermissionsMixin
 
 from voteit.meeting.models import *
 from voteit.meeting.rest_api.filters import UserPkFilter
@@ -16,8 +16,7 @@ __all__ = ('MeetingViewSet', 'MeetingRolesViewSet', )
 
 class MeetingViewSet(
     SerializerClassesMixin,
-    # TODO: Permissions for fsm mixin
-    # get_drf_fsm_mixin(Meeting, fieldname='state'),
+    CreateModelPermissionsMixin,
     viewsets.ModelViewSet,
 ):
     model = Meeting

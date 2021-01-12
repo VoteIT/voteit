@@ -23,7 +23,7 @@ class ProposalViewSet(
         'list': serializers.ProposalListSerializer,
     }
     filter_backends = DjangoFilterBackend,
-    filterset_fields = 'agenda_item', 'agenda_item__meeting',
+    filterset_fields = 'agenda_item', 'agenda_item__meeting', 'polls'
     context_queryset = AgendaItem.objects.all()
     context_lookup_kwarg = 'agenda_item'
 
