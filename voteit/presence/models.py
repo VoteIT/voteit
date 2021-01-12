@@ -41,6 +41,8 @@ class Presence(models.Model):
     def __str__(self):
         return f"Presence ({self.pk})"
 
+    objects = models.Manager()  # Type hinting
+
 
 class PresenceCheck(models.Model):
     """
@@ -78,6 +80,7 @@ class PresenceCheck(models.Model):
     def __str__(self):
         return f"Presence check ({self.pk})"
 
+    objects = models.Manager()  # Type hinting
 
 class PresenceSystem(MeetingContext):
     """
@@ -96,3 +99,5 @@ class PresenceSystem(MeetingContext):
 
     def __str__(self):
         return f"Presence system ({self.pk})"
+
+    objects = models.Manager()  # Type hinting
