@@ -8,3 +8,7 @@ class PresenceConfig(AppConfig):
 
     def ready(self):
         from voteit.presence import rules
+        from voteit.presence import channels
+        from voteit.presence import messages
+        from voteit.presence import signals
+        from voteit.presence import rest_api
