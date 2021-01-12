@@ -6,7 +6,7 @@ from voteit.proposal import models
 class ProposalListSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Proposal
-        fields = "url", "pk", "title", "state", "agenda_item", "author"
+        fields = "url", "pk", "title", "state", "agenda_item", "author", "polls"
         read_only_fields = ("state",)
 
 

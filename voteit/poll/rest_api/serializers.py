@@ -30,9 +30,11 @@ class PollMethodField(serializers.ChoiceField):
 
 
 class PollListSerializer(serializers.ModelSerializer):
+    method = serializers.CharField(source='method.title')
+
     class Meta:
         model = models.Poll
-        fields = "url", "pk", "title", "meeting", "agenda_item", "state"
+        fields = "url", "pk", "title", "meeting", "agenda_item", "state", "method"
         read_only_fields = ("state",)
 
 

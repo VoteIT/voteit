@@ -5,7 +5,6 @@ from django.db.models.query import QuerySet
 from rest_framework import permissions
 from rest_framework.decorators import action
 from rest_framework.mixins import CreateModelMixin
-from rest_framework.permissions import DjangoObjectPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
 
