@@ -17,10 +17,9 @@ class PresenceCheckAdmin(FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = ["state"]
     list_display = "state", "presence_system", "opened", "closed"
     list_filter = ("state",)
-    exclude = "state",
+    exclude = ("state",)
 
 
 @admin.register(Presence)
 class PresenceAdmin(admin.ModelAdmin):
     list_display = "user", "presence_check", "created"
-

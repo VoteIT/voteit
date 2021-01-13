@@ -82,6 +82,7 @@ class PresenceCheck(models.Model):
 
     objects = models.Manager()  # Type hinting
 
+
 class PresenceSystem(MeetingContext):
     """
     The presence system has a 1-1 relation to a meeting.
