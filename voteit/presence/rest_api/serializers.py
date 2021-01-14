@@ -12,6 +12,7 @@ class PresenceDetailSerializer(serializers.ModelSerializer):
 
 
 class PresenceCheckDetailSerializer(serializers.ModelSerializer):
+    meeting = serializers.PrimaryKeyRelatedField(source="presence_system.meeting", read_only=True)
 
     # Note: This won't have access to the request object, so no url things here!
     class Meta:
