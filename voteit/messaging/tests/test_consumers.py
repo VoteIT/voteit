@@ -3,7 +3,7 @@ from datetime import datetime
 from unittest import mock
 
 from django.dispatch import receiver
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from pydantic import BaseModel, ValidationError
 from rq import SimpleWorker
 from asgiref.sync import async_to_sync, sync_to_async
@@ -19,6 +19,12 @@ from voteit.messaging.registries import incoming_messages
 User = get_user_model()
 
 
+_channel_layers_setting = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ConsumerTests(TestCase):
     _connected = False
 

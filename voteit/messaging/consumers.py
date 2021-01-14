@@ -66,13 +66,16 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
     last_sent: datetime = None
     last_recv: datetime = None
     last_error: Optional[datetime] = None
-    # testing injection, changes queues etc
-    # testing: bool = False
     protected_subscriptions: Dict[str, ChannelSubscription]
+    # Send and queue connection signals?
+    # They're a bad idea in most unit tests since they muck about with threading and db-access,
+    # which causes the async tests to fail or start in another threads async event loop.
+    enable_connection_signals: bool = True
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, enable_connection_signals=True, **kwargs):
         super().__init__(*args, **kwargs)
         self.protected_subscriptions = {}
+        self.enable_connection_signals = enable_connection_signals
 
     async def connect(self):
         try:
@@ -96,7 +99,8 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         )
         await self.accept()
         logger.debug("Connection accepted for user %s (%s)", self.user, self.user.pk)
-        self.dispatch_connect()
+        if self.enable_connection_signals:
+            self.dispatch_connect()
 
     async def disconnect(self, close_code):
         # https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent
@@ -105,7 +109,8 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
                 "Disconnect user pk %s with close code %s", self.user_pk, close_code
             )
             # We only need to signal disconnect for an actual user
-            self.dispatch_close(close_code)
+            if self.enable_connection_signals:
+                self.dispatch_close(close_code)
         else:
             logger.debug("Disconnect was from anon, close code %s", close_code)
 
