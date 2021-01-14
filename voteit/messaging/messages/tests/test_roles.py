@@ -4,7 +4,7 @@ from unittest.mock import patch
 from asgiref.sync import sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django_rq import get_queue
 from fakeredis import FakeRedis
 from rq import SimpleWorker
@@ -51,7 +51,7 @@ class MeetingRolesTests(TestCase):
             )
 
 
-class RolesIntegrationTests(TestCase):
+class RolesIntegrationTests(TransactionTestCase):
     def setUp(self):
         self.user_a = User.objects.create(username="abel")
         self.user_b = User.objects.create(username="bret")

@@ -9,7 +9,7 @@ from channels import DEFAULT_CHANNEL_LAYER
 from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Model
 from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
@@ -496,8 +496,11 @@ class AbstractChannel(ABC):
         else:
             await message.async_send_outgoing(self.channel_name, group=True, **kwargs)
 
-    def publish(self, message: MessageABC, internal=False, **kwargs):
-        async_to_sync(self.async_publish)(message, internal=internal, **kwargs)
+    def publish(self, message: MessageABC, internal=False, on_commit=True, **kwargs):
+        if on_commit:
+            transaction.on_commit(lambda: async_to_sync(self.async_publish)(message, internal=internal, **kwargs))
+        else:
+            async_to_sync(self.async_publish)(message, internal=internal, **kwargs)
 
     async def async_leave(self, consumer_channel=None):
         if consumer_channel is None:
