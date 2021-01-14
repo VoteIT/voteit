@@ -44,7 +44,7 @@ class Presence(models.Model):
     objects = models.Manager()  # Type hinting
 
 
-class PresenceCheck(models.Model):
+class PresenceCheck(MeetingContext):
     """
     This models handles lists of users who are present.
     Only one presence check should be open at a time.
@@ -76,6 +76,10 @@ class PresenceCheck(models.Model):
     @transition(field=state, source=PresenceCheckWf.OPEN, target=PresenceCheckWf.CLOSED)
     def close(self) -> None:
         self.closed = now()
+
+    @property
+    def meeting(self) -> Optional[Meeting]:
+        return self.presence_system.meeting
 
     def __str__(self):
         return f"Presence check ({self.pk})"

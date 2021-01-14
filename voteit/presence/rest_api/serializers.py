@@ -16,7 +16,7 @@ class PresenceCheckDetailSerializer(serializers.ModelSerializer):
     # Note: This won't have access to the request object, so no url things here!
     class Meta:
         model = models.PresenceCheck
-        fields = "pk", "state", "presence_system"
+        fields = "pk", "state", "presence_system", "meeting"
         read_only_fields = "state",
 
 
