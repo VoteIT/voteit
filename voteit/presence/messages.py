@@ -147,10 +147,5 @@ class PresenceAdded(BaseObjectAdded):
 
 
 @outgoing
-class PresenceChanged(BaseObjectChanged):
-    name = "presence.changed"
-
-
-@outgoing
 class PresenceDeleted(BaseObjectDeleted):
     name = "presence.deleted"
