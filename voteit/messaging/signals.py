@@ -16,3 +16,8 @@ client_close = Signal(providing_args=["consumer_name", "user", "user_pk", "conne
 # connection        The Connection instance
 # awol             "Absent Without Official Leave" - did you just disappear on us?
 connection_terminated = Signal(providing_args=["connection", "awol"])
+
+# When a user is subscribed to a channel, components can send state app messages to that channel,
+# to make sure the user is caught up.
+channel_subscribed = Signal(providing_args=["channel", "user", "app_state"])
+channel_left = Signal(providing_args=["channel", "user"])

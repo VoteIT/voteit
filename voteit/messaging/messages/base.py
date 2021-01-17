@@ -65,6 +65,10 @@ class BaseAddObject(BaseObjectAction, ABC):
 
     def run_job(self):
         self.assert_perm(
+            # FIXME: % interpolation done outside of gettext-object, see
+            # https://docs.djangoproject.com/en/3.1/topics/i18n/translation/#standard-translation
+            # Should be:
+            # msg=_("You're not allowed to add %(ctype)s here") % {"ctype": self.add_model}
             msg=_("You're not allowed to add %(ctype)s here" % {"ctype": self.add_model})
         )
         if issubclass(self.add_model, BaseContent):
