@@ -1,4 +1,7 @@
+from contextlib import suppress
+
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
@@ -85,7 +88,8 @@ def presence_check_deleted(instance=None, **kw):
 @receiver(channel_subscribed, sender=MeetingChannel)
 def channel_subscribed(context: Meeting, user: AbstractUser, app_state: AppState, **kw):
     """ Populate app_state with current, if any, presence check objects. """
-    if presence_check := context.presencesystem.presence_checks.latest_open():
-        app_state.append_from(presence_check, PresenceCheckDetailSerializer, PresenceCheckAdded)
-        if user_presence := presence_check.presences.filter(user=user).first():
-            app_state.append_from(user_presence, PresenceDetailSerializer, PresenceAdded)
+    with suppress(ObjectDoesNotExist):
+        if presence_check := context.presencesystem.presence_checks.latest_open():
+            app_state.append_from(presence_check, PresenceCheckDetailSerializer, PresenceCheckAdded)
+            if user_presence := presence_check.presences.filter(user=user).first():
+                app_state.append_from(user_presence, PresenceDetailSerializer, PresenceAdded)
