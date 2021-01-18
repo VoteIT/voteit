@@ -41,6 +41,7 @@ class PollListSerializer(serializers.ModelSerializer):
 class PollDetailSerializer(serializers.ModelSerializer):
     voted = serializers.SerializerMethodField()
     total = serializers.SerializerMethodField()
+    method = serializers.CharField(source='method.title')
 
     def get_total(self, instance):
         if instance.electoral_register:
@@ -56,7 +57,7 @@ class PollDetailSerializer(serializers.ModelSerializer):
     # Note: This won't have access to the request object, so no url things here!
     class Meta:
         model = models.Poll
-        fields = "pk", "title", "meeting", "agenda_item", "state", "voted", "total"
+        fields = "pk", "title", "meeting", "agenda_item", "state", "method", "voted", "total"
         read_only_fields = "state",
 
 
