@@ -13,6 +13,7 @@ from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.envelopes import BaseEnvelope
 from voteit.messaging.errors import NotFoundError
 from voteit.messaging.errors import UnauthorizedError
+from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.registries import incoming_messages
 from voteit.messaging.registries import outgoing_messages
 from voteit.messaging.utils import get_channel_registry
@@ -65,14 +66,14 @@ class Subscribe(BaseChannelCommand, DeferredJob):
     schema = ChannelSchema
     data: ChannelSchema
 
-    def get_app_state(self, channel) -> Optional[list]:
-        """ Dispatch signal to populate app_state """
-        app_state = []
+    def get_app_state(self, channel: AbstractObjectChannel) -> Optional[list]:
+        """ Dispatch signal to populate app_state object, and return as list object or None """
+        app_state = AppState()
         signals.channel_subscribed.send(
-            sender=channel.__class__, channel=channel, user=self.user, app_state=app_state
+            sender=channel.__class__, context=channel.context, user=self.user, app_state=app_state
         )
-        # Transform any messages in appstate to dicts with p as payload and t as message type
-        return app_state or None
+        if app_state:
+            return list(app_state)
 
     def run_job(self) -> Subscribed:
         channel = self.get_channel(
@@ -107,7 +108,7 @@ class Leave(BaseChannelCommand, DeferredJob):
             msg = Left.from_message(self, channel_name=channel.channel_name, **self.data.dict())
             msg.send_outgoing(self.mm.consumer_name, success=True)
             # No app state when leaving channel
-            signals.channel_left.send(sender=channel.__class__, channel=channel, user=self.user)
+            signals.channel_left.send(sender=channel.__class__, context=channel.context, user=self.user)
             return msg
         else:
             raise UnauthorizedError.from_message(

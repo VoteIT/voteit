@@ -19,5 +19,5 @@ connection_terminated = Signal(providing_args=["connection", "awol"])
 
 # When a user is subscribed to a channel, components can send state app messages to that channel,
 # to make sure the user is caught up.
-channel_subscribed = Signal(providing_args=["channel", "user", "app_state"])
-channel_left = Signal(providing_args=["channel", "user"])
+channel_subscribed = Signal(providing_args=["context", "user", "app_state"])
+channel_left = Signal(providing_args=["context", "user"])

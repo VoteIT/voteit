@@ -6,7 +6,7 @@ from django.dispatch import receiver
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.messaging.channels.user import UserChannel
-from voteit.messaging.envelopes import BaseEnvelope
+from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.signals import channel_subscribed
 from voteit.presence.messages import (
     PresenceCheckStatus,
@@ -83,14 +83,9 @@ def presence_check_deleted(instance=None, **kw):
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
-def channel_subscribed(channel: MeetingChannel, user: AbstractUser, app_state: list, **kw):
-    """ Populate app_state with presence check things. """
-    meeting: Meeting = channel.context
-    if presence_check := meeting.presencesystem.presence_checks.latest_open():
-        data = PresenceCheckDetailSerializer(presence_check).data
-        check_state = BaseEnvelope(t=PresenceCheckAdded.name, p=data)
-        app_state.append(check_state)
+def channel_subscribed(context: Meeting, user: AbstractUser, app_state: AppState, **kw):
+    """ Populate app_state with current, if any, presence check objects. """
+    if presence_check := context.presencesystem.presence_checks.latest_open():
+        app_state.append_from(presence_check, PresenceCheckDetailSerializer, PresenceCheckAdded)
         if user_presence := presence_check.presences.filter(user=user).first():
-            data = PresenceDetailSerializer(user_presence).data
-            presence_state = BaseEnvelope(t=PresenceAdded.name, p=data)
-            app_state.append(presence_state)
+            app_state.append_from(user_presence, PresenceDetailSerializer, PresenceAdded)
