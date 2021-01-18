@@ -10,6 +10,7 @@ from voteit.messaging import signals
 from voteit.messaging.abcs import DeferredJob, AsyncRunnable
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import BaseIncomingMessage
+from voteit.messaging.envelopes import BaseEnvelope
 from voteit.messaging.errors import NotFoundError
 from voteit.messaging.errors import UnauthorizedError
 from voteit.messaging.registries import incoming_messages
@@ -46,7 +47,7 @@ class ChannelSubscription(ChannelSchema):
     """
 
     channel_name: str
-    app_state: Optional[List]
+    app_state: Optional[List[BaseEnvelope]]
 
 
 class BaseChannelCommand(BaseIncomingMessage, ABC):
@@ -70,6 +71,7 @@ class Subscribe(BaseChannelCommand, DeferredJob):
         signals.channel_subscribed.send(
             sender=channel.__class__, channel=channel, user=self.user, app_state=app_state
         )
+        # Transform any messages in appstate to dicts with p as payload and t as message type
         return app_state or None
 
     def run_job(self) -> Subscribed:

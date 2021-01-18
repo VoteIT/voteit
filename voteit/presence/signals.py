@@ -6,6 +6,7 @@ from django.dispatch import receiver
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.messaging.channels.user import UserChannel
+from voteit.messaging.envelopes import BaseEnvelope
 from voteit.messaging.signals import channel_subscribed
 from voteit.presence.messages import (
     PresenceCheckStatus,
@@ -87,7 +88,9 @@ def channel_subscribed(channel: MeetingChannel, user: AbstractUser, app_state: l
     meeting: Meeting = channel.context
     if presence_check := meeting.presencesystem.presence_checks.latest_open():
         data = PresenceCheckDetailSerializer(presence_check).data
-        app_state.append(PresenceCheckAdded(**data))
+        check_state = BaseEnvelope(t=PresenceCheckAdded.name, p=data)
+        app_state.append(check_state)
         if user_presence := presence_check.presences.filter(user=user).first():
             data = PresenceDetailSerializer(user_presence).data
-            app_state.append(PresenceAdded(**data))
+            presence_state = BaseEnvelope(t=PresenceAdded.name, p=data)
+            app_state.append(presence_state)
