@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from abc import ABC
+
 from pydantic import validator, BaseModel
 from typing import TYPE_CHECKING, List, Optional
 from django.utils.translation import gettext as _
@@ -29,7 +31,6 @@ LEFT = "channel.left"
 class ChannelSchema(BaseModel):
     pk: int
     channel_type: str
-    app_state: Optional[list]
 
     @validator("channel_type")
     def real_channel_type(cls, v):
@@ -45,9 +46,10 @@ class ChannelSubscription(ChannelSchema):
     """
 
     channel_name: str
+    app_state: Optional[List]
 
 
-class BaseChannelCommand(BaseIncomingMessage):
+class BaseChannelCommand(BaseIncomingMessage, ABC):
     def get_channel(
         self, channel_type: str, pk: int, consumer_name: str
     ) -> AbstractObjectChannel:
@@ -76,9 +78,9 @@ class Subscribe(BaseChannelCommand, DeferredJob):
         )
         if channel.allow_subscribe(self.user):
             channel.subscribe()
-            self.data.app_state = self.get_app_state(channel)
+            app_state = self.get_app_state(channel)
             msg = Subscribed.from_message(
-                self, channel_name=channel.channel_name, **self.data.dict()
+                self, channel_name=channel.channel_name, app_state=app_state, **self.data.dict()
             )
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg

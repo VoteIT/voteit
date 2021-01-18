@@ -239,14 +239,6 @@ class BaseOutgoingMessage(MessageABC, ABC):
         mm = MessageMeta(type=type_name, **message.mm.dict(exclude={"type"}))
         return cls.get_registry()[type_name](mm, kwargs)
 
-    @property
-    def app_state(self):
-        # FIXME This should have a special envelope?
-        return {
-            "t": self.name,
-            "p": self.data,
-        }
-
 
 class AsyncRunnable(ABC):
     """ This message is ment to be processed within the consumer.

@@ -1,15 +1,12 @@
-from typing import Optional
-
 from django.contrib.auth.models import AbstractUser
 from django.db.models.signals import post_save
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
+
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.messaging.channels.user import UserChannel
 from voteit.messaging.signals import channel_subscribed
-from voteit.presence import messages
-
 from voteit.presence.messages import (
     PresenceCheckStatus,
     PresenceDeleted,
@@ -18,7 +15,6 @@ from voteit.presence.messages import (
     PresenceCheckDeleted,
 )
 from voteit.presence.messages import PresenceAdded
-
 from voteit.presence.models import Presence
 from voteit.presence.models import PresenceCheck
 from voteit.presence.channels import PresenceCheckChannel
@@ -87,10 +83,11 @@ def presence_check_deleted(instance=None, **kw):
 
 @receiver(channel_subscribed, sender=MeetingChannel)
 def channel_subscribed(channel: MeetingChannel, user: AbstractUser, app_state: list, **kw):
+    """ Populate app_state with presence check things. """
     meeting: Meeting = channel.context
     if presence_check := meeting.presencesystem.presence_checks.latest_open():
         data = PresenceCheckDetailSerializer(presence_check).data
-        app_state.append(PresenceCheckAdded(**data).app_state)
+        app_state.append(PresenceCheckAdded(**data))
         if user_presence := presence_check.presences.filter(user=user).first():
             data = PresenceDetailSerializer(user_presence).data
-            app_state.append(PresenceAdded(**data).app_state)
+            app_state.append(PresenceAdded(**data))
