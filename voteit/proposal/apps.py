@@ -10,3 +10,4 @@ class ProposalConfig(AppConfig):
         from voteit.proposal import rules
         from voteit.proposal import rest_api
         from voteit.proposal import messages
+        from voteit.proposal import signals
