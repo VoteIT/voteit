@@ -6,8 +6,7 @@ from django.contrib.auth.models import AbstractUser
 from voteit.agenda.permissions import AgendaPermissions
 from voteit.agenda.rules import can_moderate_agendas_meeting
 from voteit.meeting.models import Meeting
-from voteit.poll.abcs import Vote
-
+from voteit.poll.models import Vote
 from voteit.poll.models import Poll
 from voteit.poll.workflows import PollWf
 from voteit.poll.permissions import PollPermissions
@@ -108,12 +107,7 @@ rules.add_perm(PollPermissions.VIEW, can_view_poll)
 @rules.predicate
 def vote_is_poll_ongoing(user: AbstractUser, vote: Vote):
     """ Delegate to is_poll_ongoing"""
-    if isinstance(vote, Vote):
-        try:
-            poll = vote.method.poll
-        except AttributeError:  # pragma: no cover
-            return
-        return is_poll_ongoing(user, poll)
+    return isinstance(vote, Vote) and is_poll_ongoing(user, vote.poll)
 
 
 rules.add_perm(VotePermissions.ADD, is_poll_ongoing & is_voter)  # Checked against poll.

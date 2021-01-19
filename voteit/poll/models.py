@@ -2,26 +2,29 @@ from __future__ import annotations
 
 import itertools
 from collections import Counter
+from datetime import datetime
 from hashlib import sha512
 from json import dumps
 from logging import getLogger
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import UniqueConstraint, Sum
 from django.dispatch import receiver
+from django.utils.functional import cached_property
 from django.utils.text import slugify
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField, transition, post_transition
-from typing import Optional
+from typing import Optional, Dict, Type, TYPE_CHECKING, Union
+
+from pydantic import ValidationError
+from pydantic.main import BaseModel
+
 from voteit.core.abcs import MeetingContext
-from voteit.core.models import BaseContent, ABCModel
+from voteit.core.models import BaseContent
 from voteit.meeting.models import Meeting
-from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import (
     BallotChecksumError,
     ElectoralRegisterEmpty,
@@ -29,8 +32,14 @@ from voteit.poll.exceptions import (
     InvalidPollMethod,
     InvalidProposalCount,
     PollNotFinished,
+    NotAllowedToVote,
 )
+from voteit.poll.utils import get_poll_method_registry
 from voteit.poll.workflows import PollWf
+
+if TYPE_CHECKING:
+    from voteit.poll.abcs import PollMethod
+
 
 logger = getLogger(__name__)
 
@@ -75,51 +84,110 @@ class Poll(BaseContent, MeetingContext):
         "agenda.AgendaItem", on_delete=models.CASCADE, null=True, related_name="polls"
     )
     proposals = models.ManyToManyField("proposal.Proposal", related_name="polls")
-    method_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True)
-    method_id = models.PositiveIntegerField(null=True)
-    method = GenericForeignKey("method_type", "method_id")
-    created = models.DateTimeField(editable=False, auto_now_add=True)
-    started = models.DateTimeField(editable=False, null=True)
-    closed = models.DateTimeField(editable=False, null=True)
-    initial_electoral_register = models.ForeignKey(
+    method_name: str = models.CharField(max_length=20)
+    settings_data: Optional[Dict] = models.JSONField(null=True, blank=True)
+    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    started: Optional[datetime] = models.DateTimeField(editable=False, null=True)
+    closed: Optional[datetime] = models.DateTimeField(editable=False, null=True)
+    initial_electoral_register: Optional[ElectoralRegister] = models.ForeignKey(
         "ElectoralRegister",
         on_delete=models.SET_NULL,
         editable=False,
         null=True,
         related_name="polls_initial",
     )
-    electoral_register: ElectoralRegister = models.ForeignKey(
+    electoral_register: Optional[ElectoralRegister] = models.ForeignKey(
         "ElectoralRegister",
         on_delete=models.SET_NULL,
         editable=False,
         null=True,
         related_name="polls",
     )
-    ballot_data = models.TextField(
+    ballot_data: Optional[str] = models.TextField(
         verbose_name=_("JSON-serialized ballot data"), editable=False, null=True
     )
-    ballot_checksum = models.CharField(
+    ballot_checksum: Optional[str] = models.CharField(
         verbose_name=_("SHA512 checksum of ballot data"),
         max_length=128,
         editable=False,
         null=True,
     )
-    abstains = models.PositiveIntegerField(
+    abstains: int = models.PositiveIntegerField(
         verbose_name=_("Abstentions"), default=0, editable=False
     )
+    result_data: Optional[Dict] = models.JSONField(
+        verbose_name=_("JSON-serialized result data"), editable=False, null=True
+    )
 
-    class Meta:
-        constraints = [
-            UniqueConstraint(
-                fields=["method_type", "method_id"],
-                name="%(app_label)s_%(class)s_method",
-            )
-        ]
+    def get_method_class(self) -> Type[PollMethod]:
+        """ Fetch the poll method class, a django proxy model.
+        """
+        reg = get_poll_method_registry()
+        if self.method_name not in reg:
+            raise InvalidPollMethod(f"{self.method_name} is not a valid poll method.")
+        return reg[self.method_name]
 
-    # def get_voted_weight(self) -> int:
-    # FIXME: DO this properly! /robinharms
-    #     users = self.method.vote_set.values_list("user", flat=True)
-    #     return self.electoral_register.voterweight_set.filter(user__in=users).aggregate(Sum("weight"))["weight__sum"]
+    @cached_property
+    def method(self) -> PollMethod:
+        method = self.get_method_class()
+        return method(self)
+
+    @property
+    def settings(self):
+        schema = self.method.settings_schema
+        if schema is not None:
+            data = self.settings_data
+            if data is None:
+                data = {}
+            # We do want things to crash here!
+            return schema(**data)
+
+    @settings.setter
+    def settings(self, value: Union[Dict, BaseModel]):
+        schema = self.method.settings_schema
+        if isinstance(value, dict):
+            data = schema(**value)
+        elif isinstance(value, schema):
+            data = value
+        else:  # pragma: no cover
+            raise ValueError(f"{value} is not a settings schema or a dict")
+        self.settings_data = data.dict()
+
+    @property
+    def result(self):
+        schema = self.method.result_schema
+        if schema is not None:
+            result = self.result_data
+            if result is not None:
+                return schema(**self.result_data)
+
+    @result.setter
+    def result(self, value: Union[Dict, BaseModel]):
+        schema = self.method.result_schema
+        if isinstance(value, dict):
+            data = schema(**value)
+        elif isinstance(value, schema):
+            data = value
+        else: # pragma: no cover
+            raise ValueError(f"{value} is not a result schema or a dict")
+        self.result_data = data.dict()
+
+
+    # class Meta:
+    #     constraints = [
+    #         UniqueConstraint(
+    #             fields=["method_type", "method_id"],
+    #             name="%(app_label)s_%(class)s_method",
+    #         )
+    #     ]
+
+    def validate_settings_guard(self):
+        """ Guard for transitions to upcoming or ongoing. """
+        try:
+            pset = self.settings  # Will raise exceptions on bad settings
+        except ValidationError:
+            return False
+        return pset is None or isinstance(pset, BaseModel)
 
     def start_check(self) -> bool:
         """ Check that this poll could be started. A very basic check for the most obvious things.
@@ -129,15 +197,19 @@ class Poll(BaseContent, MeetingContext):
             raise ElectoralRegisterMissing()
         if self.electoral_register.voters.count() < 1:
             raise ElectoralRegisterEmpty()
-        if not isinstance(self.method, PollMethod):
-            raise InvalidPollMethod()
         if self.proposals.count() < 1:
             raise InvalidProposalCount("No proposals")
+        method = self.method  # Will raise exception if doesn't exist
         # And check the specifics for the poll method
-        self.method.start_check()
+        method.start_check()
         return True
 
-    @transition(field=state, source=PollWf.PRIVATE, target=PollWf.UPCOMING)
+    @transition(
+        field=state,
+        source=PollWf.PRIVATE,
+        target=PollWf.UPCOMING,
+        conditions=[validate_settings_guard],
+    )
     def upcoming(self):
         pass
 
@@ -145,7 +217,7 @@ class Poll(BaseContent, MeetingContext):
         field=state,
         source=PollWf.UPCOMING,
         target=PollWf.ONGOING,
-        conditions=[start_check],
+        conditions=[validate_settings_guard, start_check],
     )
     def ongoing(self):
         self.started = now()
@@ -172,9 +244,12 @@ class Poll(BaseContent, MeetingContext):
         # Remove bad votes due to a change in electoral register during the poll.
         # This is probably not allowed in most meetings.
         self.vote_cleanup_set().delete()
-        ballots, abstains = self.get_ballots()
-        self.store_ballots(ballots, abstains)
-        self.method.calculate_result(ballots)
+        #ballots, abstains = self.get_ballots()
+        #self.store_ballots(ballots, abstains)
+        counter = self.finalize_vote_data()
+        assert self.ballot_data
+        assert self.ballot_checksum
+        self.method.calculate_result(counter)
 
     @transition(field=state, source=PollWf.ONGOING, target=PollWf.CANCELED)
     def cancel(self):
@@ -188,27 +263,25 @@ class Poll(BaseContent, MeetingContext):
         if not self.closed:
             self.closed = now()
 
-    def store_ballots(self, ballots: Counter, abstains=0):
-        """ Make sure ballot data is saved even if the votes will be cleared later on.
+    def finalize_vote_data(self) -> Counter:
+        """ Return JSON-serializable result counter.
+            Will also save ballot data and create a checksum + store abstentions.
         """
+        counter = Counter()
+        abstains = 0
+        for v in self.votes.all():
+            if v.abstain:
+                abstains += v.weight
+            else:
+                counter[v.vote_data] += v.weight
         self.abstains = abstains
-        self.ballot_data = dumps(ballots)
+        self.ballot_data = dumps(counter)
         self.ballot_checksum = sha512(self.ballot_data.encode("utf-8")).hexdigest()
         logger.info(
             "Finalized ballots for %s. Checksum: %s", self, self.ballot_checksum
         )
-
-    def get_ballots(self) -> (Counter, int):
-        """ Return JSON-serializable result counter and number of abstentions.
-        """
-        counter = Counter()
-        abstains = 0
-        for v in self.method.get_votes():
-            if v.abstain:
-                abstains += v.weight
-            else:
-                counter[v.ballot] += v.weight
-        return counter, abstains
+        self.save()
+        return counter
 
     def verify_checksum(self):
         if self.state != PollWf.FINISHED:
@@ -225,40 +298,100 @@ class Poll(BaseContent, MeetingContext):
                 f"Checksum doesn't match for {self}. Stored: {self.ballot_checksum}, Current: {checksum}"
             )
 
-    def vote_cleanup_set(self):
+    def vote_cleanup_set(self) -> models.QuerySet:
         """ Votes that shouldn't be here if the poll closes.
             Essentially that someone has voted but aren't in the current electoral register.
         """
         voters = self.electoral_register.voters.all()
-        return self.get_votes().exclude(user__in=voters)
+        return self.votes.exclude(user__in=voters)
 
-    def get_votes(self):
-        return self.method.get_votes()
-
-    def get_result(self):
-        if self.state != PollWf.FINISHED:
-            raise PollNotFinished(f"{self} is in state {self.state}")
-        return self.method.get_result()
+    # def get_result(self):
+    #     if self.state != PollWf.FINISHED:
+    #         raise PollNotFinished(f"{self} is in state {self.state}")
+    #     return self.method.result_schema(**self.result)
 
     def save(self, **kw):
         """ Make sure meeting is set, from agenda_items meeting.
             Also set title automatically. """
         if self.pk is None:
             # FIXME: This "helper" seems to cause a lot more problems than it's worth... :( /Robin
-            if self.meeting is None and getattr(self.agenda_item, "meeting", None) is not None:
+            if (
+                self.meeting is None
+                and getattr(self.agenda_item, "meeting", None) is not None
+            ):
                 self.meeting = self.agenda_item.meeting
-            if not self.title and self.agenda_item is not None and self.meeting is not None:
+            if (
+                not self.title
+                and self.agenda_item is not None
+                and self.meeting is not None
+            ):
                 # Create a unique slugified title
                 base = slugify(self.agenda_item.title)
                 for x in itertools.count(1):
-                    self.title = f'{base}-{x}'
+                    self.title = f"{base}-{x}"
                     if not self.meeting.polls.filter(title=self.title).exists():
                         break
-        if self.method is not None:
-            if not isinstance(self.method, PollMethod):
-                # FIXME: Probably something Django-ish instead
-                raise InvalidPollMethod(f"{self.method} is not a PollMethod instance.")
+        self.get_method_class()  # Will raise error
         super().save(**kw)
+
+    # Type hinting
+    objects = models.Manager()
+    votes: models.QuerySet
+
+
+class Vote(models.Model):
+    """ Contains data on the users vote in a specific poll.
+    """
+
+    user: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+    )
+    poll: Poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name="votes")
+    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    changed: datetime = models.DateTimeField(editable=False, auto_now=True)
+    abstain: bool = models.BooleanField(default=False)
+    vote_data: str = models.TextField(null=True, blank=True)  # This field should contain the value from PollMethod
+
+    @property
+    def vote(self) -> BaseModel:
+        return self.poll.method.vote_to_obj(self.vote_data)
+
+    @vote.setter
+    def vote(self, data: Union[BaseModel, str]):
+        if isinstance(data, BaseModel):
+            self.vote_data = self.poll.method.vote_to_str(data)
+        elif isinstance(data, str):
+            # Validate
+            self.poll.method.vote_to_obj(data)
+            self.vote_data = data
+        else:
+            raise ValueError("Not a str or vote_schema (pydantic BaseModel)")
+
+    class Meta:
+        constraints = [
+            UniqueConstraint(
+                fields=["user", "poll"],
+                name="%(app_label)s_%(class)s_unique_vote_for_user",
+            )
+        ]
+
+    def __str__(self):  # pragma: no cover
+        return f"<{self.__class__.__name__} from {self.user}>"
+
+    @property
+    def weight(self) -> int:
+        return self.poll.electoral_register.get_voter_weight(self.user)
+
+    def save(self, **kw):
+        er = self.poll.electoral_register
+        if not er:
+            raise ElectoralRegisterMissing()
+        if not er.voters.filter(id=self.user.id):
+            raise NotAllowedToVote("Not allowed to vote")
+        super().save(**kw)
+
+    # Instantiate this manually for type hinting
+    objects = models.Manager()
 
 
 @receiver(post_transition, sender=Poll)

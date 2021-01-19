@@ -17,6 +17,7 @@ from voteit.proposal.workflows import ProposalWf
 
 class PollMethodField(serializers.ChoiceField):
     """ Get poll methods options """
+
     def __init__(self, **kwargs):
         super().__init__((), **kwargs)
 
@@ -30,7 +31,7 @@ class PollMethodField(serializers.ChoiceField):
 
 
 class PollListSerializer(serializers.ModelSerializer):
-    method = serializers.CharField(source='method.title')
+    method = serializers.CharField(source="method.title")
 
     class Meta:
         model = models.Poll
@@ -50,14 +51,14 @@ class PollDetailSerializer(serializers.ModelSerializer):
     def get_voted(self, instance):
         # FIXME: Seems to be called too soon?
         if instance.method is not None:
-            return instance.method.vote_set.count()
+            return instance.votes.count()
         return 0
 
     # Note: This won't have access to the request object, so no url things here!
     class Meta:
         model = models.Poll
         fields = "pk", "title", "meeting", "agenda_item", "state", "voted", "total"
-        read_only_fields = "state",
+        read_only_fields = ("state",)
 
 
 class PollCreateSerializer(serializers.ModelSerializer):
@@ -68,19 +69,23 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """ Get proposal set and make sure they're all published. """
-        agenda_item = attrs.get('agenda_item')
-        proposal_pks = attrs.get('proposal_pks').split(',')
-        self._proposals = agenda_item.proposals.filter(pk__in=proposal_pks, state=ProposalWf.PUBLISHED)
+        agenda_item = attrs.get("agenda_item")
+        proposal_pks = attrs.get("proposal_pks").split(",")
+        self._proposals = agenda_item.proposals.filter(
+            pk__in=proposal_pks, state=ProposalWf.PUBLISHED
+        )
         if len(self._proposals) != len(proposal_pks):
-            raise serializers.ValidationError('Proposals must be published on Agenda Item')
+            raise serializers.ValidationError(
+                "Proposals must be published on Agenda Item"
+            )
         return super().validate(attrs)
 
     def create(self, validated_data):
         """ Create method object and connect proposals """
-        method_model = poll_methods.get(validated_data.get('method'))
-        validated_data['method'] = method_model.objects.create()
-        validated_data.pop('proposal_pks')
-        start = validated_data.pop('start')
+        method_model = poll_methods.get(validated_data.get("method"))
+        validated_data["method"] = method_model.objects.create()
+        validated_data.pop("proposal_pks")
+        start = validated_data.pop("start")
 
         with transaction.atomic():
             poll = super().create(validated_data)
@@ -97,5 +102,5 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Poll
-        fields = "agenda_item", "method", "proposal_pks", 'start',
-        extra_kwargs = {'agenda_item': {'required': True}}
+        fields = "agenda_item", "method", "proposal_pks", "start"
+        extra_kwargs = {"agenda_item": {"required": True}}

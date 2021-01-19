@@ -11,39 +11,35 @@ from voteit.poll.exceptions import (
 class PollMethodTests(TestCase):
     @property
     def _cut(self):
-        from voteit.poll.models import PollMethod
+        from voteit.poll.abcs import PollMethod
 
         return PollMethod
 
     def test_registration(self):
         from voteit.core.component import Registry
-        from voteit.poll.abcs import Vote
 
         poll_method = Registry(self._cut)
 
-        class _Vote(Vote):
-            class Meta:
-                app_label = "poll"
-
         @poll_method
         class HelloMethod(self._cut):
-            vote_model = _Vote
             title = "Hello"
-            vote_set = object()  # Dummy too
+            name = "hello"
+            result_schema = None
+            vote_schema = None
 
             class Meta:
                 app_label = "poll"
 
-            def calculate_result(self, ballots):
+            def vote_to_str(self, data):
                 pass
 
-            def get_result(self):
+            def vote_to_obj(self, text):
                 pass
 
-            def start_check(self):
+            def calculate_result(self, counter):
                 pass
 
-        self.assertIn("hellomethod", poll_method)
+        self.assertIn("hello", poll_method)
 
 
 class PollTests(TestCase):
@@ -66,10 +62,7 @@ class PollTests(TestCase):
         return Proposal
 
     def setUp(self):
-        from voteit.poll.app.polls.simple import Simple
-
-        self.method = Simple.objects.create()
-        self.poll = self.Poll.objects.create(method=self.method)
+        self.poll = self.Poll.objects.create(method_name="simple")
         self.user = User.objects.create(username="1")
         self.user2 = User.objects.create(username="2")
         self.poll.electoral_register = self.er = self.ElectoralRegister.objects.create()
@@ -77,7 +70,9 @@ class PollTests(TestCase):
         self.poll.save()
 
     def test_method(self):
-        self.assertIsInstance(self.poll.method, self.method.__class__)
+        from voteit.poll.app.polls.simple import Simple
+
+        self.assertIsInstance(self.poll.method, Simple)
 
     def test_start_check_no_electoral_register(self):
         self.poll.electoral_register = None
@@ -108,7 +103,7 @@ class PollTests(TestCase):
         self.assertEqual("ongoing", self.poll.state)
 
     def test_assigning_bad_poll_method(self):
-        self.poll.method = self.ElectoralRegister.objects.create()
+        self.poll.method_name = "jeff"
         self.assertRaises(InvalidPollMethod, self.poll.save)
 
     def test_closing_poll(self):
@@ -116,40 +111,43 @@ class PollTests(TestCase):
         self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        vote1 = self.method.vote_set.create(user=self.user, choice=1)
-        vote2 = self.method.vote_set.create(user=self.user2, choice=1)
-        self.assertIn(vote1, self.method.get_votes())
-        self.assertIn(vote2, self.method.get_votes())
+        vote1 = self.poll.votes.create(user=self.user, vote="y")
+        vote2 = self.poll.votes.create(user=self.user2, vote="y")
+        votes = self.poll.votes.all()
+        self.assertIn(vote1, votes)
+        self.assertIn(vote2, votes)
         self.poll.close()
-        self.assertEqual({"approve": 2, "deny": 0}, self.method.get_result())
+        self.assertEqual({"yes": 2, "no": 0}, self.poll.result.dict())
 
     def test_votes_from_non_voters_removed_on_close(self):
         prop = self.Proposal.objects.create()
         self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        vote1 = self.method.vote_set.create(user=self.user, choice=1)
-        vote2 = self.method.vote_set.create(user=self.user2, choice=1)
-        self.assertIn(vote1, self.method.get_votes())
-        self.assertIn(vote2, self.method.get_votes())
+        vote1 = self.poll.votes.create(user=self.user, vote="y")
+        vote2 = self.poll.votes.create(user=self.user2, vote="y")
+        votes = self.poll.votes.all()
+        self.assertIn(vote1, votes)
+        self.assertIn(vote2, votes)
         # Change ER
         self.poll.electoral_register = er2 = self.ElectoralRegister.objects.create()
         er2.voters.add(self.user)
         self.poll.save()
         self.poll.close()
-        self.assertIn(vote1, self.method.get_votes())
-        self.assertNotIn(vote2, self.method.get_votes())
-        self.assertEqual({"approve": 1, "deny": 0}, self.method.get_result())
+        votes = self.poll.votes.all()
+        self.assertIn(vote1, votes)
+        self.assertNotIn(vote2, votes)
+        self.assertEqual({"yes": 1, "no": 0}, self.poll.result.dict())
 
     def test_abstentions(self):
         prop = self.Proposal.objects.create()
         self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        self.method.vote_set.create(user=self.user, abstain=True)
-        self.method.vote_set.create(user=self.user2, choice=1)
+        self.poll.votes.create(user=self.user, abstain=True)
+        self.poll.votes.create(user=self.user2, vote="y")
         self.poll.close()
-        self.assertEqual({"approve": 1, "deny": 0}, self.poll.get_result())
+        self.assertEqual({"yes": 1, "no": 0}, self.poll.result.dict())
         self.assertEqual(1, self.poll.abstains)
 
     def test_checksum(self):
@@ -157,16 +155,15 @@ class PollTests(TestCase):
         self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        self.method.vote_set.create(user=self.user, choice=2)
-        self.method.vote_set.create(user=self.user2, choice=1)
+        self.poll.votes.create(user=self.user, vote="n")
+        self.poll.votes.create(user=self.user2, vote="y")
         self.poll.close()
         self.poll.save()
         self.assertEqual(
-            "37f96aff28e9e4d862b8c4614329e61e2141a155b4367f9f7d69231d6d6d263d04c0e29"
-            "4d2c474b44f288ba7415b61f8d96976611b47753da9f3886c2c90d3fb",
+            "81567db4add4931106515ce10f9c5c6025765de626c1c13d60bf550d428e2fdf66e48b06a62b4462c50abe5eff1e1dc99f3dd440687a3d3b9ea375201e094e30",
             self.poll.ballot_checksum,
         )
-        self.assertEqual('{"2": 1, "1": 1}', self.poll.ballot_data)
+        self.assertEqual('{"n": 1, "y": 1}', self.poll.ballot_data)
         self.assertTrue(self.poll.verify_checksum())
 
 
@@ -190,31 +187,36 @@ class VoteWeightTests(TestCase):
         return VoterWeight
 
     def setUp(self):
-        from voteit.poll.app.polls.simple import Simple
-
-        self.method = Simple.objects.create()
         self.er = self.ElectoralRegister.objects.create()
-        self.poll = self.Poll.objects.create(method=self.method, electoral_register=self.er)
-        self.user1 = User.objects.create(username='1')
-        self.user2 = User.objects.create(username='2')
-        self.user3 = User.objects.create(username='3')
-        self.VoterWeight.objects.create(register=self.poll.electoral_register, user=self.user1)
-        self.VoterWeight.objects.create(register=self.poll.electoral_register, user=self.user2)
-        self.VoterWeight.objects.create(register=self.poll.electoral_register, user=self.user3, weight=3)
+        self.poll = self.Poll.objects.create(
+            method_name="simple", electoral_register=self.er
+        )
+        self.user1 = User.objects.create(username="1")
+        self.user2 = User.objects.create(username="2")
+        self.user3 = User.objects.create(username="3")
+        self.VoterWeight.objects.create(
+            register=self.poll.electoral_register, user=self.user1
+        )
+        self.VoterWeight.objects.create(
+            register=self.poll.electoral_register, user=self.user2
+        )
+        self.VoterWeight.objects.create(
+            register=self.poll.electoral_register, user=self.user3, weight=3
+        )
 
     def test_poll_result(self):
-        from voteit.poll.app.polls.simple import SimpleVote
         from voteit.proposal.models import Proposal
-        self.poll.proposals.add(Proposal.objects.create(title='Abc123', body='I propose!'))
+
+        self.poll.proposals.add(
+            Proposal.objects.create(title="Abc123", body="I propose!")
+        )
         self.poll.upcoming()
         self.poll.ongoing()
-        self.method.vote_set.create(user=self.user1, choice=SimpleVote.APPROVE)
-        self.method.vote_set.create(user=self.user2, choice=SimpleVote.APPROVE)
-        self.method.vote_set.create(user=self.user3, choice=SimpleVote.DENY)
+        self.poll.votes.create(user=self.user1, vote_data="y")
+        self.poll.votes.create(user=self.user2, vote_data="y")
+        self.poll.votes.create(user=self.user3, vote_data="n")
         self.poll.close()
-        self.assertEqual(self.method.get_result(), {'approve': 2, 'deny': 3})
-        # FIXME: Make this work :)
-        # self.assertEqual(self.poll.proposals.first().state, ProposalWf.DENIED)
+        self.assertEqual(self.poll.result.dict(), {"yes": 2, "no": 3})
 
     def test_get_voter_weight(self):
         self.assertEqual(self.er.get_voter_weight(self.user1), 1)
