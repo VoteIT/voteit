@@ -12,5 +12,8 @@ from .rest_api.serializers import DiscussionPostDetailSerializer
 @receiver(channel_subscribed, sender=AgendaItemChannel)
 def channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
     """ Populate app_state with current discussions """
-    for discussion in context.get_discussions():
-        app_state.append_from(discussion, DiscussionPostDetailSerializer, DiscussionPostAdded)
+    app_state.append_from_queryset(
+        context.get_discussions(),
+        DiscussionPostDetailSerializer,
+        DiscussionPostAdded
+    )
