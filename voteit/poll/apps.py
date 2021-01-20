@@ -13,3 +13,4 @@ class PollConfig(AppConfig):
         from voteit.poll import rest_api
         from voteit.poll import channels
         from voteit.poll import messages
+        from voteit.poll import signals
