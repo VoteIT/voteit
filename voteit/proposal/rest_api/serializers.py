@@ -15,5 +15,5 @@ class ProposalDetailSerializer(BaseModelSerializer):
 
     class Meta:
         model = models.Proposal
-        fields = "pk", "title", "body", "state", "agenda_item", "author"
+        fields = "pk", "title", "body", "state", "agenda_item", "author", "polls",
         read_only_fields = ("state", "author")
