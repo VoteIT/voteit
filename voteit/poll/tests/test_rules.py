@@ -1,19 +1,21 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
+
+
+User = get_user_model()
 
 
 class PollRulesTests(TestCase):
     def setUp(self):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
-        from voteit.poll.app.polls.simple import Simple
         from voteit.meeting.models import Meeting
 
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create(meeting=self.meeting)
         self.ai.upcoming()
         self.poll = Poll.objects.create(
-            method=Simple.objects.create(), agenda_item=self.ai, meeting=self.meeting
+            method_name="simple", agenda_item=self.ai, meeting=self.meeting
         )
         self.poll.proposals.create()
         self.er = ElectoralRegister.objects.create()
@@ -186,17 +188,15 @@ class PollRulesTests(TestCase):
 
 class VoteRulesTests(TestCase):
     def setUp(self):
-        # from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
-        from voteit.poll.app.polls.simple import Simple
+        from voteit.poll.models import Poll
         from voteit.meeting.models import Meeting
 
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create(meeting=self.meeting)
         self.ai.ongoing()
-        self.method = Simple.objects.create()
-        self.poll = self.method.poll_rel.create(
-            agenda_item=self.ai, meeting=self.meeting
+        self.poll = Poll.objects.create(
+            method_name="simple", agenda_item=self.ai, meeting=self.meeting
         )
         self.poll.proposals.create()
         self.er = ElectoralRegister.objects.create()
@@ -214,7 +214,7 @@ class VoteRulesTests(TestCase):
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, "moderator")
         # And the voted user have voted of course :)
-        self.vote = self.method.vote_set.create(choice=1, user=self.voted_user)
+        self.vote = self.poll.votes.create(vote_data="y", user=self.voted_user)
 
     def p(self, perm):
         from voteit.poll.permissions import VotePermissions

@@ -1,20 +1,36 @@
+from abc import ABC
+
 from pydantic.main import BaseModel
-from voteit.messaging.abcs import BaseOutgoingMessage
-from voteit.messaging.messages.base import BaseObjectAdded, BaseObjectChanged, BaseObjectDeleted
-from voteit.messaging.registries import outgoing_messages
+from django.utils.translation import gettext as _
+
+from voteit.messaging.abcs import (
+    BaseOutgoingMessage,
+    BaseIncomingMessage,
+    DeferredJob,
+    ContextAction,
+)
+from voteit.messaging.messages.base import (
+    BaseObjectAdded,
+    BaseObjectChanged,
+    BaseObjectDeleted,
+)
+from voteit.messaging.decorators import outgoing
+from voteit.messaging.messages.text import TextResponse
+from voteit.poll.models import Poll, Vote
+from voteit.poll.permissions import VotePermissions
 
 
-@outgoing_messages
+@outgoing
 class PollAdded(BaseObjectAdded):
     name = "poll.added"
 
 
-@outgoing_messages
+@outgoing
 class PollChanged(BaseObjectChanged):
     name = "poll.changed"
 
 
-@outgoing_messages
+@outgoing
 class PollDeleted(BaseObjectDeleted):
     name = "poll.deleted"
 
@@ -25,8 +41,45 @@ class PollStatusSchema(BaseModel):
     total: int
 
 
-@outgoing_messages
+@outgoing
 class PollStatus(BaseOutgoingMessage):
     name = "poll.status"
     schema = PollStatusSchema
     data: PollStatusSchema
+
+
+class AddVote(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
+    """ The base class for adding votes.
+    """
+
+    permission = VotePermissions.ADD
+    model = Poll
+
+    def run_job(self):
+        self.assert_perm()
+        existing_vote = self.context.votes.filter(user=self.user).first()
+        if existing_vote is not None:
+            raise Exception()  # Fixme
+            # Vote already exists - no need to error we can simply change it instead?
+            # msg = ChangeVote.from_message(self, vote=self.data.vote, pk=existing_vote.pk)
+            # msg.send_internal(self.mm.consumer_name)
+            # return msg
+        else:
+            Vote.objects.create(user=self.user, poll=self.context, vote=self.data.vote)
+            msg = TextResponse.from_message(self, msg="Added")
+            # FIXME: Vote might not be saved, add on_commit for send_outgoing
+            msg.send_outgoing(self.mm.consumer_name, success=True)
+
+
+class ChangeVote(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
+    """ Update a users vote. Subclass this and register as an incoming
+        message for each poll method, with a proper vote schema.
+    """
+
+    permission = VotePermissions.CHANGE
+    model = Vote
+
+    def run_job(self):
+        self.assert_perm()
+        self.context.vote = self.data.vote
+        self.context.save()

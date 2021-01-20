@@ -8,7 +8,7 @@ from django.dispatch import receiver
 from voteit.messaging.abcs import AbstractObjectChannel
 from voteit.messaging.decorators import channel
 from voteit.poll.messages import PollStatus
-from voteit.poll.abcs import Vote
+from voteit.poll.models import Vote
 from voteit.poll.models import Poll
 from voteit.poll.permissions import PollPermissions
 
@@ -34,11 +34,12 @@ class PollChannel(AbstractObjectChannel):
 @receiver(post_save)
 def vote_added(instance=None, created=None, **kw):
     # We don't have to count updated votes!
-    if created and isinstance(instance, Vote) and instance.method is not None:
+    if created and isinstance(instance, Vote):
+        poll = instance.poll
         msg = PollStatus.create(
-            pk=instance.method.poll.pk,
-            voted=instance.method.vote_set.count(),
-            total=instance.method.poll.electoral_register.voters.count(),
+            pk=poll.pk,
+            voted=poll.votes.count(),
+            total=poll.electoral_register.voters.count(),
         )
-        ch = PollChannel.from_instance(instance.method.poll)
+        ch = PollChannel.from_instance(poll)
         ch.publish(msg)

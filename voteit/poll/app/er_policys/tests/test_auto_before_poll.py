@@ -17,7 +17,7 @@ class AutoBeforePollTests(TestCase):
         self.meeting.add_roles(self.user1, ROLE_POTENTIAL_VOTER)
         self.meeting.add_roles(self.user2, ROLE_POTENTIAL_VOTER)
         self.poll = Poll.objects.create(
-            meeting=self.meeting, method=Simple.objects.create()
+            meeting=self.meeting, method_name="simple"
         )
 
     @property

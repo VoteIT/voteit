@@ -1,8 +1,6 @@
 from django.contrib.auth.models import User
-from django.db import IntegrityError
 from django.test import TestCase
 
-from voteit.poll.exceptions import NotAllowedToVote
 from voteit.poll.exceptions import InvalidProposalCount
 
 
@@ -12,7 +10,7 @@ class SimpleTests(TestCase):
         from voteit.poll.models import ElectoralRegister
 
         self.er = ElectoralRegister.objects.create()
-        self.poll = Poll.objects.create(electoral_register=self.er)
+        self.poll = Poll.objects.create(electoral_register=self.er, method_name="simple")
 
     @property
     def Simple(self):
@@ -20,24 +18,9 @@ class SimpleTests(TestCase):
 
         return Simple
 
-    def test_generic_relation_from_poll(self):
-        method = self.Simple.objects.create()
-        self.poll.method = method
-        self.assertEqual(self.poll.method, method)
-        self.assertIsInstance(self.poll.method, method.__class__)
-
-    def test_generic_relation_from_method(self):
-        method = self.Simple.objects.create()
-        self.poll.method = method
-        self.poll.save()
-        self.assertEqual(method.poll, self.poll)
-        self.assertIsInstance(method.poll, self.poll.__class__)
-
     def test_start_check(self):
         from voteit.proposal.models import Proposal
-        method = self.Simple.objects.create()
-        self.poll.method = method
-        self.poll.save()
+        method = self.poll.method
         self.assertRaises(InvalidProposalCount, method.start_check)
         p1 = Proposal.objects.create()
         self.poll.proposals.add(p1)
@@ -46,10 +29,17 @@ class SimpleTests(TestCase):
         self.poll.proposals.add(p2)
         self.assertRaises(InvalidProposalCount, method.start_check)
 
+    def test_vote_schema(self):
+        from voteit.poll.app.polls.simple import SimpleVoteSchema
+        self.poll.upcoming()
+        self.poll.proposals.create()
+        voter = self.er.voters.create(username="a")
+        self.poll.ongoing()
+        vote = self.poll.votes.create(user=voter, vote="y")
+        self.assertIsInstance(vote.vote, SimpleVoteSchema)
+        self.assertEqual(vote.vote.choice, "y")
+
     def test_result(self):
-        method = self.Simple.objects.create()
-        self.poll.method = method
-        self.poll.save()
         self.poll.upcoming()
         self.poll.proposals.create()
         ua = User.objects.create(username="a")
@@ -57,50 +47,8 @@ class SimpleTests(TestCase):
         uc = User.objects.create(username="c")
         self.er.voters.set([ua, ub, uc])
         self.poll.ongoing()
-        method.create_vote(choice=1, user=ua)
-        method.create_vote(choice=1, user=ub)
-        method.create_vote(choice=2, user=uc)
+        self.poll.votes.create(user=ua, vote="y")
+        self.poll.votes.create(user=ub, vote="y")
+        self.poll.votes.create(user=uc, vote="n")
         self.poll.close()
-        self.assertEqual({"approve": 2, "deny": 1}, method.get_result())
-
-
-class SimpleVoteTests(TestCase):
-    def setUp(self):
-        from voteit.poll.models import Poll, ElectoralRegister
-        from voteit.poll.app.polls.simple import Simple
-
-        self.user = User.objects.create(username="a")
-        self.er = ElectoralRegister.objects.create()
-        self.er.voters.add(self.user)
-        self.method = Simple.objects.create()
-        self.poll = Poll.objects.create(electoral_register=self.er, method=self.method)
-
-    @property
-    def _cut(self):
-        from voteit.poll.app.polls.simple import SimpleVote
-
-        return SimpleVote
-
-    def test_create_blocked_without_register(self):
-        self.er.voters.remove(self.user)
-        self.assertRaises(
-            NotAllowedToVote,
-            self._cut.objects.create,
-            choice=1,
-            user=self.user,
-            method=self.method,
-        )
-
-    def test_ballot(self):
-        obj = self._cut.objects.create(choice=1, user=self.user, method=self.method)
-        self.assertEqual(1, obj.ballot)
-
-    def test_poll_user_unique_together(self):
-        self._cut.objects.create(choice=1, user=self.user, method=self.method)
-        self.assertRaises(
-            IntegrityError,
-            self._cut.objects.create,
-            choice=1,
-            user=self.user,
-            method=self.method,
-        )
+        self.assertEqual({"yes": 2, "no": 1}, self.poll.result)

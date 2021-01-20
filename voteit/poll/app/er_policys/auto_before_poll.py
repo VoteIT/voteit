@@ -29,8 +29,8 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
 
     def apply(self, poll: Poll):
         meeting = poll.meeting
-        if meeting is None:
-            # FIXME:
+        if meeting is None:  # pragma: no coverage
+            # FIXME: We don't support this yet
             raise Exception("No meeting")
         meetings_er = poll.meeting.get_latest_er()
         if meetings_er is None:
