@@ -286,8 +286,8 @@ class Poll(BaseContent, MeetingContext):
         self.abstains = abstains
         self.ballot_data = dumps(counter)
         self.ballot_checksum = sha512(self.ballot_data.encode("utf-8")).hexdigest()
-        logger.info(
-            "Finalized ballots for %s. Checksum: %s", self, self.ballot_checksum
+        logger.debug(
+            "Finalized ballots for poll %s. Checksum: %s", self.pk, self.ballot_checksum
         )
         self.save()
         return counter
