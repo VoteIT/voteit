@@ -70,6 +70,7 @@ class PollCreateSerializer(serializers.ModelSerializer):
             if start:
                 poll.upcoming()
                 poll.ongoing()
+                poll.save()
             return poll
 
     class Meta:
