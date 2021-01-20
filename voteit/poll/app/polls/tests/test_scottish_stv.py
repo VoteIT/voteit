@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django_fsm import TransitionNotAllowed
 
+from voteit.messaging.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
 
 
@@ -106,6 +107,10 @@ class AddVoteTests(TestCase):
             f"{self.prop1.pk},{self.prop2.pk},{self.prop3.pk}", vote.vote_data
         )
 
+    def test_add_bad_vote(self):
+        msg = self._mk_one(vote={"ranking": [-1, self.prop2.pk]})
+        self.assertRaises(ValidationErrorMsg, msg.run_job)
+
 
 class ChangeVoteTests(TestCase):
 
@@ -142,3 +147,7 @@ class ChangeVoteTests(TestCase):
         msg.run_job()
         self.vote.refresh_from_db()
         self.assertEqual(f"{self.prop1.pk},{self.prop2.pk}", self.vote.vote_data)
+
+    def test_change_bad_vote(self):
+        msg = self._mk_one(vote={"ranking": [-1, self.prop2.pk]})
+        self.assertRaises(ValidationErrorMsg, msg.run_job)

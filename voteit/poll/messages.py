@@ -1,7 +1,6 @@
 from abc import ABC
 
 from pydantic.main import BaseModel
-from django.utils.translation import gettext as _
 
 from voteit.messaging.abcs import (
     BaseOutgoingMessage,
@@ -48,7 +47,14 @@ class PollStatus(BaseOutgoingMessage):
     data: PollStatusSchema
 
 
-class AddVote(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
+class VoteBase(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
+
+    def validate_vote(self) -> None:
+        """ Run extra validation based on the specific poll method implementation.
+        """
+
+
+class AddVote(VoteBase, ABC):
     """ The base class for adding votes.
     """
 
@@ -57,6 +63,7 @@ class AddVote(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
 
     def run_job(self):
         self.assert_perm()
+        self.validate_vote()
         existing_vote = self.context.votes.filter(user=self.user).first()
         if existing_vote is not None:
             raise Exception()  # Fixme
@@ -71,7 +78,7 @@ class AddVote(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
             msg.send_outgoing(self.mm.consumer_name, success=True)
 
 
-class ChangeVote(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
+class ChangeVote(VoteBase, ABC):
     """ Update a users vote. Subclass this and register as an incoming
         message for each poll method, with a proper vote schema.
     """
@@ -81,5 +88,6 @@ class ChangeVote(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
 
     def run_job(self):
         self.assert_perm()
+        self.validate_vote()
         self.context.vote = self.data.vote
         self.context.save()
