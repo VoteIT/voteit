@@ -7,9 +7,12 @@ from pydantic import validator
 from pydantic.main import BaseModel
 from stvpoll.scottish_stv import ScottishSTV as _ScottishSTV
 
+from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.messages import AddVote, ChangeVote
 from voteit.poll.registries import poll_methods
+from voteit.poll.schemas import GenericVoteSchema
 
 
 __all__ = ("ScottishSTV",)
@@ -35,6 +38,24 @@ class ScottishSTVSettings(BaseModel):
 
 class STVVoteSchema(BaseModel):
     ranking: List[int]  # Validation...?
+
+
+class VoteSchema(GenericVoteSchema):
+    vote: STVVoteSchema
+
+
+@incoming
+class AddSTVVote(AddVote):
+    name = "scottish_stv_vote.add"
+    schema = VoteSchema
+    data: VoteSchema
+
+
+@incoming
+class ChangeSTVVote(ChangeVote):
+    name = "scottish_stv_vote.change"
+    schema = VoteSchema
+    data: VoteSchema
 
 
 class STVResultSchema(BaseModel):

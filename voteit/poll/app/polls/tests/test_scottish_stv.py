@@ -30,6 +30,7 @@ class ScottishTests(TestCase):
 
     def test_vote_schema(self):
         from voteit.poll.app.polls.scottish_stv import STVVoteSchema
+
         self.poll.settings = dict(winners=2)
         one = self.poll.proposals.create()
         two = self.poll.proposals.create()
@@ -63,3 +64,81 @@ class ScottishTests(TestCase):
         self.poll.close()
         result = self.poll.result
         self.assertEquals(len(result.winners), 3)
+
+
+class AddVoteTests(TestCase):
+    def setUp(self):
+        from voteit.poll.models import Poll
+        from voteit.poll.models import ElectoralRegister
+
+        self.er = ElectoralRegister.objects.create()
+        self.voter = self.er.voters.create(username="voter")
+        self.poll = Poll.objects.create(
+            electoral_register=self.er, method_name="scottish_stv"
+        )
+        self.prop1 = self.poll.proposals.create()
+        self.prop2 = self.poll.proposals.create()
+        self.prop3 = self.poll.proposals.create()
+        self.poll.settings = {"winners": 2}
+        self.poll.upcoming()
+        self.poll.ongoing()
+        self.poll.save()
+
+    @property
+    def _cut(self):
+        from voteit.poll.app.polls.scottish_stv import AddSTVVote
+
+        return AddSTVVote
+
+    def _mk_one(self, **kw):
+        kw.setdefault(
+            "vote", {"ranking": [self.prop1.pk, self.prop2.pk, self.prop3.pk]}
+        )
+        kw.setdefault("pk", self.poll.pk)
+        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+
+    def test_add(self):
+        msg = self._mk_one()
+        msg.run_job()
+        vote = self.poll.votes.filter(user=self.voter).first()
+        self.assertIsNotNone(vote)
+        self.assertEqual(
+            f"{self.prop1.pk},{self.prop2.pk},{self.prop3.pk}", vote.vote_data
+        )
+
+
+class ChangeVoteTests(TestCase):
+
+    def setUp(self):
+        from voteit.poll.models import Poll
+        from voteit.poll.models import ElectoralRegister
+        self.er = ElectoralRegister.objects.create()
+        self.voter = self.er.voters.create(username="voter")
+        self.poll = Poll.objects.create(electoral_register=self.er, method_name="scottish_stv")
+        self.prop1 = self.poll.proposals.create()
+        self.prop2 = self.poll.proposals.create()
+        self.prop3 = self.poll.proposals.create()
+        self.poll.settings = {"winners": 2}
+        self.poll.upcoming()
+        self.poll.ongoing()
+        self.poll.save()
+        self.vote = self.poll.votes.create(user=self.voter, vote_data=f"{self.prop3.pk},{self.prop2.pk}")
+
+    @property
+    def _cut(self):
+        from voteit.poll.app.polls.scottish_stv import ChangeSTVVote
+
+        return ChangeSTVVote
+
+    def _mk_one(self, **kw):
+        kw.setdefault(
+            "vote", {"ranking": [self.prop1.pk, self.prop2.pk]}
+        )
+        kw.setdefault("pk", self.vote.pk)
+        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+
+    def test_change(self):
+        msg = self._mk_one()
+        msg.run_job()
+        self.vote.refresh_from_db()
+        self.assertEqual(f"{self.prop1.pk},{self.prop2.pk}", self.vote.vote_data)

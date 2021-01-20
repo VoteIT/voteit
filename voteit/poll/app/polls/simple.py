@@ -5,9 +5,12 @@ from typing import Counter
 from django.utils.translation import gettext_lazy as _
 from pydantic import BaseModel, validator
 
+from voteit.messaging.decorators import incoming
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.abcs import PollMethod
+from voteit.poll.messages import AddVote, ChangeVote
 from voteit.poll.registries import poll_methods
+from voteit.poll.schemas import GenericVoteSchema
 
 
 __all__ = ("Simple",)
@@ -28,6 +31,24 @@ class SimpleVoteSchema(BaseModel):
         return v
 
 
+class VoteSchema(GenericVoteSchema):
+    vote: SimpleVoteSchema
+
+
+@incoming
+class AddSimpleVote(AddVote):
+    name = "simple_vote.add"
+    schema = VoteSchema
+    data: VoteSchema
+
+
+@incoming
+class ChangeSimpleVote(ChangeVote):
+    name = "simple_vote.change"
+    schema = VoteSchema
+    data: VoteSchema
+
+
 class SimplePollResult(BaseModel):
     yes: int
     no: int
@@ -38,6 +59,7 @@ class Simple(PollMethod):
     """ This poll method is a simple approve / deny,
         but also the base for all tests that should run against the abstract PollMethod.
     """
+
     VOTE_CHOICES = VOTE_CHOICES
     title = _("Simple")
     name = "simple"

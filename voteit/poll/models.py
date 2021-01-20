@@ -48,6 +48,7 @@ class VoterWeight(models.Model):
     register = models.ForeignKey("ElectoralRegister", on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     weight = models.PositiveIntegerField(default=1)
+    objects = models.Manager()  # Type hinting
 
 
 class ElectoralRegister(MeetingContext):
@@ -71,6 +72,8 @@ class ElectoralRegister(MeetingContext):
     def get_total_vote_weight(self) -> int:
         # FIXME: Is this the correct method? :)
         return self.voterweight_set.aggregate(Sum("weight"))["weight__sum"]
+
+    objects = models.Manager()  # Type hinting
 
 
 class Poll(BaseContent, MeetingContext):
@@ -116,7 +119,10 @@ class Poll(BaseContent, MeetingContext):
         verbose_name=_("Abstentions"), default=0, editable=False
     )
     result_data: Optional[Dict] = models.JSONField(
-        verbose_name=_("JSON-serialized result data"), editable=False, null=True, encoder=DjangoJSONEncoder
+        verbose_name=_("JSON-serialized result data"),
+        editable=False,
+        null=True,
+        encoder=DjangoJSONEncoder,
     )
 
     def get_method_class(self) -> Type[PollMethod]:
@@ -168,10 +174,9 @@ class Poll(BaseContent, MeetingContext):
             data = schema(**value)
         elif isinstance(value, schema):
             data = value
-        else: # pragma: no cover
+        else:  # pragma: no cover
             raise ValueError(f"{value} is not a result schema or a dict")
         self.result_data = data.dict()
-
 
     # class Meta:
     #     constraints = [
@@ -246,8 +251,8 @@ class Poll(BaseContent, MeetingContext):
         # Remove bad votes due to a change in electoral register during the poll.
         # This is probably not allowed in most meetings.
         self.vote_cleanup_set().delete()
-        #ballots, abstains = self.get_ballots()
-        #self.store_ballots(ballots, abstains)
+        # ballots, abstains = self.get_ballots()
+        # self.store_ballots(ballots, abstains)
         counter = self.finalize_vote_data()
         assert self.ballot_data
         assert self.ballot_checksum
@@ -354,7 +359,9 @@ class Vote(models.Model):
     created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
     changed: datetime = models.DateTimeField(editable=False, auto_now=True)
     abstain: bool = models.BooleanField(default=False)
-    vote_data: str = models.TextField(null=True, blank=True)  # This field should contain the value from PollMethod
+    vote_data: str = models.TextField(
+        null=True, blank=True
+    )  # This field should contain the value from PollMethod
 
     @property
     def vote(self) -> BaseModel:
