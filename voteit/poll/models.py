@@ -178,14 +178,6 @@ class Poll(BaseContent, MeetingContext):
             raise ValueError(f"{value} is not a result schema or a dict")
         self.result_data = data.dict()
 
-    # class Meta:
-    #     constraints = [
-    #         UniqueConstraint(
-    #             fields=["method_type", "method_id"],
-    #             name="%(app_label)s_%(class)s_method",
-    #         )
-    #     ]
-
     def validate_settings_guard(self):
         """ Guard for transitions to upcoming or ongoing. """
         try:
@@ -313,11 +305,6 @@ class Poll(BaseContent, MeetingContext):
         """
         voters = self.electoral_register.voters.all()
         return self.votes.exclude(user__in=voters)
-
-    # def get_result(self):
-    #     if self.state != PollWf.FINISHED:
-    #         raise PollNotFinished(f"{self} is in state {self.state}")
-    #     return self.method.result_schema(**self.result)
 
     def save(self, **kw):
         """ Make sure meeting is set, from agenda_items meeting.
