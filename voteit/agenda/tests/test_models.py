@@ -26,8 +26,8 @@ class AgendaItemTests(TestCase):
     def test_get_polls(self):
         from voteit.poll.models import Poll
         ai = self._mk_one()
-        poll = Poll.objects.create(agenda_item=ai)
-        poll2 = Poll.objects.create()
+        poll = Poll.objects.create(agenda_item=ai, method_name="simple")
+        poll2 = Poll.objects.create(method_name="simple")
         self.assertIn(poll, ai.get_polls())
         self.assertNotIn(poll2, ai.get_polls())
 
