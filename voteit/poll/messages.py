@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC
 
 from pydantic.main import BaseModel
@@ -13,10 +15,11 @@ from voteit.messaging.messages.base import (
     BaseObjectChanged,
     BaseObjectDeleted,
 )
-from voteit.messaging.decorators import outgoing
+from voteit.messaging.decorators import outgoing, incoming
 from voteit.messaging.messages.text import TextResponse
 from voteit.poll.models import Poll, Vote
 from voteit.poll.permissions import VotePermissions
+from voteit.poll.schemas import GenericVoteSchema
 
 
 @outgoing
@@ -91,3 +94,25 @@ class ChangeVote(VoteBase, ABC):
         self.validate_vote()
         self.context.vote = self.data.vote
         self.context.save()
+
+
+@incoming
+class GetVote(VoteBase):
+    """ Get users vote in a generic format.
+    """
+    name = "vote.get"
+    permission = VotePermissions.VIEW
+    model = Vote
+
+    def run_job(self) -> GenericVoteResponse:
+        self.assert_perm()
+        msg = GenericVoteResponse.from_message(self, vote=self.context.vote, pk=self.context.pk)
+        msg.send_outgoing(self.mm.consumer_name, success=True)
+        return msg
+
+
+@outgoing
+class GenericVoteResponse(BaseOutgoingMessage):
+    name = "vote.get"
+    schema = GenericVoteSchema
+    data: GenericVoteSchema
