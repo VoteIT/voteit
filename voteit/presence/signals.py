@@ -1,8 +1,16 @@
+from contextlib import suppress
+
+from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
+
 from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.models import Meeting
 from voteit.messaging.channels.user import UserChannel
+from voteit.messaging.messages.app_state import AppState
+from voteit.messaging.signals import channel_subscribed
 from voteit.presence.messages import (
     PresenceCheckStatus,
     PresenceDeleted,
@@ -11,7 +19,6 @@ from voteit.presence.messages import (
     PresenceCheckDeleted,
 )
 from voteit.presence.messages import PresenceAdded
-
 from voteit.presence.models import Presence
 from voteit.presence.models import PresenceCheck
 from voteit.presence.channels import PresenceCheckChannel
@@ -76,3 +83,13 @@ def presence_check_deleted(instance=None, **kw):
         msg = PresenceCheckDeleted(pk=instance.pk)
         ch = MeetingChannel.from_instance(meeting)
         ch.publish(msg)
+
+
+@receiver(channel_subscribed, sender=MeetingChannel)
+def channel_subscribed(context: Meeting, user: AbstractUser, app_state: AppState, **kw):
+    """ Populate app_state with current, if any, presence check objects. """
+    with suppress(ObjectDoesNotExist):
+        if presence_check := context.presencesystem.presence_checks.latest_open():
+            app_state.append_from(presence_check, PresenceCheckDetailSerializer, PresenceCheckAdded)
+            if user_presence := presence_check.presences.filter(user=user).first():
+                app_state.append_from(user_presence, PresenceDetailSerializer, PresenceAdded)

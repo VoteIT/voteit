@@ -11,3 +11,4 @@ class AgendaConfig(AppConfig):
         from voteit.agenda import rest_api
         from voteit.agenda import channels
         from voteit.agenda import messages
+        from voteit.agenda import signals

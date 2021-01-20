@@ -84,7 +84,15 @@ class PresenceCheck(MeetingContext):
     def __str__(self):
         return f"Presence check ({self.pk})"
 
-    objects = models.Manager()  # Type hinting
+    class Manager(models.Manager):
+        """ Methods to get filtered QuerySets or currently open presence check. """
+        def open(self) -> models.QuerySet:
+            return self.get_queryset().filter(state=PresenceCheckWf.OPEN)
+
+        def latest_open(self) -> PresenceCheck:
+            return self.open().latest('opened')
+
+    objects = Manager()
 
 
 class PresenceSystem(MeetingContext):

@@ -31,15 +31,6 @@ class PollMethodField(serializers.ChoiceField):
 
 
 class PollListSerializer(serializers.ModelSerializer):
-    method = serializers.CharField(source="method.title")
-
-    class Meta:
-        model = models.Poll
-        fields = "url", "pk", "title", "meeting", "agenda_item", "state", "method"
-        read_only_fields = ("state",)
-
-
-class PollDetailSerializer(serializers.ModelSerializer):
     voted = serializers.SerializerMethodField()
     total = serializers.SerializerMethodField()
 
@@ -54,11 +45,16 @@ class PollDetailSerializer(serializers.ModelSerializer):
             return instance.votes.count()
         return 0
 
-    # Note: This won't have access to the request object, so no url things here!
     class Meta:
         model = models.Poll
-        fields = "pk", "title", "meeting", "agenda_item", "state", "voted", "total"
-        read_only_fields = ("state",)
+        fields = "url", "pk", "title", "meeting", "agenda_item", "state", "method_name", "voted", "total"
+
+
+class PollDetailSerializer(PollListSerializer):
+    # Note: This won't have access to the request object, so no url things here!
+    class Meta(PollListSerializer.Meta):
+        fields = "pk", "title", "meeting", "agenda_item", "state", "method_name", "voted", "total"
+        read_only_fields = "state", "voted", "total"
 
 
 class PollCreateSerializer(serializers.ModelSerializer):

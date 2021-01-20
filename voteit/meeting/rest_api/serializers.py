@@ -33,11 +33,12 @@ class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
 
 
 class MeetingDetailSerializer(UserRolesMixin, serializers.ModelSerializer):
-    agenda_items = AgendaListSerializer(many=True, read_only=True)
+    # Agenda items now in channels app_state
+    # agenda_items = AgendaListSerializer(many=True, read_only=True)
 
     class Meta:
         model = models.Meeting
-        fields = 'title', 'pk', 'state', 'start_time', 'end_time', 'public', 'current_user_roles', 'agenda_items',
+        fields = 'title', 'pk', 'state', 'start_time', 'end_time', 'public', 'current_user_roles'
 
 
 class AgendaOrderSerializer(serializers.Serializer):

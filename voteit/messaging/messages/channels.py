@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+from abc import ABC
+
 from pydantic import validator, BaseModel
 from typing import TYPE_CHECKING, List, Optional
 from django.utils.translation import gettext as _
 
+from voteit.messaging import signals
 from voteit.messaging.abcs import DeferredJob, AsyncRunnable
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import BaseIncomingMessage
+from voteit.messaging.envelopes import BaseEnvelope
 from voteit.messaging.errors import NotFoundError
 from voteit.messaging.errors import UnauthorizedError
+from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.registries import incoming_messages
 from voteit.messaging.registries import outgoing_messages
 from voteit.messaging.utils import get_channel_registry
@@ -43,9 +48,10 @@ class ChannelSubscription(ChannelSchema):
     """
 
     channel_name: str
+    app_state: Optional[List[BaseEnvelope]]
 
 
-class BaseChannelCommand(BaseIncomingMessage):
+class BaseChannelCommand(BaseIncomingMessage, ABC):
     def get_channel(
         self, channel_type: str, pk: int, consumer_name: str
     ) -> AbstractObjectChannel:
@@ -60,14 +66,24 @@ class Subscribe(BaseChannelCommand, DeferredJob):
     schema = ChannelSchema
     data: ChannelSchema
 
+    def get_app_state(self, channel: AbstractObjectChannel) -> Optional[list]:
+        """ Dispatch signal to populate app_state object, and return as list object or None """
+        app_state = AppState()
+        signals.channel_subscribed.send(
+            sender=channel.__class__, context=channel.context, user=self.user, app_state=app_state
+        )
+        if app_state:
+            return list(app_state)
+
     def run_job(self) -> Subscribed:
         channel = self.get_channel(
             self.data.channel_type, self.data.pk, self.mm.consumer_name
         )
         if channel.allow_subscribe(self.user):
             channel.subscribe()
+            app_state = self.get_app_state(channel)
             msg = Subscribed.from_message(
-                self, channel_name=channel.channel_name, **self.data.dict()
+                self, channel_name=channel.channel_name, app_state=app_state, **self.data.dict()
             )
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg
@@ -91,6 +107,8 @@ class Leave(BaseChannelCommand, DeferredJob):
             channel.leave()
             msg = Left.from_message(self, channel_name=channel.channel_name, **self.data.dict())
             msg.send_outgoing(self.mm.consumer_name, success=True)
+            # No app state when leaving channel
+            signals.channel_left.send(sender=channel.__class__, context=channel.context, user=self.user)
             return msg
         else:
             raise UnauthorizedError.from_message(
