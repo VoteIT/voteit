@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from voteit.poll.exceptions import (
     ElectoralRegisterMissing,
@@ -6,6 +6,9 @@ from voteit.poll.exceptions import (
     InvalidProposalCount,
     InvalidPollMethod,
 )
+
+
+User = get_user_model()
 
 
 class PollMethodTests(TestCase):
