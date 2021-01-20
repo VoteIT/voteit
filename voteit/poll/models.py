@@ -9,6 +9,7 @@ from logging import getLogger
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db.models import UniqueConstraint, Sum
 from django.dispatch import receiver
@@ -18,7 +19,6 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField, transition, post_transition
 from typing import Optional, Dict, Type, TYPE_CHECKING, Union
-
 from pydantic import ValidationError
 from pydantic.main import BaseModel
 
@@ -116,7 +116,7 @@ class Poll(BaseContent, MeetingContext):
         verbose_name=_("Abstentions"), default=0, editable=False
     )
     result_data: Optional[Dict] = models.JSONField(
-        verbose_name=_("JSON-serialized result data"), editable=False, null=True
+        verbose_name=_("JSON-serialized result data"), editable=False, null=True, encoder=DjangoJSONEncoder
     )
 
     def get_method_class(self) -> Type[PollMethod]:
@@ -211,7 +211,7 @@ class Poll(BaseContent, MeetingContext):
         conditions=[validate_settings_guard],
     )
     def upcoming(self):
-        pass
+        self.save()
 
     @transition(
         field=state,
@@ -221,6 +221,7 @@ class Poll(BaseContent, MeetingContext):
     )
     def ongoing(self):
         self.started = now()
+        self.save()
 
     @transition(
         field=state,
@@ -232,6 +233,7 @@ class Poll(BaseContent, MeetingContext):
             The next step is always to count the votes via the method finish()
         """
         self._mark_closed()
+        self.save()
 
     @transition(
         field=state,
@@ -250,14 +252,16 @@ class Poll(BaseContent, MeetingContext):
         assert self.ballot_data
         assert self.ballot_checksum
         self.method.calculate_result(counter)
+        self.save()
 
     @transition(field=state, source=PollWf.ONGOING, target=PollWf.CANCELED)
     def cancel(self):
         self._mark_closed()
+        self.save()
 
     @transition(field=state, source=PollWf.UPCOMING, target=PollWf.PRIVATE)
     def unpublish(self):
-        pass
+        self.save()
 
     def _mark_closed(self):
         if not self.closed:
