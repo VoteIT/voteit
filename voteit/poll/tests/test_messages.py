@@ -45,6 +45,18 @@ class AddVoteTests(TestCase):
         msg = self._mk_one()
         self.assertRaises(UnauthorizedError, msg.run_job)
 
+    def test_add_vote_exists(self):
+        from voteit.poll.messages import ChangeVote
+        self.poll.ongoing()
+        self.poll.save()
+        self.vote = self.poll.votes.create(user=self.voter, vote_data="n")
+        msg = self._mk_one()
+        response = msg.run_job()
+        self.assertIsInstance(response, ChangeVote)
+        response.run_job()
+        vote = self.poll.votes.filter(user=self.voter).first()
+        self.assertEqual("y", vote.vote_data)
+
 
 class ChangeVoteTests(TestCase):
     """ Since this is an abstract class, we'll use simple vote to test it"""

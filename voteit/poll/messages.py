@@ -69,17 +69,19 @@ class AddVote(VoteBase, ABC):
         self.validate_vote()
         existing_vote = self.context.votes.filter(user=self.user).first()
         if existing_vote is not None:
-            raise Exception()  # Fixme
             # Vote already exists - no need to error we can simply change it instead?
-            # msg = ChangeVote.from_message(self, vote=self.data.vote, pk=existing_vote.pk)
-            # msg.send_internal(self.mm.consumer_name)
-            # return msg
+            # A bit hackish, lets guess the change name
+            base_name = self.name.split('.')[0]
+            type_name = f"{base_name}.change"
+            msg = ChangeVote.from_message(self, type_name=type_name, vote=self.data.vote, pk=existing_vote.pk)
+            msg.send_internal(self.mm.consumer_name)
+            return msg
         else:
             Vote.objects.create(user=self.user, poll=self.context, vote=self.data.vote)
             msg = TextResponse.from_message(self, msg="Added")
             # FIXME: Vote might not be saved, add on_commit for send_outgoing
             msg.send_outgoing(self.mm.consumer_name, success=True)
-
+            return msg
 
 class ChangeVote(VoteBase, ABC):
     """ Update a users vote. Subclass this and register as an incoming
