@@ -12,13 +12,5 @@ class SpeakerListPermissions:
     CHANGE = "voteit.speaker.change_speaker_list"
     DELETE = "voteit.speaker.delete_speaker_list"
     VIEW = "voteit.speaker.view_speaker_list"
-
-
-class SpeakerPermissions:
-    """ Add here is essentially enter list, while delete will be remove from list
-        if user hasn't spoken or is ongoing.
-    """
-    ADD = "voteit.speaker.add_speaker"  # Checked against speaker list
-    CHANGE = "voteit.speaker.change_speaker"
-    DELETE = "voteit.speaker.delete_speaker"
-    VIEW = "voteit.speaker.view_speaker"
+    ENTER = "voteit.speaker.enter_speaker_list"
+    LEAVE = "voteit.speaker.leave_speaker_list"

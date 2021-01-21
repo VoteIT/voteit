@@ -1,123 +1,93 @@
+from typing import Union
+
 import rules
 from django.contrib.auth.models import AbstractUser
+
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
-
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.models import SpeakerList
-from voteit.speaker.models import Speaker
 from voteit.speaker.roles import ROLE_LIST_MODERATOR, ROLE_SPEAKER
-from voteit.speaker.permissions import (
-    SpeakerListPermissions,
-    SpeakerPermissions,
-    SpeakerSystemPermissions,
-)
+from voteit.speaker.permissions import SpeakerListPermissions
+from voteit.speaker.permissions import SpeakerSystemPermissions
 from voteit.speaker.workflows import SpeakerListWf
 
-# FIXME: We might want to tweak permissions later on, so I've only added some of them /rho
-
 
 @rules.predicate
-def is_list_moderator(user: AbstractUser, list_system: SpeakerListSystem) -> bool:
-    return isinstance(list_system, SpeakerListSystem) and list_system.has_roles(
-        user, ROLE_LIST_MODERATOR
-    )
-
-
-@rules.predicate
-def is_list_speaker(user: AbstractUser, list_system: SpeakerListSystem) -> bool:
-    return isinstance(list_system, SpeakerListSystem) and list_system.has_roles(
-        user, ROLE_SPEAKER
-    )
-
-
-@rules.predicate
-def can_add_speaker(user: AbstractUser, speaker_list: SpeakerList):
+def is_moderator(
+    user: AbstractUser, obj: Union[SpeakerListSystem, SpeakerList]
+) -> bool:
+    """ Check if a user has list moderator status within this speaker list system.
     """
-        Add a speaker to a list if:
-        1. The list is open AND you're a speaker
-        2. You're list moderator
+    if isinstance(obj, SpeakerListSystem):
+        return obj.has_roles(user, ROLE_LIST_MODERATOR)
+    elif isinstance(obj, SpeakerList):
+        return obj.list_system.has_roles(user, ROLE_LIST_MODERATOR)
+    else:  # pragma: no cover
+        raise TypeError(f"{obj} is not an instance of SpeakerListSystem or SpeakerList")
+
+
+@rules.predicate
+def has_speaker_role(
+    user: AbstractUser, obj: Union[SpeakerListSystem, SpeakerList]
+) -> bool:
+    """ Check if a user has speaker role status within this speaker list system.
     """
-    return isinstance(speaker_list, SpeakerList) and (
-        (
-            speaker_list.state == SpeakerListWf.OPEN
-            and is_list_speaker(user, speaker_list.list_system)
-        )
-        or is_list_moderator(user, speaker_list.list_system)
+    if isinstance(obj, SpeakerListSystem):
+        return obj.has_roles(user, ROLE_SPEAKER)
+    elif isinstance(obj, SpeakerList):
+        return obj.list_system.has_roles(user, ROLE_SPEAKER)
+    else:  # pragma: no cover
+        raise TypeError(f"{obj} is not an instance of SpeakerListSystem or SpeakerList")
+
+
+@rules.predicate
+def can_view_related_meeting(
+    user: AbstractUser, obj: Union[SpeakerListSystem, SpeakerList]
+):
+    meeting = None
+    if isinstance(obj, SpeakerListSystem):
+        meeting = obj.meeting
+    elif isinstance(obj, SpeakerList):
+        meeting = obj.list_system.meeting
+    if meeting is None:
+        return False
+    return user.has_perm(MeetingPermissions.VIEW, meeting)
+
+
+@rules.predicate
+def is_list_open(user: AbstractUser, speaker_list: SpeakerList) -> bool:
+    return (
+        isinstance(speaker_list, SpeakerList)
+        and speaker_list.state == SpeakerListWf.OPEN
     )
 
 
 @rules.predicate
-def can_change_speaker(user: AbstractUser, speaker: Speaker):
-    """ Only moderators."""
-    return isinstance(speaker, Speaker) and is_list_moderator(
-        user, speaker.list.list_system
-    )
+def not_currently_speaking(user: AbstractUser, speaker_list: SpeakerList) -> bool:
+    if isinstance(speaker_list, SpeakerList):
+        if speaker_list.current is None:
+            return True
+        return speaker_list.current.user != user
+    else:  # pragma: no cover
+        return False
 
 
-@rules.predicate
-def can_delete_speaker(user: AbstractUser, speaker: Speaker):
-    """ Users may delete themselves (remove from list) if they're queued,
-        but never if they're speaking or if it's an old entry.
-        Moderators can always delete.
-    """
-    return isinstance(speaker, Speaker) and (
-        (speaker.user == user and speaker.in_queue)
-        or is_list_moderator(user, speaker.list.list_system)
-    )
-
-
-@rules.predicate
-def can_view_speaker(user: AbstractUser, speaker: Speaker):
-    """ View permission on attached meeting, speakers or list moderators"""
-    # FIXME: This might change a lot
-    if isinstance(speaker, Speaker):
-        system = speaker.list.list_system
-        return (
-            is_list_speaker(user, system)
-            or is_list_moderator(user, system)
-            or user.has_perm(MeetingPermissions.VIEW, system.meeting)
-        )
-
-
-rules.add_perm(SpeakerPermissions.ADD, can_add_speaker)
-rules.add_perm(SpeakerPermissions.CHANGE, can_change_speaker)
-rules.add_perm(SpeakerPermissions.DELETE, can_delete_speaker)
-rules.add_perm(SpeakerPermissions.VIEW, can_view_speaker)
-
-
-@rules.predicate
-def can_add_speaker_list(user: AbstractUser, list_system: SpeakerListSystem):
-    return is_list_moderator(user, list_system)
-
-
-@rules.predicate
-def can_change_speaker_List(user: AbstractUser, speaker_list: SpeakerList):
-    return isinstance(speaker_list, SpeakerList) and is_list_moderator(
-        user, speaker_list.list_system
-    )
-
-
-@rules.predicate
-def can_delete_speaker_list(user: AbstractUser, speaker_list: SpeakerList):
-    return isinstance(speaker_list, SpeakerList) and is_list_moderator(
-        user, speaker_list.list_system
-    )
-
-
-@rules.predicate
-def can_view_speaker_list(user: AbstractUser, speaker_list: SpeakerList):
-    """ Delegate to speaker list system VIEW
-    """
-    return isinstance(speaker_list, SpeakerList) and user.has_perm(
-        SpeakerSystemPermissions.VIEW, speaker_list.list_system
-    )
-
-
-rules.add_perm(SpeakerListPermissions.ADD, can_add_speaker_list)
-rules.add_perm(SpeakerListPermissions.CHANGE, can_change_speaker_List)
-rules.add_perm(SpeakerListPermissions.DELETE, can_delete_speaker_list)
-rules.add_perm(SpeakerListPermissions.VIEW, can_view_speaker_list)
+rules.add_perm(SpeakerListPermissions.ADD, is_moderator)  # checked against system
+rules.add_perm(SpeakerListPermissions.CHANGE, is_moderator)
+rules.add_perm(SpeakerListPermissions.DELETE, is_moderator)
+# FIXME: Contextless systems?
+rules.add_perm(
+    SpeakerListPermissions.VIEW,
+    can_view_related_meeting | has_speaker_role | is_moderator,
+)
+rules.add_perm(
+    SpeakerListPermissions.ENTER, (has_speaker_role & is_list_open) | is_moderator
+)
+rules.add_perm(
+    SpeakerListPermissions.LEAVE,
+    (has_speaker_role | is_moderator) & not_currently_speaking,
+)
 
 
 @rules.predicate
@@ -128,27 +98,10 @@ def can_add_system(user: AbstractUser, context: Meeting):
     # FIXME: Add permission for other contexts!
 
 
-@rules.predicate
-def can_change_system(user: AbstractUser, system: SpeakerListSystem):
-    return is_list_moderator(user, system)
-
-
-@rules.predicate
-def can_delete_system(user: AbstractUser, system: SpeakerListSystem):
-    return is_list_moderator(user, system)
-
-
-@rules.predicate
-def can_view_system(user: AbstractUser, system: SpeakerListSystem):
-    if isinstance(system, SpeakerListSystem):
-        return (
-            is_list_speaker(user, system)
-            or is_list_moderator(user, system)
-            or user.has_perm(MeetingPermissions.VIEW, system.meeting)
-        )
-
-
-rules.add_perm(SpeakerSystemPermissions.ADD, can_add_system)
-rules.add_perm(SpeakerSystemPermissions.CHANGE, can_change_system)
-rules.add_perm(SpeakerSystemPermissions.DELETE, can_delete_system)
-rules.add_perm(SpeakerSystemPermissions.VIEW, can_view_system)
+rules.add_perm(SpeakerSystemPermissions.ADD, can_add_system)  # Checked against meeting
+rules.add_perm(SpeakerSystemPermissions.CHANGE, is_moderator)
+rules.add_perm(SpeakerSystemPermissions.DELETE, is_moderator)
+rules.add_perm(
+    SpeakerSystemPermissions.VIEW,
+    can_view_related_meeting | has_speaker_role | is_moderator,
+)
