@@ -346,7 +346,7 @@ class Vote(models.Model):
     created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
     changed: datetime = models.DateTimeField(editable=False, auto_now=True)
     abstain: bool = models.BooleanField(default=False)
-    vote_data: str = models.TextField(
+    vote_data: Optional[str] = models.TextField(
         null=True, blank=True
     )  # This field should contain the value from PollMethod
 
@@ -386,6 +386,8 @@ class Vote(models.Model):
             raise ElectoralRegisterMissing()
         if not er.voters.filter(id=self.user.id):
             raise NotAllowedToVote("Not allowed to vote")
+        if self.abstain and self.vote_data is not None:
+            self.vote_data = None
         super().save(**kw)
 
     # Instantiate this manually for type hinting

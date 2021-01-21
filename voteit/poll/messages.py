@@ -83,6 +83,33 @@ class AddVote(VoteBase, ABC):
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg
 
+class AbstainSchema(BaseModel):
+    pk: int  # Poll pk for votes
+
+
+@incoming
+class AbstainVote(VoteBase):
+    """ Abstain from voting in this poll
+    """
+    permission = VotePermissions.ADD
+    model = Poll
+    name = "vote.abstain"
+    schema = AbstainSchema
+    data: AbstainSchema
+
+    def run_job(self):
+        self.assert_perm()
+        poll: Poll = self.context
+        existing_vote: Vote = poll.votes.filter(user=self.user).first()
+        if existing_vote is None:
+            poll.votes.create(user=self.user, abstain=True)
+        else:
+            existing_vote.abstain = True
+            existing_vote.save()
+        msg = TextResponse.from_message(self, msg="Abstained")
+        msg.send_outgoing(self.mm.consumer_name, success=True)
+
+
 class ChangeVote(VoteBase, ABC):
     """ Update a users vote. Subclass this and register as an incoming
         message for each poll method, with a proper vote schema.
@@ -99,7 +126,7 @@ class ChangeVote(VoteBase, ABC):
 
 
 @incoming
-class GetVote(VoteBase):
+class GetVote(VoteBase):  # TODO Make sure this reports abstain votes
     """ Get users vote in a generic format.
     """
     name = "vote.get"

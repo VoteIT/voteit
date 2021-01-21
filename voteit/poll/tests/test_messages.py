@@ -58,6 +58,45 @@ class AddVoteTests(TestCase):
         self.assertEqual("y", vote.vote_data)
 
 
+class AbstainTests(TestCase):
+    def setUp(self):
+        from voteit.poll.models import Poll
+        from voteit.poll.models import ElectoralRegister
+        self.er = ElectoralRegister.objects.create()
+        self.voter = self.er.voters.create(username="voter")
+        self.poll = Poll.objects.create(electoral_register=self.er, method_name="simple")
+        self.poll.proposals.create()
+        self.poll.upcoming()
+        self.poll.ongoing()
+        self.poll.save()
+
+    @property
+    def _cut(self):
+        from voteit.poll.messages import AbstainVote
+        return AbstainVote
+
+    def _mk_one(self, **kw):
+        kw.setdefault("pk", self.poll.pk)
+        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+
+    def test_abstain(self):
+        msg = self._mk_one()
+        msg.run_job()
+        vote = self.poll.votes.filter(user=self.voter).first()
+        self.assertIsNotNone(vote)
+        self.assertIs(vote.vote_data, None)
+        self.assertIs(vote.abstain, True)
+
+    def test_abstain_existing(self):
+        from voteit.poll.app.polls.simple import AddSimpleVote
+        AddSimpleVote(
+            {"user_pk": self.voter.pk, "consumer_name": "abc"},
+            vote={"choice": "y"},
+            pk=self.poll.pk,
+        ).run_job()
+        self.test_abstain()
+
+
 class ChangeVoteTests(TestCase):
     """ Since this is an abstract class, we'll use simple vote to test it"""
 
