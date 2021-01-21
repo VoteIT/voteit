@@ -75,6 +75,7 @@ class AddVote(VoteBase, ABC):
             type_name = f"{base_name}.change"
             msg = ChangeVote.from_message(self, type_name=type_name, vote=self.data.vote, pk=existing_vote.pk)
             msg.send_internal(self.mm.consumer_name)
+            TextResponse.from_message(self, msg="Changed").send_outgoing(self.mm.consumer_name, success=True)
             return msg
         else:
             Vote.objects.create(user=self.user, poll=self.context, vote=self.data.vote)
@@ -82,6 +83,7 @@ class AddVote(VoteBase, ABC):
             # FIXME: Vote might not be saved, add on_commit for send_outgoing
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg
+
 
 class AbstainSchema(BaseModel):
     pk: int  # Poll pk for votes
@@ -108,6 +110,7 @@ class AbstainVote(VoteBase):
             existing_vote.save()
         msg = TextResponse.from_message(self, msg="Abstained")
         msg.send_outgoing(self.mm.consumer_name, success=True)
+        return msg
 
 
 class ChangeVote(VoteBase, ABC):
