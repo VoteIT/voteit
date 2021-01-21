@@ -2,32 +2,12 @@ from typing import Sequence
 
 from django.db import transaction
 from rest_framework import serializers
+
 from voteit.poll import models
-
-
-__all__ = ("PollListSerializer", "PollDetailSerializer")
-
-from voteit.poll.registries import poll_methods
-
-
-# This is a big hackish atm
-# TODO Get valid poll methods for meeting
 from voteit.proposal.workflows import ProposalWf
 
 
-class PollMethodField(serializers.ChoiceField):
-    """ Get poll methods options """
-
-    def __init__(self, **kwargs):
-        super().__init__((), **kwargs)
-
-    def _get_grouped_choices(self):
-        return {k: m.title for k, m in poll_methods.items()}
-
-    def _set_grouped_choices(self, choices):
-        pass
-
-    grouped_choices = property(_get_grouped_choices, _set_grouped_choices)
+__all__ = ("PollListSerializer", "PollDetailSerializer")
 
 
 class PollListSerializer(serializers.ModelSerializer):
@@ -59,7 +39,6 @@ class PollDetailSerializer(PollListSerializer):
 
 class PollCreateSerializer(serializers.ModelSerializer):
     _proposals: Sequence
-    method = PollMethodField(write_only=True)
     proposal_pks = serializers.CharField(max_length=100, write_only=True)
     start = serializers.BooleanField(write_only=True)
 
@@ -78,8 +57,6 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """ Create method object and connect proposals """
-        method_model = poll_methods.get(validated_data.get("method"))
-        validated_data["method"] = method_model.objects.create()
         validated_data.pop("proposal_pks")
         start = validated_data.pop("start")
 
@@ -98,5 +75,5 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Poll
-        fields = "agenda_item", "method", "proposal_pks", "start"
+        fields = "agenda_item", "method_name", "proposal_pks", "start"
         extra_kwargs = {"agenda_item": {"required": True}}

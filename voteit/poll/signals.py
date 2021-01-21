@@ -17,7 +17,7 @@ def poll_subscribed(context: Poll, app_state: AppState, **kw):
     """ Populate app_state with current poll status """
     msg = PollStatus.create(
         pk=context.pk,
-        voted=context.method.vote_set.count(),
+        voted=context.votes.count(),
         total=context.electoral_register.voters.count(),
     )
     app_state.append(msg)
