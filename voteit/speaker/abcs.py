@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from logging import getLogger
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
-from django.contrib.contenttypes.fields import GenericRelation
 from django.db.models import Max
+from pydantic.main import BaseModel
 
-from voteit.core.models import ABCModel
 
 if TYPE_CHECKING:
     from voteit.speaker.models import SpeakerListSystem
@@ -16,19 +15,14 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class ListMethod(ABCModel):
-    list_system_rel = GenericRelation(
-        "speaker.SpeakerListSystem",
-        object_id_field="method_id",
-        content_type_field="method_type",
-    )
-
-    class Meta:
-        abstract = True
+class ListMethod(ABC):
+    def __init__(self, list_system: SpeakerListSystem):
+        self.list_system = list_system
 
     @property
-    def list_system(self) -> SpeakerListSystem:
-        return self.list_system_rel.get()
+    @abstractmethod
+    def name(self) -> str:
+        """ Unique name for method """
 
     @property
     @abstractmethod
@@ -39,6 +33,13 @@ class ListMethod(ABCModel):
     @abstractmethod
     def description(self) -> str:
         """ Human-readable explanation of what this does. """
+
+    @property
+    def settings_schema(self) -> Optional[BaseModel]:
+        """ Possible settings schema for this speaker list method.
+            Will be enforced if it exists
+        """
+        return None
 
     def reorder(self, speaker_list: SpeakerList) -> List[int]:
         """ Override this method to implement actual quotas or similar.

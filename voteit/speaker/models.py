@@ -1,31 +1,28 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Optional, Type
+from typing import TYPE_CHECKING, Optional, Type, Dict, Union
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models, transaction
-from django.db.models.signals import post_delete
-from django.db.models.signals import post_save
-from django.dispatch import receiver
+from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField, transition
+from pydantic.main import BaseModel
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import Roles, RoleContextMixin
 from voteit.meeting.models import Meeting
 from voteit.speaker.permissions import SpeakerListPermissions
-from voteit.speaker.signals import list_updated
+from voteit.speaker.utils import get_list_method_registry
 from voteit.speaker.workflows import SpeakerListWf
 
 if TYPE_CHECKING:
     from voteit.speaker.abcs import ListMethod
-
 
 # FIXME:
 # Då gör jag ett system som heter "talarprioritering" som har möjligheten
@@ -33,7 +30,6 @@ if TYPE_CHECKING:
 # Voila så har vi "antal talarlistor" på ett begripligt sätt.
 # Som standard så finns ingen sådan begränsning då
 # och ett system som bara sätter upp talaren utan att göra något
-
 
 # FIXME: SpeakerListSystems (SLS) should be able to relate to another SLS, causing all settings
 # to be shared between them.
@@ -63,27 +59,13 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     meeting: Optional[Meeting] = models.ForeignKey(
         Meeting, verbose_name=_("Related meeting"), on_delete=models.CASCADE, null=True
     )
-    method_type: str = models.ForeignKey(
-        ContentType, on_delete=models.SET_NULL, null=True
+    method_name: str = models.CharField(max_length=20)
+    settings_data: Dict = models.JSONField(
+        verbose_name=_("JSON-serialized settings data"),
+        editable=False,
+        null=True,
+        encoder=DjangoJSONEncoder,
     )
-    method_id: int = models.PositiveIntegerField(null=True)
-    method: ListMethod = GenericForeignKey("method_type", "method_id")
-    # moderators = models.ManyToManyField(
-    #     settings.AUTH_USER_MODEL,
-    #     verbose_name=_("Users who may moderate the speaker lists"),
-    #     blank=True,
-    #     related_name="moderator_in_list_systems",
-    #     editable=False,
-    # )
-    # speakers = models.ManyToManyField(
-    #     settings.AUTH_USER_MODEL,
-    #     verbose_name=_(
-    #         "Users who may ask to speak (i.e. enter a list) depending on if they're open or not"
-    #     ),
-    #     blank=True,
-    #     related_name="speaker_in_list_systems",
-    #     editable=False,
-    # )
     safe_positions = models.PositiveSmallIntegerField(
         verbose_name=_(
             "When a list is active, mark the top X positions as safe automatically. "
@@ -101,6 +83,48 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     )
 
     roles_cls = SpeakerSystemRoles
+
+    def get_method_class(self) -> Type[ListMethod]:
+        """ Fetch the poll method class, a django proxy model.
+        """
+        reg = get_list_method_registry()
+        return reg[self.method_name]
+
+    @cached_property
+    def method(self) -> ListMethod:
+        method = self.get_method_class()
+        return method(self)
+
+    @property
+    def settings(self):
+        schema = self.method.settings_schema
+        if schema is not None:
+            data = self.settings_data
+            if data is None:
+                data = {}
+            # We do want things to crash here!
+            return schema(**data)
+
+    @settings.setter
+    def settings(self, value: Union[Dict, BaseModel]):
+        schema = self.method.settings_schema
+        if schema is None:
+            raise ValueError(f"Method {self.method.name} has no settings_schema")
+        if isinstance(value, dict):
+            data = schema(**value)
+        elif isinstance(value, schema):
+            data = value
+        else:  # pragma: no cover
+            raise ValueError(f"{value} is not a settings schema or a dict")
+        self.settings_data = data.dict()
+
+    def save(self, **kw):
+        # Will raise error if there's something bogus with settings or referenced method
+        self.settings
+        super(SpeakerListSystem, self).save(**kw)
+
+    # Type hinting
+    objects = models.Manager()
 
 
 class Speaker(models.Model):
@@ -155,35 +179,8 @@ class Speaker(models.Model):
             # FIXME: Something...?
             raise ValueError()
 
-
-@receiver(post_save, sender=Speaker)
-def set_initial_order(
-    sender: Type[Speaker], instance: Speaker, created: bool, **kwargs
-):
-    """ 
-    :param sender: Model
-    :param instance: Speaker instance
-    :param created: Is this a new db records? We only care about the newly created for this method.
-    :param kwargs:
-    """
-    if created:
-        sl = instance.list
-        results = sl.speaker_items.filter(order__isnull=False).aggregate(
-            models.Max("order")
-        )
-        current_order = results["order__max"]
-        if current_order is None:
-            order = 1
-        else:
-            order = current_order + 1
-        instance.order = order
-        instance.save()
-        sl.reorder()
-
-
-@receiver(post_delete, sender=Speaker)
-def reorder_after_delete(sender: Type[Speaker], instance: Speaker, **kwargs):
-    instance.list.reorder(force_signal=True)
+    # Type hinting
+    objects = models.Manager()
 
 
 class SpeakerList(models.Model):
@@ -259,6 +256,9 @@ class SpeakerList(models.Model):
         return new_order
 
     def signal_list_updated(self):
+        # Circular import :(
+        from voteit.speaker.signals import list_updated
+
         list_updated.send(
             sender=self.__class__, instance=self, queue=self.current_order()
         )
@@ -285,3 +285,6 @@ class SpeakerList(models.Model):
         return self.speaker_items.filter(order__isnull=False, safe_pos=False).order_by(
             "created"
         )
+
+    # Type hinting
+    objects = models.Manager()

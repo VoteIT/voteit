@@ -10,10 +10,8 @@ class SpeakerTests(TestCase):
     def setUp(self):
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
-        from voteit.speaker.app.list_methods.simple import Simple
 
-        self.method = Simple.objects.create()
-        self.system = SpeakerListSystem.objects.create(method=self.method)
+        self.system = SpeakerListSystem.objects.create(method_name="simple")
         self.list = SpeakerList.objects.create(list_system=self.system)
         self.user = User.objects.create(username="jane")
 
@@ -61,10 +59,8 @@ class SpeakerListTests(TestCase):
     def setUp(self):
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
-        from voteit.speaker.app.list_methods.simple import Simple
 
-        self.method = Simple.objects.create()
-        self.system = SpeakerListSystem.objects.create(method=self.method)
+        self.system = SpeakerListSystem.objects.create(method_name="simple")
         self.speaker_list = SpeakerList.objects.create(list_system=self.system)
         self.user_one = User.objects.create(username="one")
         self.user_two = User.objects.create(username="two")
@@ -174,3 +170,19 @@ class SpeakerListTests(TestCase):
             [self.speaker_three.pk, self.speaker_one.pk],
             self.speaker_list.current_order(),
         )
+
+    def test_set_settings_from_schema_directly(self):
+        from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema
+        from voteit.speaker.app.list_methods.priority import Priority
+
+        self.system.method_name = "priority"
+        self.system.method = Priority(self.system)  # Rewrap to clear cache
+        self.system.save()
+        self.system.refresh_from_db()
+        settings = PrioritySettingsSchema(max_times=2)
+        self.system.settings = settings
+        self.assertEqual(2, self.system.settings.max_times)
+
+    def test_set_settings_without_existing_schema(self):
+        with self.assertRaises(ValueError):
+            self.system.settings = {}

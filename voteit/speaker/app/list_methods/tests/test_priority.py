@@ -6,10 +6,7 @@ class PriorityTests(TestCase):
     def setUp(self):
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
-        from voteit.speaker.app.list_methods.priority import Priority
-
-        self.method = Priority.objects.create()
-        self.system = SpeakerListSystem.objects.create(method=self.method)
+        self.system = SpeakerListSystem.objects.create(method_name="priority")
         self.speaker_list = SpeakerList.objects.create(list_system=self.system)
         self.user_one = User.objects.create(username="one")
         self.user_two = User.objects.create(username="two")
@@ -56,7 +53,7 @@ class PriorityTests(TestCase):
         )
 
     def test_max_times_aborts_priority(self):
-        self.method.max_times = 1
+        self.system.settings = {"max_times": 1}
         # Both one and two will be treated as 1, so two won't have higher priority
         self._mk_previous_spoken(self.user_one, 3)
         self._mk_previous_spoken(self.user_two, 2)

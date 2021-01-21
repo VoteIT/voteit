@@ -1,34 +1,36 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.utils.translation import gettext_lazy as _
 from typing import List
 
+from pydantic.main import BaseModel
 from voteit.speaker.abcs import ListMethod
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.registries import list_method
 
 
+class PrioritySettingsSchema(BaseModel):
+    max_times: int = 0
+    # "Number of times to prioritise a speaker. "
+    # "0 means always prioritise speakers who've spoken less than someone else."
+
+
 @list_method
 class Priority(ListMethod):
+    name = "priority"
     title = "Prioritise users who haven't spoken"
     description = (
         "Users who've spoken less than others in the queue will be prioritised."
     )
-    max_times = models.PositiveSmallIntegerField(
-        default=0,
-        verbose_name=_(
-            "Number of times to prioritise a speaker. "
-            "0 means always prioritise speakers who've spoken less than someone else."
-        ),
-    )
+    settings_schema = PrioritySettingsSchema
 
     def get_spoken_count(self, speaker_list: SpeakerList, user: AbstractUser) -> int:
         return speaker_list.speaker_items.filter(order__isnull=True, user=user).count()
 
     def get_cmp_val(self, speaker_list: SpeakerList, user: AbstractUser) -> int:
         count = self.get_spoken_count(speaker_list, user)
-        if self.max_times and count > self.max_times:
-            return self.max_times
+        max_times = self.list_system.settings.max_times
+        if max_times and count > max_times:
+            return max_times
         return count
 
     def reorder(self, speaker_list: SpeakerList) -> List[int]:

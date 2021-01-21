@@ -1,8 +1,11 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 
-class SimpleListMethodTests(TestCase):
+User = get_user_model()
+
+
+class ListMethodTests(TestCase):
     """ This test should also cover the abstract class ListMethod,
         since it's easier to handle the testing within a simple implementation.
     """
@@ -10,9 +13,7 @@ class SimpleListMethodTests(TestCase):
     def setUp(self):
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
-        from voteit.speaker.app.list_methods.simple import Simple
-        self.method = Simple.objects.create()
-        self.system = SpeakerListSystem.objects.create(method=self.method)
+        self.system = SpeakerListSystem.objects.create(method_name="simple")
         self.speaker_list = SpeakerList.objects.create(list_system=self.system)
         self.speaker_user = User.objects.create_user("speaker")
 
