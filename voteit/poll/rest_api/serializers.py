@@ -27,14 +27,14 @@ class PollListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Poll
-        fields = "url", "pk", "title", "meeting", "agenda_item", "state", "method_name", "voted", "total"
+        fields = "url", "pk", "title", "meeting", "agenda_item", "state", "method_name", "voted", "total", "result_data"
 
 
 class PollDetailSerializer(PollListSerializer):
     # Note: This won't have access to the request object, so no url things here!
     class Meta(PollListSerializer.Meta):
-        fields = "pk", "title", "meeting", "agenda_item", "state", "method_name", "voted", "total"
-        read_only_fields = "state", "voted", "total"
+        fields = "pk", "title", "meeting", "agenda_item", "state", "method_name", "voted", "total", "result_data"
+        read_only_fields = "state", "voted", "total", "result_data",
 
 
 class PollCreateSerializer(serializers.ModelSerializer):
