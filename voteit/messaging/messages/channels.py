@@ -176,4 +176,4 @@ class RecheckChannelSubscriptions(BaseOutgoingMessage, DeferredJob):
             if not ch.allow_subscribe(self.user):
                 ch.leave()
                 msg = Left.from_message(self, channel_name=ch.channel_name, channel_type=cs.channel_type, pk=cs.pk)
-                msg.send_outgoing(self.mm.consumer_name, success=True)
+                msg.send_outgoing(self.mm.consumer_name, success=True, on_commit=False)

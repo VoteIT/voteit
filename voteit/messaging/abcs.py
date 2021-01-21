@@ -111,15 +111,25 @@ class MessageABC(ABC):
     def channel_layer(self):
         return get_channel_layer(self.channel_layer_name)
 
-    def send_internal(self, channel_name: str, group: bool = False):
-        return async_to_sync(self.async_send_internal)(channel_name, group=group)
+    def send_internal(self, channel_name: str, group: bool = False, on_commit=True):
+        """ Queue an internal message, meant for the consumer and not to be transmitted over websocket.
+            These are usually actions that need to be taken by the consumers, like healthchecks.
+        """
+        def _hook():
+            async_to_sync(self.async_send_internal)(channel_name, group=group)
+        if on_commit:
+            transaction.on_commit(_hook)
+        else:
+            _hook()
 
-    async def async_send_internal(self, channel_name: str, group: bool = False):
+    async def async_send_internal(self, channel_name: str, group: bool = False, on_commit=None):
+        assert on_commit is None, "This argument doesn't work on async calls!"
         envelope = InternalEnvelope(
             p=self.data,
             i=self.mm.message_id,
             t=self.mm.type,
             incoming=isinstance(self, BaseIncomingMessage),
+
         )
         if group:
             await self.channel_layer.group_send(channel_name, envelope.dict())
@@ -132,10 +142,19 @@ class MessageABC(ABC):
         state: Optional[str] = None,
         success: Optional[bool] = None,
         group: bool = False,
+        on_commit: bool = True
     ):
-        return async_to_sync(self.async_send_outgoing)(
-            channel_name, state=state, success=success, group=group
-        )
+        """ Queue a message that the consumer is meant to deliver over websocket to the client.
+            The message may also contain actions that'll be taken before the message is transmitted.
+        """
+        def _hook():
+            async_to_sync(self.async_send_outgoing)(
+                channel_name, state=state, success=success, group=group
+            )
+        if on_commit:
+            transaction.on_commit(_hook)
+        else:
+            _hook()
 
     async def async_send_outgoing(
         self,
@@ -143,7 +162,12 @@ class MessageABC(ABC):
         state: Optional[str] = None,
         success: Optional[bool] = None,
         group: bool = False,
+        on_commit = None
     ):
+        """ Async call to queue an outgoing message. Use this directly when possible.
+            Note that it doesn't support transactions so it will be queued directly.
+        """
+        assert on_commit is None, "This argument doesn't work on async calls!"
         if success is not None:
             if state is not None:
                 raise ValueError("Can't specify both state and success")
@@ -163,6 +187,8 @@ class MessageABC(ABC):
     def from_consumer(
         cls, consumer, envelope: Union[IncomingEnvelope, InternalEnvelope, OutgoingEnvelope]
     ):
+        """ Instantiate a message with details from the consumer and an envelope.
+        """
         mm = MessageMeta(
             consumer_name=consumer.channel_name,
             user_pk=consumer.user.pk,
@@ -429,14 +455,28 @@ class BaseError(BaseOutgoingMessage, Exception, ABC):
         inst.data.msg = msg
         return inst
 
+    def send_outgoing(
+        self,
+        channel_name: str,
+        state: Optional[str] = None,
+        success: Optional[bool] = None,
+        group: bool = False,
+        on_commit: bool = False
+    ):
+        """ Error messages should normally be sent directly, so default on_commit to false
+        """
+        super(BaseError, self).send_outgoing(channel_name, state=state, success=success, group=group, on_commit=on_commit)
+
     async def async_send_outgoing(
         self,
         channel_name: str,
         state: Optional[str] = None,
         success: Optional[bool] = False,
         group: bool = False,
+        on_commit = None
     ):
         """ Override and default to error."""
+        assert on_commit is None, "This argument doesn't work on async calls!"
         if state is not None:
             assert state == self.FAILED, "Error messages must be sent as failed state"
         assert not success, "Error messages must be sent as failed state"
@@ -488,8 +528,9 @@ class AbstractChannel(ABC):
     def subscribe(self, consumer_channel=None):
         async_to_sync(self.async_subscribe)(consumer_channel=consumer_channel)
 
-    async def async_publish(self, message: MessageABC, internal=False, **kwargs):
+    async def async_publish(self, message: MessageABC, internal=False, on_commit=None, **kwargs):
         # self.logger.debug("Publish to %s", self.channel_name)
+        assert on_commit is None, "This argument doesn't work on async calls!"
         assert isinstance(message, MessageABC)
         if internal:
             await message.async_send_internal(self.channel_name, group=True)
@@ -497,10 +538,12 @@ class AbstractChannel(ABC):
             await message.async_send_outgoing(self.channel_name, group=True, **kwargs)
 
     def publish(self, message: MessageABC, internal=False, on_commit=True, **kwargs):
-        if on_commit:
-            transaction.on_commit(lambda: async_to_sync(self.async_publish)(message, internal=internal, **kwargs))
-        else:
+        def _hook():
             async_to_sync(self.async_publish)(message, internal=internal, **kwargs)
+        if on_commit:
+            transaction.on_commit(_hook)
+        else:
+            _hook()
 
     async def async_leave(self, consumer_channel=None):
         if consumer_channel is None:
