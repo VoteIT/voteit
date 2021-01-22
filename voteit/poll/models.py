@@ -352,7 +352,7 @@ class Vote(models.Model):
 
     @property
     def vote(self) -> BaseModel:
-        return self.poll.method.vote_to_obj(self.vote_data)
+        return self.vote_data and self.poll.method.vote_to_obj(self.vote_data)
 
     @vote.setter
     def vote(self, data: Union[BaseModel, str]):

@@ -157,11 +157,28 @@ class GetVoteTests(TestCase):
 
         return GetVote
 
-    def _mk_one(self, **kw):
-        kw.setdefault("pk", self.vote.pk)
-        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+    def _mk_one(self, voter=None, **kw):
+        voter = voter or self.voter
+        kw.setdefault("pk", self.poll.pk)
+        return self._cut({"user_pk": voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_get(self):
         msg = self._mk_one()
         response = msg.run_job()
         self.assertEqual(response.data.vote, self.vote.vote)
+        self.assertEqual(response.data.abstain, False)
+
+    def test_abstain_vote(self):
+        self.vote.abstain = True
+        self.vote.save()
+        msg = self._mk_one()
+        response = msg.run_job()
+        self.assertEqual(response.data.abstain, True)
+
+    def test_no_vote(self):
+        from voteit.messaging.messages.text import TextResponse
+        voter = self.er.voters.create(username="second_voter")
+        msg = self._mk_one(voter=voter)
+        response = msg.run_job()
+        self.assertIsInstance(response, TextResponse)
+        self.assertEqual(response.data.msg, "No vote")
