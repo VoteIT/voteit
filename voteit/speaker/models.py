@@ -46,8 +46,8 @@ class SpeakerSystemRoles(Roles, MeetingContext):
 
 
 class SpeakerListSystem(RoleContextMixin, MeetingContext):
-    """ All speaker list things relate here, while this in turn might relate to a meeting.
-        A list system has its own rules and moderators.
+    """All speaker list things relate here, while this in turn might relate to a meeting.
+    A list system has its own rules and moderators.
     """
 
     active: bool = models.BooleanField(
@@ -85,8 +85,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     roles_cls = SpeakerSystemRoles
 
     def get_method_class(self) -> Type[ListMethod]:
-        """ Fetch the poll method class, a django proxy model.
-        """
+        """Fetch the poll method class, a django proxy model."""
         reg = get_list_method_registry()
         return reg[self.method_name]
 
@@ -128,8 +127,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
 
 
 class Speaker(models.Model):
-    """ Information about a user who's entered a speaker list.
-    """
+    """Information about a user who's entered a speaker list."""
 
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT
@@ -139,10 +137,10 @@ class Speaker(models.Model):
     )
     # Note: Created is also needed for "historic" positions within a speaker list in case they're rearranged.
     created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
-    order: int = models.PositiveSmallIntegerField(null=True)
+    order: Optional[int] = models.PositiveSmallIntegerField(null=True)
     safe_pos: bool = models.BooleanField(default=False)
-    started: datetime = models.DateTimeField(null=True)
-    seconds: int = models.PositiveSmallIntegerField(null=True)
+    started: Optional[datetime] = models.DateTimeField(null=True)
+    seconds: Optional[int] = models.PositiveSmallIntegerField(null=True)
 
     class Meta:
         constraints = [
@@ -160,8 +158,8 @@ class Speaker(models.Model):
 
     @property
     def current(self) -> bool:
-        """ We're guessing that this is the current speaker
-            if it has a started timestamp and no recorded spoken seconds.
+        """We're guessing that this is the current speaker
+        if it has a started timestamp and no recorded spoken seconds.
         """
         return self.started is not None and self.seconds is None
 
@@ -175,6 +173,9 @@ class Speaker(models.Model):
             self.order = None
             self.started = now()
             self.save()
+            self.list.current = self
+            self.list.save()
+            self.list.reorder(force_signal=True)  # Since order probably won't change
         else:  # pragma: no coverage
             # FIXME: Something...?
             raise ValueError()
@@ -184,6 +185,7 @@ class Speaker(models.Model):
 
 
 class SpeakerList(models.Model):
+    title = models.CharField(max_length=200, null=True)
     state = FSMField(
         default=SpeakerListWf.initial, choices=SpeakerListWf.choices(), editable=False
     )
@@ -226,8 +228,8 @@ class SpeakerList(models.Model):
         pass
 
     def reorder(self, force_signal=False):
-        """ Something have changed within the list that makes reordering necessary.
-            Usually when a user is added or removed, but it can be triggered for attribute changes on users too.
+        """Something have changed within the list that makes reordering necessary.
+        Usually when a user is added or removed, but it can be triggered for attribute changes on users too.
         """
         current = self.current_order()
         with transaction.atomic():
@@ -259,13 +261,10 @@ class SpeakerList(models.Model):
         # Circular import :(
         from voteit.speaker.signals import list_updated
 
-        list_updated.send(
-            sender=self.__class__, instance=self, queue=self.current_order()
-        )
+        list_updated.send(sender=self.__class__, instance=self)
 
     def current_order(self):
-        """ Return an ordered list of primary keys for speaker items that are in the queue.
-        """
+        """Return an ordered list of primary keys for speaker items that are in the queue."""
         # FIXME: There's probably an optimisation to be done here :)
         return [x.pk for x in self.speakers_qs().all()]
 
@@ -275,8 +274,7 @@ class SpeakerList(models.Model):
         )
 
     def speakers_qs(self) -> models.QuerySet:
-        """ Return an ordered queryset with the speakers in the current list.
-        """
+        """Return an ordered queryset with the speakers in the current list."""
         return self.speaker_items.filter(order__isnull=False).order_by(
             "-safe_pos", "order"
         )

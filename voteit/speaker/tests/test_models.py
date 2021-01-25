@@ -52,8 +52,8 @@ class SpeakerTests(TestCase):
 
 
 class SpeakerListTests(TestCase):
-    """ Lists don't work without a method, so these basics should be tested
-        with a bare minimal implementation.
+    """Lists don't work without a method, so these basics should be tested
+    with a bare minimal implementation.
     """
 
     def setUp(self):
@@ -97,8 +97,8 @@ class SpeakerListTests(TestCase):
         L = []
 
         @receiver(list_updated, sender=SpeakerList)
-        def my_listener(instance, queue, **kw):
-            L.append(queue)
+        def my_listener(instance, **kw):
+            L.append(instance.current_order())
 
         self.speaker_list.reorder()
         # No change
@@ -153,8 +153,8 @@ class SpeakerListTests(TestCase):
         L = []
 
         @receiver(list_updated, sender=SpeakerList)
-        def my_listener(instance, queue, **kw):
-            L.append(queue)
+        def my_listener(instance, **kw):
+            L.append(instance.current_order())
 
         self.speaker_two.delete()
         self.assertTrue(L)

@@ -3,8 +3,10 @@ from abc import ABC
 from django.contrib.auth import get_user_model
 from pydantic.main import BaseModel
 from django.utils.translation import gettext as _
+from typing import List, Optional
 
 from voteit.messaging.abcs import BaseIncomingMessage
+from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import ContextAction
 from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.errors import NotFoundError
@@ -13,6 +15,7 @@ from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.permissions import SpeakerListPermissions
+
 
 User = get_user_model()
 
@@ -121,3 +124,36 @@ class ModeratorSpeakerListLeave(_ModeratorListMessage):
             msg = TextResponse.from_message(self, msg=_("Not in list"))
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
+
+
+class OrderSchema(BaseModel):
+    pk: int  # speaker list pk
+    queue: List[int]  # user pks
+    current: Optional[int]  # current user pk if speaker
+
+
+@outgoing
+class SpeakerListOrder(BaseOutgoingMessage):
+    name = "speaker_list.order"
+    schema = OrderSchema
+    data: OrderSchema
+
+
+class SpeakerListSchema(BaseModel):
+    title: Optional[str]
+    pk: int
+    state: str
+    list_system: int  # pk
+    agenda_item: int  # pk
+
+
+class SpeakerListAdded(BaseOutgoingMessage):
+    name = "speaker_list.added"
+    schema = SpeakerListSchema
+    data: SpeakerListSchema
+
+
+class SpeakerListChanged(BaseOutgoingMessage):
+    name = "speaker_list.changed"
+    schema = SpeakerListSchema
+    data: SpeakerListSchema
