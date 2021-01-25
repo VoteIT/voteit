@@ -7,6 +7,7 @@ from typing import Type
 
 from pydantic.main import BaseModel
 from voteit.core.models import ABCModel
+from voteit.poll.schemas import PollResult
 
 if TYPE_CHECKING:
     from voteit.poll.models import Poll
@@ -37,7 +38,7 @@ class PollMethod(ABC):
 
     @property
     @abstractmethod
-    def result_schema(self) -> Type[BaseModel]:
+    def result_schema(self) -> Type[PollResult]:
         """ Pydantic result schema.
         """
 

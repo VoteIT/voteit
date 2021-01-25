@@ -34,6 +34,7 @@ from voteit.poll.exceptions import (
     PollNotFinished,
     NotAllowedToVote,
 )
+from voteit.poll.schemas import PollResult
 from voteit.poll.utils import get_poll_method_registry
 from voteit.poll.workflows import PollWf
 
@@ -160,7 +161,7 @@ class Poll(BaseContent, MeetingContext):
         self.settings_data = data.dict()
 
     @property
-    def result(self):
+    def result(self) -> Optional[PollResult]:
         schema = self.method.result_schema
         if schema is not None:
             result = self.result_data
@@ -168,7 +169,7 @@ class Poll(BaseContent, MeetingContext):
                 return schema(**self.result_data)
 
     @result.setter
-    def result(self, value: Union[Dict, BaseModel]):
+    def result(self, value: Union[Dict, PollResult]):
         schema = self.method.result_schema
         if isinstance(value, dict):
             data = schema(**value)
@@ -208,7 +209,9 @@ class Poll(BaseContent, MeetingContext):
         conditions=[validate_settings_guard],
     )
     def upcoming(self):
-        self.save()
+        for proposal in self.proposals.all():
+            proposal.lock_for_vote()
+            proposal.save()
 
     @transition(
         field=state,
@@ -218,7 +221,6 @@ class Poll(BaseContent, MeetingContext):
     )
     def ongoing(self):
         self.started = now()
-        self.save()
 
     @transition(
         field=state,
@@ -230,7 +232,6 @@ class Poll(BaseContent, MeetingContext):
             The next step is always to count the votes via the method finish()
         """
         self._mark_closed()
-        self.save()
 
     @transition(
         field=state,
@@ -248,17 +249,24 @@ class Poll(BaseContent, MeetingContext):
         counter = self.finalize_vote_data()
         assert self.ballot_data
         assert self.ballot_checksum
-        self.method.calculate_result(counter)
-        self.save()
+        self.result = self.method.calculate_result(counter)
+        for proposal in self.proposals.filter(pk__in=self.result.approved):
+            proposal.approved()
+            proposal.save()
+        for proposal in self.proposals.filter(pk__in=self.result.denied):
+            proposal.denied()
+            proposal.save()
 
     @transition(field=state, source=PollWf.ONGOING, target=PollWf.CANCELED)
     def cancel(self):
         self._mark_closed()
-        self.save()
+        for proposal in self.proposals.all():
+            proposal.publish()
 
     @transition(field=state, source=PollWf.UPCOMING, target=PollWf.PRIVATE)
     def unpublish(self):
-        self.save()
+        for proposal in self.proposals.all():
+            proposal.publish()
 
     def _mark_closed(self):
         if not self.closed:

@@ -21,7 +21,7 @@ class AddVoteTests(TestCase):
         return AddSimpleVote
 
     def _mk_one(self, **kw):
-        kw.setdefault("vote", {"choice": "y"})
+        kw.setdefault("vote", {"choice": "yes"})
         kw.setdefault("pk", self.poll.pk)
         return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
@@ -32,7 +32,7 @@ class AddVoteTests(TestCase):
         msg.run_job()
         vote = self.poll.votes.filter(user=self.voter).first()
         self.assertIsNotNone(vote)
-        self.assertEqual("y", vote.vote_data)
+        self.assertEqual("yes", vote.vote_data)
 
     def test_add_not_started(self):
         msg = self._mk_one()
@@ -49,13 +49,13 @@ class AddVoteTests(TestCase):
         from voteit.poll.messages import ChangeVote
         self.poll.ongoing()
         self.poll.save()
-        self.vote = self.poll.votes.create(user=self.voter, vote_data="n")
+        self.vote = self.poll.votes.create(user=self.voter, vote_data="no")
         msg = self._mk_one()
         response = msg.run_job()
         self.assertIsInstance(response, ChangeVote)
         response.run_job()
         vote = self.poll.votes.filter(user=self.voter).first()
-        self.assertEqual("y", vote.vote_data)
+        self.assertEqual("yes", vote.vote_data)
 
 
 class AbstainTests(TestCase):
@@ -91,7 +91,7 @@ class AbstainTests(TestCase):
         from voteit.poll.app.polls.simple import AddSimpleVote
         AddSimpleVote(
             {"user_pk": self.voter.pk, "consumer_name": "abc"},
-            vote={"choice": "y"},
+            vote={"choice": "yes"},
             pk=self.poll.pk,
         ).run_job()
         self.test_abstain()
@@ -110,7 +110,7 @@ class ChangeVoteTests(TestCase):
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.save()
-        self.vote = self.poll.votes.create(user=self.voter, vote_data="y")
+        self.vote = self.poll.votes.create(user=self.voter, vote_data="yes")
 
     @property
     def _cut(self):
@@ -119,7 +119,7 @@ class ChangeVoteTests(TestCase):
         return ChangeSimpleVote
 
     def _mk_one(self, **kw):
-        kw.setdefault("vote", {"choice": "n"})
+        kw.setdefault("vote", {"choice": "no"})
         kw.setdefault("pk", self.vote.pk)
         return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
@@ -127,7 +127,7 @@ class ChangeVoteTests(TestCase):
         msg = self._mk_one()
         msg.run_job()
         self.vote.refresh_from_db()
-        self.assertEqual("n", self.vote.vote_data)
+        self.assertEqual("no", self.vote.vote_data)
 
     def test_change_closed(self):
         self.poll.close()
@@ -149,7 +149,7 @@ class GetVoteTests(TestCase):
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.save()
-        self.vote = self.poll.votes.create(user=self.voter, vote_data="y")
+        self.vote = self.poll.votes.create(user=self.voter, vote_data="yes")
 
     @property
     def _cut(self):

@@ -114,21 +114,24 @@ class PollTests(TestCase):
         self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        vote1 = self.poll.votes.create(user=self.user, vote="y")
-        vote2 = self.poll.votes.create(user=self.user2, vote="y")
+        vote1 = self.poll.votes.create(user=self.user, vote="yes")
+        vote2 = self.poll.votes.create(user=self.user2, vote="yes")
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertIn(vote2, votes)
         self.poll.close()
-        self.assertEqual({"yes": 2, "no": 0}, self.poll.result.dict())
+        self.assertEqual(
+            self.poll.result.dict(),
+            {"yes": 2, "no": 0, "approved": [prop.pk], "denied": []}
+        )
 
     def test_votes_from_non_voters_removed_on_close(self):
         prop = self.Proposal.objects.create()
         self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        vote1 = self.poll.votes.create(user=self.user, vote="y")
-        vote2 = self.poll.votes.create(user=self.user2, vote="y")
+        vote1 = self.poll.votes.create(user=self.user, vote="yes")
+        vote2 = self.poll.votes.create(user=self.user2, vote="yes")
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertIn(vote2, votes)
@@ -140,7 +143,10 @@ class PollTests(TestCase):
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertNotIn(vote2, votes)
-        self.assertEqual({"yes": 1, "no": 0}, self.poll.result.dict())
+        self.assertEqual(
+            self.poll.result.dict(),
+            {"yes": 1, "no": 0, "approved": [prop.pk], "denied": []}
+        )
 
     def test_abstentions(self):
         prop = self.Proposal.objects.create()
@@ -148,9 +154,12 @@ class PollTests(TestCase):
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.votes.create(user=self.user, abstain=True)
-        self.poll.votes.create(user=self.user2, vote="y")
+        self.poll.votes.create(user=self.user2, vote="yes")
         self.poll.close()
-        self.assertEqual({"yes": 1, "no": 0}, self.poll.result.dict())
+        self.assertEqual(
+            self.poll.result.dict(),
+            {"yes": 1, "no": 0, "approved": [prop.pk], "denied": []}
+        )
         self.assertEqual(1, self.poll.abstains)
 
     def test_checksum(self):
@@ -158,15 +167,16 @@ class PollTests(TestCase):
         self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        self.poll.votes.create(user=self.user, vote="n")
-        self.poll.votes.create(user=self.user2, vote="y")
+        self.poll.votes.create(user=self.user, vote="no")
+        self.poll.votes.create(user=self.user2, vote="yes")
         self.poll.close()
         self.poll.save()
         self.assertEqual(
-            "81567db4add4931106515ce10f9c5c6025765de626c1c13d60bf550d428e2fdf66e48b06a62b4462c50abe5eff1e1dc99f3dd440687a3d3b9ea375201e094e30",
+            # "81567db4add4931106515ce10f9c5c6025765de626c1c13d60bf550d428e2fdf66e48b06a62b4462c50abe5eff1e1dc99f3dd440687a3d3b9ea375201e094e30",
             self.poll.ballot_checksum,
+            "062cb36e77dd5f6c5d7fb29b96b43d2c54a7f993d37c1887e987acb47f3b03d80dd3e95a30e4197946264234595bd503782114deb1ce2d84aca0e674ab68d76f"
         )
-        self.assertEqual('{"n": 1, "y": 1}', self.poll.ballot_data)
+        self.assertEqual('{"no": 1, "yes": 1}', self.poll.ballot_data)
         self.assertTrue(self.poll.verify_checksum())
 
 
@@ -208,18 +218,19 @@ class VoteWeightTests(TestCase):
         )
 
     def test_poll_result(self):
-        from voteit.proposal.models import Proposal
-
-        self.poll.proposals.add(
-            Proposal.objects.create(title="Abc123", body="I propose!")
+        prop = self.poll.proposals.create(
+            title="Abc123", body="I propose!"
         )
         self.poll.upcoming()
         self.poll.ongoing()
-        self.poll.votes.create(user=self.user1, vote_data="y")
-        self.poll.votes.create(user=self.user2, vote_data="y")
-        self.poll.votes.create(user=self.user3, vote_data="n")
+        self.poll.votes.create(user=self.user1, vote_data="yes")
+        self.poll.votes.create(user=self.user2, vote_data="yes")
+        self.poll.votes.create(user=self.user3, vote_data="no")
         self.poll.close()
-        self.assertEqual(self.poll.result.dict(), {"yes": 2, "no": 3})
+        self.assertEqual(
+            self.poll.result.dict(),
+            {"yes": 2, "no": 3, "approved": [], "denied": [prop.pk]}
+        )
 
     def test_get_voter_weight(self):
         self.assertEqual(self.er.get_voter_weight(self.user1), 1)

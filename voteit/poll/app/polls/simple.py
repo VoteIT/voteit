@@ -10,14 +10,13 @@ from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.abcs import PollMethod
 from voteit.poll.messages import AddVote, ChangeVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericVoteSchema
-
+from voteit.poll.schemas import GenericVoteSchema, PollResult
 
 __all__ = ("Simple",)
 
 
-YES = "y"
-NO = "n"
+YES = "yes"
+NO = "no"
 VOTE_CHOICES = ((YES, _("Yes")), (NO, _("No")))
 
 
@@ -49,7 +48,7 @@ class ChangeSimpleVote(ChangeVote):
     data: VoteSchema
 
 
-class SimplePollResult(BaseModel):
+class SimplePollResult(PollResult):
     yes: int
     no: int
 
@@ -73,9 +72,21 @@ class Simple(PollMethod):
         return self.vote_schema(choice=text)
 
     def calculate_result(self, counter: Counter) -> SimplePollResult:
-        data = self.result_schema(yes=counter[YES], no=counter[NO])
-        self.poll.result = data
-        return data
+        """ Set proposal as approved or denied based on YES or NO votes.
+            Equal result means no approved or denied proposal.
+        """
+        proposal_pk = self.poll.proposals.get().pk
+        result = {
+            YES: counter[YES],
+            NO: counter[NO],
+        }
+        if counter[YES] > counter[NO]:
+            result["approved"] = [proposal_pk]
+        elif counter[YES] < counter[NO]:
+            result["denied"] = [proposal_pk]
+        return SimplePollResult(
+            **result
+        )
 
     def start_check(self):
         if self.poll.proposals.count() != 1:
