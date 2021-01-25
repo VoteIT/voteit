@@ -75,5 +75,6 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Poll
-        fields = "agenda_item", "method_name", "proposal_pks", "start"
+        fields = "pk", "agenda_item", "method_name", "proposal_pks", "start"
         extra_kwargs = {"agenda_item": {"required": True}}
+        read_only_fields = "pk",
