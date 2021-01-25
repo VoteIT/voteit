@@ -179,6 +179,24 @@ class PollTests(TestCase):
         self.assertEqual('{"no": 1, "yes": 1}', self.poll.ballot_data)
         self.assertTrue(self.poll.verify_checksum())
 
+    def test_proposal_state_exceptions(self):
+        from voteit.proposal.workflows import ProposalWf
+        prop = self.poll.proposals.create()
+        prop.approved()
+        prop.save()
+        # Must not cause exception
+        self.poll.upcoming()
+        self.poll.ongoing()
+        self.poll.votes.create(user=self.user, vote="no")
+        # Must not cause exception
+        self.poll.close()
+        self.poll.save()
+        self.assertEqual(
+            self.poll.proposals.get().state,
+            ProposalWf.APPROVED,
+            "Proposal state must not have changed automatically from approved."
+        )
+
 
 class VoteWeightTests(TestCase):
     @property

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 from collections import Counter
+from contextlib import suppress
 from datetime import datetime
 from hashlib import sha512
 from json import dumps
@@ -17,7 +18,7 @@ from django.utils.functional import cached_property
 from django.utils.text import slugify
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField, transition, post_transition
+from django_fsm import FSMField, transition, post_transition, TransitionNotAllowed
 from typing import Optional, Dict, Type, TYPE_CHECKING, Union
 from pydantic import ValidationError
 from pydantic.main import BaseModel
@@ -210,8 +211,9 @@ class Poll(BaseContent, MeetingContext):
     )
     def upcoming(self):
         for proposal in self.proposals.all():
-            proposal.lock_for_vote()
-            proposal.save()
+            with suppress(TransitionNotAllowed):
+                proposal.lock_for_vote()
+                proposal.save()
 
     @transition(
         field=state,
@@ -251,11 +253,13 @@ class Poll(BaseContent, MeetingContext):
         assert self.ballot_checksum
         self.result = self.method.calculate_result(counter)
         for proposal in self.proposals.filter(pk__in=self.result.approved):
-            proposal.approved()
-            proposal.save()
+            with suppress(TransitionNotAllowed):
+                proposal.approved()
+                proposal.save()
         for proposal in self.proposals.filter(pk__in=self.result.denied):
-            proposal.denied()
-            proposal.save()
+            with suppress(TransitionNotAllowed):
+                proposal.denied()
+                proposal.save()
 
     @transition(field=state, source=PollWf.ONGOING, target=PollWf.CANCELED)
     def cancel(self):
