@@ -75,12 +75,12 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         choices=[(str(x), x) for x in range(3)],
         null=True,
     )
-    active_list = models.ForeignKey(
+    active_list = models.OneToOneField(
         "SpeakerList",
         verbose_name=_("Currently active speaker list"),
         null=True,
         on_delete=models.SET_NULL,
-        related_name="active_list_system",
+        related_name="+",
     )
 
     roles_cls = SpeakerSystemRoles
@@ -211,6 +211,11 @@ class SpeakerList(models.Model):
     def method(self) -> ListMethod:
         return self.list_system.method
 
+    @property
+    def is_active_list(self) -> bool:
+        """ Is this the currently active list? """
+        return self.list_system.active_list == self
+
     @transition(
         field=state,
         source=SpeakerListWf.CLOSED,
@@ -238,8 +243,8 @@ class SpeakerList(models.Model):
             new_order = self.method.reorder(self)
             safe_updated = False
             # Check if a speaker should be moved to a safe position - only if the list is active.
-            if self.active_list_system.exists():
-                system = self.active_list_system.get()
+            if self.is_active_list:
+                system = self.list_system
                 safe_pos = system.safe_positions
                 if (
                     safe_pos
