@@ -16,6 +16,8 @@ class SpeakerListTests(TestCase):
         self.system.add_roles(self.user_speaker, ROLE_SPEAKER)
         self.user_any = User.objects.create(username="jane")
         self.list = self.system.speaker_lists.create()
+        self.system.active_list = self.list
+        self.system.save()
 
     def p(self, name):
         from voteit.speaker.permissions import SpeakerListPermissions
@@ -91,6 +93,34 @@ class SpeakerListTests(TestCase):
         self.assertTrue(self.user_moderator.has_perm(LEAVE, self.list))
         self.assertFalse(self.user_speaker.has_perm(LEAVE, self.list))
         self.assertFalse(self.user_any.has_perm(LEAVE, self.list))
+
+    def test_start(self):
+        START = self.p("START")
+        self.assertTrue(self.user_moderator.has_perm(START, self.list))
+        self.assertFalse(self.user_speaker.has_perm(START, self.list))
+        self.assertFalse(self.user_any.has_perm(START, self.list))
+
+    def test_start_not_active_list(self):
+        START = self.p("START")
+        self.system.active_list = None
+        self.system.save()
+        self.assertFalse(self.user_moderator.has_perm(START, self.list))
+        self.assertFalse(self.user_speaker.has_perm(START, self.list))
+        self.assertFalse(self.user_any.has_perm(START, self.list))
+
+    def test_stop(self):
+        STOP = self.p("STOP")
+        self.assertTrue(self.user_moderator.has_perm(STOP, self.list))
+        self.assertFalse(self.user_speaker.has_perm(STOP, self.list))
+        self.assertFalse(self.user_any.has_perm(STOP, self.list))
+
+    def test_stop_not_active_list(self):
+        STOP = self.p("STOP")
+        self.system.active_list = None
+        self.system.save()
+        self.assertFalse(self.user_moderator.has_perm(STOP, self.list))
+        self.assertFalse(self.user_speaker.has_perm(STOP, self.list))
+        self.assertFalse(self.user_any.has_perm(STOP, self.list))
 
 
 class SpeakerListSystemTests(TestCase):

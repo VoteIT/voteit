@@ -17,8 +17,7 @@ from voteit.speaker.workflows import SpeakerListWf
 def is_moderator(
     user: AbstractUser, obj: Union[SpeakerListSystem, SpeakerList]
 ) -> bool:
-    """ Check if a user has list moderator status within this speaker list system.
-    """
+    """Check if a user has list moderator status within this speaker list system."""
     if isinstance(obj, SpeakerListSystem):
         return obj.has_roles(user, ROLE_LIST_MODERATOR)
     elif isinstance(obj, SpeakerList):
@@ -31,8 +30,7 @@ def is_moderator(
 def has_speaker_role(
     user: AbstractUser, obj: Union[SpeakerListSystem, SpeakerList]
 ) -> bool:
-    """ Check if a user has speaker role status within this speaker list system.
-    """
+    """Check if a user has speaker role status within this speaker list system."""
     if isinstance(obj, SpeakerListSystem):
         return obj.has_roles(user, ROLE_SPEAKER)
     elif isinstance(obj, SpeakerList):
@@ -64,6 +62,14 @@ def is_list_open(user: AbstractUser, speaker_list: SpeakerList) -> bool:
 
 
 @rules.predicate
+def is_active_list(user: AbstractUser, speaker_list: SpeakerList) -> bool:
+    return (
+        isinstance(speaker_list, SpeakerList)
+        and speaker_list.list_system.active_list == speaker_list
+    )
+
+
+@rules.predicate
 def not_currently_speaking(user: AbstractUser, speaker_list: SpeakerList) -> bool:
     if isinstance(speaker_list, SpeakerList):
         if speaker_list.current is None:
@@ -88,6 +94,8 @@ rules.add_perm(
     SpeakerListPermissions.LEAVE,
     (has_speaker_role | is_moderator) & not_currently_speaking,
 )
+rules.add_perm(SpeakerListPermissions.START, is_active_list & is_moderator)
+rules.add_perm(SpeakerListPermissions.STOP, is_active_list & is_moderator)
 
 
 @rules.predicate
