@@ -35,20 +35,28 @@ class SimpleTests(TestCase):
         self.poll.proposals.create()
         voter = self.er.voters.create(username="a")
         self.poll.ongoing()
-        vote = self.poll.votes.create(user=voter, vote="y")
+        vote = self.poll.votes.create(user=voter, vote="yes")
         self.assertIsInstance(vote.vote, SimpleVoteSchema)
-        self.assertEqual(vote.vote.choice, "y")
+        self.assertEqual(vote.vote.choice, "yes")
 
     def test_result(self):
+        from voteit.proposal.workflows import ProposalWf
         self.poll.upcoming()
-        self.poll.proposals.create()
+        prop = self.poll.proposals.create()
         ua = User.objects.create(username="a")
         ub = User.objects.create(username="b")
         uc = User.objects.create(username="c")
         self.er.voters.set([ua, ub, uc])
         self.poll.ongoing()
-        self.poll.votes.create(user=ua, vote="y")
-        self.poll.votes.create(user=ub, vote="y")
-        self.poll.votes.create(user=uc, vote="n")
+        self.poll.votes.create(user=ua, vote="yes")
+        self.poll.votes.create(user=ub, vote="yes")
+        self.poll.votes.create(user=uc, vote="no")
         self.poll.close()
-        self.assertEqual({"yes": 2, "no": 1}, self.poll.result)
+        self.assertEqual(
+            self.poll.result,
+            {"yes": 2, "no": 1, "approved": [prop.pk], "denied": []}
+        )
+        self.assertEqual(
+            self.poll.proposals.get().state,
+            ProposalWf.APPROVED
+        )

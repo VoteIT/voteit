@@ -63,9 +63,9 @@ class PollCreateSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             poll = super().create(validated_data)
             # TODO Move to a signal?
-            for proposal in self._proposals:
-                proposal.lock_for_vote()
-                proposal.save()
+            # for proposal in self._proposals:
+            #     proposal.lock_for_vote()
+            #     proposal.save()
             poll.proposals.set(self._proposals)
             if start:
                 poll.upcoming()
