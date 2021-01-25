@@ -14,8 +14,12 @@ from voteit.speaker.messages import (
     SpeakerListOrder,
     SpeakerListChanged,
     SpeakerListAdded,
+    SpeakerListDeleted,
+    SpeakerSystemDeleted,
+    SpeakerSystemAdded,
+    SpeakerSystemChanged,
 )
-from voteit.speaker.models import Speaker, SpeakerList
+from voteit.speaker.models import Speaker, SpeakerList, SpeakerListSystem
 
 if TYPE_CHECKING:
     pass
@@ -101,4 +105,45 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
             list_system=instance.list_system.pk,
             agenda_item=agenda_item_pk,
         )
+        channel.publish(msg)
+
+
+@receiver(post_delete, sender=SpeakerList)
+def notify_deleted_speaker_list(instance: SpeakerList, **kw):
+    channel = _get_list_channel(instance)
+    if channel is not None:
+        msg = SpeakerListDeleted(pk=instance.pk)
+        channel.publish(msg)
+
+
+@receiver(post_save, sender=SpeakerListSystem)
+def notify_added_or_changed_speaker_system(
+    instance: SpeakerListSystem, created=None, **kw
+):
+    """ Updates to speaker system, pushed to meeting channel."""
+    if instance.meeting is not None:
+        channel = MeetingChannel.from_instance(instance.meeting)
+        if created:
+            msg_class = SpeakerSystemAdded
+        else:
+            msg_class = SpeakerSystemChanged
+        msg = msg_class(
+            title=instance.title,
+            pk=instance.pk,
+            active=instance.active,
+            method_name=instance.method_name,
+            settings=instance.settings,
+            safe_positions=instance.safe_positions,
+            active_list=instance.active_list and instance.active_list.pk or None,
+            meeting=instance.meeting and instance.meeting.pk or None,
+        )
+        channel.publish(msg)
+
+
+@receiver(post_delete, sender=SpeakerListSystem)
+def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
+    """ Notify meeting that the speaker system is no more."""
+    if instance.meeting is not None:
+        channel = MeetingChannel.from_instance(instance.meeting)
+        msg = SpeakerSystemDeleted(pk=instance.pk)
         channel.publish(msg)

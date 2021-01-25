@@ -50,6 +50,7 @@ class SignalListOrderChangeTests(TestCase):
     def test_meeting_gets_active_list(self, mock_publish):
         self.system.active_list = self.speaker_list
         self.system.save()
+        mock_publish.reset_mock()  # Remove above calls
         self.speaker_list.signal_list_updated()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
@@ -63,7 +64,6 @@ class SignalListOrderChangeTests(TestCase):
     @patch.object(AgendaItemChannel, "publish")
     def test_agenda_with_active_speaker(self, mock_publish):
         self.speaker_three.start()
-        # self.speaker_list.current = self.speaker_three
         self.speaker_list.save()
         self.speaker_list.signal_list_updated()
         self.assertTrue(mock_publish.called)
@@ -74,7 +74,7 @@ class SignalListOrderChangeTests(TestCase):
         self.assertEqual(self.user_three.pk, data.current)
 
 
-class SignalAddedOrChangedTests(TestCase):
+class SignalListChangesTests(TestCase):
     def setUp(self):
 
         from voteit.speaker.models import SpeakerListSystem
@@ -111,6 +111,7 @@ class SignalAddedOrChangedTests(TestCase):
 
         self.system.active_list = self.speaker_list
         self.system.save()
+        mock_publish.reset_mock()  # Above lines will have caused calls
         self.speaker_list.title = "world"
         self.speaker_list.save()
         self.assertTrue(mock_publish.called)
@@ -120,3 +121,68 @@ class SignalAddedOrChangedTests(TestCase):
         self.assertEqual(self.system.pk, data.list_system)
         self.assertEqual(self.ai.pk, data.agenda_item)
         self.assertEqual(self.speaker_list.title, data.title)
+
+    @patch.object(AgendaItemChannel, "publish")
+    def test_list_deleted(self, mock_publish):
+        from voteit.speaker.messages import SpeakerListDeleted
+
+        list_pk = self.speaker_list.pk
+        self.speaker_list.delete()
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        data = msg.data
+        self.assertIsInstance(msg, SpeakerListDeleted)
+        self.assertEqual(list_pk, data.pk)
+
+
+class SignalSystemChangesTests(TestCase):
+    def setUp(self):
+
+        from voteit.speaker.models import SpeakerListSystem
+
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        self.ai = self.meeting.agenda_items.create()
+        self.system = SpeakerListSystem.objects.create(
+            method_name="simple", meeting=self.meeting, title="We speak in order"
+        )
+
+    @patch.object(MeetingChannel, "publish")
+    def test_meeting_gets_added(self, mock_publish):
+        from voteit.speaker.messages import SpeakerSystemAdded
+        from voteit.speaker.models import SpeakerListSystem
+
+        SpeakerListSystem.objects.create(method_name="simple")
+        self.assertFalse(mock_publish.called)
+        SpeakerListSystem.objects.create(method_name="simple", meeting=self.meeting)
+        self.assertTrue(mock_publish.called)
+
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, SpeakerSystemAdded)
+
+    @patch.object(MeetingChannel, "publish")
+    def test_system_changed(self, mock_publish):
+        from voteit.speaker.messages import SpeakerSystemChanged
+
+        self.system.title = "Group 1"
+        self.system.save()
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, SpeakerSystemChanged)
+        data = msg.data
+        self.assertEqual(self.system.pk, data.pk)
+        self.assertEqual(self.meeting.pk, data.meeting)
+        self.assertEqual(self.system.title, data.title)
+
+    @patch.object(MeetingChannel, "publish")
+    def test_system_deleted(self, mock_publish):
+        from voteit.speaker.messages import SpeakerSystemDeleted
+
+        system_pk = self.system.pk
+        self.system.delete()
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, SpeakerSystemDeleted)
+        data = msg.data
+        self.assertEqual(system_pk, data.pk)

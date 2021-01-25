@@ -3,13 +3,14 @@ from abc import ABC
 from django.contrib.auth import get_user_model
 from pydantic.main import BaseModel
 from django.utils.translation import gettext as _
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import ContextAction
 from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.errors import NotFoundError
+from voteit.messaging.messages.base import BaseObjectDeleted
 from voteit.messaging.messages.text import TextResponse
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
@@ -157,3 +158,34 @@ class SpeakerListChanged(BaseOutgoingMessage):
     name = "speaker_list.changed"
     schema = SpeakerListSchema
     data: SpeakerListSchema
+
+
+class SpeakerListDeleted(BaseObjectDeleted):
+    name = "speaker_list.deleted"
+
+
+class SpeakerSystemSchema(BaseModel):
+    pk: int
+    active: bool
+    title: Optional[str]
+    meeting: Optional[int]
+    method_name: str
+    settings: Optional[Dict]
+    safe_positions: Optional[int]
+    active_list: Optional[int]
+
+
+class SpeakerSystemAdded(BaseOutgoingMessage):
+    name = "speaker_system.added"
+    schema = SpeakerSystemSchema
+    data: SpeakerSystemSchema
+
+
+class SpeakerSystemChanged(BaseOutgoingMessage):
+    name = "speaker_system.changed"
+    schema = SpeakerSystemSchema
+    data: SpeakerSystemSchema
+
+
+class SpeakerSystemDeleted(BaseObjectDeleted):
+    name = "speaker_system.deleted"

@@ -56,6 +56,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         ),
         default=False,
     )
+    title = models.CharField(max_length=200, null=True)
     meeting: Optional[Meeting] = models.ForeignKey(
         Meeting, verbose_name=_("Related meeting"), on_delete=models.CASCADE, null=True
     )
@@ -165,6 +166,7 @@ class Speaker(models.Model):
 
     @property
     def in_queue(self) -> bool:
+        """ The definition of being in the queue is that order is set to a number"""
         return self.order is not None
 
     def start(self):
