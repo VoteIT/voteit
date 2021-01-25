@@ -92,8 +92,41 @@ class SpeakerListLeaveTests(TestCase):
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
 
 
+class SpeakerListSetActiveTests(TestCase):
+    def setUp(self):
+        from voteit.speaker.models import SpeakerListSystem
+        from voteit.speaker.models import SpeakerList
 
+        self.system = SpeakerListSystem.objects.create(method_name="simple")
+        self.list = SpeakerList.objects.create(list_system=self.system)
+        self.user = User.objects.create(username="jane")
+        self.system.add_roles(self.user, "list_moderator")
 
+    @property
+    def _cut(self):
+        from voteit.speaker.messages import SetActiveList
+
+        return SetActiveList
+
+    def _mk_one(self, **kw):
+        kw.setdefault("pk", self.list.pk)
+        return self._cut({"user_pk": self.user.pk, "consumer_name": "abc"}, **kw)
+
+    def test_set_active(self):
+        from voteit.messaging.messages.text import TextResponse
+
+        msg = self._mk_one()
+        response = msg.run_job()
+        self.assertIsInstance(response, TextResponse)
+        self.system.refresh_from_db()
+        self.assertEqual(self.system.active_list, self.list)
+
+    def test_set_active_already_active(self):
+        self.system.active_list = self.list
+        self.system.save()
+        msg = self._mk_one()
+        response = msg.run_job()
+        self.assertIsNone(response)
 
 
 class ModeratorSpeakerListEnterTests(TestCase):

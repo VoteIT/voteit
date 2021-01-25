@@ -21,14 +21,14 @@ from voteit.speaker.permissions import SpeakerListPermissions
 User = get_user_model()
 
 
-class SpeakerActionSchema(BaseModel):
+class SpeakerListActionSchema(BaseModel):
     pk: int  # which list to perform the action on
 
 
 class _ListMessage(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
     model = SpeakerList
-    schema = SpeakerActionSchema
-    data: SpeakerActionSchema
+    schema = SpeakerListActionSchema
+    data: SpeakerListActionSchema
 
 
 @incoming
@@ -69,7 +69,24 @@ class SpeakerListLeave(_ListMessage):
         return msg
 
 
-class ModeratorSpeakerActionSchema(SpeakerActionSchema):
+@incoming
+class SetActiveList(_ListMessage):
+    name = "speaker_list.set_active"
+    permission = SpeakerListPermissions.CHANGE
+    context: SpeakerList
+
+    def run_job(self):
+        self.assert_perm()
+        system = self.context.list_system
+        if system.active_list != self.context:
+            system.active_list = self.context
+            system.save()
+            msg = TextResponse.from_message(self, msg=_("Active list changed"))
+            msg.send_outgoing(self.mm.consumer_name, success=True)
+            return msg
+
+
+class ModeratorSpeakerActionSchema(SpeakerListActionSchema):
     userid: int  # Moderators may do actions for someone else
 
 
