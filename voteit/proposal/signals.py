@@ -10,7 +10,7 @@ from .rest_api.serializers import ProposalDetailSerializer
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)
-def channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
+def _channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
     """ Populate app_state with current proposals """
     app_state.append_from_queryset(
         context.get_proposals(),

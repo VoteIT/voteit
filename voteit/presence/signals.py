@@ -28,8 +28,7 @@ from voteit.presence.rest_api.serializers import PresenceCheckDetailSerializer
 
 @receiver(post_save, sender=Presence)
 def presence_added(instance=None, created: bool = None, **kw):
-    """ Send presence item to user channel and a count to the specific presence check channel.
-    """
+    """Send presence item to user channel and a count to the specific presence check channel."""
     if created:
         # There is no change for presence that's relevant
         user_ch = UserChannel.from_instance(instance.user)
@@ -47,8 +46,7 @@ def presence_added(instance=None, created: bool = None, **kw):
 
 @receiver(post_delete, sender=Presence)
 def presence_deleted(instance: Presence = None, **kw):
-    """ Notify of removed presence item to user channel and a count to the specific presence check channel.
-    """
+    """Notify of removed presence item to user channel and a count to the specific presence check channel."""
     msg = PresenceCheckStatus(
         pk=instance.presence_check.pk, present=instance.presence_check.presences.count()
     )
@@ -61,8 +59,7 @@ def presence_deleted(instance: Presence = None, **kw):
 
 @receiver(post_save, sender=PresenceCheck)
 def presence_check_changed(instance: PresenceCheck = None, created: bool = None, **kw):
-    """ Transmit presence check to meeting channel
-    """
+    """Transmit presence check to meeting channel"""
     meeting = instance.presence_system.meeting
     if meeting is not None:
         data = PresenceCheckDetailSerializer(instance).data
@@ -76,8 +73,7 @@ def presence_check_changed(instance: PresenceCheck = None, created: bool = None,
 
 @receiver(post_delete, sender=PresenceCheck)
 def presence_check_deleted(instance=None, **kw):
-    """ Transmit that presence check has been deleted to meeting channel.
-    """
+    """Transmit that presence check has been deleted to meeting channel."""
     meeting = instance.presence_system.meeting
     if meeting is not None:
         msg = PresenceCheckDeleted(pk=instance.pk)
@@ -86,10 +82,16 @@ def presence_check_deleted(instance=None, **kw):
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
-def channel_subscribed(context: Meeting, user: AbstractUser, app_state: AppState, **kw):
+def _channel_subscribed(
+    context: Meeting, user: AbstractUser, app_state: AppState, **kw
+):
     """ Populate app_state with current, if any, presence check objects. """
     with suppress(ObjectDoesNotExist):
         if presence_check := context.presencesystem.presence_checks.latest_open():
-            app_state.append_from(presence_check, PresenceCheckDetailSerializer, PresenceCheckAdded)
+            app_state.append_from(
+                presence_check, PresenceCheckDetailSerializer, PresenceCheckAdded
+            )
             if user_presence := presence_check.presences.filter(user=user).first():
-                app_state.append_from(user_presence, PresenceDetailSerializer, PresenceAdded)
+                app_state.append_from(
+                    user_presence, PresenceDetailSerializer, PresenceAdded
+                )
