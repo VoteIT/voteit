@@ -214,7 +214,7 @@ class VoteRulesTests(TestCase):
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, "moderator")
         # And the voted user have voted of course :)
-        self.vote = self.poll.votes.create(vote_data="y", user=self.voted_user)
+        self.vote = self.poll.votes.create(vote_data="yes", user=self.voted_user)
 
     def p(self, perm):
         from voteit.poll.permissions import VotePermissions

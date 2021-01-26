@@ -13,8 +13,7 @@ from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote, ChangeVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericVoteSchema
-
+from voteit.poll.schemas import GenericVoteSchema, PollResult
 
 __all__ = ("ScottishSTV",)
 
@@ -82,9 +81,9 @@ class ChangeSTVVote(ChangeVote):
         _validate_vote(self, self.context.poll, self.data.vote)
 
 
-class STVResultSchema(BaseModel):
-    winners: List
-    candidates: List
+class STVResultSchema(PollResult):
+    # winners: List
+    # candidates: List
     complete: bool
     rounds: List[Dict]
     randomized: bool
@@ -116,7 +115,7 @@ class ScottishSTV(PollMethod):
         ranking = [int(x) for x in text.split(",")]
         return self.vote_schema(ranking=ranking)
 
-    def calculate_result(self, counter: Counter):
+    def calculate_result(self, counter: Counter) -> STVResultSchema:
         settings = self.poll.settings
         poll_counter = _ScottishSTV(
             seats=settings.winners,
@@ -126,9 +125,11 @@ class ScottishSTV(PollMethod):
         for (ballot, count) in counter.items():
             ballot_as_list = [int(r) for r in ballot.split(",")]
             poll_counter.add_ballot(ballot_as_list, count)
-        result = self.result_schema(**poll_counter.calculate().as_dict())
-        self.poll.result = result
-        return result
+        result_dict = poll_counter.calculate().as_dict()
+        result_dict["approved"] = result_dict.pop("winners")
+        if result_dict["complete"]:
+            result_dict["denied"] = set(result_dict["candidates"]).difference(result_dict["approved"])
+        return self.result_schema(**result_dict)
 
     def start_check(self):
         winners = self.poll.settings.winners
