@@ -35,6 +35,9 @@ if TYPE_CHECKING:
 # to be shared between them.
 
 
+__all__ = "SpeakerSystemRoles", "SpeakerListSystem", "Speaker", "SpeakerList"
+
+
 class SpeakerSystemRoles(Roles, MeetingContext):
     context: SpeakerListSystem = models.ForeignKey(
         "SpeakerListSystem", on_delete=models.CASCADE
@@ -72,13 +75,15 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
             "When a list is active, mark the top X positions as safe automatically. "
             "Safe speakers will never be moved down."
         ),
-        choices=[(str(x), x) for x in range(3)],
+        choices=[(x, str(x)) for x in range(3)],
         null=True,
+        blank=True
     )
     active_list = models.OneToOneField(
         "SpeakerList",
         verbose_name=_("Currently active speaker list"),
         null=True,
+        blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
     )
