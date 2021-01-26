@@ -219,6 +219,7 @@ class SpeakerList(models.Model):
         Speaker,
         verbose_name=_("Current speaker, if any"),
         null=True,
+        blank=True,
         on_delete=models.CASCADE,
     )
     list_system: SpeakerListSystem = models.ForeignKey(

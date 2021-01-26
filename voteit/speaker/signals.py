@@ -59,7 +59,7 @@ def set_initial_order(
             order = current_order + 1
         instance.order = order
         instance.save()
-        sl.reorder()
+        sl.reorder(force_signal=True)
 
 
 @receiver(post_delete, sender=Speaker)
