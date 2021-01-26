@@ -44,8 +44,7 @@ class ChannelSchema(BaseModel):
 
 
 class ChannelSubscription(ChannelSchema):
-    """ Track subscriptions to protected channels.
-    """
+    """Track subscriptions to protected channels."""
 
     channel_name: str
     app_state: Optional[List[BaseEnvelope]]
@@ -70,7 +69,10 @@ class Subscribe(BaseChannelCommand, DeferredJob):
         """ Dispatch signal to populate app_state object, and return as list object or None """
         app_state = AppState()
         signals.channel_subscribed.send(
-            sender=channel.__class__, context=channel.context, user=self.user, app_state=app_state
+            sender=channel.__class__,
+            context=channel.context,
+            user=self.user,
+            app_state=app_state,
         )
         if app_state:
             return list(app_state)
@@ -83,7 +85,10 @@ class Subscribe(BaseChannelCommand, DeferredJob):
             channel.subscribe()
             app_state = self.get_app_state(channel)
             msg = Subscribed.from_message(
-                self, channel_name=channel.channel_name, app_state=app_state, **self.data.dict()
+                self,
+                channel_name=channel.channel_name,
+                app_state=app_state,
+                **self.data.dict(),
             )
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg
@@ -105,10 +110,14 @@ class Leave(BaseChannelCommand, DeferredJob):
             raise NotFoundError.from_message(self, msg=_("Context doesn't exist"))
         if channel.allow_leave(self.user):
             channel.leave()
-            msg = Left.from_message(self, channel_name=channel.channel_name, **self.data.dict())
+            msg = Left.from_message(
+                self, channel_name=channel.channel_name, **self.data.dict()
+            )
             msg.send_outgoing(self.mm.consumer_name, success=True)
             # No app state when leaving channel
-            signals.channel_left.send(sender=channel.__class__, context=channel.context, user=self.user)
+            signals.channel_left.send(
+                sender=channel.__class__, context=channel.context, user=self.user
+            )
             return msg
         else:
             raise UnauthorizedError.from_message(
@@ -147,8 +156,8 @@ class RecheckSubscriptionsSchema(BaseModel):
 
 @outgoing_messages
 class RecheckChannelSubscriptions(BaseOutgoingMessage, DeferredJob):
-    """ Send this as an internal message to ask the consumer to
-        recheck that it's authorized to subscribe to different channels.
+    """Send this as an internal message to ask the consumer to
+    recheck that it's authorized to subscribe to different channels.
     """
 
     name = "channel.recheck"
@@ -175,5 +184,10 @@ class RecheckChannelSubscriptions(BaseOutgoingMessage, DeferredJob):
             ch = ch_class.from_pk(cs.pk, self.data.consumer_name)
             if not ch.allow_subscribe(self.user):
                 ch.leave()
-                msg = Left.from_message(self, channel_name=ch.channel_name, channel_type=cs.channel_type, pk=cs.pk)
+                msg = Left.from_message(
+                    self,
+                    channel_name=ch.channel_name,
+                    channel_type=cs.channel_type,
+                    pk=cs.pk,
+                )
                 msg.send_outgoing(self.mm.consumer_name, success=True, on_commit=False)
