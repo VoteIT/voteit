@@ -61,7 +61,11 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     )
     title = models.CharField(max_length=200, null=True)
     meeting: Optional[Meeting] = models.ForeignKey(
-        Meeting, verbose_name=_("Related meeting"), on_delete=models.CASCADE, null=True
+        Meeting,
+        verbose_name=_("Related meeting"),
+        on_delete=models.CASCADE,
+        null=True,
+        related_name="speaker_systems",
     )
     method_name: str = models.CharField(max_length=20)
     settings_data: Dict = models.JSONField(
@@ -85,7 +89,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name="+",
+        related_name="active_in_system",
     )
 
     roles_cls = SpeakerSystemRoles

@@ -1,10 +1,11 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
+from voteit.messaging.messages.channels import Subscribed
 
 User = get_user_model()
 
@@ -186,3 +187,88 @@ class SignalSystemChangesTests(TestCase):
         self.assertIsInstance(msg, SpeakerSystemDeleted)
         data = msg.data
         self.assertEqual(system_pk, data.pk)
+
+
+_channel_layers_setting = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class ChannelSubscribedTests(TestCase):
+    def setUp(self):
+        from voteit.speaker.models import SpeakerListSystem
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        self.ai = self.meeting.agenda_items.create()
+        self.ai.upcoming()
+        self.ai.save()
+        self.system = SpeakerListSystem.objects.create(
+            method_name="simple", meeting=self.meeting, title="We speak in order"
+        )
+        # Create lists
+        self.other_list = self.system.speaker_lists.create(agenda_item=self.ai)
+        self.active_list = self.system.speaker_lists.create(agenda_item=self.ai)
+        self.system.active_list = self.active_list
+        self.system.save()
+        # Create speakers
+        self.user_one = User.objects.create(username="one")
+        self.user_two = User.objects.create(username="two")
+        self.active_list.speaker_items.create(user=self.user_one)
+        self.active_list.speaker_items.create(user=self.user_two)
+        # Moderator
+        self.moderator = User.objects.create(username="moderator")
+        self.meeting.add_roles(self.moderator, "participant")
+        self.system.add_roles(self.moderator, "list_moderator")
+
+    def _mk_one(self, pk, channel_type):
+        from voteit.messaging.messages.channels import Subscribe
+
+        return Subscribe(
+            {"user_pk": self.moderator.pk, "consumer_name": "abc"},
+            pk=pk,
+            channel_type=channel_type,
+        )
+
+    def test_subscribe_meeting(self):
+        msg = self._mk_one(self.meeting.pk, "meeting")
+        response = msg.run_job()
+        self.assertIsInstance(response, Subscribed)
+        appstates = dict((x.t, x.p) for x in response.data.app_state)
+        self.assertIn("speaker_system.added", appstates)
+        self.assertIn("speaker_list.added", appstates)
+        self.assertEqual(
+            1,
+            sum([1 for x in response.data.app_state if x.t == "speaker_list.added"]),
+        )
+        self.assertEqual(
+            1,
+            sum([1 for x in response.data.app_state if x.t == "speaker_list.order"]),
+        )
+        self.assertEqual(
+            [self.user_one.pk, self.user_two.pk],
+            appstates["speaker_list.order"]["queue"],
+        )
+
+    def test_subscribe_ai(self):
+        msg = self._mk_one(self.ai.pk, "agenda_item")
+        response = msg.run_job()
+        self.assertIsInstance(response, Subscribed)
+        appstates = dict((x.t, x.p) for x in response.data.app_state)
+        self.assertIn("speaker_list.added", appstates)
+        # The active list has already been transmitted
+        self.assertEqual(
+            1,
+            sum([1 for x in response.data.app_state if x.t == "speaker_list.added"]),
+        )
+        list_added = appstates["speaker_list.added"]
+        self.assertEqual(self.other_list.pk, list_added["pk"])
+        self.assertEqual(
+            1,
+            sum([1 for x in response.data.app_state if x.t == "speaker_list.order"]),
+        )
+        self.assertEqual(
+            [],
+            appstates["speaker_list.order"]["queue"],
+        )

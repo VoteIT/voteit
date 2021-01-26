@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Type, Optional, Union
 
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
@@ -9,7 +10,11 @@ from django.dispatch import Signal
 from django.dispatch import receiver
 
 from voteit.agenda.channels import AgendaItemChannel
+from voteit.agenda.models import AgendaItem
 from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.models import Meeting
+from voteit.messaging.messages.app_state import AppState
+from voteit.messaging.signals import channel_subscribed
 from voteit.speaker.messages import (
     SpeakerListOrder,
     SpeakerListChanged,
@@ -20,6 +25,10 @@ from voteit.speaker.messages import (
     SpeakerSystemChanged,
 )
 from voteit.speaker.models import Speaker, SpeakerList, SpeakerListSystem
+from voteit.speaker.serializers import (
+    SpeakerListSerializer,
+    SpeakerListSystemSerializer,
+)
 
 if TYPE_CHECKING:
     pass
@@ -72,20 +81,24 @@ def _get_list_channel(
     return None
 
 
+def _get_list_order_msg(speaker_list: SpeakerList) -> SpeakerListOrder:
+    speakers_qs = speaker_list.speakers_qs().prefetch_related("user")
+    users = [x.user for x in speakers_qs]
+    user_pks = [x.pk for x in users]
+    current = speaker_list.current and speaker_list.current.user.pk or None
+    return SpeakerListOrder(pk=speaker_list.pk, queue=user_pks, current=current)
+
+
 @receiver(list_updated)
 def push_list_order_change(instance: SpeakerList, **kw):
     """When speakers reorder, send an update of the order.
     This is not transmitted on save for the speaker list,
     since the speaker items are separate.
     """
-    speakers_qs = instance.speakers_qs().prefetch_related("user")
-    users = [x.user for x in speakers_qs]
-    user_pks = [x.pk for x in users]
     channel = _get_list_channel(instance)
     if channel is not None:
-        current = instance.current and instance.current.user.pk or None
-        order_msg = SpeakerListOrder(pk=instance.pk, queue=user_pks, current=current)
-        channel.publish(order_msg)
+        msg = _get_list_order_msg(instance)
+        channel.publish(msg)
 
 
 @receiver(post_save, sender=SpeakerList)
@@ -97,14 +110,8 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
             msg_class = SpeakerListAdded
         else:
             msg_class = SpeakerListChanged
-        agenda_item_pk = instance.agenda_item and instance.agenda_item.pk or None
-        msg = msg_class(
-            title=instance.title,
-            pk=instance.pk,
-            state=instance.state,
-            list_system=instance.list_system.pk,
-            agenda_item=agenda_item_pk,
-        )
+        data = SpeakerListSerializer(instance).data
+        msg = msg_class(**data)
         channel.publish(msg)
 
 
@@ -127,16 +134,8 @@ def notify_added_or_changed_speaker_system(
             msg_class = SpeakerSystemAdded
         else:
             msg_class = SpeakerSystemChanged
-        msg = msg_class(
-            title=instance.title,
-            pk=instance.pk,
-            active=instance.active,
-            method_name=instance.method_name,
-            settings=instance.settings,
-            safe_positions=instance.safe_positions,
-            active_list=instance.active_list and instance.active_list.pk or None,
-            meeting=instance.meeting and instance.meeting.pk or None,
-        )
+        data = SpeakerListSystemSerializer(instance).data
+        msg = msg_class(**data)
         channel.publish(msg)
 
 
@@ -147,3 +146,40 @@ def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
         channel = MeetingChannel.from_instance(instance.meeting)
         msg = SpeakerSystemDeleted(pk=instance.pk)
         channel.publish(msg)
+
+
+@receiver(channel_subscribed, sender=MeetingChannel)
+def meeting_channel_subscribed(
+    context: Meeting, app_state: AppState, user: AbstractUser, **kw
+):
+    """Send current state to meeting channel.
+    - Speaker systems
+    - Active list from each system
+    - Order of any active list
+    """
+    systems_qs = context.speaker_systems.all()
+    app_state.append_from_queryset(
+        systems_qs, SpeakerListSystemSerializer, SpeakerSystemAdded
+    )
+    for system in systems_qs:
+        if system.active_list:
+            app_state.append_from(
+                system.active_list, SpeakerListSerializer, SpeakerListAdded
+            )
+            order_msg = _get_list_order_msg(system.active_list)
+            app_state.append(order_msg)
+
+
+@receiver(channel_subscribed, sender=AgendaItemChannel)
+def ai_channel_subscribed(
+    context: AgendaItem, app_state: AppState, user: AbstractUser, **kw
+):
+    """Send current state to ai channel.
+    - Any lists in this context unless they're active (They're already known in that case)
+    - Order of those lists
+    """
+    lists_qs = context.speaker_lists.filter(active_in_system__isnull=True)
+    app_state.append_from_queryset(lists_qs, SpeakerListSerializer, SpeakerListAdded)
+    for sl in lists_qs:
+        msg = _get_list_order_msg(sl)
+        app_state.append(msg)
