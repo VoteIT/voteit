@@ -251,7 +251,7 @@ class SpeakerListSchema(BaseModel):
     pk: int
     state: str
     list_system: int  # pk
-    agenda_item: int  # pk
+    agenda_item: Optional[int]  # pk
 
 
 @outgoing
