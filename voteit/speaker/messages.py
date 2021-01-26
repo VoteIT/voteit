@@ -254,18 +254,21 @@ class SpeakerListSchema(BaseModel):
     agenda_item: int  # pk
 
 
+@outgoing
 class SpeakerListAdded(BaseOutgoingMessage):
     name = "speaker_list.added"
     schema = SpeakerListSchema
     data: SpeakerListSchema
 
 
+@outgoing
 class SpeakerListChanged(BaseOutgoingMessage):
     name = "speaker_list.changed"
     schema = SpeakerListSchema
     data: SpeakerListSchema
 
 
+@outgoing
 class SpeakerListDeleted(BaseObjectDeleted):
     name = "speaker_list.deleted"
 
@@ -281,17 +284,20 @@ class SpeakerSystemSchema(BaseModel):
     active_list: Optional[int]
 
 
+@outgoing
 class SpeakerSystemAdded(BaseOutgoingMessage):
     name = "speaker_system.added"
     schema = SpeakerSystemSchema
     data: SpeakerSystemSchema
 
 
+@outgoing
 class SpeakerSystemChanged(BaseOutgoingMessage):
     name = "speaker_system.changed"
     schema = SpeakerSystemSchema
     data: SpeakerSystemSchema
 
 
+@outgoing
 class SpeakerSystemDeleted(BaseObjectDeleted):
     name = "speaker_system.deleted"

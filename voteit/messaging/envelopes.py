@@ -17,7 +17,7 @@ class IncomingEnvelope(BaseEnvelope):
     def validate_type(cls, v):
         registry = get_incoming_registry()
         if v not in registry:
-            raise ValueError("No such incoming message type")
+            raise ValueError(f"No such incoming message type ({v})")
         return v
 
 
@@ -38,5 +38,5 @@ class OutgoingEnvelope(BaseEnvelope):
     def validate_type(cls, v):
         registry = get_outgoing_registry()
         if v not in registry:
-            raise ValueError("No such incoming message type")
+            raise ValueError(f"No such outgoing message type ({v})")
         return v
