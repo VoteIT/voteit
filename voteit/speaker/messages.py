@@ -10,6 +10,7 @@ from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import ContextAction
 from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.errors import NotFoundError
+from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.messages.base import BaseObjectDeleted
 from voteit.messaging.messages.text import TextResponse
 from voteit.messaging.decorators import incoming
@@ -25,14 +26,32 @@ class SpeakerListActionSchema(BaseModel):
     pk: int  # which list to perform the action on
 
 
-class _ListMessage(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
+class SpeakerListUserSchema(SpeakerListActionSchema):
+    userid: int  # Moderators may also enter someone else.
+
+
+class ListMessage(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
     model = SpeakerList
     schema = SpeakerListActionSchema
     data: SpeakerListActionSchema
 
 
+class ModeratorListMessage(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
+    model = SpeakerList
+    schema = SpeakerListUserSchema
+    data: SpeakerListUserSchema
+
+    def get_user(self):
+        try:
+            return User.objects.get(pk=self.data.userid)
+        except User.DoesNotExist:
+            raise NotFoundError.from_message(
+                self, msg=_("User with pk %(pk)s") % {"pk": self.data.pk}
+            )
+
+
 @incoming
-class SpeakerListEnter(_ListMessage):
+class SpeakerListEnter(ListMessage):
     name = "speaker_list.enter"
     permission = SpeakerListPermissions.ENTER
 
@@ -51,7 +70,7 @@ class SpeakerListEnter(_ListMessage):
 
 
 @incoming
-class SpeakerListLeave(_ListMessage):
+class SpeakerListLeave(ListMessage):
     name = "speaker_list.leave"
     permission = SpeakerListPermissions.LEAVE
 
@@ -70,7 +89,7 @@ class SpeakerListLeave(_ListMessage):
 
 
 @incoming
-class SetActiveList(_ListMessage):
+class SetActiveList(ListMessage):
     name = "speaker_list.set_active"
     permission = SpeakerListPermissions.CHANGE
     context: SpeakerList
@@ -79,6 +98,19 @@ class SetActiveList(_ListMessage):
         self.assert_perm()
         system = self.context.list_system
         if system.active_list != self.context:
+            if system.active_list and system.active_list.current is not None:
+                raise ValidationErrorMsg.from_message(
+                    self,
+                    msg=_("Another list has an active speaker."),
+                    errors=[
+                        {
+                            "loc": ("pk",),
+                            "msg": _("List '%s' with id %s is active")
+                            % (system.active_list.title, system.active_list),
+                            "type": "value.error",
+                        }
+                    ],
+                )
             system.active_list = self.context
             system.save()
             msg = TextResponse.from_message(self, msg=_("Active list changed"))
@@ -86,26 +118,83 @@ class SetActiveList(_ListMessage):
             return msg
 
 
-class ModeratorSpeakerActionSchema(SpeakerListActionSchema):
-    userid: int  # Moderators may do actions for someone else
+@incoming
+class StartSpeakerInList(ModeratorListMessage):
+    """ Start userid. Ignore if not found or already speaking. """
 
+    name = "speaker_list.start_user"
+    permission = SpeakerListPermissions.START
+    context: SpeakerList
 
-class _ModeratorListMessage(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
-    model = SpeakerList
-    schema = ModeratorSpeakerActionSchema
-    data: ModeratorSpeakerActionSchema
-
-    def get_user(self):
-        try:
-            return User.objects.get(pk=self.data.userid)
-        except User.DoesNotExist:
-            raise NotFoundError.from_message(
-                self, msg=_("User with pk %(pk)s") % {"pk": self.data.pk}
+    def run_job(self):
+        self.assert_perm()
+        user = self.get_user()
+        speaker = self.context.speaker_items.filter(
+            user=user, order__isnull=False
+        ).first()
+        if speaker is None:
+            raise ValidationErrorMsg.from_message(
+                self,
+                msg=_("No such user in queue."),
+                errors=[
+                    {
+                        "loc": ("userid",),
+                        "msg": _("user_pk %s not in queue") % user.pk,
+                        "type": "value.error",
+                    }
+                ],
             )
+        else:
+            speaker.start()
+            msg = TextResponse.from_message(self, msg=_("Started"))
+            msg.send_outgoing(self.mm.consumer_name, success=True)
+            return msg
 
 
 @incoming
-class ModeratorSpeakerListEnter(_ModeratorListMessage):
+class StopSpeakerInList(ModeratorListMessage):
+    """ Stop userid. Ignore if not speaking. """
+
+    name = "speaker_list.stop_user"
+    permission = SpeakerListPermissions.STOP
+    context: SpeakerList
+
+    def run_job(self):
+        self.assert_perm()
+        user = self.get_user()
+        speaker = self.context.current
+        if speaker is None:
+            raise ValidationErrorMsg.from_message(
+                self,
+                msg=_("No current speaker"),
+                errors=[
+                    {
+                        "loc": ("userid",),
+                        "msg": "",
+                        "type": "value.error",
+                    }
+                ],
+            )
+        if user != speaker.user:
+            raise ValidationErrorMsg.from_message(
+                self,
+                msg=_("That user isn't speaking."),
+                errors=[
+                    {
+                        "loc": ("userid",),
+                        "msg": _("user_pk %s") % user.pk,
+                        "type": "value.error",
+                    }
+                ],
+            )
+        speaker.stop()
+        msg = TextResponse.from_message(self, msg=_("Stopped"))
+        msg.send_outgoing(self.mm.consumer_name, success=True)
+        return msg
+
+
+@incoming
+class ModeratorSpeakerListEnter(ModeratorListMessage):
     name = "mod_speaker_list.enter"
     permission = SpeakerListPermissions.ENTER
 
@@ -125,7 +214,7 @@ class ModeratorSpeakerListEnter(_ModeratorListMessage):
 
 
 @incoming
-class ModeratorSpeakerListLeave(_ModeratorListMessage):
+class ModeratorSpeakerListLeave(ModeratorListMessage):
     name = "mod_speaker_list.leave"
     permission = SpeakerListPermissions.LEAVE
 

@@ -35,6 +35,15 @@ class SpeakerTests(TestCase):
         self.assertIsNone(speaker.order)
         self.assertIsInstance(speaker.started, datetime)
 
+    def test_start_with_another_speaker_active(self):
+        speaker = self.list.speaker_items.create(user=self.user)
+        speaker.start()
+        tarzan = User.objects.create(username="tarzan")
+        tarzan_speaker = self.list.speaker_items.create(user=tarzan)
+        tarzan_speaker.start()
+        self.assertEqual(1, speaker.seconds)
+        self.assertEqual(tarzan_speaker, self.list.current)
+
     def test_ended(self):
         speaker = self.list.speaker_items.create(user=self.user)
         speaker.start()

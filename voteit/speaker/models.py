@@ -172,15 +172,30 @@ class Speaker(models.Model):
     def start(self):
         """ Remove from queue (order) and set a timestamp. """
         if self.started is None:
+            if self.list.current is not None:
+                self.list.current.stop()
             self.order = None
             self.started = now()
             self.save()
             self.list.current = self
             self.list.save()
-            self.list.reorder(force_signal=True)  # Since order probably won't change
+            # Since order might not have changed, we still need an update here
+            self.list.reorder(force_signal=True)
         else:  # pragma: no coverage
             # FIXME: Something...?
             raise ValueError()
+
+    def stop(self):
+        """End this speaker."""
+        if self.list.current == self and self.started is not None:
+            end_td = now() - self.started
+            end_secs = end_td.seconds
+            if not end_secs:
+                end_secs = 1
+            self.seconds = end_secs
+            self.save()
+            self.list.current = None
+            self.list.save()
 
     # Type hinting
     objects = models.Manager()
