@@ -9,7 +9,7 @@ from voteit.core.models import BaseContent
 from voteit.meeting.models import Meeting
 
 
-__all__ = 'AgendaItem',
+__all__ = ("AgendaItem",)
 
 
 class AgendaItem(BaseContent, MeetingContext):
@@ -30,16 +30,20 @@ class AgendaItem(BaseContent, MeetingContext):
     order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
-        ordering = 'meeting', 'order',
+        ordering = (
+            "meeting",
+            "order",
+        )
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        """ Set order as last agenda item for meeting when creating.
-        """
+    def save(self, **kw):
+        """Set order as last agenda item for meeting when creating."""
         if not self.pk:
-            max_order = self.meeting.agenda_items.aggregate(max_order=models.Max('order'))['max_order']
+            max_order = self.meeting.agenda_items.aggregate(
+                max_order=models.Max("order")
+            )["max_order"]
             if max_order is not None:
                 self.order = max_order + 1
-        super().save(force_insert, force_update, using, update_fields)
+        super().save(**kw)
 
     def get_proposals(self):
         return self.proposals.all()
@@ -56,8 +60,7 @@ class AgendaItem(BaseContent, MeetingContext):
         permission=AgendaPermissions.CHANGE,
     )
     def upcoming(self):
-        """ Make agenda item upcoming
-        """
+        """Make agenda item upcoming"""
         pass
 
     @transition(
@@ -66,8 +69,7 @@ class AgendaItem(BaseContent, MeetingContext):
         permission=AgendaPermissions.CHANGE,
     )
     def unpublish(self):
-        """ Make agenda item private
-        """
+        """Make agenda item private"""
         pass
 
     @transition(
@@ -76,8 +78,7 @@ class AgendaItem(BaseContent, MeetingContext):
         permission=AgendaPermissions.CHANGE,
     )
     def ongoing(self):
-        """ Make agenda item ongoing
-        """
+        """Make agenda item ongoing"""
         pass
 
     @transition(
@@ -86,14 +87,13 @@ class AgendaItem(BaseContent, MeetingContext):
         permission=AgendaPermissions.CHANGE,
     )
     def close(self):
-        """ Close agenda item
-        """
+        """Close agenda item"""
         pass
 
     @transition(
         field=state,
         target=AgendaItemWf.ARCHIVED,
-        source='*',
+        source="*",
         permission="__not_allowed__",  # Handled by scripts
     )
     def archive(self):
