@@ -212,7 +212,7 @@ class BaseContent(ABCModel):
         settings.AUTH_USER_MODEL,
         related_name="mentions_%(app_label)s_%(class)s",
     )
-    tags: List = ArrayField(models.CharField(max_length=100), default=tuple)
+    tags: List = ArrayField(models.CharField(max_length=100), default=list)
 
     class Meta:
         abstract = True

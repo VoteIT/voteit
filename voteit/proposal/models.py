@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from random import sample
+from string import ascii_lowercase
 from typing import TYPE_CHECKING
 
 from django.conf import settings
@@ -36,6 +39,14 @@ class Proposal(BaseContent, Reactable):
         related_name="proposals",
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["prop_id", "agenda_item"],
+                name="prop_id_unique_for_ai",
+            )
+        ]
+
     @transition(
         field=state,
         source=ProposalWf.PUBLISHED,
@@ -53,9 +64,9 @@ class Proposal(BaseContent, Reactable):
         permission=ProposalPermissions.CHANGE,
     )
     def lock_for_vote(self):
-        """ When a vote starts, mark all proposals as "voting" so they can't be retracted.
-            In case a retracted proposal is part of the vote, lock that too
-            since it might have been retracted very late.
+        """When a vote starts, mark all proposals as "voting" so they can't be retracted.
+        In case a retracted proposal is part of the vote, lock that too
+        since it might have been retracted very late.
         """
         pass
 
@@ -95,3 +106,15 @@ class Proposal(BaseContent, Reactable):
     def publish(self):
         """ Reset proposal back to published. """
         pass
+
+    def save(self, **kw):
+        if not self.prop_id:
+            self.prop_id = new_proposal_id(self)
+        if self.prop_id not in self.tags:
+            self.tags.append(self.prop_id)
+        super().save(**kw)
+
+
+def new_proposal_id(proposal: Proposal) -> str:
+    # FIXME: Do something nice here that isn't just random
+    return "".join(sample(ascii_lowercase, 8))
