@@ -1,7 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
-from voteit.proposal.permissions import ProposalPermissions
 
 
 class ProposalTestCase(APITestCase):
@@ -9,25 +8,26 @@ class ProposalTestCase(APITestCase):
         from voteit.meeting.models import Meeting
         from voteit.agenda.models import AgendaItem
         from voteit.meeting.roles import ROLE_PROPOSER, ROLE_MODERATOR, ROLE_PARTICIPANT
+
         self.meeting: Meeting = Meeting.objects.create(
-            title='Test meeting', state='ongoing'
+            title="Test meeting", state="ongoing"
         )
         self.agenda_item: AgendaItem = AgendaItem.objects.create(
-            title='Agenda item', meeting=self.meeting, state='ongoing'
+            title="Agenda item", meeting=self.meeting, state="ongoing"
         )
-        self.participant: User = User.objects.create_user('participant')
-        self.moderator: User = User.objects.create_user('moderator')
-        self.proposer: User = User.objects.create_user('proposer')
-        self.outsider: User = User.objects.create_user('outsider')
+        self.participant: User = User.objects.create_user("participant")
+        self.moderator: User = User.objects.create_user("moderator")
+        self.proposer: User = User.objects.create_user("proposer")
+        self.outsider: User = User.objects.create_user("outsider")
         self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
         self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
         self.meeting.add_roles(self.proposer, ROLE_PROPOSER)
 
     def test_create(self):
-        url = reverse('proposal-list')
+        url = reverse("proposal-list")
         data = {
-            'title': 'My proposal',
-            'agenda_item': self.agenda_item.pk,
+            "title": "My proposal",
+            "agenda_item": self.agenda_item.pk,
         }
         for user, status in (
             (None, 403),
@@ -41,12 +41,12 @@ class ProposalTestCase(APITestCase):
             self.assertEqual(response.status_code, status)
 
     def test_agenda_item_ne(self):
-        url = reverse('proposal-list')
+        url = reverse("proposal-list")
         data = {
-            'title': 'My proposal',
-            'agenda_item': 1000,
+            "title": "My proposal",
+            "agenda_item": 1000,
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json().get('detail'), 'Agenda item not found')
+        self.assertEqual(response.json().get("detail"), "Agenda item not found")
