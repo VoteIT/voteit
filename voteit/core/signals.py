@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.contrib.auth import get_user_model
 from django.dispatch import Signal, receiver
 from typing import TYPE_CHECKING, List
 
@@ -11,6 +12,7 @@ if TYPE_CHECKING:
     from voteit.core.role import Role
 
 
+User = get_user_model()
 roles_added = Signal(providing_args=["sender", "instance", "roles"])
 roles_removed = Signal(providing_args=["sender", "instance", "roles"])
 

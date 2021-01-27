@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from datetime import datetime
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -11,8 +12,11 @@ from typing import List, Set, Optional, Dict, Union
 
 from voteit.core.abcs import ABCModel
 from voteit.core.role import Role
-from voteit.core.signals import roles_added, roles_removed
-from voteit.core.utils import get_tags, get_mentions, html_should_be_escaped
+from voteit.core.signals import roles_added
+from voteit.core.signals import roles_removed
+from voteit.core.utils import get_tags
+from voteit.core.utils import get_mentions
+from voteit.core.utils import html_should_be_escaped
 
 User = get_user_model()
 
@@ -190,18 +194,18 @@ class Roles(ABCModel):
 
 
 class BaseContent(ABCModel):
-    title = models.CharField(max_length=200)
-    body_raw = models.TextField(blank=True, default="")
-    created = models.DateTimeField(editable=False, auto_now_add=True)
-    author = models.ForeignKey(
+    title: str = models.CharField(max_length=200)
+    body: str = models.TextField(blank=True, default="")
+    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    author: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         editable=False,
         null=True,
         related_name="author_%(app_label)s_%(class)s",
     )
-    modified = models.DateTimeField(editable=False, auto_now=True)
-    last_modified_by = models.ForeignKey(
+    modified: datetime = models.DateTimeField(editable=False, auto_now=True)
+    last_modified_by: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         editable=False,
@@ -217,25 +221,26 @@ class BaseContent(ABCModel):
     class Meta:
         abstract = True
 
-    @property
-    def body(self):
-        return self.body_raw
-
-    @body.setter
-    def body(self, v: str):
-        if html_should_be_escaped(v):
-            raise ValueError("body can't contain unescaped chars")
+    def set_tags(self):
         current_tags = set(self.tags)
-        tags = get_tags(v)
+        tags = get_tags(self.body)
         if tags != current_tags:
             self.tags = sorted(tags)
-        mentions = get_mentions(v)
+
+    def set_mentions(self):
+        mentions = get_mentions(self.body)
         current_user_pks = set(self.mentions.all().values_list("pk", flat=True))
         if mentions != current_user_pks:
             # Only real users are allowed as mentions
             result = User.objects.filter(pk__in=mentions).values_list("pk", flat=True)
             self.mentions.set(result)
-        self.body_raw = v
+
+    def save(self, **kw):
+        if html_should_be_escaped(self.body):
+            raise ValueError("body can't contain unescaped chars")
+        self.set_tags()
+        super().save(**kw)
+        self.set_mentions()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.title[:50]}>"

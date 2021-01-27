@@ -141,30 +141,30 @@ class BaseContentTests(TestCase):
 
     def test_body_mentions(self):
         self.assertFalse(self.meeting.mentions.filter(pk=self.user.pk).exists())
-        txt = f"Hello @{self.user.pk} what's up?"
-        self.meeting.body = txt
+        self.meeting.body = f"Hello @{self.user.pk} what's up?"
+        self.meeting.save()
         self.assertTrue(self.meeting.mentions.filter(pk=self.user.pk).exists())
 
     def test_body_mentions_with_nonexisting_user(self):
         # Shouldn't kill setting text
         deleted_pk = self.user.pk
         self.user.delete()
-        txt = f"I used to know @{deleted_pk} once"
-        self.meeting.body = txt
+        self.meeting.body = f"I used to know @{deleted_pk} once"
+        self.meeting.save()
         self.assertFalse(self.meeting.mentions.count())
 
     def test_body_tags(self):
-        txt = f"#SUP all #participants? #KörVi!"
-        self.meeting.body = txt
+        self.meeting.body = f"#SUP all #participants? #KörVi!"
+        self.meeting.save()
         self.assertEqual(["körvi", "participants", "sup"], self.meeting.tags)
 
     def test_body_with_html(self):
-        txt = "Hello <script>alert('hello')</script>"
+        self.meeting.body = "Hello <script>alert('hello')</script>"
         with self.assertRaises(ValueError):
-            self.meeting.body = txt
+            self.meeting.save()
 
     def test_body_with_escaped_html(self):
         txt = html.escape("Hello <script>alert('hello')</script>")
         self.meeting.body = txt
+        self.meeting.save()
         self.assertNotIn("<", self.meeting.body)
-        print(self.meeting.body)

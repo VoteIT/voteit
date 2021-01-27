@@ -107,11 +107,14 @@ class Proposal(BaseContent, Reactable):
         """ Reset proposal back to published. """
         pass
 
+    def set_tags(self):
+        super().set_tags()
+        if self.prop_id not in self.tags:
+            self.tags.append(self.prop_id)
+
     def save(self, **kw):
         if not self.prop_id:
             self.prop_id = new_proposal_id(self)
-        if self.prop_id not in self.tags:
-            self.tags.append(self.prop_id)
         super().save(**kw)
 
 
