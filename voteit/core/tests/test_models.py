@@ -1,3 +1,5 @@
+import html
+
 from django.contrib.auth.models import User
 from django.dispatch import receiver
 from django.test import TestCase
@@ -124,4 +126,45 @@ class RolesTests(TestCase):
         self.roles.add(participant)
         self.roles.remove(participant)
         # Roles deleted
-        self.assertFalse(MeetingRoles.objects.filter(user=self.user, context=self.meeting).exists())
+        self.assertFalse(
+            MeetingRoles.objects.filter(user=self.user, context=self.meeting).exists()
+        )
+
+
+class BaseContentTests(TestCase):
+    def setUp(self):
+        # Testing abstract model through meeting model
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        self.user = User.objects.create(username="ivan")
+
+    def test_body_mentions(self):
+        self.assertFalse(self.meeting.mentions.filter(pk=self.user.pk).exists())
+        txt = f"Hello @{self.user.pk} what's up?"
+        self.meeting.body = txt
+        self.assertTrue(self.meeting.mentions.filter(pk=self.user.pk).exists())
+
+    def test_body_mentions_with_nonexisting_user(self):
+        # Shouldn't kill setting text
+        deleted_pk = self.user.pk
+        self.user.delete()
+        txt = f"I used to know @{deleted_pk} once"
+        self.meeting.body = txt
+        self.assertFalse(self.meeting.mentions.count())
+
+    def test_body_tags(self):
+        txt = f"#SUP all #participants? #KörVi!"
+        self.meeting.body = txt
+        self.assertEqual(["körvi", "participants", "sup"], self.meeting.tags)
+
+    def test_body_with_html(self):
+        txt = "Hello <script>alert('hello')</script>"
+        with self.assertRaises(ValueError):
+            self.meeting.body = txt
+
+    def test_body_with_escaped_html(self):
+        txt = html.escape("Hello <script>alert('hello')</script>")
+        self.meeting.body = txt
+        self.assertNotIn("<", self.meeting.body)
+        print(self.meeting.body)

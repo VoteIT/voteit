@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils.translation import gettext as _
@@ -12,6 +12,9 @@ from typing import List, Set, Optional, Dict, Union
 from voteit.core.abcs import ABCModel
 from voteit.core.role import Role
 from voteit.core.signals import roles_added, roles_removed
+from voteit.core.utils import get_tags, get_mentions, html_should_be_escaped
+
+User = get_user_model()
 
 
 class RoleContextMixin(ABCModel):
@@ -20,23 +23,22 @@ class RoleContextMixin(ABCModel):
     @property
     @abstractmethod
     def roles_cls(self) -> Roles:
-        """ Return the Roles class that this context uses.
-        """
+        """Return the Roles class that this context uses."""
 
-    def add_roles(self, user: AbstractUser, *roles: Role) -> Optional[Set[Role]]:
-        assert isinstance(user, AbstractUser)
+    def add_roles(self, user: User, *roles: Role) -> Optional[Set[Role]]:
+        assert isinstance(user, User)
         roles_model, created = self.roles_cls.objects.get_or_create(
             user=user, context=self
         )
         return roles_model.add(*roles)
 
-    def remove_roles(self, user: AbstractUser, *roles: Role) -> Optional[Set[Role]]:
-        assert isinstance(user, AbstractUser)
+    def remove_roles(self, user: User, *roles: Role) -> Optional[Set[Role]]:
+        assert isinstance(user, User)
         roles_model = self.roles_cls.objects.filter(user=user, context=self).first()
         if roles_model is not None:
             return roles_model.remove(*roles)
 
-    def get_roles(self, user: AbstractUser) -> Optional[Set[Role]]:
+    def get_roles(self, user: User) -> Optional[Set[Role]]:
         roles_model = self.roles_cls.objects.filter(user=user, context=self).first()
         if roles_model is not None:
             # Note, may raise AssertionError if some roles are invalid
@@ -45,13 +47,13 @@ class RoleContextMixin(ABCModel):
                 return roles
         return None
 
-    def has_roles(self, user: AbstractUser, *roles: Union[str, Role]) -> bool:
+    def has_roles(self, user: User, *roles: Union[str, Role]) -> bool:
         q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
             user=user, context=self, assigned__contains=q
         ).exists()
 
-    def has_any_roles(self, user: AbstractUser, *roles: Union[str, Role]) -> bool:
+    def has_any_roles(self, user: User, *roles: Union[str, Role]) -> bool:
         q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
             user=user, context=self, assigned__overlap=q
@@ -80,7 +82,7 @@ class RoleContextMixin(ABCModel):
                 raise ValueError(f"{role} is not a str or Role object")
         return r
 
-    def filter_valid_roles(self, *roles:Union[Role, str]) -> Set[str]:
+    def filter_valid_roles(self, *roles: Union[Role, str]) -> Set[str]:
         items = self.roles_to_strings(*roles)
         return set([x for x in items if x in self.roles_cls.valid_roles])
 
@@ -93,7 +95,7 @@ class Roles(ABCModel):
 
     valid_roles: Dict = None  # Don't instantiate dict here!
     # It's a good idea to override the user relation to have a sane related_name
-    user: AbstractUser = models.ForeignKey(
+    user: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="roles_%(app_label)s_%(class)s",
@@ -103,8 +105,7 @@ class Roles(ABCModel):
     @property
     @abstractmethod
     def context(self) -> models.Model:
-        """ Create a ForeignKey relation to the model that acts as context for this roleset. For instance Meeting
-        """
+        """Create a ForeignKey relation to the model that acts as context for this roleset. For instance Meeting"""
 
     class Meta:
         abstract = True
@@ -171,8 +172,7 @@ class Roles(ABCModel):
 
     @classmethod
     def add_valid(cls, *roles: Role):
-        """ Assign a Role instance as a valid choice here.
-        """
+        """Assign a Role instance as a valid choice here."""
         for role in roles:
             assert isinstance(role, Role)
             assert (
@@ -191,7 +191,7 @@ class Roles(ABCModel):
 
 class BaseContent(ABCModel):
     title = models.CharField(max_length=200)
-    body = models.TextField(blank=True, default="")
+    body_raw = models.TextField(blank=True, default="")
     created = models.DateTimeField(editable=False, auto_now_add=True)
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -208,9 +208,34 @@ class BaseContent(ABCModel):
         null=True,
         related_name="last_modified_%(app_label)s_%(class)s",
     )
+    mentions = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="mentions_%(app_label)s_%(class)s",
+    )
+    tags: List = ArrayField(models.CharField(max_length=100), default=tuple)
 
     class Meta:
         abstract = True
+
+    @property
+    def body(self):
+        return self.body_raw
+
+    @body.setter
+    def body(self, v: str):
+        if html_should_be_escaped(v):
+            raise ValueError("body can't contain unescaped chars")
+        current_tags = set(self.tags)
+        tags = get_tags(v)
+        if tags != current_tags:
+            self.tags = sorted(tags)
+        mentions = get_mentions(v)
+        current_user_pks = set(self.mentions.all().values_list("pk", flat=True))
+        if mentions != current_user_pks:
+            # Only real users are allowed as mentions
+            result = User.objects.filter(pk__in=mentions).values_list("pk", flat=True)
+            self.mentions.set(result)
+        self.body_raw = v
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.title[:50]}>"

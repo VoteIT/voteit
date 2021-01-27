@@ -23,8 +23,9 @@ def load_tests(loader, tests, ignore):
     from voteit.core import role
     from voteit.core import permission
     from voteit.core import predicate
+    from voteit.core import utils
 
-    mods_to_test = [role, permission, predicate]
+    mods_to_test = [role, permission, predicate, utils]
     opts = doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS | doctest.FAIL_FAST
     for x in mods_to_test:
         tests.addTests(doctest.DocTestSuite(x, optionflags=opts))
