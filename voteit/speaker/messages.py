@@ -146,6 +146,7 @@ class StartSpeakerInList(ModeratorListMessage):
             )
         else:
             speaker.start()
+            self.context.signal_list_updated()
             msg = TextResponse.from_message(self, msg=_("Started"))
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg
@@ -188,6 +189,7 @@ class StopSpeakerInList(ModeratorListMessage):
                 ],
             )
         speaker.stop()
+        self.context.signal_list_updated()
         msg = TextResponse.from_message(self, msg=_("Stopped"))
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg

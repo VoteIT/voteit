@@ -81,7 +81,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         ),
         choices=[(x, str(x)) for x in range(3)],
         null=True,
-        blank=True
+        blank=True,
     )
     active_list = models.OneToOneField(
         "SpeakerList",
@@ -188,8 +188,6 @@ class Speaker(models.Model):
             self.save()
             self.list.current = self
             self.list.save()
-            # Since order might not have changed, we still need an update here
-            self.list.reorder(force_signal=True)
         else:  # pragma: no coverage
             # FIXME: Something...?
             raise ValueError()
