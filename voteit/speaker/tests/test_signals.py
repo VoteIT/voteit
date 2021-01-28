@@ -64,8 +64,7 @@ class SignalListOrderChangeTests(TestCase):
 
     @patch.object(AgendaItemChannel, "publish")
     def test_agenda_with_active_speaker(self, mock_publish):
-        self.speaker_three.start()
-        self.speaker_list.save()
+        self.speaker_list.start_speaker(self.speaker_three)
         self.speaker_list.signal_list_updated()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[-1].args[0]

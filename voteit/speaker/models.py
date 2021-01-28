@@ -178,31 +178,31 @@ class Speaker(models.Model):
         """ The definition of being in the queue is that order is set to a number"""
         return self.order is not None
 
-    def start(self):
-        """ Remove from queue (order) and set a timestamp. """
-        if self.started is None:
-            if self.list.current is not None:
-                self.list.current.stop()
-            self.order = None
-            self.started = now()
-            self.save()
-            self.list.current = self
-            self.list.save()
-        else:  # pragma: no coverage
-            # FIXME: Something...?
-            raise ValueError()
+    # def start(self):
+    #     """ Remove from queue (order) and set a timestamp. """
+    #     if self.started is None:
+    #         if self.list.current is not None:
+    #             self.list.current.stop()
+    #         self.order = None
+    #         self.started = now()
+    #         self.save()
+    #         self.list.current = self
+    #         self.list.save()
+    #     else:  # pragma: no coverage
+    #         # FIXME: Something...?
+    #         raise ValueError()
 
-    def stop(self):
-        """End this speaker."""
-        if self.list.current == self and self.started is not None:
-            end_td = now() - self.started
-            end_secs = end_td.seconds
-            if not end_secs:
-                end_secs = 1
-            self.seconds = end_secs
-            self.save()
-            self.list.current = None
-            self.list.save()
+    # def stop(self):
+    #     """End this speaker."""
+    #     if self.list.current == self and self.started is not None:
+    #         end_td = now() - self.started
+    #         end_secs = end_td.seconds
+    #         if not end_secs:
+    #             end_secs = 1
+    #         self.seconds = end_secs
+    #         self.save()
+    #         self.list.current = None
+    #         self.list.save()
 
     # Type hinting
     objects = models.Manager()
@@ -313,6 +313,31 @@ class SpeakerList(models.Model):
         return self.speaker_items.filter(order__isnull=False, safe_pos=False).order_by(
             "created"
         )
+
+    def start_speaker(self, speaker: Speaker) -> None:
+        """ Start a a specific user in the queue, or first user
+        """
+        if speaker := speaker or self.speakers_qs().first():
+            if speaker.started is None:
+                self.stop_speaker()
+                speaker.order = None
+                speaker.started = now()
+                speaker.save()
+                self.current = speaker
+                self.save()
+            else:  # pragma: no coverage
+                # FIXME: Something...?
+                raise ValueError()
+
+    def stop_speaker(self) -> None:
+        """ Stop current speaker and set spoken time
+        """
+        if speaker := self.current:
+            end_td = now() - speaker.started
+            speaker.seconds = end_td.seconds or 1
+            speaker.save()
+            self.current = None
+            self.save()
 
     # Type hinting
     objects = models.Manager()

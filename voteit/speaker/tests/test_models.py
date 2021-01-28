@@ -31,22 +31,22 @@ class SpeakerTests(TestCase):
 
     def test_start(self):
         speaker = self.list.speaker_items.create(user=self.user)
-        speaker.start()
+        self.list.start_speaker(speaker)
         self.assertIsNone(speaker.order)
         self.assertIsInstance(speaker.started, datetime)
 
     def test_start_with_another_speaker_active(self):
         speaker = self.list.speaker_items.create(user=self.user)
-        speaker.start()
+        self.list.start_speaker(speaker)
         tarzan = User.objects.create(username="tarzan")
         tarzan_speaker = self.list.speaker_items.create(user=tarzan)
-        tarzan_speaker.start()
+        self.list.start_speaker(tarzan_speaker)
         self.assertEqual(1, speaker.seconds)
         self.assertEqual(tarzan_speaker, self.list.current)
 
     def test_ended(self):
         speaker = self.list.speaker_items.create(user=self.user)
-        speaker.start()
+        self.list.start_speaker(speaker)
         speaker.seconds = 100
         self.assertEqual(timedelta(seconds=100), speaker.ended - speaker.started)
 
@@ -54,7 +54,7 @@ class SpeakerTests(TestCase):
         # This is cheating since we can only expect it to be the current speaker if some data isn't corrupt ;)
         speaker = self.list.speaker_items.create(user=self.user)
         self.assertFalse(speaker.current)
-        speaker.start()
+        self.list.start_speaker(speaker)
         self.assertTrue(speaker.current)
         speaker.seconds = 1
         self.assertFalse(speaker.current)
