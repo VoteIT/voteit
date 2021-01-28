@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Optional, Type, Dict, Union
 
@@ -237,7 +238,9 @@ class SpeakerList(models.Model):
     @property
     def is_active_list(self) -> bool:
         """ Is this the currently active list? """
-        return self.list_system.active_list == self
+        with suppress(SpeakerListSystem.DoesNotExist):
+            return self.active_in_system is not None
+        return False
 
     @transition(
         field=state,
@@ -315,8 +318,7 @@ class SpeakerList(models.Model):
         )
 
     def start_speaker(self, speaker: Speaker) -> None:
-        """ Start a a specific user in the queue, or first user
-        """
+        """Start a a specific user in the queue, or first user"""
         if speaker := speaker or self.speakers_qs().first():
             if speaker.started is None:
                 self.stop_speaker()
@@ -330,8 +332,7 @@ class SpeakerList(models.Model):
                 raise ValueError()
 
     def stop_speaker(self) -> None:
-        """ Stop current speaker and set spoken time
-        """
+        """Stop current speaker and set spoken time"""
         if speaker := self.current:
             end_td = now() - speaker.started
             speaker.seconds = end_td.seconds or 1

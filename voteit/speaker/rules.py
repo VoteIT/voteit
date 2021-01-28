@@ -63,10 +63,7 @@ def is_list_open(user: AbstractUser, speaker_list: SpeakerList) -> bool:
 
 @rules.predicate
 def is_active_list(user: AbstractUser, speaker_list: SpeakerList) -> bool:
-    return (
-        isinstance(speaker_list, SpeakerList)
-        and speaker_list.list_system.active_list == speaker_list
-    )
+    return isinstance(speaker_list, SpeakerList) and speaker_list.is_active_list
 
 
 @rules.predicate
