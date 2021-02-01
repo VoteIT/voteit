@@ -6,23 +6,24 @@ from typing import TYPE_CHECKING, Generator
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db import transaction
 from django.utils import timezone
+from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
 from django_fsm import FSMField, transition
-from voteit.core.abcs import MeetingContext
 
+from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent, Roles, RoleContextMixin
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
+from voteit.poll.utils import get_electoral_policy_registry
 
 if TYPE_CHECKING:
     from voteit.access_policy.models import AccessPolicy
     from voteit.poll.models import ElectoralRegister
+    from voteit.poll.abcs import ElectoralRegisterPolicy
 
 
 __all__ = "Meeting", "MeetingRoles"
@@ -59,11 +60,12 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
     public = models.BooleanField(
         verbose_name=_("Is this meeting viewable by anyone?"), default=False
     )
-    er_policy_type = models.ForeignKey(
-        ContentType, on_delete=models.CASCADE, null=True, editable=False
+    er_policy_name = models.CharField(
+        verbose_name=_("ID of used electoral policy"),
+        max_length=30,
+        null=True,
+        blank=True,
     )
-    er_policy_id = models.PositiveIntegerField(null=True, editable=False)
-    er_policy = GenericForeignKey("er_policy_type", "er_policy_id")
     organisation = models.ForeignKey(
         "organisation.Organisation",
         on_delete=models.CASCADE,
@@ -75,6 +77,11 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
 
     roles_cls = MeetingRoles
     participants = models.ManyToManyField(UserModel, through=MeetingRoles)
+
+    @cached_property
+    def er_policy(self) -> ElectoralRegisterPolicy:
+        reg = get_electoral_policy_registry()
+        return reg[self.er_policy_name](self)
 
     def get_latest_er(self) -> ElectoralRegister:
         return (
@@ -92,6 +99,9 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
             if obj:
                 yield obj  # All of them are 1-1 relations
 
+    def valid_er_policy_guard(self) -> bool:
+        return self.er_policy_name in get_electoral_policy_registry()
+
     @transition(
         field=state,
         source=MeetingWf.ONGOING,
@@ -106,6 +116,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         source=[MeetingWf.UPCOMING, MeetingWf.CLOSED],
         target=MeetingWf.ONGOING,
         permission=MeetingPermissions.MODERATE,
+        conditions=[valid_er_policy_guard],
     )
     def ongoing(self):
         self.start_time = timezone.now()

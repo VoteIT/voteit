@@ -9,7 +9,7 @@ class MeetingTests(TestCase):
         return Meeting
 
     def test_workflow_transitions(self):
-        meeting = self.Meeting.objects.create()
+        meeting = self.Meeting.objects.create(er_policy_name="auto_before_poll")
         meeting.ongoing()
         meeting.upcoming()
         meeting.ongoing()
@@ -24,10 +24,8 @@ class MeetingTests(TestCase):
     def test_er_policy(self):
         from voteit.poll.app.er_policys.auto_before_poll import AutoBeforePoll
 
-        meeting = self.Meeting.objects.create()
-        er_policy = AutoBeforePoll.objects.create()
-        meeting.er_policy = er_policy
-        self.assertEqual(er_policy, meeting.er_policy)
+        meeting = self.Meeting.objects.create(er_policy_name=AutoBeforePoll.name)
+        self.assertIsInstance(meeting.er_policy, AutoBeforePoll)
 
     def test_get_latest_er(self):
         from voteit.poll.models import ElectoralRegister
