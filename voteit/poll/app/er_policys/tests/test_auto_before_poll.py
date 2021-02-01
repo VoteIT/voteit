@@ -8,17 +8,13 @@ class AutoBeforePollTests(TestCase):
         from voteit.poll.models import Poll
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-        from voteit.poll.app.polls.simple import Simple
 
-        self.meeting = Meeting.objects.create()
-        self.meeting.er_policy = self.ABF.objects.create()
+        self.meeting = Meeting.objects.create(er_policy_name=self.ABF.name)
         self.user1 = User.objects.create(username="one")
         self.user2 = User.objects.create(username="two")
         self.meeting.add_roles(self.user1, ROLE_POTENTIAL_VOTER)
         self.meeting.add_roles(self.user2, ROLE_POTENTIAL_VOTER)
-        self.poll = Poll.objects.create(
-            meeting=self.meeting, method_name="simple"
-        )
+        self.poll = Poll.objects.create(meeting=self.meeting, method_name="simple")
 
     @property
     def ABF(self):

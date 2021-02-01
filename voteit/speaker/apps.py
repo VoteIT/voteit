@@ -11,5 +11,6 @@ class SpeakerConfig(AppConfig):
         from voteit.speaker import roles
         from voteit.speaker import signals
         from voteit.speaker import messages
+        from voteit.speaker import rest_api
         from voteit.speaker.app.list_methods import register
         register()

@@ -18,13 +18,14 @@ logger = getLogger(__name__)
 
 @er_policy
 class AutoBeforePoll(ElectoralRegisterPolicy):
-    """ Create an electoral register when a poll enters upcoming or ongoing state,
-        if it's needed. Set the latest created register for that poll and any other upcoming.
+    """Create an electoral register when a poll enters upcoming or ongoing state,
+    if it's needed. Set the latest created register for that poll and any other upcoming.
 
-        Polls must have a meeting relation for this to work, since the electoral register
-        is created from Meeting.potential_voters
+    Polls must have a meeting relation for this to work, since the electoral register
+    is created from Meeting.potential_voters
     """
 
+    name = "auto_before_poll"
     title = _("Automatic before poll")
 
     def apply(self, poll: Poll):
@@ -76,5 +77,5 @@ def handle_poll_state_change(
             # This method isn't runnable if poll isn't attached to a meeting
             # Normally this would never happen, but during tests it will...
             return
-        if isinstance(meeting.er_policy, AutoBeforePoll):
+        if meeting.er_policy_name == AutoBeforePoll.name:
             meeting.er_policy.apply(instance)

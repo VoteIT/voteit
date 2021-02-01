@@ -97,7 +97,7 @@ class SetActiveList(ListMessage):
     def run_job(self):
         self.assert_perm()
         system = self.context.list_system
-        if system.active_list != self.context:
+        if not self.context.is_active_list:
             if system.active_list and system.active_list.current is not None:
                 raise ValidationErrorMsg.from_message(
                     self,
@@ -145,7 +145,8 @@ class StartSpeakerInList(ModeratorListMessage):
                 ],
             )
         else:
-            speaker.start()
+            self.context.start_speaker(speaker)
+            self.context.signal_list_updated()
             msg = TextResponse.from_message(self, msg=_("Started"))
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg
@@ -187,7 +188,8 @@ class StopSpeakerInList(ModeratorListMessage):
                     }
                 ],
             )
-        speaker.stop()
+        self.context.stop_speaker()
+        self.context.signal_list_updated()
         msg = TextResponse.from_message(self, msg=_("Stopped"))
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg

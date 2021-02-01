@@ -6,9 +6,15 @@ from .models import *
 
 @admin.register(SpeakerListSystem)
 class SLSystemAdmin(admin.ModelAdmin):
-    pass
+    list_display = ("title", "meeting", "method_name")
+    list_filter = ("meeting", "method_name")
+    autocomplete_fields = ("meeting",)
+    search_fields = (
+        "title",
+        "meeting",
+    )
 
 
 @admin.register(SpeakerList)
 class SLAdmin(FSMTransitionMixin, admin.ModelAdmin):
-    fsm_field = 'state'
+    fsm_field = "state"

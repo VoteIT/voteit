@@ -135,7 +135,7 @@ class SpeakerListSetActiveTests(TestCase):
         self.system.active_list = other_list
         self.system.save()
         other_speaker = other_list.speaker_items.create(user=self.user)
-        other_speaker.start()
+        other_list.start_speaker(other_speaker)
         msg = self._mk_one()
         self.assertRaises(ValidationErrorMsg, msg.run_job)
 
@@ -177,7 +177,7 @@ class StartSpeakerInListTests(TestCase):
         self.assertEqual(self.list.current, self.speaker)
 
     def test_start_speaker_already_started(self):
-        self.speaker.start()
+        self.list.start_speaker(self.speaker)
         self.assertIsNotNone(self.list.current)
         msg = self._mk_one()
         self.assertRaises(ValidationErrorMsg, msg.run_job)
@@ -185,7 +185,7 @@ class StartSpeakerInListTests(TestCase):
     def test_start_speaker_someone_else_speaking(self):
         new_user = User.objects.create(username="new_speaker")
         new_speaker = self.list.speaker_items.create(user=new_user)
-        new_speaker.start()
+        self.list.start_speaker(new_speaker)
         self.assertEqual(new_speaker, self.list.current)
         msg = self._mk_one()
         msg.run_job()
@@ -210,7 +210,7 @@ class StopSpeakerInListTests(TestCase):
         self.system.save()
         self.user = User.objects.create(username="jane")
         self.speaker = self.list.speaker_items.create(user=self.user)
-        self.speaker.start()
+        self.list.start_speaker(self.speaker)
         self.list.refresh_from_db()
         self.moderator = User.objects.create(username="moderator")
         self.system.add_roles(self.user, "speaker")
@@ -236,7 +236,7 @@ class StopSpeakerInListTests(TestCase):
         self.assertEqual(1, self.speaker.seconds)
 
     def test_stop_speaker_no_current_speaker(self):
-        self.speaker.stop()
+        self.list.stop_speaker()
         msg = self._mk_one()
         self.assertRaises(ValidationErrorMsg, msg.run_job)
 

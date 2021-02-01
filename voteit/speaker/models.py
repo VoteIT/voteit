@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Optional, Type, Dict, Union
 
@@ -81,7 +82,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         ),
         choices=[(x, str(x)) for x in range(3)],
         null=True,
-        blank=True
+        blank=True,
     )
     active_list = models.OneToOneField(
         "SpeakerList",
@@ -135,6 +136,12 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     # Type hinting
     objects = models.Manager()
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self.pk}>"
+
+    def __str__(self):
+        return self.title[:30]
+
 
 class Speaker(models.Model):
     """Information about a user who's entered a speaker list."""
@@ -178,36 +185,14 @@ class Speaker(models.Model):
         """ The definition of being in the queue is that order is set to a number"""
         return self.order is not None
 
-    def start(self):
-        """ Remove from queue (order) and set a timestamp. """
-        if self.started is None:
-            if self.list.current is not None:
-                self.list.current.stop()
-            self.order = None
-            self.started = now()
-            self.save()
-            self.list.current = self
-            self.list.save()
-            # Since order might not have changed, we still need an update here
-            self.list.reorder(force_signal=True)
-        else:  # pragma: no coverage
-            # FIXME: Something...?
-            raise ValueError()
-
-    def stop(self):
-        """End this speaker."""
-        if self.list.current == self and self.started is not None:
-            end_td = now() - self.started
-            end_secs = end_td.seconds
-            if not end_secs:
-                end_secs = 1
-            self.seconds = end_secs
-            self.save()
-            self.list.current = None
-            self.list.save()
-
     # Type hinting
     objects = models.Manager()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self.pk}>"
+
+    def __str__(self):
+        return f"Speaker id {self.pk}"
 
 
 class SpeakerList(models.Model):
@@ -239,7 +224,9 @@ class SpeakerList(models.Model):
     @property
     def is_active_list(self) -> bool:
         """ Is this the currently active list? """
-        return self.list_system.active_list == self
+        with suppress(SpeakerListSystem.DoesNotExist):
+            return self.active_in_system is not None
+        return False
 
     @transition(
         field=state,
@@ -316,5 +303,36 @@ class SpeakerList(models.Model):
             "created"
         )
 
+    def start_speaker(self, speaker: Speaker) -> None:
+        """Start a a specific user in the queue, or first user"""
+        if speaker := speaker or self.speakers_qs().first():
+            if speaker.started is None:
+                self.stop_speaker()
+                speaker.order = None
+                speaker.started = now()
+                speaker.save()
+                self.current = speaker
+                self.save()
+            else:  # pragma: no coverage
+                # FIXME: Something...?
+                raise ValueError()
+
+    def stop_speaker(self) -> None:
+        """Stop current speaker and set spoken time"""
+        if speaker := self.current:
+            end_td = now() - speaker.started
+            speaker.seconds = end_td.seconds or 1
+            speaker.save()
+            self.current = None
+            self.save()
+
     # Type hinting
     objects = models.Manager()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self.title[:50]}>"
+
+    def __str__(self):
+        if self.title:
+            return self.title[:50]
+        return f"Speaker list {self.pk}"

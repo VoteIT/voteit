@@ -9,16 +9,14 @@ class RulesTests(TestCase):
         from voteit.meeting.roles import ROLE_PARTICIPANT
         from voteit.meeting.roles import ROLE_PROPOSER
 
-        self.meeting = Meeting.objects.create()
+        self.meeting = Meeting.objects.create(er_policy_name="auto_before_poll")
         self.anon_user = User.objects.create(username="anon")
         self.participant = User.objects.create(username="participant")
         self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
         self.proposer = User.objects.create(username="proposer")
-        self.proposer_author = User.objects.create(
-            username="proposer_author"
-        )
+        self.proposer_author = User.objects.create(username="proposer_author")
         self.meeting.add_roles(self.proposer, ROLE_PROPOSER)
         self.meeting.add_roles(self.proposer_author, ROLE_PROPOSER)
         self.ai = self.meeting.agenda_items.create()

@@ -194,7 +194,6 @@ class Roles(ABCModel):
 
 
 class BaseContent(ABCModel):
-    title: str = models.CharField(max_length=200)
     body: str = models.TextField(blank=True, default="")
     created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
     author: User = models.ForeignKey(
@@ -217,7 +216,9 @@ class BaseContent(ABCModel):
         related_name="mentions_%(app_label)s_%(class)s",
         editable=False,
     )
-    tags: List = ArrayField(models.CharField(max_length=100), default=list, editable=False)
+    tags: List = ArrayField(
+        models.CharField(max_length=100), default=list, editable=False
+    )
 
     class Meta:
         abstract = True

@@ -6,7 +6,8 @@ class RulesTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
-        self.meeting = Meeting.objects.create()
+
+        self.meeting = Meeting.objects.create(er_policy_name="auto_before_poll")
         self.anon_user = User.objects.create(username="anon")
         self.participant = User.objects.create(username="participant")
         self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
@@ -18,6 +19,7 @@ class RulesTests(TestCase):
 
     def p(self, perm):
         from voteit.agenda.permissions import AgendaPermissions
+
         return getattr(AgendaPermissions, perm)
 
     def _archive(self):

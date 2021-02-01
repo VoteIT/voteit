@@ -13,6 +13,7 @@ __all__ = ("AgendaItem",)
 
 
 class AgendaItem(BaseContent, MeetingContext):
+    title: str = models.CharField(max_length=100)
     state = FSMField(
         default=AgendaItemWf.initial,
         choices=AgendaItemWf.choices(),
