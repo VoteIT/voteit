@@ -136,6 +136,12 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     # Type hinting
     objects = models.Manager()
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self.pk}>"
+
+    def __str__(self):
+        return self.title[:30]
+
 
 class Speaker(models.Model):
     """Information about a user who's entered a speaker list."""
@@ -179,34 +185,14 @@ class Speaker(models.Model):
         """ The definition of being in the queue is that order is set to a number"""
         return self.order is not None
 
-    # def start(self):
-    #     """ Remove from queue (order) and set a timestamp. """
-    #     if self.started is None:
-    #         if self.list.current is not None:
-    #             self.list.current.stop()
-    #         self.order = None
-    #         self.started = now()
-    #         self.save()
-    #         self.list.current = self
-    #         self.list.save()
-    #     else:  # pragma: no coverage
-    #         # FIXME: Something...?
-    #         raise ValueError()
-
-    # def stop(self):
-    #     """End this speaker."""
-    #     if self.list.current == self and self.started is not None:
-    #         end_td = now() - self.started
-    #         end_secs = end_td.seconds
-    #         if not end_secs:
-    #             end_secs = 1
-    #         self.seconds = end_secs
-    #         self.save()
-    #         self.list.current = None
-    #         self.list.save()
-
     # Type hinting
     objects = models.Manager()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self.pk}>"
+
+    def __str__(self):
+        return f"Speaker id {self.pk}"
 
 
 class SpeakerList(models.Model):
@@ -342,3 +328,9 @@ class SpeakerList(models.Model):
 
     # Type hinting
     objects = models.Manager()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self.title[:50]}>"
+
+    def __str__(self):
+        return self.title[:50]
