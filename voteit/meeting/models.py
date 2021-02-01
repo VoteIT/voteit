@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import timedelta
-from typing import TYPE_CHECKING, Generator
+from datetime import timedelta, datetime
+from typing import TYPE_CHECKING, Generator, Optional
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from voteit.access_policy.models import AccessPolicy
     from voteit.poll.models import ElectoralRegister
     from voteit.poll.abcs import ElectoralRegisterPolicy
-
+    from voteit.organisation.models import Organisation
 
 __all__ = "Meeting", "MeetingRoles"
 
@@ -48,32 +48,32 @@ class MeetingRoles(Roles, MeetingContext):
 
 
 class Meeting(BaseContent, RoleContextMixin, MeetingContext):
-    state = FSMField(
+    state: str = FSMField(
         default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False
     )
-    start_time = models.DateTimeField(
+    start_time: Optional[datetime] = models.DateTimeField(
         verbose_name=_("When the meeting starts/started."), null=True, blank=True
     )
-    end_time = models.DateTimeField(
+    end_time: Optional[datetime] = models.DateTimeField(
         verbose_name=_("When the meeting ends/ended."), null=True, blank=True
     )
-    public = models.BooleanField(
+    public: bool = models.BooleanField(
         verbose_name=_("Is this meeting viewable by anyone?"), default=False
     )
-    er_policy_name = models.CharField(
+    er_policy_name: Optional[str] = models.CharField(
         verbose_name=_("ID of used electoral policy"),
         max_length=30,
         null=True,
         blank=True,
     )
-    organisation = models.ForeignKey(
+    organisation: Optional[Organisation] = models.ForeignKey(
         "organisation.Organisation",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name="meetings",
     )
-    archive_after = models.DateTimeField(null=True, editable=False)
+    archive_after: Optional[datetime] = models.DateTimeField(null=True, editable=False)
 
     roles_cls = MeetingRoles
     participants = models.ManyToManyField(UserModel, through=MeetingRoles)
