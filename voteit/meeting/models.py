@@ -48,6 +48,7 @@ class MeetingRoles(Roles, MeetingContext):
 
 
 class Meeting(BaseContent, RoleContextMixin, MeetingContext):
+    title: str = models.CharField(max_length=100)
     state: str = FSMField(
         default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False
     )

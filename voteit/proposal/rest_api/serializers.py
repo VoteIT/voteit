@@ -6,12 +6,34 @@ from voteit.proposal import models
 class ProposalListSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Proposal
-        fields = "url", "pk", "title", "state", "agenda_item", "author", "polls"
+        fields = (
+            "url",
+            "pk",
+            "body",
+            "state",
+            "agenda_item",
+            "author",
+            "polls",
+            "prop_id",
+        )
 
 
 class ProposalDetailSerializer(BaseModelSerializer):
     # Note: This won't have access to the request, so no url thingies here!
 
     class Meta(ProposalListSerializer.Meta):
-        fields = "pk", "title", "body", "state", "agenda_item", "author", "polls",
-        read_only_fields = "state", "author", "polls",
+        fields = (
+            "pk",
+            "body",
+            "state",
+            "agenda_item",
+            "author",
+            "polls",
+            "prop_id",
+        )
+        read_only_fields = (
+            "state",
+            "author",
+            "polls",
+            "prop_id",
+        )

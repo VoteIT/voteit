@@ -122,7 +122,7 @@ class PollTests(TestCase):
         self.poll.close()
         self.assertEqual(
             self.poll.result.dict(),
-            {"yes": 2, "no": 0, "approved": [prop.pk], "denied": []}
+            {"yes": 2, "no": 0, "approved": [prop.pk], "denied": []},
         )
 
     def test_votes_from_non_voters_removed_on_close(self):
@@ -145,7 +145,7 @@ class PollTests(TestCase):
         self.assertNotIn(vote2, votes)
         self.assertEqual(
             self.poll.result.dict(),
-            {"yes": 1, "no": 0, "approved": [prop.pk], "denied": []}
+            {"yes": 1, "no": 0, "approved": [prop.pk], "denied": []},
         )
 
     def test_abstentions(self):
@@ -158,7 +158,7 @@ class PollTests(TestCase):
         self.poll.close()
         self.assertEqual(
             self.poll.result.dict(),
-            {"yes": 1, "no": 0, "approved": [prop.pk], "denied": []}
+            {"yes": 1, "no": 0, "approved": [prop.pk], "denied": []},
         )
         self.assertEqual(1, self.poll.abstains)
 
@@ -174,13 +174,14 @@ class PollTests(TestCase):
         self.assertEqual(
             # "81567db4add4931106515ce10f9c5c6025765de626c1c13d60bf550d428e2fdf66e48b06a62b4462c50abe5eff1e1dc99f3dd440687a3d3b9ea375201e094e30",
             self.poll.ballot_checksum,
-            "062cb36e77dd5f6c5d7fb29b96b43d2c54a7f993d37c1887e987acb47f3b03d80dd3e95a30e4197946264234595bd503782114deb1ce2d84aca0e674ab68d76f"
+            "062cb36e77dd5f6c5d7fb29b96b43d2c54a7f993d37c1887e987acb47f3b03d80dd3e95a30e4197946264234595bd503782114deb1ce2d84aca0e674ab68d76f",
         )
         self.assertEqual('{"no": 1, "yes": 1}', self.poll.ballot_data)
         self.assertTrue(self.poll.verify_checksum())
 
     def test_proposal_state_exceptions(self):
         from voteit.proposal.workflows import ProposalWf
+
         prop = self.poll.proposals.create()
         prop.approved()
         prop.save()
@@ -194,7 +195,7 @@ class PollTests(TestCase):
         self.assertEqual(
             self.poll.proposals.get().state,
             ProposalWf.APPROVED,
-            "Proposal state must not have changed automatically from approved."
+            "Proposal state must not have changed automatically from approved.",
         )
 
 
@@ -236,9 +237,7 @@ class VoteWeightTests(TestCase):
         )
 
     def test_poll_result(self):
-        prop = self.poll.proposals.create(
-            title="Abc123", body="I propose!"
-        )
+        prop = self.poll.proposals.create(body="I propose!")
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.votes.create(user=self.user1, vote_data="yes")
@@ -247,7 +246,7 @@ class VoteWeightTests(TestCase):
         self.poll.close()
         self.assertEqual(
             self.poll.result.dict(),
-            {"yes": 2, "no": 3, "approved": [], "denied": [prop.pk]}
+            {"yes": 2, "no": 3, "approved": [], "denied": [prop.pk]},
         )
 
     def test_get_voter_weight(self):

@@ -30,6 +30,7 @@ class MotionProcessRoles(Roles):
 
 
 class MotionProcess(BaseContent, RoleContextMixin):
+    title: str = models.CharField(max_length=100)
     state = FSMField(
         default=MotionProcessWf.initial,
         choices=MotionProcessWf.choices(),
@@ -80,6 +81,8 @@ class MotionProcess(BaseContent, RoleContextMixin):
 
 
 class Motion(BaseContent):
+    title: str = models.CharField(max_length=100)
+
     state = FSMField(
         default=MotionWf.initial, choices=MotionWf.choices(), protected=True
     )
@@ -98,13 +101,11 @@ class Motion(BaseContent):
         permission=MP.SUBMIT,
     )
     def submit(self):
-        """ User submits their motion.
-        """
+        """User submits their motion."""
 
     @transition(field=state, target=MotionWf.PUBLISHED, permission=MP.MANAGE)
     def publish(self):
-        """ Moderator publishes a motion.
-        """
+        """Moderator publishes a motion."""
 
     @transition(
         field=state,
@@ -113,8 +114,7 @@ class Motion(BaseContent):
         permission=MP.RETRACT,
     )
     def retract(self):
-        """ User or moderator retracts the motion.
-        """
+        """User or moderator retracts the motion."""
 
     @transition(
         field=state,
@@ -154,8 +154,8 @@ class Motion(BaseContent):
 
 
 class MotionProposal(models.Model):
-    """ Lightweight version of the proposal model. This is only used within the context of the motion.
-        It's used as a template to create a motion later on.
+    """Lightweight version of the proposal model. This is only used within the context of the motion.
+    It's used as a template to create a motion later on.
     """
 
     motion = models.ForeignKey(

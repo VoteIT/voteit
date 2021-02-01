@@ -333,4 +333,6 @@ class SpeakerList(models.Model):
         return f"<{self.__class__.__name__}: {self.title[:50]}>"
 
     def __str__(self):
-        return self.title[:50]
+        if self.title:
+            return self.title[:50]
+        return f"Speaker list {self.pk}"

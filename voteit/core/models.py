@@ -20,8 +20,7 @@ class RoleContextMixin(ABCModel):
     @property
     @abstractmethod
     def roles_cls(self) -> Roles:
-        """ Return the Roles class that this context uses.
-        """
+        """Return the Roles class that this context uses."""
 
     def add_roles(self, user: AbstractUser, *roles: Role) -> Optional[Set[Role]]:
         assert isinstance(user, AbstractUser)
@@ -80,7 +79,7 @@ class RoleContextMixin(ABCModel):
                 raise ValueError(f"{role} is not a str or Role object")
         return r
 
-    def filter_valid_roles(self, *roles:Union[Role, str]) -> Set[str]:
+    def filter_valid_roles(self, *roles: Union[Role, str]) -> Set[str]:
         items = self.roles_to_strings(*roles)
         return set([x for x in items if x in self.roles_cls.valid_roles])
 
@@ -103,8 +102,7 @@ class Roles(ABCModel):
     @property
     @abstractmethod
     def context(self) -> models.Model:
-        """ Create a ForeignKey relation to the model that acts as context for this roleset. For instance Meeting
-        """
+        """Create a ForeignKey relation to the model that acts as context for this roleset. For instance Meeting"""
 
     class Meta:
         abstract = True
@@ -171,8 +169,7 @@ class Roles(ABCModel):
 
     @classmethod
     def add_valid(cls, *roles: Role):
-        """ Assign a Role instance as a valid choice here.
-        """
+        """Assign a Role instance as a valid choice here."""
         for role in roles:
             assert isinstance(role, Role)
             assert (
@@ -190,7 +187,7 @@ class Roles(ABCModel):
 
 
 class BaseContent(ABCModel):
-    title = models.CharField(max_length=200)
+    # title = models.CharField(max_length=200)
     body = models.TextField(blank=True, default="")
     created = models.DateTimeField(editable=False, auto_now_add=True)
     author = models.ForeignKey(
