@@ -215,8 +215,9 @@ class BaseContent(ABCModel):
     mentions = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name="mentions_%(app_label)s_%(class)s",
+        editable=False,
     )
-    tags: List = ArrayField(models.CharField(max_length=100), default=list)
+    tags: List = ArrayField(models.CharField(max_length=100), default=list, editable=False)
 
     class Meta:
         abstract = True
