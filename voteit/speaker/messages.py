@@ -97,7 +97,7 @@ class SetActiveList(ListMessage):
     def run_job(self):
         self.assert_perm()
         system = self.context.list_system
-        if self.context.is_active_list:
+        if not self.context.is_active_list:
             if system.active_list and system.active_list.current is not None:
                 raise ValidationErrorMsg.from_message(
                     self,
