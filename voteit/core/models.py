@@ -250,7 +250,7 @@ class BaseContent(ABCModel):
         self.set_mentions()
 
     def __repr__(self):
-        return f"<{self.__class__.__name__}: {self.title[:50]}>"
+        return f"<{self.__class__.__name__}: {self}>"
 
     def __str__(self):
-        return self.title[:50]
+        return getattr(self, 'title', self.body)[:50]
