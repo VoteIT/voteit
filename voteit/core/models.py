@@ -16,7 +16,7 @@ from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_tags
 from voteit.core.utils import get_mentions
-from voteit.core.utils import html_should_be_escaped
+from voteit.core.utils import strict_clean_html
 
 User = get_user_model()
 
@@ -223,13 +223,19 @@ class BaseContent(ABCModel):
     class Meta:
         abstract = True
 
+    def html_cleaner(self, text):
+        # FIXME: Override in a better way
+        return strict_clean_html(text)
+
     def set_tags(self):
+        # FIXME: Should be generic
         current_tags = set(self.tags)
         tags = get_tags(self.body)
         if tags != current_tags:
             self.tags = sorted(tags)
 
     def set_mentions(self):
+        # FIXME: Should be generic
         mentions = get_mentions(self.body)
         current_user_pks = set(self.mentions.all().values_list("pk", flat=True))
         if mentions != current_user_pks:
@@ -238,8 +244,7 @@ class BaseContent(ABCModel):
             self.mentions.set(result)
 
     def save(self, **kw):
-        if html_should_be_escaped(self.body):
-            raise ValueError("body can't contain unescaped chars")
+        self.body = self.html_cleaner(self.body)
         self.set_tags()
         super().save(**kw)
         self.set_mentions()

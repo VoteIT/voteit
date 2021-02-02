@@ -1,6 +1,9 @@
 import re
 from typing import Set
 
+from bleach import Cleaner, ALLOWED_TAGS
+
+
 _tag_pattern = re.compile(r"#([\w\-]+)")
 # FIXME: Do a proper regex. I'm crappy with this /rho
 _userid_pattern = re.compile(r"@([\w\d]+)")
@@ -58,10 +61,22 @@ def get_mentions(text: str) -> Set[int]:
     return res
 
 
-def html_should_be_escaped(text: str) -> bool:
-    """Simple match for dangerous things.
-    >>> html_should_be_escaped("Hello<script>")
-    True
+def strict_clean_html(text: str):
     """
-    # FIXME: Match any other chars? Like & but not &amp;
-    return "<" in text or ">" in text
+    Clean HTML for non-trusted users, for instance anonymous.
+
+    >>> strict_clean_html('<a href="javascript:1+1">Hi</a>')
+    '<a>Hi</a>'
+
+    """
+    # The cleaner instance isn't thread-safe
+    # https://bleach.readthedocs.io/en/latest/clean.html
+    cleaner = Cleaner(strip=False)
+    # FIXME: Implement
+    return cleaner.clean(text)
+
+
+def relaxed_clean_html(text: str):
+    """ Clean HTML for moderators and trusted users. Note that trusted users may have viruses too..."""
+    # FIXME: Implement
+    raise NotImplementedError()
