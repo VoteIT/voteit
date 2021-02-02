@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING, Optional, List
 from django.dispatch import receiver
 from pydantic import validator, BaseModel
 
-from voteit.messaging.abcs import BaseOutgoingMessage, DeferredJob, AsyncRunnable, BaseIncomingMessage
+from voteit.messaging.abcs import (
+    BaseOutgoingMessage,
+    DeferredJob,
+    AsyncRunnable,
+    BaseIncomingMessage,
+)
 from voteit.messaging.messages.progress import ProgressNum
 from voteit.messaging.models import Connection
 from voteit.messaging.registries import incoming_messages, outgoing_messages
@@ -83,7 +88,7 @@ class Count(BaseIncomingMessage, DeferredJob):
         if self.data.fail:
             text += f" ...But fail at {fail}"
         msg = ProgressNum.from_message(self, curr=0, total=num, msg=text)
-        msg.send_outgoing(self.mm.consumer_name, state=self.RUNNING)
+        msg.send_outgoing(self.mm.consumer_name, state=self.RUNNING, on_commit=False)
         sleep(1)
         for i in range(1, num):
             if fail and fail == i:
@@ -94,7 +99,9 @@ class Count(BaseIncomingMessage, DeferredJob):
                 return
             else:
                 msg = ProgressNum.from_message(self, curr=i, total=num)
-                msg.send_outgoing(self.mm.consumer_name, state=self.RUNNING)
+                msg.send_outgoing(
+                    self.mm.consumer_name, state=self.RUNNING, on_commit=False
+                )
             sleep(1)
         msg = ProgressNum.from_message(self, curr=num, total=num, msg="All done!")
         msg.send_outgoing(self.mm.consumer_name, success=True)
