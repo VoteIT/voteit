@@ -49,20 +49,13 @@ class MeetingViewSet(
         return self.queryset.filter(participants=self.request.user)
 
 
-class MeetingRolesViewSet(
-        SerializerClassesMixin,
-        viewsets.ModelViewSet,
-):
+class MeetingRolesViewSet(viewsets.ReadOnlyModelViewSet):
     model = MeetingRoles
     queryset = MeetingRoles.objects.all()
-    serializer_classes = {
-        'add_role': serializers.RoleSerializer,
-        'remove_role': serializers.RoleSerializer,
-        'create': serializers.MeetingAddParticipantSerializer,
-    }
     serializer_class = serializers.MeetingRolesSerializer
-    filter_backends = DjangoFilterBackend,
+    filter_backends = DjangoFilterBackend, SearchFilter,
     filter_class = UserPkFilter
+    search_fields = '^user__first_name', '^user__last_name',
     permission_classes = permissions.IsAuthenticated,
 
     def get_queryset(self):
@@ -72,43 +65,3 @@ class MeetingRolesViewSet(
         return self.queryset.filter(
             context__participants=self.request.user,
         )
-
-    def create(self, request):
-        """ Gets or creates role using meeting_id and user_id
-            Returns using MeetingRolesSerializer()
-        """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        roles, created = MeetingRoles.objects.get_or_create(
-            context_id = serializer.data.get('meeting_id'),
-            user_id = serializer.data.get('user_id'),
-        )
-        serializer = serializers.MeetingRolesSerializer(roles)
-        headers = self.get_success_headers(serializer.data)
-        if created:
-            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-        return Response(serializer.data, headers=headers)
-
-    # TODO Permissions
-    @action(methods=['post'], detail=True, url_path='add-role')
-    def add_role(self, request, pk):
-        instance: MeetingRoles = self.get_object()
-        role_serializer = self.get_serializer(data=request.data)
-        role_serializer.is_valid(raise_exception=True)
-        role_name = role_serializer.data['role']
-        instance.add(role_name)
-        return Response(serializers.MeetingRolesSerializer(instance=instance).data)
-
-    # TODO Permissions
-    @action(methods=['post'], detail=True, url_path='remove-role')
-    def remove_role(self, request, pk):
-        instance: MeetingRoles = self.get_object()
-        role_serializer = self.get_serializer(data=request.data)
-        role_serializer.is_valid(raise_exception=True)
-        role_name = role_serializer.data['role']
-        if instance.user == request.user and role_name == 'moderator':
-            return Response({
-                'role': ['Removing yourself as moderator is not allowed.']
-            }, status=400)
-        instance.remove(role_name)
-        return Response(serializers.MeetingRolesSerializer(instance=instance).data)
