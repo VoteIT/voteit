@@ -1,5 +1,3 @@
-import html
-
 from django.contrib.auth.models import User
 from django.dispatch import receiver
 from django.test import TestCase
@@ -131,40 +129,29 @@ class RolesTests(TestCase):
         )
 
 
-# class BaseContentTests(TestCase):
-#     def setUp(self):
-#         # Testing abstract model through meeting model
-#         from voteit.meeting.models import Meeting
-#
-#         self.meeting = Meeting.objects.create()
-#         self.user = User.objects.create(username="ivan")
-#
-#     def test_body_mentions(self):
-#         self.assertFalse(self.meeting.mentions.filter(pk=self.user.pk).exists())
-#         self.meeting.body = f"Hello @{self.user.pk} what's up?"
-#         self.meeting.save()
-#         self.assertTrue(self.meeting.mentions.filter(pk=self.user.pk).exists())
-#
-#     def test_body_mentions_with_nonexisting_user(self):
-#         # Shouldn't kill setting text
-#         deleted_pk = self.user.pk
-#         self.user.delete()
-#         self.meeting.body = f"I used to know @{deleted_pk} once"
-#         self.meeting.save()
-#         self.assertFalse(self.meeting.mentions.count())
-#
-#     def test_body_tags(self):
-#         self.meeting.body = f"#SUP all #participants? #KörVi!"
-#         self.meeting.save()
-#         self.assertEqual(["körvi", "participants", "sup"], self.meeting.tags)
-#
-#     def test_body_with_html(self):
-#         self.meeting.body = "Hello <script>alert('hello')</script>"
-#         with self.assertRaises(ValueError):
-#             self.meeting.save()
-#
-#     def test_body_with_escaped_html(self):
-#         txt = html.escape("Hello <script>alert('hello')</script>")
-#         self.meeting.body = txt
-#         self.meeting.save()
-#         self.assertNotIn("<", self.meeting.body)
+class BaseContentTests(TestCase):
+    def setUp(self):
+        # Testing abstract model through meeting model
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        self.user = User.objects.create(username="ivan")
+
+    def test_body_mentions(self):
+        self.assertFalse(self.meeting.mentions.filter(pk=self.user.pk).exists())
+        self.meeting.body = f"Hello <a data-userid='{self.user.pk}'/> what's up?"
+        self.meeting.save()
+        self.assertTrue(self.meeting.mentions.filter(pk=self.user.pk).exists())
+
+    def test_body_mentions_with_nonexisting_user(self):
+        # Shouldn't kill setting text
+        deleted_pk = self.user.pk
+        self.user.delete()
+        self.meeting.body = f"I used to know <a data-userid='{deleted_pk}'/> once"
+        self.meeting.save()
+        self.assertFalse(self.meeting.mentions.count())
+
+    def test_body_tags(self):
+        self.meeting.body = f"<a data-tag>#SUP</a> all <a data-tag>#participants</a>? <a data-tag>#KörVi</a>!"
+        self.meeting.save()
+        self.assertEqual(["körvi", "participants", "sup"], self.meeting.tags)
