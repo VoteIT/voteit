@@ -24,6 +24,7 @@ class ProposalDetailSerializer(BaseModelSerializer):
     class Meta(ProposalListSerializer.Meta):
         fields = (
             "pk",
+            "created",
             "body",
             "state",
             "agenda_item",
@@ -33,6 +34,7 @@ class ProposalDetailSerializer(BaseModelSerializer):
             "tags",
         )
         read_only_fields = (
+            "created",
             "state",
             "author",
             "polls",

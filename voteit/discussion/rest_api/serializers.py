@@ -16,4 +16,15 @@ class DiscussionPostDetailSerializer(BaseModelSerializer):
     # Note: This won't have access to the request, so no url thingies here!
     class Meta:
         model = models.DiscussionPost
-        fields = "pk", "body", "agenda_item", "author"
+        fields = (
+            "pk",
+            "created",
+            "body",
+            "agenda_item",
+            "author",
+            "tags",
+        )
+        read_only_fields = (
+            "created",
+            "author",
+        )
