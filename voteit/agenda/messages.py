@@ -29,6 +29,7 @@ class AddAgendaItem(BaseAddObject):
     permission = AgendaPermissions.ADD
     model = Meeting  # This is the context for the action!
     add_model = AgendaItem
+    relation_queryset_attribute = "agenda_items"
 
 
 @incoming

@@ -35,6 +35,7 @@ class AddPresence(BaseAddObject):
     permission = PresencePermissions.ADD
     model = PresenceCheck
     add_model = Presence
+    relation_queryset_attribute = "presences"
 
     def run_job(self):
         self.assert_perm(msg=_("You're not allowed to set yourself as present here."))
@@ -73,6 +74,7 @@ class AddUserPresence(BaseAddObject):
     permission = PresenceCheckPermissions.CHANGE
     model = PresenceCheck
     add_model = Presence
+    relation_queryset_attribute = "presences"
 
     def run_job(self):
         self.assert_perm(msg=_("You're not allowed to change presence check."))
@@ -92,7 +94,9 @@ class AddUserPresence(BaseAddObject):
         else:
             raise ValidationErrorMsg.from_message(
                 self,
-                msg=_("User can't be present here. Perhaps that user isn't a participant?"),
+                msg=_(
+                    "User can't be present here. Perhaps that user isn't a participant?"
+                ),
                 errors=[{"loc": ("userid",), "msg": "Invalid", "type": "value.error"}],
             )
 

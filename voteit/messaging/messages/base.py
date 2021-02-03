@@ -59,21 +59,27 @@ class BaseAddObject(BaseObjectAction, ABC):
     @property
     @abstractmethod
     def add_model(self) -> Type[Model]:
-        """ The model used for creation of the added object.
-            note that cls.model is the context where it will be added.
+        """The model used for creation of the added object.
+        note that cls.model is the context where it will be added.
+        """
+
+    @property
+    @abstractmethod
+    def relation_queryset_attribute(self):
+        """Where on the context we want create the new object.
+        For instance, on agenda items the relation has the name 'proposals'
         """
 
     def run_job(self):
         self.assert_perm(
-            # FIXME: % interpolation done outside of gettext-object, see
-            # https://docs.djangoproject.com/en/3.1/topics/i18n/translation/#standard-translation
-            # Should be:
-            # msg=_("You're not allowed to add %(ctype)s here") % {"ctype": self.add_model}
-            msg=_("You're not allowed to add %(ctype)s here" % {"ctype": self.add_model})
+            msg=_("You're not allowed to add %(ctype)s here")
+            % {"ctype": self.add_model}
         )
+
         if issubclass(self.add_model, BaseContent):
             self.data.kwargs.setdefault("author", self.user)
-        self.add_model.objects.create(**self.data.kwargs)
+        relation = getattr(self.context, self.relation_queryset_attribute)
+        relation.create(**self.data.kwargs)
         response = TextResponse.from_message(self, msg="Added")
         response.send_outgoing(self.mm.consumer_name, success=True)
 

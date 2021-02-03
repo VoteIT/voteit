@@ -29,6 +29,7 @@ class AddProposal(BaseAddObject):
     permission = ProposalPermissions.ADD
     model = AgendaItem  # This is the context for the action!
     add_model = Proposal
+    relation_queryset_attribute = "proposals"
 
 
 @incoming

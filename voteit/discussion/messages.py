@@ -29,6 +29,7 @@ class AddDiscussionPost(BaseAddObject):
     permission = DiscussionPermissions.ADD
     model = AgendaItem  # This is the context for the action!
     add_model = DiscussionPost
+    relation_queryset_attribute = "discussions"
 
 
 @incoming
