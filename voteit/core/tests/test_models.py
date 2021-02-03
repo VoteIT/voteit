@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.dispatch import receiver
 from django.test import TestCase
+from voteit.core.testing import mk_usertag, mk_hashtag
 
 
 class RolesTests(TestCase):
@@ -139,7 +140,7 @@ class BaseContentTests(TestCase):
 
     def test_body_mentions(self):
         self.assertFalse(self.meeting.mentions.filter(pk=self.user.pk).exists())
-        self.meeting.body = f"Hello <a data-userid='{self.user.pk}'/> what's up?"
+        self.meeting.body = f"Hello {mk_usertag(self.user.pk)} what's up?"
         self.meeting.save()
         self.assertTrue(self.meeting.mentions.filter(pk=self.user.pk).exists())
 
@@ -147,11 +148,27 @@ class BaseContentTests(TestCase):
         # Shouldn't kill setting text
         deleted_pk = self.user.pk
         self.user.delete()
-        self.meeting.body = f"I used to know <a data-userid='{deleted_pk}'/> once"
+        self.meeting.body = f"I used to know {mk_usertag(deleted_pk)} once"
         self.meeting.save()
         self.assertFalse(self.meeting.mentions.count())
 
     def test_body_tags(self):
-        self.meeting.body = f"<a data-tag>#SUP</a> all <a data-tag>#participants</a>? <a data-tag>#KörVi</a>!"
+        self.meeting.body = f"{mk_hashtag('SUP')} all {mk_hashtag('participants')}? {mk_hashtag('KörVi')}!"
         self.meeting.save()
         self.assertEqual(["körvi", "participants", "sup"], self.meeting.tags)
+
+    def test_body_isnt_mangled_by_bleach(self):
+        text = f"{mk_hashtag('KörVi')}!"
+        self.meeting.body = text
+        self.meeting.save()
+        self.assertIn("class", text)
+        self.assertIn("<span", text)
+        self.assertIn("KörVi", text)
+        self.assertIn("data-index", text)
+        self.assertIn("data-index", text)
+        self.assertIn("data-value", text)
+        self.assertIn("data-id", text)
+        self.assertIn("data-denotation-char", text)
+        self.assertEqual(len(text), len(self.meeting.body))
+
+        # self.assertEqual(text, self.meeting.body)

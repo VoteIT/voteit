@@ -66,28 +66,36 @@ _userid_num_match = re.compile(r"^[\d]+$")
 
 def get_tagged_userids(text: str) -> Set:
     """
-    Userid tags look like: <a href data-userid="123"/> or
-    <a href data-userid="123">This part is ignored</a>
+    Userid tags look like:
+    <span class="mention" data-index="0" data-denotation-char="@" data-id="${userid}" data-value="${name}">
+        <span contenteditable="false">
+            <span class="ql-mention-denotation-char">@</span>
+            ${name}
+        </span>
+    </span>
 
-    >>> sorted(get_tagged_userids('<a href data-userid="123"/>'))
+    Since they're kind of long we'll use a helper for this test
+
+    >>> from voteit.core.testing import mk_usertag
+    >>> sorted(get_tagged_userids(mk_usertag(123)))
     [123]
 
-    >>> sorted(get_tagged_userids('<a href data-userid="abc"/>'))
+    >>> sorted(get_tagged_userids(mk_usertag("abc")))
     []
 
-    >>> sorted(get_tagged_userids('<a href data-userid="abc123"/>'))
+    >>> sorted(get_tagged_userids(mk_usertag("abc123")))
     []
 
-    >>> sorted(get_tagged_userids('<a href data-userid="1">Just ignore me</a> and <span><a data-userid="2"></a></span>'))
+    >>> sorted(get_tagged_userids(mk_usertag("1") + " and " + mk_usertag("2")))
     [1, 2]
-
-    >>> sorted(get_tagged_userids('<span data-userid="1">Just ignore me and my tag</span>'))
-    []
     """
     soup = BeautifulSoup(text, features="lxml")
     found = set()
-    for item in soup.find_all(name="a", attrs={"data-userid": _userid_num_match}):
-        found.add(int(item["data-userid"]))
+    # data-denotation-char="@"
+    for item in soup.find_all(
+        name="span", attrs={"data-denotation-char": "@", "data-id": _userid_num_match}
+    ):
+        found.add(int(item["data-id"]))
     return found
 
 
@@ -96,42 +104,55 @@ _single_tag_pattern = re.compile(r"^[#]?([\w\-]+)")
 
 def get_tagged_hashtags(text: str, lower=True) -> Set:
     """
-    Tags come in a-blocks with data-tag attribute. The contents is the tag.
-    <a data-tag>#Hej</a>
+    Tags from Quills look like this:
+    <span class="mention" data-index="0" data-denotation-char="#" data-id="{tag}" data-value="{tag}">
+        <span contenteditable="false">
+            <span class="ql-mention-denotation-char">#</span>
+            {tag}
+        </span>
+    </span>
 
-    >>> sorted(get_tagged_hashtags('<a data-tag>#tag</a>'))
+    So we have a helper function to create them
+    >>> from voteit.core.testing import mk_hashtag
+
+    >>> sorted(get_tagged_hashtags(mk_hashtag('tag')))
     ['tag']
 
-    Hence without content the tags will be ignored
-    >>> get_tagged_hashtags('<a data-tag></a> or <a data-tag />')
-    set()
-
-    Tags can be with or without hashtag
-    >>> sorted(get_tagged_hashtags('<a data-tag>#meenie</a> or <a data-tag>moo</a>'))
-    ['meenie', 'moo']
-
     Tags are lowercased by default, ie removing any duplicates regardless of format
-    >>> sorted(get_tagged_hashtags('<a data-tag>#aaa</a> <a data-tag>AAA</a>'))
+    >>> sorted(get_tagged_hashtags(mk_hashtag('aaa') + " and " + mk_hashtag('AAA')))
     ['aaa']
 
     Pass lower=False to override
-    >>> sorted(get_tagged_hashtags('<a data-tag>#Same</a> <a data-tag>same</a>', lower=False))
+    >>> sorted(get_tagged_hashtags(mk_hashtag('same') + mk_hashtag('Same'), lower=False))
     ['Same', 'same']
     """
     soup = BeautifulSoup(text, features="lxml")
     found = set()
-    for item in soup.select("a[data-tag]"):
-        if _single_tag_pattern.match(item.text):
-            v = item.text.replace("#", "")
-            if lower:
-                found.add(v.lower())
-            else:
-                found.add(v)
+    for item in soup.find_all(
+        name="span", attrs={"data-denotation-char": "#", "data-id": _single_tag_pattern}
+    ):
+        if lower:
+            found.add(item["data-id"].lower())
+        else:
+            found.add(item["data-id"])
     return found
 
 
 _allowed_attributes = ALLOWED_ATTRIBUTES.copy()
 _allowed_attributes["a"].extend(["data-userid", "data-tag"])
+_allowed_attributes.setdefault("span", [])
+_allowed_attributes["span"].extend(
+    [
+        "class",
+        "contenteditable",
+        "data-denotation-char",
+        "data-id",
+        "data-index",
+        "data-value",
+        "ql-mention-denotation-char",
+    ]
+)
+_allowed_tags = ALLOWED_TAGS + ["span"]
 
 
 def strict_clean_html(text: str):
@@ -148,7 +169,7 @@ def strict_clean_html(text: str):
     """
     # The cleaner instance isn't thread-safe
     # https://bleach.readthedocs.io/en/latest/clean.html
-    cleaner = Cleaner(strip=False, attributes=_allowed_attributes)
+    cleaner = Cleaner(strip=False, tags=_allowed_tags, attributes=_allowed_attributes)
     # FIXME: The cleaned version of this moves exclamation mark inside the tag? '<a data-userid="1"/>!'
     return cleaner.clean(text)
 
