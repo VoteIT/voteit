@@ -14,8 +14,8 @@ from voteit.core.abcs import ABCModel
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
-from voteit.core.utils import get_tags
-from voteit.core.utils import get_mentions
+from voteit.core.utils import get_tagged_hashtags
+from voteit.core.utils import get_tagged_userids
 from voteit.core.utils import strict_clean_html
 
 User = get_user_model()
@@ -230,13 +230,13 @@ class BaseContent(ABCModel):
     def set_tags(self):
         # FIXME: Should be generic
         current_tags = set(self.tags)
-        tags = get_tags(self.body)
+        tags = get_tagged_hashtags(self.body)
         if tags != current_tags:
             self.tags = sorted(tags)
 
     def set_mentions(self):
         # FIXME: Should be generic
-        mentions = get_mentions(self.body)
+        mentions = get_tagged_userids(self.body)
         current_user_pks = set(self.mentions.all().values_list("pk", flat=True))
         if mentions != current_user_pks:
             # Only real users are allowed as mentions
