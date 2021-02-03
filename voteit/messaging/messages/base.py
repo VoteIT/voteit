@@ -92,7 +92,10 @@ class BaseChangeObject(BaseObjectAction, ABC):
         self.assert_perm(
             msg=_("You're not allowed to change %(ctype)s here" % {"ctype": self.model})
         )
-        self.context.update(**self.data.kwargs)
+        # self.context.update(**self.data.kwargs)
+        # FIXME This should be validated and saved using a serializer
+        for key, value in self.data.kwargs.items():
+            setattr(self.context, key, value)
         self.context.save()
         response = TextResponse.from_message(self, msg="Changed")
         response.send_outgoing(self.mm.consumer_name, success=True)
