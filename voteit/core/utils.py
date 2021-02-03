@@ -152,7 +152,7 @@ _allowed_attributes["span"].extend(
         "ql-mention-denotation-char",
     ]
 )
-_allowed_tags = ALLOWED_TAGS + ["span"]
+_allowed_tags = ALLOWED_TAGS + ["p", "span", "br"]
 
 
 def strict_clean_html(text: str):
