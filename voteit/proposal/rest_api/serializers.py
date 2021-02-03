@@ -30,10 +30,12 @@ class ProposalDetailSerializer(BaseModelSerializer):
             "author",
             "polls",
             "prop_id",
+            "tags",
         )
         read_only_fields = (
             "state",
             "author",
             "polls",
             "prop_id",
+            "tags",
         )
