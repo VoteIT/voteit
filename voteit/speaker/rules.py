@@ -23,7 +23,7 @@ def is_moderator(
     elif isinstance(obj, SpeakerList):
         return obj.list_system.has_roles(user, ROLE_LIST_MODERATOR)
     else:  # pragma: no cover
-        raise TypeError(f"{obj} is not an instance of SpeakerListSystem or SpeakerList")
+        return False
 
 
 @rules.predicate
@@ -36,13 +36,12 @@ def has_speaker_role(
     elif isinstance(obj, SpeakerList):
         return obj.list_system.has_roles(user, ROLE_SPEAKER)
     else:  # pragma: no cover
-        raise TypeError(f"{obj} is not an instance of SpeakerListSystem or SpeakerList")
-
+        return False
 
 @rules.predicate
 def can_view_related_meeting(
     user: AbstractUser, obj: Union[SpeakerListSystem, SpeakerList]
-):
+) -> bool:
     meeting = None
     if isinstance(obj, SpeakerListSystem):
         meeting = obj.meeting
@@ -96,11 +95,12 @@ rules.add_perm(SpeakerListPermissions.STOP, is_active_list & is_moderator)
 
 
 @rules.predicate
-def can_add_system(user: AbstractUser, context: Meeting):
+def can_add_system(user: AbstractUser, context: Meeting) -> bool:
     if isinstance(context, Meeting):
         # FIXME might be a good idea to add other guards too
         return user.has_perm(MeetingPermissions.CHANGE, context)
     # FIXME: Add permission for other contexts!
+    return False
 
 
 rules.add_perm(SpeakerSystemPermissions.ADD, can_add_system)  # Checked against meeting
