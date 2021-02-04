@@ -18,3 +18,9 @@ class SLSystemAdmin(admin.ModelAdmin):
 @admin.register(SpeakerList)
 class SLAdmin(FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = "state"
+
+
+@admin.register(SpeakerSystemRoles)
+class SpeakerSystemRolesAdmin(admin.ModelAdmin):
+    autocomplete_fields = "user", "context"
+    list_display = "assigned", "user", "context"
