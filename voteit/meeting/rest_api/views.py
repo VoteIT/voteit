@@ -1,10 +1,10 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
-from voteit.core.rest_api.mixins import SerializerClassesMixin, CreateModelPermissionsMixin
+from voteit.core.rest_api.mixins import CreateModelPermissionsMixin, TransitionsMixin
 
 from voteit.meeting.models import *
 from voteit.meeting.rest_api.filters import UserPkFilter
@@ -15,15 +15,16 @@ __all__ = ('MeetingViewSet', 'MeetingRolesViewSet', )
 
 
 class MeetingViewSet(
-    SerializerClassesMixin,
+    TransitionsMixin,
     CreateModelPermissionsMixin,
     viewsets.ModelViewSet,
 ):
     model = Meeting
     queryset = Meeting.objects.all()
-    serializer_class = serializers.MeetingSerializer
+    serializer_class = serializers.MeetingDetailSerializer
     serializer_classes = {
         'retrieve': serializers.MeetingDetailSerializer,
+        'list': serializers.MeetingSerializer,
         'set_agenda_order': serializers.AgendaOrderSerializer,
     }
     filter_backends = DjangoFilterBackend, SearchFilter,

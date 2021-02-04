@@ -7,8 +7,10 @@ from django.dispatch import receiver
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import AgendaItemSerializer
+from voteit.meeting.messages import MeetingChanged
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
+from voteit.meeting.rest_api.serializers import MeetingDetailSerializer
 from voteit.messaging.abcs import AbstractObjectChannel
 from voteit.agenda.messages import AgendaDeleted, AgendaAdded, AgendaChanged
 from voteit.messaging.decorators import channel
@@ -47,6 +49,14 @@ class ModeratorChannel(AbstractObjectChannel):
     model = Meeting
     permission = MeetingPermissions.MODERATE
 
+
+@receiver(post_save, sender=Meeting)
+def meeting_change(instance, created=None, **kw):
+    if not created:
+        data = MeetingDetailSerializer(instance).data
+        ch = MeetingChannel.from_instance(instance)
+        msg = MeetingChanged({}, **data)
+        ch.publish(msg)
 
 # FIXME: Split updates on state change for moderators or regular users. Essentially an instance made private
 

@@ -11,3 +11,4 @@ class MeetingConfig(AppConfig):
         from voteit.meeting import rules
         from voteit.meeting import rest_api
         from voteit.meeting import channels
+        from voteit.meeting import messages
