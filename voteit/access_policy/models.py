@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 from abc import abstractmethod
+from typing import TYPE_CHECKING
 
 from django.db import models
-from typing import List, Union
 
 from voteit.core.abcs import MeetingContext
-from voteit.core.role import Role
-from voteit.meeting.roles import MeetingRoles
+
+if TYPE_CHECKING:
+    from voteit.meeting.models import Meeting
 
 
 class AccessPolicy(MeetingContext):
@@ -14,8 +17,8 @@ class AccessPolicy(MeetingContext):
     The tests for this class are in voteit.access_policy.app.automatic
     """
 
-    active = models.BooleanField(default=False)
-    meeting = models.OneToOneField(
+    active: bool = models.BooleanField(default=False)
+    meeting: Meeting = models.OneToOneField(
         "meeting.Meeting",
         on_delete=models.CASCADE,
         related_name="%(app_label)s_%(class)s",
@@ -33,22 +36,6 @@ class AccessPolicy(MeetingContext):
     @abstractmethod
     def title(self) -> str:
         """Human readable name"""
-
-    def prep_roles(self, *role_list: List[Union[str, Role]]) -> List[Role]:
-        """Take a list of role classes or strings. Check that
-        they're valid for a meeting context and return the role instance for
-        this specific meeting.
-        """
-        results = []
-        for role in role_list:
-            if isinstance(role, str):
-                role = MeetingRoles.valid_roles[role]
-            elif isinstance(role, Role):
-                assert role.name in MeetingRoles.valid_roles
-            else:  # pragma: no cover
-                raise ValueError(f"{role} is not assignable to meetings or not a role.")
-            results.append(role)
-        return results
 
     def __str__(self):
         return f"{self.__class__.__name__} for meeting {self.meeting.pk}"

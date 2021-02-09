@@ -6,6 +6,7 @@ from typing import List, Type, Union, Optional, TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
+from django.contrib.postgres.fields import ArrayField
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django.db import models
@@ -30,8 +31,8 @@ User: AbstractUser = get_user_model()
 
 @access_policies
 class ModeratorApprovedAccess(AccessPolicy):
-    name = "moderator_approved"
-    title = _("Users apply for access, moderators approve manually")
+    name: str = "moderator_approved"
+    title: str = _("Users apply for access, moderators approve manually")
 
     def request_access(self, user: User, message: str = "") -> AccessRequest:
         #  FIXME: Block subsequent requests etc
@@ -78,7 +79,7 @@ class AccessRequest(MeetingContext):
         null=True,
         editable=False,
     )
-    roles_given: str = models.TextField(_("Roles given"), null=True, blank=True)
+    roles_given: List = ArrayField(models.CharField(max_length=20), default=tuple)
 
     @property
     def meeting(self) -> Meeting:
@@ -98,9 +99,8 @@ class AccessRequest(MeetingContext):
         message: str = "",
     ):
         """Moderator accepts a request and sets some roles to a user."""
-        roles_to_handle = self.access_policy.prep_roles(*give_roles)
-        self.meeting.add_roles(self.user, *roles_to_handle)
-        self.roles_given = ",".join([x.name for x in roles_to_handle])
+        self.meeting.add_roles(self.user, *give_roles)
+        self.roles_given = give_roles
         self._set_handled(moderator_user, message)
 
     @transition(

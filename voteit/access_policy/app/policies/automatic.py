@@ -1,13 +1,13 @@
 from logging import getLogger
-from typing import List, Type, Union
+from typing import List
 
 from django.contrib.auth.models import AbstractUser
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from voteit.access_policy.models import AccessPolicy
 from voteit.access_policy.registries import access_policies
-from voteit.core.role import Role
 
 __all__ = ["AutomaticAccess"]
 logger = getLogger(__name__)
@@ -15,21 +15,16 @@ logger = getLogger(__name__)
 
 @access_policies
 class AutomaticAccess(AccessPolicy):
-    name = "automatic"
-    title = _("Give users access automatically")
-    roles_given: str = models.TextField(_("Roles given"), null=True, blank=True)
-
-    def set_given_roles(self, *given_roles: List[Union[str, Type[Role]]]):
-        """ Set roles that any user requesting access should be given.
-        """
-        role_instances = self.prep_roles(*given_roles)
-        self.roles_given = ",".join([r.name for r in role_instances])
-
-    def get_role_instances(self) -> List[Role]:
-        if self.roles_given:
-            return self.prep_roles(*self.roles_given.split(","))
-        return []
+    name: str = "automatic"
+    title: str = _("Give users access automatically")
+    roles_given: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
 
     def assign(self, user: AbstractUser):
-        roles = self.get_role_instances()
-        self.meeting.add_roles(user, *roles)
+        if self.roles_given:
+            self.meeting.add_roles(user, *self.roles_given)
+
+    def save(self, **kw):
+        for role_name in self.roles_given:
+            if role_name not in self.meeting.roles_cls.valid_roles:
+                raise ValueError(f"{role_name} is not a valid role for meeting")
+        super().save(**kw)

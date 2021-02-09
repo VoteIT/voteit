@@ -8,7 +8,9 @@ class ModeratorApprovedTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR
-        from voteit.access_policy.app.policies.moderator_approved import ModeratorApprovedAccess
+        from voteit.access_policy.app.policies.moderator_approved import (
+            ModeratorApprovedAccess,
+        )
 
         self.meeting = Meeting.objects.create()
         self.moderator = User.objects.create(username="moderator")
@@ -33,7 +35,9 @@ class AccessRequestTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR
-        from voteit.access_policy.app.policies.moderator_approved import ModeratorApprovedAccess
+        from voteit.access_policy.app.policies.moderator_approved import (
+            ModeratorApprovedAccess,
+        )
 
         self.meeting = Meeting.objects.create()
         self.moderator = User.objects.create(username="moderator")
@@ -50,6 +54,7 @@ class AccessRequestTests(TestCase):
     def test_accept(self):
         from voteit.meeting.rules import is_moderator
         from voteit.meeting.rules import is_participant
+
         ar = self.ap.request_access(self.user)
         self.assertEqual("unhandled", ar.state)
         give_roles = ["participant", "moderator"]
@@ -58,7 +63,7 @@ class AccessRequestTests(TestCase):
         self.assertEqual("Welcome", ar.moderator_message)
         self.assertIsInstance(ar.handled_ts, datetime)
         self.assertEqual(self.moderator, ar.handled_by)
-        self.assertEqual("participant,moderator", ar.roles_given)
+        self.assertEqual(["participant", "moderator"], ar.roles_given)
         self.assertTrue(is_moderator(self.user, self.meeting))
         self.assertTrue(is_participant(self.user, self.meeting))
 
@@ -70,7 +75,7 @@ class AccessRequestTests(TestCase):
         self.assertEqual("No no", ar.moderator_message)
         self.assertIsInstance(ar.handled_ts, datetime)
         self.assertEqual(self.moderator, ar.handled_by)
-        self.assertEqual(None, ar.roles_given)
+        self.assertFalse(ar.roles_given)
 
     def test_reset(self):
         ar = self.ap.request_access(self.user)
