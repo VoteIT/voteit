@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
 from logging import getLogger
-from typing import List, Type, Union
+from typing import List, Type, Union, Optional, TYPE_CHECKING
 
-from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
@@ -12,13 +13,19 @@ from django_fsm import FSMField, transition
 
 from voteit.access_policy.models import AccessPolicy
 from voteit.access_policy.registries import access_policies
+from voteit.core.abcs import MeetingContext
 from voteit.core.role import Role
 from voteit.core.workflows import AcceptanceWf
 from voteit.meeting.rules import is_moderator
 
+if TYPE_CHECKING:
+    from voteit.meeting.models import Meeting
+
 __all__ = ["ModeratorApprovedAccess"]
 
 logger = getLogger(__name__)
+
+User: AbstractUser = get_user_model()
 
 
 @access_policies
@@ -26,7 +33,7 @@ class ModeratorApprovedAccess(AccessPolicy):
     name = "moderator_approved"
     title = _("Users apply for access, moderators approve manually")
 
-    def request_access(self, user: AbstractUser, message: str = "") -> AccessRequest:
+    def request_access(self, user: User, message: str = "") -> AccessRequest:
         #  FIXME: Block subsequent requests etc
         if AccessRequest.objects.filter(
             user=user, state=AcceptanceWf.UNHANDLED
@@ -44,27 +51,27 @@ class ModeratorApprovedAccess(AccessPolicy):
         )
 
 
-class AccessRequest(models.Model):
-    state = FSMField(
+class AccessRequest(MeetingContext):
+    state: str = FSMField(
         default=AcceptanceWf.initial,
         choices=AcceptanceWf.choices(),
         protected=True,
         editable=False,
     )
-    access_policy = models.ForeignKey(
+    access_policy: ModeratorApprovedAccess = models.ForeignKey(
         ModeratorApprovedAccess,
         on_delete=models.CASCADE,
         related_name="access_requests",
     )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    user: User = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    message: Optional[str] = models.TextField(blank=True, null=True)
+    moderator_message: Optional[str] = models.TextField(blank=True, null=True)
+    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    handled_ts: Optional[datetime] = models.DateTimeField(
+        blank=True, null=True, editable=False
     )
-    message = models.TextField(blank=True, null=True)
-    moderator_message = models.TextField(blank=True, null=True)
-    created = models.DateTimeField(editable=False, auto_now_add=True)
-    handled_ts = models.DateTimeField(blank=True, null=True, editable=False)
-    handled_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    handled_by: Optional[User] = models.ForeignKey(
+        User,
         on_delete=models.PROTECT,
         related_name="+",
         blank=True,
@@ -72,6 +79,10 @@ class AccessRequest(models.Model):
         editable=False,
     )
     roles_given: str = models.TextField(_("Roles given"), null=True, blank=True)
+
+    @property
+    def meeting(self) -> Meeting:
+        return self.access_policy.meeting
 
     @transition(
         field=state,
@@ -86,11 +97,9 @@ class AccessRequest(models.Model):
         give_roles: List[Union[str, Type[Role]]],
         message: str = "",
     ):
-        """ Moderator accepts a request and sets some roles to a user.
-        """
+        """Moderator accepts a request and sets some roles to a user."""
         roles_to_handle = self.access_policy.prep_roles(*give_roles)
-        meeting = self.access_policy.meeting
-        meeting.add_roles(self.user, *roles_to_handle)
+        self.meeting.add_roles(self.user, *roles_to_handle)
         self.roles_given = ",".join([x.name for x in roles_to_handle])
         self._set_handled(moderator_user, message)
 
@@ -102,8 +111,7 @@ class AccessRequest(models.Model):
         permission=is_moderator,
     )
     def reject(self, moderator_user: AbstractUser, message: str = ""):
-        """ Moderator rejects request.
-        """
+        """Moderator rejects request."""
         self._set_handled(moderator_user, message)
 
     @transition(
@@ -113,8 +121,7 @@ class AccessRequest(models.Model):
         permission=is_moderator,
     )
     def reset(self):
-        """ In case reject was pressed wrongly, the moderator may reset the request back to unhandled.
-        """
+        """In case reject was pressed wrongly, the moderator may reset the request back to unhandled."""
         self.handled_by = None
         self.handled_ts = None
         self.moderator_message = None
