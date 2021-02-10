@@ -5,7 +5,7 @@ from logging import getLogger
 from typing import List, Type, Union, Optional, TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AbstractUser
+
 from django.contrib.postgres.fields import ArrayField
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
@@ -21,6 +21,7 @@ from voteit.meeting.rules import is_moderator
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
+    from django.contrib.auth.models import AbstractUser
 
 __all__ = ["ModeratorApprovedAccess"]
 
@@ -94,7 +95,7 @@ class AccessRequest(MeetingContext):
     )
     def accept(
         self,
-        moderator_user: AbstractUser,
+        moderator_user: User,
         give_roles: List[Union[str, Type[Role]]],
         message: str = "",
     ):
@@ -110,7 +111,7 @@ class AccessRequest(MeetingContext):
         on_error=AcceptanceWf.UNHANDLED,
         permission=is_moderator,
     )
-    def reject(self, moderator_user: AbstractUser, message: str = ""):
+    def reject(self, moderator_user: User, message: str = ""):
         """Moderator rejects request."""
         self._set_handled(moderator_user, message)
 
@@ -126,7 +127,7 @@ class AccessRequest(MeetingContext):
         self.handled_ts = None
         self.moderator_message = None
 
-    def _set_handled(self, moderator_user: AbstractUser, message: str):
+    def _set_handled(self, moderator_user: User, message: str):
         self.handled_by = moderator_user
         self.handled_ts = now()
         self.moderator_message = message

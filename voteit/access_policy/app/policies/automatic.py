@@ -15,6 +15,18 @@ logger = getLogger(__name__)
 
 @access_policies
 class AutomaticAccess(AccessPolicy):
+    """
+    >>> from voteit.meeting.models import Meeting
+    >>> meeting = Meeting.objects.create()
+    >>> aa = AutomaticAccess.objects.create(meeting=meeting)
+    """
+
+    # There's a shortcut check the meetings relation name to this policy
+    # >>> aa.meeting_related_name
+    # 'ap_automaticaccess'
+    # >>> hasattr(meeting, "ap_automaticaccess")
+    # True
+
     name: str = "automatic"
     title: str = _("Give users access automatically")
     roles_given: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
