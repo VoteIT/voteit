@@ -3,34 +3,36 @@ from inspect import isclass, isfunction
 
 
 class Registry(UserDict):
-    """ A simple dict registry for classes or other kind of factories.
-        Will validate abstract classes and subclasses.
+    """A simple dict registry for classes or other kind of factories.
+    Will validate abstract classes and subclasses.
 
-        Usage example:
+    Usage example:
 
-        >>> class AbstractFoo:
-        ...    pass
+    >>> class AbstractFoo:
+    ...    pass
 
-        >>> foo_registry = Registry(AbstractFoo)
+    >>> foo_registry = Registry(AbstractFoo)
 
-        create a new class to register by class name
+    create a new class to register by class name
 
-        >>> @foo_registry
-        >>> class MyFoo(AbstractFoo):
-        ...     pass
+    >>> @foo_registry
+    ... class MyFoo(AbstractFoo):
+    ...     pass
 
-        Will be registered as "myfo"
+    Will be registered as "myfo"
 
-        You can either specify key by passing it to the decorator or using a name attribute.
-        The decorator has priority.
+    You can either specify key by passing it to the decorator or using a name attribute.
+    The decorator has priority.
 
-        >>> @foo_registry("foo")
-        >>> class MyFoo(AbstractFoo):
-        ...     pass
+    >>> @foo_registry("foo")
+    ... class MyFoo(AbstractFoo):
+    ...     pass
 
-        >>> @foo_registry
-        >>> class MyFoo(AbstractFoo):
-        ...     name = "foo_fighters"
+    >>> @foo_registry
+    ... class MyFoo(AbstractFoo):
+    ...     name = "foo_fighters"
+
+
     """
 
     def __init__(self, required):
@@ -52,11 +54,15 @@ class Registry(UserDict):
         if isclass(factory_or_name):
             name = getattr(factory_or_name, "name", factory_or_name.__name__.lower())
         elif isfunction(factory_or_name):
-            raise ValueError("Assign name to a function through the decorator: decorator('<name>')")
+            raise ValueError(
+                "Assign name to a function through the decorator: decorator('<name>')"
+            )
         else:
             # Probably an instance, what do we know :)
             assert hasattr(factory_or_name, "__class__")
-            name = getattr(factory_or_name, "name", factory_or_name.__class__.__name__.lower())
+            name = getattr(
+                factory_or_name, "name", factory_or_name.__class__.__name__.lower()
+            )
 
         self[name] = factory_or_name
         return factory_or_name

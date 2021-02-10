@@ -3,6 +3,9 @@ import os
 
 from django.test import TestCase
 
+from voteit import core
+from voteit.core.testing import load_doctests
+
 
 class CoreDocTests(TestCase):
 
@@ -19,14 +22,6 @@ class CoreDocTests(TestCase):
         # self._doctest_file("narrative.md")
 
 
-def load_tests(loader, tests, ignore):
-    from voteit.core import role
-    from voteit.core import permission
-    from voteit.core import predicate
-    from voteit.core import utils
-
-    mods_to_test = [role, permission, predicate, utils]
-    opts = doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS | doctest.FAIL_FAST
-    for x in mods_to_test:
-        tests.addTests(doctest.DocTestSuite(x, optionflags=opts))
+def load_tests(loader, tests, pattern):
+    load_doctests(tests, core)
     return tests
