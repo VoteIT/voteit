@@ -29,6 +29,9 @@ class ScottishSTVSettings(BaseModel):
             raise ValueError(f"Must have more winners than {ScottishSTV.min_winners}")
         return v
 
+    class Config:
+        allow_mutation = False
+
     # models.BooleanField(
     #     _('Allow random in tiebreaks'), default=True,
     #     help_text=_('Poll may yield incomplete result if random tiebreak is not allowed. '
@@ -45,7 +48,9 @@ class VoteSchema(GenericVoteSchema):
 
 
 def _validate_vote(msg, poll, vote_data: STVVoteSchema):
-    matched_pks = set(poll.proposals.filter(pk__in=vote_data.ranking).values_list("pk", flat=True))
+    matched_pks = set(
+        poll.proposals.filter(pk__in=vote_data.ranking).values_list("pk", flat=True)
+    )
     unmatched = set(msg.data.vote.ranking) - matched_pks
     if unmatched:
         raise ValidationErrorMsg.from_message(
@@ -54,7 +59,8 @@ def _validate_vote(msg, poll, vote_data: STVVoteSchema):
             errors=[
                 {
                     "loc": ("vote.ranking",),
-                    "msg": _("Invalid choice, the following proposals don't exist: %s") % ",".join([str(x) for x in unmatched]),
+                    "msg": _("Invalid choice, the following proposals don't exist: %s")
+                    % ",".join([str(x) for x in unmatched]),
                     "type": "value.error",
                 }
             ],
@@ -94,10 +100,10 @@ class STVResultSchema(PollResult):
 
 @poll_methods
 class ScottishSTV(PollMethod):
-    """ Scottish STV, a ranked proportional vote method for multiple winners.
-        proportional = True
-        majority_winner = False
-        min_losers = 1
+    """Scottish STV, a ranked proportional vote method for multiple winners.
+    proportional = True
+    majority_winner = False
+    min_losers = 1
     """
 
     name = "scottish_stv"
@@ -128,7 +134,9 @@ class ScottishSTV(PollMethod):
         result_dict = poll_counter.calculate().as_dict()
         result_dict["approved"] = result_dict.pop("winners")
         if result_dict["complete"]:
-            result_dict["denied"] = set(result_dict["candidates"]).difference(result_dict["approved"])
+            result_dict["denied"] = set(result_dict["candidates"]).difference(
+                result_dict["approved"]
+            )
         return self.result_schema(**result_dict)
 
     def start_check(self):

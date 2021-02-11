@@ -13,6 +13,9 @@ class PrioritySettingsSchema(BaseModel):
     # "Number of times to prioritise a speaker. "
     # "0 means always prioritise speakers who've spoken less than someone else."
 
+    class Config:
+        allow_mutation = False
+
 
 @list_method
 class Priority(ListMethod):
