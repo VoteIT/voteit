@@ -24,10 +24,22 @@ class ValidationErrorMsg(BaseError):
 
 
 class UnauthorizedSchema(ErrorSchema):
+    """
+    Serializable error message/exception that might handle Permission types
+
+    >>> from voteit.meeting.permissions import MeetingPermissions
+    >>> err = UnauthorizedSchema(permission=MeetingPermissions.ADD)
+    >>> err.json()
+    '{"msg": null, "permission": "meeting.add_meeting"}'
+    """
+
     permission: Optional[Union[str, Permission]]
 
     class Config:
         arbitrary_types_allowed = True
+        json_encoders = {
+            Permission: lambda v: str(v),
+        }
 
 
 @outgoing
