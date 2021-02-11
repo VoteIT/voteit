@@ -8,14 +8,14 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models, IntegrityError
 from django.utils.translation import gettext_lazy as _
 
-# from voteit.core.fields import RoleField
-# from voteit.core.role import Role
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting, MeetingRoles
+
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from voteit.core.models import BaseContent
+    from voteit.agenda.models import AgendaItem
 
 User: AbstractUser = get_user_model()
 
@@ -117,7 +117,10 @@ class Reaction(models.Model):
     object_id: int = models.PositiveIntegerField()
     object: BaseContent = GenericForeignKey()
     button: ReactionButton = models.ForeignKey(ReactionButton, on_delete=models.CASCADE)
-    user: User = models.ForeignKey(User, models.CASCADE)
+    user: User = models.ForeignKey(User, on_delete=models.CASCADE)  # FIXME: Really?
+    agenda_item: AgendaItem = models.ForeignKey(
+        "agenda.AgendaItem", on_delete=models.CASCADE, related_name="reactions"
+    )
 
     # def save(self, **kw):
     # FIXME: Handle with rules
@@ -132,3 +135,18 @@ class Reaction(models.Model):
         verbose_name = _("Reaction")
         verbose_name_plural = _("Reactions")
         unique_together = [["content_type", "object_id", "button", "user"]]
+
+    # class Manager(models.Manager):
+    #     def reactions_for_ai(self, ai: AgendaItem):
+    #         from voteit.discussion.models import DiscussionPost
+    #         from voteit.proposal.models import Proposal
+    #
+    #         ctypes = ContentType.objects.get_for_models(Proposal, DiscussionPost)
+    #         ai.proposals.all() | ai.discussions.all()
+    #
+    #         return self.get_queryset().filter(
+    #             content_type__in=ctypes,
+    #             object_id__in=ai.proposals.all() | ai.discussions.all(),
+    #         )
+
+    # objects = Manager()

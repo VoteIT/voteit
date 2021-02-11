@@ -24,7 +24,7 @@ class ButtonDeleted(BaseObjectDeleted):
 
 
 class ReactionCountSchema(BaseModel):
-    content_type: str
+    content_type: int
     object_id: int
     button: int
     count: int
@@ -37,13 +37,28 @@ class ReactionCount(BaseOutgoingMessage):
     data: ReactionCountSchema
 
 
-#
-#
+class UserReactionSchema(BaseModel):
+    pk: int
+    content_type: int
+    object_id: int
+    button: int
+    user: int
+    agenda_item: int
+
+
+@outgoing
+class UserReactionAdded(BaseOutgoingMessage):
+    """ Normally only sent to the user who added it!"""
+
+    name = "reaction.added"
+    schema = UserReactionSchema
+    data: UserReactionSchema
+
+
+# FIXME
 # @outgoing
-# class UserReactionAdded(BaseOutgoingMessage):
-#     pass
-#
-#
-# @outgoing
-# class UserReactionRemoved(BaseOutgoingMessage):
-#     pass
+# class UserReactionDeleted(BaseObjectDeleted):
+#     name = "reaction.deleted"
+
+
+# FIXME: Add/delete

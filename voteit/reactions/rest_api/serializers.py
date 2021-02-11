@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from voteit.reactions.models import ReactionButton
+from voteit.reactions.models import ReactionButton, Reaction
 
 
 class ButtonDetailSerializer(serializers.ModelSerializer):
@@ -16,4 +16,17 @@ class ButtonDetailSerializer(serializers.ModelSerializer):
             "change_roles",
             "list_roles",
             "active",
+        )
+
+
+class ReactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reaction
+        fields = (
+            "pk",
+            "content_type",
+            "object_id",
+            "button",
+            "user",
+            "agenda_item",
         )

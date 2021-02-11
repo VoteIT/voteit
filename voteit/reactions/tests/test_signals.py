@@ -22,6 +22,7 @@ class SignalButtonTests(TestCase):
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create()
         self.prop = self.ai.proposals.create()
+        self.disc = self.ai.discussions.create()
         self.button = self.meeting.reactionbutton_set.create()
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, "moderator")
@@ -73,19 +74,25 @@ class SignalButtonTests(TestCase):
         self.assertEqual(self.button.pk, unpacked["reaction_button.added"]["pk"])
 
     def test_ai_channel_subscribed(self):
-        # FIXME: Create a reaction first
-        self.other = User.objects.create(username="other")
+        other = User.objects.create(username="other")
+        self.prop.reaction_set.create(
+            user=self.moderator, button=self.button, agenda_item=self.ai
+        )
+        self.prop.reaction_set.create(
+            user=other, button=self.button, agenda_item=self.ai
+        )
+        self.disc.reaction_set.create(
+            user=self.moderator, button=self.button, agenda_item=self.ai
+        )
         command = Subscribe(
             {"consumer_name": "abc", "user_pk": self.moderator.pk},
             pk=self.ai.pk,
             channel_type="agenda_item",
         )
         msg = command.run_job()
-        unpacked = dict([(x.t, x.p) for x in msg.data.app_state])
-        # FIXME
-
-        # self.assertIn("reaction_button.added", unpacked)
-        # self.assertEqual(self.button.pk, unpacked["reaction_button.added"]["pk"])
+        reactions = [x for x in msg.data.app_state if x.t == "reaction.added"]
+        self.assertEqual(2, len(reactions))
+        self.assertEqual(self.button.pk, reactions[0].p["button"])
 
 
 class SignalReactionTests(TestCase):
@@ -104,6 +111,7 @@ class SignalReactionTests(TestCase):
         kw.setdefault("object", self.prop)
         kw.setdefault("button", self.button)
         kw.setdefault("user", self.user)
+        kw.setdefault("agenda_item", self.ai)
         return Reaction.objects.create(**kw)
 
     @patch.object(AgendaItemChannel, "publish")
@@ -111,13 +119,13 @@ class SignalReactionTests(TestCase):
         from voteit.reactions.messages import ReactionCount
 
         self.assertFalse(mock_publish.called)
-        self._mk_reaction()
+        reaction = self._mk_reaction()
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ReactionCount)
         self.assertEqual(1, msg.data.count)
         self.assertEqual(self.button.pk, msg.data.button)
         self.assertEqual(self.prop.pk, msg.data.object_id)
-        self.assertEqual("proposal | proposal", msg.data.content_type)
+        self.assertEqual(reaction.content_type.pk, msg.data.content_type)
 
     @patch.object(AgendaItemChannel, "publish")
     def test_reaction_deleted(self, mock_publish):
@@ -131,4 +139,4 @@ class SignalReactionTests(TestCase):
         self.assertEqual(0, msg.data.count)
         self.assertEqual(self.button.pk, msg.data.button)
         self.assertEqual(self.prop.pk, msg.data.object_id)
-        self.assertEqual("proposal | proposal", msg.data.content_type)
+        self.assertEqual(reaction.content_type.pk, msg.data.content_type)

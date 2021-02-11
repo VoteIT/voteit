@@ -12,9 +12,13 @@ from voteit.reactions.messages import (
     ButtonChanged,
     ButtonDeleted,
     ReactionCount,
+    UserReactionAdded,
 )
 from voteit.reactions.models import ReactionButton, Reaction
-from voteit.reactions.rest_api.serializers import ButtonDetailSerializer
+from voteit.reactions.rest_api.serializers import (
+    ButtonDetailSerializer,
+    ReactionSerializer,
+)
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -36,7 +40,10 @@ def meeting_channel_subscribed(
 def ai_channel_subscribed(
     context: AgendaItem, app_state: AppState, user: AbstractUser, **kw
 ):
-    pass
+    # Users own reactions
+    app_state.append_from_queryset(
+        context.reactions.filter(user=user), ReactionSerializer, UserReactionAdded
+    )
 
 
 @receiver(post_save, sender=ReactionButton)
@@ -76,7 +83,7 @@ def _send_count(instance, pre_delete=False):
         count -= 1
     msg = ReactionCount(
         {},
-        content_type=str(instance.content_type),
+        content_type=instance.content_type.pk,
         object_id=instance.object_id,
         button=instance.button.pk,
         count=count,
