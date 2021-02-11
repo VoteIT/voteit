@@ -8,3 +8,4 @@ class ReactionsConfig(AppConfig):
 
     def ready(self):
         from voteit.reactions import rules
+        from voteit.reactions import signals
