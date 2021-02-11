@@ -1,10 +1,11 @@
+from django.db.models import QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
-from voteit.core.rest_api.mixins import CreateModelPermissionsMixin, TransitionsMixin
+from voteit.core.rest_api.mixins import TransitionsMixin
 
 from voteit.meeting.models import *
 from voteit.meeting.rest_api.filters import UserPkFilter
@@ -16,11 +17,12 @@ __all__ = ('MeetingViewSet', 'MeetingRolesViewSet', )
 
 class MeetingViewSet(
     TransitionsMixin,
-    CreateModelPermissionsMixin,
+    # CreateModelPermissionsMixin,
     viewsets.ModelViewSet,
 ):
     model = Meeting
-    queryset = Meeting.objects.all()
+    # context_queryset = Organisation.objects.all()
+    # context_lookup_kwarg = 'organisation'
     serializer_class = serializers.MeetingDetailSerializer
     serializer_classes = {
         'retrieve': serializers.MeetingDetailSerializer,
@@ -44,10 +46,8 @@ class MeetingViewSet(
             ai.save()
         return Response(status=201)
 
-    def get_queryset(self):
-        if self.request.user.is_superuser:
-            return self.queryset
-        return self.queryset.filter(participants=self.request.user)
+    def get_queryset(self) -> QuerySet:
+        return Meeting.objects.for_user(self.request.user)
 
 
 class MeetingRolesViewSet(viewsets.ReadOnlyModelViewSet):

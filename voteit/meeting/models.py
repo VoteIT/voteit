@@ -168,3 +168,21 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
     def meeting(self) -> Meeting:
         """ To fullfill the MeetingContext ABC."""
         return self
+
+    class QuerySet(models.QuerySet):
+        def for_user(self, user: AbstractUser):
+            if user.is_superuser:
+                return self.all()
+            return self.filter(
+                models.Q(public=True) |
+                models.Q(participants=user)
+            )
+
+    class Manager(models.Manager):
+        def get_queryset(self):
+            return Meeting.QuerySet(self.model, using=self._db)
+
+        def for_user(self, user: AbstractUser):
+            return self.get_queryset().for_user(user)
+
+    objects = Manager()

@@ -26,6 +26,7 @@ class CreateModelPermissionsMixin(CreateModelMixin):
     context_queryset: QuerySet
     context_lookup_kwarg: str = 'context'
     context_lookup_field: str = 'pk'
+    create_permission_denied_message: str = 'Permission denied'
     _ignore_model_permissions = True
 
     def create(self, request, *args, **kwargs):
@@ -34,7 +35,7 @@ class CreateModelPermissionsMixin(CreateModelMixin):
                 **{self.context_lookup_field: request.data.get(self.context_lookup_kwarg)}
             )
         except ObjectDoesNotExist:
-            self.permission_denied(request, 'Agenda item not found')
+            self.permission_denied(request, self.create_permission_denied_message)
         else:
             self.check_object_permissions(request, context)
             return super().create(request, *args, **kwargs)

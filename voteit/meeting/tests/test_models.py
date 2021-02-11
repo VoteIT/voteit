@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 
@@ -58,3 +59,32 @@ class MeetingTests(TestCase):
         meeting.archive()
         ai = meeting.agenda_items.first()
         self.assertEqual("archived", ai.state)
+
+
+class ManagerTests(TestCase):
+    @property
+    def Meeting(self):
+        from voteit.meeting.models import Meeting
+
+        return Meeting
+
+    def setUp(self) -> None:
+        self.private_meeting = self.Meeting.objects.create()
+        self.public_meeting = self.Meeting.objects.create(public=True)
+
+    def test_for_user(self):
+        User = get_user_model()
+        participant = self.private_meeting.participants.create(username='p')
+        non_participant = User.objects.create(username='np')
+        self.assertEqual(
+            self.Meeting.objects.for_user(participant).count(), 2
+        )
+        self.assertEqual(
+            self.Meeting.objects.for_user(participant).filter(public=False).count(), 1
+        )
+        self.assertEqual(
+            self.Meeting.objects.for_user(non_participant).count(), 1
+        )
+        self.assertIs(
+            self.Meeting.objects.for_user(non_participant).get().public, True
+        )

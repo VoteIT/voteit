@@ -30,7 +30,7 @@ class ProposalTestCase(APITestCase):
             "agenda_item": self.agenda_item.pk,
         }
         for user, status in (
-            (None, 403),
+            (None, 401),
             (self.moderator, 201),
             (self.proposer, 201),
             (self.participant, 403),
@@ -49,4 +49,4 @@ class ProposalTestCase(APITestCase):
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json().get("detail"), "Agenda item not found")
+        self.assertEqual(response.json().get("detail"), "Permission denied")
