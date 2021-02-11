@@ -190,6 +190,20 @@ class RepeatedSchulzeTests(TestCase):
         with self.assertRaises(TypeError):
             self.poll.settings.winners = 2
 
+    def test_calc_results(self):
+        from collections import Counter
+
+        counter = Counter()
+        counter["[[10, 1], [20, 2], [30, 3]]"] = 1
+        self.poll.settings = {"winners": 2}
+        [self.poll.proposals.create() for x in range(3)]
+        result = self.poll.method.calculate_result(counter)
+        self.assertEqual(30, result.rounds[0].winner)
+        self.assertEqual(20, result.rounds[1].winner)
+        self.assertEqual({10, 20}, result.rounds[1].candidates)
+        self.assertEqual({20, 30}, set(result.approved))
+        self.assertEqual({10}, set(result.denied))
+
     def test_calc_vote_core_wiki_example_with_full_rounds(self):
         # Test from python-vote-core, rewritten as A=1 etc
         # Generate data

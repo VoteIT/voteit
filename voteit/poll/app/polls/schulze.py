@@ -141,27 +141,6 @@ class RepeatedSchulze(Schulze):
     settings_schema = RepeatedSchulzeSettingsSchema
 
     def calculate_result(self, counter: Counter) -> RepeatedSchulzeResult:
-        """
-        >>> from collections import Counter
-        >>> from voteit.poll.models import Poll
-        >>> counter = Counter()
-        >>> counter['[[10, 1], [20, 2], [30, 3]]'] = 1
-        >>> poll = Poll.objects.create(method_name=RepeatedSchulze.name, settings={"winners": 2})
-        >>> props = [poll.proposals.create() for x in range(3)]
-        >>> method:RepeatedSchulze = poll.method
-        >>> result = method.calculate_result(counter)
-        >>> result.rounds[0].winner
-        30
-        >>> result.rounds[1].winner
-        20
-        >>> result.rounds[1].candidates
-        {10, 20}
-        >>> set(result.approved)
-        {20, 30}
-        >>> set(result.denied)
-        {10}
-
-        """
         input = self.schulze_format(counter)
         sort_props = self.poll.settings.winners is None
         if sort_props:
