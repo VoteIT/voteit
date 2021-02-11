@@ -155,6 +155,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
     )
     def archive(self):
         with transaction.atomic():
+            # FIXME: Move this to a signal so a lot of different models may handle archiving
             for ai in self.agenda_items.all():
                 ai.archive()
                 ai.save()
@@ -165,6 +166,10 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         pass
 
     @property
+    def is_archived(self):
+        return self.state in MeetingWf.archived_states
+
+    @property
     def meeting(self) -> Meeting:
         """ To fullfill the MeetingContext ABC."""
         return self
@@ -173,10 +178,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         def for_user(self, user: AbstractUser):
             if user.is_superuser:
                 return self.all()
-            return self.filter(
-                models.Q(public=True) |
-                models.Q(participants=user)
-            )
+            return self.filter(models.Q(public=True) | models.Q(participants=user))
 
     class Manager(models.Manager):
         def get_queryset(self):
