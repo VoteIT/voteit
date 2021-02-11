@@ -178,7 +178,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         def for_user(self, user: AbstractUser):
             if user.is_superuser:
                 return self.all()
-            return self.filter(models.Q(public=True) | models.Q(participants=user))
+            return self.filter(models.Q(public=True) | models.Q(participants=user)).distinct()
 
     class Manager(models.Manager):
         def get_queryset(self):
