@@ -1,104 +1,134 @@
-from typing import Iterator
+from __future__ import annotations
+from typing import Iterator, List, TYPE_CHECKING
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.fields import ArrayField
 from django.db import models, IntegrityError
 from django.utils.translation import gettext_lazy as _
 
-from voteit.core.fields import RoleField
-from voteit.core.models import BaseContent
-from voteit.core.role import Role
+# from voteit.core.fields import RoleField
+# from voteit.core.role import Role
+from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting, MeetingRoles
 
+if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractUser
+    from voteit.core.models import BaseContent
 
-class ReactionButton(models.Model):
-    role_set: models.QuerySet
+User: AbstractUser = get_user_model()
+
+
+class ReactionButton(MeetingContext):
+    # role_set: models.QuerySet
     ICON_CHOICES = (  # TODO, maybe use material icons? https://material.io/resources/icons/?style=baseline
-        ('thumb_up', _('Thumb up')),
-        ('thumb_down', _('Thumb down')),
-        ('check', _('Checkmark')),
-        ('block', _('Block')),
-        ('star', _('Star')),
-        ('accessible', _('Accessible')),
+        ("thumb_up", _("Thumb up")),
+        ("thumb_down", _("Thumb down")),
+        ("check", _("Checkmark")),
+        ("block", _("Block")),
+        ("star", _("Star")),
+        ("accessible", _("Accessible")),
     )
     COLOR_CHOICES = (  # TODO, don't know how to define these. Using BS4 standard names 4 now. Should follow theme.
-        ('primary', _('Primary')),
-        ('secondary', _('Secondary')),
-        ('success', _('Success')),
-        ('danger', _('Danger')),
-        ('warning', _('Warning')),
-        ('info', _('Info')),
+        ("primary", _("Primary")),
+        ("secondary", _("Secondary")),
+        ("success", _("Success")),
+        ("danger", _("Danger")),
+        ("warning", _("Warning")),
+        ("info", _("Info")),
     )
 
-    title: str = models.CharField(_('Name'), max_length=80)
-    icon: str = models.CharField(_('Icon name'), max_length=80, choices=ICON_CHOICES)
-    color: str = models.CharField(_('Color'), max_length=80, choices=COLOR_CHOICES)
-    meeting: Meeting = models.ForeignKey(Meeting, models.CASCADE)
+    title: str = models.CharField(_("Name"), max_length=80)
+    icon: str = models.CharField(_("Icon name"), max_length=80, choices=ICON_CHOICES)
+    color: str = models.CharField(_("Color"), max_length=80, choices=COLOR_CHOICES)
+    meeting: Meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE)
     order: int = models.PositiveSmallIntegerField(default=0)
+    change_roles: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
+    list_roles: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
+    active: bool = models.BooleanField(_("Is this activated?"), default=True)
 
     class Meta:
-        verbose_name = _('Reaction button')
-        verbose_name_plural = _('Reaction buttons')
-        ordering = ['order']
+        verbose_name = _("Reaction button")
+        verbose_name_plural = _("Reaction buttons")
+        ordering = ["order"]
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def save(self, **kw):
         if self.order == 0:
             self.order = self.meeting.reactionbutton_set.count()
-        super().save(force_insert, force_update, using, update_fields)
+        for role in set(self.change_roles) | set(self.list_roles):
+            if role not in MeetingRoles.valid_roles:
+                raise ValueError(f"{role} is not a valid meeting role")
+        if self.meeting.is_archived:
+            raise IntegrityError("This is part of an archived meeting")
+        super().save(**kw)
 
-    def get_valid_roles(self, ct: ContentType, mode: str = 'view') -> Iterator[Role]:
-        if mode not in ReactionRoles.MODES:
-            raise ValueError(f'Invalid permission mode. Must be one of {ReactionRoles.MODES}')
-        for reaction_role in self.role_set.filter(content_type=ct, **{mode: True}):
-            yield MeetingRoles.valid_roles[reaction_role.role.name]
+    # def get_valid_roles(self, ct: ContentType, mode: str = "view") -> Iterator[Role]:
+    #     if mode not in ReactionRoles.MODES:
+    #         raise ValueError(
+    #             f"Invalid permission mode. Must be one of {ReactionRoles.MODES}"
+    #         )
+    #     for reaction_role in self.role_set.filter(content_type=ct, **{mode: True}):
+    #         yield MeetingRoles.valid_roles[reaction_role.role.name]
 
     class Manager(models.Manager):
         def counts_for_object(self, obj):
             obj_ct = ContentType.objects.get_for_model(obj)
             return self.get_queryset().annotate(
-                count=models.Count('reaction', filter=models.Q(
-                    reaction__content_type=obj_ct,
-                    reaction__object_id=obj.pk,
-                ))
+                count=models.Count(
+                    "reaction",
+                    filter=models.Q(
+                        reaction__content_type=obj_ct,
+                        reaction__object_id=obj.pk,
+                    ),
+                )
             )
 
     objects = Manager()
 
 
-class ReactionRoles(models.Model):
-    """ Handles roles and their permissions for a specific button. """
-    MODES = 'view', 'change', 'list',
+# class ReactionRoles(models.Model):
+#     """ Handles roles and their permissions for a specific button. """
+#
+#     MODES = (
+#         "view",
+#         "change",
+#         "list",
+#     )
+#
+#     button = models.ForeignKey(ReactionButton, models.CASCADE, related_name="role_set")
+#     content_type = models.ForeignKey(ContentType, models.CASCADE)
+#     role = RoleField(MeetingRoles, null=False, blank=False)
+#     #    view = models.BooleanField(default=True)
+#     change = models.BooleanField(default=True)
+#     list = models.BooleanField(default=False)
 
-    button = models.ForeignKey(ReactionButton, models.CASCADE, related_name='role_set')
-    content_type = models.ForeignKey(ContentType, models.CASCADE)
-    role = RoleField(MeetingRoles, null=False, blank=False)
-    view = models.BooleanField(default=True)
-    change = models.BooleanField(default=True)
-    list = models.BooleanField(default=False)
-
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        """ View is always on if there are other permissions. """
-        if self.change or self.list:
-            self.view = True
-        super().save(force_insert, force_update, using, update_fields)
+# def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+#     """ View is always on if there are other permissions. """
+#     if self.change or self.list:
+#         self.view = True
+#     super().save(force_insert, force_update, using, update_fields)
 
 
 class Reaction(models.Model):
     """ """
-    content_type: ContentType = models.ForeignKey(ContentType, models.CASCADE)
+
+    content_type: ContentType = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id: int = models.PositiveIntegerField()
     object: BaseContent = GenericForeignKey()
-    button: ReactionButton = models.ForeignKey(ReactionButton, models.CASCADE)
+    button: ReactionButton = models.ForeignKey(ReactionButton, on_delete=models.CASCADE)
     user: User = models.ForeignKey(User, models.CASCADE)
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        valid_roles = self.button.get_valid_roles(self.content_type, 'change')
-        if not MeetingRoles.objects.filter(assigned__overlap=[x.name for x in valid_roles]).exists():
-            raise IntegrityError()
-        super().save(force_insert, force_update, using, update_fields)
+    # def save(self, **kw):
+    # FIXME: Handle with rules
+    # valid_roles = self.button.get_valid_roles(self.content_type, "change")
+    # if not MeetingRoles.objects.filter(
+    #     assigned__overlap=[x.name for x in valid_roles]
+    # ).exists():
+    #     raise IntegrityError()
+    # super().save(**kw)
 
     class Meta:
-        verbose_name = _('Reaction')
-        verbose_name_plural = _('Reactions')
-        unique_together = [['content_type', 'object_id', 'button', 'user']]
+        verbose_name = _("Reaction")
+        verbose_name_plural = _("Reactions")
+        unique_together = [["content_type", "object_id", "button", "user"]]
