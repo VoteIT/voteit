@@ -6,6 +6,7 @@ from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
 from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.meeting import roles
 
 from voteit.meeting.models import *
 from voteit.meeting.rest_api.filters import UserPkFilter
@@ -48,6 +49,10 @@ class MeetingViewSet(
 
     def get_queryset(self) -> QuerySet:
         return Meeting.objects.for_user(self.request.user)
+
+    def perform_create(self, serializer):
+        instance: Meeting = serializer.save()
+        instance.add_roles(self.request.user, roles.ROLE_MODERATOR)
 
 
 class MeetingRolesViewSet(viewsets.ReadOnlyModelViewSet):
