@@ -40,7 +40,10 @@ def meeting_channel_subscribed(
 def ai_channel_subscribed(
     context: AgendaItem, app_state: AppState, user: AbstractUser, **kw
 ):
-    # Users own reactions
+    """ Send users own reactions
+    """
+    # TODO: We need to send initial reaction count too, right?
+    # Reaction count should be done using queryset annotations, and not by multiple queries.
     app_state.append_from_queryset(
         context.reactions.filter(user=user), ReactionSerializer, UserReactionAdded
     )
@@ -67,6 +70,9 @@ def reaction_button_delete(instance: ReactionButton = None, **kw):
 
 
 def _send_count(instance, pre_delete=False):
+    # TODO: Discuss: This could be done much more efficient if we send many button reactions.
+    # For a full ai, or for a set of buttons, do it all in one query.
+    # The signal for subscribing to AI should use that method.
     try:
         ai = instance.object.agenda_item
     except AttributeError:
@@ -76,6 +82,7 @@ def _send_count(instance, pre_delete=False):
     # count = ReactionButton.objects.counts_for_object(instance.object)
     count = Reaction.objects.filter(
         button=instance.button,
+        # TODO: Discuss: Is there a difference from using object=instance?
         object_id=instance.object_id,
         content_type=instance.content_type,
     ).count()
@@ -83,7 +90,7 @@ def _send_count(instance, pre_delete=False):
         count -= 1
     msg = ReactionCount(
         {},
-        content_type=instance.content_type.pk,
+        content_type=instance.content_type.pk,  # TODO: This is not predictable. We probably need model name (.__class__.__name__?)
         object_id=instance.object_id,
         button=instance.button.pk,
         count=count,
@@ -100,3 +107,5 @@ def send_count_saved(instance: Reaction = None, **kw):
 @receiver(pre_delete, sender=Reaction)
 def send_count_deleted(instance: Reaction = None, **kw):
     _send_count(instance, pre_delete=True)
+
+# TODO: Incoming signals?

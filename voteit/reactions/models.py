@@ -117,6 +117,7 @@ class Reaction(models.Model):
     object_id: int = models.PositiveIntegerField()
     object: BaseContent = GenericForeignKey()
     button: ReactionButton = models.ForeignKey(ReactionButton, on_delete=models.CASCADE)
+    # TODO: Discuss: Both fields below should be nullable? (Depends on whether we actually delete User objects?)
     user: User = models.ForeignKey(User, on_delete=models.CASCADE)  # FIXME: Really?
     agenda_item: AgendaItem = models.ForeignKey(
         "agenda.AgendaItem", on_delete=models.CASCADE, related_name="reactions"
