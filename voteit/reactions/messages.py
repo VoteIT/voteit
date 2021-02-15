@@ -38,21 +38,43 @@ class ButtonDeleted(BaseObjectDeleted):
     name = "reaction_button.deleted"
 
 
+def validate_content_type(content_type: Union[ContentType, str]) -> str:
+    """
+    Validator lowercases content types
+    >>> validate_content_type("bla.Bla")
+    'bla.bla'
+
+    Content type models are accepted aswell
+    >>> from voteit.proposal.models import Proposal
+    >>> ct = ContentType.objects.get_for_model(Proposal)
+    >>> validate_content_type(ct)
+    'proposal.proposal'
+
+    Content types aren't validated if they're strings, but at least the dot's checked.
+    >>> validate_content_type("hello")
+    Traceback (most recent call last):
+    ...
+    ValueError:
+    """
+    if isinstance(content_type, ContentType):
+        content_type = ".".join(content_type.natural_key())
+    if len(content_type.split(".")) != 2:
+        raise ValueError(
+            "content_type must be separated with a dot: app_name.content_type"
+        )
+    content_type = content_type.lower()
+    return content_type
+
+
 class ReactionSchema(BaseModel):
+
     content_type: Union[ContentType, str]
     object_id: int
     button: int
 
-    @validator("content_type")
-    def validate_content_type(cls, v):
-        if isinstance(v, ContentType):
-            v = ".".join(v.natural_key())
-        if len(v.split(".")) != 2:
-            raise ValueError(
-                "content_type must be separated with a dot: app_name.content_type"
-            )
-        v = v.lower()
-        return v
+    _validate_content_type = validator("content_type", allow_reuse=True)(
+        validate_content_type
+    )
 
     class Config:
         arbitrary_types_allowed = True
@@ -93,15 +115,9 @@ class AddReactionSchema(BaseModel):
     pk: int  # The buttons schema! Since this is where the permission check is done.
     content_type: str
     object_id: int
-
-    @validator("content_type")
-    def validate_content_type(cls, v):
-        if len(v.split(".")) != 2:
-            raise ValueError(
-                "content_type must be separated with a dot: app_name.content_type"
-            )
-        v = v.lower()
-        return v
+    _validate_content_type = validator("content_type", allow_reuse=True)(
+        validate_content_type
+    )
 
 
 @incoming

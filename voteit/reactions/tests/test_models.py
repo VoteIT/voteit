@@ -84,3 +84,11 @@ class ModelsTestCase(TestCase):
         self.assertTrue(self.meeting.is_archived)
         self.like_button.title = "Me like"
         self.assertRaises(IntegrityError, self.like_button.save)
+
+    def test_invalid_change_roles(self):
+        self.like_button.change_roles = ["404"]
+        self.assertRaises(ValueError, self.like_button.save)
+
+    def test_invalid_list_roles(self):
+        self.like_button.list_roles = ["404"]
+        self.assertRaises(ValueError, self.like_button.save)

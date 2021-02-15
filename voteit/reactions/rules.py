@@ -88,7 +88,10 @@ def is_reaction_owner(user: AbstractUser, obj: Reaction):
 
 
 # Button
-rules.add_perm(ReactionButtonPermissions.ADD, is_not_archived & is_moderator)
+rules.add_perm(
+    ReactionButtonPermissions.ADD,
+    is_not_archived & is_moderator & user_can_change_meeting,
+)
 rules.add_perm(ReactionButtonPermissions.CHANGE, user_can_change_meeting)
 rules.add_perm(ReactionButtonPermissions.DELETE, user_can_change_meeting)
 rules.add_perm(ReactionButtonPermissions.VIEW, user_can_view_meeting)

@@ -31,7 +31,12 @@ def load_doctests(tests, package) -> None:
 
     Where module is voteit.core for instance.
     """
-    opts = doctest.NORMALIZE_WHITESPACE | doctest.ELLIPSIS | doctest.FAIL_FAST
+    opts = (
+        doctest.NORMALIZE_WHITESPACE
+        | doctest.ELLIPSIS
+        | doctest.FAIL_FAST
+        | doctest.IGNORE_EXCEPTION_DETAIL
+    )
     for importer, name, ispkg in walk_packages(
         package.__path__, package.__name__ + "."
     ):
