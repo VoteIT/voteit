@@ -94,6 +94,9 @@ class SignalButtonTests(TestCase):
         reactions = [x for x in msg.data.app_state if x.t == "reaction.added"]
         self.assertEqual(2, len(reactions))
         self.assertEqual(self.button.pk, reactions[0].p["button"])
+        counts = [m for m in msg.data.app_state if m.t == 'reaction.count']
+        self.assertEqual(len(counts), 2)
+        self.assertEqual(sum(c.p['count'] for c in counts), 3)
 
 
 class SignalReactionTests(TestCase):
