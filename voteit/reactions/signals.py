@@ -63,7 +63,7 @@ def ai_channel_subscribed(
                 if count:
                     msg = ReactionCount(
                         {},
-                        content_type=ct.pk,
+                        content_type=ct,
                         object_id=item.pk,
                         button=button.pk,
                         count=count,
@@ -111,7 +111,7 @@ def _send_count(instance, pre_delete=False):
     msg = ReactionCount(
         {},
         # FIXME: Change to natural_key: app.model
-        content_type=instance.content_type.pk,
+        content_type=instance.content_type,
         object_id=instance.object_id,
         button=instance.button.pk,
         count=count,

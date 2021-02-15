@@ -19,7 +19,19 @@ class ButtonDetailSerializer(serializers.ModelSerializer):
         )
 
 
+class ContentTypeSerializer(serializers.CharField):
+    """ Content type to natural key"""
+
+    def to_internal_value(self, data):
+        raise NotImplementedError("Shouldn't be used")
+
+    def to_representation(self, value):
+        return ".".join(value.natural_key())
+
+
 class ReactionSerializer(serializers.ModelSerializer):
+    content_type = ContentTypeSerializer(max_length=50)
+
     class Meta:
         model = Reaction
         fields = (

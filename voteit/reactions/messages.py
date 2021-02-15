@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 from django.contrib.contenttypes.models import ContentType
 from pydantic import validator
@@ -38,11 +38,34 @@ class ButtonDeleted(BaseObjectDeleted):
     name = "reaction_button.deleted"
 
 
-class ReactionCountSchema(BaseModel):
-    content_type: int
+class ReactionSchema(BaseModel):
+    content_type: Union[ContentType, str]
     object_id: int
     button: int
+
+    @validator("content_type")
+    def validate_content_type(cls, v):
+        if isinstance(v, ContentType):
+            v = ".".join(v.natural_key())
+        if len(v.split(".")) != 2:
+            raise ValueError(
+                "content_type must be separated with a dot: app_name.content_type"
+            )
+        v = v.lower()
+        return v
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class ReactionCountSchema(ReactionSchema):
     count: int
+
+
+class UserReactionResponseSchema(ReactionSchema):
+    pk: int  # The reactions pk!
+    user: int
+    agenda_item: Optional[int]
 
 
 @outgoing
@@ -50,15 +73,6 @@ class ReactionCount(BaseOutgoingMessage):
     name = "reaction.count"
     schema = ReactionCountSchema
     data: ReactionCountSchema
-
-
-class UserReactionResponseSchema(BaseModel):
-    pk: int  # The reactions pk!
-    content_type: int
-    object_id: int
-    button: int
-    user: int
-    agenda_item: Optional[int]
 
 
 @outgoing

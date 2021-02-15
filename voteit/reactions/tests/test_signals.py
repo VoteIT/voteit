@@ -139,7 +139,7 @@ class SignalReactionTests(TestCase):
         self.assertEqual(1, msg.data.count)
         self.assertEqual(self.button.pk, msg.data.button)
         self.assertEqual(self.prop.pk, msg.data.object_id)
-        self.assertEqual(reaction.content_type.pk, msg.data.content_type)
+        self.assertEqual("proposal.proposal", msg.data.content_type)
 
     @patch.object(AgendaItemChannel, "publish")
     def test_reaction_deleted_ai(self, mock_publish):
@@ -153,7 +153,7 @@ class SignalReactionTests(TestCase):
         self.assertEqual(0, msg.data.count)
         self.assertEqual(self.button.pk, msg.data.button)
         self.assertEqual(self.prop.pk, msg.data.object_id)
-        self.assertEqual(reaction.content_type.pk, msg.data.content_type)
+        self.assertEqual("proposal.proposal", msg.data.content_type)
 
     @patch.object(UserChannel, "publish")
     def test_reaction_added_user(self, mock_publish):
@@ -166,7 +166,7 @@ class SignalReactionTests(TestCase):
         self.assertEqual(reaction.pk, msg.data.pk)
         self.assertEqual(self.button.pk, msg.data.button)
         self.assertEqual(self.prop.pk, msg.data.object_id)
-        self.assertEqual(reaction.content_type.pk, msg.data.content_type)
+        self.assertEqual("proposal.proposal", msg.data.content_type)
 
     @patch.object(UserChannel, "publish")
     def test_reaction_deleted_user(self, mock_publish):
