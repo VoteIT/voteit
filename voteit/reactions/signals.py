@@ -6,6 +6,7 @@ from django.dispatch import receiver
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
+from voteit.messaging.channels.user import UserChannel
 from voteit.messaging.signals import channel_subscribed
 from voteit.reactions.messages import (
     ButtonAdded,
@@ -13,6 +14,7 @@ from voteit.reactions.messages import (
     ButtonDeleted,
     ReactionCount,
     UserReactionAdded,
+    UserReactionDeleted,
 )
 from voteit.reactions.models import ReactionButton, Reaction
 from voteit.reactions.rest_api.serializers import (
@@ -98,8 +100,25 @@ def _send_count(instance, pre_delete=False):
 
 
 @receiver(post_save, sender=Reaction)
-def send_count_saved(instance: Reaction = None, **kw):
-    _send_count(instance)
+def send_count_saved(instance: Reaction = None, created: bool = None, **kw):
+    if created:
+        # Update should never happen
+        _send_count(instance)
+
+
+@receiver(post_save, sender=Reaction)
+def send_added_to_user(instance: Reaction = None, created: bool = None, **kw):
+    """This is a message that goes to the user channel for the specific user who added the reaction.
+    It's not a reply to the action that the reaction was added, but a consequence.
+    The reason it's not a response is simply that the user may have several browser tabs open,
+    and things should appear as marked there too.
+    """
+    if created:
+        # Update shouldn't exist
+        data = ReactionSerializer(instance).data
+        msg = UserReactionAdded({}, **data)
+        user_ch = UserChannel.from_instance(instance.user)
+        user_ch.publish(msg)
 
 
 @receiver(pre_delete, sender=Reaction)
@@ -107,4 +126,9 @@ def send_count_deleted(instance: Reaction = None, **kw):
     _send_count(instance, pre_delete=True)
 
 
-# TODO: Incoming signals?
+@receiver(pre_delete, sender=Reaction)
+def send_deleted_to_user(instance: Reaction = None, **kw):
+    """Same as send_added_to_user, sent to userchannel instead of a response."""
+    msg = UserReactionDeleted({}, pk=instance.pk)
+    user_ch = UserChannel.from_instance(instance.user)
+    user_ch.publish(msg)

@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
+from voteit.messaging.channels.user import UserChannel
 from voteit.messaging.messages.channels import Subscribed, Subscribe
 
 User = get_user_model()
@@ -115,7 +116,7 @@ class SignalReactionTests(TestCase):
         return Reaction.objects.create(**kw)
 
     @patch.object(AgendaItemChannel, "publish")
-    def test_reaction_added(self, mock_publish):
+    def test_reaction_added_ai(self, mock_publish):
         from voteit.reactions.messages import ReactionCount
 
         self.assertFalse(mock_publish.called)
@@ -128,7 +129,7 @@ class SignalReactionTests(TestCase):
         self.assertEqual(reaction.content_type.pk, msg.data.content_type)
 
     @patch.object(AgendaItemChannel, "publish")
-    def test_reaction_deleted(self, mock_publish):
+    def test_reaction_deleted_ai(self, mock_publish):
         from voteit.reactions.messages import ReactionCount
 
         self.assertFalse(mock_publish.called)
@@ -140,3 +141,28 @@ class SignalReactionTests(TestCase):
         self.assertEqual(self.button.pk, msg.data.button)
         self.assertEqual(self.prop.pk, msg.data.object_id)
         self.assertEqual(reaction.content_type.pk, msg.data.content_type)
+
+    @patch.object(UserChannel, "publish")
+    def test_reaction_added_user(self, mock_publish):
+        from voteit.reactions.messages import UserReactionAdded
+
+        self.assertFalse(mock_publish.called)
+        reaction = self._mk_reaction()
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, UserReactionAdded)
+        self.assertEqual(reaction.pk, msg.data.pk)
+        self.assertEqual(self.button.pk, msg.data.button)
+        self.assertEqual(self.prop.pk, msg.data.object_id)
+        self.assertEqual(reaction.content_type.pk, msg.data.content_type)
+
+    @patch.object(UserChannel, "publish")
+    def test_reaction_deleted_user(self, mock_publish):
+        from voteit.reactions.messages import UserReactionDeleted
+
+        self.assertFalse(mock_publish.called)
+        reaction = self._mk_reaction()
+        reaction_pk = reaction.pk
+        reaction.delete()
+        msg = mock_publish.mock_calls[-1].args[0]
+        self.assertIsInstance(msg, UserReactionDeleted)
+        self.assertEqual(reaction_pk, msg.data.pk)
