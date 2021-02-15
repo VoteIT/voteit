@@ -88,3 +88,19 @@ class ManagerTests(TestCase):
         self.assertIs(
             self.Meeting.objects.for_user(non_participant).get().public, True
         )
+
+    def test_distinct_for_user(self):
+        User = get_user_model()
+        for n in range(1,4):
+            self.public_meeting.participants.create(username=f'p{n}')
+        participant = self.public_meeting.participants.create(username='p')
+        self.private_meeting.participants.add(participant)
+        non_participant = User.objects.create(username='np')
+        meetings_for_p = self.Meeting.objects.for_user(participant)
+        meetings_for_np = self.Meeting.objects.for_user(non_participant)
+
+        self.assertEqual(meetings_for_p.count(), 2)
+        self.assertEqual(meetings_for_np.count(), 1)
+        with self.assertRaises(self.public_meeting.DoesNotExist):
+            meetings_for_np.get(pk=self.private_meeting.pk)
+        self.assertTrue(meetings_for_p.get(pk=self.private_meeting.pk))
