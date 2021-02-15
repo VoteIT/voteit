@@ -48,6 +48,10 @@ class GenericObjectSchema(BaseModel):
     kwargs: Dict  # What to send to the constructor (create)
 
 
+class GenericDeleteSchema(BaseModel):
+    pk: int
+
+
 class BaseObjectAction(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
     pass
 
@@ -102,7 +106,8 @@ class BaseChangeObject(BaseObjectAction, ABC):
 
 
 class BaseDeleteObject(BaseObjectAction, ABC):
-    # Use default schema with only pk
+    schema = GenericDeleteSchema
+    data: GenericDeleteSchema
 
     def run_job(self):
         self.assert_perm(
