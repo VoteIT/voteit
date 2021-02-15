@@ -1,0 +1,116 @@
+from django.contrib.auth import get_user_model
+from django.test import TestCase, override_settings
+from voteit.messaging.errors import UnauthorizedError
+from voteit.messaging.messages.text import TextResponse
+
+User = get_user_model()
+
+
+_channel_layers_setting = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class AddReactionTests(TestCase):
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        self.ai = self.meeting.agenda_items.create()
+        self.prop = self.ai.proposals.create()
+        self.disc = self.ai.discussions.create()
+        self.button = self.meeting.reactionbutton_set.create(
+            change_roles=["potential_voter"]
+        )
+        self.voter = User.objects.create(username="voter")
+        self.participant = User.objects.create(username="participant")
+        self.meeting.add_roles(self.voter, "potential_voter")
+        self.meeting.add_roles(self.participant, "participant")
+
+    @property
+    def _cut(self):
+        from voteit.reactions.messages import AddReaction
+
+        return AddReaction
+
+    def _mk_one(self, context, **kw):
+        content_type = context._meta.label  # FIXME?
+        return self._cut(
+            {"consumer_name": "abc", "user_pk": self.voter.pk},
+            pk=self.button.pk,
+            content_type=content_type,
+            object_id=context.pk,
+            **kw,
+        )
+
+    def test_add_on_prop(self):
+        self.assertFalse(self.prop.reaction_set.count())
+        msg = self._mk_one(self.prop)
+        response = msg.run_job()
+        self.assertIsInstance(response, TextResponse)
+        self.assertTrue(self.prop.reaction_set.count())
+
+    def test_add_on_discussion(self):
+        self.assertFalse(self.prop.reaction_set.count())
+        msg = self._mk_one(self.disc)
+        response = msg.run_job()
+        self.assertIsInstance(response, TextResponse)
+        self.assertTrue(self.disc.reaction_set.count())
+
+    def test_add_on_prop_wrong_perm(self):
+        msg = self._mk_one(self.disc)
+        msg.mm.user_pk = self.participant.pk
+        self.assertRaises(UnauthorizedError, msg.run_job)
+
+    def test_duplicate(self):
+        self.assertFalse(self.prop.reaction_set.count())
+        msg = self._mk_one(self.prop)
+        msg.run_job()
+        self.assertEqual(1, self.prop.reaction_set.count())
+        msg.run_job()
+        self.assertEqual(1, self.prop.reaction_set.count())
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class DeleteReactionTests(TestCase):
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        self.ai = self.meeting.agenda_items.create()
+        self.prop = self.ai.proposals.create()
+        self.disc = self.ai.discussions.create()
+        self.button = self.meeting.reactionbutton_set.create(
+            change_roles=["potential_voter"]
+        )
+        self.voter = User.objects.create(username="voter")
+        self.participant = User.objects.create(username="participant")
+        self.meeting.add_roles(self.voter, "potential_voter")
+        self.meeting.add_roles(self.participant, "participant")
+        self.reaction = self.prop.reaction_set.create(
+            user=self.voter,
+            button=self.button,
+            object_id=self.disc.id,
+            agenda_item=self.ai,
+            content_type=self.disc,
+        )
+
+    @property
+    def _cut(self):
+        from voteit.reactions.messages import DeleteReaction
+
+        return DeleteReaction
+
+    def _mk_one(self):
+        return self._cut(
+            {"consumer_name": "abc", "user_pk": self.voter.pk},
+            pk=self.reaction.pk,
+            # reaction_pk=self.reaction.pk,
+        )
+
+    def test_delete(self):
+        self.assertTrue(self.prop.reaction_set.count())
+        msg = self._mk_one()
+        msg.run_job()
+        self.assertFalse(self.prop.reaction_set.count())

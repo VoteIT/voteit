@@ -10,7 +10,8 @@ class ReactionButtonPermissions:
     LIST_REACTIONS = permissions.create(
         "reactions.list_reactions", "reactions.ReactionButton"
     )
-    # Add or remove a Reaction object
-    CHANGE_REACTION = permissions.create(
-        "reactions.change_reaction", "reactions.ReactionButton"
-    )
+
+
+class ReactionPermissions:
+    ADD = permissions.create("reactions.add_reaction", "reactions.ReactionButton")
+    DELETE = permissions.create("reactions.delete_reaction", "reactions.Reaction")

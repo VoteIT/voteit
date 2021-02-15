@@ -5,7 +5,7 @@ from django.test import TestCase
 User = get_user_model()
 
 
-class PermissionTests(TestCase):
+class ButtonPermissionTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
 
@@ -82,20 +82,60 @@ class PermissionTests(TestCase):
         self.button.save()
         self.assertFalse(self.participant.has_perm(LIST_REACTIONS, self.button))
 
-    def test_change_reaction(self):
-        CHANGE_REACTION = self.p.CHANGE_REACTION
-        self.assertFalse(self.anon_user.has_perm(CHANGE_REACTION, self.button))
-        self.assertTrue(self.participant.has_perm(CHANGE_REACTION, self.button))
-        self.assertTrue(self.moderator.has_perm(CHANGE_REACTION, self.button))
+
+class ReactionPermissionTests(TestCase):
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        self.anon_user = User.objects.create(username="anon")
+        self.moderator = User.objects.create(username="moderator")
+        self.participant = User.objects.create(username="participant")
+        self.meeting.add_roles(self.moderator, "moderator")
+        self.meeting.add_roles(self.participant, "participant")
+        self.button = self.meeting.reactionbutton_set.create(
+            change_roles=["participant"], list_roles=["participant"]
+        )
+        self.ai = self.meeting.agenda_items.create()
+        self.disc = self.ai.discussions.create()
+        self.reaction = self.disc.reaction_set.create(
+            user=self.moderator, object=self.disc, button=self.button
+        )
+
+    @property
+    def p(self):
+        from voteit.reactions.permissions import ReactionPermissions
+
+        return ReactionPermissions
+
+    def test_add_reaction(self):
+        ADD = self.p.ADD
+        self.assertFalse(self.anon_user.has_perm(ADD, self.button))
+        self.assertTrue(self.participant.has_perm(ADD, self.button))
+        self.assertTrue(self.moderator.has_perm(ADD, self.button))
         self.button.change_roles.remove("participant")
         self.button.save()
-        self.assertFalse(self.participant.has_perm(CHANGE_REACTION, self.button))
-        self.assertFalse(self.moderator.has_perm(CHANGE_REACTION, self.button))
+        self.assertFalse(self.participant.has_perm(ADD, self.button))
+        self.assertFalse(self.moderator.has_perm(ADD, self.button))
 
-    def test_change_reaction_not_active(self):
+    def test_add_reaction_not_active(self):
         self.button.active = False
         self.button.save()
-        CHANGE_REACTION = self.p.CHANGE_REACTION
-        self.assertFalse(self.anon_user.has_perm(CHANGE_REACTION, self.button))
-        self.assertFalse(self.participant.has_perm(CHANGE_REACTION, self.button))
-        self.assertFalse(self.moderator.has_perm(CHANGE_REACTION, self.button))
+        ADD = self.p.ADD
+        self.assertFalse(self.anon_user.has_perm(ADD, self.button))
+        self.assertFalse(self.participant.has_perm(ADD, self.button))
+        self.assertFalse(self.moderator.has_perm(ADD, self.button))
+
+    def test_delete(self):
+        DELETE = self.p.DELETE
+        self.assertFalse(self.anon_user.has_perm(DELETE, self.reaction))
+        self.assertFalse(self.participant.has_perm(DELETE, self.reaction))
+        self.assertTrue(self.moderator.has_perm(DELETE, self.reaction))
+
+    def test_delete_inactive_button(self):
+        self.button.active = False
+        self.button.save()
+        DELETE = self.p.DELETE
+        self.assertFalse(self.anon_user.has_perm(DELETE, self.reaction))
+        self.assertFalse(self.participant.has_perm(DELETE, self.reaction))
+        self.assertFalse(self.moderator.has_perm(DELETE, self.reaction))

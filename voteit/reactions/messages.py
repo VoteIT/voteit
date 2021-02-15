@@ -1,11 +1,26 @@
+from typing import Optional
+
+from django.contrib.contenttypes.models import ContentType
+from pydantic import validator
 from pydantic.main import BaseModel
-from voteit.messaging.abcs import BaseOutgoingMessage, BaseIncomingMessage
+from django.utils.translation import gettext as _
+
+from voteit.messaging.abcs import (
+    BaseOutgoingMessage,
+    BaseIncomingMessage,
+    DeferredJob,
+    ContextAction,
+)
 from voteit.messaging.decorators import outgoing, incoming
 from voteit.messaging.messages.base import (
     BaseObjectAdded,
     BaseObjectChanged,
     BaseObjectDeleted,
+    BaseDeleteObject,
 )
+from voteit.messaging.messages.text import TextResponse
+from voteit.reactions.models import Reaction, ReactionButton
+from voteit.reactions.permissions import ReactionButtonPermissions, ReactionPermissions
 
 
 @outgoing
@@ -37,16 +52,13 @@ class ReactionCount(BaseOutgoingMessage):
     data: ReactionCountSchema
 
 
-class ReactionSchema(BaseModel):
-    pk: int
+class UserReactionResponseSchema(BaseModel):
+    pk: int  # The reactions pk!
     content_type: int
     object_id: int
     button: int
-
-
-class UserReactionResponseSchema(ReactionSchema):
     user: int
-    agenda_item: int
+    agenda_item: Optional[int]
 
 
 @outgoing
@@ -63,18 +75,58 @@ class UserReactionDeleted(BaseObjectDeleted):
     name = "reaction.deleted"
 
 
-# @incoming
-# class AddUserReaction(BaseIncomingMessage):
-#     name = "reaction.add"
-#     schema = ReactionSchema
-#     data: ReactionSchema
-#
-#
-# @incoming
-# class DeleteUserReaction(BaseIncomingMessage):
-#     name = "reaction.delete"
-#     schema = ReactionSchema
-#     data: ReactionSchema
+class AddReactionSchema(BaseModel):
+    pk: int  # The buttons schema! Since this is where the permission check is done.
+    content_type: str
+    object_id: int
+
+    @validator("content_type")
+    def validate_content_type(cls, v):
+        if len(v.split(".")) != 2:
+            raise ValueError(
+                "content_type must be separated with a dot: app_name.content_type"
+            )
+        v = v.lower()
+        return v
 
 
-# FIXME: Add/delete
+@incoming
+class AddReaction(BaseIncomingMessage, DeferredJob, ContextAction):
+    schema = AddReactionSchema
+    data: AddReactionSchema
+    permission = ReactionPermissions.ADD
+    name = "reaction.add"
+    model = ReactionButton
+
+    def run_job(self) -> TextResponse:
+        self.assert_perm()
+        ct_parts = self.data.content_type.split(".")
+        ct = ContentType.objects.get_by_natural_key(*ct_parts)
+        reactable = ct.get_object_for_this_type(pk=self.data.object_id)
+        ai = getattr(reactable, "agenda_item", None)
+        # FIXME: set object directly? Reverse relation doesn't seem to work now
+        reaction, created = Reaction.objects.get_or_create(
+            user=self.user,
+            button=self.context,
+            object_id=reactable.id,
+            agenda_item=ai,
+            content_type=ct,
+        )
+        response = TextResponse.from_message(self, msg="")
+        response.send_outgoing(self.mm.consumer_name, success=True)
+        return response
+
+
+@incoming
+class DeleteReaction(BaseDeleteObject):
+    name = "reaction.delete"
+    permission = ReactionPermissions.DELETE
+    model = Reaction
+
+    def run_job(self) -> TextResponse:
+        self.assert_perm(msg=_("You're not allowed to change this now"))
+
+        self.context.delete()
+        response = TextResponse.from_message(self, msg="")
+        response.send_outgoing(self.mm.consumer_name, success=True)
+        return response
