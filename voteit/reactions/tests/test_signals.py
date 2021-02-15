@@ -91,22 +91,12 @@ class SignalButtonTests(TestCase):
             channel_type="agenda_item",
         )
         msg = command.run_job()
-        reactions_added = [x for x in msg.data.app_state if x.t == "reaction.added"]
-        self.assertEqual(2, len(reactions_added))
-        self.assertEqual(self.button.pk, reactions_added[0].p["button"])
-        # Test the counts
-        count_prop = [
-            x
-            for x in msg.data.app_state
-            if x.t == "reaction.count" and x.p["object_id"] == self.prop.pk
-        ][0]
-        count_disc = [
-            x
-            for x in msg.data.app_state
-            if x.t == "reaction.count" and x.p["object_id"] == self.disc.pk
-        ][0]
-        self.assertEqual(2, count_prop.p["count"])
-        self.assertEqual(1, count_disc.p["count"])
+        reactions = [x for x in msg.data.app_state if x.t == "reaction.added"]
+        self.assertEqual(2, len(reactions))
+        self.assertEqual(self.button.pk, reactions[0].p["button"])
+        counts = [m for m in msg.data.app_state if m.t == "reaction.count"]
+        self.assertEqual(len(counts), 2)
+        self.assertEqual(sum(c.p["count"] for c in counts), 3)
 
 
 class SignalReactionTests(TestCase):

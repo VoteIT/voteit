@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Count
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
@@ -44,31 +45,18 @@ def ai_channel_subscribed(
     context: AgendaItem, app_state: AppState, user: AbstractUser, **kw
 ):
     """Send users own reactions and the total count for this agenda items content"""
+    all_buttons = (
+        context.reactions.values("content_type", "object_id", "button")
+        .annotate(count=Count("pk"))
+        .order_by()
+    )
+    for b in all_buttons:
+        b["content_type"] = ContentType.objects.get_for_id(b["content_type"])
+        app_state.append(ReactionCount(**b))
+    # Users own reactions
     app_state.append_from_queryset(
         context.reactions.filter(user=user), ReactionSerializer, UserReactionAdded
     )
-    # FIXME: This should be optimized in a proper query - this is just a placeholder
-    buttons = tuple(context.meeting.reactionbutton_set.filter(active=True))
-    if buttons:
-        items = set(context.proposals.all()) | set(context.discussions.all())
-        for button in buttons:
-            for item in items:
-                ct = ContentType.objects.get_for_model(item)
-                count = Reaction.objects.filter(
-                    button=button,
-                    object_id=item.pk,
-                    content_type=ct,
-                ).count()
-                # FIXME: Change to natural_key: app.model
-                if count:
-                    msg = ReactionCount(
-                        {},
-                        content_type=ct,
-                        object_id=item.pk,
-                        button=button.pk,
-                        count=count,
-                    )
-                    app_state.append(msg)
 
 
 @receiver(post_save, sender=ReactionButton)
@@ -91,21 +79,22 @@ def reaction_button_delete(instance: ReactionButton = None, **kw):
     ch.publish(msg)
 
 
-def _send_count(instance, pre_delete=False):
+def _send_count(instance: Reaction, pre_delete=False):
     # TODO: Discuss: This could be done much more efficient if we send many button reactions.
     # For a full ai, or for a set of buttons, do it all in one query.
     # The signal for subscribing to AI should use that method.
     try:
-        ai = instance.object.agenda_item
+        ai = instance.agenda_item
     except AttributeError:
         return
     if ai is None:
         return
-    count = Reaction.objects.filter(
-        button=instance.button,
-        object_id=instance.object_id,
-        content_type=instance.content_type,
-    ).count()
+    count = instance.object.reaction_set.filter(button=instance.button).count()
+    # count = Reaction.objects.filter(
+    #     button=instance.button,
+    #     object_id=instance.object_id,
+    #     content_type=instance.content_type,
+    # ).count()
     if pre_delete:
         count -= 1
     msg = ReactionCount(
