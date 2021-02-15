@@ -63,14 +63,6 @@ class ReactionButton(MeetingContext):
             raise IntegrityError("This is part of an archived meeting")
         super().save(**kw)
 
-    # def get_valid_roles(self, ct: ContentType, mode: str = "view") -> Iterator[Role]:
-    #     if mode not in ReactionRoles.MODES:
-    #         raise ValueError(
-    #             f"Invalid permission mode. Must be one of {ReactionRoles.MODES}"
-    #         )
-    #     for reaction_role in self.role_set.filter(content_type=ct, **{mode: True}):
-    #         yield MeetingRoles.valid_roles[reaction_role.role.name]
-
     class Manager(models.Manager):
         def counts_for_object(self, obj):
             obj_ct = ContentType.objects.get_for_model(obj)
@@ -85,29 +77,6 @@ class ReactionButton(MeetingContext):
             )
 
     objects = Manager()
-
-
-# class ReactionRoles(models.Model):
-#     """ Handles roles and their permissions for a specific button. """
-#
-#     MODES = (
-#         "view",
-#         "change",
-#         "list",
-#     )
-#
-#     button = models.ForeignKey(ReactionButton, models.CASCADE, related_name="role_set")
-#     content_type = models.ForeignKey(ContentType, models.CASCADE)
-#     role = RoleField(MeetingRoles, null=False, blank=False)
-#     #    view = models.BooleanField(default=True)
-#     change = models.BooleanField(default=True)
-#     list = models.BooleanField(default=False)
-
-# def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-#     """ View is always on if there are other permissions. """
-#     if self.change or self.list:
-#         self.view = True
-#     super().save(force_insert, force_update, using, update_fields)
 
 
 class Reaction(models.Model):
@@ -126,15 +95,6 @@ class Reaction(models.Model):
         null=True,
         blank=True,
     )
-
-    # def save(self, **kw):
-    # FIXME: Handle with rules
-    # valid_roles = self.button.get_valid_roles(self.content_type, "change")
-    # if not MeetingRoles.objects.filter(
-    #     assigned__overlap=[x.name for x in valid_roles]
-    # ).exists():
-    #     raise IntegrityError()
-    # super().save(**kw)
 
     class Meta:
         verbose_name = _("Reaction")
