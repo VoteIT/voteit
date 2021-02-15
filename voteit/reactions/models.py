@@ -80,7 +80,9 @@ class ReactionButton(MeetingContext):
 
 
 class Reaction(models.Model):
-    """ """
+    """Works as a boolean true for a specific context, user and button.
+    Essentially users never have reactions if the haven't marked something.
+    """
 
     content_type: ContentType = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id: int = models.PositiveIntegerField()

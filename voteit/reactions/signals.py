@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
+from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
@@ -42,12 +43,32 @@ def meeting_channel_subscribed(
 def ai_channel_subscribed(
     context: AgendaItem, app_state: AppState, user: AbstractUser, **kw
 ):
-    """Send users own reactions"""
-    # TODO: We need to send initial reaction count too, right?
-    # Reaction count should be done using queryset annotations, and not by multiple queries.
+    """Send users own reactions and the total count for this agenda items content"""
     app_state.append_from_queryset(
         context.reactions.filter(user=user), ReactionSerializer, UserReactionAdded
     )
+    # FIXME: This should be optimized in a proper query - this is just a placeholder
+    buttons = tuple(context.meeting.reactionbutton_set.filter(active=True))
+    if buttons:
+        items = set(context.proposals.all()) | set(context.discussions.all())
+        for button in buttons:
+            for item in items:
+                ct = ContentType.objects.get_for_model(item)
+                count = Reaction.objects.filter(
+                    button=button,
+                    object_id=item.pk,
+                    content_type=ct,
+                ).count()
+                # FIXME: Change to natural_key: app.model
+                if count:
+                    msg = ReactionCount(
+                        {},
+                        content_type=ct.pk,
+                        object_id=item.pk,
+                        button=button.pk,
+                        count=count,
+                    )
+                    app_state.append(msg)
 
 
 @receiver(post_save, sender=ReactionButton)
