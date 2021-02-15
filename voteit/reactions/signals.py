@@ -40,8 +40,7 @@ def meeting_channel_subscribed(
 def ai_channel_subscribed(
     context: AgendaItem, app_state: AppState, user: AbstractUser, **kw
 ):
-    """ Send users own reactions
-    """
+    """Send users own reactions"""
     # TODO: We need to send initial reaction count too, right?
     # Reaction count should be done using queryset annotations, and not by multiple queries.
     app_state.append_from_queryset(
@@ -79,10 +78,8 @@ def _send_count(instance, pre_delete=False):
         return
     if ai is None:
         return
-    # count = ReactionButton.objects.counts_for_object(instance.object)
     count = Reaction.objects.filter(
         button=instance.button,
-        # TODO: Discuss: Is there a difference from using object=instance?
         object_id=instance.object_id,
         content_type=instance.content_type,
     ).count()
@@ -90,7 +87,8 @@ def _send_count(instance, pre_delete=False):
         count -= 1
     msg = ReactionCount(
         {},
-        content_type=instance.content_type.pk,  # TODO: This is not predictable. We probably need model name (.__class__.__name__?)
+        # FIXME: Change to natural_key: app.model
+        content_type=instance.content_type.pk,
         object_id=instance.object_id,
         button=instance.button.pk,
         count=count,
@@ -107,5 +105,6 @@ def send_count_saved(instance: Reaction = None, **kw):
 @receiver(pre_delete, sender=Reaction)
 def send_count_deleted(instance: Reaction = None, **kw):
     _send_count(instance, pre_delete=True)
+
 
 # TODO: Incoming signals?
