@@ -103,6 +103,14 @@ class SchulzeTests(TestCase):
         )
         self.assertEqual(res.winner, 3)
 
+    def test_result_wiki_example_storage_and_json(self):
+        method = self.poll.method
+        counter = wiki_example_ballots(method)
+        res = method.calculate_result(counter)
+        self.poll.result = res
+        # Just to make sure nothing dies
+        self.assertIsInstance(res.json(), str)
+
     def test_calc_former_tiebreaker_bug(self):
         # Test from python-vote-core, rewritten as A=1 etc
         # Generate data
@@ -275,7 +283,8 @@ class AddSchulzeVoteTests(TestCase):
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.poll.pk)
         kw.setdefault(
-            "vote", {"ranking": ((self.prop1.pk, 10), (self.prop2.pk, 5), (self.prop3.pk, 1))}
+            "vote",
+            {"ranking": ((self.prop1.pk, 10), (self.prop2.pk, 5), (self.prop3.pk, 1))},
         )
         return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 

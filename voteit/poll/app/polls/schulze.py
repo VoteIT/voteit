@@ -88,11 +88,27 @@ class Schulze(PollMethod):
             input.append({"count": count, "ballot": ranking})
         return input
 
-    def schulze_to_poll_result(self, method: SchulzeMethod) -> SchulzePollResult:
-        output = method.as_dict()
-        for key in ('pairs', 'strong_pairs'):
-            output[key] = list(output.get(key, {}).items())
-        return SchulzePollResult(**output)
+    def schulze_to_poll_result(self, data: Dict) -> SchulzePollResult:
+        """
+        The library we use presents part of the result as dicts with tuple of pairs as key.
+        This doesn't work with json, so we have to reformat a bit.
+        It looks a bit like this
+
+        >>> data = {'candidates': {1496, 1494, 1495}, 'winner': 1494, \
+        'pairs': {(1496, 1494): 0, (1496, 1495): 0, (1494, 1496): 1, (1494, 1495): 1, (1495, 1496): 1, (1495, 1494): 0},\
+        'strong_pairs': {(1494, 1496): 1, (1494, 1495): 1, (1495, 1496): 1}}
+
+        With reformat we can now serialize the result
+        >>> method = Schulze(None)
+        >>> result = method.schulze_to_poll_result(data)
+        >>> isinstance(result.json(), str)
+        True
+        >>> sorted(result.strong_pairs)
+        [((1494, 1495), 1), ((1494, 1496), 1), ((1495, 1496), 1)]
+        """
+        for key in ("pairs", "strong_pairs"):
+            data[key] = list(data.get(key, {}).items())
+        return SchulzePollResult(**data)
 
     def calculate_result(self, counter: Counter) -> SchulzePollResult:
         """
@@ -106,11 +122,12 @@ class Schulze(PollMethod):
         >>> set(result.candidates)
         {10, 20}
         """
-        input = self.schulze_format(counter)
+        input_data = self.schulze_format(counter)
         method = SchulzeMethod(
-            input, ballot_notation=SchulzeMethod.BALLOT_NOTATION_RATING
+            input_data, ballot_notation=SchulzeMethod.BALLOT_NOTATION_RATING
         )
-        res = self.schulze_to_poll_result(method)
+        data: Dict = method.as_dict()
+        res = self.schulze_to_poll_result(data)
         res.approved.append(res.winner)
         res.denied.extend([x for x in res.candidates if x != res.winner])
         return res
@@ -149,7 +166,7 @@ class RepeatedSchulze(Schulze):
     settings_schema = RepeatedSchulzeSettingsSchema
 
     def calculate_result(self, counter: Counter) -> RepeatedSchulzeResult:
-        input = self.schulze_format(counter)
+        input_data = self.schulze_format(counter)
         sort_props = self.poll.settings.winners is None
         if sort_props:
             rounds_to_do = self.poll.proposals.count()
@@ -158,15 +175,16 @@ class RepeatedSchulze(Schulze):
         rounds = []
         for i in range(rounds_to_do):
             method = SchulzeMethod(
-                input, ballot_notation=SchulzeMethod.BALLOT_NOTATION_RATING
+                input_data, ballot_notation=SchulzeMethod.BALLOT_NOTATION_RATING
             )
-            this_round = self.schulze_to_poll_result(method)
+            data: Dict = method.as_dict()
+            this_round = self.schulze_to_poll_result(data)
             rounds.append(this_round)
             # Eliminate elected
-            for item in input:
+            for item in input_data:
                 item["ballot"].pop(this_round.winner, None)
         # Fetch candidates from first round
-        result = RepeatedSchulzeResult(rounds=rounds, candidates=rounds[0].candidates)
+        result = self.result_schema(rounds=rounds, candidates=rounds[0].candidates)
         # Sorted polls don't approve or deny
         if not sort_props:
             approved = set()
