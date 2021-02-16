@@ -34,8 +34,9 @@ def meeting_subscribed(context: Meeting, app_state: AppState, **kw):
 
 
 @receiver(post_save, sender=Poll)
-def poll_change(instance=None, created=None, **kw):
+def poll_change(instance: Poll = None, created: bool = None, **kw):
     if instance.meeting is not None:
+        instance.refresh_from_db(fields=['result_data'])  # FIXME somewhere else, preferably.
         ch = MeetingChannel.from_instance(instance.meeting)
         data = PollDetailSerializer(instance).data
         if created:
