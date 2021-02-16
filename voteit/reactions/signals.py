@@ -85,7 +85,7 @@ def _send_count(instance: Reaction, pre_delete=False):
     # The signal for subscribing to AI should use that method.
     try:
         ai = instance.agenda_item
-    except AttributeError:
+    except AttributeError:  # pragma: no cover
         return
     if ai is None:
         return
