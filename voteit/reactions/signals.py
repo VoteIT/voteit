@@ -8,6 +8,7 @@ from django.dispatch import receiver
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.signals import archive_meeting
 from voteit.messaging.channels.user import UserChannel
 from voteit.messaging.signals import channel_subscribed
 from voteit.reactions.messages import (
@@ -136,3 +137,11 @@ def send_deleted_to_user(instance: Reaction = None, **kw):
     msg = UserReactionDeleted({}, pk=instance.pk)
     user_ch = UserChannel.from_instance(instance.user)
     user_ch.publish(msg)
+
+
+@receiver(archive_meeting)
+def disable_buttons(meeting: Meeting, **kw):
+    """Archived meetings shouldn't have active buttons."""
+    for button in meeting.reactionbutton_set.filter(active=True):
+        button.active = False
+        button.save()

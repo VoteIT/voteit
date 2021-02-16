@@ -109,5 +109,3 @@ rules.add_perm(
     ReactionPermissions.DELETE,
     is_reaction_owner & is_button_active & has_change_own_reaction_role,
 )
-
-# And the specific for deleting a reaction
