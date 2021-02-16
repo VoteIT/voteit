@@ -90,16 +90,10 @@ def _send_count(instance: Reaction, pre_delete=False):
     if ai is None:
         return
     count = instance.object.reaction_set.filter(button=instance.button).count()
-    # count = Reaction.objects.filter(
-    #     button=instance.button,
-    #     object_id=instance.object_id,
-    #     content_type=instance.content_type,
-    # ).count()
     if pre_delete:
         count -= 1
     msg = ReactionCount(
         {},
-        # FIXME: Change to natural_key: app.model
         content_type=instance.content_type,
         object_id=instance.object_id,
         button=instance.button.pk,
