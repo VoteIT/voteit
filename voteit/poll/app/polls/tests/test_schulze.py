@@ -317,3 +317,10 @@ class AddSchulzeVoteTests(TestCase):
         self.poll.close()
         self.assertIsInstance(self.poll.result, RepeatedSchulzeResult)
         self.assertEqual({self.prop1.pk, self.prop2.pk}, set(self.poll.result.approved))
+
+    def test_add_vote_invalid_proposal(self):
+        self.poll.ongoing()
+        self.poll.save()
+        msg = self._mk_one()
+        msg.data.vote.ranking.append((-1, 10))
+        self.assertRaises(ValidationErrorMsg, msg.run_job)

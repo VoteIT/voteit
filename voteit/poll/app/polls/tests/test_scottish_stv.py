@@ -1,3 +1,5 @@
+from collections import Counter
+
 from django.test import TestCase
 from django_fsm import TransitionNotAllowed
 
@@ -67,8 +69,25 @@ class ScottishTests(TestCase):
         result = self.poll.result
         self.assertEqual(len(result.approved), 3)
         self.assertEqual(len(result.denied), 7)
-        for state, count in (ProposalWf.VOTING, 0), (ProposalWf.APPROVED, 3), (ProposalWf.DENIED, 7):
+        for state, count in (
+            (ProposalWf.VOTING, 0),
+            (ProposalWf.APPROVED, 3),
+            (ProposalWf.DENIED, 7),
+        ):
             self.assertEqual(self.poll.proposals.filter(state=state).count(), count)
+
+    def test_result(self):
+        self.poll.settings = {"winners": 2}
+        one = self.poll.proposals.create()
+        two = self.poll.proposals.create()
+        three = self.poll.proposals.create()
+        counter = Counter()
+        counter[f"{one.pk},{two.pk},{three.pk}"] = 5
+        counter[f"{one.pk},{three.pk}"] = 2
+        counter[f"{three.pk},{two.pk}"] = 3
+        result = self.poll.method.calculate_result(counter)
+        self.assertEqual([one.pk, three.pk], result.approved)
+        self.assertIsInstance(result.json(), str)
 
 
 class AddVoteTests(TestCase):
@@ -117,13 +136,15 @@ class AddVoteTests(TestCase):
 
 
 class ChangeVoteTests(TestCase):
-
     def setUp(self):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
+
         self.er = ElectoralRegister.objects.create()
         self.voter = self.er.voters.create(username="voter")
-        self.poll = Poll.objects.create(electoral_register=self.er, method_name="scottish_stv")
+        self.poll = Poll.objects.create(
+            electoral_register=self.er, method_name="scottish_stv"
+        )
         self.prop1 = self.poll.proposals.create()
         self.prop2 = self.poll.proposals.create()
         self.prop3 = self.poll.proposals.create()
@@ -131,7 +152,9 @@ class ChangeVoteTests(TestCase):
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.save()
-        self.vote = self.poll.votes.create(user=self.voter, vote_data=f"{self.prop3.pk},{self.prop2.pk}")
+        self.vote = self.poll.votes.create(
+            user=self.voter, vote_data=f"{self.prop3.pk},{self.prop2.pk}"
+        )
 
     @property
     def _cut(self):
@@ -140,9 +163,7 @@ class ChangeVoteTests(TestCase):
         return ChangeSTVVote
 
     def _mk_one(self, **kw):
-        kw.setdefault(
-            "vote", {"ranking": [self.prop1.pk, self.prop2.pk]}
-        )
+        kw.setdefault("vote", {"ranking": [self.prop1.pk, self.prop2.pk]})
         kw.setdefault("pk", self.vote.pk)
         return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 

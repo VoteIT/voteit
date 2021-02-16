@@ -32,12 +32,6 @@ class ScottishSTVSettings(BaseModel):
     class Config:
         allow_mutation = False
 
-    # models.BooleanField(
-    #     _('Allow random in tiebreaks'), default=True,
-    #     help_text=_('Poll may yield incomplete result if random tiebreak is not allowed. '
-    #                 'Random tiebreaks can sometimes affect the end result.')
-    # )
-
 
 class STVVoteSchema(BaseModel):
     ranking: List[int]  # Validation...?
@@ -55,7 +49,7 @@ def _validate_vote(msg, poll, vote_data: STVVoteSchema):
     if unmatched:
         raise ValidationErrorMsg.from_message(
             msg,
-            msg=_("Invalid roles"),
+            msg=_("Invalid vote"),
             errors=[
                 {
                     "loc": ("vote.ranking",),
@@ -115,9 +109,21 @@ class ScottishSTV(PollMethod):
     min_losers = 1
 
     def vote_to_str(self, data: STVVoteSchema) -> str:
+        """
+        >>> data = STVVoteSchema(ranking=[1,3,2])
+        >>> method = ScottishSTV(None)
+        >>> method.vote_to_str(data)
+        '1,3,2'
+        """
         return ",".join([str(x) for x in data.ranking])
 
     def vote_to_obj(self, text: str) -> STVVoteSchema:
+        """
+        >>> method = ScottishSTV(None)
+        >>> data = method.vote_to_obj("4,1,3,2")
+        >>> data.ranking
+        [4, 1, 3, 2]
+        """
         ranking = [int(x) for x in text.split(",")]
         return self.vote_schema(ranking=ranking)
 

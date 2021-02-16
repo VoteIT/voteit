@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 from typing import Counter, Dict, Set, Tuple, Optional, List
 
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext as _
 from py3votecore.schulze_method import SchulzeMethod
 from pydantic import BaseModel, validator
 
 from voteit.messaging.decorators import incoming
+from voteit.messaging.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.abcs import PollMethod
 from voteit.poll.messages import AddVote, ChangeVote
@@ -26,11 +27,35 @@ class VoteSchema(GenericVoteSchema):
     vote: SchulzeVoteSchema
 
 
+def _validate_vote(msg, poll, vote_data: SchulzeVoteSchema):
+    ranked_pks = [x[0] for x in msg.data.vote.ranking]
+    matched_pks = set(
+        poll.proposals.filter(pk__in=ranked_pks).values_list("pk", flat=True)
+    )
+    unmatched = set(ranked_pks) - matched_pks
+    if unmatched:
+        raise ValidationErrorMsg.from_message(
+            msg,
+            msg=_("Invalid vote"),
+            errors=[
+                {
+                    "loc": ("vote.ranking",),
+                    "msg": _("Invalid choice, the following proposals don't exist: %s")
+                    % ",".join([str(x) for x in unmatched]),
+                    "type": "value.error",
+                }
+            ],
+        )
+
+
 @incoming
 class AddSchulzeVote(AddVote):
     name = "schulze_vote.add"
     schema = VoteSchema
     data: VoteSchema
+
+    def validate_vote(self):
+        _validate_vote(self, self.context, self.data.vote)
 
 
 @incoming
@@ -38,6 +63,9 @@ class ChangeSchulzeVote(ChangeVote):
     name = "schulze_vote.change"
     schema = VoteSchema
     data: VoteSchema
+
+    def validate_vote(self):
+        _validate_vote(self, self.context.poll, self.data.vote)
 
 
 class SchulzePollResult(PollResult):
