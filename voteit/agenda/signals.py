@@ -11,6 +11,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import AgendaItemSerializer
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.signals import archive_meeting
 from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.signals import channel_subscribed
 
@@ -45,3 +46,10 @@ def agenda_delete(instance=None, **kw):
     ch = MeetingChannel.from_instance(instance.meeting)
     msg = AgendaDeleted({}, pk=instance.pk)
     ch.publish(msg)
+
+
+@receiver(archive_meeting)
+def archive_agenda_items(meeting: Meeting, **kw):
+    for ai in meeting.agenda_items.all():
+        ai.archive()
+        ai.save()

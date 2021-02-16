@@ -154,13 +154,10 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         field=state, target=MeetingWf.ARCHIVED, permission="__not_allowed_manually__"
     )
     def archive(self):
+        from voteit.meeting.signals import archive_meeting  # Avoid circular import
+
         with transaction.atomic():
-            # FIXME: Move this to a signal so a lot of different models may handle archiving
-            for ai in self.agenda_items.all():
-                ai.archive()
-                ai.save()
-        # Catch DatabaseError?
-        # FIXME cleanup, actual work etc...
+            archive_meeting.send(sender=self.__class__, meeting=self)
 
     def archiving_allowed(self):
         pass
@@ -178,7 +175,9 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         def for_user(self, user: AbstractUser):
             if user.is_superuser:
                 return self.all()
-            return self.filter(models.Q(public=True) | models.Q(participants=user)).distinct()
+            return self.filter(
+                models.Q(public=True) | models.Q(participants=user)
+            ).distinct()
 
     class Manager(models.Manager):
         def get_queryset(self):
