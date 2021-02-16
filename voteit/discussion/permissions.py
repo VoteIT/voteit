@@ -1,7 +1,12 @@
+from voteit.core.registries import permissions
 
 
 class DiscussionPermissions:
-    ADD = "discussion.add_discussionpost"  # Checked against agenda item
-    CHANGE = "discussion.change_discussionpost"
-    DELETE = "discussion.delete_discussionpost"
-    VIEW = "discussion.view_discussionpost"
+    ADD = permissions.create("discussion.add_discussionpost", "agenda.AgendaItem")
+    CHANGE = permissions.create(
+        "discussion.change_discussionpost", "discussion.DiscussionPost"
+    )
+    DELETE = permissions.create(
+        "discussion.delete_discussionpost", "discussion.DiscussionPost"
+    )
+    VIEW = permissions.create("discussion.view_discussionpost", "discussion.DiscussionPost")

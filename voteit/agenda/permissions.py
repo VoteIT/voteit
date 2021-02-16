@@ -1,7 +1,8 @@
+from voteit.core.registries import permissions
 
 
 class AgendaPermissions:
-    ADD = "voteit.agenda.add_agenda"  # Checked against meeting
-    CHANGE = "voteit.agenda.change_agenda"
-    DELETE = "voteit.agenda.delete_agenda"
-    VIEW = "voteit.agenda.view_agenda"
+    ADD = permissions.create("voteit.agenda.add_agenda", "meeting.Meeting")
+    CHANGE = permissions.create("voteit.agenda.change_agenda", "agenda.AgendaItem")
+    DELETE = permissions.create("voteit.agenda.delete_agenda", "agenda.AgendaItem")
+    VIEW = permissions.create("voteit.agenda.view_agenda", "agenda.AgendaItem")

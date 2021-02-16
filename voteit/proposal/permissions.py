@@ -1,8 +1,9 @@
+from voteit.core.registries import permissions
 
 
 class ProposalPermissions:
-    ADD = "proposal.add_proposal"  # Checked against agenda item
-    CHANGE = "proposal.change_proposal"
-    DELETE = "proposal.delete_proposal"
-    VIEW = "proposal.view_proposal"
-    RETRACT = "proposal.retract_proposal"
+    ADD = permissions.create("proposal.add_proposal", "agenda.AgendaItem")
+    CHANGE = permissions.create("proposal.change_proposal", "proposal.Proposal")
+    DELETE = permissions.create("proposal.delete_proposal", "proposal.Proposal")
+    VIEW = permissions.create("proposal.view_proposal", "proposal.Proposal")
+    RETRACT = permissions.create("proposal.retract_proposal", "proposal.Proposal")

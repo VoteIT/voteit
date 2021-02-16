@@ -1,16 +1,39 @@
+from voteit.core.registries import permissions
+
+
 class SpeakerSystemPermissions:
-    ADD = "voteit.speaker.add_speaker_system"  # We don't know about this perm yet
-    CHANGE = "voteit.speaker.change_speaker_system"
-    DELETE = "voteit.speaker.delete_speaker_system"
-    VIEW = "voteit.speaker.view_speaker_system"
+    ADD = permissions.create("voteit.speaker.add_speaker_system", "meeting.Meeting")
+    CHANGE = permissions.create(
+        "voteit.speaker.change_speaker_system", "speaker.SpeakerListSystem"
+    )
+    DELETE = permissions.create(
+        "voteit.speaker.delete_speaker_system", "speaker.SpeakerListSystem"
+    )
+    VIEW = permissions.create(
+        "voteit.speaker.view_speaker_system", "speaker.SpeakerListSystem"
+    )
 
 
 class SpeakerListPermissions:
-    ADD = "voteit.speaker.add_speaker_list"  # Checked against speaker system
-    CHANGE = "voteit.speaker.change_speaker_list"
-    DELETE = "voteit.speaker.delete_speaker_list"
-    VIEW = "voteit.speaker.view_speaker_list"
-    ENTER = "voteit.speaker.enter_speaker_list"
-    LEAVE = "voteit.speaker.leave_speaker_list"
-    START = "voteit.speaker.start_speaker_in_list"
-    STOP = "voteit.speaker.stop_speaker_in_list"
+    ADD = permissions.create(
+        "voteit.speaker.add_speaker_list", "speaker.SpeakerListSystem"
+    )
+    CHANGE = permissions.create(
+        "voteit.speaker.change_speaker_list", "speaker.SpeakerList"
+    )
+    DELETE = permissions.create(
+        "voteit.speaker.delete_speaker_list", "speaker.SpeakerList"
+    )
+    VIEW = permissions.create("voteit.speaker.view_speaker_list", "speaker.SpeakerList")
+    ENTER = permissions.create(
+        "voteit.speaker.enter_speaker_list", "speaker.SpeakerList"
+    )
+    LEAVE = permissions.create(
+        "voteit.speaker.leave_speaker_list", "speaker.SpeakerList"
+    )
+    START = permissions.create(
+        "voteit.speaker.start_speaker_in_list", "speaker.SpeakerList"
+    )
+    STOP = permissions.create(
+        "voteit.speaker.stop_speaker_in_list", "speaker.SpeakerList"
+    )
