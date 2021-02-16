@@ -60,10 +60,11 @@ class AddVote(VoteBase, ABC):
 
     permission = VotePermissions.ADD
     model = Poll
+    context: Poll
 
     def run_job(self):
         self.assert_perm()
-        poll: Poll = self.context
+        poll = self.context
         poll.method.validate_vote(self)
         existing_vote = poll.votes.filter(user=self.user).first()
         if existing_vote is not None:
@@ -100,10 +101,11 @@ class AbstainVote(VoteBase):
     name = "vote.abstain"
     schema = AbstainSchema
     data: AbstainSchema
+    context: Poll
 
     def run_job(self):
         self.assert_perm()
-        poll: Poll = self.context
+        poll = self.context
         existing_vote: Vote = poll.votes.filter(user=self.user).first()
         if existing_vote is None:
             poll.votes.create(user=self.user, abstain=True)
@@ -120,6 +122,7 @@ class ChangeVote(VoteBase, ABC):
     message for each poll method, with a proper vote schema.
     """
 
+    context: Vote
     permission = VotePermissions.CHANGE
     model = Vote
 
@@ -139,10 +142,11 @@ class GetVote(VoteBase):
     name = "vote.get"
     permission = VotePermissions.ADD
     model = Poll
+    context: Poll
 
     def run_job(self) -> Union[GenericVoteResponse, TextResponse]:
         self.assert_perm()
-        poll: Poll = self.context
+        poll = self.context
         try:
             vote: Vote = poll.votes.get(user=self.user)
             msg = GenericVoteResponse.from_message(
