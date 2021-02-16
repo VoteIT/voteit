@@ -11,6 +11,7 @@ from voteit.poll.schemas import PollResult
 if TYPE_CHECKING:
     from voteit.poll.models import Poll
     from voteit.meeting.models import Meeting
+    from voteit.poll.messages import VoteBase
 
 logger = getLogger(__name__)
 
@@ -58,6 +59,12 @@ class PollMethod(ABC):
     @abstractmethod
     def calculate_result(self, counter) -> BaseModel:
         """Takes the counted ballots, calculate the result and store it."""
+
+    def validate_vote(self, msg: VoteBase) -> None:
+        """Run extra validation based on how the vote itself looks.
+        For instance checking that a ranked vote actually ranks real proposals.
+        May raise ValidationErrorMsg in case something goes wrong.
+        """
 
     def start_check(self) -> bool:  # pragma: no cover
         """Specifics for this poll method except the ones for the base Poll.

@@ -52,34 +52,32 @@ class PollStatus(BaseOutgoingMessage):
 
 
 class VoteBase(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
-
-    def validate_vote(self) -> None:
-        """ Run extra validation based on the specific poll method implementation.
-        """
+    pass
 
 
 class AddVote(VoteBase, ABC):
-    """ The base class for adding votes.
-    """
+    """The base class for adding votes."""
 
     permission = VotePermissions.ADD
     model = Poll
 
     def run_job(self):
         self.assert_perm()
-        self.validate_vote()
         poll: Poll = self.context
+        poll.method.validate_vote(self)
         existing_vote = poll.votes.filter(user=self.user).first()
         if existing_vote is not None:
             # Vote already exists - no need to error we can simply change it instead?
             # A bit hackish, lets guess the change name
-            base_name = self.name.split('.')[0]
+            base_name = self.name.split(".")[0]
             type_name = f"{base_name}.change"
             msg = ChangeVote.from_message(
                 self, type_name=type_name, vote=self.data.vote, pk=existing_vote.pk
             )
             msg.send_internal(self.mm.consumer_name)
-            TextResponse.from_message(self, msg="Changed").send_outgoing(self.mm.consumer_name, success=True)
+            TextResponse.from_message(self, msg="Changed").send_outgoing(
+                self.mm.consumer_name, success=True
+            )
             return msg
         else:
             poll.votes.create(user=self.user, vote=self.data.vote)
@@ -95,8 +93,8 @@ class AbstainSchema(BaseModel):
 
 @incoming
 class AbstainVote(VoteBase):
-    """ Abstain from voting in this poll
-    """
+    """Abstain from voting in this poll"""
+
     permission = VotePermissions.ADD
     model = Poll
     name = "vote.abstain"
@@ -118,8 +116,8 @@ class AbstainVote(VoteBase):
 
 
 class ChangeVote(VoteBase, ABC):
-    """ Update a users vote. Subclass this and register as an incoming
-        message for each poll method, with a proper vote schema.
+    """Update a users vote. Subclass this and register as an incoming
+    message for each poll method, with a proper vote schema.
     """
 
     permission = VotePermissions.CHANGE
@@ -127,7 +125,8 @@ class ChangeVote(VoteBase, ABC):
 
     def run_job(self):
         self.assert_perm()
-        self.validate_vote()
+        poll: Poll = self.context.poll
+        poll.method.validate_vote(self)
         self.context.vote = self.data.vote
         self.context.abstain = False
         self.context.save()
@@ -135,8 +134,8 @@ class ChangeVote(VoteBase, ABC):
 
 @incoming
 class GetVote(VoteBase):
-    """ Get users vote in a generic format.
-    """
+    """Get users vote in a generic format."""
+
     name = "vote.get"
     permission = VotePermissions.ADD
     model = Poll
@@ -146,7 +145,9 @@ class GetVote(VoteBase):
         poll: Poll = self.context
         try:
             vote: Vote = poll.votes.get(user=self.user)
-            msg = GenericVoteResponse.from_message(self, vote=vote.vote, abstain=vote.abstain, pk=self.context.pk)
+            msg = GenericVoteResponse.from_message(
+                self, vote=vote.vote, abstain=vote.abstain, pk=self.context.pk
+            )
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg
         except Vote.DoesNotExist:

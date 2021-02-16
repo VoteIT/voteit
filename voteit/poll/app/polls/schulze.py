@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Counter, Dict, Set, Tuple, Optional, List
+from typing import Counter, Dict, Tuple, Optional, List, Union
 
 from django.utils.translation import gettext as _
 from py3votecore.schulze_method import SchulzeMethod
@@ -27,35 +27,11 @@ class VoteSchema(GenericVoteSchema):
     vote: SchulzeVoteSchema
 
 
-def _validate_vote(msg, poll, vote_data: SchulzeVoteSchema):
-    ranked_pks = [x[0] for x in msg.data.vote.ranking]
-    matched_pks = set(
-        poll.proposals.filter(pk__in=ranked_pks).values_list("pk", flat=True)
-    )
-    unmatched = set(ranked_pks) - matched_pks
-    if unmatched:
-        raise ValidationErrorMsg.from_message(
-            msg,
-            msg=_("Invalid vote"),
-            errors=[
-                {
-                    "loc": ("vote.ranking",),
-                    "msg": _("Invalid choice, the following proposals don't exist: %s")
-                    % ",".join([str(x) for x in unmatched]),
-                    "type": "value.error",
-                }
-            ],
-        )
-
-
 @incoming
 class AddSchulzeVote(AddVote):
     name = "schulze_vote.add"
     schema = VoteSchema
     data: VoteSchema
-
-    def validate_vote(self):
-        _validate_vote(self, self.context, self.data.vote)
 
 
 @incoming
@@ -63,9 +39,6 @@ class ChangeSchulzeVote(ChangeVote):
     name = "schulze_vote.change"
     schema = VoteSchema
     data: VoteSchema
-
-    def validate_vote(self):
-        _validate_vote(self, self.context.poll, self.data.vote)
 
 
 class SchulzePollResult(PollResult):
@@ -159,6 +132,28 @@ class Schulze(PollMethod):
         res.approved.append(res.winner)
         res.denied.extend([x for x in res.candidates if x != res.winner])
         return res
+
+    def validate_vote(self, msg: Union[AddSchulzeVote, ChangeSchulzeVote]) -> None:
+        ranked_pks = [x[0] for x in msg.data.vote.ranking]
+        matched_pks = set(
+            self.poll.proposals.filter(pk__in=ranked_pks).values_list("pk", flat=True)
+        )
+        unmatched = set(ranked_pks) - matched_pks
+        if unmatched:
+            raise ValidationErrorMsg.from_message(
+                msg,
+                msg=_("Invalid vote"),
+                errors=[
+                    {
+                        "loc": ("vote.ranking",),
+                        "msg": _(
+                            "Invalid choice, the following proposals don't exist: %s"
+                        )
+                        % ",".join([str(x) for x in unmatched]),
+                        "type": "value.error",
+                    }
+                ],
+            )
 
     def start_check(self):
         if self.poll.proposals.count() < 3:
