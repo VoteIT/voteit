@@ -4,6 +4,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from voteit.poll import models
+from voteit.poll.utils import get_poll_method_registry
 from voteit.proposal.workflows import ProposalWf
 
 
@@ -46,12 +47,18 @@ class PollCreateSerializer(serializers.ModelSerializer):
         """ Get proposal set and make sure they're all published. """
         agenda_item = attrs.get("agenda_item")
         proposal_pks = attrs.get("proposal_pks").split(",")
+        method_name = attrs.get("method_name")
         self._proposals = agenda_item.proposals.filter(
             pk__in=proposal_pks, state=ProposalWf.PUBLISHED
         )
         if len(self._proposals) != len(proposal_pks):
             raise serializers.ValidationError(
                 "Proposals must be published on Agenda Item"
+            )
+        reg = get_poll_method_registry()
+        if method_name not in reg:
+            raise serializers.ValidationError(
+                f"{method_name} is not a valid poll method. {repr(list(reg.keys()))}"
             )
         return super().validate(attrs)
 
@@ -62,10 +69,6 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
         with transaction.atomic():
             poll = super().create(validated_data)
-            # TODO Move to a signal?
-            # for proposal in self._proposals:
-            #     proposal.lock_for_vote()
-            #     proposal.save()
             poll.proposals.set(self._proposals)
             if start:
                 poll.upcoming()

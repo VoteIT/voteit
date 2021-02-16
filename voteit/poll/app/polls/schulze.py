@@ -18,7 +18,8 @@ __all__ = ("Schulze", "RepeatedSchulze")
 
 
 class SchulzeVoteSchema(BaseModel):
-    ranking: Dict[int, int]
+    # FIXME Will not serialize: https://github.com/django/channels_redis/issues/216
+    ranking: List[Tuple[int, int]]
 
 
 class VoteSchema(GenericVoteSchema):
@@ -27,24 +28,24 @@ class VoteSchema(GenericVoteSchema):
 
 @incoming
 class AddSchulzeVote(AddVote):
-    name = "schulze.add"
+    name = "schulze_vote.add"
     schema = VoteSchema
     data: VoteSchema
 
 
 @incoming
 class ChangeSchulzeVote(ChangeVote):
-    name = "schulze.change"
+    name = "schulze_vote.change"
     schema = VoteSchema
     data: VoteSchema
 
 
 class SchulzePollResult(PollResult):
-    pairs: Dict[Tuple[int, int], int]
-    candidates: Set[int]
+    pairs: List[Tuple[Tuple[int, int], int]]
+    candidates: List[int]
     winner: int
-    strong_pairs: Dict[Tuple[int, int], int]
-    tied_winners: Optional[Set[int]]
+    strong_pairs: List[Tuple[Tuple[int, int], int]]
+    tied_winners: Optional[List[int]]
 
 
 @poll_methods
@@ -59,32 +60,39 @@ class Schulze(PollMethod):
     def vote_to_str(self, data: SchulzeVoteSchema) -> str:
         """
         >>> method = Schulze(None)
-        >>> vote = SchulzeVoteSchema(ranking={10:1, 30:3, 20:2})
+        >>> vote = SchulzeVoteSchema(ranking=[[10, 1], [20, 2], [30, 3]])
         >>> method.vote_to_str(vote)
         '[[10, 1], [20, 2], [30, 3]]'
         """
-        # Create a list and sort on proposal id
-        items = sorted(data.ranking.items(), key=lambda x: x[0])
+        # Sort on proposal id
+        items = sorted(data.ranking, key=lambda x: x[0])
         return json.dumps(items)
 
     def vote_to_obj(self, text: str) -> SchulzeVoteSchema:
         """
         >>> method = Schulze(None)
         >>> method.vote_to_obj("[[10, 1], [20, 2], [30, 3]]")
-        SchulzeVoteSchema(ranking={10: 1, 20: 2, 30: 3})
+        SchulzeVoteSchema(ranking=[(10, 1), (20, 2), (30, 3)])
         """
         vals = []
         if text:
             vals = json.loads(text)
-        return self.vote_schema(ranking=dict(vals))
+        return self.vote_schema(ranking=vals)
 
     def schulze_format(self, counter: Counter) -> List[Dict]:
         """ Internal helper to fix expected input."""
         input = []
         for (text, count) in counter.items():
             ballot = self.vote_to_obj(text)
-            input.append({"count": count, "ballot": ballot.ranking})
+            ranking = dict(ballot.ranking)  # Method needs a dict
+            input.append({"count": count, "ballot": ranking})
         return input
+
+    def schulze_to_poll_result(self, method: SchulzeMethod) -> SchulzePollResult:
+        output = method.as_dict()
+        for key in ('pairs', 'strong_pairs'):
+            output[key] = list(output.get(key, {}).items())
+        return SchulzePollResult(**output)
 
     def calculate_result(self, counter: Counter) -> SchulzePollResult:
         """
@@ -95,14 +103,14 @@ class Schulze(PollMethod):
         >>> result = method.calculate_result(counter)
         >>> result.winner
         20
-        >>> result.candidates
+        >>> set(result.candidates)
         {10, 20}
         """
         input = self.schulze_format(counter)
-        output = SchulzeMethod(
+        method = SchulzeMethod(
             input, ballot_notation=SchulzeMethod.BALLOT_NOTATION_RATING
         )
-        res = SchulzePollResult(**output.as_dict())
+        res = self.schulze_to_poll_result(method)
         res.approved.append(res.winner)
         res.denied.extend([x for x in res.candidates if x != res.winner])
         return res
@@ -114,7 +122,7 @@ class Schulze(PollMethod):
 
 class RepeatedSchulzeResult(PollResult):
     rounds: List[SchulzePollResult] = []
-    candidates: Set[int]
+    candidates: List[int]
 
 
 class RepeatedSchulzeSettingsSchema(BaseModel):
@@ -149,10 +157,10 @@ class RepeatedSchulze(Schulze):
             rounds_to_do = self.poll.settings.winners
         rounds = []
         for i in range(rounds_to_do):
-            output = SchulzeMethod(
+            method = SchulzeMethod(
                 input, ballot_notation=SchulzeMethod.BALLOT_NOTATION_RATING
             )
-            this_round = SchulzePollResult(**output.as_dict())
+            this_round = self.schulze_to_poll_result(method)
             rounds.append(this_round)
             # Eliminate elected
             for item in input:
