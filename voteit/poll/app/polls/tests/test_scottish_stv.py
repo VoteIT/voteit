@@ -1,4 +1,5 @@
 from collections import Counter
+from json import dumps
 
 from django.test import TestCase
 from django_fsm import TransitionNotAllowed

@@ -49,8 +49,7 @@ User = get_user_model()
 
 
 class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
-    """ Demultiplexing consumer.
-    """
+    """Demultiplexing consumer."""
 
     # User model, don't trust this since it will be wiped during logout procedure.
     user: Optional[AbstractUser] = None
@@ -134,7 +133,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         """
         :param message: Outgoing or incoming message
         :param require_action: Cause an exception of the message wasn't acted upon.
-        :return: 
+        :return:
         """
         # FIXME: How do we handle errors here?
         act = 0
@@ -196,10 +195,13 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             await self.post_error()
 
     async def websocket_send(self, event: Dict):
-        """ Push data to the websocket. Any channels message with the type "websocket.send" will end up here.
-            But don't use this method directly,
-            send messages that are registered within registries.outgoing_messages
+        """Push data to the websocket. Any channels message with the type "websocket.send" will end up here.
+        But don't use this method directly,
+        send messages that are registered within registries.outgoing_messages
         """
+        inc_p = event.get("p", None)
+        if inc_p and isinstance(inc_p, str):
+            event["p"] = json.loads(inc_p)
         envelope = OutgoingEnvelope(**event)
         message = BaseOutgoingMessage.from_consumer(self, envelope)
         await self.handle_message(message, require_action=False)
@@ -210,8 +212,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         self.last_sent = now()
 
     async def post_error(self):
-        """ Things that might need to be cleaned up or handled after an incoming message has caused an error.
-        """
+        """Things that might need to be cleaned up or handled after an incoming message has caused an error."""
         if self.message_errors > 10:
             logger.debug(
                 "Consumer %s caused too many errors, disconnecting", self.channel_name
@@ -223,6 +224,9 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         Handle incoming internal messages.
         Incoming messages are dicts corresponding to InternalEnvelope.
         """
+        inc_p = event.get("p", None)
+        if inc_p and isinstance(inc_p, str):
+            event["p"] = json.loads(inc_p)
         envelope = InternalEnvelope(**event)
         # This may cause validation errors, but that message shouldn't exist in that case it was resent from
         # backend and not from the user.
@@ -234,9 +238,9 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         await self.handle_message(message)
 
     async def send_error(self, error: BaseError):
-        """ Send an error directly to the consumer instead of going through the channels layer.
+        """Send an error directly to the consumer instead of going through the channels layer.
 
-            Any error occurring within the consumer should be handled this way.
+        Any error occurring within the consumer should be handled this way.
         """
         self.last_error = now()
         assert isinstance(error, BaseError)
@@ -248,9 +252,9 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=payload)
 
     def dispatch_connect(self):
-        """ The connect signal even will be fired in a worker instead,
-            since the sync calls to db aren't great to mix with async code.
-            Currently channels testing doesn't work very well with database_sync_to_async. (2020-12 /Robin)
+        """The connect signal even will be fired in a worker instead,
+        since the sync calls to db aren't great to mix with async code.
+        Currently channels testing doesn't work very well with database_sync_to_async. (2020-12 /Robin)
         """
         queue = self.get_queue(DEFAULT_QUEUE)
         return queue.enqueue(
@@ -260,8 +264,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         )
 
     def dispatch_close(self, close_code):
-        """ Ask as worker to signal instead of doing it here.
-        """
+        """Ask as worker to signal instead of doing it here."""
         queue = self.get_queue(DEFAULT_QUEUE)
         return queue.enqueue(
             signal_websocket_close,

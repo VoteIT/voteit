@@ -70,14 +70,12 @@ class MessageABC(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        """ The ID/name of the command or query. This corresponds to 't' on incoming messages.
-        """
+        """The ID/name of the command or query. This corresponds to 't' on incoming messages."""
 
     @staticmethod
     @abstractmethod
     def get_registry() -> Registry:
-        """ The used registry for this type.
-        """
+        """The used registry for this type."""
 
     @classmethod
     @abstractmethod
@@ -93,7 +91,7 @@ class MessageABC(ABC):
             self.mm = mm
         else:
             assert isinstance(self.name, str), "Name attribute is not set as a string"
-            mm['type'] = self.name
+            mm["type"] = self.name
             self.mm = MessageMeta(**mm)
         if data is None:
             data = {}
@@ -112,24 +110,27 @@ class MessageABC(ABC):
         return get_channel_layer(self.channel_layer_name)
 
     def send_internal(self, channel_name: str, group: bool = False, on_commit=True):
-        """ Queue an internal message, meant for the consumer and not to be transmitted over websocket.
-            These are usually actions that need to be taken by the consumers, like healthchecks.
+        """Queue an internal message, meant for the consumer and not to be transmitted over websocket.
+        These are usually actions that need to be taken by the consumers, like healthchecks.
         """
+
         def _hook():
             async_to_sync(self.async_send_internal)(channel_name, group=group)
+
         if on_commit:
             transaction.on_commit(_hook)
         else:
             _hook()
 
-    async def async_send_internal(self, channel_name: str, group: bool = False, on_commit=None):
+    async def async_send_internal(
+        self, channel_name: str, group: bool = False, on_commit=None
+    ):
         assert on_commit is None, "This argument doesn't work on async calls!"
         envelope = InternalEnvelope(
-            p=self.data,
+            p=self.data.json(),
             i=self.mm.message_id,
             t=self.mm.type,
             incoming=isinstance(self, BaseIncomingMessage),
-
         )
         if group:
             await self.channel_layer.group_send(channel_name, envelope.dict())
@@ -142,15 +143,17 @@ class MessageABC(ABC):
         state: Optional[str] = None,
         success: Optional[bool] = None,
         group: bool = False,
-        on_commit: bool = True
+        on_commit: bool = True,
     ):
-        """ Queue a message that the consumer is meant to deliver over websocket to the client.
-            The message may also contain actions that'll be taken before the message is transmitted.
+        """Queue a message that the consumer is meant to deliver over websocket to the client.
+        The message may also contain actions that'll be taken before the message is transmitted.
         """
+
         def _hook():
             async_to_sync(self.async_send_outgoing)(
                 channel_name, state=state, success=success, group=group
             )
+
         if on_commit:
             transaction.on_commit(_hook)
         else:
@@ -162,10 +165,10 @@ class MessageABC(ABC):
         state: Optional[str] = None,
         success: Optional[bool] = None,
         group: bool = False,
-        on_commit = None
+        on_commit=None,
     ):
-        """ Async call to queue an outgoing message. Use this directly when possible.
-            Note that it doesn't support transactions so it will be queued directly.
+        """Async call to queue an outgoing message. Use this directly when possible.
+        Note that it doesn't support transactions so it will be queued directly.
         """
         assert on_commit is None, "This argument doesn't work on async calls!"
         if success is not None:
@@ -176,7 +179,7 @@ class MessageABC(ABC):
             else:
                 state = self.FAILED
         envelope = OutgoingEnvelope(
-            p=self.data, i=self.mm.message_id, t=self.mm.type, s=state
+            p=self.data.json(), i=self.mm.message_id, t=self.mm.type, s=state
         )
         if group:
             await self.channel_layer.group_send(channel_name, envelope.dict())
@@ -185,10 +188,11 @@ class MessageABC(ABC):
 
     @classmethod
     def from_consumer(
-        cls, consumer, envelope: Union[IncomingEnvelope, InternalEnvelope, OutgoingEnvelope]
+        cls,
+        consumer,
+        envelope: Union[IncomingEnvelope, InternalEnvelope, OutgoingEnvelope],
     ):
-        """ Instantiate a message with details from the consumer and an envelope.
-        """
+        """Instantiate a message with details from the consumer and an envelope."""
         mm = MessageMeta(
             consumer_name=consumer.channel_name,
             user_pk=consumer.user.pk,
@@ -220,11 +224,11 @@ class MessageABC(ABC):
 
 
 class BaseIncomingMessage(MessageABC, ABC):
-    """ A message that might be received from websocket or picked up internally.
+    """A message that might be received from websocket or picked up internally.
 
-        Only these kinds of messages can be received through sockets.
+    Only these kinds of messages can be received through sockets.
 
-        It's registered in the incoming registry and works as an API.
+    It's registered in the incoming registry and works as an API.
     """
 
     @staticmethod
@@ -245,8 +249,8 @@ class BaseIncomingMessage(MessageABC, ABC):
 
 
 class BaseOutgoingMessage(MessageABC, ABC):
-    """ A message that may be transmitted and processed within the consumer or delegated and sent to the websocket.
-        These kind of messages are registered as outgoing and should be treated as expected responses.
+    """A message that may be transmitted and processed within the consumer or delegated and sent to the websocket.
+    These kind of messages are registered as outgoing and should be treated as expected responses.
     """
 
     @staticmethod
@@ -267,9 +271,9 @@ class BaseOutgoingMessage(MessageABC, ABC):
 
 
 class AsyncRunnable(ABC):
-    """ This message is ment to be processed within the consumer.
-        It mustn't be blocking or run database queries.
-        Anything locking up the consumer will cause it to stop processing messages for that user.
+    """This message is ment to be processed within the consumer.
+    It mustn't be blocking or run database queries.
+    Anything locking up the consumer will cause it to stop processing messages for that user.
     """
 
     @abstractmethod
@@ -278,8 +282,8 @@ class AsyncRunnable(ABC):
 
 
 class DeferredJob(ABC):
-    """ Command/query can be deferred to a job queue.
-        Must be used together with BaseIncomingMessage or BaseOutgoingMessage"""
+    """Command/query can be deferred to a job queue.
+    Must be used together with BaseIncomingMessage or BaseOutgoingMessage"""
 
     queue = DEFAULT_QUEUE
     # job_timeout = 7
@@ -291,20 +295,21 @@ class DeferredJob(ABC):
     # Markers for type checking
     mm: MessageMeta
     data: BaseModel  # But really the schema
-    should_run:bool = True  # Mark as false to abort run
+    should_run: bool = True  # Mark as false to abort run
 
     async def pre_queue(self, consumer: WebsocketDemuxConsumer):
-        """ Do something before entering the queue. Only applies to when the consumer receives the message.
-            It's a good idea to avoid using this if it's not needed.
+        """Do something before entering the queue. Only applies to when the consumer receives the message.
+        It's a good idea to avoid using this if it's not needed.
         """
 
     def enqueue(self, queue=None):
         # FIXME: Queues and django_rq are kind of a mess right now
         from voteit.messaging.jobs import run_job
+
         if not self.should_run:
             return
         kwargs = dict(
-            msg_data=self.data.dict(),
+            msg_data=self.data.dict(),  # FIXME: Json encode instead?
             mm_data=self.mm.dict(),
             incoming=isinstance(self, BaseIncomingMessage),
             atomic=True,
@@ -366,12 +371,12 @@ class ContextSchema(BaseModel):
 
 
 class ContextAction(MessageABC, ABC):
-    """ An action performed on a specific context.
-        It has a permission and a model. The schema itself must contain 'pk' that will be
-        used for lookup of the context to perform the action on.
+    """An action performed on a specific context.
+    It has a permission and a model. The schema itself must contain 'pk' that will be
+    used for lookup of the context to perform the action on.
 
-        Note that it only works as a placeholder for an action, the code itself should be constructed by
-        combining it with DeferredJob and must also inherit BaseIncomingMessage or BaseOutgoingMessage
+    Note that it only works as a placeholder for an action, the code itself should be constructed by
+    combining it with DeferredJob and must also inherit BaseIncomingMessage or BaseOutgoingMessage
     """
 
     schema = ContextSchema
@@ -461,11 +466,12 @@ class BaseError(BaseOutgoingMessage, Exception, ABC):
         state: Optional[str] = None,
         success: Optional[bool] = None,
         group: bool = False,
-        on_commit: bool = False
+        on_commit: bool = False,
     ):
-        """ Error messages should normally be sent directly, so default on_commit to false
-        """
-        super(BaseError, self).send_outgoing(channel_name, state=state, success=success, group=group, on_commit=on_commit)
+        """Error messages should normally be sent directly, so default on_commit to false"""
+        super(BaseError, self).send_outgoing(
+            channel_name, state=state, success=success, group=group, on_commit=on_commit
+        )
 
     async def async_send_outgoing(
         self,
@@ -473,7 +479,7 @@ class BaseError(BaseOutgoingMessage, Exception, ABC):
         state: Optional[str] = None,
         success: Optional[bool] = False,
         group: bool = False,
-        on_commit = None
+        on_commit=None,
     ):
         """ Override and default to error."""
         assert on_commit is None, "This argument doesn't work on async calls!"
@@ -484,8 +490,8 @@ class BaseError(BaseOutgoingMessage, Exception, ABC):
 
 
 class AbstractChannel(ABC):
-    """ Classic publish/subscribe pattern. This represents a channel that a consumer (websocket connection)
-        can subscribe to.
+    """Classic publish/subscribe pattern. This represents a channel that a consumer (websocket connection)
+    can subscribe to.
     """
 
     logger = logger
@@ -528,7 +534,9 @@ class AbstractChannel(ABC):
     def subscribe(self, consumer_channel=None):
         async_to_sync(self.async_subscribe)(consumer_channel=consumer_channel)
 
-    async def async_publish(self, message: MessageABC, internal=False, on_commit=None, **kwargs):
+    async def async_publish(
+        self, message: MessageABC, internal=False, on_commit=None, **kwargs
+    ):
         # self.logger.debug("Publish to %s", self.channel_name)
         assert on_commit is None, "This argument doesn't work on async calls!"
         assert isinstance(message, MessageABC)
@@ -540,6 +548,7 @@ class AbstractChannel(ABC):
     def publish(self, message: MessageABC, internal=False, on_commit=True, **kwargs):
         def _hook():
             async_to_sync(self.async_publish)(message, internal=internal, **kwargs)
+
         if on_commit:
             transaction.on_commit(_hook)
         else:
@@ -557,8 +566,7 @@ class AbstractChannel(ABC):
 
 
 class AbstractObjectChannel(AbstractChannel):
-    """ A channel that has to do with a specific object. For instance, the agenda channel is related to a meeting.
-    """
+    """A channel that has to do with a specific object. For instance, the agenda channel is related to a meeting."""
 
     logger = logger
     pk: int  # Primary key of the object that this channel is about
@@ -615,8 +623,8 @@ class AbstractObjectChannel(AbstractChannel):
             )
 
     def allow_subscribe(self, user):
-        """ Call this before subscribing. Due to sync/async and the complexity of
-            permissions this won't be enforced before calling subscribe.
+        """Call this before subscribing. Due to sync/async and the complexity of
+        permissions this won't be enforced before calling subscribe.
         """
         if user is None:
             return False
@@ -627,17 +635,17 @@ class AbstractObjectChannel(AbstractChannel):
         return user.has_perm(self.permission, self.context)
 
     def allow_publish(self, user):
-        """ Override and call this before publishing. Due to sync/async and the complexity of
-            permissions this won't be enforced before calling publish.
+        """Override and call this before publishing. Due to sync/async and the complexity of
+        permissions this won't be enforced before calling publish.
 
-            Defaulting to false is ok here
+        Defaulting to false is ok here
         """
         return False
 
     def allow_leave(self, user):
-        """ Override and call this before leaving. Due to sync/async and the complexity of
-            permissions this won't be enforced before calling leave.
+        """Override and call this before leaving. Due to sync/async and the complexity of
+        permissions this won't be enforced before calling leave.
 
-            Leave shouldn't require the same permission checks so we'll settle on allowing this as default.
+        Leave shouldn't require the same permission checks so we'll settle on allowing this as default.
         """
         return True
