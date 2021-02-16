@@ -18,8 +18,7 @@ class CoreDocTests(TestCase):
         doctest.testfile(os.path.join(self.DOCS_RELATIVE, fn))
 
     def test_narrative_readme(self):
-        pass
-        # self._doctest_file("narrative.md")
+        self._doctest_file("narrative.md")
 
 
 def load_tests(loader, tests, pattern):

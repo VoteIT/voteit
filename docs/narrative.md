@@ -5,7 +5,8 @@ This file is part of the regular test suite too.
 
 Since most things relate to user, we'll create a user first.
 
-    >>> from django.contrib.auth.models import User
+    >>> from django.contrib.auth import get_user_model
+    >>> User = get_user_model()
     >>> jane = User.objects.create(username="jane")
 
 ## Organisations
@@ -21,17 +22,25 @@ Organisations have managers - they should have access to all
 settings and meetings. The rule is_manager checks that.
 
     >>> from voteit.organisation.rules import is_manager
-    >>> org.managers.add(jane)
-    >>> org.save()
+    >>> org.add_roles(jane, "org_manager")
+    [org_manager]
+
     >>> is_manager(jane, org)
+    True
+
+Most permissions checks are done directly from the user model though.
+
+    >>> from voteit.organisation.permissions import OrgPermissions
+    >>> jane.has_perm(OrgPermissions.MANAGE, org)
     True
 
 Meeting creators should only have the option to create a meeting
 but can't touch anything else.
 
     >>> from voteit.organisation.rules import is_meeting_creator
-    >>> org.meeting_creators.add(jane)
-    >>> org.save()
+    >>> org.add_roles(jane, "meeting_creator")
+    [meeting_creator]
+
     >>> is_meeting_creator(jane, org)
     True
 
@@ -54,8 +63,9 @@ a meeting should pass that rule first.
     >>> is_participant(jane, meeting)
     False
 
-    >>> meeting.participants.add(jane)
-    >>> meeting.save()
+    >>> meeting.add_roles(jane, "participant")
+    [participant]
+
     >>> is_participant(jane, meeting)
     True
 
