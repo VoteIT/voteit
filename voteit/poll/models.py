@@ -151,8 +151,12 @@ class Poll(BaseContent, MeetingContext):
             return schema(**data)
 
     @settings.setter
-    def settings(self, value: Union[Dict, BaseModel]):
+    def settings(self, value: Union[Dict, BaseModel, None]) -> None:
+        if value is None:
+            return
         schema = self.method.settings_schema
+        if schema is None:
+            raise ValueError(f"Poll method '{self.method_name}' has no settings")
         if isinstance(value, dict):
             data = schema(**value)
         elif isinstance(value, schema):

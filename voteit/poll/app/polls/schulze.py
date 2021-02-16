@@ -41,6 +41,20 @@ class ChangeSchulzeVote(ChangeVote):
     data: VoteSchema
 
 
+@incoming
+class AddRepeatedSchulzeVote(AddVote):
+    name = "repeated_schulze_vote.add"
+    schema = VoteSchema
+    data: VoteSchema
+
+
+@incoming
+class ChangeRepeatedSchulzeVote(ChangeVote):
+    name = "repeated_schulze_vote.change"
+    schema = VoteSchema
+    data: VoteSchema
+
+
 class SchulzePollResult(PollResult):
     pairs: List[Tuple[Tuple[int, int], int]]
     candidates: List[int]
