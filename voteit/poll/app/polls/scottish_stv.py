@@ -1,5 +1,4 @@
 from collections import Counter
-from decimal import Decimal
 from typing import List, Dict, Union
 
 from django.utils.translation import gettext as _
@@ -62,7 +61,7 @@ class STVResultSchema(PollResult):
     rounds: List[Dict]
     randomized: bool
     quota: int
-    runtime: Decimal
+    runtime: float
     empty_ballot_count: int
 
 
