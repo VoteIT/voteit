@@ -3,8 +3,8 @@ from django.utils.translation import gettext_lazy as _
 
 
 class MeetingConfig(AppConfig):
-    name = 'voteit.meeting'
-    verbose_name = _('Meeting')
+    name = "voteit.meeting"
+    verbose_name = _("Meeting")
 
     def ready(self):
         from voteit.meeting import roles
@@ -12,3 +12,4 @@ class MeetingConfig(AppConfig):
         from voteit.meeting import rest_api
         from voteit.meeting import channels
         from voteit.meeting import messages
+        from voteit.meeting import signals
