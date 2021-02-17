@@ -60,11 +60,6 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
         else:
             logger.debug("%s already has the correct electoral register", poll)
 
-    def create_er(self, meeting: Meeting) -> ElectoralRegister:
-        er = ElectoralRegister.objects.create(meeting=meeting)
-        er.voters.set(meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER))
-        return er
-
 
 @receiver(pre_transition, sender=Poll)
 def handle_poll_state_change(

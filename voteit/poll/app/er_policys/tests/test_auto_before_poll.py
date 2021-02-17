@@ -59,7 +59,6 @@ class AutoBeforePollTests(TestCase):
         self.assertEqual(first_er, self.meeting.get_latest_er())
 
     def test_changed_er_ref_on_poll(self):
-
         first_er = self.meeting.er_policy.create_er(self.meeting)
         self.poll.electoral_register = first_er
         user3 = User.objects.create(username="three")
@@ -70,3 +69,15 @@ class AutoBeforePollTests(TestCase):
             {self.user1, self.user2, user3},
             set(self.poll.electoral_register.voters.all()),
         )
+
+    def test_initial_er_set_when_upcoming(self):
+        self.poll.upcoming()
+        self.poll.proposals.create()
+        first_er = self.poll.electoral_register
+        user3 = User.objects.create(username="three")
+        self.meeting.add_roles(user3, ROLE_POTENTIAL_VOTER)
+        self.poll.ongoing()
+        self.assertEqual(
+            self.poll.initial_electoral_register, self.poll.electoral_register
+        )
+        self.assertNotEqual(self.poll.initial_electoral_register, first_er)

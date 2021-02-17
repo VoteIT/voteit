@@ -5,11 +5,13 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Optional
 from typing import Type
 from pydantic.main import BaseModel
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 from voteit.poll.schemas import PollResult
 
 if TYPE_CHECKING:
     from voteit.poll.models import Poll
+    from voteit.poll.models import ElectoralRegister
     from voteit.meeting.models import Meeting
     from voteit.poll.messages import VoteBase
 
@@ -92,4 +94,15 @@ class ElectoralRegisterPolicy(ABC):
 
     @abstractmethod
     def apply(self, poll: Poll):
-        pass
+        """Apply the policy to this poll."""
+
+    def create_er(self, meeting: Meeting) -> ElectoralRegister:
+        """A default method to create electoral registers.
+        There's no need to use this for the policy.
+        Some will probably implement their own.
+        """
+        from voteit.poll.models import ElectoralRegister
+
+        er = ElectoralRegister.objects.create(meeting=meeting)
+        er.voters.set(meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER))
+        return er

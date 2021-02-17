@@ -128,8 +128,7 @@ class Poll(BaseContent, MeetingContext):
     )
 
     def get_method_class(self) -> Type[PollMethod]:
-        """ Fetch the poll method class, a django proxy model.
-        """
+        """Fetch the poll method class, a django proxy model."""
         reg = get_poll_method_registry()
         if self.method_name not in reg:
             raise InvalidPollMethod(f"{self.method_name} is not a valid poll method.")
@@ -193,8 +192,8 @@ class Poll(BaseContent, MeetingContext):
         return pset is None or isinstance(pset, BaseModel)
 
     def start_check(self) -> bool:
-        """ Check that this poll could be started. A very basic check for the most obvious things.
-            Note that it's used as a transition condition, so it must return True if everything is ok!
+        """Check that this poll could be started. A very basic check for the most obvious things.
+        Note that it's used as a transition condition, so it must return True if everything is ok!
         """
         if self.electoral_register is None:
             raise ElectoralRegisterMissing()
@@ -226,6 +225,9 @@ class Poll(BaseContent, MeetingContext):
         conditions=[validate_settings_guard, start_check],
     )
     def ongoing(self):
+        # The guard should've taken care of this already
+        assert self.electoral_register, "No electoral register"
+        self.initial_electoral_register = self.electoral_register
         self.started = now()
 
     @transition(
@@ -234,8 +236,8 @@ class Poll(BaseContent, MeetingContext):
         target=PollWf.CLOSED,
     )
     def close(self):
-        """ Close the poll for further votes.
-            The next step is always to count the votes via the method finish()
+        """Close the poll for further votes.
+        The next step is always to count the votes via the method finish()
         """
         self._mark_closed()
 
@@ -281,8 +283,8 @@ class Poll(BaseContent, MeetingContext):
             self.closed = now()
 
     def finalize_vote_data(self) -> Counter:
-        """ Return JSON-serializable result counter.
-            Will also save ballot data and create a checksum + store abstentions.
+        """Return JSON-serializable result counter.
+        Will also save ballot data and create a checksum + store abstentions.
         """
         counter = Counter()
         abstains = 0
@@ -316,15 +318,15 @@ class Poll(BaseContent, MeetingContext):
             )
 
     def vote_cleanup_set(self) -> models.QuerySet:
-        """ Votes that shouldn't be here if the poll closes.
-            Essentially that someone has voted but aren't in the current electoral register.
+        """Votes that shouldn't be here if the poll closes.
+        Essentially that someone has voted but aren't in the current electoral register.
         """
         voters = self.electoral_register.voters.all()
         return self.votes.exclude(user__in=voters)
 
     def save(self, **kw):
-        """ Make sure meeting is set, from agenda_items meeting.
-            Also set title automatically. """
+        """Make sure meeting is set, from agenda_items meeting.
+        Also set title automatically."""
         if self.pk is None:
             # FIXME: This "helper" seems to cause a lot more problems than it's worth... :( /Robin
             if (
@@ -352,8 +354,7 @@ class Poll(BaseContent, MeetingContext):
 
 
 class Vote(models.Model):
-    """ Contains data on the users vote in a specific poll.
-    """
+    """Contains data on the users vote in a specific poll."""
 
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT
@@ -414,8 +415,8 @@ class Vote(models.Model):
 def finish_closed_poll(
     sender: Poll, instance: Poll, source: str, target: str, **kwargs
 ):
-    """ As soon as the poll has closed, calculate the result.
-        This method should probably offload this transition change to a worker later on.
+    """As soon as the poll has closed, calculate the result.
+    This method should probably offload this transition change to a worker later on.
     """
     if target == PollWf.CLOSED:
         instance.finish()
