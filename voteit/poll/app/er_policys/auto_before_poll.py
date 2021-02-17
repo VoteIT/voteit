@@ -7,12 +7,11 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 from voteit.poll.abcs import ElectoralRegisterPolicy
 from voteit.poll.models import Poll
-from voteit.poll.models import ElectoralRegister
 from voteit.poll.registries import er_policy
 from voteit.poll.workflows import PollWf
-from voteit.meeting.models import Meeting
 
 
+__all__ = ("AutoBeforePoll",)
 logger = getLogger(__name__)
 
 
@@ -27,6 +26,7 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
 
     name = "auto_before_poll"
     title = _("Automatic before poll")
+    logger = logger
 
     def apply(self, poll: Poll):
         meeting = poll.meeting
@@ -35,30 +35,33 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
             raise Exception("No meeting")
         meetings_er = poll.meeting.get_latest_er()
         if meetings_er is None:
-            logger.debug("%s has no electoral register, creating...", meeting)
+            self.logger.debug("%s has no electoral register, creating...", meeting)
             meetings_er = self.create_er(meeting)
         elif set(meetings_er.voters.all().values_list(flat=True)) != set(
             meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
         ):
             # FIXME: Is there a smarter way to make this comparison?
-            logger.debug(
+            self.logger.debug(
                 "%s electoral register is outdated. Creating a new one.", meeting
             )
             meetings_er = self.create_er(meeting)
         if poll.electoral_register is None:
-            logger.debug(
+            self.logger.debug(
                 "%s has no electoral register. Attaching %s", poll, meetings_er
             )
             poll.electoral_register = meetings_er
         elif poll.electoral_register != meetings_er:
-            logger.debug(
+            self.logger.debug(
                 "%s has an outdated electoral register, changing to %s instead",
                 poll,
                 meetings_er,
             )
             poll.electoral_register = meetings_er
         else:
-            logger.debug("%s already has the correct electoral register", poll)
+            self.logger.debug("%s already has the correct electoral register", poll)
+            return
+        # FIXME: This should probably be wrapped in a transaction
+        poll.save()
 
 
 @receiver(pre_transition, sender=Poll)
