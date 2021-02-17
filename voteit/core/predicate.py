@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from functools import update_wrapper
 from inspect import isfunction, isclass, getsource
+from logging import getLogger, Logger
 from typing import Optional
 
+from django.conf import settings
 from rules import Predicate as RulesPredicate
+from rules.predicates import NO_VALUE
 
 from voteit.core.component import Registry
 from voteit.core.role import Role
@@ -67,6 +70,9 @@ class Predicate(RulesPredicate):
     """
 
     role: Optional[Role] = None
+    logger: Logger = getLogger(__name__)  # Attached via registry or this as default
+    verbose_permission_log: bool = False
+    permission_log_fail_only: bool = True
 
     @property
     def source(self):
@@ -85,31 +91,40 @@ class Predicate(RulesPredicate):
     def role_name(self) -> Optional[str]:
         return self.role and self.role.name or None
 
+    def test(self, obj=NO_VALUE, target=NO_VALUE) -> bool:
+        check_result: bool = super().test(obj=obj, target=target)
+        if self.verbose_permission_log:
+            if self.permission_log_fail_only and check_result:
+                return check_result
+            self.logger.info(
+                "predicate:%s==%s for %s -> %s", self.name, check_result, obj, target
+            )
+        return check_result
+
     def output(self) -> PredicateOutput:
         return PredicateOutput.from_orm(self)
 
 
 class PredicateRegistry(Registry):
-    """ Behaves like a dict that stores predicates.
+    """Behaves like a dict that stores predicates.
 
-        You can decorate predicates with an instance of this registry to turn
-        them into rules predicates and register them here.
+    You can decorate predicates with an instance of this registry to turn
+    them into rules predicates and register them here.
 
-        >>> predicates = PredicateRegistry(Predicate)
-        >>> @predicates
-        ... def hello_world():
-        ...     pass
+    >>> predicates = PredicateRegistry(Predicate)
+    >>> @predicates
+    ... def hello_world():
+    ...     pass
 
-        >>> "hello_world" in predicates
-        True
+    >>> "hello_world" in predicates
+    True
 
-        >>> isinstance(hello_world, Predicate)
-        True
+    >>> isinstance(hello_world, Predicate)
+    True
     """
 
-    def __call__(self, fn=None, name=None, role=None, **options):
-        """ Mimics the behaviour of the @rules.predicate decorator, but injects the predicate in the registry.
-        """
+    def __call__(self, fn=None, name=None, logger=None, role=None, **options):
+        """Mimics the behaviour of the @rules.predicate decorator, but injects the predicate in the registry."""
         if not name and not callable(fn):
             name = fn
             fn = None
@@ -118,17 +133,26 @@ class PredicateRegistry(Registry):
             if isinstance(fn, Predicate):
                 self[fn.name] = fn
             else:
-                p = Predicate(fn, name, **options)
-                update_wrapper(p, fn)
+                pred = Predicate(fn, name, **options)
+                update_wrapper(pred, fn)
+
+                pred.verbose_permission_log = getattr(
+                    settings, "VERBOSE_PERMISSION_LOG", False
+                )
+                pred.permission_log_fail_only = getattr(
+                    settings, "PERMISSON_LOG_FAIL_ONLY", True
+                )
+                if logger is not None:
+                    pred.logger = logger
                 if role:
                     if role.predicate is not None:
                         raise ValueError(
                             f"{role} is already assigned to the predicate {role.predicate}"
                         )
-                    p.role = role
-                    role.predicate = p
-                self[p.name] = p
-            return p
+                    pred.role = role
+                    role.predicate = pred
+                self[pred.name] = pred
+            return pred
 
         if fn:
             return inner(fn)
