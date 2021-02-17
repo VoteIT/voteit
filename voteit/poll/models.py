@@ -43,6 +43,8 @@ if TYPE_CHECKING:
     from voteit.poll.abcs import PollMethod
 
 
+__all__ = "VoterWeight", "ElectoralRegister", "Poll", "Vote"
+
 logger = getLogger(__name__)
 
 
@@ -75,7 +77,18 @@ class ElectoralRegister(MeetingContext):
         # FIXME: Is this the correct method? :)
         return self.voterweight_set.aggregate(Sum("weight"))["weight__sum"]
 
-    objects = models.Manager()  # Type hinting
+    class QuerySet(models.QuerySet):
+        def for_user(self, user: AbstractUser):
+            return self.filter(meeting__participants=user).distinct()
+
+    class Manager(models.Manager):
+        def get_queryset(self):
+            return ElectoralRegister.QuerySet(self.model, using=self._db)
+
+        def for_user(self, user: AbstractUser):
+            return self.get_queryset().for_user(user)
+
+    objects = Manager()
 
 
 class Poll(BaseContent, MeetingContext):

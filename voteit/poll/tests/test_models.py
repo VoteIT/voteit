@@ -255,3 +255,42 @@ class VoteWeightTests(TestCase):
 
     def test_get_total_vote_weight(self):
         self.assertEqual(5, self.er.get_total_vote_weight())
+
+
+class ElectoralRegisterTests(TestCase):
+    def _mk_meeting_user(self, _id: int):
+        from voteit.meeting.models import Meeting
+        from voteit.meeting import roles
+        from voteit.poll.app.er_policys import AutoBeforePoll
+        from voteit.poll.app.polls import Simple
+
+        meeting = Meeting.objects.create(
+            title="Test meeting",
+            er_policy_name=AutoBeforePoll.name,
+        )
+        meeting.ongoing()
+        meeting.save()
+        user = User.objects.create(username=f"user-{_id}")
+        meeting.add_roles(user, roles.ROLE_POTENTIAL_VOTER)
+
+        ai = meeting.agenda_items.create(title='Test agenda item')
+        ai.ongoing()
+        ai.save()
+
+        poll = ai.polls.create(
+            title="Simple test poll",
+            method_name=Simple.name,
+        )
+        poll.proposals.add(ai.proposals.create(author=user))
+        poll.upcoming()
+        poll.ongoing()
+        poll.save()
+        return meeting, user
+
+    def test_manager(self):
+        from voteit.poll.models import ElectoralRegister
+        meeting1, user1 = self._mk_meeting_user(1)
+        meeting2, _ = self._mk_meeting_user(2)
+        self.assertEqual(ElectoralRegister.objects.for_user(user1).count(), 1)
+        self.assertEqual(ElectoralRegister.objects.for_user(user1).get().meeting, meeting1)
+        self.assertNotEqual(ElectoralRegister.objects.for_user(user1).get().meeting, meeting2)
