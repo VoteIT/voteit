@@ -30,13 +30,16 @@ def poll_subscribed(context: Poll, app_state: AppState, **kw):
 @receiver(channel_subscribed, sender=MeetingChannel)
 def meeting_subscribed(context: Meeting, app_state: AppState, **kw):
     """ Populate app_state with current meeting polls """
+    # FIXME: We probably want to pick the polls to send instead
     app_state.append_from_queryset(context.polls.all(), PollDetailSerializer, PollAdded)
 
 
 @receiver(post_save, sender=Poll)
 def poll_change(instance: Poll = None, created: bool = None, **kw):
     if instance.meeting is not None:
-        instance.refresh_from_db(fields=['result_data'])  # FIXME somewhere else, preferably.
+        instance.refresh_from_db(
+            fields=["result_data"]
+        )  # FIXME somewhere else, preferably.
         ch = MeetingChannel.from_instance(instance.meeting)
         data = PollDetailSerializer(instance).data
         if created:

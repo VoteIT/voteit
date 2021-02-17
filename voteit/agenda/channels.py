@@ -17,12 +17,11 @@ class AgendaItemChannel(AbstractObjectChannel):
     - Proposals
     - Discussions
     - Any metadata around those
+
+    Agenda Items themselves go in the meeting channel
     """
 
     name = "agenda_item"
     logger = logger
     model = AgendaItem
     permission = AgendaPermissions.VIEW
-
-
-# Note: Agenda Items themselves go in the meeting channel
