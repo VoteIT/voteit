@@ -134,7 +134,7 @@ class RulesTests(TestCase):
         CHANGE = self.p("CHANGE")
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.participant.has_perm(CHANGE, self.proposal))
-        self.assertTrue(self.moderator.has_perm(CHANGE, self.proposal))
+        self.assertFalse(self.moderator.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(CHANGE, self.proposal))
 
@@ -176,7 +176,7 @@ class RulesTests(TestCase):
         DELETE = self.p("DELETE")
         self.assertFalse(self.anon_user.has_perm(DELETE, self.proposal))
         self.assertFalse(self.participant.has_perm(DELETE, self.proposal))
-        self.assertTrue(self.moderator.has_perm(DELETE, self.proposal))
+        self.assertFalse(self.moderator.has_perm(DELETE, self.proposal))
         self.assertFalse(self.proposer.has_perm(DELETE, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(DELETE, self.proposal))
 
@@ -235,7 +235,7 @@ class RulesTests(TestCase):
         RETRACT = self.p("RETRACT")
         self.assertFalse(self.anon_user.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.participant.has_perm(RETRACT, self.proposal))
-        self.assertTrue(self.moderator.has_perm(RETRACT, self.proposal))
+        self.assertFalse(self.moderator.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(RETRACT, self.proposal))
 

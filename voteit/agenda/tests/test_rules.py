@@ -27,6 +27,7 @@ class RulesTests(TestCase):
         self.meeting.close()
         self.meeting.archive()
         self.meeting.save()
+        self.ai.refresh_from_db()
 
     def test_view_private(self):
         self.ai.unpublish()

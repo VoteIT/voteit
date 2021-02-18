@@ -16,9 +16,7 @@ class RulesTests(TestCase):
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
         self.discusser = User.objects.create(username="discusser")
-        self.discusser_author = User.objects.create(
-            username="discusser_author"
-        )
+        self.discusser_author = User.objects.create(username="discusser_author")
         self.meeting.add_roles(self.discusser, ROLE_DISCUSSER)
         self.meeting.add_roles(self.discusser_author, ROLE_DISCUSSER)
         self.ai = self.meeting.agenda_items.create()

@@ -13,9 +13,10 @@ from django_fsm import transition
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
 from voteit.presence.workflows import PresenceCheckWf
+from voteit.presence.permissions import PresenceCheckPermissions
 
 
-class Presence(models.Model):
+class Presence(MeetingContext):
     """
     A registered presence for a specific user.
     It's only possible to create/delete this if the presence_check is open.
@@ -29,6 +30,11 @@ class Presence(models.Model):
         "PresenceCheck", on_delete=models.CASCADE, related_name="presences"
     )
     created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+
+    @property
+    def meeting(self) -> Optional[Meeting]:
+        """ Find meeting from this instance"""
+        return self.presence_check.meeting
 
     class Meta:
         constraints = [
@@ -73,7 +79,12 @@ class PresenceCheck(MeetingContext):
         editable=False, null=True, blank=True
     )
 
-    @transition(field=state, source=PresenceCheckWf.OPEN, target=PresenceCheckWf.CLOSED)
+    @transition(
+        field=state,
+        source=PresenceCheckWf.OPEN,
+        target=PresenceCheckWf.CLOSED,
+        permission=PresenceCheckPermissions.CHANGE,
+    )
     def close(self) -> None:
         self.closed = now()
 
@@ -86,11 +97,12 @@ class PresenceCheck(MeetingContext):
 
     class Manager(models.Manager):
         """ Methods to get filtered QuerySets or currently open presence check. """
+
         def open(self) -> models.QuerySet:
             return self.get_queryset().filter(state=PresenceCheckWf.OPEN)
 
         def latest_open(self) -> PresenceCheck:
-            return self.open().latest('opened')
+            return self.open().latest("opened")
 
     objects = Manager()
 

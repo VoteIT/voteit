@@ -132,6 +132,7 @@ class PollRulesTests(TestCase):
         self.poll.ongoing()
         self.poll.close()
         self.meeting.archive()
+        self.ai.refresh_from_db()
         DELETE = self.p("DELETE")
         self.assertFalse(self.anon_user.has_perm(DELETE, self.poll))
         self.assertFalse(self.voter_user.has_perm(DELETE, self.poll))

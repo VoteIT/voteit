@@ -3,8 +3,12 @@ from typing import Union
 import rules
 from django.contrib.auth.models import AbstractUser
 
-from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
+from voteit.core.decorators import predicate
+from voteit.meeting.rules import (
+    can_view_meeting,
+    is_moderator,
+    meeting_upcoming_ongoing,
+)
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.roles import ROLE_LIST_MODERATOR, ROLE_SPEAKER
@@ -13,8 +17,8 @@ from voteit.speaker.permissions import SpeakerSystemPermissions
 from voteit.speaker.workflows import SpeakerListWf
 
 
-@rules.predicate
-def is_moderator(
+@predicate
+def is_speaker_moderator(
     user: AbstractUser, obj: Union[SpeakerListSystem, SpeakerList]
 ) -> bool:
     """Check if a user has list moderator status within this speaker list system."""
@@ -26,7 +30,7 @@ def is_moderator(
         return False
 
 
-@rules.predicate
+@predicate
 def has_speaker_role(
     user: AbstractUser, obj: Union[SpeakerListSystem, SpeakerList]
 ) -> bool:
@@ -38,21 +42,8 @@ def has_speaker_role(
     else:  # pragma: no cover
         return False
 
-@rules.predicate
-def can_view_related_meeting(
-    user: AbstractUser, obj: Union[SpeakerListSystem, SpeakerList]
-) -> bool:
-    meeting = None
-    if isinstance(obj, SpeakerListSystem):
-        meeting = obj.meeting
-    elif isinstance(obj, SpeakerList):
-        meeting = obj.list_system.meeting
-    if meeting is None:
-        return False
-    return user.has_perm(MeetingPermissions.VIEW, meeting)
 
-
-@rules.predicate
+@predicate
 def is_list_open(user: AbstractUser, speaker_list: SpeakerList) -> bool:
     return (
         isinstance(speaker_list, SpeakerList)
@@ -60,12 +51,34 @@ def is_list_open(user: AbstractUser, speaker_list: SpeakerList) -> bool:
     )
 
 
-@rules.predicate
+@predicate
 def is_active_list(user: AbstractUser, speaker_list: SpeakerList) -> bool:
     return isinstance(speaker_list, SpeakerList) and speaker_list.is_active_list
 
 
-@rules.predicate
+@predicate
+def is_system_active(
+    user: AbstractUser, instance: Union[SpeakerListSystem, SpeakerList]
+) -> bool:
+    if isinstance(instance, SpeakerListSystem):
+        return instance.active
+    elif isinstance(instance, SpeakerList):
+        return instance.list_system.active
+    return False
+
+
+@predicate
+def is_system_not_archived(
+    user: AbstractUser, instance: Union[SpeakerListSystem, SpeakerList]
+) -> bool:
+    if isinstance(instance, SpeakerListSystem):
+        return not instance.archived
+    elif isinstance(instance, SpeakerList):
+        return not instance.list_system.archived
+    return False
+
+
+@predicate
 def not_currently_speaking(user: AbstractUser, speaker_list: SpeakerList) -> bool:
     if isinstance(speaker_list, SpeakerList):
         if speaker_list.current is None:
@@ -75,38 +88,52 @@ def not_currently_speaking(user: AbstractUser, speaker_list: SpeakerList) -> boo
         return False
 
 
-rules.add_perm(SpeakerListPermissions.ADD, is_moderator)  # checked against system
-rules.add_perm(SpeakerListPermissions.CHANGE, is_moderator)
-rules.add_perm(SpeakerListPermissions.DELETE, is_moderator)
+# Speaker list permissions
+rules.add_perm(
+    SpeakerListPermissions.ADD, is_speaker_moderator & is_system_not_archived
+)
+rules.add_perm(
+    SpeakerListPermissions.CHANGE, is_speaker_moderator & is_system_not_archived
+)
+rules.add_perm(
+    SpeakerListPermissions.DELETE, is_speaker_moderator & is_system_not_archived
+)
 # FIXME: Contextless systems?
 rules.add_perm(
     SpeakerListPermissions.VIEW,
-    can_view_related_meeting | has_speaker_role | is_moderator,
+    can_view_meeting | has_speaker_role | is_speaker_moderator,
 )
 rules.add_perm(
-    SpeakerListPermissions.ENTER, (has_speaker_role & is_list_open) | is_moderator
+    SpeakerListPermissions.ENTER,
+    (
+        (has_speaker_role & is_list_open & is_system_active)
+        | (is_speaker_moderator & is_system_not_archived)
+    ),
 )
+# Lists should be emtied on archive, so don't bother about that
 rules.add_perm(
     SpeakerListPermissions.LEAVE,
-    (has_speaker_role | is_moderator) & not_currently_speaking,
+    (has_speaker_role | is_speaker_moderator) & not_currently_speaking,
 )
-rules.add_perm(SpeakerListPermissions.START, is_active_list & is_moderator)
-rules.add_perm(SpeakerListPermissions.STOP, is_active_list & is_moderator)
+rules.add_perm(
+    SpeakerListPermissions.START,
+    is_active_list & is_speaker_moderator & is_system_active,
+)
+rules.add_perm(SpeakerListPermissions.STOP, is_active_list & is_speaker_moderator)
 
-
-@rules.predicate
-def can_add_system(user: AbstractUser, context: Meeting) -> bool:
-    if isinstance(context, Meeting):
-        # FIXME might be a good idea to add other guards too
-        return user.has_perm(MeetingPermissions.CHANGE, context)
-    # FIXME: Add permission for other contexts!
-    return False
-
-
-rules.add_perm(SpeakerSystemPermissions.ADD, can_add_system)  # Checked against meeting
-rules.add_perm(SpeakerSystemPermissions.CHANGE, is_moderator)
-rules.add_perm(SpeakerSystemPermissions.DELETE, is_moderator)
+# Speaker system permissions
+rules.add_perm(
+    SpeakerSystemPermissions.ADD, is_moderator & meeting_upcoming_ongoing
+)  # Checked against meeting
+rules.add_perm(
+    SpeakerSystemPermissions.CHANGE,
+    is_speaker_moderator & meeting_upcoming_ongoing & is_system_not_archived,
+)
+rules.add_perm(
+    SpeakerSystemPermissions.DELETE,
+    is_speaker_moderator & meeting_upcoming_ongoing & is_system_not_archived,
+)
 rules.add_perm(
     SpeakerSystemPermissions.VIEW,
-    can_view_related_meeting | has_speaker_role | is_moderator,
+    can_view_meeting | has_speaker_role | is_speaker_moderator,
 )

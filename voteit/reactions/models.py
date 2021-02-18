@@ -8,6 +8,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models, IntegrityError
 from django.utils.translation import gettext_lazy as _
 
+from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting, MeetingRoles
 
@@ -79,7 +80,7 @@ class ReactionButton(MeetingContext):
     objects = Manager()
 
 
-class Reaction(models.Model):
+class Reaction(AgendaItemContext):
     """Works as a boolean true for a specific context, user and button.
     Essentially users never have reactions if the haven't marked something.
     """

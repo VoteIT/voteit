@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import rules
 from django.contrib.auth.models import AbstractUser
+from voteit.core.decorators import predicate
 
 from voteit.core.rules import is_author
 from voteit.motion.permissions import MotionPermissions
@@ -17,7 +18,7 @@ from voteit.organisation.models import Organisation
 from voteit.organisation.permissions import OrgPermissions
 
 
-@rules.predicate
+@predicate
 def is_mp_viewer(user: AbstractUser, motion_process: MotionProcess):
     """ User can view the process. """
     return isinstance(motion_process, MotionProcess) and motion_process.has_roles(
@@ -25,16 +26,15 @@ def is_mp_viewer(user: AbstractUser, motion_process: MotionProcess):
     )
 
 
-@rules.predicate
+@predicate
 def is_mp_mover(user: AbstractUser, motion_process: MotionProcess):
-    """ Someone who's has the role that enables them to submit motions.
-    """
+    """Someone who's has the role that enables them to submit motions."""
     return isinstance(motion_process, MotionProcess) and motion_process.has_roles(
         user, ROLE_MP_MOVER
     )
 
 
-@rules.predicate
+@predicate
 def is_mp_manager(user: AbstractUser, motion_process: MotionProcess):
     return isinstance(motion_process, MotionProcess) and motion_process.has_roles(
         user, ROLE_MP_MANAGER
@@ -42,12 +42,12 @@ def is_mp_manager(user: AbstractUser, motion_process: MotionProcess):
 
 
 # MotionProcess permissions
-@rules.predicate
+@predicate
 def can_add_motion_process(user: AbstractUser, organisation: Organisation):
     return user.has_perm(OrgPermissions.MANAGE, organisation)
 
 
-@rules.predicate
+@predicate
 def can_view_motion_process(user: AbstractUser, motion_process: MotionProcess):
     return motion_process.public or is_mp_viewer(user, motion_process)
 
@@ -60,10 +60,9 @@ rules.add_perm(MotionProcessPermissions.DELETE, is_mp_manager)
 
 
 # Motion permissions
-@rules.predicate
+@predicate
 def can_add_motion(user: AbstractUser, motion_process: MotionProcess):
-    """ Is it possible for the current user to create a motion within this motionprocess?
-    """
+    """Is it possible for the current user to create a motion within this motionprocess?"""
     if isinstance(motion_process, MotionProcess):
         return (
             is_mp_manager(user, motion_process)
@@ -72,10 +71,9 @@ def can_add_motion(user: AbstractUser, motion_process: MotionProcess):
         )
 
 
-@rules.predicate
+@predicate
 def can_change_motion(user: AbstractUser, motion: Motion):
-    """ Change the text, add proposals etc.
-    """
+    """Change the text, add proposals etc."""
     return is_mp_manager(user, motion.motion_process) or (
         motion.author == user
         and motion.state == MotionWf.DRAFT
@@ -83,12 +81,12 @@ def can_change_motion(user: AbstractUser, motion: Motion):
     )
 
 
-@rules.predicate
+@predicate
 def can_view_motion(user: AbstractUser, motion: Motion):
-    """ Motions can always be viewed by their author and managers.
-        Other users may view motions in the state published, accepted or rejected if any of these are true:
-        - The motion process is public
-        - They're listed as viewers or movers
+    """Motions can always be viewed by their author and managers.
+    Other users may view motions in the state published, accepted or rejected if any of these are true:
+    - The motion process is public
+    - They're listed as viewers or movers
     """
     if is_author(user, motion):
         return True
@@ -98,10 +96,9 @@ def can_view_motion(user: AbstractUser, motion: Motion):
         return motion.motion_process.public or is_mp_viewer(user, motion.motion_process)
 
 
-@rules.predicate
+@predicate
 def can_submit_motion(user: AbstractUser, motion: Motion):
-    """ Is the author of the motion able to submit it?
-    """
+    """Is the author of the motion able to submit it?"""
     return (
         is_author(user, motion)
         and motion.state == MotionWf.DRAFT
@@ -109,10 +106,9 @@ def can_submit_motion(user: AbstractUser, motion: Motion):
     )
 
 
-@rules.predicate
+@predicate
 def can_retract_motion(user: AbstractUser, motion: Motion):
-    """ Is the author of the motion able to submit it?
-    """
+    """Is the author of the motion able to submit it?"""
     return (
         motion.state in (MotionWf.DRAFT, MotionWf.PUBLISHED)
         and is_author(user, motion)
@@ -120,7 +116,7 @@ def can_retract_motion(user: AbstractUser, motion: Motion):
     )
 
 
-@rules.predicate
+@predicate
 def can_manage_motion(user: AbstractUser, motion: Motion):
     return is_mp_manager(user, motion.motion_process)
 

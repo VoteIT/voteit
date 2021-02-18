@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from random import sample
 from string import ascii_lowercase
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django_fsm import FSMField, transition
 
+from voteit.core.abcs import AgendaItemContext, MeetingContext
 from voteit.core.models import BaseContent
 from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
@@ -16,11 +17,12 @@ from voteit.reactions.mixins import Reactable
 
 if TYPE_CHECKING:
     from voteit.agenda.models import AgendaItem
+    from voteit.meeting.models import Meeting
 
 __all__ = ("Proposal",)
 
 
-class Proposal(BaseContent, Reactable):
+class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     state: str = FSMField(
         default=ProposalWf.initial, choices=ProposalWf.choices(), protected=True
     )
@@ -38,6 +40,12 @@ class Proposal(BaseContent, Reactable):
         null=True,
         related_name="proposals",
     )
+
+    @property
+    def meeting(self) -> Optional[Meeting]:
+        """ While not directly related, it still good to be able to do lookups this way"""
+        if self.agenda_item:
+            return self.agenda_item.meeting
 
     class Meta:
         constraints = [

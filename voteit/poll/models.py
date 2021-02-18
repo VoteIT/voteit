@@ -23,6 +23,7 @@ from typing import Optional, Dict, Type, TYPE_CHECKING, Union
 from pydantic import ValidationError
 from pydantic.main import BaseModel
 
+from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
 from voteit.meeting.models import Meeting
@@ -91,7 +92,7 @@ class ElectoralRegister(MeetingContext):
     objects = Manager()
 
 
-class Poll(BaseContent, MeetingContext):
+class Poll(BaseContent, MeetingContext, AgendaItemContext):
     state = FSMField(default=PollWf.initial, choices=PollWf.choices(), protected=True)
     title = models.CharField(max_length=70)
     description = models.CharField(max_length=200)

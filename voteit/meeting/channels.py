@@ -12,11 +12,10 @@ logger = getLogger(__name__)
 
 @channel
 class MeetingChannel(AbstractObjectChannel):
-    """This contains generic messages for the meeting.
+    """This transmits messages for
 
-    Transport for
     - Polls
-    - Agenda (The title and order of agenda items)
+    - Non-private Agenda (The title and order of agenda items)
     - Anything public related to the meeting
     """
 
@@ -26,6 +25,7 @@ class MeetingChannel(AbstractObjectChannel):
     permission = MeetingPermissions.VIEW
 
 
+# FIXME: Private agenda items
 @channel
 class ModeratorChannel(AbstractObjectChannel):
     """Moderator specific messages

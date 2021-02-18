@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 from django.db import models
 from django_fsm import FSMField, transition
 from django.utils.translation import gettext as _
+
 from voteit.agenda.permissions import AgendaPermissions
 from voteit.agenda.workflows import AgendaItemWf
+from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
-
 from voteit.core.models import BaseContent
 from voteit.meeting.models import Meeting
 
@@ -12,7 +15,7 @@ from voteit.meeting.models import Meeting
 __all__ = ("AgendaItem",)
 
 
-class AgendaItem(BaseContent, MeetingContext):
+class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     title: str = models.CharField(max_length=100)
     state = FSMField(
         default=AgendaItemWf.initial,
@@ -29,6 +32,11 @@ class AgendaItem(BaseContent, MeetingContext):
         verbose_name=_("Block new proposals"), default=False
     )
     order = models.PositiveSmallIntegerField(default=0)
+
+    @property
+    def agenda_item(self) -> AgendaItem:
+        """ AgendaItemContext demands this."""
+        return self
 
     class Meta:
         ordering = (

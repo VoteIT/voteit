@@ -3,11 +3,13 @@ from django.test import TestCase
 
 User = get_user_model()
 
+
 class PresenceSystemTests(TestCase):
     def setUp(self):
         from voteit.presence.models import PresenceSystem
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
+
         self.meeting = Meeting.objects.create()
         self.system = PresenceSystem.objects.create(meeting=self.meeting)
         self.moderator = User.objects.create(username="moderator")
@@ -19,6 +21,7 @@ class PresenceSystemTests(TestCase):
     @property
     def P(self):
         from voteit.presence.permissions import PresenceSystemPermissions
+
         return PresenceSystemPermissions
 
     def test_add(self):
@@ -51,6 +54,7 @@ class PresenceCheckTests(TestCase):
         from voteit.presence.models import PresenceSystem
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
+
         self.meeting = Meeting.objects.create()
         self.system = PresenceSystem.objects.create(meeting=self.meeting)
         self.presence_check = self.system.presence_checks.create()
@@ -63,6 +67,7 @@ class PresenceCheckTests(TestCase):
     @property
     def P(self):
         from voteit.presence.permissions import PresenceCheckPermissions
+
         return PresenceCheckPermissions
 
     def test_add(self):
@@ -117,6 +122,7 @@ class PresenceTests(TestCase):
         from voteit.presence.models import PresenceSystem
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
+
         self.meeting = Meeting.objects.create()
         self.system = PresenceSystem.objects.create(meeting=self.meeting)
         self.presence_check = self.system.presence_checks.create()
@@ -127,11 +133,14 @@ class PresenceTests(TestCase):
         self.anon_user = User.objects.create(username="anon")
         self.present_participant = User.objects.create(username="present_participant")
         self.meeting.add_roles(self.present_participant, ROLE_PARTICIPANT)
-        self.presence = self.presence_check.presences.create(user=self.present_participant)
+        self.presence = self.presence_check.presences.create(
+            user=self.present_participant
+        )
 
     @property
     def P(self):
         from voteit.presence.permissions import PresencePermissions
+
         return PresencePermissions
 
     def test_add(self):

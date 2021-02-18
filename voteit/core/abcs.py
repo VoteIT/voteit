@@ -8,6 +8,10 @@ from django.db import models
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
+    from voteit.agenda.models import AgendaItem
+
+
+__all__ = ("ABCModel", "AgendaItemContext", "MeetingContext")
 
 
 class _AbstractModelMeta(ABCMeta, type(models.Model)):
@@ -15,10 +19,23 @@ class _AbstractModelMeta(ABCMeta, type(models.Model)):
 
 
 class ABCModel(models.Model, metaclass=_AbstractModelMeta):
-    """ Abstract classes based on ABCMeta don't work in django -
-        this is a workaround to make them behave correctly.
-        Remove this as soon as it's fixed in django.
+    """Abstract classes based on ABCMeta don't work in django -
+    this is a workaround to make them behave correctly.
+    Remove this as soon as it's fixed in django.
     """
+
+    class Meta:
+        abstract = True
+
+
+class AgendaItemContext(ABCModel):
+    """ Subclassed by things that have a relation to an agenda item. Even the agenda item itself."""
+
+    @property
+    @abstractmethod
+    def agenda_item(self) -> Optional[AgendaItem]:
+        """ Return the AgendaItem object. Probably a foreign key relation."""
+        pass
 
     class Meta:
         abstract = True

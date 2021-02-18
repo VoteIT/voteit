@@ -12,7 +12,9 @@ class SpeakerListEnterTests(TestCase):
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
 
-        self.system = SpeakerListSystem.objects.create(method_name="simple")
+        self.system = SpeakerListSystem.objects.create(
+            method_name="simple", active=True
+        )
         self.list = SpeakerList.objects.create(list_system=self.system)
         self.user = User.objects.create(username="jane")
         self.system.add_roles(self.user, "speaker")
@@ -96,10 +98,11 @@ class SpeakerListLeaveTests(TestCase):
 
 class SpeakerListSetActiveTests(TestCase):
     def setUp(self):
-        from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
+        from voteit.meeting.models import Meeting
 
-        self.system = SpeakerListSystem.objects.create(method_name="simple")
+        meeting = Meeting.objects.create()
+        self.system = meeting.speaker_systems.create(method_name="simple", active=True)
         self.list = SpeakerList.objects.create(list_system=self.system)
         self.user = User.objects.create(username="jane")
         self.system.add_roles(self.user, "list_moderator")
@@ -142,10 +145,11 @@ class SpeakerListSetActiveTests(TestCase):
 
 class StartSpeakerInListTests(TestCase):
     def setUp(self):
-        from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
+        from voteit.meeting.models import Meeting
 
-        self.system = SpeakerListSystem.objects.create(method_name="simple")
+        meeting = Meeting.objects.create()
+        self.system = meeting.speaker_systems.create(method_name="simple", active=True)
         self.list = SpeakerList.objects.create(list_system=self.system)
         self.system.active_list = self.list
         self.system.save()
@@ -201,10 +205,11 @@ class StartSpeakerInListTests(TestCase):
 
 class StopSpeakerInListTests(TestCase):
     def setUp(self):
-        from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
+        from voteit.meeting.models import Meeting
 
-        self.system = SpeakerListSystem.objects.create(method_name="simple")
+        meeting = Meeting.objects.create()
+        self.system = meeting.speaker_systems.create(method_name="simple", active=True)
         self.list = SpeakerList.objects.create(list_system=self.system)
         self.system.active_list = self.list
         self.system.save()
@@ -248,10 +253,11 @@ class StopSpeakerInListTests(TestCase):
 
 class ModeratorSpeakerListEnterTests(TestCase):
     def setUp(self):
-        from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
+        from voteit.meeting.models import Meeting
 
-        self.system = SpeakerListSystem.objects.create(method_name="simple")
+        meeting = Meeting.objects.create()
+        self.system = meeting.speaker_systems.create(method_name="simple", active=True)
         self.list = SpeakerList.objects.create(list_system=self.system)
         self.user = User.objects.create(username="jane")
         self.moderator = User.objects.create(username="moderator")
@@ -298,10 +304,11 @@ class ModeratorSpeakerListEnterTests(TestCase):
 
 class ModeratorSpeakerListLeaveTests(TestCase):
     def setUp(self):
-        from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
+        from voteit.meeting.models import Meeting
 
-        self.system = SpeakerListSystem.objects.create(method_name="simple")
+        meeting = Meeting.objects.create()
+        self.system = meeting.speaker_systems.create(method_name="simple", active=True)
         self.list = SpeakerList.objects.create(list_system=self.system)
         self.user = User.objects.create(username="jane")
         self.system.add_roles(self.user, "speaker")

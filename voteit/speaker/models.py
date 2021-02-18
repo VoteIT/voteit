@@ -15,6 +15,7 @@ from django_fsm import FSMField, transition
 from pydantic.main import BaseModel
 
 from voteit.agenda.models import AgendaItem
+from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import Roles, RoleContextMixin
 from voteit.meeting.models import Meeting
@@ -58,6 +59,10 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         verbose_name=_(
             "Is the system activated? If not it won't be visible to anyone."
         ),
+        default=False,
+    )
+    archived: bool = models.BooleanField(
+        verbose_name=_("Is the system archived?"),
         default=False,
     )
     title = models.CharField(max_length=200, null=True)
@@ -128,6 +133,16 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
             raise ValueError(f"{value} is not a settings schema or a dict")
         self.settings_data = data.dict()
 
+    def archive(self):
+        self.active_list = None
+        for slist in self.speaker_lists.all():
+            slist.stop_speaker()
+            for speaker in slist.speakers_qs():
+                speaker.delete()
+        self.active = False
+        self.archived = True
+        self.save()
+
     def save(self, **kw):
         # Will raise error if there's something bogus with settings or referenced method
         self.settings
@@ -195,8 +210,8 @@ class Speaker(models.Model):
         return f"Speaker id {self.pk}"
 
 
-class SpeakerList(models.Model):
-    title = models.CharField(max_length=200, null=True)
+class SpeakerList(AgendaItemContext, MeetingContext):
+    title = models.CharField(max_length=200)
     state = FSMField(
         default=SpeakerListWf.initial, choices=SpeakerListWf.choices(), editable=False
     )
@@ -216,6 +231,12 @@ class SpeakerList(models.Model):
     speakers = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through=Speaker, related_name="speaker_lists"
     )
+
+    @property
+    def meeting(self) -> Optional[Meeting]:
+        """ While not directly related, it still good to be able to do lookups this way"""
+        if self.list_system:
+            return self.list_system.meeting
 
     @property
     def method(self) -> ListMethod:
@@ -325,6 +346,11 @@ class SpeakerList(models.Model):
             speaker.save()
             self.current = None
             self.save()
+
+    def save(self, **kw):
+        if self.title is None:
+            self.title = "list @ " + self.agenda_item.title
+        super().save(**kw)
 
     # Type hinting
     objects = models.Manager()

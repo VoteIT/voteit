@@ -13,6 +13,7 @@ from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.signals import archive_meeting
 from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.signals import channel_subscribed
 from voteit.speaker.messages import (
@@ -183,3 +184,9 @@ def ai_channel_subscribed(
     for sl in lists_qs:
         msg = _get_list_order_msg(sl)
         app_state.append(msg)
+
+
+@receiver(archive_meeting)
+def close_and_cleanup(meeting, **kw):
+    for system in meeting.speaker_systems.all():
+        system.archive()

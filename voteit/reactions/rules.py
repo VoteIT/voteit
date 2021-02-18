@@ -3,41 +3,19 @@ from typing import TYPE_CHECKING, Union
 
 import rules
 from django.contrib.auth.models import AbstractUser
+
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_not_archived
-from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
-from voteit.meeting.rules import is_moderator
+from voteit.meeting.rules import (
+    is_moderator,
+    can_view_meeting,
+    meeting_upcoming_ongoing,
+)
 from voteit.reactions.models import ReactionButton, Reaction
 from voteit.reactions.permissions import ReactionButtonPermissions, ReactionPermissions
 
 if TYPE_CHECKING:
     pass
-
-
-@predicate
-def user_can_change_meeting(
-    user: AbstractUser, obj: Union[Meeting, ReactionButton]
-) -> bool:
-    """ Delegate permission check to meeting"""
-    meeting = None
-    if isinstance(obj, ReactionButton):
-        meeting = obj.meeting
-    elif isinstance(obj, Meeting):
-        meeting = obj
-    return user.has_perm(MeetingPermissions.CHANGE, meeting)
-
-
-@predicate
-def user_can_view_meeting(
-    user: AbstractUser, obj: Union[Meeting, ReactionButton]
-) -> bool:
-    meeting = None
-    if isinstance(obj, ReactionButton):
-        meeting = obj.meeting
-    elif isinstance(obj, Meeting):
-        meeting = obj
-    return user.has_perm(MeetingPermissions.VIEW, meeting)
 
 
 @predicate
@@ -76,13 +54,6 @@ def has_change_own_reaction_role(
 
 
 @predicate
-def is_meeting_moderator(user: AbstractUser, obj: ReactionButton):
-    return isinstance(obj, ReactionButton) and user.has_perm(
-        MeetingPermissions.MODERATE, obj.meeting
-    )
-
-
-@predicate
 def is_reaction_owner(user: AbstractUser, obj: Reaction):
     return isinstance(obj, Reaction) and user == obj.user
 
@@ -90,14 +61,18 @@ def is_reaction_owner(user: AbstractUser, obj: Reaction):
 # Button
 rules.add_perm(
     ReactionButtonPermissions.ADD,
-    is_not_archived & is_moderator & user_can_change_meeting,
+    is_not_archived & is_moderator,
 )
-rules.add_perm(ReactionButtonPermissions.CHANGE, user_can_change_meeting)
-rules.add_perm(ReactionButtonPermissions.DELETE, user_can_change_meeting)
-rules.add_perm(ReactionButtonPermissions.VIEW, user_can_view_meeting)
+rules.add_perm(
+    ReactionButtonPermissions.CHANGE, meeting_upcoming_ongoing & is_moderator
+)
+rules.add_perm(
+    ReactionButtonPermissions.DELETE, meeting_upcoming_ongoing & is_moderator
+)
+rules.add_perm(ReactionButtonPermissions.VIEW, can_view_meeting)
 rules.add_perm(
     ReactionButtonPermissions.LIST_REACTIONS,
-    is_meeting_moderator | has_list_users_reactions_role,
+    is_moderator | has_list_users_reactions_role,
 )
 rules.add_perm(
     ReactionPermissions.ADD,

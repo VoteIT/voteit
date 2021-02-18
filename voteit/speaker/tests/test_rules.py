@@ -6,10 +6,11 @@ from voteit.meeting.roles import ROLE_MODERATOR
 
 class SpeakerListTests(TestCase):
     def setUp(self):
-        from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.roles import ROLE_SPEAKER, ROLE_LIST_MODERATOR
+        from voteit.meeting.models import Meeting
 
-        self.system = SpeakerListSystem.objects.create(method_name="simple")
+        meeting = Meeting.objects.create()
+        self.system = meeting.speaker_systems.create(method_name="simple", active=True)
         self.user_moderator = User.objects.create(username="moderator")
         self.system.add_roles(self.user_moderator, ROLE_LIST_MODERATOR)
         self.user_speaker = User.objects.create(username="in")
@@ -125,10 +126,11 @@ class SpeakerListTests(TestCase):
 
 class SpeakerListSystemTests(TestCase):
     def setUp(self):
-        from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.roles import ROLE_LIST_MODERATOR, ROLE_SPEAKER
+        from voteit.meeting.models import Meeting
 
-        self.system = SpeakerListSystem.objects.create(method_name="simple")
+        meeting = Meeting.objects.create()
+        self.system = meeting.speaker_systems.create(method_name="simple")
         self.user_moderator = User.objects.create(username="moderator")
         self.system.add_roles(self.user_moderator, ROLE_LIST_MODERATOR)
         self.user_speaker = User.objects.create(username="in")

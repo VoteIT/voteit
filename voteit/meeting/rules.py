@@ -3,16 +3,17 @@ from typing import TYPE_CHECKING
 
 import rules
 from django.contrib.auth.models import AbstractUser
+from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import predicate
 
 from voteit.core.rules import is_not_archived
-from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.rules import is_manager
 from voteit.organisation.rules import is_meeting_creator
 
@@ -21,41 +22,78 @@ if TYPE_CHECKING:
 
 
 @predicate(role=ROLE_PARTICIPANT)
-def is_participant(user: AbstractUser, meeting: Meeting) -> bool:
+def is_participant(user: AbstractUser, context: MeetingContext) -> bool:
     """ Is this a meeting participant? """
-    return isinstance(meeting, Meeting) and meeting.has_roles(user, ROLE_PARTICIPANT)
+    return isinstance(context, MeetingContext) and context.meeting.has_roles(
+        user, ROLE_PARTICIPANT
+    )
 
 
 @predicate(role=ROLE_POTENTIAL_VOTER)
-def is_potential_voter(user: AbstractUser, meeting: Meeting) -> bool:
-    return isinstance(meeting, Meeting) and meeting.has_roles(
+def is_potential_voter(user: AbstractUser, context: MeetingContext) -> bool:
+    return isinstance(context, MeetingContext) and context.meeting.has_roles(
         user, ROLE_POTENTIAL_VOTER
     )
 
 
 @predicate(role=ROLE_MODERATOR)
-def is_moderator(user: AbstractUser, meeting: Meeting) -> bool:
-    return isinstance(meeting, Meeting) and meeting.has_roles(user, ROLE_MODERATOR)
+def is_moderator(user: AbstractUser, context: MeetingContext) -> bool:
+    return isinstance(context, MeetingContext) and context.meeting.has_roles(
+        user, ROLE_MODERATOR
+    )
 
 
 @predicate(role=ROLE_DISCUSSER)
-def is_discusser(user: AbstractUser, meeting: Meeting) -> bool:
-    return isinstance(meeting, Meeting) and meeting.has_roles(user, ROLE_DISCUSSER)
+def is_discusser(user: AbstractUser, context: MeetingContext) -> bool:
+    return isinstance(context, MeetingContext) and context.meeting.has_roles(
+        user, ROLE_DISCUSSER
+    )
 
 
 @predicate(role=ROLE_PROPOSER)
-def is_proposer(user: AbstractUser, meeting: Meeting) -> bool:
-    return isinstance(meeting, Meeting) and meeting.has_roles(user, ROLE_PROPOSER)
+def is_proposer(user: AbstractUser, context: MeetingContext) -> bool:
+    return isinstance(context, MeetingContext) and context.meeting.has_roles(
+        user, ROLE_PROPOSER
+    )
 
 
 @predicate
-def is_public(user: AbstractUser, meeting: Meeting) -> bool:
+def is_public_meeting(user: AbstractUser, context: MeetingContext) -> bool:
     """ The meeting is visible for everyone. """
-    return isinstance(meeting, Meeting) and meeting.public
+    return isinstance(context, MeetingContext) and context.meeting.public
+
+
+@predicate
+def meeting_not_archived(user: AbstractUser, context: MeetingContext) -> bool:
+    """ The related meeting isn't archived or archiving. """
+    return isinstance(context, MeetingContext) and is_not_archived(
+        user, context.meeting
+    )
+
+
+@predicate
+def meeting_upcoming_ongoing(user: AbstractUser, context: MeetingContext) -> bool:
+    return (
+        isinstance(context, MeetingContext)
+        and context.meeting is not None
+        and context.meeting.state in (MeetingWf.ONGOING, MeetingWf.UPCOMING)
+    )
+
+
+@predicate
+def can_view_meeting(user: AbstractUser, context: MeetingContext) -> bool:
+    """Shorthand for the combinations to allow attached meeting to be viewed.
+    Import and use this for any underlying things that implement MeetingContext
+    """
+    return (
+        is_public_meeting(user, context)
+        or is_participant(user, context)
+        or is_moderator(user, context)
+    )
 
 
 rules.add_perm(MeetingPermissions.ADD, is_manager | is_meeting_creator)
-rules.add_perm(MeetingPermissions.VIEW, is_public | is_participant | is_moderator)
+rules.add_perm(MeetingPermissions.VIEW, can_view_meeting)
 rules.add_perm(MeetingPermissions.MODERATE, is_not_archived & is_moderator)
 # We might want to add editor role later on
 rules.add_perm(MeetingPermissions.CHANGE, is_not_archived & is_moderator)
