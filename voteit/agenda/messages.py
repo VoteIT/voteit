@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 @incoming
 class AddAgendaItem(BaseAddObject):
-    name = "agenda.add"
+    name = "agenda_item.add"
     permission = AgendaPermissions.ADD
     model = Meeting  # This is the context for the action!
     add_model = AgendaItem
@@ -34,28 +34,28 @@ class AddAgendaItem(BaseAddObject):
 
 @incoming
 class ChangeAgendaItem(BaseChangeObject):
-    name = "agenda.change"
+    name = "agenda_item.change"
     model = AgendaItem
     permission = AgendaPermissions.CHANGE
 
 
 @incoming
 class DeleteAgendaItem(BaseDeleteObject):
-    name = "agenda.delete"
+    name = "agenda_item.delete"
     model = AgendaItem
     permission = AgendaPermissions.DELETE
 
 
 @outgoing
 class AgendaAdded(BaseObjectAdded):
-    name = "agenda.added"
+    name = "agenda_item.added"
 
 
 @outgoing
 class AgendaChanged(BaseObjectChanged):
-    name = "agenda.changed"
+    name = "agenda_item.changed"
 
 
 @outgoing
 class AgendaDeleted(BaseObjectDeleted):
-    name = "agenda.deleted"
+    name = "agenda_item.deleted"

@@ -32,7 +32,7 @@ class MeetingSubscribedTests(TestCase):
             channel_type="meeting",
         )
         msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "agenda.added"])
+        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "agenda_item.added"])
         self.assertEqual({self.ai.pk, self.ai_private.pk}, pks)
 
 
