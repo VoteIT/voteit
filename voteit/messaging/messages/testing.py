@@ -5,12 +5,14 @@ from typing import TYPE_CHECKING, Optional, List
 
 from django.dispatch import receiver
 from pydantic import validator, BaseModel
+from django.apps import apps
 
 from voteit.messaging.abcs import (
     BaseOutgoingMessage,
     DeferredJob,
     AsyncRunnable,
     BaseIncomingMessage,
+    ContextAction,
 )
 from voteit.messaging.messages.progress import ProgressNum
 from voteit.messaging.models import Connection
@@ -130,3 +132,96 @@ class OnlineUsersSchema(BaseModel):
 class OnlineUsersResponse(BaseOutgoingMessage):
     name = "testing.online_users"
     schema = OnlineUsersSchema
+
+
+class CheckSchema(BaseModel):
+    pk: int
+    natural_key: str
+
+    @validator("natural_key")
+    def check_natural_key(cls, v):
+        v = v.lower()
+        parts = v.split(".")
+        if len(parts) != 2:
+            raise ValueError("Natural key must contain one dot")
+        try:
+            apps.get_model(*parts)
+        except LookupError:
+            raise ValueError(f"No model found with natural key {v}")
+        return v
+
+
+class CheckPermissionSchema(CheckSchema):
+    permission: str
+
+    @validator("permission")
+    def check_permission(cls, v):
+        from voteit.core.registries import permissions
+
+        if v not in permissions:
+            raise ValueError(f"No permission named {v} in permission registry")
+        return v
+
+
+class CheckPredicateSchema(CheckSchema):
+    predicate: str
+
+    @validator("predicate")
+    def check_predicate(cls, v):
+        from voteit.core.registries import predicates
+
+        if v not in predicates:
+            raise ValueError(f"No predicate named {v} in predicate registry")
+        return v
+
+
+class CheckMixin(ContextAction):
+    data: CheckSchema
+
+    @property
+    def model(self):
+        parts = self.data.natural_key.split(".")
+        return apps.get_model(*parts)
+
+
+@incoming_messages
+class CheckPermission(BaseIncomingMessage, DeferredJob, CheckMixin):
+    name = "testing.check_permission"
+    schema = CheckPermissionSchema
+    data: CheckPermissionSchema
+
+    @property
+    def permission(self):
+        return self.data.permission
+
+    def run_job(self):
+        msg = CheckedResult.from_message(self, result=self.allowed())
+        msg.send_outgoing(self.mm.consumer_name, success=True)
+        return msg
+
+
+@incoming_messages
+class CheckPredicate(BaseIncomingMessage, DeferredJob, CheckMixin):
+    name = "testing.check_predicate"
+    schema = CheckPredicateSchema
+    data: CheckPredicateSchema
+    permission = None
+
+    def run_job(self):
+        from voteit.core.registries import predicates
+
+        result = predicates[self.data.predicate](self.user, self.context)
+        msg = CheckedResult.from_message(self, result=result)
+        msg.send_outgoing(self.mm.consumer_name, success=True)
+        return msg
+
+
+class CheckedResultSchema(BaseModel):
+    result: bool
+
+
+@outgoing_messages
+class CheckedResult(BaseOutgoingMessage):
+    name = "testing.checked_result"
+    schema = CheckedResultSchema
+    data: CheckedResultSchema
