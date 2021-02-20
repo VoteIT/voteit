@@ -38,6 +38,8 @@ class SimpleTests(TestCase):
         vote = self.poll.votes.create(user=voter, vote="yes")
         self.assertIsInstance(vote.vote, SimpleVoteSchema)
         self.assertEqual(vote.vote.choice, "yes")
+        with self.assertRaises(ValueError):
+            SimpleVoteSchema(choice="abstain")
 
     def test_result(self):
         from voteit.proposal.workflows import ProposalWf

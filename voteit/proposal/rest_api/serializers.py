@@ -9,12 +9,14 @@ class ProposalListSerializer(serializers.ModelSerializer):
         fields = (
             "url",
             "pk",
+            "created",
             "body",
             "state",
             "agenda_item",
             "author",
             "polls",
             "prop_id",
+            "tags",
         )
 
 
