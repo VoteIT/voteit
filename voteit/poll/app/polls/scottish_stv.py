@@ -12,7 +12,7 @@ from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote, ChangeVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericVoteSchema, PollResult
+from voteit.poll.schemas import GenericVoteSchema, PollResult, RankingSchema, RankedVoteSchema
 
 __all__ = ("ScottishSTV",)
 
@@ -32,31 +32,25 @@ class ScottishSTVSettings(BaseModel):
         allow_mutation = False
 
 
-class STVVoteSchema(BaseModel):
-    ranking: List[int]  # Validation...?
-
-
-class VoteSchema(GenericVoteSchema):
-    vote: STVVoteSchema
-
-
 @incoming
 class AddSTVVote(AddVote):
     name = "scottish_stv_vote.add"
-    schema = VoteSchema
-    data: VoteSchema
+    schema = RankedVoteSchema
+    data: RankedVoteSchema
 
 
 @incoming
 class ChangeSTVVote(ChangeVote):
     name = "scottish_stv_vote.change"
-    schema = VoteSchema
-    data: VoteSchema
+    schema = RankedVoteSchema
+    data: RankedVoteSchema
 
 
 class STVResultSchema(PollResult):
     # winners: List
     # candidates: List
+    approved: List[int] = []
+    denied: List[int] = []
     complete: bool
     rounds: List[Dict]
     randomized: bool
@@ -76,21 +70,21 @@ class ScottishSTV(PollMethod):
     name = "scottish_stv"
     title = _("Scottish STV")
     settings_schema = ScottishSTVSettings
-    vote_schema = STVVoteSchema
+    vote_schema = RankingSchema
     result_schema = STVResultSchema
     min_winners = 2
     min_losers = 1
 
-    def vote_to_str(self, data: STVVoteSchema) -> str:
+    def vote_to_str(self, data: RankingSchema) -> str:
         """
-        >>> data = STVVoteSchema(ranking=[1,3,2])
+        >>> data = RankingSchema(ranking=[1,3,2])
         >>> method = ScottishSTV(None)
         >>> method.vote_to_str(data)
         '1,3,2'
         """
         return ",".join([str(x) for x in data.ranking])
 
-    def vote_to_obj(self, text: str) -> STVVoteSchema:
+    def vote_to_obj(self, text: str) -> RankingSchema:
         """
         >>> method = ScottishSTV(None)
         >>> data = method.vote_to_obj("4,1,3,2")

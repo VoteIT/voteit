@@ -33,12 +33,15 @@ class SimpleTests(TestCase):
         from voteit.poll.app.polls.combined_simple import CombinedSimpleVoteSchema
         self.poll.upcoming()
         proposal = self.poll.proposals.create()
+        proposal2 = self.poll.proposals.create()
         voter = self.er.voters.create(username="a")
         self.poll.ongoing()
-        vote = self.poll.votes.create(user=voter, vote=f'{{"yes": [{proposal.pk}]}}')
+        vote = self.poll.votes.create(user=voter, vote=f'{{"yes": [{proposal2.pk},{proposal.pk}]}}')
         self.assertIsInstance(vote.vote, CombinedSimpleVoteSchema)
-        self.assertEqual(vote.vote.yes, [proposal.pk])
+        self.assertEqual(vote.vote.yes, [proposal.pk, proposal2.pk])
         self.assertIsInstance(self.poll.method.vote_to_str(vote.vote), str)
+        with self.assertRaises(ValueError):
+            CombinedSimpleVoteSchema(yes=['bad'])
 
     def test_result(self):
         from voteit.proposal.workflows import ProposalWf

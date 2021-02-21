@@ -13,7 +13,7 @@ from voteit.poll.messages import AddVote, ChangeVote
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import GenericVoteSchema, PollResult
 
-__all__ = ("Simple",)
+__all__ = ("CombinedSimple",)
 
 
 YES = "yes"
@@ -26,6 +26,10 @@ class CombinedSimpleVoteSchema(BaseModel):
     yes: List[int] = []
     no: List[int] = []
     abstain: List[int] = []
+
+    @validator("yes", "no", "abstain")
+    def order_choices(cls, lst: List[int]):
+        return sorted(lst)
 
 
 class VoteSchema(GenericVoteSchema):

@@ -1,8 +1,6 @@
 from collections import Counter
 
 from django.test import TestCase
-from django_fsm import TransitionNotAllowed
-
 from voteit.messaging.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
 
@@ -14,27 +12,22 @@ class ScottishTests(TestCase):
 
         self.er = ElectoralRegister.objects.create()
         self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="scottish_stv"
+            electoral_register=self.er, method_name="irv"
         )
         self.voter = self.er.voters.create(username="a_voter")
 
     @property
-    def ScottishSTV(self):
-        from voteit.poll.app.polls.scottish_stv import ScottishSTV
+    def IRV(self):
+        from voteit.poll.app.polls.irv import IRV
 
-        return ScottishSTV
+        return IRV
 
     def test_start_check(self):
-        self.poll.settings = dict(winners=3)
         self.assertRaises(InvalidProposalCount, self.poll.method.start_check)
-
-    def test_without_settings(self):
-        self.assertRaises(TransitionNotAllowed, self.poll.upcoming)
 
     def test_vote_schema(self):
         from voteit.poll.schemas import RankingSchema
 
-        self.poll.settings = dict(winners=2)
         one = self.poll.proposals.create()
         two = self.poll.proposals.create()
         self.poll.proposals.create()
@@ -49,7 +42,6 @@ class ScottishTests(TestCase):
         from random import sample, randint
         from voteit.proposal.workflows import ProposalWf
 
-        self.poll.settings = dict(winners=3)
         for n in range(10):
             self.poll.proposals.create()
         self.assertIsNone(self.poll.method.start_check())
@@ -67,17 +59,16 @@ class ScottishTests(TestCase):
             )
         self.poll.close()
         result = self.poll.result
-        self.assertEqual(len(result.approved), 3)
-        self.assertEqual(len(result.denied), 7)
+        self.assertEqual(len(result.approved), 1)
+        self.assertEqual(len(result.denied), 9)
         for state, count in (
             (ProposalWf.VOTING, 0),
-            (ProposalWf.APPROVED, 3),
-            (ProposalWf.DENIED, 7),
+            (ProposalWf.APPROVED, 1),
+            (ProposalWf.DENIED, 9),
         ):
             self.assertEqual(self.poll.proposals.filter(state=state).count(), count)
 
     def test_result(self):
-        self.poll.settings = {"winners": 2}
         one = self.poll.proposals.create()
         two = self.poll.proposals.create()
         three = self.poll.proposals.create()
@@ -86,8 +77,19 @@ class ScottishTests(TestCase):
         counter[f"{one.pk},{three.pk}"] = 2
         counter[f"{three.pk},{two.pk}"] = 3
         result = self.poll.method.calculate_result(counter)
-        self.assertEqual([one.pk, three.pk], result.approved)
+        self.assertEqual([one.pk], result.approved)
         self.assertIsInstance(result.json(), str)
+
+    def test_no_majority(self):
+        one = self.poll.proposals.create()
+        two = self.poll.proposals.create()
+        three = self.poll.proposals.create()
+        result = self.poll.method.calculate_result({
+            str(one.pk): 1,
+            str(two.pk): 1,
+            str(three.pk): 1,
+        })
+        self.assertIs(result.complete, False)
 
 
 class AddVoteTests(TestCase):
@@ -98,21 +100,20 @@ class AddVoteTests(TestCase):
         self.er = ElectoralRegister.objects.create()
         self.voter = self.er.voters.create(username="voter")
         self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="scottish_stv"
+            electoral_register=self.er, method_name="irv"
         )
         self.prop1 = self.poll.proposals.create()
         self.prop2 = self.poll.proposals.create()
         self.prop3 = self.poll.proposals.create()
-        self.poll.settings = {"winners": 2}
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.save()
 
     @property
     def _cut(self):
-        from voteit.poll.app.polls.scottish_stv import AddSTVVote
+        from voteit.poll.app.polls.irv import AddIRVVote
 
-        return AddSTVVote
+        return AddIRVVote
 
     def _mk_one(self, **kw):
         kw.setdefault(
@@ -143,12 +144,11 @@ class ChangeVoteTests(TestCase):
         self.er = ElectoralRegister.objects.create()
         self.voter = self.er.voters.create(username="voter")
         self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="scottish_stv"
+            electoral_register=self.er, method_name="irv"
         )
         self.prop1 = self.poll.proposals.create()
         self.prop2 = self.poll.proposals.create()
         self.prop3 = self.poll.proposals.create()
-        self.poll.settings = {"winners": 2}
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.save()
@@ -158,9 +158,9 @@ class ChangeVoteTests(TestCase):
 
     @property
     def _cut(self):
-        from voteit.poll.app.polls.scottish_stv import ChangeSTVVote
+        from voteit.poll.app.polls.irv import ChangeIRVVote
 
-        return ChangeSTVVote
+        return ChangeIRVVote
 
     def _mk_one(self, **kw):
         kw.setdefault("vote", {"ranking": [self.prop1.pk, self.prop2.pk]})
