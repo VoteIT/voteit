@@ -2,8 +2,9 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
-from voteit.agenda.channels import AgendaItemChannel
-from voteit.meeting.channels import ParticipantsChannel, ModeratorsChannel
+
+from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.messaging.messages.channels import Subscribe
 
 User = get_user_model()

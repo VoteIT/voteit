@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
+from voteit.agenda.workflows import AgendaItemWf
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
@@ -31,17 +32,19 @@ def poll_subscribed(context: Poll, app_state: AppState, **kw):
 
 @receiver(channel_subscribed, sender=ParticipantsChannel)
 def participants_subscribed(context: Meeting, app_state: AppState, **kw):
-    """ Populate app_state with current meeting polls """
-    # FIXME: We probably want to pick the polls to send instead
+    """ Populate app_state with current meeting polls, except private ones """
     app_state.append_from_queryset(
-        context.polls.exclude(state=PollWf.PRIVATE), PollDetailSerializer, PollAdded
+        context.polls.exclude(state=PollWf.PRIVATE).exclude(
+            agenda_item__state=AgendaItemWf.PRIVATE
+        ),
+        PollDetailSerializer,
+        PollAdded,
     )
 
 
 @receiver(channel_subscribed, sender=ModeratorsChannel)
 def moderators_subscribed(context: Meeting, app_state: AppState, **kw):
     """ Populate app_state with current meeting polls """
-    # FIXME: We probably want to pick the polls to send instead
     app_state.append_from_queryset(context.polls.all(), PollDetailSerializer, PollAdded)
 
 
@@ -63,18 +66,21 @@ def poll_change(instance: Poll = None, created: bool = None, **kw):
             if not created:
                 participants_msg = PollDeleted(pk=instance.pk)
                 participants_ch.publish(participants_msg)
-        else:
+        elif instance.agenda_item is None or not instance.agenda_item.is_private:
+            # Publish if ai isn't private
             participants_ch.publish(msg)
         moderators_ch.publish(msg)
 
 
 @receiver(pre_delete, sender=Poll)
-def poll_delete(instance=None, **kw):
+def poll_delete(instance: Poll = None, **kw):
     """ Poll deleted is only sent to moderators if the poll's private"""
     if instance.meeting is not None:
         moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
         msg = PollDeleted({}, pk=instance.pk)
         moderators_ch.publish(msg)
+        # Publish to participants if poll isn't private. If agenda item exists, make sure it's not private
         if not instance.is_private:
-            participants_ch = ParticipantsChannel.from_instance(instance.meeting)
-            participants_ch.publish(msg)
+            if instance.agenda_item is None or not instance.agenda_item.is_private:
+                participants_ch = ParticipantsChannel.from_instance(instance.meeting)
+                participants_ch.publish(msg)
