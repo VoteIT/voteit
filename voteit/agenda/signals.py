@@ -9,43 +9,70 @@ from voteit.agenda.messages import AgendaChanged
 from voteit.agenda.messages import AgendaDeleted
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import AgendaItemSerializer
-from voteit.meeting.channels import MeetingChannel
+from voteit.agenda.workflows import AgendaItemWf
+from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.signals import archive_meeting
 from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.signals import channel_subscribed
 
 
-@receiver(channel_subscribed, sender=MeetingChannel)
-def meeting_channel_subscribed(
+@receiver(channel_subscribed, sender=ParticipantsChannel)
+def participants_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    """ Send agenda items to client. """
-    # TODO Filter based on user permissions (client handle if showing private ai:s for now)
+    """ Send non-private agenda items to regular users. """
     app_state.append_from_queryset(
-        context.agenda_items.all(), AgendaItemSerializer, AgendaAdded
+        context.agenda_items.exclude(state=AgendaItemWf.PRIVATE),
+        AgendaItemSerializer,
+        AgendaAdded,
     )
 
 
-# FIXME: Split updates on state change for moderators or regular users. Essentially an instance made private
+@receiver(channel_subscribed, sender=ModeratorsChannel)
+def moderators_channel_subscribed(
+    context: Meeting, app_state: AppState, user: AbstractUser, **kw
+):
+    """ Send all agenda items"""
+    app_state.append_from_queryset(
+        context.agenda_items.all(),
+        AgendaItemSerializer,
+        AgendaAdded,
+    )
 
 
 @receiver(post_save, sender=AgendaItem)
 def agenda_change(instance=None, created=None, **kw):
-    ch = MeetingChannel.from_instance(instance.meeting)
+    participants_ch = ParticipantsChannel.from_instance(instance.meeting)
+    moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
     data = AgendaItemSerializer(instance).data
+    # Base message that might only get sent to moderators
     if created:
         msg = AgendaAdded({}, **data)
     else:
         msg = AgendaChanged({}, **data)
-    ch.publish(msg)
+    if instance.is_private:
+        # This signal is for moderators only.
+        # Send deleted to users channel in case it was published before
+        if not created:
+            msg_deleted = AgendaDeleted(pk=instance.pk)
+            participants_ch.publish(msg_deleted)
+        # Moderators get the new agenda item
+    else:
+        # The agenda item isn't private so publish to everyone
+        participants_ch.publish(msg)
+    moderators_ch.publish(msg)
 
 
 @receiver(pre_delete, sender=AgendaItem)
-def agenda_delete(instance=None, **kw):
-    ch = MeetingChannel.from_instance(instance.meeting)
+def agenda_delete(instance: AgendaItem = None, **kw):
+    moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
     msg = AgendaDeleted({}, pk=instance.pk)
-    ch.publish(msg)
+    moderators_ch.publish(msg)
+    if not instance.is_private:
+        participants_ch = ParticipantsChannel.from_instance(instance.meeting)
+        participants_ch.publish(msg)
 
 
 @receiver(archive_meeting)

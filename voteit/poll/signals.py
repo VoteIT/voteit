@@ -3,7 +3,8 @@ from __future__ import annotations
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
+from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
 from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.signals import channel_subscribed
@@ -14,6 +15,7 @@ from voteit.poll.messages import PollDeleted
 from voteit.poll.messages import PollStatus
 from voteit.poll.models import Poll
 from voteit.poll.rest_api.serializers import PollDetailSerializer
+from voteit.poll.workflows import PollWf
 
 
 @receiver(channel_subscribed, sender=PollChannel)
@@ -27,8 +29,17 @@ def poll_subscribed(context: Poll, app_state: AppState, **kw):
     app_state.append(msg)
 
 
-@receiver(channel_subscribed, sender=MeetingChannel)
-def meeting_subscribed(context: Meeting, app_state: AppState, **kw):
+@receiver(channel_subscribed, sender=ParticipantsChannel)
+def participants_subscribed(context: Meeting, app_state: AppState, **kw):
+    """ Populate app_state with current meeting polls """
+    # FIXME: We probably want to pick the polls to send instead
+    app_state.append_from_queryset(
+        context.polls.exclude(state=PollWf.PRIVATE), PollDetailSerializer, PollAdded
+    )
+
+
+@receiver(channel_subscribed, sender=ModeratorsChannel)
+def moderators_subscribed(context: Meeting, app_state: AppState, **kw):
     """ Populate app_state with current meeting polls """
     # FIXME: We probably want to pick the polls to send instead
     app_state.append_from_queryset(context.polls.all(), PollDetailSerializer, PollAdded)
@@ -40,18 +51,30 @@ def poll_change(instance: Poll = None, created: bool = None, **kw):
         instance.refresh_from_db(
             fields=["result_data"]
         )  # FIXME somewhere else, preferably.
-        ch = MeetingChannel.from_instance(instance.meeting)
         data = PollDetailSerializer(instance).data
+        participants_ch = ParticipantsChannel.from_instance(instance.meeting)
+        moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
         if created:
             msg = PollAdded({}, **data)
         else:
             msg = PollChanged({}, **data)
-        ch.publish(msg)
+        if instance.is_private:
+            # Only care about transmitting to participants if it existed previously
+            if not created:
+                participants_msg = PollDeleted(pk=instance.pk)
+                participants_ch.publish(participants_msg)
+        else:
+            participants_ch.publish(msg)
+        moderators_ch.publish(msg)
 
 
 @receiver(pre_delete, sender=Poll)
 def poll_delete(instance=None, **kw):
+    """ Poll deleted is only sent to moderators if the poll's private"""
     if instance.meeting is not None:
-        ch = MeetingChannel.from_instance(instance.meeting)
+        moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
         msg = PollDeleted({}, pk=instance.pk)
-        ch.publish(msg)
+        moderators_ch.publish(msg)
+        if not instance.is_private:
+            participants_ch = ParticipantsChannel.from_instance(instance.meeting)
+            participants_ch.publish(msg)

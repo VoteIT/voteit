@@ -362,6 +362,10 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         self.get_method_class()  # Will raise error
         super().save(**kw)
 
+    @property
+    def is_private(self) -> bool:
+        return self.state == PollWf.PRIVATE
+
     # Type hinting
     objects = models.Manager()
     votes: models.QuerySet

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Type, Optional, Union
+from typing import TYPE_CHECKING, Type
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -32,8 +32,7 @@ from voteit.speaker.serializers import (
 )
 
 if TYPE_CHECKING:
-    pass
-
+    from voteit.messaging.abcs import BaseOutgoingMessage
 
 list_updated = Signal(providing_args=["sender", "instance"])
 
@@ -68,20 +67,6 @@ def reorder_after_delete(sender: Type[Speaker], instance: Speaker, **kwargs):
     instance.list.reorder(force_signal=True)
 
 
-# FIXME: Push when active list changes
-def _get_list_channel(
-    speaker_list: SpeakerList,
-) -> Optional[Union[MeetingChannel, AgendaItemChannel]]:
-    system = speaker_list.list_system
-    if system.active_list == speaker_list and system.meeting is not None:
-        # We don't know of other transport ways for active list that meeting.
-        # If meeting doesn't exist, we still want to default to agenda item.
-        return MeetingChannel.from_instance(system.meeting)
-    elif speaker_list.agenda_item is not None:
-        return AgendaItemChannel.from_instance(speaker_list.agenda_item)
-    return None
-
-
 def _get_list_order_msg(speaker_list: SpeakerList) -> SpeakerListOrder:
     speakers_qs = speaker_list.speakers_qs().prefetch_related("user")
     users = [x.user for x in speakers_qs]
@@ -90,38 +75,43 @@ def _get_list_order_msg(speaker_list: SpeakerList) -> SpeakerListOrder:
     return SpeakerListOrder(pk=speaker_list.pk, queue=user_pks, current=current)
 
 
+def _publish_list_msg(speaker_list: SpeakerList, msg: BaseOutgoingMessage):
+    if speaker_list.is_active_list and speaker_list.meeting:
+        ch = MeetingChannel.from_instance(speaker_list.meeting)
+        ch.publish(msg)
+    elif speaker_list.agenda_item is not None:
+        ai_ch = AgendaItemChannel.from_instance(speaker_list.agenda_item)
+        ai_ch.publish(msg)
+
+
 @receiver(list_updated)
 def push_list_order_change(instance: SpeakerList, **kw):
     """When speakers reorder, send an update of the order.
     This is not transmitted on save for the speaker list,
     since the speaker items are separate.
+
+    Inactive lists are transmitted to each agenda item. Active lists to participants/moderators.
     """
-    channel = _get_list_channel(instance)
-    if channel is not None:
-        msg = _get_list_order_msg(instance)
-        channel.publish(msg)
+    msg = _get_list_order_msg(instance)
+    _publish_list_msg(instance, msg)
 
 
 @receiver(post_save, sender=SpeakerList)
 def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **kw):
     """Send to Agenda or meeting channel depending on if it's the active list."""
-    channel = _get_list_channel(instance)
-    if channel is not None:
-        if created:
-            msg_class = SpeakerListAdded
-        else:
-            msg_class = SpeakerListChanged
-        data = SpeakerListSerializer(instance).data
-        msg = msg_class(**data)
-        channel.publish(msg)
+    if created:
+        msg_class = SpeakerListAdded
+    else:
+        msg_class = SpeakerListChanged
+    data = SpeakerListSerializer(instance).data
+    msg = msg_class(**data)
+    _publish_list_msg(instance, msg)
 
 
 @receiver(post_delete, sender=SpeakerList)
 def notify_deleted_speaker_list(instance: SpeakerList, **kw):
-    channel = _get_list_channel(instance)
-    if channel is not None:
-        msg = SpeakerListDeleted(pk=instance.pk)
-        channel.publish(msg)
+    msg = SpeakerListDeleted(pk=instance.pk)
+    _publish_list_msg(instance, msg)
 
 
 @receiver(post_save, sender=SpeakerListSystem)
@@ -130,23 +120,23 @@ def notify_added_or_changed_speaker_system(
 ):
     """ Updates to speaker system, pushed to meeting channel."""
     if instance.meeting is not None:
-        channel = MeetingChannel.from_instance(instance.meeting)
         if created:
             msg_class = SpeakerSystemAdded
         else:
             msg_class = SpeakerSystemChanged
         data = SpeakerListSystemSerializer(instance).data
         msg = msg_class(**data)
-        channel.publish(msg)
+        ch = MeetingChannel.from_instance(instance.meeting)
+        ch.publish(msg)
 
 
 @receiver(post_delete, sender=SpeakerListSystem)
 def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
     """ Notify meeting that the speaker system is no more."""
     if instance.meeting is not None:
-        channel = MeetingChannel.from_instance(instance.meeting)
         msg = SpeakerSystemDeleted(pk=instance.pk)
-        channel.publish(msg)
+        ch = MeetingChannel.from_instance(instance.meeting)
+        ch.publish(msg)
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)

@@ -61,7 +61,7 @@ class RolesIntegrationTests(TransactionTestCase):
 
     async def test_roles_removed_kicks_user_from_protected_channel(self):
         from voteit.messaging.consumers import WebsocketDemuxConsumer
-        from voteit.meeting.channels import ModeratorChannel
+        from voteit.meeting.channels import ModeratorsChannel
         from voteit.messaging.messages.channels import ChannelSubscription
         from voteit.messaging.messages.roles import RemoveMeetingRoles
 
@@ -85,7 +85,7 @@ class RolesIntegrationTests(TransactionTestCase):
         consumer_b.get_queue = mock.MagicMock(return_value=queue)
 
         # Subscribe both users to the moderator channel
-        mod_channel = ModeratorChannel.from_instance(self.meeting)
+        mod_channel = ModeratorsChannel.from_instance(self.meeting)
         subscription = ChannelSubscription(
             pk=self.meeting.pk,
             channel_type=mod_channel.name,

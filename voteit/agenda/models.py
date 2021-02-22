@@ -109,3 +109,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         # Mark agenda item as archived. Handled by scripts.
         # It should be able to go to archived from any state.
         pass
+
+    @property
+    def is_private(self) -> bool:
+        return self.state == AgendaItemWf.PRIVATE
