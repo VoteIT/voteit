@@ -3,11 +3,11 @@ from rest_framework import serializers
 from voteit.agenda.models import AgendaItem
 
 
-class AgendaListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AgendaItem
-        fields = "url", "pk", "meeting", "title", "state", "order"
-        read_only_fields = "state", "order"
+# class AgendaListSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = AgendaItem
+#         fields = "url", "pk", "meeting", "title", "state", "order"
+#         read_only_fields = "state", "order"
 
 
 class AgendaItemSerializer(serializers.ModelSerializer):
