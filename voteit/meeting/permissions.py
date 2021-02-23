@@ -2,6 +2,15 @@ from voteit.core.registries import permissions
 
 
 class MeetingPermissions:
+    """
+    The permissions must map the object permissions in django.
+
+    >>> from voteit.core.testing import find_bad_permission_names
+    >>> from voteit.meeting.models import Meeting
+    >>> find_bad_permission_names(MeetingPermissions, Meeting)
+
+    """
+
     ADD = permissions.create("meeting.add_meeting", "organisation.Organisation")
     CHANGE = permissions.create("meeting.change_meeting", "meeting.Meeting")
     DELETE = permissions.create("meeting.delete_meeting", "meeting.Meeting")

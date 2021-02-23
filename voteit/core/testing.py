@@ -1,6 +1,11 @@
 """ Testing helpers"""
+from __future__ import annotations
 import doctest
 from pkgutil import walk_packages
+from typing import TYPE_CHECKING, Set, Optional, Dict
+
+if TYPE_CHECKING:
+    from django.db.models import Model
 
 user_tag = """
 <span class="mention" data-index="0" data-denotation-char="@" data-id="{userid}" data-value="{name}">
@@ -41,3 +46,30 @@ def load_doctests(tests, package) -> None:
         package.__path__, package.__name__ + "."
     ):
         tests.addTests(doctest.DocTestSuite(name, optionflags=opts))
+
+
+_PERMS_TO_TEST = ("ADD", "CHANGE", "DELETE", "VIEW")
+
+
+def find_bad_permission_names(permissions, model: Model) -> Optional[Dict]:
+    """Returns non-django-compliant names from a permission object
+    May return a dict with failing permissions where the key is the correct one
+
+    add: user.has_perm("foo.add_bar")
+    change: user.has_perm("foo.change_bar")
+    delete: user.has_perm("foo.delete_bar")
+    view: user.has_perm("foo.view_bar")
+    """
+    from django.contrib.contenttypes.models import ContentType
+
+    ct: ContentType = ContentType.objects.get_for_model(model)
+    app_name, model_name = ct.natural_key()
+    results = {}
+    for perm_name in _PERMS_TO_TEST:
+        perm = getattr(permissions, perm_name, None)
+        if perm is not None:
+            dj_perm = f"{app_name}.{perm_name.lower()}_{model_name}"
+            if dj_perm != perm:
+                results[dj_perm] = perm
+    if results:
+        return results

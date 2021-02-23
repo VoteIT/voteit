@@ -2,38 +2,42 @@ from voteit.core.registries import permissions
 
 
 class SpeakerSystemPermissions:
-    ADD = permissions.create("voteit.speaker.add_speaker_system", "meeting.Meeting")
+    """
+    The permissions must map the object permissions in django.
+
+    >>> from voteit.core.testing import find_bad_permission_names
+    >>> from voteit.speaker.models import SpeakerListSystem
+    >>> find_bad_permission_names(SpeakerSystemPermissions, SpeakerListSystem)
+
+    """
+
+    ADD = permissions.create("speaker.add_speakerlistsystem", "meeting.Meeting")
     CHANGE = permissions.create(
-        "voteit.speaker.change_speaker_system", "speaker.SpeakerListSystem"
+        "speaker.change_speakerlistsystem", "speaker.SpeakerListSystem"
     )
     DELETE = permissions.create(
-        "voteit.speaker.delete_speaker_system", "speaker.SpeakerListSystem"
+        "speaker.delete_speakerlistsystem", "speaker.SpeakerListSystem"
     )
     VIEW = permissions.create(
-        "voteit.speaker.view_speaker_system", "speaker.SpeakerListSystem"
+        "speaker.view_speakerlistsystem", "speaker.SpeakerListSystem"
     )
 
 
 class SpeakerListPermissions:
-    ADD = permissions.create(
-        "voteit.speaker.add_speaker_list", "speaker.SpeakerListSystem"
-    )
-    CHANGE = permissions.create(
-        "voteit.speaker.change_speaker_list", "speaker.SpeakerList"
-    )
-    DELETE = permissions.create(
-        "voteit.speaker.delete_speaker_list", "speaker.SpeakerList"
-    )
-    VIEW = permissions.create("voteit.speaker.view_speaker_list", "speaker.SpeakerList")
-    ENTER = permissions.create(
-        "voteit.speaker.enter_speaker_list", "speaker.SpeakerList"
-    )
-    LEAVE = permissions.create(
-        "voteit.speaker.leave_speaker_list", "speaker.SpeakerList"
-    )
-    START = permissions.create(
-        "voteit.speaker.start_speaker_in_list", "speaker.SpeakerList"
-    )
-    STOP = permissions.create(
-        "voteit.speaker.stop_speaker_in_list", "speaker.SpeakerList"
-    )
+    """
+    The permissions must map the object permissions in django.
+
+    >>> from voteit.core.testing import find_bad_permission_names
+    >>> from voteit.speaker.models import SpeakerList
+    >>> find_bad_permission_names(SpeakerListPermissions, SpeakerList)
+
+    """
+
+    ADD = permissions.create("speaker.add_speakerlist", "speaker.SpeakerListSystem")
+    CHANGE = permissions.create("speaker.change_speakerlist", "speaker.SpeakerList")
+    DELETE = permissions.create("speaker.delete_speakerlist", "speaker.SpeakerList")
+    VIEW = permissions.create("speaker.view_speakerlist", "speaker.SpeakerList")
+    ENTER = permissions.create("speaker.enter_speakerlist", "speaker.SpeakerList")
+    LEAVE = permissions.create("speaker.leave_speakerlist", "speaker.SpeakerList")
+    START = permissions.create("speaker.start_speaker_in_list", "speaker.SpeakerList")
+    STOP = permissions.create("speaker.stop_speaker_in_list", "speaker.SpeakerList")
