@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from voteit.agenda.models import *
+from voteit.agenda.models import AgendaItem
 
 
 class AgendaListSerializer(serializers.ModelSerializer):

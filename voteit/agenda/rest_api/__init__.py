@@ -4,5 +4,6 @@ from . import views
 
 
 router.register(
-    'agenda-items', views.AgendaViewSet,
+    "agenda-items",
+    views.AgendaViewSet,
 )
