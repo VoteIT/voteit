@@ -18,8 +18,6 @@ class SpeakerListSerializer(serializers.ModelSerializer):
 
 
 class SpeakerListSystemSerializer(serializers.ModelSerializer):
-    # Note: This won't have access to the request, so no url thingies here!
-
     class Meta:
         model = SpeakerListSystem
         fields = (
@@ -28,6 +26,7 @@ class SpeakerListSystemSerializer(serializers.ModelSerializer):
             "method_name",
             "title",
             "active",
+            "archived",
             "settings",
             "safe_positions",
             "active_list",
