@@ -62,3 +62,32 @@ class AgendaItemViewTestCase(APITestCase):
         self.client.force_login(self.moderator)
         response = self.client.get(url, data)
         self.assertEqual(response.status_code, 405)
+
+    def test_transition_moderator(self):
+        url = f"/api/agenda-items/{self.ai.pk}/transitions/"
+        data = {"transition": "upcoming"}
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 201)
+
+    def test_bad_transition_moderator(self):
+        url = f"/api/agenda-items/{self.ai.pk}/transitions/"
+        data = {"transition": "wooohoooo"}
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_transition_unauthorized_users(self):
+        url = f"/api/agenda-items/{self.ai.pk}/transitions/"
+        data = {"transition": "upcoming"}
+        response = self.client.post(url, data)
+        self.assertEqual(
+            response.status_code,
+            401,
+        )
+        self.client.force_login(self.participant)
+        response = self.client.post(url, data)
+        self.assertEqual(
+            response.status_code,
+            403,
+        )
