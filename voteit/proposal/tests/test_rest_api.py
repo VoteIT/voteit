@@ -44,9 +44,9 @@ class ProposalTestCase(APITestCase):
         url = reverse("proposal-list")
         data = {
             "title": "My proposal",
-            "agenda_item": 1000,
+            "agenda_item": -1,
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json().get("detail"), "Permission denied")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json().get("detail"), "No item found where pk==-1")

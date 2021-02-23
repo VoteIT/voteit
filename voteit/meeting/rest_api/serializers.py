@@ -3,9 +3,7 @@ from typing import Type, Optional, List
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import IntegrityError
 from rest_framework import serializers
-from voteit.agenda.rest_api.serializers import AgendaListSerializer
 from voteit.core.models import Roles
 from voteit.core.rest_api.serializers import UserSerializer
 
@@ -21,7 +19,7 @@ class UserRolesMixin(serializers.Serializer):
     def get_current_user_roles(self, instance) -> Optional[List[str]]:
         """ Return current user roles, if available, for a meeting. """
         if self.context:
-            user = self.context['request'].user
+            user = self.context["request"].user
             with suppress(ObjectDoesNotExist):
                 return instance.roles.get(user=user).assigned
 
@@ -29,7 +27,16 @@ class UserRolesMixin(serializers.Serializer):
 class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
     class Meta:
         model = models.Meeting
-        fields = 'url', 'pk', 'title', 'state', 'start_time', 'end_time', 'public', 'current_user_roles'
+        fields = (
+            "url",
+            "pk",
+            "title",
+            "state",
+            "start_time",
+            "end_time",
+            "public",
+            "current_user_roles",
+        )
 
 
 class MeetingDetailSerializer(UserRolesMixin, serializers.ModelSerializer):
@@ -52,25 +59,26 @@ class AgendaOrderSerializer(serializers.Serializer):
 
 
 class MeetingRolesSerializer(serializers.ModelSerializer):
-    meeting = serializers.IntegerField(source='context_id', read_only=True)
+    meeting = serializers.IntegerField(source="context_id", read_only=True)
     user = UserSerializer(read_only=True)
 
     class Meta:
         model = models.MeetingRoles
-        fields = 'pk', 'user', 'meeting', 'assigned'
+        fields = "pk", "user", "meeting", "assigned"
 
 
 class MeetingAddParticipantSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField()
-    meeting_id = serializers.IntegerField(source='context_id')
+    meeting_id = serializers.IntegerField(source="context_id")
 
     class Meta:
         model = models.MeetingRoles
-        fields = 'user_id', 'meeting_id'
+        fields = "user_id", "meeting_id"
 
 
 class RoleValidator:
     """ Ensures that role name is valid for roles class provided on class instantiation. """
+
     roles_cls: Type[Roles]
 
     def __init__(self, roles_cls: Type[Roles]):
@@ -78,8 +86,12 @@ class RoleValidator:
 
     def __call__(self, value):
         if value not in self.roles_cls.valid_roles:
-            raise serializers.ValidationError(f'The role "{value}" is not valid for this context.')
+            raise serializers.ValidationError(
+                f'The role "{value}" is not valid for this context.'
+            )
 
 
 class RoleSerializer(serializers.Serializer):
-    role = serializers.CharField(max_length=20, validators=[RoleValidator(roles_cls=models.MeetingRoles)])
+    role = serializers.CharField(
+        max_length=20, validators=[RoleValidator(roles_cls=models.MeetingRoles)]
+    )

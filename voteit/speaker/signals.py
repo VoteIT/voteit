@@ -26,7 +26,7 @@ from voteit.speaker.messages import (
     SpeakerSystemChanged,
 )
 from voteit.speaker.models import Speaker, SpeakerList, SpeakerListSystem
-from voteit.speaker.serializers import (
+from voteit.speaker.rest_api.serializers import (
     SpeakerListSerializer,
     SpeakerListSystemSerializer,
 )

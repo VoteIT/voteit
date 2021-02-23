@@ -51,8 +51,8 @@ class AgendaItemViewTestCase(APITestCase):
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json().get("detail"), "Permission denied")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
 
     def test_get(self):
         url = reverse("agendaitem-list")

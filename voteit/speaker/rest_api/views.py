@@ -1,22 +1,16 @@
 from rest_framework import (
     viewsets,
-    generics
 )
 
 from voteit.core.rest_api.mixins import (
     TransitionsMixin,
-    SerializerClassesMixin,
 )
 
-from voteit.speaker.models import *
-from . import serializers
+from voteit.speaker.models import SpeakerList
+from voteit.speaker.rest_api import serializers
 
 
-class SpeakerListViewSet(
-    TransitionsMixin,
-    SerializerClassesMixin,
-    viewsets.ReadOnlyModelViewSet
-):
+class SpeakerListViewSet(TransitionsMixin, viewsets.ReadOnlyModelViewSet):
     model = SpeakerList
     queryset = SpeakerList.objects.all()
     serializer_class = serializers.SpeakerListSerializer
