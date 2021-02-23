@@ -10,7 +10,6 @@ from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.db import models, transaction
-from django.db.models import Model
 from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
@@ -83,7 +82,10 @@ class MessageABC(ABC):
         pass
 
     def __init__(
-        self, mm: Union[Dict, MessageMeta] = None, data: Optional[Dict] = None, **kwargs
+        self,
+        mm: Union[Dict, MessageMeta] = None,
+        data: Optional[Dict] = None,
+        **kwargs,
     ):
         if mm is None:
             mm = {}
@@ -390,7 +392,7 @@ class ContextAction(MessageABC, ABC):
 
     @property
     @abstractmethod
-    def model(self) -> Type[Model]:
+    def model(self) -> Type[models.Model]:
         pass
 
     def allowed(self) -> bool:
@@ -403,7 +405,7 @@ class ContextAction(MessageABC, ABC):
         return self.user.has_perm(self.permission, self.context)
 
     @cached_property
-    def context(self) -> Model:
+    def context(self) -> models.Model:
         try:
             return self.model.objects.get(pk=self.data.pk)
         except self.model.DoesNotExist:
