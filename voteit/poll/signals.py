@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
+from django_fsm import post_transition
 
+from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
@@ -84,3 +86,15 @@ def poll_delete(instance: Poll = None, **kw):
             if instance.agenda_item is None or not instance.agenda_item.is_private:
                 participants_ch = ParticipantsChannel.from_instance(instance.meeting)
                 participants_ch.publish(msg)
+
+
+@receiver(post_transition, sender=AgendaItem)
+def private_ai_published(instance: AgendaItem, source: str, **kw):
+    """Notify participants of any existing polls
+    Note that polls may appear before the agenda item does!"""
+    if source == AgendaItemWf.PRIVATE and instance.meeting is not None:
+        participants_ch = ParticipantsChannel.from_instance(instance.meeting)
+        for poll in instance.polls.exclude(state=PollWf.PRIVATE):
+            data = PollDetailSerializer(poll).data
+            msg = PollAdded({}, **data)
+            participants_ch.publish(msg)

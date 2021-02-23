@@ -166,3 +166,47 @@ class PollChangedTests(TestCase):
         poll.delete()
         # Poll was private, so no message sent
         self.assertFalse(mock_publish.called)
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class PrivateAIPublishedTests(TestCase):
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+        from voteit.poll.models import ElectoralRegister
+
+        self.er = ElectoralRegister.objects.create()
+        self.meeting = Meeting.objects.create()
+        self.ai = self.meeting.agenda_items.create()
+        self.poll = self.meeting.polls.create(
+            method_name="simple", electoral_register=self.er, agenda_item=self.ai
+        )
+        self.user = User.objects.create(username="user")
+        self.meeting.add_roles(self.user, "participant")
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_ai_made_public_private_poll(self, mock_publish):
+        from voteit.agenda.messages import AgendaChanged
+
+        self.ai.upcoming()
+        self.ai.save()
+
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, AgendaChanged)
+        self.assertEqual(1, len(mock_publish.mock_calls))
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_ai_made_public_visible_poll(self, mock_publish):
+        from voteit.agenda.messages import AgendaChanged
+        from voteit.poll.messages import PollAdded
+
+        self.poll.upcoming()
+        self.poll.save()
+        mock_publish.reset_mock()
+        self.ai.upcoming()
+        self.ai.save()
+
+        self.assertTrue(mock_publish.called)
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(1, len([x for x in messages if isinstance(x, AgendaChanged)]))
+        self.assertEqual(1, len([x for x in messages if isinstance(x, PollAdded)]))

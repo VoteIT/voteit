@@ -195,3 +195,28 @@ class ProposalChangedTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalDeleted)
         self.assertEqual(prop_pk, msg.data.pk)
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class PrivateAIPublishedTests(TestCase):
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        self.ai = self.meeting.agenda_items.create()
+        self.ai.proposals.create(body="Hello")
+        self.user = User.objects.create(username="user")
+        self.meeting.add_roles(self.user, "participant")
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_ai_made_public(self, mock_publish):
+        from voteit.agenda.messages import AgendaChanged
+        from voteit.proposal.messages import ProposalAdded
+
+        self.ai.upcoming()
+        self.ai.save()
+
+        self.assertTrue(mock_publish.called)
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(1, len([x for x in messages if isinstance(x, AgendaChanged)]))
+        self.assertEqual(1, len([x for x in messages if isinstance(x, ProposalAdded)]))
