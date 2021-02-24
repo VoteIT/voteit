@@ -2,6 +2,7 @@ from typing import Sequence, Type
 
 from django.db import transaction
 from rest_framework import serializers
+from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
 
 from voteit.poll import models
 from voteit.poll.abcs import PollMethod
@@ -19,33 +20,27 @@ __all__ = (
 
 class PollDetailSerializer(serializers.ModelSerializer):
     # Note: This won't have access to the request object, so no url things here!
+    serializer_url_field = OptionalHyperlinkedIdentityField
+
     class Meta:
         model = models.Poll
-        fields = (
-            "pk",
-            "body",
-            "title",
-            "agenda_item",
-            "electoral_register",
-            "initial_electoral_register",
-            "meeting",
-            "method_name",
-            "proposals",
-            "result_data",
-            "settings_data",
-            "state",
-        )
         read_only_fields = (
             "agenda_item",
             "electoral_register",
             "initial_electoral_register",
             "meeting",
             "method_name",
-            "proposals",
+            "pk",
             "result_data",
             "settings_data",
             "state",
+            "proposals",
+            "url",
         )
+        fields = list(read_only_fields) + [
+            "body",
+            "title",
+        ]
 
 
 class PollListSerializer(PollDetailSerializer):
@@ -65,7 +60,6 @@ class PollListSerializer(PollDetailSerializer):
 
     class Meta:
         fields = [
-            "url",
             "voted",
             "total",
         ] + list(PollDetailSerializer.Meta.fields)
@@ -134,7 +128,7 @@ class ElectoralRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.ElectoralRegister
 
-        read_only_fields = (
+        fields = read_only_fields = (
             "pk",
             "voters",
         )

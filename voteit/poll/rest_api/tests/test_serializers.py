@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
-
+from django.test import TestCase, RequestFactory
 
 User = get_user_model()
 
@@ -27,6 +26,17 @@ class PollDetailSerializerTests(TestCase):
 
         return PollDetailSerializer
 
+    def test_serializer_url(self):
+        serializer = self._cut(self.poll)
+        self.assertIsNone(serializer.data["url"])
+
+        rf = RequestFactory()
+        request = rf.request()
+        serializer = self._cut(self.poll, context={"request": request})
+        self.assertEqual(
+            f"http://testserver/api/polls/{self.poll.pk}/", serializer.data["url"]
+        )
+
     def test_serializer_simple(self):
         serializer = self._cut(self.poll)
         self.assertEqual(
@@ -43,6 +53,7 @@ class PollDetailSerializerTests(TestCase):
                 "result_data": None,
                 "settings_data": None,
                 "state": "private",
+                "url": None,
             },
             serializer.data,
         )

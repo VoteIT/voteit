@@ -9,9 +9,15 @@ class BaseModelSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         ModelClass = self.Meta.model
         return ModelClass.objects.create(
-            author=self.context['request'].user,
-            **validated_data
+            author=self.context["request"].user, **validated_data
         )
+
+
+class OptionalHyperlinkedIdentityField(serializers.HyperlinkedIdentityField):
+    def to_representation(self, value):
+        if "request" not in self.context:
+            return None
+        return super().to_representation(value)
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -22,11 +28,17 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserModel
-        fields = 'pk', 'username', 'full_name', 'first_name', 'last_name',
+        fields = (
+            "pk",
+            "username",
+            "full_name",
+            "first_name",
+            "last_name",
+        )
 
 
 class TransitionSerializer(serializers.Serializer):
     transition = serializers.CharField(max_length=20)
 
     class Meta:
-        fields = "transition",
+        fields = ("transition",)
