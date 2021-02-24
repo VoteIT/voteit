@@ -66,23 +66,18 @@ class PollListSerializer(PollDetailSerializer):
 
 
 class PollCreateSerializer(serializers.ModelSerializer):
-    _proposals: Sequence
-    proposal_pks = serializers.CharField(max_length=100, write_only=True)
-    start = serializers.BooleanField(write_only=True)
-    settings = serializers.JSONField(allow_null=True, write_only=True)
+    start = serializers.BooleanField(write_only=True, required=False, default=False)
+    settings = serializers.JSONField(allow_null=True, write_only=True, required=False)
 
     def validate(self, attrs):
-        """ Get proposal set and make sure they're all published. """
+        """ Run some extended validation. """
         agenda_item = attrs.get("agenda_item")
-        proposal_pks = attrs.get("proposal_pks").split(",")
+        proposals = set(attrs.get("proposals"))
         method_name = attrs.get("method_name")
         settings = attrs.get("settings")
-        self._proposals = agenda_item.proposals.filter(
-            pk__in=proposal_pks, state=ProposalWf.PUBLISHED
-        )
-        if len(self._proposals) != len(proposal_pks):
+        if proposals - set(agenda_item.proposals.all()):
             raise serializers.ValidationError(
-                {"proposal_pks": "Proposals must be published on Agenda Item"}
+                {"proposals": "Proposals must be published on Agenda Item"}
             )
         reg = get_poll_method_registry()
         method: Type[PollMethod] = reg.get(method_name)
@@ -104,13 +99,10 @@ class PollCreateSerializer(serializers.ModelSerializer):
         return super().validate(attrs)
 
     def create(self, validated_data):
-        """ Create method object and connect proposals """
-        validated_data.pop("proposal_pks")
         start = validated_data.pop("start")
 
         with transaction.atomic():
             poll = super().create(validated_data)
-            poll.proposals.set(self._proposals)
             if start:
                 poll.upcoming()
                 poll.ongoing()
@@ -119,9 +111,19 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Poll
-        fields = "pk", "agenda_item", "method_name", "proposal_pks", "start", "settings"
-        extra_kwargs = {"agenda_item": {"required": True}}
         read_only_fields = ("pk",)
+        fields = list(read_only_fields) + [
+            "agenda_item",
+            "meeting",
+            "method_name",
+            "proposals",
+            "start",
+            "settings",
+        ]
+        extra_kwargs = {
+            "agenda_item": {"required": True},
+            "meeting": {"required": True},
+        }
 
 
 class ElectoralRegisterSerializer(serializers.ModelSerializer):

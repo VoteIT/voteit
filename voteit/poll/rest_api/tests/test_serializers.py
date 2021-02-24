@@ -104,6 +104,87 @@ class PollDetailSerializerTests(TestCase):
         )
 
 
+class PollCreateSerializerTests(TestCase):
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        self.ai = self.meeting.agenda_items.create(title="Hello")
+        self.prop = self.ai.proposals.create()
+        self.er = self.meeting.electoral_registers.create()
+        self.er.voters.create(username="one")
+
+    @property
+    def _cut(self):
+        from voteit.poll.rest_api.serializers import PollCreateSerializer
+
+        return PollCreateSerializer
+
+    def _fixture(self, **kw):
+        kw.setdefault("meeting", self.meeting.pk)
+        kw.setdefault("agenda_item", self.ai.pk)
+        kw.setdefault("method_name", "simple")
+        kw.setdefault("title", "Well...")
+        kw.setdefault("proposals", [self.prop.pk])
+        return kw
+
+    def test_serializer_no_props(self):
+        data = self._fixture()
+        data.pop("proposals")
+        serializer = self._cut(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("proposals", serializer.errors)
+
+    def test_serializer_minimal(self):
+        data = self._fixture()
+        serializer = self._cut(data=data)
+        self.assertTrue(serializer.is_valid())
+        instance = serializer.save()
+        instance.electoral_register = self.er
+        instance.upcoming()
+        instance.ongoing()
+        instance.save()
+
+    def test_serializer_wrong_ai(self):
+        other_ai = self.meeting.agenda_items.create()
+        other_prop = other_ai.proposals.create()
+        data = self._fixture(proposals=[other_prop])
+        serializer = self._cut(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("proposals", serializer.errors)
+
+    def test_serializer_repeated_schulze(self):
+        prop2 = self.ai.proposals.create()
+        prop3 = self.ai.proposals.create()
+        data = self._fixture(
+            method_name="repeated_schulze",
+            proposals=[self.prop.pk, prop2.pk, prop3.pk],
+        )
+        serializer = self._cut(data=data)
+        self.assertTrue(serializer.is_valid())
+        instance = serializer.save()
+        instance.electoral_register = self.er
+        instance.upcoming()
+        instance.ongoing()
+        instance.save()
+
+    def test_serializer_scottish_stv(self):
+        prop2 = self.ai.proposals.create()
+        prop3 = self.ai.proposals.create()
+        data = self._fixture(
+            method_name="scottish_stv",
+            proposals=[self.prop.pk, prop2.pk, prop3.pk],
+            settings={"winners": 2},
+        )
+        serializer = self._cut(data=data)
+        self.assertTrue(serializer.is_valid())
+        instance = serializer.save()
+        instance.electoral_register = self.er
+        instance.upcoming()
+        instance.ongoing()
+        instance.save()
+
+
 class ElectoralRegisterSerializerTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
