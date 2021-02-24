@@ -102,3 +102,35 @@ class PollDetailSerializerTests(TestCase):
         self.assertEqual(
             len(formatted_fake_result.strong_pairs), len(result_data["strong_pairs"])
         )
+
+
+class ElectoralRegisterSerializerTests(TestCase):
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        self.er = self.meeting.electoral_registers.create()
+        one = self.er.voters.create(username="one")
+        two = self.er.voters.create(username="two")
+        self.voter_pks = {one.pk, two.pk}
+
+    @property
+    def _cut(self):
+        from voteit.poll.rest_api.serializers import ElectoralRegisterSerializer
+
+        return ElectoralRegisterSerializer
+
+    def test_er(self):
+        serializer = self._cut(self.er)
+        self.assertEqual(self.er.pk, serializer.data["pk"])
+        self.assertEqual(self.voter_pks, set(serializer.data["voters"]))
+        self.assertEqual(None, serializer.data["url"])
+
+    def test_er_with_url(self):
+        rf = RequestFactory()
+        request = rf.request()
+        serializer = self._cut(self.er, context={"request": request})
+        self.assertEqual(
+            f"http://testserver/api/electoral-registers/{self.er.pk}/",
+            serializer.data["url"],
+        )
