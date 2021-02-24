@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Sequence, Type
 
 from django.db import transaction
 from rest_framework import serializers
@@ -29,16 +29,43 @@ class PollListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Poll
-        fields = ("url", "pk", "title", "meeting", "agenda_item", "state", "method_name", "voted",
-                  "total", "result_data", "electoral_register")
+        fields = (
+            "url",
+            "pk",
+            "title",
+            "meeting",
+            "agenda_item",
+            "state",
+            "method_name",
+            "voted",
+            "total",
+            "result_data",
+            "electoral_register",
+        )
 
 
 class PollDetailSerializer(PollListSerializer):
     # Note: This won't have access to the request object, so no url things here!
     class Meta(PollListSerializer.Meta):
-        fields = ("pk", "title", "meeting", "agenda_item", "state", "method_name", "voted", "total",
-                  "result_data", "electoral_register")
-        read_only_fields = "state", "voted", "total", "result_data", "electoral_register"
+        fields = (
+            "pk",
+            "title",
+            "meeting",
+            "agenda_item",
+            "state",
+            "method_name",
+            "voted",
+            "total",
+            "result_data",
+            "electoral_register",
+        )
+        read_only_fields = (
+            "state",
+            "voted",
+            "total",
+            "result_data",
+            "electoral_register",
+        )
 
 
 class PollCreateSerializer(serializers.ModelSerializer):
@@ -57,23 +84,26 @@ class PollCreateSerializer(serializers.ModelSerializer):
             pk__in=proposal_pks, state=ProposalWf.PUBLISHED
         )
         if len(self._proposals) != len(proposal_pks):
-            raise serializers.ValidationError({
-                "proposal_pks": "Proposals must be published on Agenda Item"
-            })
+            raise serializers.ValidationError(
+                {"proposal_pks": "Proposals must be published on Agenda Item"}
+            )
         reg = get_poll_method_registry()
-        method: PollMethod = reg.get(method_name)
+        method: Type[PollMethod] = reg.get(method_name)
         if method is None:
-            raise serializers.ValidationError({
-                "method_name": f"{method_name} is not a valid poll method. {repr(list(reg.keys()))}",
-            })
+            raise serializers.ValidationError(
+                {
+                    "method_name": f"{method_name} is not a valid poll method. {repr(list(reg.keys()))}",
+                }
+            )
         if settings is not None:
-            # TODO Better
+            if method.settings_schema is None:
+                raise serializers.ValidationError(
+                    {"settings": "Got settings for a poll that doesn't accept settings"}
+                )
             try:
                 method.settings_schema(**settings)
             except ValueError:
-                raise serializers.ValidationError({
-                    "settings": "Invalid settings"
-                })
+                raise serializers.ValidationError({"settings": "Invalid settings"})
         return super().validate(attrs)
 
     def create(self, validated_data):
@@ -94,10 +124,13 @@ class PollCreateSerializer(serializers.ModelSerializer):
         model = models.Poll
         fields = "pk", "agenda_item", "method_name", "proposal_pks", "start", "settings"
         extra_kwargs = {"agenda_item": {"required": True}}
-        read_only_fields = "pk",
+        read_only_fields = ("pk",)
 
 
 class ElectoralRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.ElectoralRegister
-        fields = "pk", "voters",
+        fields = (
+            "pk",
+            "voters",
+        )
