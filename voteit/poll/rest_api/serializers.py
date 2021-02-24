@@ -9,10 +9,46 @@ from voteit.poll.utils import get_poll_method_registry
 from voteit.proposal.workflows import ProposalWf
 
 
-__all__ = ("PollListSerializer", "PollDetailSerializer")
+__all__ = (
+    "PollListSerializer",
+    "PollDetailSerializer",
+    "PollCreateSerializer",
+    "ElectoralRegisterSerializer",
+)
 
 
-class PollListSerializer(serializers.ModelSerializer):
+class PollDetailSerializer(serializers.ModelSerializer):
+    # Note: This won't have access to the request object, so no url things here!
+    class Meta:
+        model = models.Poll
+        fields = (
+            "pk",
+            "body",
+            "title",
+            "agenda_item",
+            "electoral_register",
+            "initial_electoral_register",
+            "meeting",
+            "method_name",
+            "proposals",
+            "result_data",
+            "settings_data",
+            "state",
+        )
+        read_only_fields = (
+            "agenda_item",
+            "electoral_register",
+            "initial_electoral_register",
+            "meeting",
+            "method_name",
+            "proposals",
+            "result_data",
+            "settings_data",
+            "state",
+        )
+
+
+class PollListSerializer(PollDetailSerializer):
     voted = serializers.SerializerMethodField()
     total = serializers.SerializerMethodField()
 
@@ -28,45 +64,11 @@ class PollListSerializer(serializers.ModelSerializer):
         return 0
 
     class Meta:
-        model = models.Poll
-        fields = (
+        fields = [
             "url",
-            "pk",
-            "title",
-            "body",
-        )
-        read_only_fields = (
-            "meeting",
-            "result_data",
-            "agenda_item",
-            "state",
-            "method_name",
-            "electoral_register",
             "voted",
             "total",
-        )
-
-
-class PollDetailSerializer(PollListSerializer):
-    # Note: This won't have access to the request object, so no url things here!
-    class Meta(PollListSerializer.Meta):
-        fields = (
-            "pk",
-            "body",
-            "title",
-        )
-        read_only_fields = (
-            "agenda_item",
-            "electoral_register",
-            "electoral_register",
-            "meeting",
-            "method_name",
-            "result_data",
-            "result_data",
-            "state",
-            "total",
-            "voted",
-        )
+        ] + list(PollDetailSerializer.Meta.fields)
 
 
 class PollCreateSerializer(serializers.ModelSerializer):
