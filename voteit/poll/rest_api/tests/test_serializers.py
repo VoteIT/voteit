@@ -148,7 +148,7 @@ class PollCreateSerializerTests(TestCase):
     def test_serializer_wrong_ai(self):
         other_ai = self.meeting.agenda_items.create()
         other_prop = other_ai.proposals.create()
-        data = self._fixture(proposals=[other_prop])
+        data = self._fixture(proposals=[other_prop.pk])
         serializer = self._cut(data=data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("proposals", serializer.errors)
