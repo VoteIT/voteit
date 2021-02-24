@@ -33,14 +33,17 @@ class PollListSerializer(serializers.ModelSerializer):
             "url",
             "pk",
             "title",
+            "body",
+        )
+        read_only_fields = (
             "meeting",
+            "result_data",
             "agenda_item",
             "state",
             "method_name",
+            "electoral_register",
             "voted",
             "total",
-            "result_data",
-            "electoral_register",
         )
 
 
@@ -49,22 +52,20 @@ class PollDetailSerializer(PollListSerializer):
     class Meta(PollListSerializer.Meta):
         fields = (
             "pk",
+            "body",
             "title",
-            "meeting",
-            "agenda_item",
-            "state",
-            "method_name",
-            "voted",
-            "total",
-            "result_data",
-            "electoral_register",
         )
         read_only_fields = (
-            "state",
-            "voted",
-            "total",
-            "result_data",
+            "agenda_item",
             "electoral_register",
+            "electoral_register",
+            "meeting",
+            "method_name",
+            "result_data",
+            "result_data",
+            "state",
+            "total",
+            "voted",
         )
 
 
@@ -130,7 +131,8 @@ class PollCreateSerializer(serializers.ModelSerializer):
 class ElectoralRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.ElectoralRegister
-        fields = (
+
+        read_only_fields = (
             "pk",
             "voters",
         )
