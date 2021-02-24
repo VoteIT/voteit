@@ -1,5 +1,6 @@
 from collections import Counter
-from typing import List, Dict, Union
+from decimal import Decimal
+from typing import List, Union, Tuple
 
 from django.utils.translation import gettext as _
 from pydantic import validator
@@ -12,7 +13,11 @@ from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote, ChangeVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericVoteSchema, PollResult, RankingSchema, RankedVoteSchema
+from voteit.poll.schemas import (
+    PollResult,
+    RankingSchema,
+    RankedVoteSchema,
+)
 
 __all__ = ("ScottishSTV",)
 
@@ -46,13 +51,41 @@ class ChangeSTVVote(ChangeVote):
     data: RankedVoteSchema
 
 
+class STVResultRoundSchema(BaseModel):
+    method: str
+    status: str
+    selected: List[int]
+    vote_count: List[Tuple[int, Decimal]]
+
+    @validator("vote_count", pre=True)
+    def convert_vote_count(cls, v):
+        """Vote count from STVPoll method looks like this:
+        >>> vote_count = [{1: Decimal(0)}, {2: Decimal(2)}]
+        >>> result = STVResultRoundSchema.convert_vote_count(vote_count)
+        >>> sorted(result, key=lambda x:x[0])
+        [(1, Decimal('0')), (2, Decimal('2'))]
+
+        Feeding it the same data again should yield the same result
+        >>> result == STVResultRoundSchema.convert_vote_count(vote_count)
+        True
+
+        """
+        res = []
+        for x in v:
+            if isinstance(x, dict):
+                res.extend([(k, v) for k, v in x.items()])
+            else:
+                res.append(x)
+        return res
+
+
 class STVResultSchema(PollResult):
     # winners: List
     # candidates: List
     approved: List[int] = []
     denied: List[int] = []
     complete: bool
-    rounds: List[Dict]
+    rounds: List[STVResultRoundSchema]
     randomized: bool
     quota: int
     runtime: float
