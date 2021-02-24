@@ -24,6 +24,7 @@ class PollMethod(ABC):
     """
 
     poll: Poll
+    settings_schema: Optional[Type[BaseModel]] = None
 
     def __init__(self, poll: Poll):
         self.poll = poll
@@ -42,11 +43,6 @@ class PollMethod(ABC):
     @abstractmethod
     def result_schema(self) -> Type[PollResult]:
         """Pydantic result schema."""
-
-    @property
-    def settings_schema(self) -> Optional[Type[BaseModel]]:
-        """Pydantic settings schema."""
-        return None
 
     @abstractmethod
     def vote_to_str(self, data: BaseModel) -> str:

@@ -112,7 +112,7 @@ class PollCreateSerializerTests(TestCase):
         self.ai = self.meeting.agenda_items.create(title="Hello")
         self.prop = self.ai.proposals.create()
         self.er = self.meeting.electoral_registers.create()
-        self.er.voters.create(username="one")
+        self.voter = self.er.voters.create(username="one")
 
     @property
     def _cut(self):
@@ -153,6 +153,26 @@ class PollCreateSerializerTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("proposals", serializer.errors)
 
+    def test_serializer_wrong_method(self):
+        data = self._fixture(method_name="404")
+        serializer = self._cut(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("method_name", serializer.errors)
+
+    def test_settings_with_no_settings_method(self):
+        data = self._fixture(settings={"weee": "okay"})
+        serializer = self._cut(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("settings", serializer.errors)
+
+    def test_bad_settings(self):
+        data = self._fixture(
+            settings={"winners": "yes please"}, method_name="repeated_schulze"
+        )
+        serializer = self._cut(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("settings", serializer.errors)
+
     def test_serializer_repeated_schulze(self):
         prop2 = self.ai.proposals.create()
         prop3 = self.ai.proposals.create()
@@ -183,6 +203,16 @@ class PollCreateSerializerTests(TestCase):
         instance.upcoming()
         instance.ongoing()
         instance.save()
+
+    def test_serializer_start(self):
+        self.meeting.er_policy_name = "auto_always"
+        self.meeting.save()
+        self.meeting.add_roles(self.voter, "potential_voter")
+        data = self._fixture(start=True)
+        serializer = self._cut(data=data)
+        self.assertTrue(serializer.is_valid())
+        instance = serializer.save()
+        self.assertEqual("ongoing", instance.state)
 
 
 class ElectoralRegisterSerializerTests(TestCase):
