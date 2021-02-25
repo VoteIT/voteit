@@ -155,7 +155,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         return f"<{self.__class__.__name__}: {self.pk}>"
 
     def __str__(self):
-        return self.title[:30]
+        return self.title and self.title[:30] or f"Speaker id {self.pk}"
 
 
 class Speaker(models.Model):
