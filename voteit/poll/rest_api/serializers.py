@@ -59,6 +59,7 @@ class PollListSerializer(PollDetailSerializer):
         return 0
 
     class Meta:
+        model = models.Poll
         fields = [
             "voted",
             "total",
@@ -111,7 +112,7 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Poll
-        read_only_fields = ("pk",)
+        read_only_fields = ("pk", "title")
         fields = list(read_only_fields) + [
             "agenda_item",
             "meeting",
