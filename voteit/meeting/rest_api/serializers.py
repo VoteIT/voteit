@@ -55,7 +55,7 @@ class MeetingDetailSerializer(UserRolesMixin, serializers.ModelSerializer):
 
 
 class AgendaOrderSerializer(serializers.Serializer):
-    order = serializers.CharField()
+    order = serializers.ListSerializer(child=serializers.IntegerField())
 
 
 class MeetingRolesSerializer(serializers.ModelSerializer):

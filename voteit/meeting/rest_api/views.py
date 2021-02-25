@@ -36,10 +36,9 @@ class MeetingViewSet(
 
     @action(methods=['post'], detail=True)
     def set_agenda_order(self, request, pk):
-        try:
-            order = [int(o) for o in request.data.get('order', '').split(',')]
-        except ValueError:
-            return Response('Bad order', status=400)
+        serializer = serializers.AgendaOrderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        order = serializer.validated_data['order']
         meeting: Meeting = self.get_object()
         agenda_items = meeting.agenda_items.filter(pk__in=order)
         for i, ai in enumerate(agenda_items):
