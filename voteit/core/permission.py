@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from collections import UserString
-from typing import Union, TYPE_CHECKING, Generator, Optional
+from typing import Generator
+from typing import Optional
+from typing import Union
 
 from voteit.core.component import Registry
 from voteit.core.schemas import PermissionOutput
-
-if TYPE_CHECKING:
-    pass
 
 
 class PermissionRegistry(Registry):

@@ -33,3 +33,15 @@ class VotePermissions:
     CHANGE = permissions.create("poll.change_vote", "poll.Vote")
     DELETE = permissions.create("poll.delete_vote", "poll.Vote")
     VIEW = permissions.create("poll.view_vote", "poll.Vote")
+
+
+class ElectoralRegisterPermissions:
+    """These shouldn't be created manually
+
+    >>> from voteit.core.testing import find_bad_permission_names
+    >>> from voteit.poll.models import ElectoralRegister
+    >>> find_bad_permission_names(ElectoralRegisterPermissions, ElectoralRegister)
+
+    """
+
+    VIEW = permissions.create("poll.view_electoralregister", "poll.ElectoralRegister")

@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from datetime import datetime
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Set
+from typing import Union
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
-from django.utils.translation import gettext as _
-from typing import List, Set, Optional, Dict, Union
-
 from voteit.core.abcs import ABCModel
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
@@ -19,6 +21,20 @@ from voteit.core.utils import get_tagged_userids
 from voteit.core.utils import strict_clean_html
 
 User = get_user_model()
+
+__all__ = ("RoleContextMixin", "Roles", "BaseContent")
+
+
+def real_user_only(method):
+    """Role method should never return true for anon users."""
+
+    def _inner(context, user, *args, **kwargs):
+
+        if not user.is_authenticated:
+            return set()  # OK as bool false too
+        return method(context, user, *args, **kwargs)
+
+    return _inner
 
 
 class RoleContextMixin(ABCModel):
@@ -42,6 +58,7 @@ class RoleContextMixin(ABCModel):
         if roles_model is not None:
             return roles_model.remove(*roles)
 
+    @real_user_only
     def get_roles(self, user: User) -> Optional[Set[Role]]:
         roles_model = self.roles_cls.objects.filter(user=user, context=self).first()
         if roles_model is not None:
@@ -51,12 +68,14 @@ class RoleContextMixin(ABCModel):
                 return roles
         return None
 
+    @real_user_only
     def has_roles(self, user: User, *roles: Union[str, Role]) -> bool:
         q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
             user=user, context=self, assigned__contains=q
         ).exists()
 
+    @real_user_only
     def has_any_roles(self, user: User, *roles: Union[str, Role]) -> bool:
         q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
@@ -253,4 +272,4 @@ class BaseContent(ABCModel):
         return f"<{self.__class__.__name__}: {self}>"
 
     def __str__(self):
-        return getattr(self, 'title', self.body)[:50]
+        return getattr(self, "title", self.body)[:50]

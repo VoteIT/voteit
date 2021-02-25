@@ -1,21 +1,27 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Union
+
+from typing import TYPE_CHECKING
+from typing import Union
 
 import rules
 from django.contrib.auth.models import AbstractUser
+
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
-
 from voteit.core.decorators import predicate
-from voteit.core.rules import is_not_archived, is_not_private, is_not_finished
+from voteit.core.rules import is_not_archived
+from voteit.core.rules import is_not_finished
+from voteit.core.rules import is_not_private
 from voteit.meeting.models import Meeting
+from voteit.meeting.permissions import MeetingPermissions
+from voteit.meeting.rules import can_view_meeting
 from voteit.meeting.rules import is_moderator
-from voteit.poll.models import Vote
 from voteit.poll.models import Poll
-from voteit.poll.workflows import PollWf
+from voteit.poll.models import Vote
+from voteit.poll.permissions import ElectoralRegisterPermissions
 from voteit.poll.permissions import PollPermissions
 from voteit.poll.permissions import VotePermissions
-from voteit.meeting.permissions import MeetingPermissions
+from voteit.poll.workflows import PollWf
 
 if TYPE_CHECKING:
     pass
@@ -103,3 +109,7 @@ rules.add_perm(VotePermissions.ADD, is_poll_ongoing & is_voter)  # Checked again
 rules.add_perm(VotePermissions.CHANGE, is_vote_owner & vote_is_poll_ongoing)
 rules.add_perm(VotePermissions.DELETE, is_vote_owner & vote_is_poll_ongoing)
 rules.add_perm(VotePermissions.VIEW, is_vote_owner)
+
+
+# Electoral register
+rules.add_perm(ElectoralRegisterPermissions.VIEW, can_view_meeting)
