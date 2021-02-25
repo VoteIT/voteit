@@ -61,7 +61,8 @@ class AgendaItemViewTestCase(APITestCase):
         }
         self.client.force_login(self.moderator)
         response = self.client.get(url, data)
-        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(0, len(response.json()))
 
     def test_transition_moderator(self):
         url = f"/api/agenda-items/{self.ai.pk}/transitions/"

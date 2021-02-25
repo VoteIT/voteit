@@ -83,7 +83,8 @@ class SpeakerListsViewTestCase(APITestCase):
         }
         self.client.force_login(self.list_moderator)
         response = self.client.get(url, data)
-        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json())
 
     def test_transition_list_moderator(self):
         self.client.force_login(self.list_moderator)
@@ -215,7 +216,8 @@ class SpeakerListSystemViewTestCase(APITestCase):
         data = {"meeting": self.meeting.pk, "method_name": "simple"}
         self.client.force_login(self.moderator)
         response = self.client.get(url, data)
-        self.assertEqual(response.status_code, 405)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(0, len(response.json()))
 
     def test_put(self):
         url = f"/api/speaker-list-systems/{self.system.pk}/"

@@ -1,10 +1,4 @@
-from rest_framework import (
-    viewsets,
-    mixins,
-)
-
-from voteit.core.rest_api.mixins import CreateModelPermissionsMixin
-from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.meeting.models import Meeting
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
@@ -12,13 +6,7 @@ from voteit.speaker.rest_api import serializers
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 
 
-class SpeakerListViewSet(
-    CreateModelPermissionsMixin,
-    TransitionsMixin,
-    mixins.UpdateModelMixin,
-    mixins.DestroyModelMixin,
-    viewsets.GenericViewSet,
-):
+class SpeakerListViewSet(DefaultModelViewSet):
     model = SpeakerList
     queryset = SpeakerList.objects.all()
     serializer_class = serializers.SpeakerListSerializer
@@ -27,12 +15,7 @@ class SpeakerListViewSet(
     context_queryset = SpeakerListSystem.objects.all()
 
 
-class SpeakerListSystemViewSet(
-    CreateModelPermissionsMixin,
-    mixins.UpdateModelMixin,
-    mixins.DestroyModelMixin,
-    viewsets.GenericViewSet,
-):
+class SpeakerListSystemViewSet(DefaultModelViewSet):
     model = SpeakerListSystem
     queryset = SpeakerListSystem.objects.all()
     serializer_class = serializers.SpeakerListSystemSerializer

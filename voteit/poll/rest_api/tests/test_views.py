@@ -72,3 +72,95 @@ class PollViewSetTests(APITestCase):
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 400)
         self.assertIn("method_name", response.json())
+
+    def test_list_poll_in_this_meeting(self):
+        poll = self.meeting.polls.create(
+            agenda_item=self.ai, method_name="simple", state="upcoming"
+        )
+        url = f"/api/polls/?agenda_item={self.ai.pk}"
+        self.moderator.is_superuser = True
+        self.moderator.save()
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        data = response.json()
+        self.assertEqual(1, len(data))
+        self.assertEqual(poll.pk, data[0]["pk"])
+        # Participant
+        self.client.force_login(self.participant)
+        response = self.client.get(url)
+        self.assertEqual(0, len(response.json()))
+        # Authenticated but not within meeting
+        self.client.force_login(self.outsider)
+        response = self.client.get(url)
+        self.assertEqual(0, len(response.json()))
+
+    def test_get(self):
+        poll = self.meeting.polls.create(
+            agenda_item=self.ai, method_name="simple", state="upcoming"
+        )
+        url = f"/api/polls/{poll.pk}/"
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(poll.pk, data["pk"])
+        # Participant
+        self.client.force_login(self.participant)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        # Authenticated but not within meeting
+        self.client.force_login(self.outsider)
+        response = self.client.get(url)
+        self.assertEqual(403, response.status_code)
+
+    def test_get_private_ai(self):
+        poll = self.meeting.polls.create(
+            agenda_item=self.ai_private, method_name="simple", state="upcoming"
+        )
+        url = f"/api/polls/{poll.pk}/"
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(poll.pk, data["pk"])
+        # Participant
+        self.client.force_login(self.participant)
+        response = self.client.get(url)
+        self.assertEqual(403, response.status_code)
+        # Authenticated but not within meeting
+        self.client.force_login(self.outsider)
+        response = self.client.get(url)
+        self.assertEqual(403, response.status_code)
+
+    def test_get_private_poll(self):
+        poll = self.meeting.polls.create(agenda_item=self.ai, method_name="simple")
+        url = f"/api/polls/{poll.pk}/"
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        # Participant
+        self.client.force_login(self.participant)
+        response = self.client.get(url)
+        self.assertEqual(403, response.status_code)
+        # Authenticated but not within meeting
+        self.client.force_login(self.outsider)
+        response = self.client.get(url)
+        self.assertEqual(403, response.status_code)
+
+    def test_get_other_meeting(self):
+        from voteit.meeting.models import Meeting
+
+        meeting = Meeting.objects.create()
+        poll = meeting.polls.create(method_name="simple", state="upcoming")
+        url = f"/api/polls/{poll.pk}/"
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(403, response.status_code)
+        # Participant
+        self.client.force_login(self.participant)
+        response = self.client.get(url)
+        self.assertEqual(403, response.status_code)
+        # Authenticated but not within meeting
+        self.client.force_login(self.outsider)
+        response = self.client.get(url)
+        self.assertEqual(403, response.status_code)
