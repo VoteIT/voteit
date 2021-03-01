@@ -5,15 +5,13 @@ from voteit.messaging.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
 
 
-class ScottishTests(TestCase):
+class IRVTests(TestCase):
     def setUp(self):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
 
         self.er = ElectoralRegister.objects.create()
-        self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="irv"
-        )
+        self.poll = Poll.objects.create(electoral_register=self.er, method_name="irv")
         self.voter = self.er.voters.create(username="a_voter")
 
     @property
@@ -84,11 +82,13 @@ class ScottishTests(TestCase):
         one = self.poll.proposals.create()
         two = self.poll.proposals.create()
         three = self.poll.proposals.create()
-        result = self.poll.method.calculate_result({
-            str(one.pk): 1,
-            str(two.pk): 1,
-            str(three.pk): 1,
-        })
+        result = self.poll.method.calculate_result(
+            {
+                str(one.pk): 1,
+                str(two.pk): 1,
+                str(three.pk): 1,
+            }
+        )
         self.assertIs(result.complete, False)
 
 
@@ -99,9 +99,7 @@ class AddVoteTests(TestCase):
 
         self.er = ElectoralRegister.objects.create()
         self.voter = self.er.voters.create(username="voter")
-        self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="irv"
-        )
+        self.poll = Poll.objects.create(electoral_register=self.er, method_name="irv")
         self.prop1 = self.poll.proposals.create()
         self.prop2 = self.poll.proposals.create()
         self.prop3 = self.poll.proposals.create()
@@ -143,9 +141,7 @@ class ChangeVoteTests(TestCase):
 
         self.er = ElectoralRegister.objects.create()
         self.voter = self.er.voters.create(username="voter")
-        self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="irv"
-        )
+        self.poll = Poll.objects.create(electoral_register=self.er, method_name="irv")
         self.prop1 = self.poll.proposals.create()
         self.prop2 = self.poll.proposals.create()
         self.prop3 = self.poll.proposals.create()
