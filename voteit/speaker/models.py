@@ -12,6 +12,7 @@ from typing import Union
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import IntegrityError
 from django.db import models
 from django.db import transaction
 from django.utils.timezone import now
@@ -357,6 +358,14 @@ class SpeakerList(AgendaItemContext, MeetingContext):
     def save(self, **kw):
         if self.title is None:
             self.title = "list @ " + self.agenda_item.title
+        if (
+            self.agenda_item
+            and self.agenda_item.meeting
+            and self.list_system.meeting != self.agenda_item.meeting
+        ):
+            raise IntegrityError(
+                "agenda item and list system attached to different meetings"
+            )
         super().save(**kw)
 
     # Type hinting

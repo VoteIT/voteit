@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
+from django.db import IntegrityError
 from django.dispatch import receiver
 from django.test import TestCase
 from django.utils.timezone import now
@@ -179,6 +180,14 @@ class SpeakerListTests(TestCase):
             [self.speaker_three.pk, self.speaker_one.pk],
             self.speaker_list.current_order(),
         )
+
+    def test_different_meeting_contexts(self):
+        from voteit.meeting.models import Meeting
+
+        new_meeting = Meeting.objects.create()
+        new_ai = new_meeting.agenda_items.create()
+        self.speaker_list.agenda_item = new_ai
+        self.assertRaises(IntegrityError, self.speaker_list.save)
 
 
 class SpeakerListSystemsTests(TestCase):
