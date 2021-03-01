@@ -121,7 +121,12 @@ class SpeakerListsViewTestCase(APITestCase):
     def test_put(self):
         slist = self.system.speaker_lists.create()
         url = f"/api/speaker-lists/{slist.pk}/"
-        data = {"title": "Sup?", "list_system": self.system.pk}
+        data = {
+            "title": "Sup?",
+            "list_system": self.system.pk,
+            "meeting": self.meeting.pk,
+            "agenda_item": self.ai.pk,
+        }
         self.client.force_login(self.list_moderator)
         response = self.client.put(url, data)
         self.assertEqual(
@@ -252,3 +257,14 @@ class SpeakerListSystemViewTestCase(APITestCase):
             204,
         )
         self.assertRaises(ObjectDoesNotExist, self.system.refresh_from_db)
+
+    def test_retrieve(self):
+        self.system.method_name = "priority"
+        self.system.settings = {"max_times": 3}
+        self.system.save()
+        url = f"/api/speaker-list-systems/{self.system.pk}/"
+        self.client.force_login(self.list_moderator)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual({"max_times": 3}, data["settings"])
