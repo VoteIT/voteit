@@ -370,6 +370,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
 
     # Type hinting
     objects = models.Manager()
+    speaker_items = models.QuerySet()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.title[:50]}>"
