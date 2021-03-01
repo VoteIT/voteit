@@ -1,14 +1,13 @@
-from typing import Sequence, Type
+from typing import Type
 
 from django.db import transaction
 from rest_framework import serializers
-from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
 
+from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
+from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.poll import models
 from voteit.poll.abcs import PollMethod
 from voteit.poll.utils import get_poll_method_registry
-from voteit.proposal.workflows import ProposalWf
-
 
 __all__ = (
     "PollListSerializer",
@@ -19,8 +18,9 @@ __all__ = (
 
 
 class PollDetailSerializer(serializers.ModelSerializer):
-    # Note: This won't have access to the request object, so no url things here!
     serializer_url_field = OptionalHyperlinkedIdentityField
+    settings = PydanticFieldSerializer(allow_null=True, required=False)
+    result = PydanticFieldSerializer(allow_null=True, required=False)
 
     class Meta:
         model = models.Poll
@@ -29,18 +29,17 @@ class PollDetailSerializer(serializers.ModelSerializer):
             "electoral_register",
             "initial_electoral_register",
             "meeting",
-            "method_name",
             "pk",
-            "result_data",
-            "settings_data",
+            "settings",
+            "method_name",
+            "result",
             "state",
             "proposals",
             "url",
-        )
-        fields = list(read_only_fields) + [
             "body",
             "title",
-        ]
+        )
+        fields = read_only_fields
 
 
 class PollListSerializer(PollDetailSerializer):
@@ -58,12 +57,12 @@ class PollListSerializer(PollDetailSerializer):
             return instance.votes.count()
         return 0
 
-    class Meta:
-        model = models.Poll
+    class Meta(PollDetailSerializer.Meta):
         fields = [
             "voted",
             "total",
         ] + list(PollDetailSerializer.Meta.fields)
+        read_only_fields = fields
 
 
 class PollCreateSerializer(serializers.ModelSerializer):
@@ -108,12 +107,13 @@ class PollCreateSerializer(serializers.ModelSerializer):
                 poll.upcoming()
                 poll.ongoing()
                 poll.save()
-            return poll
+        return poll
 
     class Meta:
         model = models.Poll
-        read_only_fields = ("pk", "title")
-        fields = list(read_only_fields) + [
+        fields = [
+            "title",
+            "body",
             "agenda_item",
             "meeting",
             "method_name",

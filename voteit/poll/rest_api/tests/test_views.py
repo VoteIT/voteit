@@ -164,3 +164,13 @@ class PollViewSetTests(APITestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(url)
         self.assertEqual(403, response.status_code)
+
+    def test_change(self):
+        poll = self.meeting.polls.create(method_name="simple", title="First")
+        url = f"/api/polls/{poll.pk}/"
+        self.client.force_login(self.moderator)
+        data = {"title": "And then"}  # Readonly
+        response = self.client.patch(url, data)
+        self.assertEqual(200, response.status_code)
+        poll.refresh_from_db(fields=("title",))
+        self.assertEqual("First", poll.title)

@@ -37,6 +37,12 @@ class PollDetailSerializerTests(TestCase):
             f"http://testserver/api/polls/{self.poll.pk}/", serializer.data["url"]
         )
 
+    def test_serializer_readonly_fields(self):
+        serializer = self._cut(self.poll, data={"title": "No no"})
+        serializer.is_valid()  # Why the f...
+        inst = serializer.save()
+        self.assertEqual("world", inst.title)
+
     def test_serializer_simple(self):
         serializer = self._cut(self.poll)
         self.assertEqual(
@@ -50,8 +56,8 @@ class PollDetailSerializerTests(TestCase):
                 "meeting": self.meeting.pk,
                 "method_name": "simple",
                 "proposals": [self.prop1.pk, self.prop2.pk],
-                "result_data": None,
-                "settings_data": None,
+                "result": None,
+                "settings": None,
                 "state": "private",
                 "url": None,
             },
@@ -60,6 +66,8 @@ class PollDetailSerializerTests(TestCase):
 
     def test_serializer_repeated_schulze(self):
         self.poll.method_name = "repeated_schulze"
+        # reset cache
+        self.poll.method = self.poll.get_method_class()(self.poll)
         self.poll.settings = {"winners": 2}
         prop3 = self.poll.proposals.create()
         serializer = self._cut(self.poll)
@@ -69,10 +77,12 @@ class PollDetailSerializerTests(TestCase):
             set(expected_data.pop("proposals")),
         )
         self.assertEqual("repeated_schulze", expected_data.pop("method_name"))
-        self.assertEqual({"winners": 2}, expected_data.pop("settings_data"))
+        self.assertEqual({"winners": 2}, expected_data.pop("settings"))
 
     def test_schulze_result(self):
         self.poll.method_name = "schulze"
+        # reset cache object
+        self.poll.method = self.poll.get_method_class()(self.poll)
         fake_result = {
             "candidates": {1496, 1494, 1495},
             "winner": 1494,
@@ -91,16 +101,14 @@ class PollDetailSerializerTests(TestCase):
         self.poll.save()
         serializer = self._cut(self.poll)
         expected_data = serializer.data.copy()
-        result_data = expected_data.pop("result_data")
+        result = expected_data.pop("result")
+        self.assertSequenceEqual(result["candidates"], formatted_fake_result.candidates)
+        self.assertEqual(len(formatted_fake_result.pairs), len(result["pairs"]))
         self.assertSequenceEqual(
-            result_data["candidates"], formatted_fake_result.candidates
-        )
-        self.assertEqual(len(formatted_fake_result.pairs), len(result_data["pairs"]))
-        self.assertSequenceEqual(
-            result_data["pairs"][0][0], list(formatted_fake_result.pairs[0][0])
+            result["pairs"][0][0], list(formatted_fake_result.pairs[0][0])
         )
         self.assertEqual(
-            len(formatted_fake_result.strong_pairs), len(result_data["strong_pairs"])
+            len(formatted_fake_result.strong_pairs), len(result["strong_pairs"])
         )
 
 
