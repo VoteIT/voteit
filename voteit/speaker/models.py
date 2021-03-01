@@ -1,23 +1,30 @@
 from __future__ import annotations
 
 from contextlib import suppress
-from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Optional, Type, Dict, Union
+from datetime import datetime
+from datetime import timedelta
+from typing import Dict
+from typing import Optional
+from typing import TYPE_CHECKING
+from typing import Type
+from typing import Union
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import models, transaction
-from django.utils.functional import cached_property
+from django.db import models
+from django.db import transaction
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField, transition
+from django_fsm import FSMField
+from django_fsm import transition
 from pydantic.main import BaseModel
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
-from voteit.core.models import Roles, RoleContextMixin
+from voteit.core.models import RoleContextMixin
+from voteit.core.models import Roles
 from voteit.meeting.models import Meeting
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.utils import get_list_method_registry
@@ -105,7 +112,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         reg = get_list_method_registry()
         return reg[self.method_name]
 
-    @cached_property
+    @property
     def method(self) -> ListMethod:
         method = self.get_method_class()
         return method(self)
