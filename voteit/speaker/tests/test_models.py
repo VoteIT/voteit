@@ -180,18 +180,46 @@ class SpeakerListTests(TestCase):
             self.speaker_list.current_order(),
         )
 
+
+class SpeakerListSystemsTests(TestCase):
+    def setUp(self):
+        from voteit.speaker.models import SpeakerListSystem
+
+        self.system = SpeakerListSystem.objects.create(
+            method_name="simple", active=True
+        )
+        # self.speaker_list = self.system.speaker_lists.create()
+        # self.user_one = User.objects.create(username="one")
+        # self.user_two = User.objects.create(username="two")
+        # self.speaker_one = self.speaker_list.speaker_items.create(user=self.user_one)
+        # self.speaker_two = self.speaker_list.speaker_items.create(user=self.user_two)
+
     def test_set_settings_from_schema_directly(self):
         from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema
-        from voteit.speaker.app.list_methods.priority import Priority
 
         self.system.method_name = "priority"
-        self.system.method = Priority(self.system)  # Rewrap to clear cache
         self.system.save()
-        self.system.refresh_from_db()
-        settings = PrioritySettingsSchema(max_times=2)
-        self.system.settings = settings
+        self.system.settings = PrioritySettingsSchema(max_times=2)
         self.assertEqual(2, self.system.settings.max_times)
 
     def test_set_settings_without_existing_schema(self):
         with self.assertRaises(ValueError):
             self.system.settings = {}
+
+    def test_archive(self):
+        one_user = User.objects.create(username="one")
+        one_two = User.objects.create(username="two")
+        one_list = self.system.speaker_lists.create()
+        speaker_one = one_list.speaker_items.create(user=one_user)
+        speaker_two = one_list.speaker_items.create(user=one_two)
+        one_list.start_speaker(speaker_one)
+        self.system.active_list = one_list
+        self.system.save()
+        self.system.archive()
+        self.assertIsNone(self.system.active_list)
+        self.assertFalse(self.system.active)
+        self.assertTrue(self.system.archived)
+        self.assertEqual([], one_list.current_order())  # two was deleted
+        speaker_one.refresh_from_db()
+        self.assertEqual(1, speaker_one.seconds)
+        self.assertFalse(speaker_one.in_queue)
