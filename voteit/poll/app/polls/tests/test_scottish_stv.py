@@ -14,7 +14,9 @@ class ScottishTests(TestCase):
 
         self.er = ElectoralRegister.objects.create()
         self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="scottish_stv"
+            electoral_register=self.er,
+            method_name="scottish_stv",
+            settings={"winners": 2},
         )
         self.voter = self.er.voters.create(username="a_voter")
 
@@ -29,6 +31,7 @@ class ScottishTests(TestCase):
         self.assertRaises(InvalidProposalCount, self.poll.method.start_check)
 
     def test_without_settings(self):
+        self.poll.settings_data = None
         self.assertRaises(TransitionNotAllowed, self.poll.upcoming)
 
     def test_vote_schema(self):
@@ -98,7 +101,9 @@ class AddVoteTests(TestCase):
         self.er = ElectoralRegister.objects.create()
         self.voter = self.er.voters.create(username="voter")
         self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="scottish_stv"
+            electoral_register=self.er,
+            method_name="scottish_stv",
+            settings={"winners": 2},
         )
         self.prop1 = self.poll.proposals.create()
         self.prop2 = self.poll.proposals.create()
@@ -143,7 +148,9 @@ class ChangeVoteTests(TestCase):
         self.er = ElectoralRegister.objects.create()
         self.voter = self.er.voters.create(username="voter")
         self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="scottish_stv"
+            electoral_register=self.er,
+            method_name="scottish_stv",
+            settings={"winners": 2},
         )
         self.prop1 = self.poll.proposals.create()
         self.prop2 = self.poll.proposals.create()

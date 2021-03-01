@@ -11,6 +11,7 @@ from logging import getLogger
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import IntegrityError
 from django.db import models
 from django.db.models import UniqueConstraint, Sum
 from django.dispatch import receiver
@@ -166,6 +167,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     @settings.setter
     def settings(self, value: Union[Dict, BaseModel, None]) -> None:
         if value is None:
+            self.settings_data = None
             return
         schema = self.method.settings_schema
         if schema is None:
@@ -341,6 +343,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     def save(self, **kw):
         """Make sure meeting is set, from agenda_items meeting.
         Also set title automatically."""
+        self.get_method_class()  # Will raise error
         if self.pk is None:
             # FIXME: This "helper" seems to cause a lot more problems than it's worth... :( /Robin
             if (
@@ -359,7 +362,9 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
                     self.title = f"{base}-{x}"
                     if not self.meeting.polls.filter(title=self.title).exists():
                         break
-        self.get_method_class()  # Will raise error
+        # Make sure we don't have bad settings
+        if not self.validate_settings_guard():
+            raise IntegrityError("Invalid settings")
         super().save(**kw)
 
     @property
