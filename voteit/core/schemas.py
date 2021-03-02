@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from typing import List
+from typing import Optional
+
 from pydantic import validator
 from pydantic.main import BaseModel
-from typing import Optional, List
 
 
 class RoleOutput(BaseModel):
@@ -10,7 +12,7 @@ class RoleOutput(BaseModel):
     title: str
     description: str
     require_names: Optional[List[str]]
-    roles_cls_name: Optional[str]
+    roles_cls_natural_key: Optional[str]
     predicate_info: Optional[PredicateOutput]
 
     class Config:
@@ -32,7 +34,7 @@ class PredicateOutput(BaseModel):
         return v
 
     class Config:
-       orm_mode = True
+        orm_mode = True
 
 
 class PermissionOutput(BaseModel):

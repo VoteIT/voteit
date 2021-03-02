@@ -171,6 +171,7 @@ class AssignedMeetingRolesResponse(BaseOutgoingMessage):
 
 class AvailableRolesSchema(BaseModel):
     natural_key: str
+    predicates: bool = False
 
     @validator("natural_key")
     def check_natural_key(cls, v):
@@ -197,6 +198,10 @@ class AvailableRoles(BaseIncomingMessage, AsyncRunnable):
         key_parts = self.data.natural_key.split(".")
         model = apps.get_model(*key_parts)
         roles = [x.output() for x in model.roles_cls.valid_roles.values()]
+        if not self.data.predicates:
+            for role in roles:
+                # We don't need to send this
+                role.predicate_info = None
         response = AvailableRolesResponse.from_message(self, roles=roles)
         await response.async_send_outgoing(self.mm.consumer_name, success=True)
         return response

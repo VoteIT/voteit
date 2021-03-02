@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from typing import Type, Set, TYPE_CHECKING, Optional
+from typing import Optional
+from typing import Set
+from typing import TYPE_CHECKING
+from typing import Type
 
-from voteit.core.schemas import RoleOutput, PredicateOutput
+from voteit.core.schemas import PredicateOutput
+from voteit.core.schemas import RoleOutput
 
 if TYPE_CHECKING:
     from voteit.core.models import Roles
@@ -47,6 +51,7 @@ class Role:
     {'name': 'comp_owner', 'title': 'Comp_Owner', 'description': '',
     'require_names': [], 'roles_cls_name': 'voteit.core.role.MyContext', 'predicate_info': None}
     """
+
     name: str
     predicate: Optional[Predicate] = None
     title: str
@@ -102,8 +107,9 @@ class Role:
         return set([x.name for x in self.requires])
 
     @property
-    def roles_cls_name(self) -> Optional[str]:
-        return f"{self.roles_cls.__module__}.{self.roles_cls.__name__}"
+    def roles_cls_natural_key(self) -> Optional[str]:
+        cls_meta = self.roles_cls._meta
+        return f"{cls_meta.app_label}.{cls_meta.model_name.lower()}"
 
     def __eq__(self, other):
         if isinstance(other, Role):

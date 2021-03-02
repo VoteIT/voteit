@@ -36,6 +36,7 @@ class AvalableMeetingRolesTests(TestCase):
         response = await msg.run(None)
         self.assertIsInstance(response, AvailableRolesResponse)
         self.assertIsInstance(response.data.roles[0], RoleOutput)
+        self.assertIsNotNone(response.data.roles[0].roles_cls_natural_key)
 
     async def test_get_bad_types_and_names(self):
         self.assertRaises(ValidationError, self._mk_one, natural_key="meetingmeeting")
