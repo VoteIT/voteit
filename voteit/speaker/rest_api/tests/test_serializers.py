@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from django.test import TestCase
+from django.utils.timezone import now
 
 
 class SpeakerListSerializerTests(TestCase):
@@ -53,7 +56,12 @@ class HistoricSpeakerListSerializerTests(TestCase):
         self.user_one = self.slist.speakers.create(username="one")
         self.user_two = self.slist.speakers.create(username="two")
         for i in range(1, 4):
-            self.slist.speaker_items.create(user=self.user_one, seconds=i * 5)
+            self.slist.speaker_items.create(
+                user=self.user_one,
+                seconds=i * 5,
+                # Make sure there's a diff between started, since it's sorted on that
+                started=now() - timedelta(seconds=10 - i),
+            )
         self.slist.speaker_items.create(user=self.user_two, seconds=11)
 
     @property

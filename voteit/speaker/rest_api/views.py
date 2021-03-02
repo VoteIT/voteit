@@ -1,4 +1,6 @@
+from rest_framework.decorators import action
 from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.base import ReadonlyModelViewSet
 from voteit.meeting.models import Meeting
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
@@ -10,9 +12,16 @@ class SpeakerListViewSet(DefaultModelViewSet):
     model = SpeakerList
     queryset = SpeakerList.objects.all()
     serializer_class = serializers.SpeakerListSerializer
+    serializer_classes = {"historic": serializers.HistoricSpeakerListSerializer}
     context_lookup_kwarg: str = "list_system"
     context_lookup_field: str = "pk"
     context_queryset = SpeakerListSystem.objects.all()
+
+
+class HistoricSpeakerListViewSet(ReadonlyModelViewSet):
+    model = SpeakerList
+    queryset = SpeakerList.objects.all()
+    serializer_class = serializers.HistoricSpeakerListSerializer
 
 
 class SpeakerListSystemViewSet(DefaultModelViewSet):
