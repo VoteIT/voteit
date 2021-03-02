@@ -25,6 +25,8 @@ from voteit.speaker.messages import (
     SpeakerSystemAdded,
     SpeakerSystemChanged,
 )
+from voteit.speaker.messages import SpeakerStarted
+from voteit.speaker.messages import SpeakerStopped
 from voteit.speaker.models import Speaker, SpeakerList, SpeakerListSystem
 from voteit.speaker.rest_api.serializers import (
     SpeakerListSerializer,
@@ -35,17 +37,16 @@ if TYPE_CHECKING:
     from voteit.messaging.abcs import BaseOutgoingMessage
 
 list_updated = Signal(providing_args=["sender", "instance"])
+speaker_started = Signal(providing_args=["sender", "speaker"])
+speaker_stopped = Signal(providing_args=["sender", "speaker"])
 
 
 @receiver(post_save, sender=Speaker)
-def set_initial_order(
-    sender: Type[Speaker], instance: Speaker, created: bool, **kwargs
-):
+def set_initial_order(instance: Speaker, created: bool, **kwargs):
     """
-    :param sender: Model
-    :param instance: Speaker instance
-    :param created: Is this a new db records? We only care about the newly created for this method.
-    :param kwargs:
+    Add order for newly created speakers. If the order attribute is anything but None,
+    it means that the speaker is in the queue.
+    Is this a new db record? We only care about the newly created for this method.
     """
     if created:
         sl = instance.list
@@ -84,6 +85,12 @@ def _publish_list_msg(speaker_list: SpeakerList, msg: BaseOutgoingMessage):
         ai_ch.publish(msg)
 
 
+def _publish_active_list_msg(speaker_list: SpeakerList, msg: BaseOutgoingMessage):
+    if speaker_list.meeting is not None:
+        ch = MeetingChannel.from_instance(speaker_list.meeting)
+        ch.publish(msg)
+
+
 @receiver(list_updated)
 def push_list_order_change(instance: SpeakerList, **kw):
     """When speakers reorder, send an update of the order.
@@ -106,6 +113,29 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
     data = SpeakerListSerializer(instance).data
     msg = msg_class(**data)
     _publish_list_msg(instance, msg)
+
+
+@receiver(speaker_started)
+def notify_started_speaker(speaker: Speaker, **kwargs):
+    msg = SpeakerStarted(
+        userid=speaker.user.pk,
+        pk=speaker.pk,
+        speaker_list=speaker.list.pk,
+        started=speaker.started,
+    )
+    _publish_active_list_msg(speaker.list, msg)
+
+
+@receiver(speaker_stopped)
+def notify_stopped_speaker(speaker: Speaker, **kwargs):
+    msg = SpeakerStopped(
+        userid=speaker.user.pk,
+        pk=speaker.pk,
+        speaker_list=speaker.list.pk,
+        started=speaker.started,
+        seconds=speaker.seconds,
+    )
+    _publish_active_list_msg(speaker.list, msg)
 
 
 @receiver(post_delete, sender=SpeakerList)
@@ -147,6 +177,7 @@ def meeting_channel_subscribed(
     - Speaker systems
     - Active list from each system
     - Order of any active list
+    - Any ongoing speaker
     """
     systems_qs = context.speaker_systems.all()
     app_state.append_from_queryset(
@@ -159,6 +190,16 @@ def meeting_channel_subscribed(
             )
             order_msg = _get_list_order_msg(system.active_list)
             app_state.append(order_msg)
+            if system.active_list.current is not None:
+                speaker = system.active_list.current
+                # Append current ongoing speaker
+                msg = SpeakerStarted(
+                    userid=speaker.user.pk,
+                    pk=speaker.pk,
+                    speaker_list=system.active_list.pk,
+                    started=speaker.started,
+                )
+                app_state.append(msg)
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)

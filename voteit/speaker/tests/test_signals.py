@@ -9,7 +9,12 @@ from voteit.messaging.messages.channels import Subscribed
 
 User = get_user_model()
 
+_channel_layers_setting = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}
 
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalListOrderChangeTests(TestCase):
     def setUp(self):
 
@@ -74,6 +79,67 @@ class SignalListOrderChangeTests(TestCase):
         self.assertEqual(self.user_three.pk, data.current)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class SignalStartedStoppedTests(TestCase):
+    def setUp(self):
+
+        from voteit.speaker.models import SpeakerListSystem
+        from voteit.speaker.models import SpeakerList
+        from voteit.speaker.models import Speaker
+
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        # self.ai = self.meeting.agenda_items.create()
+        self.system: SpeakerListSystem = SpeakerListSystem.objects.create(
+            method_name="simple", meeting=self.meeting
+        )
+        self.speaker_list: SpeakerList = SpeakerList.objects.create(
+            list_system=self.system, title="Hello"  # agenda_item=self.ai
+        )
+        self.system.active_list = self.speaker_list
+        self.system.save()
+        self.user: User = self.meeting.participants.create(username="user")
+        self.speaker: Speaker = self.speaker_list.speaker_items.create(user=self.user)
+
+    @patch.object(MeetingChannel, "publish")
+    def test_start_speaker(self, mock_publish):
+        from voteit.speaker.messages import SpeakerStarted
+
+        self.speaker_list.start_speaker(self.speaker)
+        self.assertTrue(mock_publish.called)
+        msg = None
+        for mcall in mock_publish.mock_calls:
+            if isinstance(mcall.args[0], SpeakerStarted):
+                msg = mcall.args[0]
+                break
+        self.assertIsNotNone(msg, "SpeakerStarted never found in meeting channel")
+        data = msg.data
+        self.assertEqual(self.speaker.pk, data.pk)
+        self.assertEqual(self.speaker.started, data.started)
+        self.assertIsNone(data.seconds)
+
+    @patch.object(MeetingChannel, "publish")
+    def test_stop_speaker(self, mock_publish):
+        from voteit.speaker.messages import SpeakerStopped
+
+        self.speaker_list.start_speaker(self.speaker)
+        mock_publish.reset_mock()
+        self.speaker_list.stop_speaker()
+        self.assertTrue(mock_publish.called)
+        msg = None
+        for mcall in mock_publish.mock_calls:
+            if isinstance(mcall.args[0], SpeakerStopped):
+                msg = mcall.args[0]
+                break
+        self.assertIsNotNone(msg, "SpeakerStopped never found in meeting channel")
+        data = msg.data
+        self.assertEqual(self.speaker.pk, data.pk)
+        self.assertEqual(self.speaker.started, data.started)
+        self.assertEqual(1, data.seconds)  # Minimum 1!
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalListChangesTests(TestCase):
     def setUp(self):
 
@@ -135,6 +201,7 @@ class SignalListChangesTests(TestCase):
         self.assertEqual(list_pk, data.pk)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalSystemChangesTests(TestCase):
     def setUp(self):
 
@@ -188,11 +255,6 @@ class SignalSystemChangesTests(TestCase):
         self.assertEqual(system_pk, data.pk)
 
 
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
-
-
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ChannelSubscribedTests(TestCase):
     def setUp(self):
@@ -214,8 +276,10 @@ class ChannelSubscribedTests(TestCase):
         # Create speakers
         self.user_one = User.objects.create(username="one")
         self.user_two = User.objects.create(username="two")
-        self.active_list.speaker_items.create(user=self.user_one)
-        self.active_list.speaker_items.create(user=self.user_two)
+        self.speaker_one = self.active_list.speaker_items.create(user=self.user_one)
+        self.speaker_two = self.active_list.speaker_items.create(user=self.user_two)
+        # Start speaker
+        self.active_list.start_speaker(self.speaker_one)
         # Moderator
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, "participant")
@@ -246,7 +310,11 @@ class ChannelSubscribedTests(TestCase):
             sum([1 for x in response.data.app_state if x.t == "speaker_list.order"]),
         )
         self.assertEqual(
-            [self.user_one.pk, self.user_two.pk],
+            1,
+            sum([1 for x in response.data.app_state if x.t == "speaker.started"]),
+        )
+        self.assertEqual(
+            [self.user_two.pk],
             appstates["speaker_list.order"]["queue"],
         )
 

@@ -1,4 +1,5 @@
 from abc import ABC
+from datetime import datetime
 
 from django.contrib.auth import get_user_model
 from pydantic.main import BaseModel
@@ -193,6 +194,28 @@ class StopSpeakerInList(ModeratorListMessage):
         msg = TextResponse.from_message(self, msg=_("Stopped"))
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
+
+
+class SpeakerStatsSchema(BaseModel):
+    pk: int  # Speaker pk
+    userid: int  # User speaker
+    speaker_list: int
+    started: datetime
+    seconds: Optional[int]
+
+
+@outgoing
+class SpeakerStarted(BaseOutgoingMessage):
+    name = "speaker.started"
+    schema = SpeakerStatsSchema
+    data: SpeakerStatsSchema
+
+
+@outgoing
+class SpeakerStopped(BaseOutgoingMessage):
+    name = "speaker.stopped"
+    schema = SpeakerStatsSchema
+    data: SpeakerStatsSchema
 
 
 @incoming

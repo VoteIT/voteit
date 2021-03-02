@@ -217,6 +217,16 @@ class Speaker(models.Model):
     def __str__(self):
         return f"Speaker id {self.pk}"
 
+    def signal_started(self):
+        from voteit.speaker.signals import speaker_started
+
+        speaker_started.send(sender=self.__class__, speaker=self)
+
+    def signal_stopped(self):
+        from voteit.speaker.signals import speaker_stopped
+
+        speaker_stopped.send(sender=self.__class__, speaker=self)
+
 
 class SpeakerList(AgendaItemContext, MeetingContext):
     title = models.CharField(max_length=200)
@@ -342,6 +352,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
                 speaker.save()
                 self.current = speaker
                 self.save()
+                speaker.signal_started()
             else:  # pragma: no coverage
                 # FIXME: Something...?
                 raise ValueError()
@@ -354,6 +365,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
             speaker.save()
             self.current = None
             self.save()
+            speaker.signal_stopped()
 
     def save(self, **kw):
         if self.title is None:
