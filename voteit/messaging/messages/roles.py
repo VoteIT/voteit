@@ -1,30 +1,37 @@
 from __future__ import annotations
 
-from abc import abstractmethod, ABC
-from typing import List, Type, Optional, Dict
+from abc import ABC
+from abc import abstractmethod
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Type
 
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext as _
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
+from pydantic import validator
 
 from voteit.core.models import RoleContextMixin
 from voteit.core.schemas import RoleOutput
-from voteit.meeting.models import Meeting, MeetingRoles
+from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingRoles
 from voteit.meeting.permissions import MeetingPermissions
-from voteit.messaging.abcs import (
-    BaseIncomingMessage,
-    DeferredJob,
-    ContextAction,
-    ContextSchema,
-    BaseOutgoingMessage,
-)
+from voteit.messaging.abcs import AsyncRunnable
+from voteit.messaging.abcs import BaseIncomingMessage
+from voteit.messaging.abcs import BaseOutgoingMessage
+from voteit.messaging.abcs import ContextAction
+from voteit.messaging.abcs import ContextSchema
+from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.channels.user import UserChannel
-from voteit.messaging.decorators import incoming, outgoing
+from voteit.messaging.decorators import incoming
+from voteit.messaging.decorators import outgoing
 from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.messages.channels import RecheckChannelSubscriptions
 from voteit.messaging.messages.text import TextResponse
-
 
 User = get_user_model()
 
@@ -147,8 +154,7 @@ class GetMeetingRoles(BaseIncomingMessage, DeferredJob, ContextAction):
 
 
 class AssignedResponseSchema(BaseModel):
-    """ Return a dict with assigned roles where key is user_pk and value is a list of roles as strings
-    """
+    """Return a dict with assigned roles where key is user_pk and value is a list of roles as strings"""
 
     items: Dict[int, List[str]] = Field(
         title="Assigned roles",
@@ -163,28 +169,45 @@ class AssignedMeetingRolesResponse(BaseOutgoingMessage):
     data: AssignedResponseSchema
 
 
-class BaseAvailableRoles(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
-    def run_job(self) -> AvailableRolesResponse:
-        assert isinstance(self.context, RoleContextMixin)
-        roles = [x.output() for x in self.context.roles_cls.valid_roles.values()]
-        response = AvailableRolesResponse.from_message(self, roles=roles)
-        response.send_outgoing(self.mm.consumer_name, success=True)
-        return response
+class AvailableRolesSchema(BaseModel):
+    natural_key: str
+
+    @validator("natural_key")
+    def check_natural_key(cls, v):
+        v = v.lower()
+        parts = v.split(".")
+        if len(parts) != 2:
+            raise ValueError("Model key must contain one dot")
+        try:
+            model = apps.get_model(*parts)
+        except LookupError:
+            raise ValueError(f"No model found with natural key {v}")
+        if not issubclass(model, RoleContextMixin):
+            raise ValueError(f"Model {v} can't have roles")
+        return v
 
 
 @incoming
-class AvailableMeetingRoles(BaseAvailableRoles):
-    name = "meeting.roles.available"
-    model = Meeting
-    permission = None
+class AvailableRoles(BaseIncomingMessage, AsyncRunnable):
+    name = "roles.available"
+    schema = AvailableRolesSchema
+    data: AvailableRolesSchema
+
+    async def run(self, consumer):
+        key_parts = self.data.natural_key.split(".")
+        model = apps.get_model(*key_parts)
+        roles = [x.output() for x in model.roles_cls.valid_roles.values()]
+        response = AvailableRolesResponse.from_message(self, roles=roles)
+        await response.async_send_outgoing(self.mm.consumer_name, success=True)
+        return response
 
 
-class AvailableRolesSchema(BaseModel):
+class AvailableRolesResponseSchema(BaseModel):
     roles: List[RoleOutput]
 
 
 @outgoing
 class AvailableRolesResponse(BaseOutgoingMessage):
     name = "roles.available"
-    schema = AvailableRolesSchema
-    data: AvailableRolesSchema
+    schema = AvailableRolesResponseSchema
+    data: AvailableRolesResponseSchema

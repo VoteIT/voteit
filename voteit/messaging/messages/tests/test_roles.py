@@ -4,16 +4,42 @@ from unittest.mock import patch
 from asgiref.sync import sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
+from django.test import TransactionTestCase
+from django.test import override_settings
 from django_rq import get_queue
 from fakeredis import FakeRedis
+from pydantic import ValidationError
 from rq import SimpleWorker
-
 from voteit.core.queues import TESTING_QUEUE
+from voteit.core.schemas import RoleOutput
 from voteit.meeting.models import Meeting
 from voteit.messaging.errors import UnauthorizedError
 
 User = get_user_model()
+_channel_layers_setting = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class AvalableMeetingRolesTests(TestCase):
+    def _mk_one(self, **kw):
+        from voteit.messaging.messages.roles import AvailableRoles
+
+        return AvailableRoles(mm={"consumer_name": "abc"}, **kw)
+
+    async def test_get_meeting_roles(self):
+        from voteit.messaging.messages.roles import AvailableRolesResponse
+
+        msg = self._mk_one(natural_key="meeting.meeting")
+        response = await msg.run(None)
+        self.assertIsInstance(response, AvailableRolesResponse)
+        self.assertIsInstance(response.data.roles[0], RoleOutput)
+
+    async def test_get_bad_types_and_names(self):
+        self.assertRaises(ValidationError, self._mk_one, natural_key="meetingmeeting")
+        self.assertRaises(ValidationError, self._mk_one, natural_key="poll.poll")
 
 
 class MeetingRolesTests(TestCase):
