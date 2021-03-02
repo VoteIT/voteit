@@ -211,6 +211,11 @@ class Roles(ABCModel):
             role = role.name
         return role in self.assigned
 
+    @classmethod
+    def related_model_natural_key(cls) -> str:
+        related = cls.context.field.related_model
+        return f"{related._meta.app_label}.{related._meta.model_name.lower()}"
+
 
 class BaseContent(ABCModel):
     body: str = models.TextField(blank=True, default="")

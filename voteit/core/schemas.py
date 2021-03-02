@@ -13,6 +13,7 @@ class RoleOutput(BaseModel):
     description: str
     require_names: Optional[List[str]]
     roles_cls_natural_key: Optional[str]
+    context_natural_key: Optional[str]
     predicate_info: Optional[PredicateOutput]
 
     class Config:

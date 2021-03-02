@@ -49,7 +49,8 @@ class Role:
     And they can produce output with pydantic:
     >>> COMPUTER_OWNER.output().dict()
     {'name': 'comp_owner', 'title': 'Comp_Owner', 'description': '',
-    'require_names': [], 'roles_cls_name': 'voteit.core.role.MyContext', 'predicate_info': None}
+    'require_names': [], 'roles_cls_natural_key': 'core.mycontext',
+    'context_natural_key': None, 'predicate_info': None}
     """
 
     name: str
@@ -110,6 +111,10 @@ class Role:
     def roles_cls_natural_key(self) -> Optional[str]:
         cls_meta = self.roles_cls._meta
         return f"{cls_meta.app_label}.{cls_meta.model_name.lower()}"
+
+    @property
+    def context_natural_key(self) -> str:
+        return self.roles_cls.related_model_natural_key()
 
     def __eq__(self, other):
         if isinstance(other, Role):
