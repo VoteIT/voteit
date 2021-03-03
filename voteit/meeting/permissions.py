@@ -18,4 +18,5 @@ class MeetingPermissions:
     MODERATE = permissions.create("meeting.moderate_meeting", "meeting.Meeting")
     ARCHIVE = permissions.create("meeting.archive_meeting", "meeting.Meeting")
     ADD_ROLES = permissions.create("meeting.add_roles_meeting", "meeting.Meeting")
-    REMOVE_ROLES = permissions.create("meeting.remove_roles_meeting", "meeting.Meeting")
+    CHANGE_ROLES = permissions.create("meeting.change_roles_meeting", "meeting.Meeting")
+    VIEW_ROLES = permissions.create("meeting.view_roles_meeting", "meeting.Meeting")
