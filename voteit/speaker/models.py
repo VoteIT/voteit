@@ -63,6 +63,8 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     A list system has its own rules and moderators.
     """
 
+    name = "list_system"
+
     active: bool = models.BooleanField(
         verbose_name=_(
             "Is the system activated? If not it won't be visible to anyone."
@@ -169,10 +171,12 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
 class Speaker(models.Model):
     """Information about a user who's entered a speaker list."""
 
+    name = "speaker"
+
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT
     )
-    list: SpeakerList = models.ForeignKey(
+    speaker_list: SpeakerList = models.ForeignKey(
         "SpeakerList", on_delete=models.CASCADE, related_name="speaker_items"
     )
     # Note: Created is also needed for "historic" positions within a speaker list in case they're rearranged.
@@ -229,6 +233,7 @@ class Speaker(models.Model):
 
 
 class SpeakerList(AgendaItemContext, MeetingContext):
+    name = "speaker_list"
     title = models.CharField(max_length=200)
     state = FSMField(
         default=SpeakerListWf.initial, choices=SpeakerListWf.choices(), editable=False

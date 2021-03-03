@@ -53,7 +53,7 @@ def set_initial_order(instance: Speaker, created: bool, **kwargs):
     Is this a new db record? We only care about the newly created for this method.
     """
     if created:
-        sl = instance.list
+        sl = instance.speaker_list
         results = sl.speaker_items.filter(order__isnull=False).aggregate(
             models.Max("order")
         )
@@ -69,7 +69,7 @@ def set_initial_order(instance: Speaker, created: bool, **kwargs):
 
 @receiver(post_delete, sender=Speaker)
 def reorder_after_delete(sender: Type[Speaker], instance: Speaker, **kwargs):
-    instance.list.reorder(force_signal=True)
+    instance.speaker_list.reorder(force_signal=True)
 
 
 def _get_list_order_msg(speaker_list: SpeakerList) -> SpeakerListOrder:
@@ -124,10 +124,10 @@ def notify_started_speaker(speaker: Speaker, **kwargs):
     msg = SpeakerStarted(
         userid=speaker.user.pk,
         pk=speaker.pk,
-        speaker_list=speaker.list.pk,
+        speaker_list=speaker.speaker_list.pk,
         started=speaker.started,
     )
-    _publish_active_list_msg(speaker.list, msg)
+    _publish_active_list_msg(speaker.speaker_list, msg)
 
 
 @receiver(speaker_stopped)
@@ -135,11 +135,11 @@ def notify_stopped_speaker(speaker: Speaker, **kwargs):
     msg = SpeakerStopped(
         userid=speaker.user.pk,
         pk=speaker.pk,
-        speaker_list=speaker.list.pk,
+        speaker_list=speaker.speaker_list.pk,
         started=speaker.started,
         seconds=speaker.seconds,
     )
-    _publish_active_list_msg(speaker.list, msg)
+    _publish_active_list_msg(speaker.speaker_list, msg)
 
 
 @receiver(post_delete, sender=SpeakerList)
