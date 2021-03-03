@@ -252,22 +252,9 @@ class AssignedRolesResponse(BaseOutgoingMessage):
 
 
 class AvailableRolesSchema(BaseModel):
-    natural_key: str
+    model: str = Field(title="Model name, lowercased, like 'agenda_item'")
     predicates: bool = False
-
-    @validator("natural_key")
-    def check_natural_key(cls, v):
-        v = v.lower()
-        parts = v.split(".")
-        if len(parts) != 2:
-            raise ValueError("Model key must contain one dot")
-        try:
-            model = apps.get_model(*parts)
-        except LookupError:
-            raise ValueError(f"No model found with natural key {v}")
-        if not issubclass(model, RoleContextMixin):
-            raise ValueError(f"Model {v} can't have roles")
-        return v
+    _validate_model = validator("model", allow_reuse=True)(validate_roles_context_model)
 
 
 @incoming
@@ -277,8 +264,7 @@ class AvailableRoles(BaseIncomingMessage, AsyncRunnable):
     data: AvailableRolesSchema
 
     async def run(self, consumer):
-        key_parts = self.data.natural_key.split(".")
-        model = apps.get_model(*key_parts)
+        model = get_model_by_shortname(self.data.model)
         roles = [x.output() for x in model.roles_cls.valid_roles.values()]
         if not self.data.predicates:
             for role in roles:
