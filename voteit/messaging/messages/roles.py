@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
-from typing import Dict
+from typing import Dict, Tuple
 from typing import List
 from typing import Optional
 from typing import Type
@@ -145,9 +145,7 @@ class GetMeetingRoles(BaseIncomingMessage, DeferredJob, ContextAction):
         if self.data.filter_userids:
             kwargs["user__in"] = self.data.userids
         qs = MeetingRoles.objects.filter(**kwargs).values("user_id", "assigned")
-        items = {}
-        for item in qs:
-            items[item["user_id"]] = item["assigned"]
+        items = [(item["user_id"], item["assigned"]) for item in qs]
         msg = AssignedMeetingRolesResponse.from_message(self, items=items)
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
@@ -156,7 +154,7 @@ class GetMeetingRoles(BaseIncomingMessage, DeferredJob, ContextAction):
 class AssignedResponseSchema(BaseModel):
     """Return a dict with assigned roles where key is user_pk and value is a list of roles as strings"""
 
-    items: Dict[int, List[str]] = Field(
+    items: List[Tuple[int, List[str]]] = Field(
         title="Assigned roles",
         description="Key is user_pk and value the assigned roles.",
     )
