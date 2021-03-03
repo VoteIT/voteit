@@ -1,12 +1,22 @@
-import re
-from typing import Set
+from __future__ import annotations
 
-from bleach import Cleaner, ALLOWED_TAGS, ALLOWED_ATTRIBUTES
+import re
+from typing import Optional
+from typing import Set
+from typing import TYPE_CHECKING
+
+from bleach import ALLOWED_ATTRIBUTES
+from bleach import ALLOWED_TAGS
+from bleach import Cleaner
 from bs4 import BeautifulSoup
+from typing import Type
 
 _tag_pattern = re.compile(r"#([\w\-]+)")
 # FIXME: Do a proper regex. I'm crappy with this /rho
 _userid_pattern = re.compile(r"@([\w\d]+)")
+
+if TYPE_CHECKING:
+    from django.db.models import Model
 
 
 def get_tags(text: str, lower=True) -> Set[str]:
@@ -178,3 +188,15 @@ def relaxed_clean_html(text: str):
     """ Clean HTML for moderators and trusted users. Note that trusted users may have viruses too..."""
     # FIXME: Implement
     raise NotImplementedError()
+
+
+def get_content_registry():
+    from .registries import content_types
+
+    return content_types
+
+
+def get_model_by_shortname(name, default=None) -> Optional[Type[Model]]:
+    name = name.lower()
+    reg = get_content_registry()
+    return reg.get(name, default)

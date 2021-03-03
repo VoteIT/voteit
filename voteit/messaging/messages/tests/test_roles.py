@@ -53,30 +53,26 @@ class MeetingRolesTests(TestCase):
 
     def test_get_meeting_roles_unauthorized(self):
         self.meeting.add_roles(self.user_a, "participant", "moderator")
-        from voteit.messaging.messages.roles import GetMeetingRoles
+        from voteit.messaging.messages.roles import GetRoles
 
-        msg = GetMeetingRoles({}, pk=self.meeting.pk)
+        msg = GetRoles({}, pk=self.meeting.pk, model="meeting")
         self.assertRaises(UnauthorizedError, msg.run_job)
 
     def test_get_meeting_roles(self):
         self.meeting.add_roles(self.user_a, "participant", "moderator")
-        from voteit.messaging.messages.roles import GetMeetingRoles
-        from voteit.messaging.messages.roles import AssignedMeetingRolesResponse
+        from voteit.messaging.messages.roles import GetRoles
+        from voteit.messaging.messages.roles import AssignedRolesResponse
 
-        msg = GetMeetingRoles({"user_pk": self.user_a.pk}, pk=self.meeting.pk)
+        msg = GetRoles({"user_pk": self.user_a.pk}, pk=self.meeting.pk, model="meeting")
 
-        with patch.object(AssignedMeetingRolesResponse, "send_outgoing") as mock_method:
+        with patch.object(AssignedRolesResponse, "send_outgoing") as mock_method:
             response = msg.run_job()
             self.assertTrue(mock_method.called)
-            self.assertIsInstance(response, AssignedMeetingRolesResponse)
-
-            res_dict = response.data.dict()
-            self.assertEqual(1, len(res_dict["items"]))
-            res_items = res_dict["items"]
-            self.assertIn(self.user_a.pk, res_items)
-            self.assertEqual(
-                {"participant", "moderator"}, set(res_items[self.user_a.pk])
-            )
+            self.assertIsInstance(response, AssignedRolesResponse)
+            data = response.data
+            self.assertEqual(1, len(data.items))
+            self.assertIn(self.user_a.pk, [x[0] for x in data.items])
+            self.assertEqual({"participant", "moderator"}, set(data.items[0][1]))
 
 
 class RolesIntegrationTests(TransactionTestCase):
@@ -91,7 +87,7 @@ class RolesIntegrationTests(TransactionTestCase):
         from voteit.messaging.consumers import WebsocketDemuxConsumer
         from voteit.meeting.channels import ModeratorsChannel
         from voteit.messaging.messages.channels import ChannelSubscription
-        from voteit.messaging.messages.roles import RemoveMeetingRoles
+        from voteit.messaging.messages.roles import RemoveRoles
 
         fakeredis_conn = FakeRedis()
 
@@ -133,10 +129,11 @@ class RolesIntegrationTests(TransactionTestCase):
 
         try:
             # User A sends this message
-            msg = RemoveMeetingRoles(
+            msg = RemoveRoles(
                 mm={"user_pk": self.user_a.pk},
                 userids=[self.user_a.pk, self.user_b.pk],
                 roles=["moderator"],
+                model="meeting",
                 pk=self.meeting.pk,
             )
             await consumer_a.handle_message(msg)

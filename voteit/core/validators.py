@@ -1,0 +1,54 @@
+# Common validators
+from typing import Dict
+from voteit.core.models import RoleContextMixin
+from voteit.core.utils import get_model_by_shortname
+
+
+def validate_roles_context_model(v: str) -> str:
+    """
+    Make sure it's a model that exists and has roles
+    >>> validate_roles_context_model("meeting")
+    'meeting'
+    >>> validate_roles_context_model("Meeting")
+    'meeting'
+    >>> validate_roles_context_model("404")
+    Traceback (most recent call last):
+    ...
+    ValueError:
+
+    Context that can't have roles should fail too
+    >>> validate_roles_context_model("proposal")
+    Traceback (most recent call last):
+    ...
+    ValueError:
+    """
+    v = v.lower()
+    model = get_model_by_shortname(v)
+    if model is None:
+        raise ValueError(f"{v} is not a known content type")
+    if not issubclass(model, RoleContextMixin):
+        raise ValueError(f"{v} content can't have roles")
+    return v
+
+
+def root_validate_roles_and_model(cls, values: Dict):
+    """
+    Checking roles requires the model too
+    >>> v = {"model": "meeting", "roles": ["participant"]}
+    >>> res = root_validate_roles_and_model(None, v)
+    >>> v == res
+    True
+
+    >>> v = {"model": "meeting", "roles": ["participant", "404"]}
+    >>> root_validate_roles_and_model(None, v)
+    Traceback (most recent call last):
+    ...
+    ValueError:
+    """
+    model = get_model_by_shortname(values.get("model"))
+    # This should already have passed validation - use validate_roles_context_model
+    assert model is not None
+    not_valid = set(values["roles"]) - set(model.roles_cls.valid_roles.keys())
+    if not_valid:
+        raise ValueError(f"Invalid roles for this context: {', '.join(not_valid)}")
+    return values

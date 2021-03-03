@@ -35,6 +35,8 @@ UserModel = get_user_model()
 class MeetingRoles(Roles, MeetingContext):
     """ Contains assigned meeting roles for a specific meeting and user"""
 
+    name = "meeting_roles"
+
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="meeting_roles"
     )
@@ -48,6 +50,7 @@ class MeetingRoles(Roles, MeetingContext):
 
 
 class Meeting(BaseContent, RoleContextMixin, MeetingContext):
+    name = "meeting"
     title: str = models.CharField(max_length=100)
     state: str = FSMField(
         default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False
