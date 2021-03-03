@@ -339,3 +339,23 @@ class ChannelSubscribedTests(TestCase):
             [],
             appstates["speaker_list.order"]["queue"],
         )
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class RolesRelationsTests(TestCase):
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+
+        self.meeting: Meeting = Meeting.objects.create()
+        self.system = self.meeting.speaker_systems.create(method_name="simple")
+        self.user = User.objects.create(username="jane")
+
+    def test_removing_participant_removes_system_roles(self):
+        self.meeting.add_roles(self.user, "participant")
+        self.system.add_roles(self.user, "speaker")
+        self.meeting.remove_roles(self.user, "participant")
+        self.assertFalse(self.system.get_roles(self.user))
+
+    def test_adding_system_roles_adds_participant(self):
+        self.system.add_roles(self.user, "speaker")
+        self.assertFalse(self.meeting.get_roles(self.user))

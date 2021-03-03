@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
+from typing import Type
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -11,27 +12,30 @@ from django.dispatch import receiver
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
+from voteit.core.signals import roles_added
+from voteit.core.signals import roles_removed
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingRoles
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.signals import archive_meeting
 from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.signals import channel_subscribed
-from voteit.speaker.messages import (
-    SpeakerListOrder,
-    SpeakerListChanged,
-    SpeakerListAdded,
-    SpeakerListDeleted,
-    SpeakerSystemDeleted,
-    SpeakerSystemAdded,
-    SpeakerSystemChanged,
-)
+from voteit.speaker.messages import SpeakerListAdded
+from voteit.speaker.messages import SpeakerListChanged
+from voteit.speaker.messages import SpeakerListDeleted
+from voteit.speaker.messages import SpeakerListOrder
 from voteit.speaker.messages import SpeakerStarted
 from voteit.speaker.messages import SpeakerStopped
-from voteit.speaker.models import Speaker, SpeakerList, SpeakerListSystem
-from voteit.speaker.rest_api.serializers import (
-    SpeakerListSerializer,
-    SpeakerListSystemSerializer,
-)
+from voteit.speaker.messages import SpeakerSystemAdded
+from voteit.speaker.messages import SpeakerSystemChanged
+from voteit.speaker.messages import SpeakerSystemDeleted
+from voteit.speaker.models import Speaker
+from voteit.speaker.models import SpeakerList
+from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.models import SpeakerSystemRoles
+from voteit.speaker.rest_api.serializers import SpeakerListSerializer
+from voteit.speaker.rest_api.serializers import SpeakerListSystemSerializer
 
 if TYPE_CHECKING:
     from voteit.messaging.abcs import BaseOutgoingMessage
@@ -221,3 +225,23 @@ def ai_channel_subscribed(
 def close_and_cleanup(meeting, **kw):
     for system in meeting.speaker_systems.all():
         system.archive()
+
+
+@receiver(roles_added, sender=SpeakerSystemRoles)
+def make_list_system_users_participants(instance: SpeakerSystemRoles, **kw):
+    """Whatever role we're adding to speaker system,
+    make that user is a participant in the related meeting.
+    """
+    if instance.meeting is not None:
+        instance.meeting.add_roles(instance.user, ROLE_PARTICIPANT)
+
+
+@receiver(roles_removed, sender=MeetingRoles)
+def make_list_system_users_participants(instance: MeetingRoles, roles, **kw):
+    """If someone is removed as a participant from the meeting,
+    remove their speaker system roles too.
+    """
+    if ROLE_PARTICIPANT in roles:
+        to_remove = list(SpeakerListSystem.roles_cls.valid_roles.keys())
+        for system in instance.meeting.speaker_systems.all():
+            system.remove_roles(instance.user, *to_remove)
