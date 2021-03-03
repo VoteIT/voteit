@@ -196,6 +196,12 @@ def get_content_registry():
     return content_types
 
 
+def get_permission_registry():
+    from .registries import permissions
+
+    return permissions
+
+
 def get_model_by_shortname(name, default=None) -> Optional[Type[Model]]:
     name = name.lower()
     reg = get_content_registry()

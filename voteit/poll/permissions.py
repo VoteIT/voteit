@@ -1,47 +1,23 @@
-from voteit.core.registries import permissions
+from voteit.core.permission import ModelPermissions
+from voteit.core.permission import Permission as P
 
 
-class PollPermissions:
-    """
-    The permissions must map the object permissions in django.
-
-    >>> from voteit.core.testing import find_bad_permission_names
-    >>> from voteit.poll.models import Poll
-    >>> find_bad_permission_names(PollPermissions, Poll)
-
-    """
-
-    ADD = permissions.create("poll.add_poll", "agenda.AgendaItem")
-    CHANGE = permissions.create("poll.change_poll", "poll.Poll")
-    DELETE = permissions.create("poll.delete_poll", "poll.Poll")
-    VIEW = permissions.create("poll.view_poll", "poll.Poll")
+class PollPermissions(ModelPermissions):
+    model = "poll"
+    ADD = P("poll.add_poll", context="agenda_item")
+    CHANGE = P("poll.change_poll")
+    DELETE = P("poll.delete_poll")
+    VIEW = P("poll.view_poll")
 
 
-class VotePermissions:
-    """Note that adding, deleting or changing a Vote is the same thing as being able to vote!
-        Add is checked against a poll, and change/delete is checked against an existing vote.
-        They should always yield the same result.
-
-    The permissions must map the object permissions in django.
-    >>> from voteit.core.testing import find_bad_permission_names
-    >>> from voteit.poll.models import Vote
-    >>> find_bad_permission_names(VotePermissions, Vote)
-
-    """
-
-    ADD = permissions.create("poll.add_vote", "poll.Poll")
-    CHANGE = permissions.create("poll.change_vote", "poll.Vote")
-    DELETE = permissions.create("poll.delete_vote", "poll.Vote")
-    VIEW = permissions.create("poll.view_vote", "poll.Vote")
+class VotePermissions(ModelPermissions):
+    model = "vote"
+    ADD = P("poll.add_vote", context="poll")
+    CHANGE = P("poll.change_vote", "poll.Vote")
+    DELETE = P("poll.delete_vote", "poll.Vote")
+    VIEW = P("poll.view_vote", "poll.Vote")
 
 
-class ElectoralRegisterPermissions:
-    """These shouldn't be created manually
-
-    >>> from voteit.core.testing import find_bad_permission_names
-    >>> from voteit.poll.models import ElectoralRegister
-    >>> find_bad_permission_names(ElectoralRegisterPermissions, ElectoralRegister)
-
-    """
-
-    VIEW = permissions.create("poll.view_electoralregister", "poll.ElectoralRegister")
+class ElectoralRegisterPermissions(ModelPermissions):
+    model = "electoral_register"
+    VIEW = P("poll.view_electoralregister")

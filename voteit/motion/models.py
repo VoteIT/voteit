@@ -30,6 +30,8 @@ class MotionProcessRoles(Roles):
 
 
 class MotionProcess(BaseContent, RoleContextMixin):
+    name = "motion_process"
+
     title: str = models.CharField(max_length=100)
     state = FSMField(
         default=MotionProcessWf.initial,
@@ -81,6 +83,7 @@ class MotionProcess(BaseContent, RoleContextMixin):
 
 
 class Motion(BaseContent):
+    name = "motion"
     title: str = models.CharField(max_length=100)
 
     state = FSMField(

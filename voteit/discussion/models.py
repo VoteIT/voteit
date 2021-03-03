@@ -18,6 +18,7 @@ class DiscussionPost(
     MeetingContext,
     Reactable,
 ):
+    name = "discussion_post"
     agenda_item = models.ForeignKey(
         "agenda.AgendaItem",
         on_delete=models.CASCADE,

@@ -1,15 +1,12 @@
-class OrgPermissions:
-    """
-    The permissions must map the object permissions in django.
+from voteit.core.permission import ModelPermissions
+from voteit.core.permission import Permission as P
 
-    >>> from voteit.core.testing import find_bad_permission_names
-    >>> from voteit.organisation.models import Organisation
-    >>> find_bad_permission_names(OrgPermissions, Organisation)
 
-    """
+class OrgPermissions(ModelPermissions):
+    model = "organisation"
 
-    ADD = "organisation.add_organisation"  # FIXME
-    CHANGE = "organisation.change_organisation"
-    DELETE = "organisation.delete_organisation"
-    VIEW = "organisation.view_organisation"
-    MANAGE = "organisation.manage_organisation"
+    ADD = P("organisation.add_organisation")  # FIXME: We don't know about the context
+    CHANGE = P("organisation.change_organisation")
+    DELETE = P("organisation.delete_organisation")
+    VIEW = P("organisation.view_organisation")
+    MANAGE = P("organisation.manage_organisation")

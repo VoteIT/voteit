@@ -1,57 +1,26 @@
-from voteit.core.registries import permissions
+from voteit.core.permission import ModelPermissions
+from voteit.core.permission import Permission as P
 
 
-class PresenceSystemPermissions:
-    """
-    The permissions must map the object permissions in django.
-
-    >>> from voteit.core.testing import find_bad_permission_names
-    >>> from voteit.presence.models import PresenceSystem
-    >>> find_bad_permission_names(PresenceSystemPermissions, PresenceSystem)
-
-    """
-
-    ADD = permissions.create("presence.add_presencesystem", "meeting.Meeting")
-    CHANGE = permissions.create(
-        "presence.change_presencesystem", "presence.PresenceSystem"
-    )
-    DELETE = permissions.create(
-        "presence.delete_presencesystem", "presence.PresenceSystem"
-    )
-    VIEW = permissions.create("presence.view_presencesystem", "presence.PresenceSystem")
+class PresenceSystemPermissions(ModelPermissions):
+    model = "presence_system"
+    ADD = P("presence.add_presencesystem", context="meeting")
+    CHANGE = P("presence.change_presencesystem")
+    DELETE = P("presence.delete_presencesystem")
+    VIEW = P("presence.view_presencesystem")
 
 
 class PresenceCheckPermissions:
-    """
-    The permissions must map the object permissions in django.
-
-    >>> from voteit.core.testing import find_bad_permission_names
-    >>> from voteit.presence.models import PresenceCheck
-    >>> find_bad_permission_names(PresenceCheckPermissions, PresenceCheck)
-
-    """
-
-    ADD = permissions.create("presence.add_presencecheck", "presence.PresenceSystem")
-    CHANGE = permissions.create(
-        "presence.change_presencecheck", "presence.PresenceCheck"
-    )
-    DELETE = permissions.create(
-        "presence.delete_presencecheck", "presence.PresenceCheck"
-    )
-    VIEW = permissions.create("presence.view_presencecheck", "presence.PresenceCheck")
+    model = "presence_system"
+    ADD = P("presence.add_presencecheck", context="presence_system")
+    CHANGE = P("presence.change_presencecheck")
+    DELETE = P("presence.delete_presencecheck")
+    VIEW = P("presence.view_presencecheck")
 
 
 class PresencePermissions:
-    """
-    The permissions must map the object permissions in django.
-
-    >>> from voteit.core.testing import find_bad_permission_names
-    >>> from voteit.presence.models import Presence
-    >>> find_bad_permission_names(PresencePermissions, Presence)
-
-    """
-
+    model = "presence"
     # Change doesn't exist
-    ADD = permissions.create("presence.add_presence", "presence.PresenceCheck")
-    DELETE = permissions.create("presence.delete_presence", "presence.Presence")
-    VIEW = permissions.create("presence.view_presence", "presence.Presence")
+    ADD = P("presence.add_presence", context="presence_check")
+    DELETE = P("presence.delete_presence")
+    VIEW = P("presence.view_presence")

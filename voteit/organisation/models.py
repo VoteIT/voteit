@@ -22,5 +22,5 @@ class OrganisationRoles(Roles):
 
 class Organisation(BaseContent, RoleContextMixin):
     title: str = models.CharField(max_length=100)
-
+    name = "organisation"
     roles_cls = OrganisationRoles

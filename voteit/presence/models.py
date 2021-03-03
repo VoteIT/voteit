@@ -63,6 +63,8 @@ class PresenceCheck(MeetingContext):
     since deleting is better than tampering :)
     """
 
+    name = "presence_check"
+
     state: str = FSMField(
         default=PresenceCheckWf.initial,
         choices=PresenceCheckWf.choices(),
@@ -117,6 +119,8 @@ class PresenceSystem(MeetingContext):
     Most of the permission checks for this system is delegated to the related meeting,
     so there's no separate role to run presence checks.
     """
+
+    name = "presence_system"
 
     meeting: Optional[Meeting] = models.OneToOneField(
         Meeting, on_delete=models.CASCADE, null=True

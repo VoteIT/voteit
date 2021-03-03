@@ -58,6 +58,7 @@ class VoterWeight(models.Model):
 
 
 class ElectoralRegister(MeetingContext):
+    name = "electoral_register"
     created = models.DateTimeField(editable=False, auto_now_add=True)
     voters = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
@@ -94,6 +95,7 @@ class ElectoralRegister(MeetingContext):
 
 
 class Poll(BaseContent, MeetingContext, AgendaItemContext):
+    name = "poll"
     state = FSMField(default=PollWf.initial, choices=PollWf.choices(), protected=True)
     title = models.CharField(max_length=70)
     description = models.CharField(max_length=200)
@@ -379,6 +381,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 class Vote(models.Model):
     """Contains data on the users vote in a specific poll."""
 
+    name = "vote"
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT
     )

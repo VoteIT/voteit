@@ -22,6 +22,7 @@ User: AbstractUser = get_user_model()
 
 
 class ReactionButton(MeetingContext):
+    name = "reaction_button"
     # role_set: models.QuerySet
     ICON_CHOICES = (  # TODO, maybe use material icons? https://material.io/resources/icons/?style=baseline
         ("thumb_up", _("Thumb up")),

@@ -41,7 +41,8 @@ class PredicateOutput(BaseModel):
 class PermissionOutput(BaseModel):
     name: str
     description: str = ""
-    model_name: Optional[str]
+    model: Optional[str]
+    context: Optional[str]
 
     class Config:
         orm_mode = True

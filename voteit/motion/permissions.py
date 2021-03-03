@@ -1,37 +1,24 @@
-from voteit.core.registries import permissions
+from voteit.core.permission import ModelPermissions
+from voteit.core.permission import Permission as P
 
 
-class MotionProcessPermissions:
-    """
-    The permissions must map the object permissions in django.
+class MotionProcessPermissions(ModelPermissions):
+    model = "motion_process"
 
-    >>> from voteit.core.testing import find_bad_permission_names
-    >>> from voteit.motion.models import MotionProcess
-    >>> find_bad_permission_names(MotionProcessPermissions, MotionProcess)
-
-    """
-
-    MANAGE = permissions.create("motion.manage_motionprocess", "motion.MotionProcess")
-    ADD = permissions.create("motion.add_motionprocess", "organisation.Organisation")
-    CHANGE = permissions.create("motion.change_motionprocess", "motion.MotionProcess")
-    DELETE = permissions.create("motion.delete_motionprocess", "motion.MotionProcess")
-    VIEW = permissions.create("motion.view_motionprocess", "motion.MotionProcess")
+    MANAGE = P("motion.manage_motionprocess")
+    ADD = P("motion.add_motionprocess", context="organisation")
+    CHANGE = P("motion.change_motionprocess", "motion.MotionProcess")
+    DELETE = P("motion.delete_motionprocess", "motion.MotionProcess")
+    VIEW = P("motion.view_motionprocess", "motion.MotionProcess")
 
 
-class MotionPermissions:
-    """
-    The permissions must map the object permissions in django.
+class MotionPermissions(ModelPermissions):
+    model = "motion"
 
-    >>> from voteit.core.testing import find_bad_permission_names
-    >>> from voteit.motion.models import Motion
-    >>> find_bad_permission_names(MotionPermissions, Motion)
-
-    """
-
-    ADD = permissions.create("motion.add_motion", "motion.MotionProcess")
-    CHANGE = permissions.create("motion.change_motion", "motion.Motion")
-    VIEW = permissions.create("motion.view_motion", "motion.Motion")
-    DELETE = permissions.create("motion.delete_motion", "motion.Motion")
-    MANAGE = permissions.create("motion.manage_motion", "motion.Motion")
-    SUBMIT = permissions.create("motion.submit_motion", "motion.Motion")
-    RETRACT = permissions.create("motion.retract_motion", "motion.Motion")
+    ADD = P("motion.add_motion", context="motion_process")
+    CHANGE = P("motion.change_motion")
+    VIEW = P("motion.view_motion")
+    DELETE = P("motion.delete_motion")
+    MANAGE = P("motion.manage_motion")
+    SUBMIT = P("motion.submit_motion")
+    RETRACT = P("motion.retract_motion")

@@ -1,23 +1,11 @@
-from voteit.core.registries import permissions
+from voteit.core.permission import ModelPermissions
+from voteit.core.permission import Permission as P
 
 
-class DiscussionPermissions:
-    """
-    The permissions must map the object permissions in django.
+class DiscussionPermissions(ModelPermissions):
+    model = "discussion_post"
 
-    >>> from voteit.core.testing import find_bad_permission_names
-    >>> from voteit.discussion.models import DiscussionPost
-    >>> find_bad_permission_names(DiscussionPermissions, DiscussionPost)
-
-    """
-
-    ADD = permissions.create("discussion.add_discussionpost", "agenda.AgendaItem")
-    CHANGE = permissions.create(
-        "discussion.change_discussionpost", "discussion.DiscussionPost"
-    )
-    DELETE = permissions.create(
-        "discussion.delete_discussionpost", "discussion.DiscussionPost"
-    )
-    VIEW = permissions.create(
-        "discussion.view_discussionpost", "discussion.DiscussionPost"
-    )
+    ADD = P("discussion.add_discussionpost", context="agenda_item")
+    CHANGE = P("discussion.change_discussionpost")
+    DELETE = P("discussion.delete_discussionpost")
+    VIEW = P("discussion.view_discussionpost")
