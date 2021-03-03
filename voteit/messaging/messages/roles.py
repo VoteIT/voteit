@@ -75,23 +75,6 @@ class BaseRoles(BaseIncomingMessage, DeferredJob, ContextAction):
         return get_model_by_shortname(self.data.model)
 
     def validate_and_fetch(self) -> models.QuerySet:
-        # Roles
-        # assert isinstance(self.context, RoleContextMixin)
-        # invalid = set(self.data.roles) - self.context.filter_valid_roles(
-        #     *self.data.roles
-        # )
-        # if invalid:
-        #     raise ValidationErrorMsg.from_message(
-        #         self,
-        #         msg=_("Invalid roles"),
-        #         errors=[
-        #             {
-        #                 "loc": ("roles",),
-        #                 "msg": _("Invalid: %(roles)s" % {"roles": invalid}),
-        #                 "type": "value.error",
-        #             }
-        #         ],
-        #     )
         # Permission
         self.assert_perm(msg=_("You're not allowed to change roles"))
         # Users
@@ -151,46 +134,6 @@ class RemoveRoles(BaseRoles):
             user_channel.publish(msg, internal=True)
 
 
-# class BaseAddRoles(BaseRoles, ABC):
-#     def run_job(self):
-#         users_qs = self.validate_and_fetch()
-#         for user in users_qs:
-#             self.context.add_roles(user, *self.data.roles)
-#         if self.mm.consumer_name:  # If this is a script, consumer_name will be None
-#             response = TextResponse.from_message(self, msg="Added")
-#             response.send_outgoing(self.mm.consumer_name, success=True)
-
-
-# class BaseRemoveRoles(BaseRoles, ABC):
-#     def run_job(self):
-#         users_qs = self.validate_and_fetch()
-#         notify_users = set()
-#         for user in users_qs:
-#             if self.context.remove_roles(user, *self.data.roles):
-#                 notify_users.add(user)
-#         if self.mm.consumer_name:  # If this is a script, consumer_name will be None
-#             response = TextResponse.from_message(self, msg="Removed")
-#             response.send_outgoing(self.mm.consumer_name, success=True)
-#         msg = RecheckChannelSubscriptions()
-#         for user in notify_users:
-#             user_channel = UserChannel.from_instance(user)
-#             user_channel.publish(msg, internal=True)
-#
-#
-# @incoming
-# class AddMeetingRoles(BaseAddRoles):
-#     name = "meeting.add_roles"
-#     model = Meeting
-#     permission = MeetingPermissions.CHANGE
-#
-#
-# @incoming
-# class RemoveMeetingRoles(BaseRemoveRoles):
-#     name = "meeting.remove_roles"
-#     model = Meeting
-#     permission = MeetingPermissions.CHANGE
-
-
 class GetRolesSchema(BaseModel):
     pk: int = Field(title="pk of context")
     model: str = Field(title="Model name, lowercased, like 'agenda_item'")
@@ -205,8 +148,6 @@ class GetRoles(BaseIncomingMessage, DeferredJob, ContextAction):
     """ Transmits a dict looking like AssignedResponseSchema with user_pk and assigned roles. """
 
     name = "roles.get"
-    # model = Meeting
-    # permission = MeetingPermissions.VIEW
     schema = GetRolesSchema
     data: GetRolesSchema
 
