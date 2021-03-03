@@ -84,10 +84,7 @@ class PermissionRegistry(Registry):
 
         """
         for permission in self.values():
-            try:
-                model = get_model_by_shortname(permission.model)
-            except Exception:
-                breakpoint()
+            model = get_model_by_shortname(permission.model)
             if model is None:
                 raise ValueError(
                     f"Permission {permission} references a model that doesn't exist: '{permission.model}'"
