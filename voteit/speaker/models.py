@@ -63,7 +63,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     A list system has its own rules and moderators.
     """
 
-    name = "list_system"
+    name = "speaker_system"
 
     active: bool = models.BooleanField(
         verbose_name=_(

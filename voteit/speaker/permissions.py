@@ -3,7 +3,7 @@ from voteit.core.permission import Permission as P
 
 
 class SpeakerSystemPermissions(ModelPermissions):
-    name = "speaker_system"
+    model = "speaker_system"
     ADD = P("speaker.add_speakerlistsystem", context="meeting")
     CHANGE = P("speaker.change_speakerlistsystem")
     DELETE = P("speaker.delete_speakerlistsystem")
@@ -11,7 +11,7 @@ class SpeakerSystemPermissions(ModelPermissions):
 
 
 class SpeakerListPermissions(ModelPermissions):
-    name = "speaker_list"
+    model = "speaker_list"
     ADD = P("speaker.add_speakerlist", context="speaker_system")
     CHANGE = P("speaker.change_speakerlist")
     DELETE = P("speaker.delete_speakerlist")

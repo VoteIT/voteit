@@ -7,9 +7,9 @@ class MotionProcessPermissions(ModelPermissions):
 
     MANAGE = P("motion.manage_motionprocess")
     ADD = P("motion.add_motionprocess", context="organisation")
-    CHANGE = P("motion.change_motionprocess", "motion.MotionProcess")
-    DELETE = P("motion.delete_motionprocess", "motion.MotionProcess")
-    VIEW = P("motion.view_motionprocess", "motion.MotionProcess")
+    CHANGE = P("motion.change_motionprocess")
+    DELETE = P("motion.delete_motionprocess")
+    VIEW = P("motion.view_motionprocess")
 
 
 class MotionPermissions(ModelPermissions):

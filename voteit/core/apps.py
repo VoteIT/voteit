@@ -12,7 +12,10 @@ class CoreConfig(AppConfig):
         from voteit.core import signals
         from voteit.core import messages
         from voteit.core.registries import content_types
+        from voteit.core.registries import permissions
 
         # Register some of the other content types we might care about
         User = get_user_model()
         content_types["user"] = User
+        # Make sure linked permissions make sense
+        permissions.validate_registry()

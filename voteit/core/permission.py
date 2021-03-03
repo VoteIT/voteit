@@ -8,8 +8,10 @@ from typing import Generator
 from typing import Optional
 from typing import Union
 
+from typing import Type
 from voteit.core.component import Registry
 from voteit.core.schemas import PermissionOutput
+from voteit.core.utils import get_model_by_shortname
 from voteit.core.utils import get_permission_registry
 
 
@@ -30,6 +32,8 @@ class PermissionRegistry(Registry):
     True
     """
 
+    ATTRS_TO_CHECK = ("add", "change", "view", "delete")
+
     def for_model(self, model: str) -> Generator[Permission, None, None]:
         for perm in self.values():
             if model == perm.model:
@@ -39,6 +43,71 @@ class PermissionRegistry(Registry):
         for perm in self.values():
             if model == perm.context:
                 yield perm
+
+    def validate_registry(self):
+        """Make sure registered permissions make sense.
+        This must be run after model ready.
+
+        Example:
+        >>> registry = PermissionRegistry(Permission)
+
+        Bad model picked up
+        >>> perm = Permission("hello_world", model="boho")
+        >>> registry(perm)
+        'hello_world'
+        >>> registry.validate_registry()
+        Traceback (most recent call last):
+        ...
+        ValueError
+
+        Contexts are checked too
+        >>> registry.clear()
+        >>> perm = Permission("hello_world", model="meeting", context="404")
+        >>> registry(perm)
+        'hello_world'
+        >>> registry.validate_registry()
+        Traceback (most recent call last):
+        ...
+        ValueError
+
+        Any permission names that doesn't match Djangos model permissions
+        for add, change, view, delete will cause errors too.
+        >>> registry.clear()
+        >>> perm = Permission("meeting.add_some_meeting", model="meeting")
+        >>> perm.perms_cls_attr = "ADD"
+        >>> registry(perm)
+        'meeting.add_some_meeting'
+        >>> registry.validate_registry()
+        Traceback (most recent call last):
+        ...
+        ValueError
+
+        """
+        for permission in self.values():
+            try:
+                model = get_model_by_shortname(permission.model)
+            except Exception:
+                breakpoint()
+            if model is None:
+                raise ValueError(
+                    f"Permission {permission} references a model that doesn't exist: '{permission.model}'"
+                )
+            context_model = get_model_by_shortname(permission.context)
+            if context_model is None:
+                raise ValueError(
+                    f"Permission {permission} has a context that references a model that doesn't exist: '{permission.context}'"
+                )
+            if permission.perms_cls_attr.lower() in self.ATTRS_TO_CHECK:
+                dj_perm = (
+                    f"{model._meta.app_label}.{permission.perms_cls_attr.lower()}_"
+                    f"{model._meta.model_name.lower()}"
+                )
+                if dj_perm != permission:
+                    raise ValueError(
+                        f"Djangos object permissions {permission.perms_cls_attr} "
+                        f"for model {permission.model} to have the format {dj_perm}. "
+                        f"Got: {permission}"
+                    )
 
 
 class Permission(UserString):
@@ -57,6 +126,9 @@ class Permission(UserString):
     description: str
     model: str = None
     context: str = None
+    # Internal to make testing easier
+    perms_cls: Type[ModelPermissions] = None
+    perms_cls_attr: str = None
 
     def __init__(
         self, name, model: str = None, context: str = None, description: str = ""
@@ -85,18 +157,19 @@ class MPMeta(ABCMeta):
         reg = get_permission_registry()
         for (k, v) in namespace.items():
             if isinstance(v, Permission):
-                perm = getattr(cls, k)
+                perm: Permission = getattr(cls, k)
                 if perm.model is None:
+                    assert isinstance(
+                        cls.model, str
+                    ), f"{cls} doesn't have a valid 'model' attribute set"
                     perm.model = cls.model
                 if perm.context is None:
                     perm.context = perm.model
+                perm.perms_cls = cls
+                perm.perms_cls_attr = k
                 reg(perm)
-
         return cls
 
 
 class ModelPermissions(ABC, metaclass=MPMeta):
-    @property
-    @abstractmethod
-    def model(self) -> str:
-        """ The shortname of the model. For instance "meeting"."""
+    model = None  # The shortname of the model. For instance "meeting"
