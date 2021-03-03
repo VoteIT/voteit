@@ -32,7 +32,7 @@ class AvalableMeetingRolesTests(TestCase):
     async def test_get_meeting_roles(self):
         from voteit.messaging.messages.roles import AvailableRolesResponse
 
-        msg = self._mk_one(natural_key="meeting.meeting")
+        msg = self._mk_one(model="meeting")
         response = await msg.run(None)
         self.assertIsInstance(response, AvailableRolesResponse)
         self.assertIsInstance(response.data.roles[0], RoleOutput)
