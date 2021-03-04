@@ -111,8 +111,8 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Poll
-        fields = [
-            "title",
+        read_only_fields = ["pk", "title"]
+        fields = read_only_fields + [
             "body",
             "agenda_item",
             "meeting",
