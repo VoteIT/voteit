@@ -106,19 +106,16 @@ class PresenceCheck(MeetingContext):
                 raise IntegrityError("There's already an ongoing presence check here")
         super().save(**kw)
 
-    # FIXME: This manager makes no sense since we'll never
-    #  filter out open presence checks without filtering system.
-    # class Manager(models.Manager):
-    #     """ Methods to get filtered QuerySets or currently open presence check. """
-    #
-    #     def open(self) -> models.QuerySet:
-    #         return self.get_queryset().filter(state=PresenceCheckWf.OPEN)
-    #
-    #     def latest_open(self) -> PresenceCheck:
-    #         return self.open().latest("opened")
+    class Manager(models.Manager):
+        """ Methods to get filtered QuerySets or currently open presence check. """
 
-    # objects = Manager()
-    objects: models.Manager
+        def open(self) -> models.QuerySet:
+            return self.get_queryset().filter(state=PresenceCheckWf.OPEN)
+
+        def latest_open(self) -> PresenceCheck:
+            return self.open().latest("opened")
+
+    objects = Manager()
 
 
 class PresenceSystem(MeetingContext):

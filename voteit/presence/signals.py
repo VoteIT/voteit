@@ -87,7 +87,7 @@ def _channel_subscribed(
 ):
     """ Populate app_state with current, if any, presence check objects. """
     with suppress(ObjectDoesNotExist):
-        if presence_check := context.presencesystem.presence_checks.latest_open():
+        if presence_check := context.presence_system.presence_checks.latest_open():
             app_state.append_from(
                 presence_check, PresenceCheckDetailSerializer, PresenceCheckAdded
             )
