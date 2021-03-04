@@ -66,7 +66,7 @@ class SpeakerListSystemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SpeakerListSystem
-        read_only_fields = ["archived"]
+        read_only_fields = ["state"]
         fields = [
             "pk",
             "meeting",
@@ -75,7 +75,6 @@ class SpeakerListSystemSerializer(serializers.ModelSerializer):
             "settings",
             "active_list",
             "safe_positions",
-            "active",
         ] + read_only_fields
         extra_kwargs = {
             # At least right now...

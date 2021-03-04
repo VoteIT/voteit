@@ -92,7 +92,7 @@ class SpeakerListSystemSerializerTests(TestCase):
         )
         # self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
         self.system = self.meeting.speaker_systems.create(
-            method_name="simple", active=True
+            method_name="simple", state="active"
         )
         self.slist = self.system.speaker_lists.create()
 
@@ -114,9 +114,8 @@ class SpeakerListSystemSerializerTests(TestCase):
                 "method_name": "simple",
                 "settings": None,
                 "safe_positions": None,
-                "archived": False,
+                "state": "active",
                 "active_list": None,
-                "active": True,
             },
             data,
         )

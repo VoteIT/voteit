@@ -10,7 +10,9 @@ class SpeakerListTests(TestCase):
         from voteit.meeting.models import Meeting
 
         meeting = Meeting.objects.create()
-        self.system = meeting.speaker_systems.create(method_name="simple", active=True)
+        self.system = meeting.speaker_systems.create(
+            method_name="simple", state="active"
+        )
         self.user_moderator = User.objects.create(username="moderator")
         self.system.add_roles(self.user_moderator, ROLE_LIST_MODERATOR)
         self.user_speaker = User.objects.create(username="in")

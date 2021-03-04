@@ -1,4 +1,3 @@
-from rest_framework.decorators import action
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.base import ReadonlyModelViewSet
 from voteit.meeting.models import Meeting

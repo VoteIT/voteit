@@ -1,13 +1,16 @@
 from django.contrib import admin
 from fsm_admin.mixins import FSMTransitionMixin
 
-from .models import *
+from voteit.speaker.models import SpeakerList
+from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.models import SpeakerSystemRoles
 
 
 @admin.register(SpeakerListSystem)
-class SLSystemAdmin(admin.ModelAdmin):
-    list_display = ("title", "meeting", "method_name")
-    list_filter = ("meeting", "method_name")
+class SLSystemAdmin(FSMTransitionMixin, admin.ModelAdmin):
+    fsm_field = "state"
+    list_display = ("title", "meeting", "method_name", "state")
+    list_filter = ("meeting", "method_name", "state")
     autocomplete_fields = ("meeting",)
     search_fields = (
         "title",

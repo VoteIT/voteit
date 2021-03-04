@@ -272,6 +272,13 @@ class SpeakerListSystemViewTestCase(APITestCase):
         data = response.json()
         self.assertEqual({"max_times": 3}, data["settings"])
 
+    def test_transition_list_moderator(self):
+        url = f"/api/speaker-list-systems/{self.system.pk}/transitions/"
+        self.client.force_login(self.list_moderator)
+        data = {"transition": "activate"}
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 201)
+
 
 class HistoricSpeakerViewTests(APITestCase):
     def setUp(self):

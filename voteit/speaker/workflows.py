@@ -13,3 +13,19 @@ class SpeakerListWf:
     @classmethod
     def choices(cls):
         return cls.states.items()
+
+
+class SpeakerSystemWf:
+    INACTIVE = "inactive"
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+    states = {
+        INACTIVE: _("inactive"),
+        ACTIVE: _("Active"),
+        ARCHIVED: _("Archived"),
+    }
+    initial = INACTIVE
+
+    @classmethod
+    def choices(cls):
+        return cls.states.items()

@@ -195,13 +195,8 @@ class SpeakerListSystemsTests(TestCase):
         from voteit.speaker.models import SpeakerListSystem
 
         self.system = SpeakerListSystem.objects.create(
-            method_name="simple", active=True
+            method_name="simple", state="active"
         )
-        # self.speaker_list = self.system.speaker_lists.create()
-        # self.user_one = User.objects.create(username="one")
-        # self.user_two = User.objects.create(username="two")
-        # self.speaker_one = self.speaker_list.speaker_items.create(user=self.user_one)
-        # self.speaker_two = self.speaker_list.speaker_items.create(user=self.user_two)
 
     def test_set_settings_from_schema_directly(self):
         from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema
@@ -226,8 +221,7 @@ class SpeakerListSystemsTests(TestCase):
         self.system.save()
         self.system.archive()
         self.assertIsNone(self.system.active_list)
-        self.assertFalse(self.system.active)
-        self.assertTrue(self.system.archived)
+        self.assertTrue(self.system.is_archived)
         self.assertEqual([], one_list.current_order())  # two was deleted
         speaker_one.refresh_from_db()
         self.assertEqual(1, speaker_one.seconds)

@@ -300,7 +300,7 @@ class SpeakerListDeleted(BaseObjectDeleted):
 
 class SpeakerSystemSchema(BaseModel):
     pk: int
-    active: bool
+    state: str
     title: Optional[str]
     meeting: Optional[int]
     method_name: str

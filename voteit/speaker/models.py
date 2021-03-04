@@ -28,21 +28,13 @@ from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.meeting.models import Meeting
 from voteit.speaker.permissions import SpeakerListPermissions
+from voteit.speaker.permissions import SpeakerSystemPermissions
 from voteit.speaker.utils import get_list_method_registry
 from voteit.speaker.workflows import SpeakerListWf
+from voteit.speaker.workflows import SpeakerSystemWf
 
 if TYPE_CHECKING:
     from voteit.speaker.abcs import ListMethod
-
-# FIXME:
-# Då gör jag ett system som heter "talarprioritering" som har möjligheten
-# att begränsa antalet gånger en talare ska prioriteras.
-# Voila så har vi "antal talarlistor" på ett begripligt sätt.
-# Som standard så finns ingen sådan begränsning då
-# och ett system som bara sätter upp talaren utan att göra något
-
-# FIXME: SpeakerListSystems (SLS) should be able to relate to another SLS, causing all settings
-# to be shared between them.
 
 
 __all__ = "SpeakerSystemRoles", "SpeakerListSystem", "Speaker", "SpeakerList"
@@ -64,16 +56,10 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     """
 
     name = "speaker_system"
-
-    active: bool = models.BooleanField(
-        verbose_name=_(
-            "Is the system activated? If not it won't be visible to anyone."
-        ),
-        default=False,
-    )
-    archived: bool = models.BooleanField(
-        verbose_name=_("Is the system archived?"),
-        default=False,
+    state: str = FSMField(
+        default=SpeakerSystemWf.initial,
+        choices=SpeakerSystemWf.choices(),
+        editable=False,
     )
     title = models.CharField(max_length=200, null=True)
     meeting: Optional[Meeting] = models.ForeignKey(
@@ -143,14 +129,35 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
             raise ValueError(f"{value} is not a settings schema or a dict")
         self.settings_data = data.dict()
 
+    @transition(
+        field=state,
+        target=SpeakerSystemWf.ARCHIVED,
+        permission=SpeakerSystemPermissions.CHANGE,
+        # FIXME: This shouldn't be a manual action
+    )
+    def activate(self):
+        """
+        Set system as active
+        """
+
+    def inactivate(self):
+        """
+        Make system disabled and hidden for users. This is not a permission though,
+        so users can still view the information if they dig around in the frontends source.
+        """
+
+    @transition(
+        field=state,
+        target=SpeakerSystemWf.ARCHIVED,
+        permission=SpeakerSystemPermissions.CHANGE,
+        # FIXME: This shouldn't be a manual action
+    )
     def archive(self):
         self.active_list = None
         for slist in self.speaker_lists.all():
             slist.stop_speaker()
             for speaker in slist.speakers_qs():
                 speaker.delete()
-        self.active = False
-        self.archived = True
         self.save()
 
     def save(self, **kw):
@@ -158,8 +165,17 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         self.settings
         super(SpeakerListSystem, self).save(**kw)
 
+    @property
+    def is_archived(self):
+        return self.state == SpeakerSystemWf.ARCHIVED
+
+    @property
+    def is_active(self):
+        return self.state == SpeakerSystemWf.ACTIVE
+
     # Type hinting
-    objects = models.Manager()
+    objects: models.Manager
+    speaker_lists: models.QuerySet
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.pk}>"

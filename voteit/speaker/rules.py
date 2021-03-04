@@ -61,9 +61,9 @@ def is_system_active(
     user: AbstractUser, instance: Union[SpeakerListSystem, SpeakerList]
 ) -> bool:
     if isinstance(instance, SpeakerListSystem):
-        return instance.active
+        return instance.is_active
     elif isinstance(instance, SpeakerList):
-        return instance.list_system.active
+        return instance.list_system.is_active
     return False
 
 
@@ -72,9 +72,9 @@ def is_system_not_archived(
     user: AbstractUser, instance: Union[SpeakerListSystem, SpeakerList]
 ) -> bool:
     if isinstance(instance, SpeakerListSystem):
-        return not instance.archived
+        return not instance.is_archived
     elif isinstance(instance, SpeakerList):
-        return not instance.list_system.archived
+        return not instance.list_system.is_archived
     return False
 
 
