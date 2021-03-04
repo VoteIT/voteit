@@ -131,15 +131,19 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
 
     @transition(
         field=state,
-        target=SpeakerSystemWf.ARCHIVED,
+        target=SpeakerSystemWf.ACTIVE,
         permission=SpeakerSystemPermissions.CHANGE,
-        # FIXME: This shouldn't be a manual action
     )
     def activate(self):
         """
         Set system as active
         """
 
+    @transition(
+        field=state,
+        target=SpeakerSystemWf.INACTIVE,
+        permission=SpeakerSystemPermissions.CHANGE,
+    )
     def inactivate(self):
         """
         Make system disabled and hidden for users. This is not a permission though,
