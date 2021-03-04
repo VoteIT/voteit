@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from typing import Type
 
-from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
@@ -12,8 +11,10 @@ from django.dispatch import receiver
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
+from voteit.core.messages import RolesAdded
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
+from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
@@ -38,6 +39,7 @@ from voteit.speaker.rest_api.serializers import SpeakerListSerializer
 from voteit.speaker.rest_api.serializers import SpeakerListSystemSerializer
 
 if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractUser
     from voteit.messaging.abcs import BaseOutgoingMessage
 
 list_updated = Signal(providing_args=["sender", "instance"])
@@ -182,12 +184,25 @@ def meeting_channel_subscribed(
     - Active list from each system
     - Order of any active list
     - Any ongoing speaker
+    - User roles within speaker systems
     """
     systems_qs = context.speaker_systems.all()
     app_state.append_from_queryset(
         systems_qs, SpeakerListSystemSerializer, SpeakerSystemAdded
     )
     for system in systems_qs:
+        # Roles
+        roles = system.get_roles(user)
+        if roles:
+            msg = RolesAdded(
+                mm=dict(),
+                roles=system.roles_to_strings(*roles),
+                pk=system.pk,
+                model=get_model_shortname(system),
+                user_pk=user.pk,
+            )
+            app_state.append(msg)
+        # Active list info
         if system.active_list:
             app_state.append_from(
                 system.active_list, SpeakerListSerializer, SpeakerListAdded

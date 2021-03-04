@@ -318,6 +318,17 @@ class ChannelSubscribedTests(TestCase):
             appstates["speaker_list.order"]["queue"],
         )
 
+        added_system_roles = [
+            x
+            for x in response.data.app_state
+            if x.t == "roles.added" and x.p["pk"] == self.system.pk
+        ]
+        self.assertEqual(1, len(added_system_roles))
+        payload = added_system_roles[0].p
+        self.assertEqual(set(payload["roles"]), {"list_moderator"})
+        self.assertEqual(payload["user_pk"], self.moderator.pk)
+        self.assertEqual(payload["model"], "speaker_system")
+
     def test_subscribe_ai(self):
         msg = self._mk_one(self.ai.pk, "agenda_item")
         response = msg.run_job()
