@@ -3,20 +3,19 @@ from __future__ import annotations
 import re
 from typing import Optional
 from typing import Set
-from typing import TYPE_CHECKING
+from typing import Type
+from typing import Union
 
 from bleach import ALLOWED_ATTRIBUTES
 from bleach import ALLOWED_TAGS
 from bleach import Cleaner
 from bs4 import BeautifulSoup
-from typing import Type
+from django.db.models import Model
+
 
 _tag_pattern = re.compile(r"#([\w\-]+)")
 # FIXME: Do a proper regex. I'm crappy with this /rho
 _userid_pattern = re.compile(r"@([\w\d]+)")
-
-if TYPE_CHECKING:
-    from django.db.models import Model
 
 
 def get_tags(text: str, lower=True) -> Set[str]:
@@ -206,3 +205,29 @@ def get_model_by_shortname(name, default=None) -> Optional[Type[Model]]:
     name = name.lower()
     reg = get_content_registry()
     return reg.get(name, default)
+
+
+def get_model_shortname(model: Union[Type[Model], Model]) -> str:
+    """
+    Fetch model shortname from class or instance
+    >>> from voteit.meeting.models import Meeting
+    >>> get_model_shortname(Meeting)
+    'meeting'
+    >>> get_model_shortname(Meeting())
+    'meeting'
+
+    Should also work with types that lack name attr or has it set to something else
+    >>> from django.contrib.auth.models import Permission
+    >>> get_model_shortname(Permission)
+    'permission'
+    """
+    if isinstance(model, Model):
+        model = model.__class__
+    elif issubclass(model, Model):
+        pass
+    else:
+        raise ValueError(f"{model} is not an instance or classed based on Django Model")
+    name = getattr(model, "name", None)
+    if isinstance(name, str):
+        return name
+    return model.__name__.lower()

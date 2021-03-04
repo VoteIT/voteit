@@ -11,10 +11,11 @@ class RolesChangeSchema(BaseModel):
 
     model is the class name an pk the primary key of the context where the change happened.
     """
+
     user_pk: int
     roles: List[str]
     pk: int  # context where the change happened, use together with model
-    model: str  # The class name
+    model: str  # The model shortname
 
 
 @outgoing

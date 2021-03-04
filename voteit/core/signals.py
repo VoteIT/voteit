@@ -11,6 +11,7 @@ from django.dispatch import receiver
 from voteit.core.abcs import MeetingContext
 from voteit.core.messages import RolesAdded
 from voteit.core.messages import RolesRemoved
+from voteit.core.utils import get_model_shortname
 
 if TYPE_CHECKING:
     from voteit.core.models import Roles
@@ -41,10 +42,10 @@ def _publish(instance, msg):
 @receiver(roles_added)
 def push_roles_added(instance: Roles, roles: List[Role], **kwargs):
     msg = RolesAdded(
-        dict(),
+        mm=dict(),
         roles=instance.context.roles_to_strings(*roles),
         pk=instance.context.pk,
-        model=instance.context.__class__.__name__,
+        model=get_model_shortname(instance.context),
         user_pk=instance.user.pk,
     )
     _publish(instance, msg)
@@ -53,10 +54,10 @@ def push_roles_added(instance: Roles, roles: List[Role], **kwargs):
 @receiver(roles_removed)
 def push_roles_removed(instance: Roles, roles: List[Role], **kwargs):
     msg = RolesRemoved(
-        dict(),
+        mm=dict(),
         roles=instance.context.roles_to_strings(*roles),
         pk=instance.context.pk,
-        model=instance.context.__class__.__name__,
+        model=get_model_shortname(instance.context),
         user_pk=instance.user.pk,
     )
     _publish(instance, msg)
