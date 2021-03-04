@@ -36,7 +36,7 @@ class SpeakerListsViewTestCase(APITestCase):
         url = reverse("speaker-lists-list")
         data = {
             "title": "A think to talk about",
-            "list_system": self.system.pk,
+            "speaker_system": self.system.pk,
             "agenda_item": self.ai.pk,
         }
         for user, status in (
@@ -58,7 +58,7 @@ class SpeakerListsViewTestCase(APITestCase):
         url = reverse("speaker-lists-list")
         data = {
             "title": "A think to talk about",
-            "list_system": -1,
+            "speaker_system": -1,
             "agenda_item": self.ai.pk,
         }
         self.client.force_login(self.list_moderator)
@@ -70,7 +70,7 @@ class SpeakerListsViewTestCase(APITestCase):
         url = reverse("speaker-lists-list")
         data = {
             "title": "A think to talk about",
-            "list_system": self.system.pk,
+            "speaker_system": self.system.pk,
             "agenda_item": -1,
         }
         self.client.force_login(self.list_moderator)
@@ -82,7 +82,7 @@ class SpeakerListsViewTestCase(APITestCase):
     def test_get(self):
         url = reverse("speaker-lists-list")
         data = {
-            "list_system": self.system.pk,
+            "speaker_system": self.system.pk,
         }
         self.client.force_login(self.list_moderator)
         response = self.client.get(url, data)
@@ -126,7 +126,7 @@ class SpeakerListsViewTestCase(APITestCase):
         url = f"/api/speaker-lists/{slist.pk}/"
         data = {
             "title": "Sup?",
-            "list_system": self.system.pk,
+            "speaker_system": self.system.pk,
             "meeting": self.meeting.pk,
             "agenda_item": self.ai.pk,
         }

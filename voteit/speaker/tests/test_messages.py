@@ -15,7 +15,7 @@ class SpeakerListEnterTests(TestCase):
         self.system = SpeakerListSystem.objects.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(list_system=self.system)
+        self.list = SpeakerList.objects.create(speaker_system=self.system)
         self.user = User.objects.create(username="jane")
         self.system.add_roles(self.user, "speaker")
 
@@ -57,7 +57,7 @@ class SpeakerListLeaveTests(TestCase):
         from voteit.speaker.models import SpeakerList
 
         self.system = SpeakerListSystem.objects.create(method_name="simple")
-        self.list = SpeakerList.objects.create(list_system=self.system)
+        self.list = SpeakerList.objects.create(speaker_system=self.system)
         self.user = User.objects.create(username="jane")
         self.system.add_roles(self.user, "speaker")
         self.speaker = self.list.speaker_items.create(user=self.user)
@@ -105,7 +105,7 @@ class SpeakerListSetActiveTests(TestCase):
         self.system = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(list_system=self.system)
+        self.list = SpeakerList.objects.create(speaker_system=self.system)
         self.user = User.objects.create(username="jane")
         self.system.add_roles(self.user, "list_moderator")
 
@@ -154,7 +154,7 @@ class StartSpeakerInListTests(TestCase):
         self.system = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(list_system=self.system)
+        self.list = SpeakerList.objects.create(speaker_system=self.system)
         self.system.active_list = self.list
         self.system.save()
         self.user = User.objects.create(username="jane")
@@ -216,7 +216,7 @@ class StopSpeakerInListTests(TestCase):
         self.system = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(list_system=self.system)
+        self.list = SpeakerList.objects.create(speaker_system=self.system)
         self.system.active_list = self.list
         self.system.save()
         self.user = User.objects.create(username="jane")
@@ -266,7 +266,7 @@ class ModeratorSpeakerListEnterTests(TestCase):
         self.system = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(list_system=self.system)
+        self.list = SpeakerList.objects.create(speaker_system=self.system)
         self.user = User.objects.create(username="jane")
         self.moderator = User.objects.create(username="moderator")
         self.system.add_roles(self.user, "speaker")
@@ -319,7 +319,7 @@ class ModeratorSpeakerListLeaveTests(TestCase):
         self.system = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(list_system=self.system)
+        self.list = SpeakerList.objects.create(speaker_system=self.system)
         self.user = User.objects.create(username="jane")
         self.system.add_roles(self.user, "speaker")
         self.speaker = self.list.speaker_items.create(user=self.user)

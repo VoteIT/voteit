@@ -16,8 +16,8 @@ logger = getLogger(__name__)
 
 
 class ListMethod(ABC):
-    def __init__(self, list_system: SpeakerListSystem):
-        self.list_system = list_system
+    def __init__(self, speaker_system: SpeakerListSystem):
+        self.speaker_system = speaker_system
 
     @property
     @abstractmethod
@@ -36,17 +36,17 @@ class ListMethod(ABC):
 
     @property
     def settings_schema(self) -> Optional[BaseModel]:
-        """ Possible settings schema for this speaker list method.
-            Will be enforced if it exists
+        """Possible settings schema for this speaker list method.
+        Will be enforced if it exists
         """
         return None
 
     def reorder(self, speaker_list: SpeakerList) -> List[int]:
-        """ Override this method to implement actual quotas or similar.
-            The default one simply orders users according to the order they entered the list.
+        """Override this method to implement actual quotas or similar.
+        The default one simply orders users according to the order they entered the list.
 
-            This method returns the primary keys of the speakers according to the new order.
-            Make sure to include the safe speakers!
+        This method returns the primary keys of the speakers according to the new order.
+        Make sure to include the safe speakers!
         """
         new_order = [x.pk for x in speaker_list.safe_speakers_qs().all()]
         result = speaker_list.speaker_items.filter(

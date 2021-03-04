@@ -6,8 +6,9 @@ class PriorityTests(TestCase):
     def setUp(self):
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
+
         self.system = SpeakerListSystem.objects.create(method_name="priority")
-        self.speaker_list = SpeakerList.objects.create(list_system=self.system)
+        self.speaker_list = SpeakerList.objects.create(speaker_system=self.system)
         self.user_one = User.objects.create(username="one")
         self.user_two = User.objects.create(username="two")
         self.user_three = User.objects.create(username="three")

@@ -261,7 +261,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
         blank=True,
         on_delete=models.CASCADE,
     )
-    list_system: SpeakerListSystem = models.ForeignKey(
+    speaker_system: SpeakerListSystem = models.ForeignKey(
         SpeakerListSystem, on_delete=models.CASCADE, related_name="speaker_lists"
     )
     agenda_item: Optional[AgendaItem] = models.ForeignKey(
@@ -274,12 +274,12 @@ class SpeakerList(AgendaItemContext, MeetingContext):
     @property
     def meeting(self) -> Optional[Meeting]:
         """ While not directly related, it still good to be able to do lookups this way"""
-        if self.list_system:
-            return self.list_system.meeting
+        if self.speaker_system:
+            return self.speaker_system.meeting
 
     @property
     def method(self) -> ListMethod:
-        return self.list_system.method
+        return self.speaker_system.method
 
     @property
     def is_active_list(self) -> bool:
@@ -316,7 +316,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
             safe_updated = False
             # Check if a speaker should be moved to a safe position - only if the list is active.
             if self.is_active_list:
-                system = self.list_system
+                system = self.speaker_system
                 safe_pos = system.safe_positions
                 if (
                     safe_pos
@@ -394,7 +394,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
         if (
             self.agenda_item
             and self.agenda_item.meeting
-            and self.list_system.meeting != self.agenda_item.meeting
+            and self.speaker_system.meeting != self.agenda_item.meeting
         ):
             raise IntegrityError(
                 "agenda item and list system attached to different meetings"

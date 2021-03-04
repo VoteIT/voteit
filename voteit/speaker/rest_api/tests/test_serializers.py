@@ -29,7 +29,7 @@ class SpeakerListSerializerTests(TestCase):
             {
                 "pk": self.slist.pk,
                 "title": "",
-                "list_system": self.system.pk,
+                "speaker_system": self.system.pk,
                 "agenda_item": self.ai.pk,
                 "state": "open",
             },

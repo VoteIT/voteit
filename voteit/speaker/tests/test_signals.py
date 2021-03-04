@@ -29,7 +29,7 @@ class SignalListOrderChangeTests(TestCase):
             method_name="simple", meeting=self.meeting
         )
         self.speaker_list = SpeakerList.objects.create(
-            list_system=self.system, agenda_item=self.ai
+            speaker_system=self.system, agenda_item=self.ai
         )
         self.user_one = User.objects.create(username="one")
         self.user_two = User.objects.create(username="two")
@@ -95,7 +95,7 @@ class SignalStartedStoppedTests(TestCase):
             method_name="simple", meeting=self.meeting
         )
         self.speaker_list: SpeakerList = SpeakerList.objects.create(
-            list_system=self.system, title="Hello"  # agenda_item=self.ai
+            speaker_system=self.system, title="Hello"  # agenda_item=self.ai
         )
         self.system.active_list = self.speaker_list
         self.system.save()
@@ -154,7 +154,7 @@ class SignalListChangesTests(TestCase):
             method_name="simple", meeting=self.meeting
         )
         self.speaker_list = SpeakerList.objects.create(
-            list_system=self.system, agenda_item=self.ai, title="Hello"
+            speaker_system=self.system, agenda_item=self.ai, title="Hello"
         )
 
     @patch.object(AgendaItemChannel, "publish")
@@ -167,7 +167,7 @@ class SignalListChangesTests(TestCase):
         self.assertIsInstance(msg, SpeakerListAdded)
         data = msg.data
         self.assertEqual("open", data.state)
-        self.assertEqual(self.system.pk, data.list_system)
+        self.assertEqual(self.system.pk, data.speaker_system)
         self.assertEqual(speaker_list.pk, data.pk)
         self.assertEqual(self.ai.pk, data.agenda_item)
 
@@ -184,7 +184,7 @@ class SignalListChangesTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         data = msg.data
         self.assertIsInstance(msg, SpeakerListChanged)
-        self.assertEqual(self.system.pk, data.list_system)
+        self.assertEqual(self.system.pk, data.speaker_system)
         self.assertEqual(self.ai.pk, data.agenda_item)
         self.assertEqual(self.speaker_list.title, data.title)
 

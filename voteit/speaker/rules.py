@@ -25,7 +25,7 @@ def is_speaker_moderator(
     if isinstance(obj, SpeakerListSystem):
         return obj.has_roles(user, ROLE_LIST_MODERATOR)
     elif isinstance(obj, SpeakerList):
-        return obj.list_system.has_roles(user, ROLE_LIST_MODERATOR)
+        return obj.speaker_system.has_roles(user, ROLE_LIST_MODERATOR)
     else:  # pragma: no cover
         return False
 
@@ -38,7 +38,7 @@ def has_speaker_role(
     if isinstance(obj, SpeakerListSystem):
         return obj.has_roles(user, ROLE_SPEAKER)
     elif isinstance(obj, SpeakerList):
-        return obj.list_system.has_roles(user, ROLE_SPEAKER)
+        return obj.speaker_system.has_roles(user, ROLE_SPEAKER)
     else:  # pragma: no cover
         return False
 
@@ -63,7 +63,7 @@ def is_system_active(
     if isinstance(instance, SpeakerListSystem):
         return instance.is_active
     elif isinstance(instance, SpeakerList):
-        return instance.list_system.is_active
+        return instance.speaker_system.is_active
     return False
 
 
@@ -74,7 +74,7 @@ def is_system_not_archived(
     if isinstance(instance, SpeakerListSystem):
         return not instance.is_archived
     elif isinstance(instance, SpeakerList):
-        return not instance.list_system.is_archived
+        return not instance.speaker_system.is_archived
     return False
 
 

@@ -18,7 +18,7 @@ class SpeakerListSerializer(serializers.ModelSerializer):
         fields = [
             "pk",
             "title",
-            "list_system",
+            "speaker_system",
             "agenda_item",
         ] + read_only_fields
         extra_kwargs = {

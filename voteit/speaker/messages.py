@@ -97,7 +97,7 @@ class SetActiveList(ListMessage):
 
     def run_job(self):
         self.assert_perm()
-        system = self.context.list_system
+        system = self.context.speaker_system
         if not self.context.is_active_list:
             if system.active_list and system.active_list.current is not None:
                 raise ValidationErrorMsg.from_message(
@@ -275,7 +275,7 @@ class SpeakerListSchema(BaseModel):
     title: Optional[str]
     pk: int
     state: str
-    list_system: int  # pk
+    speaker_system: int  # pk
     agenda_item: Optional[int]  # pk
 
 

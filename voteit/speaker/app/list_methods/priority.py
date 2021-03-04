@@ -31,7 +31,7 @@ class Priority(ListMethod):
 
     def get_cmp_val(self, speaker_list: SpeakerList, user: AbstractUser) -> int:
         count = self.get_spoken_count(speaker_list, user)
-        max_times = self.list_system.settings.max_times
+        max_times = self.speaker_system.settings.max_times
         if max_times and count > max_times:
             return max_times
         return count

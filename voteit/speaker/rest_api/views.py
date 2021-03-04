@@ -12,7 +12,7 @@ class SpeakerListViewSet(DefaultModelViewSet):
     queryset = SpeakerList.objects.all()
     serializer_class = serializers.SpeakerListSerializer
     serializer_classes = {"historic": serializers.HistoricSpeakerListSerializer}
-    context_lookup_kwarg: str = "list_system"
+    context_lookup_kwarg: str = "speaker_system"
     context_lookup_field: str = "pk"
     context_queryset = SpeakerListSystem.objects.all()
 

@@ -228,8 +228,9 @@ def close_and_cleanup(meeting, **kw):
 
 
 @receiver(roles_added, sender=SpeakerSystemRoles)
-def make_list_system_users_participants(instance: SpeakerSystemRoles, **kw):
-    """Whatever role we're adding to speaker system,
+def make_speaker_system_users_participants(instance: SpeakerSystemRoles, **kw):
+    """
+    Whatever role we're adding to speaker system,
     make that user is a participant in the related meeting.
     """
     if instance.meeting is not None:
@@ -237,8 +238,9 @@ def make_list_system_users_participants(instance: SpeakerSystemRoles, **kw):
 
 
 @receiver(roles_removed, sender=MeetingRoles)
-def make_list_system_users_participants(instance: MeetingRoles, roles, **kw):
-    """If someone is removed as a participant from the meeting,
+def make_speaker_system_users_participants(instance: MeetingRoles, roles, **kw):
+    """
+    If someone is removed as a participant from the meeting,
     remove their speaker system roles too.
     """
     if ROLE_PARTICIPANT in roles:
