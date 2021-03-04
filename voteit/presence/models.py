@@ -5,6 +5,7 @@ from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
+from django.db import IntegrityError
 from django.db import models
 from django.utils.timezone import now
 from django_fsm import FSMField
@@ -47,7 +48,8 @@ class Presence(MeetingContext):
     def __str__(self):
         return f"Presence ({self.pk})"
 
-    objects = models.Manager()  # Type hinting
+    # Type hinting
+    objects: models.Manager
 
 
 class PresenceCheck(MeetingContext):
@@ -97,16 +99,26 @@ class PresenceCheck(MeetingContext):
     def __str__(self):
         return f"Presence check ({self.pk})"
 
-    class Manager(models.Manager):
-        """ Methods to get filtered QuerySets or currently open presence check. """
+    def save(self, **kw):
+        if self.state == PresenceCheckWf.OPEN:
+            qs = self.presence_system.presence_checks.filter(state=PresenceCheckWf.OPEN)
+            if self.pk is None and qs.exists() or qs.exclude(pk=self.pk).exists():
+                raise IntegrityError("There's already an ongoing presence check here")
+        super().save(**kw)
 
-        def open(self) -> models.QuerySet:
-            return self.get_queryset().filter(state=PresenceCheckWf.OPEN)
+    # FIXME: This manager makes no sense since we'll never
+    #  filter out open presence checks without filtering system.
+    # class Manager(models.Manager):
+    #     """ Methods to get filtered QuerySets or currently open presence check. """
+    #
+    #     def open(self) -> models.QuerySet:
+    #         return self.get_queryset().filter(state=PresenceCheckWf.OPEN)
+    #
+    #     def latest_open(self) -> PresenceCheck:
+    #         return self.open().latest("opened")
 
-        def latest_open(self) -> PresenceCheck:
-            return self.open().latest("opened")
-
-    objects = Manager()
+    # objects = Manager()
+    objects: models.Manager
 
 
 class PresenceSystem(MeetingContext):
@@ -123,10 +135,12 @@ class PresenceSystem(MeetingContext):
     name = "presence_system"
 
     meeting: Optional[Meeting] = models.OneToOneField(
-        Meeting, on_delete=models.CASCADE, null=True
+        Meeting, on_delete=models.CASCADE, null=True, related_name="presence_system"
     )
 
     def __str__(self):
         return f"Presence system ({self.pk})"
 
-    objects = models.Manager()  # Type hinting
+    # Type hinting
+    objects: models.Manager
+    presence_checks: models.QuerySet

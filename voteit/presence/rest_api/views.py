@@ -1,35 +1,28 @@
-# from django_filters.rest_framework import DjangoFilterBackend
-# from rest_framework import viewsets, permissions
-# from voteit.agenda.models import AgendaItem
-# from voteit.core.rest_api.mixins import SerializerClassesMixin, CreateModelPermissionsMixin, TransitionsMixin
-# from voteit.poll.models import Poll
-#
-# from . import serializers
-#
-#
-# __all__ = ['PollViewSet']
-#
-#
-# class PollViewSet(
-#     TransitionsMixin,
-#     SerializerClassesMixin,
-#     CreateModelPermissionsMixin,
-#     viewsets.ModelViewSet
-# ):
-#     model = Poll
-#     queryset = Poll.objects.all()
-#     serializer_class = serializers.PollDetailSerializer
-#     serializer_classes = {
-#         'list': serializers.PollListSerializer,
-#         'create': serializers.PollCreateSerializer,
-#     }
-#     filter_backends = DjangoFilterBackend,
-#     filterset_fields = 'agenda_item', 'agenda_item__meeting',
-#     context_queryset = AgendaItem.objects.all()
-#     context_lookup_kwarg = 'agenda_item'
-#
-#     def get_queryset(self):
-#         if self.request.user.is_superuser:
-#             return self.queryset
-#         # TODO: Filter out private ai:s
-#         return self.queryset.filter(agenda_item__meeting__participants=self.request.user)
+from voteit.core.rest_api.base import DefaultModelViewSet, ReadonlyModelViewSet
+from voteit.meeting.models import Meeting
+from voteit.presence.models import PresenceSystem, PresenceCheck
+
+from . import serializers
+
+
+class PresenceSystemViewSet(DefaultModelViewSet):
+    serializer_class = serializers.PresenceSystemDetailSerializer
+    serializer_classes = {
+        "create": serializers.PresenceSystemCreateSerializer,
+    }
+    context_queryset = Meeting.objects.all()
+    context_lookup_kwarg = "meeting"
+    model = PresenceSystem
+    queryset = PresenceSystem.objects.all()
+    # FIXME: Queryset that actually works for list rather than default?
+
+
+class PresenceCheckViewSet(DefaultModelViewSet):
+    serializer_class = serializers.PresenceCheckDetailSerializer
+    serializer_classes = {
+        "create": serializers.PresenceCheckCreateSerializer,
+    }
+    context_queryset = PresenceSystem.objects.all()
+    context_lookup_kwarg = "presence_system"
+    model = PresenceCheck
+    queryset = PresenceCheck.objects.all()

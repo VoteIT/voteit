@@ -1,30 +1,63 @@
 from rest_framework import serializers
+
+from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
 from voteit.presence import models
 
 
 class PresenceDetailSerializer(serializers.ModelSerializer):
+    serializer_url_field = OptionalHyperlinkedIdentityField
 
-    # Note: This won't have access to the request object, so no url things here!
     class Meta:
         model = models.Presence
-        fields = "pk", "user", "presence_check", "created"
-        read_only_fields = "created",
+        read_only_fields = [
+            "created",
+            "pk",
+            "presence_check",
+            "pk",
+            "user",
+            "url",
+        ]
+        fields = list(read_only_fields)
 
 
 class PresenceCheckDetailSerializer(serializers.ModelSerializer):
-    meeting = serializers.PrimaryKeyRelatedField(source="presence_system.meeting", read_only=True)
+    meeting = serializers.PrimaryKeyRelatedField(
+        source="presence_system.meeting", read_only=True
+    )
+    # serializer_url_field = OptionalHyperlinkedIdentityField
 
-    # Note: This won't have access to the request object, so no url things here!
     class Meta:
         model = models.PresenceCheck
-        fields = "pk", "state", "presence_system", "meeting"
-        read_only_fields = "state",
+        read_only_fields = [
+            "state",
+            "meeting",
+            "pk",
+            "presence_system",
+            # "url",
+        ]
+        fields = list(read_only_fields)
+
+
+class PresenceCheckCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.PresenceCheck
+        fields = ("presence_system",)
 
 
 class PresenceSystemDetailSerializer(serializers.ModelSerializer):
+    # serializer_url_field = OptionalHyperlinkedIdentityField
+    # FIXME: "url" doesn't work here...?
 
-    # Note: This won't have access to the request object, so no url things here!
     class Meta:
         model = models.PresenceSystem
-        fields = "pk", "meeting"
-        #read_only_fields = "state",
+        read_only_fields = ["meeting", "pk"]
+        fields = read_only_fields
+
+
+class PresenceSystemCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.PresenceSystem
+        fields = ("meeting",)
+        extra_kwargs = {
+            "meeting": {"required": True},
+        }
