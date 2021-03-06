@@ -386,7 +386,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
         """Stop current speaker and set spoken time"""
         if speaker := self.current:
             end_td = now() - speaker.started
-            speaker.seconds = end_td.seconds or 1
+            speaker.seconds = min(end_td.seconds or 1, 32767)  # Max value of PosSmallIntField ~ 9 hours
             speaker.save()
             self.current = None
             self.save()
