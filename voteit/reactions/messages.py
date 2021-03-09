@@ -10,6 +10,7 @@ from voteit.core.validators import validate_model_shortname
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
+from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.messages.base import BaseAddObject
 from voteit.messaging.messages.base import BaseDeleteObject
 from voteit.messaging.messages.base import BaseObjectAdded
@@ -99,11 +100,21 @@ class AddReaction(BaseAddObject):
     relation_queryset_attribute = "reactions"
     schema = AddReactionSchema
     data: AddReactionSchema
+    context: ReactionButton
 
     def run_job(self) -> TextResponse:
         self.assert_perm()
+        model_shortname = self.data.content_type
+        if model_shortname not in self.context.allowed_models:
+            raise ValidationErrorMsg.from_message(
+                self,
+                msg=_("This type of reaction can't be added to this content type"),
+                errors=[
+                    {"loc": ("content_type",), "msg": "Invalid", "type": "value.error"}
+                ],
+            )
         # Already validated
-        model = get_model_by_shortname(self.data.content_type)
+        model = get_model_by_shortname(model_shortname)
         ct = ContentType.objects.get_for_model(model)
         reactable = model.objects.get(pk=self.data.object_id)
         ai = getattr(reactable, "agenda_item", None)

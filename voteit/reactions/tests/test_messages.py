@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from voteit.core.utils import get_model_shortname
 from voteit.messaging.errors import UnauthorizedError
+from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.messages.text import TextResponse
 
 User = get_user_model()
@@ -16,12 +17,13 @@ _channel_layers_setting = {
 class AddReactionTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
+        from voteit.reactions.models import ReactionButton
 
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create()
         self.prop = self.ai.proposals.create()
         self.disc = self.ai.discussions.create()
-        self.button = self.meeting.reaction_buttons.create(
+        self.button: ReactionButton = self.meeting.reaction_buttons.create(
             change_roles=["potential_voter"]
         )
         self.voter = User.objects.create(username="voter")
@@ -57,6 +59,12 @@ class AddReactionTests(TestCase):
         response = msg.run_job()
         self.assertIsInstance(response, TextResponse)
         self.assertTrue(self.disc.reaction_set.count())
+
+    def test_add_wrong_type(self):
+        self.button.allowed_models = ["discussion_post"]
+        self.button.save()
+        msg = self._mk_one(self.prop)
+        self.assertRaises(ValidationErrorMsg, msg.run_job)
 
     def test_add_on_prop_wrong_perm(self):
         msg = self._mk_one(self.disc)

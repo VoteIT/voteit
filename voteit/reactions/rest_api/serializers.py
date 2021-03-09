@@ -1,6 +1,8 @@
 from rest_framework import serializers
+
 from voteit.core.utils import get_model_shortname
-from voteit.reactions.models import ReactionButton, Reaction
+from voteit.reactions.models import Reaction
+from voteit.reactions.models import ReactionButton
 
 
 class ButtonDetailSerializer(serializers.ModelSerializer):
