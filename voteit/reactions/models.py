@@ -41,7 +41,7 @@ class ReactionButton(MeetingContext):
         ("info", _("Info")),
     )
 
-    title: str = models.CharField(_("Name"), max_length=80)
+    title: str = models.CharField(_("Display name"), max_length=80)
     icon: str = models.CharField(_("Icon name"), max_length=80, choices=ICON_CHOICES)
     color: str = models.CharField(_("Color"), max_length=80, choices=COLOR_CHOICES)
     meeting: Meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE)
@@ -79,6 +79,12 @@ class ReactionButton(MeetingContext):
             )
 
     objects = Manager()
+
+    def __str__(self):
+        return self.title
+
+    def __repr__(self):
+        return f"ReactionButton: {self.title}"
 
 
 class Reaction(AgendaItemContext):
@@ -119,3 +125,9 @@ class Reaction(AgendaItemContext):
     #         )
 
     # objects = Manager()
+
+    def __str__(self):
+        return f"{self.button.title} from {self.user}"
+
+    def __repr__(self):
+        return f"{self.button.title} from {self.user}"
