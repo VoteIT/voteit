@@ -1,29 +1,29 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count
-from django.db.models.signals import post_save, pre_delete
+from django.db.models.signals import post_save
+from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
 from voteit.agenda.channels import AgendaItemChannel
+from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.signals import archive_meeting
 from voteit.messaging.channels.user import UserChannel
 from voteit.messaging.signals import channel_subscribed
-from voteit.reactions.messages import (
-    ButtonAdded,
-    ButtonChanged,
-    ButtonDeleted,
-    ReactionCount,
-    UserReactionAdded,
-    UserReactionDeleted,
-)
-from voteit.reactions.models import ReactionButton, Reaction
-from voteit.reactions.rest_api.serializers import (
-    ButtonDetailSerializer,
-    ReactionSerializer,
-)
+from voteit.reactions.messages import ButtonAdded
+from voteit.reactions.messages import ButtonChanged
+from voteit.reactions.messages import ButtonDeleted
+from voteit.reactions.messages import ReactionCount
+from voteit.reactions.messages import UserReactionAdded
+from voteit.reactions.messages import UserReactionDeleted
+from voteit.reactions.models import Reaction
+from voteit.reactions.models import ReactionButton
+from voteit.reactions.rest_api.serializers import ButtonDetailSerializer
+from voteit.reactions.rest_api.serializers import ReactionSerializer
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -51,9 +51,12 @@ def ai_channel_subscribed(
         .annotate(count=Count("pk"))
         .order_by()
     )
-    for b in all_buttons:
-        b["content_type"] = ContentType.objects.get_for_id(b["content_type"])
-        app_state.append(ReactionCount(**b))
+    for button in all_buttons:
+        # FIXME: Serializer should handle this
+        ct = ContentType.objects.get_for_id(button["content_type"])
+        model = ct.model_class()
+        button["content_type"] = get_model_shortname(model)
+        app_state.append(ReactionCount(**button))
     # Users own reactions
     app_state.append_from_queryset(
         context.reactions.filter(user=user), ReactionSerializer, UserReactionAdded
@@ -95,7 +98,7 @@ def _send_count(instance: Reaction, pre_delete=False):
         count -= 1
     msg = ReactionCount(
         {},
-        content_type=instance.content_type,
+        content_type=get_model_shortname(instance.content_type.model_class()),
         object_id=instance.object_id,
         button=instance.button.pk,
         count=count,

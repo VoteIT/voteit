@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
+from voteit.core.utils import get_model_by_shortname
 from voteit.meeting.models import Meeting, MeetingRoles
 
 
@@ -19,6 +20,10 @@ if TYPE_CHECKING:
     from voteit.agenda.models import AgendaItem
 
 User: AbstractUser = get_user_model()
+
+
+def _default_allowed_models():
+    return ["proposal", "discussion_post"]
 
 
 class ReactionButton(MeetingContext):
@@ -51,6 +56,10 @@ class ReactionButton(MeetingContext):
     change_roles: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
     list_roles: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
     active: bool = models.BooleanField(_("Is this activated?"), default=True)
+    allowed_models: List[str] = ArrayField(
+        models.CharField(max_length=20),
+        default=_default_allowed_models,
+    )
 
     class Meta:
         verbose_name = _("Reaction button")
@@ -65,6 +74,12 @@ class ReactionButton(MeetingContext):
                 raise ValueError(f"{role} is not a valid meeting role")
         if self.meeting.is_archived:
             raise IntegrityError("This is part of an archived meeting")
+        for k in self.allowed_models:
+            model = get_model_by_shortname(k)
+            if model is None:
+                raise IntegrityError(
+                    f"'allowed_models' contains the value {k} which isn't a valid model."
+                )
         super().save(**kw)
 
     class Manager(models.Manager):
@@ -72,15 +87,16 @@ class ReactionButton(MeetingContext):
             obj_ct = ContentType.objects.get_for_model(obj)
             return self.get_queryset().annotate(
                 count=models.Count(
-                    "reaction",
+                    "reactions",
                     filter=models.Q(
-                        reaction__content_type=obj_ct,
-                        reaction__object_id=obj.pk,
+                        reactions__content_type=obj_ct,
+                        reactions__object_id=obj.pk,
                     ),
                 )
             )
 
     objects = Manager()
+    reactions: models.QuerySet
 
     def __str__(self):
         return self.title
@@ -97,7 +113,9 @@ class Reaction(AgendaItemContext):
     content_type: ContentType = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id: int = models.PositiveIntegerField()
     object: BaseContent = GenericForeignKey()
-    button: ReactionButton = models.ForeignKey(ReactionButton, on_delete=models.CASCADE)
+    button: ReactionButton = models.ForeignKey(
+        ReactionButton, on_delete=models.CASCADE, related_name="reactions"
+    )
     # Normally we don't want to delete user, but we should probably allow this later
     user: User = models.ForeignKey(User, on_delete=models.PROTECT)
     agenda_item: AgendaItem = models.ForeignKey(

@@ -1,131 +1,117 @@
 from django.test import TestCase
 
 
-class PresenceCheckSerializerTests(TestCase):
+class ButtonDetailSerializerTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
-        from voteit.presence.models import PresenceSystem
+        from voteit.reactions.models import ReactionButton
 
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        self.system: PresenceSystem = PresenceSystem.objects.create(
-            meeting=self.meeting
+        self.button: ReactionButton = self.meeting.reaction_buttons.create(
+            title="Thumbs up", color="primary", icon="thumb_up"
         )
-        self.presence_check = self.system.presence_checks.create()
 
     @property
     def _cut(self):
-        from voteit.presence.rest_api.serializers import PresenceCheckDetailSerializer
+        from voteit.reactions.rest_api.serializers import ButtonDetailSerializer
 
-        return PresenceCheckDetailSerializer
+        return ButtonDetailSerializer
 
     def test_get(self):
-        serializer = self._cut(self.presence_check)
+        serializer = self._cut(self.button)
         data = serializer.data
         self.assertEqual(
             {
-                "pk": self.presence_check.pk,
-                "presence_system": self.system.pk,
-                "state": "open",
+                "pk": self.button.pk,
                 "meeting": self.meeting.pk,
+                "title": "Thumbs up",
+                "color": "primary",
+                "icon": "thumb_up",
+                "order": 0,
+                "change_roles": [],
+                "list_roles": [],
+                "active": True,
+                "allowed_models": ["proposal", "discussion_post"],
             },
             data,
         )
 
     def test_patch(self):
-        serializer = self._cut(self.presence_check, {"state": "closed"}, partial=True)
-        self.assertTrue(serializer.is_valid())  # Readonly, but still... DRF why why...
+        serializer = self._cut(self.button, {"title": "Just thumbs"}, partial=True)
+        self.assertTrue(serializer.is_valid())
         serializer.save()
-        self.assertEqual(self.presence_check.state, "open")
+        self.assertEqual(self.button.title, "Just thumbs")
 
 
-class PresenceCheckCreateSerializerTests(TestCase):
+class ButtonCreateSerializerTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
-        from voteit.presence.models import PresenceSystem
 
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        self.system: PresenceSystem = PresenceSystem.objects.create(
-            meeting=self.meeting
-        )
 
     @property
     def _cut(self):
-        from voteit.presence.rest_api.serializers import PresenceCheckCreateSerializer
+        from voteit.reactions.rest_api.serializers import ButtonCreateSerializer
 
-        return PresenceCheckCreateSerializer
+        return ButtonCreateSerializer
 
     def test_create(self):
-        from voteit.presence.models import PresenceCheck
+        from voteit.reactions.models import ReactionButton
 
-        serializer = self._cut(data={"presence_system": self.system.pk})
+        serializer = self._cut(
+            data={
+                "meeting": self.meeting.pk,
+                "title": "Hello",
+                "color": "primary",
+                "icon": "thumb_up",
+            }
+        )
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
-        self.assertIsInstance(instance, PresenceCheck)
-        self.assertEqual(instance.presence_system, self.system)
+        self.assertIsInstance(instance, ReactionButton)
+        self.assertEqual(instance.meeting, self.meeting)
 
 
-class PresenceSystemSerializerTests(TestCase):
+class ReactionSerializerSerializerTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
-        from voteit.presence.models import PresenceSystem
+        from voteit.reactions.models import Reaction
+        from voteit.reactions.models import ReactionButton
 
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        self.system: PresenceSystem = PresenceSystem.objects.create(
-            meeting=self.meeting
+        self.ai = self.meeting.agenda_items.create()
+        self.prop = self.ai.proposals.create()
+        self.user = self.meeting.participants.create(username="Jane")
+        self.button: ReactionButton = self.meeting.reaction_buttons.create(
+            title="Thumbs up", color="primary", icon="thumb_up"
+        )
+        self.reaction: Reaction = self.button.reactions.create(
+            user=self.user, object=self.prop
         )
 
     @property
     def _cut(self):
-        from voteit.presence.rest_api.serializers import PresenceSystemDetailSerializer
+        from voteit.reactions.rest_api.serializers import ReactionSerializer
 
-        return PresenceSystemDetailSerializer
+        return ReactionSerializer
 
     def test_get(self):
-        # Queue is not part of this
-        serializer = self._cut(self.system)
+        serializer = self._cut(self.reaction)
         data = serializer.data
         self.assertEqual(
-            {"pk": self.system.pk, "meeting": self.meeting.pk},
+            {
+                "pk": self.reaction.pk,
+                "button": self.button.pk,
+                "user": self.user.pk,
+                "content_type": "proposal",
+                "object_id": self.prop.pk,
+                "agenda_item": None,
+            },
             data,
         )
-
-    def test_patch(self):
-        serializer = self._cut(
-            self.system,
-            {"meeting": -1},
-            partial=True,
-        )
-        self.assertTrue(serializer.is_valid())  # Since DRF throws away meeting...
-        serializer.save()
-        self.system.refresh_from_db(fields=["meeting"])
-        self.assertEqual(self.meeting, self.system.meeting)
-
-
-class PresenceSystemCreateSerializer(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-
-        self.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
-
-    @property
-    def _cut(self):
-        from voteit.presence.rest_api.serializers import PresenceSystemCreateSerializer
-
-        return PresenceSystemCreateSerializer
-
-    def test_create(self):
-        from voteit.presence.models import PresenceSystem
-
-        serializer = self._cut(data={"meeting": self.meeting.pk})
-        self.assertTrue(serializer.is_valid())
-        instance = serializer.save()
-        self.assertIsInstance(instance, PresenceSystem)
-        self.assertEqual(self.meeting, instance.meeting)

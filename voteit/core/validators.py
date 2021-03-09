@@ -1,7 +1,27 @@
 # Common validators
 from typing import Dict
+
 from voteit.core.models import RoleContextMixin
 from voteit.core.utils import get_model_by_shortname
+
+
+def validate_model_shortname(v: str):
+    """
+    Make sure it's a model that exists and has roles
+    >>> validate_model_shortname("meeting")
+    'meeting'
+    >>> validate_model_shortname("Meeting")
+    'meeting'
+    >>> validate_model_shortname("404")
+    Traceback (most recent call last):
+    ...
+    ValueError:
+    """
+    v = v.lower()
+    model = get_model_by_shortname(v)
+    if model is None:
+        raise ValueError(f"{v} is not a known content type")
+    return v
 
 
 def validate_roles_context_model(v: str) -> str:

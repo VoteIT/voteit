@@ -1,26 +1,24 @@
-from typing import Optional, Union
+from typing import Optional
 
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext as _
 from pydantic import validator
 from pydantic.main import BaseModel
-from django.utils.translation import gettext as _
 
-from voteit.messaging.abcs import (
-    BaseOutgoingMessage,
-    BaseIncomingMessage,
-    DeferredJob,
-    ContextAction,
-)
-from voteit.messaging.decorators import outgoing, incoming
-from voteit.messaging.messages.base import (
-    BaseObjectAdded,
-    BaseObjectChanged,
-    BaseObjectDeleted,
-    BaseDeleteObject,
-)
+from voteit.core.utils import get_model_by_shortname
+from voteit.core.validators import validate_model_shortname
+from voteit.messaging.abcs import BaseOutgoingMessage
+from voteit.messaging.decorators import incoming
+from voteit.messaging.decorators import outgoing
+from voteit.messaging.messages.base import BaseAddObject
+from voteit.messaging.messages.base import BaseDeleteObject
+from voteit.messaging.messages.base import BaseObjectAdded
+from voteit.messaging.messages.base import BaseObjectChanged
+from voteit.messaging.messages.base import BaseObjectDeleted
 from voteit.messaging.messages.text import TextResponse
-from voteit.reactions.models import Reaction, ReactionButton
-from voteit.reactions.permissions import ReactionButtonPermissions, ReactionPermissions
+from voteit.reactions.models import Reaction
+from voteit.reactions.models import ReactionButton
+from voteit.reactions.permissions import ReactionPermissions
 
 
 @outgoing
@@ -38,42 +36,14 @@ class ButtonDeleted(BaseObjectDeleted):
     name = "reaction_button.deleted"
 
 
-def validate_content_type(content_type: Union[ContentType, str]) -> str:
-    """
-    Validator lowercases content types
-    >>> validate_content_type("bla.Bla")
-    'bla.bla'
-
-    Content type models are accepted aswell
-    >>> from voteit.proposal.models import Proposal
-    >>> ct = ContentType.objects.get_for_model(Proposal)
-    >>> validate_content_type(ct)
-    'proposal.proposal'
-
-    Content types aren't validated if they're strings, but at least the dot's checked.
-    >>> validate_content_type("hello")
-    Traceback (most recent call last):
-    ...
-    ValueError:
-    """
-    if isinstance(content_type, ContentType):
-        content_type = ".".join(content_type.natural_key())
-    if len(content_type.split(".")) != 2:
-        raise ValueError(
-            "content_type must be separated with a dot: app_name.content_type"
-        )
-    content_type = content_type.lower()
-    return content_type
-
-
 class ReactionSchema(BaseModel):
 
-    content_type: Union[ContentType, str]
+    content_type: str
     object_id: int
     button: int
 
     _validate_content_type = validator("content_type", allow_reuse=True)(
-        validate_content_type
+        validate_model_shortname
     )
 
     class Config:
@@ -112,27 +82,30 @@ class UserReactionDeleted(BaseObjectDeleted):
 
 
 class AddReactionSchema(BaseModel):
-    pk: int  # The buttons schema! Since this is where the permission check is done.
-    content_type: str
+    pk: int  # The button! Since this is where the permission check is done.
+    content_type: str  # model shortname, like "proposal"
     object_id: int
     _validate_content_type = validator("content_type", allow_reuse=True)(
-        validate_content_type
+        validate_model_shortname
     )
 
 
 @incoming
-class AddReaction(BaseIncomingMessage, DeferredJob, ContextAction):
+class AddReaction(BaseAddObject):
+    name = "reaction.add"
+    permission = ReactionPermissions.ADD
+    model = ReactionButton  # This is the context for the action!
+    add_model = Reaction
+    relation_queryset_attribute = "reactions"
     schema = AddReactionSchema
     data: AddReactionSchema
-    permission = ReactionPermissions.ADD
-    name = "reaction.add"
-    model = ReactionButton
 
     def run_job(self) -> TextResponse:
         self.assert_perm()
-        ct_parts = self.data.content_type.split(".")
-        ct = ContentType.objects.get_by_natural_key(*ct_parts)
-        reactable = ct.get_object_for_this_type(pk=self.data.object_id)
+        # Already validated
+        model = get_model_by_shortname(self.data.content_type)
+        ct = ContentType.objects.get_for_model(model)
+        reactable = model.objects.get(pk=self.data.object_id)
         ai = getattr(reactable, "agenda_item", None)
         # FIXME: set object directly? Reverse relation doesn't seem to work now
         reaction, created = Reaction.objects.get_or_create(
@@ -155,7 +128,6 @@ class DeleteReaction(BaseDeleteObject):
 
     def run_job(self) -> TextResponse:
         self.assert_perm(msg=_("You're not allowed to change this now"))
-
         self.context.delete()
         response = TextResponse.from_message(self, msg="")
         response.send_outgoing(self.mm.consumer_name, success=True)

@@ -1,13 +1,13 @@
 from rest_framework import serializers
+from voteit.core.utils import get_model_shortname
 from voteit.reactions.models import ReactionButton, Reaction
 
 
 class ButtonDetailSerializer(serializers.ModelSerializer):
-    # Note: This won't have access to the request, so no url thingies here!
-
     class Meta:
         model = ReactionButton
-        fields = (
+        read_only_fields = ("meeting",)
+        fields = list(read_only_fields) + [
             "pk",
             "title",
             "icon",
@@ -16,6 +16,22 @@ class ButtonDetailSerializer(serializers.ModelSerializer):
             "change_roles",
             "list_roles",
             "active",
+            "allowed_models",
+        ]
+
+
+class ButtonCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReactionButton
+        fields = (
+            "title",
+            "icon",
+            "color",
+            "meeting",
+            "order",
+            "change_roles",
+            "list_roles",
+            "allowed_models",
         )
 
 
@@ -29,12 +45,23 @@ class ContentTypeSerializer(serializers.CharField):
         return ".".join(value.natural_key())
 
 
+class ContentTypeShortnameSerializer(serializers.CharField):
+    """ Content type to model shortname. """
+
+    def to_internal_value(self, data):
+        raise NotImplementedError("Shouldn't be used")
+
+    def to_representation(self, value):
+        klass = value.model_class()
+        return get_model_shortname(klass)
+
+
 class ReactionSerializer(serializers.ModelSerializer):
-    content_type = ContentTypeSerializer(max_length=50)
+    content_type = ContentTypeShortnameSerializer(max_length=50)
 
     class Meta:
         model = Reaction
-        fields = (
+        fields = read_only_fields = (
             "pk",
             "content_type",
             "object_id",

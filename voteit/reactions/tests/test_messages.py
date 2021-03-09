@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from voteit.core.utils import get_model_shortname
 from voteit.messaging.errors import UnauthorizedError
 from voteit.messaging.messages.text import TextResponse
 
@@ -35,11 +36,10 @@ class AddReactionTests(TestCase):
         return AddReaction
 
     def _mk_one(self, context, **kw):
-        content_type = context._meta.label  # FIXME?
         return self._cut(
             {"consumer_name": "abc", "user_pk": self.voter.pk},
             pk=self.button.pk,
-            content_type=content_type,
+            content_type=get_model_shortname(context),
             object_id=context.pk,
             **kw,
         )
