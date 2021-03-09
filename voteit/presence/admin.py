@@ -15,11 +15,12 @@ class PresenceSystemAdmin(admin.ModelAdmin):
 @admin.register(PresenceCheck)
 class PresenceCheckAdmin(FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = ["state"]
-    list_display = "state", "presence_system", "opened", "closed"
-    list_filter = ("state",)
+    list_display = "state", "meeting", "presence_system", "opened", "closed"
+    list_filter = ("state", "presence_system__meeting")
     exclude = ("state",)
 
 
 @admin.register(Presence)
 class PresenceAdmin(admin.ModelAdmin):
-    list_display = "user", "presence_check", "created"
+    list_display = "user", "presence_check", "created", "meeting"
+    list_filter = "user", "presence_check", "presence_check__presence_system__meeting"
