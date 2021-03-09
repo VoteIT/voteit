@@ -1,4 +1,5 @@
-import yaml
+from pprint import pprint
+
 from django.core.management import BaseCommand
 
 
@@ -13,6 +14,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from voteit.core.registries import permissions
         from rules.permissions import permissions as rules_perms
+
         only_model = options.get("m")
         if only_model:
             assert (
@@ -25,8 +27,9 @@ class Command(BaseCommand):
         print("Listing permissions")
         print("=" * 80)
         for perm in perms:
-            print(yaml.dump(perm.output().dict(skip_defaults=True)).strip())
+            data = perm.output().dict(skip_defaults=True)
             pred = rules_perms.get(perm)
             if pred is not None:
-                print("predicate:", pred)
+                data["predicate"] = pred
+            pprint(data)
             print("-" * 80)

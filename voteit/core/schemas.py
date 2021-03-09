@@ -5,6 +5,7 @@ from typing import Optional
 
 from pydantic import validator
 from pydantic.main import BaseModel
+from typing import Set
 
 
 class RoleOutput(BaseModel):
@@ -42,7 +43,7 @@ class PermissionOutput(BaseModel):
     name: str
     description: str = ""
     model: Optional[str]
-    context: Optional[str]
+    context: Set[str]
 
     class Config:
         orm_mode = True

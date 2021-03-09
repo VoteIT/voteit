@@ -85,7 +85,8 @@ class RoleContextMixin(ABCModel):
     def get_userids_with_roles(self, *roles: Union[str, Role]):
         q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
-            context=self, assigned__contains=q
+            context=self,
+            assigned__contains=q,
         ).values_list("user", flat=True)
 
     def get_userids_with_any_roles(self, *roles):
