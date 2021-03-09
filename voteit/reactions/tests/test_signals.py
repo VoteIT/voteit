@@ -24,7 +24,7 @@ class SignalButtonTests(TestCase):
         self.ai = self.meeting.agenda_items.create()
         self.prop = self.ai.proposals.create()
         self.disc = self.ai.discussions.create()
-        self.button = self.meeting.reactionbutton_set.create()
+        self.button = self.meeting.reaction_buttons.create()
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, "moderator")
 
@@ -32,7 +32,7 @@ class SignalButtonTests(TestCase):
     def test_button_added(self, mock_publish):
         from voteit.reactions.messages import ButtonAdded
 
-        button = self.meeting.reactionbutton_set.create()
+        button = self.meeting.reaction_buttons.create()
 
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
@@ -106,7 +106,7 @@ class SignalReactionTests(TestCase):
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create()
         self.prop = self.ai.proposals.create()
-        self.button = self.meeting.reactionbutton_set.create()
+        self.button = self.meeting.reaction_buttons.create()
         self.user = User.objects.create(username="hej")
 
     def _mk_reaction(self, **kw):
@@ -177,7 +177,7 @@ class ArchiveMeetingTests(TestCase):
         from voteit.meeting.models import Meeting
 
         self.meeting = Meeting.objects.create()
-        self.button = self.meeting.reactionbutton_set.create()
+        self.button = self.meeting.reaction_buttons.create()
 
     def test_button_inactive_when_archived(self):
         self.assertTrue(self.button.active)

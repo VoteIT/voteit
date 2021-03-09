@@ -67,7 +67,7 @@ class ModelsTestCase(TestCase):
         self.prop1.reaction_set.create(
             user=self.user1, button=self.dislike_button, agenda_item=self.ai
         )
-        qs = self.meeting.reactionbutton_set.counts_for_object(self.prop1).order_by(
+        qs = self.meeting.reaction_buttons.counts_for_object(self.prop1).order_by(
             "title"
         )
         self.assertEqual(qs.count(), 3)

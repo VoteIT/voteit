@@ -20,7 +20,7 @@ class AddReactionTests(TestCase):
         self.ai = self.meeting.agenda_items.create()
         self.prop = self.ai.proposals.create()
         self.disc = self.ai.discussions.create()
-        self.button = self.meeting.reactionbutton_set.create(
+        self.button = self.meeting.reaction_buttons.create(
             change_roles=["potential_voter"]
         )
         self.voter = User.objects.create(username="voter")
@@ -81,7 +81,7 @@ class DeleteReactionTests(TestCase):
         self.ai = self.meeting.agenda_items.create()
         self.prop = self.ai.proposals.create()
         self.disc = self.ai.discussions.create()
-        self.button = self.meeting.reactionbutton_set.create(
+        self.button = self.meeting.reaction_buttons.create(
             change_roles=["potential_voter"]
         )
         self.voter = User.objects.create(username="voter")

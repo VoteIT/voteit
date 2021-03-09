@@ -44,7 +44,9 @@ class ReactionButton(MeetingContext):
     title: str = models.CharField(_("Display name"), max_length=80)
     icon: str = models.CharField(_("Icon name"), max_length=80, choices=ICON_CHOICES)
     color: str = models.CharField(_("Color"), max_length=80, choices=COLOR_CHOICES)
-    meeting: Meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE)
+    meeting: Meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="reaction_buttons"
+    )
     order: int = models.PositiveSmallIntegerField(default=0)
     change_roles: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
     list_roles: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
@@ -57,7 +59,7 @@ class ReactionButton(MeetingContext):
 
     def save(self, **kw):
         if self.order == 0:
-            self.order = self.meeting.reactionbutton_set.count()
+            self.order = self.meeting.reaction_buttons.count()
         for role in set(self.change_roles) | set(self.list_roles):
             if role not in MeetingRoles.valid_roles:
                 raise ValueError(f"{role} is not a valid meeting role")

@@ -37,7 +37,7 @@ def meeting_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
     app_state.append_from_queryset(
-        context.reactionbutton_set.all(), ButtonDetailSerializer, ButtonAdded
+        context.reaction_buttons.all(), ButtonDetailSerializer, ButtonAdded
     )
 
 
@@ -142,6 +142,6 @@ def send_deleted_to_user(instance: Reaction = None, **kw):
 @receiver(archive_meeting)
 def disable_buttons(meeting: Meeting, **kw):
     """Archived meetings shouldn't have active buttons."""
-    for button in meeting.reactionbutton_set.filter(active=True):
+    for button in meeting.reaction_buttons.filter(active=True):
         button.active = False
         button.save()

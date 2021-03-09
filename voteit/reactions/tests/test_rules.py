@@ -15,7 +15,7 @@ class ButtonPermissionTests(TestCase):
         self.participant = User.objects.create(username="participant")
         self.meeting.add_roles(self.moderator, "moderator")
         self.meeting.add_roles(self.participant, "participant")
-        self.button = self.meeting.reactionbutton_set.create(
+        self.button = self.meeting.reaction_buttons.create(
             change_roles=["participant"], list_roles=["participant"]
         )
 
@@ -93,7 +93,7 @@ class ReactionPermissionTests(TestCase):
         self.participant = User.objects.create(username="participant")
         self.meeting.add_roles(self.moderator, "moderator")
         self.meeting.add_roles(self.participant, "participant")
-        self.button = self.meeting.reactionbutton_set.create(
+        self.button = self.meeting.reaction_buttons.create(
             change_roles=["participant"], list_roles=["participant"]
         )
         self.ai = self.meeting.agenda_items.create()
