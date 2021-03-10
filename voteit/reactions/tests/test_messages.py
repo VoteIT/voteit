@@ -40,7 +40,7 @@ class AddReactionTests(TestCase):
     def _mk_one(self, context, **kw):
         return self._cut(
             {"consumer_name": "abc", "user_pk": self.voter.pk},
-            pk=self.button.pk,
+            button=self.button.pk,
             content_type=get_model_shortname(context),
             object_id=context.pk,
             **kw,

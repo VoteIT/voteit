@@ -38,7 +38,6 @@ class ButtonDeleted(BaseObjectDeleted):
 
 
 class ReactionSchema(BaseModel):
-
     content_type: str
     object_id: int
     button: int
@@ -83,7 +82,7 @@ class UserReactionDeleted(BaseObjectDeleted):
 
 
 class AddReactionSchema(BaseModel):
-    pk: int  # The button! Since this is where the permission check is done.
+    button: int
     content_type: str  # model shortname, like "proposal"
     object_id: int
     _validate_content_type = validator("content_type", allow_reuse=True)(
@@ -101,6 +100,7 @@ class AddReaction(BaseAddObject):
     schema = AddReactionSchema
     data: AddReactionSchema
     context: ReactionButton
+    context_pk_attr = "button"
 
     def run_job(self) -> TextResponse:
         self.assert_perm()
