@@ -31,7 +31,7 @@ class SpeakerListTests(TestCase):
         ADD = self.p("ADD")
         self.assertTrue(self.user_moderator.has_perm(ADD, self.system))
         self.assertFalse(self.user_speaker.has_perm(ADD, self.system))
-        self.assertFalse(self.user_any.has_perm(ADD, self.list))
+        self.assertFalse(self.user_any.has_perm(ADD, self.system))
 
     def test_change_speaker_list(self):
         CHANGE = self.p("CHANGE")

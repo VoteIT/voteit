@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from inspect import isclass
 from typing import Optional
 from typing import Set
 from typing import Type
@@ -223,7 +224,7 @@ def get_model_shortname(model: Union[Type[Model], Model]) -> str:
     """
     if isinstance(model, Model):
         model = model.__class__
-    elif issubclass(model, Model):
+    elif isclass(model) and issubclass(model, Model):
         pass
     else:
         raise ValueError(f"{model} is not an instance or classed based on Django Model")

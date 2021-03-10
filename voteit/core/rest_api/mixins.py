@@ -10,6 +10,7 @@ from rest_framework import exceptions
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
+from voteit.core.utils import get_permission_registry
 
 from .serializers import TransitionSerializer
 
@@ -45,7 +46,13 @@ class AutoPermissionViewSetMixin:
         assert perm_type in self.permission_type_map.values()
         ct: ContentType = ContentType.objects.get_for_model(obj)
         app_name, model_name = ct.natural_key()
-        return f"{app_name}.{perm_type}_{model_name}"
+        perm_name = f"{app_name}.{perm_type}_{model_name}"
+        reg = get_permission_registry()
+        try:
+            # This is to make debugging easier since permission instances have contexts etc
+            return reg[perm_name]
+        except KeyError:
+            return perm_name
 
     def initial(self, *args, **kwargs):
         """Ensures user has permission to perform the requested action."""

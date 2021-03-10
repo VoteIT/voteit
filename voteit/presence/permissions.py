@@ -10,15 +10,15 @@ class PresenceSystemPermissions(ModelPermissions):
     VIEW = P("presence.view_presencesystem")
 
 
-class PresenceCheckPermissions:
-    model = "presence_system"
+class PresenceCheckPermissions(ModelPermissions):
+    model = "presence_check"
     ADD = P("presence.add_presencecheck", context="presence_system")
     CHANGE = P("presence.change_presencecheck")
     DELETE = P("presence.delete_presencecheck")
     VIEW = P("presence.view_presencecheck")
 
 
-class PresencePermissions:
+class PresencePermissions(ModelPermissions):
     model = "presence"
     # Change doesn't exist
     ADD = P("presence.add_presence", context="presence_check")
