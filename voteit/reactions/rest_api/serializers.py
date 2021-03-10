@@ -11,6 +11,7 @@ class ButtonDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ("meeting",)
         fields = list(read_only_fields) + [
             "pk",
+            "meeting",
             "title",
             "icon",
             "color",
