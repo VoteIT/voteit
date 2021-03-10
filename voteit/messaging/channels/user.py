@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from logging import getLogger
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
+from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.dispatch import receiver
-
 from voteit.messaging.abcs import AbstractObjectChannel
 from voteit.messaging.decorators import channel
-from voteit.messaging.signals import client_connect, client_close
+from voteit.messaging.signals import client_close
+from voteit.messaging.signals import client_connect
 
 if TYPE_CHECKING:
     pass

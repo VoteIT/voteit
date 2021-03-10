@@ -1,8 +1,9 @@
-from pydantic import BaseModel
 from typing import Optional
 
-from voteit.messaging.decorators import outgoing
+from pydantic import BaseModel
 from voteit.messaging.abcs import BaseOutgoingMessage
+from voteit.messaging.decorators import outgoing
+
 
 # So should we have an initializer that's a special message, or simply
 # have the first status update (and all subsequent ones) contain all information?

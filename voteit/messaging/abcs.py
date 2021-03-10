@@ -19,7 +19,6 @@ from django.db import transaction
 from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
-
 from voteit.core.queues import DEFAULT_QUEUE
 from voteit.messaging import INTERNAL_MESSAGE
 from voteit.messaging import MESSAGE_FAILED

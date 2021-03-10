@@ -1,13 +1,13 @@
 from unittest import mock
 
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
+from asgiref.sync import sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django_rq import get_queue
 from fakeredis import FakeRedis
 from rq import SimpleWorker
-
 from voteit.core.queues import TESTING_QUEUE
 
 User = get_user_model()

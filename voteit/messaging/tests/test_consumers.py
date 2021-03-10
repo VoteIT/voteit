@@ -2,18 +2,22 @@ import json
 from datetime import datetime
 from unittest import mock
 
-from django.dispatch import receiver
-from django.test import TestCase, override_settings
-from pydantic import BaseModel, ValidationError
-from rq import SimpleWorker
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
+from asgiref.sync import sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
+from django.dispatch import receiver
+from django.test import TestCase
+from django.test import override_settings
 from django_rq import get_queue
 from fakeredis import FakeRedis
-
+from pydantic import BaseModel
+from pydantic import ValidationError
+from rq import SimpleWorker
 from voteit.core.queues import TESTING_QUEUE
-from voteit.messaging.abcs import BaseIncomingMessage, AsyncRunnable, DeferredJob
+from voteit.messaging.abcs import AsyncRunnable
+from voteit.messaging.abcs import BaseIncomingMessage
+from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.registries import incoming_messages
 
 User = get_user_model()
@@ -31,7 +35,6 @@ class ConsumerTests(TestCase):
     def setUp(self):
         self.user = User.objects.create(username="sockety")
         self.fakeredis_conn = FakeRedis()
-        from voteit.messaging.messages import testing  # To enable testing messages
 
         super().setUp()
 

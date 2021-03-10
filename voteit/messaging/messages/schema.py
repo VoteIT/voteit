@@ -1,7 +1,7 @@
-from pydantic import validator
-from pydantic.main import BaseModel
 from typing import Dict
 
+from pydantic import validator
+from pydantic.main import BaseModel
 from voteit.messaging.abcs import AsyncRunnable
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import BaseOutgoingMessage

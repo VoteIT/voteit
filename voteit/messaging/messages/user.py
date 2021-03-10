@@ -4,15 +4,13 @@ from typing import TYPE_CHECKING
 
 from channels.auth import logout
 from pydantic.main import BaseModel
-
-from voteit.messaging.abcs import (
-    AsyncRunnable,
-    DeferredJob,
-    BaseIncomingMessage,
-    BaseOutgoingMessage,
-)
+from voteit.messaging.abcs import AsyncRunnable
+from voteit.messaging.abcs import BaseIncomingMessage
+from voteit.messaging.abcs import BaseOutgoingMessage
+from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.channels.user import UserChannel
-from voteit.messaging.decorators import incoming, outgoing
+from voteit.messaging.decorators import incoming
+from voteit.messaging.decorators import outgoing
 from voteit.messaging.models import Connection
 from voteit.messaging.utils import cleanup_connection_status
 

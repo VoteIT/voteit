@@ -1,7 +1,14 @@
-from pydantic import Field, BaseModel, validator
-from typing import Dict, Optional, Union
-from voteit.messaging import INTERNAL_MESSAGE, WEBSOCKET_OUTGOING
-from voteit.messaging.utils import get_outgoing_registry, get_incoming_registry
+from typing import Dict
+from typing import Optional
+from typing import Union
+
+from pydantic import BaseModel
+from pydantic import Field
+from pydantic import validator
+from voteit.messaging import INTERNAL_MESSAGE
+from voteit.messaging import WEBSOCKET_OUTGOING
+from voteit.messaging.utils import get_incoming_registry
+from voteit.messaging.utils import get_outgoing_registry
 
 
 class BaseEnvelope(BaseModel):

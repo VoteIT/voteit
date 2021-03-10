@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import timedelta
 from logging import getLogger
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
+from typing import TYPE_CHECKING
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -42,8 +43,7 @@ def update_connection_status(
     online: Optional[bool] = True,
     awol: Optional[bool] = None,
 ) -> Connection:
-    """ This is sync code so don't call this in any async context!
-    """
+    """This is sync code so don't call this in any async context!"""
     conn, created = Connection.objects.get_or_create(
         user=user, channel_name=channel_name
     )
@@ -93,15 +93,14 @@ def get_old_connections(hours=24) -> QuerySet:
 
 
 def cleanup_old_connections(hours=24):
-    """ Delete connection info from db.
-        It might be a good idea to store some of the information before deleting. """
+    """Delete connection info from db.
+    It might be a good idea to store some of the information before deleting."""
     qs = get_old_connections(hours)
     qs.delete()
 
 
 async def check_redis_keys(keys) -> set:
-    """ Return a set of keys that exist. For instance the consumer channel name.
-    """
+    """Return a set of keys that exist. For instance the consumer channel name."""
     channel_layer = get_channel_layer()
     found = set()
     # FIXME: There's no stable API to get a sensible connection index from the pool in channel layer right now :(

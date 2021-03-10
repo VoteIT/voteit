@@ -1,15 +1,18 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
-from typing import Dict, Type, TYPE_CHECKING
 
-from pydantic.main import BaseModel
+from abc import ABC
+from abc import abstractmethod
+from typing import Dict
+from typing import TYPE_CHECKING
+from typing import Type
+
 from django.utils.translation import gettext as _
+from pydantic.main import BaseModel
 from voteit.core.models import BaseContent
-
-from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import BaseIncomingMessage
-from voteit.messaging.abcs import DeferredJob
+from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import ContextAction
+from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.messages.text import TextResponse
 
 if TYPE_CHECKING:

@@ -1,13 +1,12 @@
 from logging import getLogger
+from typing import Dict
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django_rq import job
-from typing import Dict
-
 from voteit.core.queues import DEFAULT_QUEUE
-from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.abcs import BaseError
+from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.signals import client_close
 from voteit.messaging.signals import client_connect
 from voteit.messaging.utils import update_connection_status
@@ -19,8 +18,8 @@ User = get_user_model()
 
 @job(DEFAULT_QUEUE, timeout=30)
 def run_job(msg_data: Dict, mm_data: Dict, incoming=True, atomic=True):
-    """ This is the job that handles all DeferredJob messages.
-        They're dispatched from the message consumer.
+    """This is the job that handles all DeferredJob messages.
+    They're dispatched from the message consumer.
     """
     instance = DeferredJob.from_job(msg_data, mm_data, incoming=incoming)
     if instance.user is not None and instance.mm.consumer_name is not None:
@@ -43,11 +42,16 @@ def run_job(msg_data: Dict, mm_data: Dict, incoming=True, atomic=True):
 @job(DEFAULT_QUEUE, timeout=5)
 def signal_websocket_connect(user_pk: int = None, consumer_name: str = ""):
     """ This job handles the sync code for a user connecting to a consumer. """
-    user = User.objects.get(pk=user_pk)  # User should always exist when this job is dispatched
+    user = User.objects.get(
+        pk=user_pk
+    )  # User should always exist when this job is dispatched
     logger.debug("%s connected consumer %s", user_pk, consumer_name)
     conn = update_connection_status(user=user, channel_name=consumer_name, online=True)
     client_connect.send(
-        sender=None, user=user, consumer_name=consumer_name, connection=conn,
+        sender=None,
+        user=user,
+        consumer_name=consumer_name,
+        connection=conn,
     )
 
 
@@ -55,8 +59,10 @@ def signal_websocket_connect(user_pk: int = None, consumer_name: str = ""):
 def signal_websocket_close(
     user_pk: int = None, consumer_name: str = "", close_code: int = None
 ):
-    user = User.objects.get(pk=user_pk)  # User should always exist when this job is dispatched
-    conn=update_connection_status(user, channel_name=consumer_name, online=False)
+    user = User.objects.get(
+        pk=user_pk
+    )  # User should always exist when this job is dispatched
+    conn = update_connection_status(user, channel_name=consumer_name, online=False)
     logger.debug(
         "%s disconnected consumer %s. close_code: %s",
         user_pk,

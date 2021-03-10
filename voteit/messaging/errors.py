@@ -1,8 +1,12 @@
-from typing import Optional, List, Dict, Union
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Union
 
 from django.utils.translation import gettext as _
 from voteit.core.permissions import Permission
-from voteit.messaging.abcs import BaseError, ErrorSchema
+from voteit.messaging.abcs import BaseError
+from voteit.messaging.abcs import ErrorSchema
 from voteit.messaging.decorators import outgoing
 
 
