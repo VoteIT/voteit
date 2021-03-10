@@ -133,6 +133,9 @@ class ChangeVote(VoteBase, ABC):
         self.context.vote = self.data.vote
         self.context.abstain = False
         self.context.save()
+        msg = TextResponse.from_message(self, msg="Changed")
+        msg.send_outgoing(self.mm.consumer_name, success=True)
+        return msg
 
 
 class GetVoteSchema(BaseModel):
