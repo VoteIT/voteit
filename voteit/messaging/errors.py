@@ -1,7 +1,7 @@
 from typing import Optional, List, Dict, Union
 
 from django.utils.translation import gettext as _
-from voteit.core.permission import Permission
+from voteit.core.permissions import Permission
 from voteit.messaging.abcs import BaseError, ErrorSchema
 from voteit.messaging.decorators import outgoing
 

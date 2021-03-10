@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from functools import update_wrapper
-from inspect import isfunction, isclass, getsource
-from logging import getLogger, Logger
+from inspect import getsource
+from inspect import isclass
+from inspect import isfunction
+from logging import Logger
+from logging import getLogger
 from typing import Optional
 
 from django.conf import settings

@@ -6,9 +6,9 @@ from typing import Type
 from django.db.models import Model
 
 from voteit.core.component import Registry
-from voteit.core.permission import PermissionRegistry
+from voteit.core.permissions import PermissionRegistry
 
-from voteit.core.permission import Permission
+from voteit.core.permissions import Permission
 from voteit.core.predicate import PredicateRegistry
 
 

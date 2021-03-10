@@ -1,5 +1,5 @@
-from voteit.core.permission import ModelPermissions
-from voteit.core.permission import Permission as P
+from voteit.core.permissions import ModelPermissions
+from voteit.core.permissions import Permission as P
 
 
 class PresenceSystemPermissions(ModelPermissions):
