@@ -116,6 +116,7 @@ class PresenceCheck(MeetingContext):
             return self.open().latest("opened")
 
     objects = Manager()
+    presences: models.QuerySet
 
 
 class PresenceSystem(MeetingContext):

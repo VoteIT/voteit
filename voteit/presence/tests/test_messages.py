@@ -31,7 +31,8 @@ class AddPresenceTests(TestCase, _PresenceFixture):
 
     def _mk_one(self):
         return self._cut(
-            {"user_pk": self.user.pk, "consumer_name": "abc"}, pk=self.check.pk
+            {"user_pk": self.user.pk, "consumer_name": "abc"},
+            presence_check=self.check.pk,
         )
 
     def test_add(self):
@@ -107,7 +108,7 @@ class AddUserPresenceTests(TestCase, _PresenceFixture):
     def _mk_one(self):
         return self._cut(
             {"user_pk": self.moderator.pk, "consumer_name": "abc"},
-            pk=self.check.pk,
+            presence_check=self.check.pk,
             userid=self.user.pk,
         )
 

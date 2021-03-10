@@ -1,45 +1,49 @@
 from django.contrib.auth import get_user_model
-from pydantic.main import BaseModel
+from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext as _
+from pydantic.main import BaseModel
 
 from voteit.messaging.abcs import BaseOutgoingMessage
-from voteit.messaging.decorators import outgoing
 from voteit.messaging.decorators import incoming
+from voteit.messaging.decorators import outgoing
 from voteit.messaging.errors import ValidationErrorMsg
-from voteit.messaging.messages.base import (
-    BaseAddObject,
-    BaseDeleteObject,
-    BaseObjectChanged,
-    BaseObjectAdded,
-    BaseObjectDeleted,
-)
+from voteit.messaging.messages.base import BaseAddObject
+from voteit.messaging.messages.base import BaseDeleteObject
+from voteit.messaging.messages.base import BaseObjectAdded
+from voteit.messaging.messages.base import BaseObjectChanged
+from voteit.messaging.messages.base import BaseObjectDeleted
 from voteit.messaging.messages.text import TextResponse
 from voteit.presence.models import Presence
 from voteit.presence.models import PresenceCheck
 from voteit.presence.permissions import PresenceCheckPermissions
 from voteit.presence.permissions import PresencePermissions
 
+User: AbstractUser = get_user_model()
 
-User = get_user_model()
+
+class AddPresenceSchema(BaseModel):
+    presence_check: int  # The context for add
 
 
 class PresenceSchema(BaseModel):
-    pk: int  # presence check object for add, presence for other operations
+    pk: int
 
 
 @incoming
 class AddPresence(BaseAddObject):
     name = "presence.add"
-    schema = PresenceSchema
-    data: PresenceSchema
+    schema = AddPresenceSchema
+    data: AddPresenceSchema
     permission = PresencePermissions.ADD
     model = PresenceCheck
     add_model = Presence
     relation_queryset_attribute = "presences"
+    context_pk_attr = "presence_check"
+    context: PresenceCheck
 
     def run_job(self):
         self.assert_perm(msg=_("You're not allowed to set yourself as present here."))
-        self.add_model.objects.create(user=self.user, presence_check=self.context)
+        self.context.presences.create(user=self.user)
         if self.mm.consumer_name is not None:
             response = TextResponse.from_message(self, msg="Added")
             response.send_outgoing(self.mm.consumer_name, success=True)
@@ -62,6 +66,10 @@ class DeletePresence(BaseDeleteObject):
             response.send_outgoing(self.mm.consumer_name, success=True)
 
 
+class AddUserPresenceSchema(AddPresenceSchema):
+    userid: int
+
+
 class UserPresenceSchema(PresenceSchema):
     userid: int
 
@@ -69,12 +77,14 @@ class UserPresenceSchema(PresenceSchema):
 @incoming
 class AddUserPresence(BaseAddObject):
     name = "presence.add_user"
-    schema = UserPresenceSchema
-    data: UserPresenceSchema
+    schema = AddUserPresenceSchema
+    data: AddUserPresenceSchema
     permission = PresenceCheckPermissions.CHANGE
     model = PresenceCheck
     add_model = Presence
     relation_queryset_attribute = "presences"
+    context_pk_attr = "presence_check"
+    context: PresenceCheck
 
     def run_job(self):
         self.assert_perm(msg=_("You're not allowed to change presence check."))
@@ -86,7 +96,7 @@ class AddUserPresence(BaseAddObject):
                 errors=[{"loc": ("userid",), "msg": "Invalid", "type": "value.error"}],
             )
         if user.has_perm(PresencePermissions.ADD, self.context):
-            self.add_model.objects.create(user=user, presence_check=self.context)
+            self.context.presences.create(user=user)
             if self.mm.consumer_name is not None:
                 response = TextResponse.from_message(self, msg="Added")
                 response.send_outgoing(self.mm.consumer_name, success=True)
