@@ -8,9 +8,12 @@ class AddVoteTests(TestCase):
     def setUp(self):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
+
         self.er = ElectoralRegister.objects.create()
         self.voter = self.er.voters.create(username="voter")
-        self.poll = Poll.objects.create(electoral_register=self.er, method_name="simple")
+        self.poll = Poll.objects.create(
+            electoral_register=self.er, method_name="simple"
+        )
         self.poll.proposals.create()
         self.poll.upcoming()
 
@@ -22,7 +25,7 @@ class AddVoteTests(TestCase):
 
     def _mk_one(self, **kw):
         kw.setdefault("vote", {"choice": "yes"})
-        kw.setdefault("pk", self.poll.pk)
+        kw.setdefault("poll", self.poll.pk)
         return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_add(self):
@@ -47,6 +50,7 @@ class AddVoteTests(TestCase):
 
     def test_add_vote_exists(self):
         from voteit.poll.messages import ChangeVote
+
         self.poll.ongoing()
         self.poll.save()
         self.vote = self.poll.votes.create(user=self.voter, vote_data="no")
@@ -62,9 +66,12 @@ class AbstainTests(TestCase):
     def setUp(self):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
+
         self.er = ElectoralRegister.objects.create()
         self.voter = self.er.voters.create(username="voter")
-        self.poll = Poll.objects.create(electoral_register=self.er, method_name="simple")
+        self.poll = Poll.objects.create(
+            electoral_register=self.er, method_name="simple"
+        )
         self.poll.proposals.create()
         self.poll.upcoming()
         self.poll.ongoing()
@@ -73,10 +80,11 @@ class AbstainTests(TestCase):
     @property
     def _cut(self):
         from voteit.poll.messages import AbstainVote
+
         return AbstainVote
 
     def _mk_one(self, **kw):
-        kw.setdefault("pk", self.poll.pk)
+        kw.setdefault("poll", self.poll.pk)
         return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_abstain(self):
@@ -89,10 +97,11 @@ class AbstainTests(TestCase):
 
     def test_abstain_existing(self):
         from voteit.poll.app.polls.simple import AddSimpleVote
+
         AddSimpleVote(
             {"user_pk": self.voter.pk, "consumer_name": "abc"},
             vote={"choice": "yes"},
-            pk=self.poll.pk,
+            poll=self.poll.pk,
         ).run_job()
         self.test_abstain()
 
@@ -103,9 +112,12 @@ class ChangeVoteTests(TestCase):
     def setUp(self):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
+
         self.er = ElectoralRegister.objects.create()
         self.voter = self.er.voters.create(username="voter")
-        self.poll = Poll.objects.create(electoral_register=self.er, method_name="simple")
+        self.poll = Poll.objects.create(
+            electoral_register=self.er, method_name="simple"
+        )
         self.poll.proposals.create()
         self.poll.upcoming()
         self.poll.ongoing()
@@ -142,9 +154,12 @@ class GetVoteTests(TestCase):
     def setUp(self):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
+
         self.er = ElectoralRegister.objects.create()
         self.voter = self.er.voters.create(username="voter")
-        self.poll = Poll.objects.create(electoral_register=self.er, method_name="simple")
+        self.poll = Poll.objects.create(
+            electoral_register=self.er, method_name="simple"
+        )
         self.poll.proposals.create()
         self.poll.upcoming()
         self.poll.ongoing()
@@ -177,6 +192,7 @@ class GetVoteTests(TestCase):
 
     def test_no_vote(self):
         from voteit.messaging.messages.text import TextResponse
+
         voter = self.er.voters.create(username="second_voter")
         msg = self._mk_one(voter=voter)
         response = msg.run_job()

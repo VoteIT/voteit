@@ -1,20 +1,20 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
-from voteit.messaging.decorators import outgoing, incoming
-from voteit.messaging.messages.base import (
-    BaseObjectAdded,
-    BaseObjectChanged,
-    BaseObjectDeleted,
-    BaseAddObject,
-    BaseChangeObject,
-    BaseDeleteObject,
-)
 from voteit.meeting.models import Meeting
+from voteit.messaging.decorators import incoming
+from voteit.messaging.decorators import outgoing
+from voteit.messaging.messages.base import BaseAddObject
+from voteit.messaging.messages.base import BaseChangeObject
+from voteit.messaging.messages.base import BaseDeleteObject
+from voteit.messaging.messages.base import BaseObjectAdded
+from voteit.messaging.messages.base import BaseObjectChanged
+from voteit.messaging.messages.base import BaseObjectDeleted
 
 User = get_user_model()
 

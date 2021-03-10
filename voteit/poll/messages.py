@@ -5,22 +5,20 @@ from typing import Union
 
 from pydantic.main import BaseModel
 
-from voteit.messaging.abcs import (
-    BaseOutgoingMessage,
-    BaseIncomingMessage,
-    DeferredJob,
-    ContextAction,
-)
-from voteit.messaging.messages.base import (
-    BaseObjectAdded,
-    BaseObjectChanged,
-    BaseObjectDeleted,
-)
-from voteit.messaging.decorators import outgoing, incoming
+from voteit.messaging.abcs import BaseIncomingMessage
+from voteit.messaging.abcs import BaseOutgoingMessage
+from voteit.messaging.abcs import ContextAction
+from voteit.messaging.abcs import DeferredJob
+from voteit.messaging.decorators import incoming
+from voteit.messaging.decorators import outgoing
+from voteit.messaging.messages.base import BaseObjectAdded
+from voteit.messaging.messages.base import BaseObjectChanged
+from voteit.messaging.messages.base import BaseObjectDeleted
 from voteit.messaging.messages.text import TextResponse
-from voteit.poll.models import Poll, Vote
+from voteit.poll.models import Poll
+from voteit.poll.models import Vote
 from voteit.poll.permissions import VotePermissions
-from voteit.poll.schemas import GenericVoteSchema
+from voteit.poll.schemas import GenericExistingVoteSchema
 
 
 @outgoing
@@ -52,7 +50,7 @@ class PollStatus(BaseOutgoingMessage):
 
 
 class VoteBase(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
-    pass
+    context_pk_attr = "pk"
 
 
 class AddVote(VoteBase, ABC):
@@ -61,6 +59,7 @@ class AddVote(VoteBase, ABC):
     permission = VotePermissions.ADD
     model = Poll
     context: Poll
+    context_pk_attr = "poll"
 
     def run_job(self):
         self.assert_perm()
@@ -89,7 +88,7 @@ class AddVote(VoteBase, ABC):
 
 
 class AbstainSchema(BaseModel):
-    pk: int  # Poll pk for votes
+    poll: int  # Poll pk for votes
 
 
 @incoming
@@ -102,6 +101,7 @@ class AbstainVote(VoteBase):
     schema = AbstainSchema
     data: AbstainSchema
     context: Poll
+    context_pk_attr = "poll"
 
     def run_job(self):
         self.assert_perm()
@@ -135,6 +135,10 @@ class ChangeVote(VoteBase, ABC):
         self.context.save()
 
 
+class GetVoteSchema(BaseModel):
+    pk: int  # Vote
+
+
 @incoming
 class GetVote(VoteBase):
     """Get users vote in a generic format."""
@@ -143,6 +147,8 @@ class GetVote(VoteBase):
     permission = VotePermissions.ADD
     model = Poll
     context: Poll
+    schema = GetVoteSchema
+    data: GetVoteSchema
 
     def run_job(self) -> Union[GenericVoteResponse, TextResponse]:
         self.assert_perm()
@@ -163,5 +169,5 @@ class GetVote(VoteBase):
 @outgoing
 class GenericVoteResponse(BaseOutgoingMessage):
     name = "vote.get"
-    schema = GenericVoteSchema
-    data: GenericVoteSchema
+    schema = GenericExistingVoteSchema
+    data: GenericExistingVoteSchema

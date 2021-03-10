@@ -3,14 +3,18 @@ from __future__ import annotations
 from typing import Counter
 
 from django.utils.translation import gettext_lazy as _
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
+from pydantic import validator
 
 from voteit.messaging.decorators import incoming
-from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.abcs import PollMethod
-from voteit.poll.messages import AddVote, ChangeVote
+from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.messages import AddVote
+from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericVoteSchema, PollResult
+from voteit.poll.schemas import GenericAddVoteSchema
+from voteit.poll.schemas import GenericExistingVoteSchema
+from voteit.poll.schemas import PollResult
 
 __all__ = ("Simple",)
 
@@ -30,22 +34,26 @@ class SimpleVoteSchema(BaseModel):
         return v
 
 
-class VoteSchema(GenericVoteSchema):
+class AddVoteSchema(GenericAddVoteSchema):
+    vote: SimpleVoteSchema
+
+
+class ExistingVoteSchema(GenericExistingVoteSchema):
     vote: SimpleVoteSchema
 
 
 @incoming
 class AddSimpleVote(AddVote):
     name = "simple_vote.add"
-    schema = VoteSchema
-    data: VoteSchema
+    schema = AddVoteSchema
+    data: AddVoteSchema
 
 
 @incoming
 class ChangeSimpleVote(ChangeVote):
     name = "simple_vote.change"
-    schema = VoteSchema
-    data: VoteSchema
+    schema = ExistingVoteSchema
+    data: ExistingVoteSchema
 
 
 class SimplePollResult(PollResult):
@@ -55,8 +63,8 @@ class SimplePollResult(PollResult):
 
 @poll_methods
 class Simple(PollMethod):
-    """ This poll method is a simple approve / deny,
-        but also the base for all tests that should run against the abstract PollMethod.
+    """This poll method is a simple approve / deny,
+    but also the base for all tests that should run against the abstract PollMethod.
     """
 
     VOTE_CHOICES = VOTE_CHOICES
@@ -72,8 +80,8 @@ class Simple(PollMethod):
         return self.vote_schema(choice=text)
 
     def calculate_result(self, counter: Counter) -> SimplePollResult:
-        """ Set proposal as approved or denied based on YES or NO votes.
-            Equal result means no approved or denied proposal.
+        """Set proposal as approved or denied based on YES or NO votes.
+        Equal result means no approved or denied proposal.
         """
         proposal_pk = self.poll.proposals.get().pk
         result = {
@@ -84,9 +92,7 @@ class Simple(PollMethod):
             result["approved"] = [proposal_pk]
         elif counter[YES] < counter[NO]:
             result["denied"] = [proposal_pk]
-        return SimplePollResult(
-            **result
-        )
+        return SimplePollResult(**result)
 
     def start_check(self):
         if self.poll.proposals.count() != 1:

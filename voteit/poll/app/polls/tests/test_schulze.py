@@ -281,7 +281,7 @@ class AddSchulzeVoteTests(TestCase):
         return AddSchulzeVote
 
     def _mk_one(self, **kw):
-        kw.setdefault("pk", self.poll.pk)
+        kw.setdefault("poll", self.poll.pk)
         kw.setdefault(
             "vote",
             {"ranking": ((self.prop1.pk, 10), (self.prop2.pk, 5), (self.prop3.pk, 1))},

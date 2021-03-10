@@ -35,12 +35,14 @@ class ListMessage(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
     model = SpeakerList
     schema = SpeakerListActionSchema
     data: SpeakerListActionSchema
+    context_pk_attr = "pk"
 
 
 class ModeratorListMessage(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
     model = SpeakerList
     schema = SpeakerListUserSchema
     data: SpeakerListUserSchema
+    context_pk_attr = "pk"
 
     def get_user(self):
         try:

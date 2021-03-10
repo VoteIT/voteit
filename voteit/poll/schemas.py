@@ -3,10 +3,17 @@ from typing import Any, List
 from pydantic.main import BaseModel
 
 
-class GenericVoteSchema(BaseModel):
+class _GenericVoteSchema(BaseModel):
     vote: Any  # Override this
     abstain: bool = False
-    pk: int  # Poll pk for votes
+
+
+class GenericAddVoteSchema(_GenericVoteSchema):
+    poll: int  # Poll pk for votes
+
+
+class GenericExistingVoteSchema(_GenericVoteSchema):
+    pk: int  # Votes pk
 
 
 class PollResult(BaseModel):
@@ -18,5 +25,9 @@ class RankingSchema(BaseModel):
     ranking: List[int]  # Validation...?
 
 
-class RankedVoteSchema(GenericVoteSchema):
+class AddRankedVoteSchema(GenericAddVoteSchema):
+    vote: RankingSchema
+
+
+class ExistingRankedVoteSchema(GenericExistingVoteSchema):
     vote: RankingSchema

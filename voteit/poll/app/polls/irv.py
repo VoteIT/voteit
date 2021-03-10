@@ -2,28 +2,22 @@ from typing import Counter
 
 from django.utils.translation import gettext_lazy as _
 from pydantic import BaseModel
+from stvpoll import Candidate
+from stvpoll import ElectionRound
+from stvpoll import IncompleteResult
+from stvpoll import STVPollBase
 
-from stvpoll import (
-    Candidate,
-    ElectionRound,
-    IncompleteResult,
-    STVPollBase,
-)
 from voteit.messaging.decorators import incoming
 from voteit.poll.app.polls import ScottishSTV
 from voteit.poll.app.polls.scottish_stv import STVResultSchema
 from voteit.poll.exceptions import InvalidProposalCount
-from voteit.poll.messages import (
-    AddVote,
-    ChangeVote
-)
+from voteit.poll.messages import AddVote
+from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import (
-    RankedVoteSchema,
-)
+from voteit.poll.schemas import AddRankedVoteSchema
+from voteit.poll.schemas import ExistingRankedVoteSchema
 
-
-__all__ = "IRV",
+__all__ = ("IRV",)
 
 
 def irv_quota(poll: STVPollBase) -> int:
@@ -32,9 +26,10 @@ def irv_quota(poll: STVPollBase) -> int:
 
 
 class IRVPoll(STVPollBase):
-    """ Alternative vote or Instant-Runoff Voting is a method for selecting a majority winner
-        among a set of proposals / candidates using ranked votes.
+    """Alternative vote or Instant-Runoff Voting is a method for selecting a majority winner
+    among a set of proposals / candidates using ranked votes.
     """
+
     def __init__(self, candidates, quota=irv_quota, random_in_tiebreaks=True):
         super().__init__(1, candidates, quota, random_in_tiebreaks)
 
@@ -48,7 +43,7 @@ class IRVPoll(STVPollBase):
 
         else:
             if len(self.standing_candidates) == 1:
-                raise IncompleteResult('No candidate can get majority.')
+                raise IncompleteResult("No candidate can get majority.")
 
             loser, method = self.get_candidate(most_votes=False)
             self.select(loser, method, Candidate.EXCLUDED)
@@ -58,15 +53,15 @@ class IRVPoll(STVPollBase):
 @incoming
 class AddIRVVote(AddVote):
     name = "irv_vote.add"
-    schema = RankedVoteSchema
-    data: RankedVoteSchema
+    schema = AddRankedVoteSchema
+    data: AddRankedVoteSchema
 
 
 @incoming
 class ChangeIRVVote(ChangeVote):
     name = "irv_vote.change"
-    schema = RankedVoteSchema
-    data: RankedVoteSchema
+    schema = ExistingRankedVoteSchema
+    data: ExistingRankedVoteSchema
 
 
 class IRVSettings(BaseModel):
@@ -79,7 +74,7 @@ class IRVSettings(BaseModel):
 @poll_methods
 class IRV(ScottishSTV):
     name = "irv"
-    title = _('Instant-Runoff Voting')
+    title = _("Instant-Runoff Voting")
     settings_schema = IRVSettings
     min_winners = 1
     max_winners = 1

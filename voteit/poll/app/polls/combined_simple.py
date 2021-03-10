@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Dict, List, Tuple
+from typing import Dict
+from typing import List
+from typing import Tuple
 
 from django.utils.translation import gettext_lazy as _
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
+from pydantic import validator
 
 from voteit.messaging.decorators import incoming
-from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.abcs import PollMethod
-from voteit.poll.messages import AddVote, ChangeVote
+from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.messages import AddVote
+from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericVoteSchema, PollResult
+from voteit.poll.schemas import GenericAddVoteSchema
+from voteit.poll.schemas import GenericExistingVoteSchema
+from voteit.poll.schemas import PollResult
 
 __all__ = ("CombinedSimple",)
 
@@ -32,22 +38,26 @@ class CombinedSimpleVoteSchema(BaseModel):
         return sorted(lst)
 
 
-class VoteSchema(GenericVoteSchema):
+class AddVoteSchema(GenericAddVoteSchema):
+    vote: CombinedSimpleVoteSchema
+
+
+class ExistingVoteSchema(GenericExistingVoteSchema):
     vote: CombinedSimpleVoteSchema
 
 
 @incoming
 class AddSimpleVote(AddVote):
     name = "combined_simple_vote.add"
-    schema = VoteSchema
-    data: VoteSchema
+    schema = AddVoteSchema
+    data: AddVoteSchema
 
 
 @incoming
 class ChangeSimpleVote(ChangeVote):
     name = "combined_simple_vote.change"
-    schema = VoteSchema
-    data: VoteSchema
+    schema = ExistingVoteSchema
+    data: ExistingVoteSchema
 
 
 class ProposalResult(BaseModel):
@@ -62,8 +72,8 @@ class CombinedSimplePollResult(PollResult):
 
 @poll_methods
 class CombinedSimple(PollMethod):
-    """ This poll method is a simple approve / deny,
-        but also the base for all tests that should run against the abstract PollMethod.
+    """This poll method is a simple approve / deny,
+    but also the base for all tests that should run against the abstract PollMethod.
     """
 
     VOTE_CHOICES = VOTE_CHOICES
@@ -79,7 +89,9 @@ class CombinedSimple(PollMethod):
         return self.vote_schema.parse_raw(text)
 
     @staticmethod
-    def _count_votes(pk: int, votes: List[Tuple[CombinedSimpleVoteSchema, int]]) -> Counter:
+    def _count_votes(
+        pk: int, votes: List[Tuple[CombinedSimpleVoteSchema, int]]
+    ) -> Counter:
         count = Counter()
         for vote, ct in votes:
             if pk in getattr(vote, YES):
@@ -91,15 +103,20 @@ class CombinedSimple(PollMethod):
         return count
 
     def calculate_result(self, counter: Counter) -> CombinedSimplePollResult:
-        """ Set proposals as approved or denied based on YES or NO votes.
-            Equal result means proposal is neither approved nor denied.
+        """Set proposals as approved or denied based on YES or NO votes.
+        Equal result means proposal is neither approved nor denied.
         """
         votes = [(self.vote_to_obj(vote), ct) for vote, ct in counter.items()]
         results: Dict[int, Counter] = {
-            pk: self._count_votes(pk, votes) for pk in self.poll.proposals.values_list("pk", flat=True)
+            pk: self._count_votes(pk, votes)
+            for pk in self.poll.proposals.values_list("pk", flat=True)
         }
-        approved: List[int] = [pk for pk, counter in results.items() if counter[YES] > counter[NO]]
-        denied: List[int] = [pk for pk, counter in results.items() if counter[YES] < counter[NO]]
+        approved: List[int] = [
+            pk for pk, counter in results.items() if counter[YES] > counter[NO]
+        ]
+        denied: List[int] = [
+            pk for pk, counter in results.items() if counter[YES] < counter[NO]
+        ]
         return CombinedSimplePollResult(
             results=results,
             approved=approved,

@@ -117,7 +117,7 @@ class AddVoteTests(TestCase):
         kw.setdefault(
             "vote", {"ranking": [self.prop1.pk, self.prop2.pk, self.prop3.pk]}
         )
-        kw.setdefault("pk", self.poll.pk)
+        kw.setdefault("poll", self.poll.pk)
         return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_add(self):

@@ -177,6 +177,7 @@ class CheckPredicateSchema(CheckSchema):
 
 class CheckMixin(ContextAction):
     data: CheckSchema
+    context_pk_attr = "pk"
 
     @property
     def model(self):

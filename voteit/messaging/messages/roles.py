@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from abc import ABC
-from abc import abstractmethod
-from typing import Dict, Tuple
 from typing import List
 from typing import Optional
+from typing import Tuple
 from typing import Type
 
-from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext as _
@@ -15,21 +12,16 @@ from pydantic import BaseModel
 from pydantic import Field
 from pydantic import root_validator
 from pydantic import validator
-
 from voteit.core.models import RoleContextMixin
 from voteit.core.schemas import RoleOutput
-from voteit.core.utils import get_content_registry
 from voteit.core.utils import get_model_by_shortname
 from voteit.core.validators import root_validate_roles_and_model
 from voteit.core.validators import validate_roles_context_model
-from voteit.meeting.models import Meeting
-from voteit.meeting.models import MeetingRoles
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.messaging.abcs import AsyncRunnable
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import ContextAction
-from voteit.messaging.abcs import ContextSchema
 from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.channels.user import UserChannel
 from voteit.messaging.decorators import incoming
@@ -41,7 +33,7 @@ from voteit.messaging.messages.text import TextResponse
 User = get_user_model()
 
 
-class ChangeRolesSchema(ContextSchema):
+class ChangeRolesSchema(BaseModel):
     """
     Typical valid input:
     >>> ChangeRolesSchema(userids=[1], roles=["participant"], model="meeting", pk=2)
@@ -54,6 +46,7 @@ class ChangeRolesSchema(ContextSchema):
     pydantic.error_wrappers.ValidationError:
     """
 
+    pk: int
     userids: List[int]
     roles: List[str]  # We have no clue of roles are valid here
     model: str  # The short name of the model to change roles in
@@ -68,6 +61,7 @@ class ChangeRolesSchema(ContextSchema):
 class BaseRoles(BaseIncomingMessage, DeferredJob, ContextAction):
     schema = ChangeRolesSchema
     data: ChangeRolesSchema
+    context_pk_attr = "pk"
 
     @property
     def model(self) -> Type[RoleContextMixin]:
@@ -150,6 +144,7 @@ class GetRoles(BaseIncomingMessage, DeferredJob, ContextAction):
     name = "roles.get"
     schema = GetRolesSchema
     data: GetRolesSchema
+    context_pk_attr = "pk"
 
     @property
     def permission(self) -> str:

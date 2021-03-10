@@ -1,32 +1,34 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 from logging import getLogger
-from typing import Optional, TYPE_CHECKING, Type, Dict, Union
+from typing import Dict
+from typing import Optional
+from typing import TYPE_CHECKING
+from typing import Type
+from typing import Union
 
 from asgiref.sync import async_to_sync
 from channels import DEFAULT_CHANNEL_LAYER
 from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
-from django.db import models, transaction
+from django.db import models
+from django.db import transaction
 from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
 
 from voteit.core.queues import DEFAULT_QUEUE
-from voteit.messaging import (
-    MESSAGE_WAITING,
-    MESSAGE_RUNNING,
-    MESSAGE_SUCCESS,
-    MESSAGE_FAILED,
-    INTERNAL_MESSAGE,
-)
-from voteit.messaging.envelopes import (
-    IncomingEnvelope,
-    InternalEnvelope,
-    OutgoingEnvelope,
-)
+from voteit.messaging import INTERNAL_MESSAGE
+from voteit.messaging import MESSAGE_FAILED
+from voteit.messaging import MESSAGE_RUNNING
+from voteit.messaging import MESSAGE_SUCCESS
+from voteit.messaging import MESSAGE_WAITING
+from voteit.messaging.envelopes import IncomingEnvelope
+from voteit.messaging.envelopes import InternalEnvelope
+from voteit.messaging.envelopes import OutgoingEnvelope
 from voteit.messaging.utils import get_incoming_registry
 from voteit.messaging.utils import get_outgoing_registry
 
@@ -39,7 +41,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-User = get_user_model()
+User: AbstractUser = get_user_model()
 
 
 class MessageMeta(BaseModel):
@@ -366,34 +368,34 @@ class DeferredJob(ABC):
         pass
 
 
-class ContextSchema(BaseModel):
-    """ Default context schema, feel free to override. """
-
-    pk: int
-
-
 class ContextAction(MessageABC, ABC):
     """An action performed on a specific context.
-    It has a permission and a model. The schema itself must contain 'pk' that will be
-    used for lookup of the context to perform the action on.
+    It has a permission and a model. The schema itself must contain an attribute that will be
+    used for lookup of the context to perform the action on. (context_pk_attr)
 
     Note that it only works as a placeholder for an action, the code itself should be constructed by
     combining it with DeferredJob and must also inherit BaseIncomingMessage or BaseOutgoingMessage
     """
 
-    schema = ContextSchema
-    data: ContextSchema
+    @property
+    @abstractmethod
+    def context_pk_attr(self) -> str:
+        """ Fetch context from this attribute in the schema"""
+
+    @property
+    @abstractmethod
+    def schema(self) -> Type[BaseModel]:
+        """ This really must have a valid schema"""
 
     @property
     @abstractmethod
     def permission(self) -> Optional[str]:
         """ Text permission, None means allow any. """
-        pass
 
     @property
     @abstractmethod
     def model(self) -> Type[models.Model]:
-        pass
+        """ Model class this operates on."""
 
     def allowed(self) -> bool:
         if self.user is None:
@@ -407,7 +409,13 @@ class ContextAction(MessageABC, ABC):
     @cached_property
     def context(self) -> models.Model:
         try:
-            return self.model.objects.get(pk=self.data.pk)
+            pk = getattr(self.data, self.context_pk_attr)
+        except AttributeError:
+            raise AttributeError(
+                f"{self.context_pk_attr} is not a valid schema attribute for pk lookup. Message: {self}"
+            )
+        try:
+            return self.model.objects.get(pk=pk)
         except self.model.DoesNotExist:
             raise BaseError.create(
                 type_name="error.not_found",

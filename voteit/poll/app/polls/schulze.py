@@ -1,19 +1,27 @@
 from __future__ import annotations
 
 import json
-from typing import Counter, Dict, Tuple, Optional, List, Union
+from typing import Counter
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 from django.utils.translation import gettext as _
 from py3votecore.schulze_method import SchulzeMethod
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
+from pydantic import validator
 
 from voteit.messaging.decorators import incoming
 from voteit.messaging.errors import ValidationErrorMsg
-from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.abcs import PollMethod
-from voteit.poll.messages import AddVote, ChangeVote
+from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.messages import AddVote
+from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericVoteSchema, PollResult
+from voteit.poll.schemas import GenericAddVoteSchema, GenericExistingVoteSchema
+from voteit.poll.schemas import PollResult
 
 __all__ = ("Schulze", "RepeatedSchulze")
 
@@ -23,36 +31,40 @@ class SchulzeVoteSchema(BaseModel):
     ranking: List[Tuple[int, int]]
 
 
-class VoteSchema(GenericVoteSchema):
+class AddVoteSchema(GenericAddVoteSchema):
     vote: SchulzeVoteSchema
 
 
 @incoming
 class AddSchulzeVote(AddVote):
     name = "schulze_vote.add"
-    schema = VoteSchema
-    data: VoteSchema
+    schema = AddVoteSchema
+    data: AddVoteSchema
+
+
+class ExistingVoteSchema(GenericExistingVoteSchema):
+    vote: SchulzeVoteSchema
 
 
 @incoming
 class ChangeSchulzeVote(ChangeVote):
     name = "schulze_vote.change"
-    schema = VoteSchema
-    data: VoteSchema
+    schema = ExistingVoteSchema
+    data: ExistingVoteSchema
 
 
 @incoming
 class AddRepeatedSchulzeVote(AddVote):
     name = "repeated_schulze_vote.add"
-    schema = VoteSchema
-    data: VoteSchema
+    schema = AddVoteSchema
+    data: AddVoteSchema
 
 
 @incoming
 class ChangeRepeatedSchulzeVote(ChangeVote):
     name = "repeated_schulze_vote.change"
-    schema = VoteSchema
-    data: VoteSchema
+    schema = ExistingVoteSchema
+    data: ExistingVoteSchema
 
 
 class SchulzePollResult(PollResult):

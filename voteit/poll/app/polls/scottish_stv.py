@@ -1,6 +1,8 @@
 from collections import Counter
 from decimal import Decimal
-from typing import List, Union, Tuple
+from typing import List
+from typing import Tuple
+from typing import Union
 
 from django.utils.translation import gettext as _
 from pydantic import validator
@@ -11,15 +13,16 @@ from voteit.messaging.decorators import incoming
 from voteit.messaging.errors import ValidationErrorMsg
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
-from voteit.poll.messages import AddVote, ChangeVote
+from voteit.poll.messages import AddVote
+from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import (
-    PollResult,
-    RankingSchema,
-    RankedVoteSchema,
-)
+from voteit.poll.schemas import AddRankedVoteSchema
+from voteit.poll.schemas import ExistingRankedVoteSchema
+from voteit.poll.schemas import PollResult
 
 __all__ = ("ScottishSTV",)
+
+from voteit.poll.schemas import RankingSchema
 
 
 class ScottishSTVSettings(BaseModel):
@@ -40,15 +43,15 @@ class ScottishSTVSettings(BaseModel):
 @incoming
 class AddSTVVote(AddVote):
     name = "scottish_stv_vote.add"
-    schema = RankedVoteSchema
-    data: RankedVoteSchema
+    schema = AddRankedVoteSchema
+    data: AddRankedVoteSchema
 
 
 @incoming
 class ChangeSTVVote(ChangeVote):
     name = "scottish_stv_vote.change"
-    schema = RankedVoteSchema
-    data: RankedVoteSchema
+    schema = ExistingRankedVoteSchema
+    data: ExistingRankedVoteSchema
 
 
 class STVResultRoundSchema(BaseModel):

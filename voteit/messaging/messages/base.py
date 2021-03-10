@@ -53,7 +53,7 @@ class GenericDeleteSchema(BaseModel):
 
 
 class BaseObjectAction(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
-    pass
+    context_pk_attr = "pk"
 
 
 class BaseAddObject(BaseObjectAction, ABC):
