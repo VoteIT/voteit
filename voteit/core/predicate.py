@@ -135,6 +135,7 @@ class PredicateRegistry(Registry):
         def inner(fn):
             if isinstance(fn, Predicate):
                 self[fn.name] = fn
+                return fn
             else:
                 pred = Predicate(fn, name, **options)
                 update_wrapper(pred, fn)
@@ -155,7 +156,7 @@ class PredicateRegistry(Registry):
                     pred.role = role
                     role.predicate = pred
                 self[pred.name] = pred
-            return pred
+                return pred
 
         if fn:
             return inner(fn)
