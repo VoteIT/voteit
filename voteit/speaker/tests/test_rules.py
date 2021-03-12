@@ -133,7 +133,9 @@ class SpeakerListSystemTests(TestCase):
 
         meeting = Meeting.objects.create()
         self.system = meeting.speaker_systems.create(method_name="simple")
-        self.user_moderator = User.objects.create(username="moderator")
+        self.user_meeting_moderator = User.objects.create(username="m_moderator")
+        meeting.add_roles(self.user_meeting_moderator, ROLE_MODERATOR)
+        self.user_moderator = User.objects.create(username="s_moderator")
         self.system.add_roles(self.user_moderator, ROLE_LIST_MODERATOR)
         self.user_speaker = User.objects.create(username="in")
         self.system.add_roles(self.user_speaker, ROLE_SPEAKER)
@@ -160,15 +162,17 @@ class SpeakerListSystemTests(TestCase):
 
     def test_change_system(self):
         CHANGE = self.p("CHANGE")
-        self.assertTrue(self.user_moderator.has_perm(CHANGE, self.system))
-        self.assertFalse(self.user_speaker.has_perm(CHANGE, self.system))
-        self.assertFalse(self.user_any.has_perm(CHANGE, self.system))
+        self.assertIs(self.user_meeting_moderator.has_perm(CHANGE, self.system), True)
+        self.assertIs(self.user_moderator.has_perm(CHANGE, self.system), False)
+        self.assertIs(self.user_speaker.has_perm(CHANGE, self.system), False)
+        self.assertIs(self.user_any.has_perm(CHANGE, self.system), False)
 
     def test_delete_system(self):
         DELETE = self.p("DELETE")
-        self.assertTrue(self.user_moderator.has_perm(DELETE, self.system))
-        self.assertFalse(self.user_speaker.has_perm(DELETE, self.system))
-        self.assertFalse(self.user_any.has_perm(DELETE, self.system))
+        self.assertIs(self.user_meeting_moderator.has_perm(DELETE, self.system), True)
+        self.assertIs(self.user_moderator.has_perm(DELETE, self.system), False)
+        self.assertIs(self.user_speaker.has_perm(DELETE, self.system), False)
+        self.assertIs(self.user_any.has_perm(DELETE, self.system), False)
 
     def test_view_system_contextless(self):
         VIEW = self.p("VIEW")

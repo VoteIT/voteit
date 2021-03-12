@@ -230,7 +230,7 @@ class SpeakerListSystemViewTestCase(APITestCase):
     def test_put(self):
         url = f"/api/speaker-list-systems/{self.system.pk}/"
         data = {"meeting": self.meeting.pk, "title": "Mkay", "method_name": "simple"}
-        self.client.force_login(self.list_moderator)
+        self.client.force_login(self.moderator)
         response = self.client.put(url, data)
         self.assertEqual(
             response.status_code,
@@ -242,7 +242,7 @@ class SpeakerListSystemViewTestCase(APITestCase):
     def test_patch(self):
         url = f"/api/speaker-list-systems/{self.system.pk}/"
         data = {"title": "Mkay"}
-        self.client.force_login(self.list_moderator)
+        self.client.force_login(self.moderator)
         response = self.client.patch(url, data)
         self.assertEqual(
             response.status_code,
@@ -253,7 +253,7 @@ class SpeakerListSystemViewTestCase(APITestCase):
 
     def test_delete(self):
         url = f"/api/speaker-list-systems/{self.system.pk}/"
-        self.client.force_login(self.list_moderator)
+        self.client.force_login(self.moderator)
         response = self.client.delete(url)
         self.assertEqual(
             response.status_code,
@@ -272,12 +272,19 @@ class SpeakerListSystemViewTestCase(APITestCase):
         data = response.json()
         self.assertEqual({"max_times": 3}, data["settings"])
 
+    def test_transition_moderator(self):
+        url = f"/api/speaker-list-systems/{self.system.pk}/transitions/"
+        self.client.force_login(self.moderator)
+        data = {"transition": "activate"}
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 201)
+
     def test_transition_list_moderator(self):
         url = f"/api/speaker-list-systems/{self.system.pk}/transitions/"
         self.client.force_login(self.list_moderator)
         data = {"transition": "activate"}
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 403)
 
 
 class HistoricSpeakerViewTests(APITestCase):

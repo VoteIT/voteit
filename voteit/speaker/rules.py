@@ -127,11 +127,11 @@ rules.add_perm(
 )  # Checked against meeting
 rules.add_perm(
     SpeakerSystemPermissions.CHANGE,
-    is_speaker_moderator & meeting_upcoming_ongoing & is_system_not_archived,
+    is_moderator & meeting_upcoming_ongoing & is_system_not_archived,
 )
 rules.add_perm(
     SpeakerSystemPermissions.DELETE,
-    is_speaker_moderator & meeting_upcoming_ongoing & is_system_not_archived,
+    is_moderator & meeting_upcoming_ongoing & is_system_not_archived,
 )
 rules.add_perm(
     SpeakerSystemPermissions.VIEW,
