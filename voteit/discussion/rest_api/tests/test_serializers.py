@@ -13,11 +13,12 @@ class DiscussionPostDetailSerializerTests(TestCase):
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
+        self.group = self.meeting.groups.create()
         self.user = self.meeting.participants.create(username="jane")
         self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
         tag_html = mk_hashtag("world")
         self.disc = self.ai.discussions.create(
-            author=self.user, body=f"Hello {tag_html}"
+            author=self.user, body=f"Hello {tag_html}", meeting_group=self.group
         )
 
     @property
@@ -38,6 +39,7 @@ class DiscussionPostDetailSerializerTests(TestCase):
         self.assertIsInstance(dt, datetime)
         self.assertEqual(data.pop("author"), self.user.pk)
         self.assertEqual(data.pop("tags"), ["world"])
+        self.assertEqual(data.pop("meeting_group"), self.group.pk)
         # Make sure we checked everything
         self.assertFalse(data.keys())
 
@@ -56,7 +58,9 @@ class DiscussionPostCreateSerializer(TestCase):
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
+        self.group = self.meeting.groups.create()
         self.user = self.meeting.participants.create(username="jane")
+        self.group.members.add(self.user)
         self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
 
     @property
@@ -67,17 +71,23 @@ class DiscussionPostCreateSerializer(TestCase):
 
         return DiscussionPostCreateSerializer
 
-    def test_create(self):
+    def _mk_request(self):
         rf = RequestFactory()
         request = rf.request()
         request.user = self.user
+        return request
+
+    def test_create(self):
         data = {
             "body": "Hello " + mk_hashtag("world"),
             "agenda_item": self.ai.pk,
+            "meeting_group": self.group.pk,
         }
+        request = self._mk_request()
         serializer = self._cut(data=data, context={"request": request})
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
         self.assertEqual(["world"], instance.tags)
         self.assertEqual(self.ai, instance.agenda_item)
         self.assertEqual(self.user, instance.author)
+        self.assertEqual(self.group, instance.meeting_group)

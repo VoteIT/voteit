@@ -74,28 +74,22 @@ class ManagerTests(TestCase):
 
     def test_for_user(self):
         User = get_user_model()
-        participant = self.private_meeting.participants.create(username='p')
-        non_participant = User.objects.create(username='np')
-        self.assertEqual(
-            self.Meeting.objects.for_user(participant).count(), 2
-        )
+        participant = self.private_meeting.participants.create(username="p")
+        non_participant = User.objects.create(username="np")
+        self.assertEqual(self.Meeting.objects.for_user(participant).count(), 2)
         self.assertEqual(
             self.Meeting.objects.for_user(participant).filter(public=False).count(), 1
         )
-        self.assertEqual(
-            self.Meeting.objects.for_user(non_participant).count(), 1
-        )
-        self.assertIs(
-            self.Meeting.objects.for_user(non_participant).get().public, True
-        )
+        self.assertEqual(self.Meeting.objects.for_user(non_participant).count(), 1)
+        self.assertIs(self.Meeting.objects.for_user(non_participant).get().public, True)
 
     def test_distinct_for_user(self):
         User = get_user_model()
-        for n in range(1,4):
-            self.public_meeting.participants.create(username=f'p{n}')
-        participant = self.public_meeting.participants.create(username='p')
+        for n in range(1, 4):
+            self.public_meeting.participants.create(username=f"p{n}")
+        participant = self.public_meeting.participants.create(username="p")
         self.private_meeting.participants.add(participant)
-        non_participant = User.objects.create(username='np')
+        non_participant = User.objects.create(username="np")
         meetings_for_p = self.Meeting.objects.for_user(participant)
         meetings_for_np = self.Meeting.objects.for_user(non_participant)
 

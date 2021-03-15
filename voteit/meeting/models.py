@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from datetime import timedelta, datetime
-from typing import TYPE_CHECKING, Generator, Optional
+from datetime import datetime
+from datetime import timedelta
+from typing import Generator
+from typing import Optional
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -12,10 +15,12 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
-from django_fsm import FSMField, transition
-
+from django_fsm import FSMField
+from django_fsm import transition
 from voteit.core.abcs import MeetingContext
-from voteit.core.models import BaseContent, Roles, RoleContextMixin
+from voteit.core.models import BaseContent
+from voteit.core.models import RoleContextMixin
+from voteit.core.models import Roles
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.utils import get_electoral_policy_registry
@@ -26,10 +31,10 @@ if TYPE_CHECKING:
     from voteit.poll.abcs import ElectoralRegisterPolicy
     from voteit.organisation.models import Organisation
 
-__all__ = "Meeting", "MeetingRoles"
+__all__ = "Meeting", "MeetingRoles", "MeetingGroup"
 
 
-UserModel = get_user_model()
+UserModel: AbstractUser = get_user_model()
 
 
 class MeetingRoles(Roles, MeetingContext):
@@ -190,3 +195,18 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
             return self.get_queryset().for_user(user)
 
     objects = Manager()
+    groups: models.QuerySet
+
+
+class MeetingGroup(BaseContent, MeetingContext):
+    name: str = "meeting_group"
+    title: str = models.CharField(max_length=100, default="")
+    meeting: Meeting = models.ForeignKey(
+        "Meeting", on_delete=models.CASCADE, related_name="groups"
+    )
+    members = models.ManyToManyField(
+        UserModel, blank=True, related_name="meeting_groups"
+    )
+    # Type annotations - relations
+    proposals: models.QuerySet
+    discussions: models.QuerySet

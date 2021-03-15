@@ -13,10 +13,13 @@ class ProposalDetailSerializerTests(TestCase):
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
+        self.group = self.meeting.groups.create()
         self.user = self.meeting.participants.create(username="jane")
         self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
         tag_html = mk_hashtag("world")
-        self.prop = self.ai.proposals.create(author=self.user, body=f"Hello {tag_html}")
+        self.prop = self.ai.proposals.create(
+            author=self.user, body=f"Hello {tag_html}", meeting_group=self.group
+        )
 
     @property
     def _cut(self):
@@ -40,6 +43,7 @@ class ProposalDetailSerializerTests(TestCase):
         self.assertEqual(2, len(tags))
         self.assertIsInstance(prop_id, str)
         self.assertEqual("published", data.pop("state"))
+        self.assertEqual(self.group.pk, data.pop("meeting_group"))
         # Make sure we checked everything
         self.assertFalse(data.keys())
 
@@ -59,6 +63,8 @@ class ProposalCreateSerializer(TestCase):
             title="Test meeting", state="ongoing"
         )
         self.user = self.meeting.participants.create(username="jane")
+        self.group = self.meeting.groups.create()
+        self.group.members.add(self.user)
         self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
 
     @property
@@ -74,6 +80,7 @@ class ProposalCreateSerializer(TestCase):
         data = {
             "body": "Hello " + mk_hashtag("world"),
             "agenda_item": self.ai.pk,
+            "meeting_group": self.group.pk,
         }
         serializer = self._cut(data=data, context={"request": request})
         self.assertTrue(serializer.is_valid())
@@ -82,3 +89,4 @@ class ProposalCreateSerializer(TestCase):
         self.assertIn(instance.prop_id, instance.tags)
         self.assertEqual(self.ai, instance.agenda_item)
         self.assertEqual(self.user, instance.author)
+        self.assertEqual(self.group, instance.meeting_group)

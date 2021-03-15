@@ -3,9 +3,10 @@ from django.utils.translation import gettext_lazy as _
 from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.agenda.models import AgendaItem
+from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingGroup
+from voteit.meeting.models import MeetingRoles
 from voteit.proposal.models import Proposal
-
-from .models import Meeting, MeetingRoles
 
 
 class AgendaItemInline(admin.TabularInline):
@@ -46,3 +47,14 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
 class MeetingRolesAdmin(admin.ModelAdmin):
     autocomplete_fields = "user", "context"
     list_display = "assigned", "user", "context"
+
+
+@admin.register(MeetingGroup)
+class MeetingGroupAdmin(admin.ModelAdmin):
+    autocomplete_fields = ("meeting",)
+    list_display = ("title", "meeting", "member_count")
+    list_filter = ("meeting", "members")
+    search_fields = ("title",)
+
+    def member_count(self, group: MeetingGroup):
+        return group.members.count()

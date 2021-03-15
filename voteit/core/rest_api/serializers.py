@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.contrib.auth import get_user_model
 from django.core.serializers.json import DjangoJSONEncoder
 from pydantic.main import BaseModel
@@ -10,9 +12,12 @@ UserModel = get_user_model()
 class BaseModelSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         ModelClass = self.Meta.model
-        return ModelClass.objects.create(
-            author=self.context["request"].user, **validated_data
-        )
+        user = self.get_request_user()
+        return ModelClass.objects.create(author=user, **validated_data)
+
+    def get_request_user(self) -> Optional[UserModel]:
+        # Validate user?
+        return self.context["request"].user
 
 
 class OptionalHyperlinkedIdentityField(serializers.HyperlinkedIdentityField):

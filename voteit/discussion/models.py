@@ -10,10 +10,9 @@ from voteit.core.abcs import MeetingContext
 from voteit.reactions.mixins import Reactable
 
 if TYPE_CHECKING:
-    from voteit.meeting.models import Meeting
-
-    # from voteit.meeting.models import MeetingGroup
     from django.contrib.auth.models import AbstractUser
+    from voteit.meeting.models import Meeting
+    from voteit.meeting.models import MeetingGroup
 
 
 User: AbstractUser = get_user_model()
@@ -39,13 +38,13 @@ class DiscussionPost(
         null=True,
         related_name="discussions",
     )
-    # group: MeetingGroup = models.ForeignKey(
-    #     "meeting.MeetingGroup",
-    #     on_delete=models.PROTECT,
-    #     null=True,
-    #     blank=True,
-    #     related_name="discussions",
-    # )
+    meeting_group: MeetingGroup = models.ForeignKey(
+        "meeting.MeetingGroup",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="discussions",
+    )
 
     @property
     def meeting(self) -> Optional[Meeting]:

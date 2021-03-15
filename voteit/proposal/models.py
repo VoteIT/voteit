@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from random import sample
 from string import ascii_lowercase
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django_fsm import FSMField, transition
+from django_fsm import FSMField
+from django_fsm import transition
 
-from voteit.core.abcs import AgendaItemContext, MeetingContext
+from voteit.core.abcs import AgendaItemContext
+from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
 from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
@@ -34,13 +37,13 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         null=True,
         related_name="proposals",
     )
-    # group: MeetingGroup = models.ForeignKey(
-    #     "meeting.MeetingGroup",
-    #     on_delete=models.PROTECT,
-    #     null=True,
-    #     blank=True,
-    #     related_name="proposals",
-    # )
+    meeting_group: MeetingGroup = models.ForeignKey(
+        "meeting.MeetingGroup",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="proposals",
+    )
     prop_id: str = models.CharField(max_length=50)
     agenda_item: AgendaItem = models.ForeignKey(
         "agenda.AgendaItem",

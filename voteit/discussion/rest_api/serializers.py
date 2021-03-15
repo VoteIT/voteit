@@ -1,6 +1,8 @@
+from __future__ import annotations
 from rest_framework import serializers
 
 from voteit.core.rest_api.serializers import BaseModelSerializer
+from voteit.core.rest_api.validators import ValidateGroupAIContext
 from voteit.discussion import models
 
 
@@ -12,9 +14,10 @@ class DiscussionPostDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.DiscussionPost
         read_only_fields = [
+            "agenda_item",
             "author",
             "created",
-            "agenda_item",
+            "meeting_group",
             "pk",
             "tags",
         ]
@@ -29,4 +32,6 @@ class DiscussionPostCreateSerializer(BaseModelSerializer):
         fields = [
             "body",
             "agenda_item",
+            "meeting_group",
         ]
+        validators = (ValidateGroupAIContext(),)
