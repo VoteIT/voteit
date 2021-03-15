@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from django.db.models.signals import post_save, pre_delete
+from django.db.models.signals import post_save
+from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
-from voteit.discussion.messages import (
-    DiscussionPostAdded,
-    DiscussionPostChanged,
-    DiscussionPostDeleted,
-)
+from voteit.discussion.messages import DiscussionPostAdded
+from voteit.discussion.messages import DiscussionPostChanged
+from voteit.discussion.messages import DiscussionPostDeleted
 from voteit.discussion.models import DiscussionPost
 from voteit.discussion.rest_api.serializers import DiscussionPostDetailSerializer
 from voteit.messaging.messages.app_state import AppState

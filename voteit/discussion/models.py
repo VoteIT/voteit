@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 
+from django.contrib.auth import get_user_model
 from django.db import models
 
 from voteit.core.models import BaseContent
@@ -11,6 +12,12 @@ from voteit.reactions.mixins import Reactable
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
 
+    # from voteit.meeting.models import MeetingGroup
+    from django.contrib.auth.models import AbstractUser
+
+
+User: AbstractUser = get_user_model()
+
 
 class DiscussionPost(
     BaseContent,
@@ -19,12 +26,26 @@ class DiscussionPost(
     Reactable,
 ):
     name = "discussion_post"
+    author: AbstractUser = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="discussions",
+    )
     agenda_item = models.ForeignKey(
         "agenda.AgendaItem",
         on_delete=models.CASCADE,
         null=True,
         related_name="discussions",
     )
+    # group: MeetingGroup = models.ForeignKey(
+    #     "meeting.MeetingGroup",
+    #     on_delete=models.PROTECT,
+    #     null=True,
+    #     blank=True,
+    #     related_name="discussions",
+    # )
 
     @property
     def meeting(self) -> Optional[Meeting]:
