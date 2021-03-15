@@ -2,23 +2,22 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.db.models.signals import post_save, pre_delete
+from django.db.models.signals import post_save
+from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django_fsm import post_transition
-from voteit.agenda.models import AgendaItem
 
-from voteit.meeting.channels import ParticipantsChannel
+from voteit.agenda.models import AgendaItem
+from voteit.agenda.workflows import AgendaItemWf
 from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.signals import channel_subscribed
-from voteit.proposal.messages import (
-    ProposalAdded,
-    ProposalChanged,
-    ProposalDeleted,
-)
+from voteit.proposal.messages import ProposalAdded
+from voteit.proposal.messages import ProposalChanged
+from voteit.proposal.messages import ProposalDeleted
 from voteit.proposal.models import Proposal
 from voteit.proposal.rest_api.serializers import ProposalDetailSerializer
-from voteit.agenda.workflows import AgendaItemWf
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting

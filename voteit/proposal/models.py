@@ -18,6 +18,7 @@ from voteit.reactions.mixins import Reactable
 if TYPE_CHECKING:
     from voteit.agenda.models import AgendaItem
     from voteit.meeting.models import Meeting
+    from voteit.meeting.models import MeetingGroup
 
 __all__ = ("Proposal",)
 
@@ -29,10 +30,17 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     author: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        editable=True,
+        blank=True,
         null=True,
         related_name="proposals",
     )
+    # group: MeetingGroup = models.ForeignKey(
+    #     "meeting.MeetingGroup",
+    #     on_delete=models.PROTECT,
+    #     null=True,
+    #     blank=True,
+    #     related_name="proposals",
+    # )
     prop_id: str = models.CharField(max_length=50)
     agenda_item: AgendaItem = models.ForeignKey(
         "agenda.AgendaItem",

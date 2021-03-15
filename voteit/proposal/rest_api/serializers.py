@@ -1,45 +1,35 @@
 from rest_framework import serializers
+
 from voteit.core.rest_api.serializers import BaseModelSerializer
-from voteit.proposal import models
+from voteit.proposal.models import Proposal
+
+__all__ = ("ProposalDetailSerializer", "ProposalCreateSerializer")
 
 
-class ProposalListSerializer(serializers.ModelSerializer):
+class ProposalDetailSerializer(serializers.ModelSerializer):
     class Meta:
-        model = models.Proposal
-        fields = (
-            "url",
+        model = Proposal
+        read_only_fields = [
+            "author",
+            "created",
+            "state",
+            "prop_id",
+            "state",
             "pk",
-            "created",
-            "body",
-            "state",
             "agenda_item",
-            "author",
-            "polls",
-            "prop_id",
             "tags",
-        )
-
-
-class ProposalDetailSerializer(BaseModelSerializer):
-    # Note: This won't have access to the request, so no url thingies here!
-
-    class Meta(ProposalListSerializer.Meta):
-        fields = (
-            "pk",
-            "created",
+            # "group",
+        ]
+        fields = read_only_fields + [
             "body",
-            "state",
+        ]
+
+
+class ProposalCreateSerializer(BaseModelSerializer):
+    class Meta:
+        model = Proposal
+        fields = [
             "agenda_item",
-            "author",
-            "polls",
-            "prop_id",
-            "tags",
-        )
-        read_only_fields = (
-            "created",
-            "state",
-            "author",
-            "polls",
-            "prop_id",
-            "tags",
-        )
+            "body",
+            # "group",
+        ]
