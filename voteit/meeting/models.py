@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from datetime import timedelta, datetime
-from typing import TYPE_CHECKING, Generator, Optional
+from datetime import datetime
+from datetime import timedelta
+from typing import Generator
+from typing import Optional
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -12,13 +15,17 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
-from django_fsm import FSMField, transition
+from django_fsm import FSMField
+from django_fsm import transition
 
 from voteit.core.abcs import MeetingContext
-from voteit.core.models import BaseContent, Roles, RoleContextMixin
+from voteit.core.models import BaseContent
+from voteit.core.models import RoleContextMixin
+from voteit.core.models import Roles
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.utils import get_electoral_policy_registry
+from voteit.proposal.utils import get_proposal_id_registry
 
 if TYPE_CHECKING:
     from voteit.access_policy.models import AccessPolicy
@@ -70,6 +77,12 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         null=True,
         blank=True,
     )
+    proposal_id_policy_name: Optional[str] = models.CharField(
+        verbose_name=_("Proposal ID policy name, defaults to system standard"),
+        max_length=30,
+        null=True,
+        blank=True,
+    )
     organisation: Optional[Organisation] = models.ForeignKey(
         "organisation.Organisation",
         on_delete=models.CASCADE,
@@ -81,6 +94,13 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
 
     roles_cls = MeetingRoles
     participants = models.ManyToManyField(UserModel, through=MeetingRoles)
+
+    @cached_property
+    def pid_policy(self) -> ElectoralRegisterPolicy:
+        reg = get_proposal_id_registry()
+        if self.proposal_id_policy_name:
+            return reg[self.proposal_id_policy_name](self)
+        return reg["username"](self)
 
     @cached_property
     def er_policy(self) -> ElectoralRegisterPolicy:

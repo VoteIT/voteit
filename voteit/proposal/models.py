@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from logging import getLogger
 from random import sample
 from string import ascii_lowercase
 from typing import TYPE_CHECKING, Optional
@@ -21,6 +22,8 @@ if TYPE_CHECKING:
     from voteit.meeting.models import MeetingGroup
 
 __all__ = ("Proposal",)
+
+logger = getLogger(__name__)
 
 
 class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
@@ -129,11 +132,23 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
             self.tags.append(self.prop_id)
 
     def save(self, **kw):
+        try:
+            pid_policy = self.meeting.pid_policy
+        except AttributeError:
+            pid_policy = _new_proposal_id
         if not self.prop_id:
-            self.prop_id = new_proposal_id(self)
+            suggestion = pid_policy(self)
+            if suggestion:
+                self.prop_id = suggestion
+            else:
+                logger.debug(
+                    "Proposal id for policy '%s' returned None, using random prop_id.",
+                    self.meeting.proposal_id_policy_name,
+                )
+                self.prop_id = _new_proposal_id(self)
         super().save(**kw)
 
 
-def new_proposal_id(proposal: Proposal) -> str:
+def _new_proposal_id(proposal: Proposal) -> str:
     # FIXME: Do something nice here that isn't just random
     return "".join(sample(ascii_lowercase, 8))

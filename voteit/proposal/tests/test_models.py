@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.db.models import ProtectedError
 from django.test import TestCase
-
+from voteit.meeting.models import Meeting
 
 User = get_user_model()
 
@@ -28,11 +28,15 @@ class ProposalTests(TestCase):
         self.assertIn("hello", prop.tags)
 
     def test_prop_id_unique_to_agenda(self):
-        from voteit.agenda.models import AgendaItem
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
-        ai = AgendaItem.objects.create(meeting=meeting)
+        ai = meeting.agenda_items.create()
         self._mk_one(prop_id="hello", agenda_item=ai)
         with self.assertRaises(IntegrityError):
             self._mk_one(prop_id="hello", agenda_item=ai)
+
+    def test_default_prop_id_based_on_username(self):
+        user = User.objects.create(username="hi")
+        meeting = Meeting.objects.create()
+        ai = meeting.agenda_items.create()
+        prop = self._mk_one(agenda_item=ai, author=user)
+        self.assertEqual("hi-1", prop.prop_id)
