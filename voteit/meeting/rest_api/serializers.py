@@ -1,14 +1,15 @@
 from contextlib import suppress
-from typing import Type, Optional, List
+from typing import List
+from typing import Optional
+from typing import Type
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
+
 from voteit.core.models import Roles
 from voteit.core.rest_api.serializers import UserSerializer
-
 from voteit.meeting import models
-
 
 UserModel = get_user_model()
 
@@ -95,3 +96,15 @@ class RoleSerializer(serializers.Serializer):
     role = serializers.CharField(
         max_length=20, validators=[RoleValidator(roles_cls=models.MeetingRoles)]
     )
+
+
+class MeetingGroupCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.MeetingRoles
+
+
+class MeetingGroupDetailSerializer(serializers.ModelSerializer):
+    # FIXME: Do we want to have a rest endpoint here?
+    class Meta:
+        model = models.MeetingGroup
+        fields = ["pk"] + [f.name for f in models.MeetingGroup._meta.get_fields()]

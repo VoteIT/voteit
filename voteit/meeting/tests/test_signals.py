@@ -41,8 +41,10 @@ class MeetingChannelSubscribedTests(TestCase):
         self.meeting: Meeting = Meeting.objects.create()
         self.user: User = self.meeting.participants.create(username="user")
         self.meeting.add_roles(self.user, "moderator")
+        self.group = self.meeting.groups.create(title="Gang")
+        self.group.members.add(self.user)
 
-    def test_roles_in_appstruct(self):
+    def test_roles_in_app_state(self):
         from voteit.messaging.messages.channels import Subscribe
         from voteit.messaging.messages.channels import Subscribed
 
@@ -63,3 +65,63 @@ class MeetingChannelSubscribedTests(TestCase):
         self.assertEqual(set(payload["roles"]), {"participant", "moderator"})
         self.assertEqual(payload["user_pk"], self.user.pk)
         self.assertEqual(payload["model"], "meeting")
+
+    def test_meeting_groups_in_app_state(self):
+        from voteit.messaging.messages.channels import Subscribe
+        from voteit.messaging.messages.channels import Subscribed
+
+        msg = Subscribe(
+            mm={"user_pk": self.user.pk, "consumer_name": "abc"},
+            channel_type="meeting",
+            pk=self.meeting.pk,
+        )
+        response = msg.run_job()
+        self.assertIsInstance(response, Subscribed)
+        added = [x for x in response.data.app_state if x.t == "meeting_group.added"]
+        self.assertEqual(1, len(added))
+        payload = added[0].p
+        self.assertEqual(
+            set(payload["members"]),
+            {self.user.pk},
+        )
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class MeetingGroupChangedTests(TestCase):
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+
+        self.meeting = Meeting.objects.create()
+        self.group = self.meeting.groups.create()
+
+    @patch.object(MeetingChannel, "publish")
+    def test_added(self, mock_publish):
+        from voteit.meeting.messages import MeetingGroupAdded
+
+        group = self.meeting.groups.create()
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, MeetingGroupAdded)
+        self.assertEqual(group.pk, msg.data.pk)
+
+    @patch.object(MeetingChannel, "publish")
+    def test_changed(self, mock_publish):
+        from voteit.meeting.messages import MeetingGroupChanged
+
+        self.group.title = "Hello"
+        self.group.save()
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, MeetingGroupChanged)
+        self.assertEqual(self.group.pk, msg.data.pk)
+
+    @patch.object(MeetingChannel, "publish")
+    def test_deleted(self, mock_publish):
+        from voteit.meeting.messages import MeetingGroupDeleted
+
+        group_pk = self.group.pk
+        self.group.delete()
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, MeetingGroupDeleted)
+        self.assertEqual(group_pk, msg.data.pk)
