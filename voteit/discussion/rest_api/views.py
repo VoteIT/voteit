@@ -23,11 +23,3 @@ class DiscussionPostViewSet(DefaultModelViewSet):
     )
     context_queryset = AgendaItem.objects.all()
     context_lookup_kwarg = "agenda_item"
-
-    def get_queryset(self):
-        if self.request.user.is_superuser:
-            return self.queryset
-        # TODO: Filter out private ai:s
-        return self.queryset.filter(
-            agenda_item__meeting__participants=self.request.user
-        )
