@@ -1,25 +1,28 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 import rules
 from django.contrib.auth.models import AbstractUser
 
 from voteit.core.decorators import predicate
-from voteit.organisation.permissions import OrgPermissions
-from voteit.organisation.roles import ROLE_ORG_MANAGER, ROLE_MEETING_CREATOR
 from voteit.organisation.models import Organisation
+from voteit.organisation.permissions import OrgPermissions
+from voteit.organisation.roles import ROLE_MEETING_CREATOR
+from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 if TYPE_CHECKING:
     pass
 
 
-@predicate
+@predicate(role=ROLE_ORG_MANAGER)
 def is_manager(user: AbstractUser, organisation: Organisation):
     return isinstance(organisation, Organisation) and organisation.has_roles(
         user, ROLE_ORG_MANAGER
     )
 
 
-@predicate
+@predicate(role=ROLE_MEETING_CREATOR)
 def is_meeting_creator(user: AbstractUser, organisation: Organisation):
     return isinstance(organisation, Organisation) and organisation.has_roles(
         user, ROLE_MEETING_CREATOR
