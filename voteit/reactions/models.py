@@ -30,20 +30,20 @@ class ReactionButton(MeetingContext):
     name = "reaction_button"
     # role_set: models.QuerySet
     ICON_CHOICES = (  # TODO, maybe use material icons? https://material.io/resources/icons/?style=baseline
-        ("thumb_up", _("Thumb up")),
-        ("thumb_down", _("Thumb down")),
-        ("check", _("Checkmark")),
-        ("block", _("Block")),
-        ("star", _("Star")),
-        ("accessible", _("Accessible")),
+        ("mdi-thumb-up", _("Thumb up")),
+        ("mdi-thumb-down", _("Thumb down")),
+        ("mdi-check", _("Checkmark")),
+        ("mdi-cancel", _("Block")),
+        ("mdi-star", _("Star")),
+        ("mdi-wheelchair-accessibility", _("Accessible")),
     )
     COLOR_CHOICES = (  # TODO, don't know how to define these. Using BS4 standard names 4 now. Should follow theme.
         ("primary", _("Primary")),
         ("secondary", _("Secondary")),
-        ("success", _("Success")),
-        ("danger", _("Danger")),
-        ("warning", _("Warning")),
+        ("error", _("Error")),
         ("info", _("Info")),
+        ("success", _("Success")),
+        ("warning", _("Warning")),
     )
 
     title: str = models.CharField(_("Display name"), max_length=80)
