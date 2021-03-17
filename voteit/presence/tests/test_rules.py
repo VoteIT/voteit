@@ -57,7 +57,7 @@ class PresenceCheckTests(TestCase):
 
         self.meeting = Meeting.objects.create()
         self.system = PresenceSystem.objects.create(meeting=self.meeting)
-        self.presence_check = self.system.presence_checks.create()
+        self.presence_check = self.meeting.presence_checks.create()
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
         self.participant = User.objects.create(username="participant")
@@ -72,9 +72,9 @@ class PresenceCheckTests(TestCase):
 
     def test_add(self):
         ADD = self.P.ADD
-        self.assertTrue(self.moderator.has_perm(ADD, self.system))
-        self.assertFalse(self.participant.has_perm(ADD, self.system))
-        self.assertFalse(self.anon_user.has_perm(ADD, self.system))
+        self.assertIs(self.moderator.has_perm(ADD, self.meeting), True)
+        self.assertIs(self.participant.has_perm(ADD, self.meeting), False)
+        self.assertIs(self.anon_user.has_perm(ADD, self.meeting), False)
 
     def test_change_open(self):
         CHANGE = self.P.CHANGE
@@ -125,7 +125,7 @@ class PresenceTests(TestCase):
 
         self.meeting = Meeting.objects.create()
         self.system = PresenceSystem.objects.create(meeting=self.meeting)
-        self.presence_check = self.system.presence_checks.create()
+        self.presence_check = self.meeting.presence_checks.create()
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
         self.participant = User.objects.create(username="participant")

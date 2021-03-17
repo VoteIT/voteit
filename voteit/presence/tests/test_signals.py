@@ -28,7 +28,7 @@ class SignalsTests(TestCase):
         self.meeting.add_roles(self.user, "participant")
         self.meeting.add_roles(self.moderator, "moderator")
         self.system = PresenceSystem.objects.create(meeting=self.meeting)
-        self.check = PresenceCheck.objects.create(presence_system=self.system)
+        self.check = PresenceCheck.objects.create(meeting=self.meeting)
 
     def _mk_presence(self):
         from voteit.presence.models import Presence

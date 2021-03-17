@@ -60,7 +60,7 @@ def presence_deleted(instance: Presence = None, **kw):
 @receiver(post_save, sender=PresenceCheck)
 def presence_check_changed(instance: PresenceCheck = None, created: bool = None, **kw):
     """Transmit presence check to meeting channel"""
-    meeting = instance.presence_system.meeting
+    meeting = instance.meeting
     if meeting is not None:
         data = PresenceCheckDetailSerializer(instance).data
         if created:
@@ -74,7 +74,7 @@ def presence_check_changed(instance: PresenceCheck = None, created: bool = None,
 @receiver(post_delete, sender=PresenceCheck)
 def presence_check_deleted(instance=None, **kw):
     """Transmit that presence check has been deleted to meeting channel."""
-    meeting = instance.presence_system.meeting
+    meeting = instance.meeting
     if meeting is not None:
         msg = PresenceCheckDeleted(pk=instance.pk)
         ch = MeetingChannel.from_instance(meeting)
@@ -87,7 +87,7 @@ def _channel_subscribed(
 ):
     """ Populate app_state with current, if any, presence check objects. """
     with suppress(ObjectDoesNotExist):
-        if presence_check := context.presence_system.presence_checks.latest_open():
+        if presence_check := context.presence_checks.latest_open():
             app_state.append_from(
                 presence_check, PresenceCheckDetailSerializer, PresenceCheckAdded
             )
@@ -95,3 +95,13 @@ def _channel_subscribed(
                 app_state.append_from(
                     user_presence, PresenceDetailSerializer, PresenceAdded
                 )
+
+
+@receiver(channel_subscribed, sender=PresenceCheckChannel)
+def _check_channel_subscribed(
+    context: PresenceCheck, user: AbstractUser, app_state: AppState, **kw
+):
+    app_state.append(PresenceCheckStatus(
+        pk=context.pk,
+        present=context.presences.count()
+    ))

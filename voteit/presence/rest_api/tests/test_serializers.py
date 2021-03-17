@@ -12,7 +12,7 @@ class PresenceCheckSerializerTests(TestCase):
         self.system: PresenceSystem = PresenceSystem.objects.create(
             meeting=self.meeting
         )
-        self.presence_check = self.system.presence_checks.create()
+        self.presence_check = self.meeting.presence_checks.create()
 
     @property
     def _cut(self):
@@ -23,12 +23,13 @@ class PresenceCheckSerializerTests(TestCase):
     def test_get(self):
         serializer = self._cut(self.presence_check)
         data = serializer.data
-        self.assertEqual(
+        self.assertDictEqual(
             {
                 "pk": self.presence_check.pk,
-                "presence_system": self.system.pk,
                 "state": "open",
                 "meeting": self.meeting.pk,
+                "opened": self.presence_check.opened.isoformat()[:-6]+'Z',
+                "closed": None
             },
             data,
         )
@@ -54,18 +55,18 @@ class PresenceCheckCreateSerializerTests(TestCase):
 
     @property
     def _cut(self):
-        from voteit.presence.rest_api.serializers import PresenceCheckCreateSerializer
+        from voteit.presence.rest_api.serializers import PresenceCheckDetailSerializer
 
-        return PresenceCheckCreateSerializer
+        return PresenceCheckDetailSerializer
 
     def test_create(self):
         from voteit.presence.models import PresenceCheck
 
-        serializer = self._cut(data={"presence_system": self.system.pk})
+        serializer = self._cut(data={"meeting": self.meeting.pk})
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
         self.assertIsInstance(instance, PresenceCheck)
-        self.assertEqual(instance.presence_system, self.system)
+        self.assertEqual(instance.meeting, self.meeting)
 
 
 class PresenceSystemSerializerTests(TestCase):

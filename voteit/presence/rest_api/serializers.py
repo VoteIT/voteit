@@ -21,27 +21,15 @@ class PresenceDetailSerializer(serializers.ModelSerializer):
 
 
 class PresenceCheckDetailSerializer(serializers.ModelSerializer):
-    meeting = serializers.PrimaryKeyRelatedField(
-        source="presence_system.meeting", read_only=True
-    )
-    # serializer_url_field = OptionalHyperlinkedIdentityField
-
     class Meta:
         model = models.PresenceCheck
         read_only_fields = [
             "state",
-            "meeting",
             "pk",
-            "presence_system",
-            # "url",
+            "opened",
+            "closed",
         ]
-        fields = list(read_only_fields)
-
-
-class PresenceCheckCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = models.PresenceCheck
-        fields = ("presence_system",)
+        fields = read_only_fields + ["meeting"]
 
 
 class PresenceSystemDetailSerializer(serializers.ModelSerializer):

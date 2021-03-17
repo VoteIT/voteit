@@ -5,8 +5,10 @@ from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
 from django.db import models
+from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django_fsm import FSMField
 from django_fsm import transition
@@ -75,9 +77,12 @@ class PresenceCheck(MeetingContext):
     present_users = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through=Presence, related_name="presences"
     )
-    presence_system: PresenceSystem = models.ForeignKey(
-        "PresenceSystem", on_delete=models.CASCADE, related_name="presence_checks"
+    meeting: Meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="presence_checks"
     )
+    # presence_system: PresenceSystem = models.ForeignKey(
+    #     "PresenceSystem", on_delete=models.CASCADE, related_name="presence_checks"
+    # )
     opened: datetime = models.DateTimeField(editable=False, auto_now_add=True)
     closed: Optional[datetime] = models.DateTimeField(
         editable=False, null=True, blank=True
@@ -92,16 +97,20 @@ class PresenceCheck(MeetingContext):
     def close(self) -> None:
         self.closed = now()
 
-    @property
-    def meeting(self) -> Optional[Meeting]:
-        return self.presence_system.meeting
+    # @property
+    # def meeting(self) -> Optional[Meeting]:
+    #     return self.presence_system.meeting
+
+    @cached_property
+    def presence_system(self):
+        return PresenceSystem.objects.get_or_create(meeting=self.meeting)
 
     def __str__(self):
         return f"Presence check ({self.pk})"
 
     def save(self, **kw):
         if self.state == PresenceCheckWf.OPEN:
-            qs = self.presence_system.presence_checks.filter(state=PresenceCheckWf.OPEN)
+            qs = self.meeting.presence_checks.filter(state=PresenceCheckWf.OPEN)
             if self.pk is None and qs.exists() or qs.exclude(pk=self.pk).exists():
                 raise IntegrityError("There's already an ongoing presence check here")
         super().save(**kw)

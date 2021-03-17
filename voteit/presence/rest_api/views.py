@@ -1,4 +1,4 @@
-from voteit.core.rest_api.base import DefaultModelViewSet, ReadonlyModelViewSet
+from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.meeting.models import Meeting
 from voteit.presence.models import PresenceSystem, PresenceCheck
 
@@ -19,10 +19,7 @@ class PresenceSystemViewSet(DefaultModelViewSet):
 
 class PresenceCheckViewSet(DefaultModelViewSet):
     serializer_class = serializers.PresenceCheckDetailSerializer
-    serializer_classes = {
-        "create": serializers.PresenceCheckCreateSerializer,
-    }
-    context_queryset = PresenceSystem.objects.all()
-    context_lookup_kwarg = "presence_system"
+    context_queryset = Meeting.objects.all()
+    context_lookup_kwarg = "meeting"
     model = PresenceCheck
     queryset = PresenceCheck.objects.all()

@@ -12,7 +12,7 @@ class PresenceSystemPermissions(ModelPermissions):
 
 class PresenceCheckPermissions(ModelPermissions):
     model = "presence_check"
-    ADD = P("presence.add_presencecheck", context="presence_system")
+    ADD = P("presence.add_presencecheck", context="meeting")
     CHANGE = P("presence.change_presencecheck")
     DELETE = P("presence.delete_presencecheck")
     VIEW = P("presence.view_presencecheck")

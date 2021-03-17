@@ -128,22 +128,22 @@ class PresenceCheckTests(APITestCase):
     def _mk_one(self):
         from voteit.presence.models import PresenceCheck
 
-        return PresenceCheck.objects.create(presence_system=self.system)
+        return PresenceCheck.objects.create(meeting=self.meeting)
 
     def test_create(self):
         url = reverse("presence-checks-list")
-        data = {"presence_system": self.system.pk}
+        data = {"meeting": self.meeting.pk}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(
             response.status_code,
             201,
         )
-        self.assertTrue(self.system.presence_checks.exists())
+        self.assertIs(self.meeting.presence_checks.exists(), True)
 
     def test_create_bad_users(self):
         url = reverse("presence-checks-list")
-        data = {"presence_system": self.system.pk}
+        data = {"meeting": self.meeting.pk}
         for user, status in (
             (None, 401),
             (self.participant, 403),
@@ -158,6 +158,8 @@ class PresenceCheckTests(APITestCase):
             )
 
     def test_create_system_ne(self):
+        # FIXME Check when there is a setting for presence checks on/off
+        self.skipTest("Presence checks connects to meeting now")
         url = reverse("presence-checks-list")
         data = {"presence_system": -1}
         self.client.force_login(self.moderator)
@@ -180,7 +182,7 @@ class PresenceCheckTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(presence_check.pk, data["pk"])
-        self.assertEqual(self.system.pk, data["presence_system"])
+        self.assertEqual(self.meeting.pk, data["meeting"])
 
     def test_delete(self):
         presence_check = self._mk_one()

@@ -16,7 +16,7 @@ class _PresenceFixture:
         self.meeting = Meeting.objects.create()
         self.meeting.add_roles(self.user, "participant")
         self.system = PresenceSystem.objects.create(meeting=self.meeting)
-        self.check = PresenceCheck.objects.create(presence_system=self.system)
+        self.check = PresenceCheck.objects.create(meeting=self.meeting)
 
 
 class AddPresenceTests(TestCase, _PresenceFixture):
