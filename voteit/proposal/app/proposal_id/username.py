@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import itertools
 from typing import Optional
 
+from django.utils.text import slugify
 from voteit.proposal.abcs import ProposalIDPolicy
 from voteit.proposal.registry import proposal_id_registry
 from voteit.proposal.models import Proposal
@@ -14,33 +16,24 @@ class UsernamePID(ProposalIDPolicy):
     name = "username"
 
     def __call__(self, proposal: Proposal) -> Optional[str]:
-        if proposal.agenda_item is None:
+        if proposal.meeting is None:
             return None
         if proposal.author is None:
             return None
             # raise ValueError(f"Proposal {proposal.pk} has no author")
-        username = proposal.author.username
+        # TODO Switch to slugify(user.nickname or user.get_full_name()) when implemented
+        username = slugify(proposal.author.username)
         if username:
-            last_prop = (
-                Proposal.objects.filter(
-                    agenda_item=proposal.agenda_item, author=proposal.author
-                )
-                .order_by("-created")
-                .first()
-            )
-            if last_prop:
-                try:
-                    num_part = int(last_prop.prop_id.split("-")[-1])
-                except ValueError:
-                    num_part = (
-                        Proposal.objects.filter(
-                            agenda_item=proposal.agenda_item, author=proposal.author
-                        ).count()
-                        + 1
-                    )
-            else:
-                num_part = 1
-            for i in range(num_part, num_part + 20):
+            meeting_proposals = Proposal.objects.filter(agenda_item__meeting=proposal.meeting)
+            author_proposals = meeting_proposals.filter(author=proposal.author)
+            try:
+                last_prop = author_proposals.latest("created")
+                num_part = int(last_prop.prop_id.rsplit("-", 1)[-1])
+            except Proposal.DoesNotExist:
+                num_part = 0
+            except ValueError:
+                num_part = author_proposals.count()
+            for i in itertools.count(num_part + 1):
                 suggestion = f"{username}-{i}"
-                if not Proposal.objects.filter(prop_id=suggestion).exists():
+                if not meeting_proposals.filter(prop_id=suggestion).exists():
                     return suggestion

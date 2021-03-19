@@ -36,7 +36,15 @@ class ProposalTests(TestCase):
 
     def test_default_prop_id_based_on_username(self):
         user = User.objects.create(username="hi")
+        user2 = User.objects.create(username="Hi")
+        user3 = User.objects.create(username="Hii")
         meeting = Meeting.objects.create()
         ai = meeting.agenda_items.create()
         prop = self._mk_one(agenda_item=ai, author=user)
         self.assertEqual("hi-1", prop.prop_id)
+        prop = self._mk_one(agenda_item=ai, author=user)
+        self.assertEqual("hi-2", prop.prop_id)
+        prop = self._mk_one(agenda_item=ai, author=user2)
+        self.assertEqual("hi-3", prop.prop_id)
+        prop = self._mk_one(agenda_item=ai, author=user3)
+        self.assertEqual("hii-1", prop.prop_id)
