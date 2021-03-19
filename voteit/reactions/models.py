@@ -36,6 +36,12 @@ class ReactionButton(MeetingContext):
         ("mdi-cancel", _("Block")),
         ("mdi-star", _("Star")),
         ("mdi-wheelchair-accessibility", _("Accessible")),
+        ("mdi-heart", _("Heart")),
+        ("mdi-forum", _("Forum")),
+        ("mdi-alert", _("Alert")),
+        ("mdi-attachment", _("Attachment")),
+        ("mdi-pencil", _("Pencil")),
+        ("mdi-currency-eur", _("Currency")),
     )
     COLOR_CHOICES = (  # TODO, don't know how to define these. Using BS4 standard names 4 now. Should follow theme.
         ("primary", _("Primary")),
