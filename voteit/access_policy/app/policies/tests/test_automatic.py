@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -7,6 +7,8 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 class AutomaticAPTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
+
+        User = get_user_model()
 
         self.meeting = Meeting.objects.create()
         self.user = User.objects.create(username="a")

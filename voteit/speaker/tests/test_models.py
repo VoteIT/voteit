@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.dispatch import receiver
 from django.test import TestCase
 from django.utils.timezone import now
+
+User = get_user_model()
 
 
 class SpeakerTests(TestCase):

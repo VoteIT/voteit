@@ -1,7 +1,9 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from voteit.poll.exceptions import InvalidProposalCount
+
+User = get_user_model()
 
 
 class SimpleTests(TestCase):
@@ -10,7 +12,9 @@ class SimpleTests(TestCase):
         from voteit.poll.models import ElectoralRegister
 
         self.er = ElectoralRegister.objects.create()
-        self.poll = Poll.objects.create(electoral_register=self.er, method_name="simple")
+        self.poll = Poll.objects.create(
+            electoral_register=self.er, method_name="simple"
+        )
 
     @property
     def Simple(self):
@@ -20,6 +24,7 @@ class SimpleTests(TestCase):
 
     def test_start_check(self):
         from voteit.proposal.models import Proposal
+
         method = self.poll.method
         self.assertRaises(InvalidProposalCount, method.start_check)
         p1 = Proposal.objects.create()
@@ -31,6 +36,7 @@ class SimpleTests(TestCase):
 
     def test_vote_schema(self):
         from voteit.poll.app.polls.simple import SimpleVoteSchema
+
         self.poll.upcoming()
         self.poll.proposals.create()
         voter = self.er.voters.create(username="a")
@@ -43,6 +49,7 @@ class SimpleTests(TestCase):
 
     def test_result(self):
         from voteit.proposal.workflows import ProposalWf
+
         self.poll.upcoming()
         prop = self.poll.proposals.create()
         ua = User.objects.create(username="a")
@@ -55,10 +62,6 @@ class SimpleTests(TestCase):
         self.poll.votes.create(user=uc, vote="no")
         self.poll.close()
         self.assertEqual(
-            self.poll.result,
-            {"yes": 2, "no": 1, "approved": [prop.pk], "denied": []}
+            self.poll.result, {"yes": 2, "no": 1, "approved": [prop.pk], "denied": []}
         )
-        self.assertEqual(
-            self.poll.proposals.get().state,
-            ProposalWf.APPROVED
-        )
+        self.assertEqual(self.poll.proposals.get().state, ProposalWf.APPROVED)

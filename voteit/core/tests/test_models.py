@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.dispatch import receiver
 from django.test import TestCase
 from voteit.core.testing import mk_usertag, mk_hashtag
@@ -11,6 +11,7 @@ class RolesTests(TestCase):
         from voteit.meeting.models import MeetingRoles
         from voteit.meeting.models import Meeting
 
+        User = get_user_model()
         self.user = User.objects.create(username="jane")
         self.meeting = Meeting.objects.create()
         self.roles = MeetingRoles.objects.create(user=self.user, context=self.meeting)
@@ -134,6 +135,8 @@ class BaseContentTests(TestCase):
     def setUp(self):
         # Testing abstract model through meeting model
         from voteit.meeting.models import Meeting
+
+        User = get_user_model()
 
         self.meeting = Meeting.objects.create()
         self.user = User.objects.create(username="ivan")

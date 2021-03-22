@@ -12,7 +12,6 @@ from channels.db import database_sync_to_async
 from channels.exceptions import DenyConnection
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
@@ -38,8 +37,6 @@ logger = getLogger(__name__)
 if TYPE_CHECKING:
     pass
 
-
-User = get_user_model()
 
 # FIXME: We might need to check if channels properly cleans up groups
 # They could fill up with messages fast in case no one is there to receive them.
@@ -122,7 +119,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         return None
 
     # NOTE! database_sync_to_async doesn't work in tests - use mock to override
-    async def refresh_user(self) -> Optional[User]:
+    async def refresh_user(self) -> Optional[AbstractUser]:
         user = await get_user(self.scope)
         if user.pk is not None:
             self.user = user

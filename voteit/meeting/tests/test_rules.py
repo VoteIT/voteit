@@ -1,8 +1,12 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
-from voteit.meeting.roles import ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER, ROLE_MODERATOR, ROLE_DISCUSSER, ROLE_PROPOSER
+from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.roles import ROLE_PROPOSER
 
-
+User = get_user_model()
 class RulesTests(TestCase):
 
     def setUp(self):
@@ -45,7 +49,7 @@ class RulesTests(TestCase):
 
 class PermissionTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting, MeetingRoles
+        from voteit.meeting.models import Meeting
         self.meeting = Meeting.objects.create()
         self.anon_user = User.objects.create(username="anon")
         self.moderator = User.objects.create(username="moderator")
@@ -61,7 +65,7 @@ class PermissionTests(TestCase):
 
     def test_can_add_meeting(self):
         from voteit.organisation.roles import ROLE_MEETING_CREATOR, ROLE_ORG_MANAGER
-        from voteit.organisation.models import Organisation, OrganisationRoles
+        from voteit.organisation.models import Organisation
 
         organisation = Organisation.objects.create()
         self.meeting.organisation = organisation

@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from voteit.motion.permissions import MotionPermissions as MP
@@ -8,6 +8,8 @@ from voteit.motion.permissions import MotionProcessPermissions as MPP
 class MotionProcessRulesTests(TestCase):
     def setUp(self):
         from voteit.motion.models import MotionProcess, MotionProcessRoles
+
+        User = get_user_model()
 
         self.mp = MotionProcess.objects.create()
 
@@ -83,6 +85,8 @@ class MotionProcessRulesTests(TestCase):
 class MotionRulesTests(TestCase):
     def setUp(self):
         from voteit.motion.models import MotionProcess, MotionProcessRoles
+
+        User = get_user_model()
 
         manager = MotionProcessRoles.valid_roles["mp_manager"]
         mover = MotionProcessRoles.valid_roles["mp_mover"]

@@ -12,7 +12,6 @@ from voteit.messaging.signals import client_connect
 from voteit.messaging.utils import update_connection_status
 
 logger = getLogger(__name__)
-
 User = get_user_model()
 
 

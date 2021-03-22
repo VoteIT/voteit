@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 
@@ -8,6 +8,7 @@ class RulesTests(TestCase):
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
 
         self.meeting = Meeting.objects.create(er_policy_name="auto_before_poll")
+        User = get_user_model()
         self.anon_user = User.objects.create(username="anon")
         self.participant = User.objects.create(username="participant")
         self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)

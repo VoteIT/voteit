@@ -1,7 +1,9 @@
 # Common validators
 from typing import Dict
 
-from voteit.core.models import RoleContextMixin
+from django.core import validators
+from django.utils.deconstruct import deconstructible
+from django.utils.translation import gettext_lazy as _
 from voteit.core.utils import get_model_by_shortname
 
 
@@ -17,6 +19,7 @@ def validate_model_shortname(v: str):
     ...
     ValueError:
     """
+
     v = v.lower()
     model = get_model_by_shortname(v)
     if model is None:
@@ -42,6 +45,9 @@ def validate_roles_context_model(v: str) -> str:
     ...
     ValueError:
     """
+    # Avioid circular import
+    from voteit.core.models import RoleContextMixin
+
     v = v.lower()
     model = get_model_by_shortname(v)
     if model is None:
@@ -72,3 +78,13 @@ def root_validate_roles_and_model(cls, values: Dict):
     if not_valid:
         raise ValueError(f"Invalid roles for this context: {', '.join(not_valid)}")
     return values
+
+
+@deconstructible
+class UserIDValidator(validators.RegexValidator):
+    regex = r"^[\w.@+-]+\Z"
+    message = _(
+        "Enter a valid username. This value may contain only letters, "
+        "numbers, and /-/_ characters."
+    )
+    flags = 0

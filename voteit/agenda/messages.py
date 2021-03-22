@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from django.contrib.auth import get_user_model
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
@@ -15,12 +12,6 @@ from voteit.messaging.messages.base import BaseDeleteObject
 from voteit.messaging.messages.base import BaseObjectAdded
 from voteit.messaging.messages.base import BaseObjectChanged
 from voteit.messaging.messages.base import BaseObjectDeleted
-
-User = get_user_model()
-
-
-if TYPE_CHECKING:
-    pass
 
 
 @incoming

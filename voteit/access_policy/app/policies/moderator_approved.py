@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from datetime import datetime
 from logging import getLogger
-from typing import List, Type, Union, Optional, TYPE_CHECKING
+from typing import List
+from typing import Optional
+from typing import TYPE_CHECKING
+from typing import Type
+from typing import Union
 
-from django.contrib.auth import get_user_model
-
+from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
+from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
-from django.db import models
-from django_fsm import FSMField, transition
-
+from django_fsm import FSMField
+from django_fsm import transition
 from voteit.access_policy.models import AccessPolicy
 from voteit.access_policy.registries import access_policies
 from voteit.core.abcs import MeetingContext
@@ -27,15 +30,13 @@ __all__ = ["ModeratorApprovedAccess"]
 
 logger = getLogger(__name__)
 
-User: AbstractUser = get_user_model()
-
 
 @access_policies
 class ModeratorApprovedAccess(AccessPolicy):
     name: str = "moderator_approved"
     title: str = _("Users apply for access, moderators approve manually")
 
-    def request_access(self, user: User, message: str = "") -> AccessRequest:
+    def request_access(self, user: AbstractUser, message: str = "") -> AccessRequest:
         #  FIXME: Block subsequent requests etc
         if AccessRequest.objects.filter(
             user=user, state=AcceptanceWf.UNHANDLED
@@ -65,15 +66,17 @@ class AccessRequest(MeetingContext):
         on_delete=models.CASCADE,
         related_name="access_requests",
     )
-    user: User = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    user: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+    )
     message: Optional[str] = models.TextField(blank=True, null=True)
     moderator_message: Optional[str] = models.TextField(blank=True, null=True)
     created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
     handled_ts: Optional[datetime] = models.DateTimeField(
         blank=True, null=True, editable=False
     )
-    handled_by: Optional[User] = models.ForeignKey(
-        User,
+    handled_by: Optional[AbstractUser] = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="+",
         blank=True,
@@ -95,7 +98,7 @@ class AccessRequest(MeetingContext):
     )
     def accept(
         self,
-        moderator_user: User,
+        moderator_user: AbstractUser,
         give_roles: List[Union[str, Type[Role]]],
         message: str = "",
     ):
@@ -111,7 +114,7 @@ class AccessRequest(MeetingContext):
         on_error=AcceptanceWf.UNHANDLED,
         permission=is_moderator,
     )
-    def reject(self, moderator_user: User, message: str = ""):
+    def reject(self, moderator_user: AbstractUser, message: str = ""):
         """Moderator rejects request."""
         self._set_handled(moderator_user, message)
 
@@ -127,7 +130,7 @@ class AccessRequest(MeetingContext):
         self.handled_ts = None
         self.moderator_message = None
 
-    def _set_handled(self, moderator_user: User, message: str):
+    def _set_handled(self, moderator_user: AbstractUser, message: str):
         self.handled_by = moderator_user
         self.handled_ts = now()
         self.moderator_message = message

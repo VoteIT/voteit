@@ -7,7 +7,6 @@ from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db import transaction
@@ -34,9 +33,6 @@ if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
 
 __all__ = "Meeting", "MeetingRoles", "MeetingGroup"
-
-
-UserModel: AbstractUser = get_user_model()
 
 
 class MeetingRoles(Roles, MeetingContext):
@@ -93,7 +89,9 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
     archive_after: Optional[datetime] = models.DateTimeField(null=True, editable=False)
 
     roles_cls = MeetingRoles
-    participants = models.ManyToManyField(UserModel, through=MeetingRoles)
+    participants = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, through=MeetingRoles
+    )
 
     @cached_property
     def pid_policy(self) -> ElectoralRegisterPolicy:
@@ -220,7 +218,7 @@ class MeetingGroup(BaseContent, MeetingContext):
         "Meeting", on_delete=models.CASCADE, related_name="groups"
     )
     members = models.ManyToManyField(
-        UserModel, blank=True, related_name="meeting_groups"
+        settings.AUTH_USER_MODEL, blank=True, related_name="meeting_groups"
     )
     # Type annotations - relations
     proposals: models.QuerySet

@@ -1,17 +1,24 @@
-from django.contrib.auth import get_user_model
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-User = get_user_model()
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractUser
 
 
 class Connection(models.Model):
-    """ These are created on websocket connect, and marked as online=False when client disconnects.
-        Since channels doesn't handle any kind of cleanup, it's important to check these now and then.
+    """These are created on websocket connect, and marked as online=False when client disconnects.
+    Since channels doesn't handle any kind of cleanup, it's important to check these now and then.
     """
 
-    user: User = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="user_connections"
+    user: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_connections",
     )
     # device_id = models.CharField(max_lenght=100)
     channel_name: str = models.CharField(

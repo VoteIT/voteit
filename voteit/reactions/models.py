@@ -1,25 +1,25 @@
 from __future__ import annotations
-from typing import Iterator, List, TYPE_CHECKING
 
-from django.contrib.auth import get_user_model
+from typing import List
+from typing import TYPE_CHECKING
+
+from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
-from django.db import models, IntegrityError
+from django.db import IntegrityError
+from django.db import models
 from django.utils.translation import gettext_lazy as _
-
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.utils import get_model_by_shortname
-from voteit.meeting.models import Meeting, MeetingRoles
-
+from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingRoles
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from voteit.core.models import BaseContent
     from voteit.agenda.models import AgendaItem
-
-User: AbstractUser = get_user_model()
 
 
 def _default_allowed_models():
@@ -123,7 +123,9 @@ class Reaction(AgendaItemContext):
         ReactionButton, on_delete=models.CASCADE, related_name="reactions"
     )
     # Normally we don't want to delete user, but we should probably allow this later
-    user: User = models.ForeignKey(User, on_delete=models.PROTECT)
+    user: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+    )
     agenda_item: AgendaItem = models.ForeignKey(
         "agenda.AgendaItem",
         on_delete=models.CASCADE,

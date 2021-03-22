@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 
-from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.db import models
 
 from voteit.core.models import BaseContent
@@ -15,9 +15,6 @@ if TYPE_CHECKING:
     from voteit.meeting.models import MeetingGroup
 
 
-User: AbstractUser = get_user_model()
-
-
 class DiscussionPost(
     BaseContent,
     AgendaItemContext,
@@ -26,7 +23,7 @@ class DiscussionPost(
 ):
     name = "discussion_post"
     author: AbstractUser = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         null=True,
         blank=True,

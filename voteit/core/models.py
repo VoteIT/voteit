@@ -6,10 +6,12 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Set
+from typing import TYPE_CHECKING
 from typing import Union
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import UserManager
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from voteit.core.abcs import ABCModel
@@ -19,10 +21,44 @@ from voteit.core.signals import roles_removed
 from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
 from voteit.core.utils import strict_clean_html
+from voteit.core.validators import UserIDValidator
 
-User = get_user_model()
+if TYPE_CHECKING:
+    from voteit.organisation.models import Organisation
 
-__all__ = ("RoleContextMixin", "Roles", "BaseContent")
+
+__all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
+
+
+class User(AbstractUser):
+    """ Custom user model linked to organisation"""
+
+    name = "user"
+    userid_validator = UserIDValidator()
+
+    # Note that this is only null to make testing easier, it should never be null!
+    organisation: Organisation = models.ForeignKey(
+        "organisation.Organisation",
+        on_delete=models.CASCADE,
+        null=True,
+        related_name="users",
+    )
+    # Some meetings may require this to be set
+    userid: str = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        validators=[userid_validator],
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["userid", "organisation"], name="unique org userid"
+            ),
+        ]
+
+    objects = UserManager()
 
 
 def real_user_only(method):

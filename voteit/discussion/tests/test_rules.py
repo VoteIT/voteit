@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 
@@ -9,6 +9,7 @@ class RulesTests(TestCase):
         from voteit.meeting.roles import ROLE_DISCUSSER
         from voteit.meeting.roles import ROLE_PARTICIPANT
 
+        User = get_user_model()
         self.meeting = Meeting.objects.create()
         self.anon_user = User.objects.create(username="anon")
         self.participant = User.objects.create(username="participant")

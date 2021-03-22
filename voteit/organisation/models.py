@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from django.conf import settings
-from django.contrib.auth.models import AbstractUser
-from django.db import models
+from typing import TYPE_CHECKING
 
-from voteit.core.models import BaseContent, Roles, RoleContextMixin
+from django.conf import settings
+from django.db import models
+from voteit.core.models import BaseContent
+from voteit.core.models import RoleContextMixin
+from voteit.core.models import Roles
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractUser
 
 
 class OrganisationRoles(Roles):
@@ -21,6 +26,14 @@ class OrganisationRoles(Roles):
 
 
 class Organisation(BaseContent, RoleContextMixin):
-    title: str = models.CharField(max_length=100)
     name = "organisation"
+    title: str = models.CharField(max_length=100)
     roles_cls = OrganisationRoles
+
+
+# PUA
+# Kontaktperson
+# Kontaktadress etc...
+# Scopes?
+# Logga
+# Supportadress?

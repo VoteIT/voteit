@@ -13,8 +13,8 @@ UserModel = get_user_model()
 
 class UserSearchViewSet(viewsets.ModelViewSet):
     model = UserModel
-    permission_classes = DjangoModelPermissions,
+    permission_classes = (DjangoModelPermissions,)
     queryset = UserModel.objects.all()
     serializer_class = serializers.UserSerializer
-    filter_backends = filters.SearchFilter,
-    search_fields = 'username', 'email', 'first_name', 'last_name'
+    filter_backends = (filters.SearchFilter,)
+    search_fields = "username", "email", "first_name", "last_name"

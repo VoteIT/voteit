@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import List
 from typing import TYPE_CHECKING
 
-from django.contrib.auth import get_user_model
 from django.db.models.signals import class_prepared
 from django.dispatch import Signal
 from django.dispatch import receiver
@@ -12,6 +11,7 @@ from voteit.core.abcs import MeetingContext
 from voteit.core.messages import RolesAdded
 from voteit.core.messages import RolesRemoved
 from voteit.core.utils import get_model_shortname
+from voteit.core import models_to_register
 
 if TYPE_CHECKING:
     from voteit.core.models import Roles
@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from django.db.models import Model
 
 
-User = get_user_model()
 roles_added = Signal(providing_args=["sender", "instance", "roles"])
 roles_removed = Signal(providing_args=["sender", "instance", "roles"])
 
@@ -64,32 +63,9 @@ def push_roles_removed(instance: Roles, roles: List[Role], **kwargs):
 
 
 @receiver(class_prepared)
-def register_model(sender: Model, **kw):
-    """Register models in content registry.
-
-    Models should be here after class_prepared is called
-    >>> from voteit.core.registries import content_types
-    >>> "meeting" in content_types
-    True
-
-    Registering the same model twice should raise errors
-    >>> from voteit.meeting.models import Meeting
-    >>> register_model(Meeting)
-    Traceback (most recent call last):
-    ...
-    ValueError: ...
-
+def deferred_register_model(sender: Model, **kw):
+    """Prep register models in content registry.
+    Done in apps ready()
     """
-    from voteit.core.registries import content_types
 
-    if hasattr(sender, "name"):
-        # Only care about models with name
-        if sender.name is None:
-            sender.name = sender.__name__.lower()
-        if sender.name in content_types:
-            raise ValueError(
-                f"{sender.name} is already present in content registry. \n"
-                f"Existing: {content_types[sender.name]}\n"
-                f"Tried to register {sender}"
-            )
-        content_types[sender.name] = sender
+    models_to_register.add(sender)

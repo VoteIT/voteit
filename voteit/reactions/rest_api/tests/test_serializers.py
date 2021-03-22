@@ -10,7 +10,7 @@ class ButtonDetailSerializerTests(TestCase):
             title="Test meeting", state="ongoing"
         )
         self.button: ReactionButton = self.meeting.reaction_buttons.create(
-            title="Thumbs up", color="primary", icon="thumb_up"
+            title="Thumbs up", color="primary", icon="mdi-thumb-up"
         )
 
     @property
@@ -28,7 +28,7 @@ class ButtonDetailSerializerTests(TestCase):
                 "meeting": self.meeting.pk,
                 "title": "Thumbs up",
                 "color": "primary",
-                "icon": "thumb_up",
+                "icon": "mdi-thumb-up",
                 "order": 0,
                 "change_roles": [],
                 "list_roles": [],
@@ -67,7 +67,7 @@ class ButtonCreateSerializerTests(TestCase):
                 "meeting": self.meeting.pk,
                 "title": "Hello",
                 "color": "primary",
-                "icon": "thumb_up",
+                "icon": "mdi-thumb-up",
             }
         )
         self.assertTrue(serializer.is_valid())
@@ -89,7 +89,7 @@ class ReactionSerializerSerializerTests(TestCase):
         self.prop = self.ai.proposals.create()
         self.user = self.meeting.participants.create(username="Jane")
         self.button: ReactionButton = self.meeting.reaction_buttons.create(
-            title="Thumbs up", color="primary", icon="thumb_up"
+            title="Thumbs up", color="primary", icon="mdi-thumb-up"
         )
         self.reaction: Reaction = self.button.reactions.create(
             user=self.user, object=self.prop

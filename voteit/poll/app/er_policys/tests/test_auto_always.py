@@ -1,6 +1,8 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+
+User = get_user_model()
 
 
 class AutoAlwaysTests(TestCase):

@@ -20,9 +20,6 @@ from voteit.speaker.models import SpeakerList
 from voteit.speaker.permissions import SpeakerListPermissions
 
 
-User = get_user_model()
-
-
 class SpeakerListActionSchema(BaseModel):
     pk: int  # which list to perform the action on
 
@@ -45,6 +42,7 @@ class ModeratorListMessage(BaseIncomingMessage, DeferredJob, ContextAction, ABC)
     context_pk_attr = "pk"
 
     def get_user(self):
+        User = get_user_model()
         try:
             return User.objects.get(pk=self.data.userid)
         except User.DoesNotExist:

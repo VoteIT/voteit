@@ -3,15 +3,12 @@ from typing import List
 from typing import Optional
 from typing import Type
 
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 from voteit.core.models import Roles
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.meeting import models
-
-UserModel = get_user_model()
 
 
 class UserRolesMixin(serializers.Serializer):

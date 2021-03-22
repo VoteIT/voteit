@@ -31,7 +31,10 @@ class ReactionButtonViewSetTests(APITestCase):
         from voteit.reactions.models import ReactionButton
 
         return ReactionButton.objects.create(
-            meeting=self.meeting, title="Thumbs up", color="primary", icon="thumb_up"
+            meeting=self.meeting,
+            title="Thumbs up",
+            color="primary",
+            icon="mdi-thumb-up",
         )
 
     def test_create(self):
@@ -39,7 +42,7 @@ class ReactionButtonViewSetTests(APITestCase):
         data = {
             "title": "Gilla",
             "meeting": self.meeting.pk,
-            "icon": "thumb_up",
+            "icon": "mdi-thumb-up",
             "color": "primary",
         }
         self.client.force_login(self.moderator)
@@ -55,7 +58,7 @@ class ReactionButtonViewSetTests(APITestCase):
         data = {
             "title": "Gilla",
             "meeting": self.meeting.pk,
-            "icon": "thumb_up",
+            "icon": "mdi-thumb-up",
             "color": "primary",
         }
         for user, status in (
@@ -76,7 +79,7 @@ class ReactionButtonViewSetTests(APITestCase):
         data = {
             "title": "Gilla",
             "meeting": -1,
-            "icon": "thumb_up",
+            "icon": "mdi-thumb-up",
             "color": "primary",
         }
         self.client.force_login(self.moderator)

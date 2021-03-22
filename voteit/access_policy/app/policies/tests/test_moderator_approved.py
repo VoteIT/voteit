@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 
@@ -12,6 +12,7 @@ class ModeratorApprovedTests(TestCase):
             ModeratorApprovedAccess,
         )
 
+        User = get_user_model()
         self.meeting = Meeting.objects.create()
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
@@ -39,6 +40,7 @@ class AccessRequestTests(TestCase):
             ModeratorApprovedAccess,
         )
 
+        User = get_user_model()
         self.meeting = Meeting.objects.create()
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, ROLE_MODERATOR)

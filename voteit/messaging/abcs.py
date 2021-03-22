@@ -40,9 +40,6 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-User: AbstractUser = get_user_model()
-
-
 class MessageMeta(BaseModel):
     message_id: Optional[str]
     type: str  # Validation is handled by the envelope instead
@@ -105,6 +102,7 @@ class MessageABC(ABC):
     def user(self) -> Optional[AbstractUser]:
         """ Retrieve user from MessageMeta.user_pk, if it exists"""
         if self.mm.user_pk:
+            User: AbstractUser = get_user_model()
             return User.objects.filter(pk=self.mm.user_pk).first()
         return None
 

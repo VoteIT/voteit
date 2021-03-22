@@ -51,34 +51,34 @@ class ValidateGroupAIContextTests(TestCase):
         data = {
             "body": "Hello " + mk_hashtag("world"),
             "agenda_item": self.ai.pk,
-            "group": self.group.pk,
+            "meeting_group": self.group.pk,
         }
         request = self._mk_request()
         serializer = self._cut(data=data, context={"request": request})
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
-        self.assertEqual(self.group, instance.group)
+        self.assertEqual(self.group, instance.meeting_group)
 
     def test_create_unrelated_group(self):
         data = {
             "body": "Hello " + mk_hashtag("world"),
             "agenda_item": self.ai.pk,
-            "group": self.group.pk,
+            "meeting_group": self.group.pk,
         }
         request = self._mk_request()
         serializer = self._cut(data=data, context={"request": request})
         self.assertFalse(serializer.is_valid())
-        self.assertIn("group", serializer.errors)
+        self.assertIn("meeting_group", serializer.errors)
 
     def test_create_unrelated_group_with_moderator(self):
         self.meeting.add_roles(self.user, "moderator")
         data = {
             "body": "Hello " + mk_hashtag("world"),
             "agenda_item": self.ai.pk,
-            "group": self.group.pk,
+            "meeting_group": self.group.pk,
         }
         request = self._mk_request()
         serializer = self._cut(data=data, context={"request": request})
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
-        self.assertEqual(self.group, instance.group)
+        self.assertEqual(self.group, instance.meeting_group)
