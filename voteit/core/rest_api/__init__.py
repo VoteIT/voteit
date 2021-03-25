@@ -5,4 +5,5 @@ from . import views
 
 router = DefaultRouter()
 
-router.register('users', views.UserSearchViewSet, 'users')
+router.register("users", views.UserSearchViewSet, "users")
+router.register("providers", views.ProviderViewSet)

@@ -21,6 +21,9 @@ class CoreConfig(AppConfig):
         # Make sure linked permissions make sense
         permissions.validate_registry()
 
+        # Register providers
+        from voteit.core import providers
+
 
 def register_model(model, registry):
     """

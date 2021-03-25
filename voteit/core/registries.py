@@ -6,6 +6,8 @@ from rules import Predicate
 from typing import Type
 from django.db.models import Model
 
+from voteit.core.abcs import ProviderResponseAdapter
+
 from voteit.core.component import Registry
 
 from voteit.core.permissions import Permission
@@ -163,3 +165,4 @@ class PermissionRegistry(Registry):
 predicates = PredicateRegistry(Predicate)
 permissions = PermissionRegistry(Permission)
 content_types = ContentRegistry(Model)
+provider_response_adapters = Registry(ProviderResponseAdapter)

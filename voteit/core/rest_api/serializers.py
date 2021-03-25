@@ -1,13 +1,16 @@
 from __future__ import annotations
+
 from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.core.serializers.json import DjangoJSONEncoder
 from pydantic.main import BaseModel
+from requests_oauthlib import OAuth2Session
 from rest_framework import serializers
 from rest_framework.fields import JSONField
-
+from voteit.core.models import OAuth2Provider
+from voteit.core.schemas import OAuthStateSchema
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -109,3 +112,34 @@ class PydanticFieldSerializer(JSONField):
         if isinstance(value, BaseModel):
             value = value.dict()
         return super().to_representation(value)
+
+
+class BeginProviderAuthSerializer(serializers.ModelSerializer):
+    begin_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OAuth2Provider
+        fields = ["pk", "begin_url", "title", "provider_id"]
+
+    def get_begin_url(self, instance: OAuth2Provider):
+        # Get scopes from organisation or provider?
+        request = self.context["request"]
+        # Only local path for "next" - add domain later
+        auth_session = OAuth2Session(
+            client_id=instance.client_id,
+            scope=instance.scopes,
+            redirect_uri=instance.redirect_url,
+        )
+        authorization_url, state = auth_session.authorization_url(instance.auth_url)
+        state_data = OAuthStateSchema(
+            provider_pk=instance.pk, next=request.GET.get("next", "/"), state=state
+        )
+        request.session["oauth_state"] = state_data.dict()
+        # request.session.save()
+        return authorization_url
+
+
+class ProviderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OAuth2Provider
+        fields = ["pk", "title", "organisation", "provider_id"]
