@@ -1,12 +1,54 @@
 from rest_framework import permissions
 from rest_framework.mixins import RetrieveModelMixin
 from rest_framework.viewsets import GenericViewSet
+from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.organisation.models import Organisation
+from voteit.organisation.models import TermsOfService
+from voteit.organisation.models import UserConsent
 from voteit.organisation.rest_api import serializers
 
 
 class OrganisationViewSet(GenericViewSet, RetrieveModelMixin):
-    permission_classes = [permissions.AllowAny]
+    # permission_classes = [permissions.AllowAny]
     model = Organisation
     queryset = Organisation.objects.all()
     serializer_class = serializers.OrganisationSerializer
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return self.queryset
+        if self.request.user.organisation:
+            return self.queryset.filter(pk=self.request.user.organisation.pk)
+        return self.queryset.none()
+
+
+class TOSViewSet(DefaultModelViewSet):
+    serializer_class = serializers.TOSSerializer
+    context_queryset = Organisation.objects.all()
+    context_lookup_kwarg = "organisation"
+    model = TermsOfService
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return self.model.objects.all()
+        if self.request.user.organisation:
+            return self.model.objects.filter(
+                organisation=self.request.user.organisation
+            )
+        return self.model.objects.none()
+
+
+class UserConsentViewSet(DefaultModelViewSet):
+    serializer_class = serializers.UserConsentSerializer
+    context_queryset = TermsOfService.objects.all()
+    context_lookup_kwarg = "tos"
+    model = UserConsent
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return self.model.objects.all()
+        if self.request.user.organisation:
+            return self.model.objects.filter(
+                tos__organisation=self.request.user.organisation
+            )
+        return self.model.objects.none()

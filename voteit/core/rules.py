@@ -22,6 +22,12 @@ def is_author(user: AbstractUser, instance: Model) -> bool:
     return getattr(instance, "author", _MARKER) == user
 
 
+@predicate
+def is_user(user: AbstractUser, instance: Model) -> bool:
+    """ Check against any generic object with the user attribute. """
+    return getattr(instance, "user", _MARKER) == user
+
+
 _ARCHIVED_STATES = MeetingWf.archived_states | AgendaItemWf.archived_states
 
 
