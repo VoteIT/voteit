@@ -1,5 +1,5 @@
 from rest_framework import permissions
-from rest_framework.mixins import RetrieveModelMixin
+from rest_framework.mixins import RetrieveModelMixin, UpdateModelMixin
 from rest_framework.viewsets import GenericViewSet
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.organisation.models import Organisation
@@ -8,7 +8,7 @@ from voteit.organisation.models import UserConsent
 from voteit.organisation.rest_api import serializers
 
 
-class OrganisationViewSet(GenericViewSet, RetrieveModelMixin):
+class OrganisationViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
     # permission_classes = [permissions.AllowAny]
     model = Organisation
     queryset = Organisation.objects.all()
@@ -24,6 +24,7 @@ class OrganisationViewSet(GenericViewSet, RetrieveModelMixin):
 
 class TOSViewSet(DefaultModelViewSet):
     serializer_class = serializers.TOSSerializer
+    serializer_classes = {"create": serializers.TOSCreateSerializer}
     context_queryset = Organisation.objects.all()
     context_lookup_kwarg = "organisation"
     model = TermsOfService
@@ -40,6 +41,7 @@ class TOSViewSet(DefaultModelViewSet):
 
 class UserConsentViewSet(DefaultModelViewSet):
     serializer_class = serializers.UserConsentSerializer
+    serializer_classes = {"create": serializers.UserConsentCreateSerializer}
     context_queryset = TermsOfService.objects.all()
     context_lookup_kwarg = "tos"
     model = UserConsent

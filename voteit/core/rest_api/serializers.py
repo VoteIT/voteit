@@ -17,10 +17,12 @@ if TYPE_CHECKING:
 
 
 class BaseModelSerializer(serializers.ModelSerializer):
+    author_kw = "author"
+
     def create(self, validated_data):
         ModelClass = self.Meta.model
-        user = self.get_request_user()
-        return ModelClass.objects.create(author=user, **validated_data)
+        validated_data[self.author_kw] = self.get_request_user()
+        return ModelClass.objects.create(**validated_data)
 
     def get_request_user(self) -> Optional[AbstractUser]:
         # Validate user?

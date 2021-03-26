@@ -99,7 +99,7 @@ class UserConsent(OrganisationContext):
     tos: TermsOfService = models.ForeignKey(
         TermsOfService, on_delete=models.CASCADE, related_name="consents"
     )
-    consent: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
     revoked: datetime = models.DateTimeField(null=True, blank=True)
 
     class Meta:
