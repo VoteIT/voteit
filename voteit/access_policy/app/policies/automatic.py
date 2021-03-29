@@ -16,9 +16,7 @@ logger = getLogger(__name__)
 @access_policies
 class AutomaticAccess(AccessPolicy):
     """
-    >>> from voteit.meeting.models import Meeting
-    >>> meeting = Meeting.objects.create()
-    >>> aa = AutomaticAccess.objects.create(meeting=meeting)
+    Give access to any user that requests access.
     """
 
     name: str = "automatic"
