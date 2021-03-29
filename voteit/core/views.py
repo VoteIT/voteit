@@ -15,7 +15,6 @@ from voteit.core.schemas import OAuthStateSchema
 logger = getLogger(__name__)
 
 
-@transaction.atomic
 def finish_auth(request):
     # FIXME: Very early, for testing
     error = request.GET.get("error", None)
@@ -24,13 +23,12 @@ def finish_auth(request):
     try:
         data = request.session["oauth_state"]
     except KeyError:
-        if settings.DEBUG:
-            raise
-        raise Http404("No session")
+        return HttpResponseBadRequest("No login session")
     try:
         state_data = OAuthStateSchema(**data)
     except ValidationError:
         request.session.pop("oauth_state", None)
+        request.session.save()
         if settings.DEBUG:
             raise
         raise Http404("No login in progress")
@@ -70,19 +68,23 @@ def finish_auth(request):
     print(data)
     adapted = provider.response_adapter(data)
     user = adapted.get_user()
-    if user:
-        print(f"Got user {user}")
-    else:
-        # register
-        print(f"Creating new user")
-        user = adapted.register()
-        print(f"Created user {user}")
-    adapted.update(user)
-    adapted.store_token(token_response)
-    print("Logging in")
-    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-    print("Login complete")
-    request.session.pop("oauth_state", None)
+    with transaction.atomic():
+        if user:
+            print(f"Got user {user}")
+        else:
+            # register
+            print(f"Creating new user")
+            user = adapted.register()
+            print(f"Created user {user}")
+        adapted.update(user)
+        adapted.store_token(token_response)
+        print("Logging in")
+        # Any session login kind with http only cookie would do
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        print("Login complete")
+        # We might want to save token etc
+        request.session.pop("oauth_state", None)
+        request.session.save()
     # FIXME: Frontend server
     next_url = "localhost:8080" + state_data.next
     return HttpResponse(f"You're logged in, go here next: {next_url}")
