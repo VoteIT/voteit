@@ -183,7 +183,7 @@ class TransitionsMixin(SerializerClassesMixin):
         """
         instance = self.get_object()
         available_transitions = dict(
-            (x.name, x) for x in instance.get_available_state_transitions()
+            (x.name, x) for x in instance.get_available_user_state_transitions()
         )
         if request.method == "GET":
             return Response(
