@@ -26,6 +26,7 @@ from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
+from voteit.core.permissions import NOT_ALLOWED
 from voteit.meeting.models import Meeting
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.permissions import SpeakerSystemPermissions
@@ -153,8 +154,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     @transition(
         field=state,
         target=SpeakerSystemWf.ARCHIVED,
-        permission=SpeakerSystemPermissions.CHANGE,
-        # FIXME: This shouldn't be a manual action
+        permission=NOT_ALLOWED,
     )
     def archive(self):
         self.active_list = None
@@ -386,7 +386,9 @@ class SpeakerList(AgendaItemContext, MeetingContext):
         """Stop current speaker and set spoken time"""
         if speaker := self.current:
             end_td = now() - speaker.started
-            speaker.seconds = min(end_td.seconds or 1, 32767)  # Max value of PosSmallIntField ~ 9 hours
+            speaker.seconds = min(
+                end_td.seconds or 1, 32767
+            )  # Max value of PosSmallIntField ~ 9 hours
             speaker.save()
             self.current = None
             self.save()
