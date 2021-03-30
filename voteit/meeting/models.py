@@ -21,6 +21,7 @@ from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
+from voteit.core.permissions import NOT_ALLOWED
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.utils import get_electoral_policy_registry
@@ -171,9 +172,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
     def abort_archiving(self):
         self.archive_after = None
 
-    @transition(
-        field=state, target=MeetingWf.ARCHIVED, permission="__not_allowed_manually__"
-    )
+    @transition(field=state, target=MeetingWf.ARCHIVED, permission=NOT_ALLOWED)
     def archive(self):
         from voteit.meeting.signals import archive_meeting  # Avoid circular import
 
