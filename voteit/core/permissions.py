@@ -178,8 +178,10 @@ class Permission(UserString):
             # Still none, no model! It might be implicitly assigned later on
             # by ModelPermissions class
             self.context = set()
+        elif isinstance(context, set):
+            self.context = context
         else:
-            self.context = set(context)
+            raise ValueError("context is not a set or a string")
 
     @property
     def name(self):
@@ -255,3 +257,15 @@ class VerbosePermissionBackend(ObjectPermissionBackend):
     @cached_property
     def check_permission_context(self):
         return getattr(settings, "CHECK_PERMISSION_CONTEXT", False)
+
+
+class AlwaysTrueSet(set):
+    def add(self, item):
+        pass
+
+    def __contains__(self, item):
+        return True
+
+
+ANY_SET = AlwaysTrueSet()
+NOT_ALLOWED = Permission("__not_allowed", model=ANY_SET, context=ANY_SET)

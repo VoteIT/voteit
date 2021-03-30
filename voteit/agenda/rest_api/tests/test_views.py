@@ -90,5 +90,5 @@ class AgendaItemViewTestCase(APITestCase):
         response = self.client.post(url, data)
         self.assertEqual(
             response.status_code,
-            403,
+            400,  # Raises invalid transition
         )
