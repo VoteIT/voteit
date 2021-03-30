@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from voteit.core.abcs import ProviderResponseAdapter
 
 
-__all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
+__all__ = ("RoleContextMixin", "Roles", "BaseContent", "User", "OAuth2Provider")
 
 
 class User(AbstractUser):
