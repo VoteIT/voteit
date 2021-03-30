@@ -24,7 +24,7 @@ class IDProxy(ProviderResponseAdapter):
             # Handle all scopes here
             # Email
             email = identity.get("email", None)
-            if email["validated"]:
+            if email and email["validated"]:
                 user.email = email["email"]
             # Other identity parts in identity obj?
         user.save()
