@@ -46,8 +46,7 @@ def finish_auth(request):
     # Use token response any other way?
     code = request.GET.get("code", "")
     if not code:
-        return HttpResponseBadRequest("Login error")
-    assert code
+        return HttpResponseBadRequest("Login error - no code param")
     token_response = auth_session.fetch_token(
         provider.token_url,
         code=code,
@@ -74,7 +73,7 @@ def finish_auth(request):
         else:
             # register
             print(f"Creating new user")
-            user = adapted.register()
+            user = adapted.register(organisation=provider.organisation)
             print(f"Created user {user}")
         adapted.update(user)
         adapted.store_token(token_response)

@@ -14,6 +14,7 @@ from django.utils.functional import cached_property
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
     from voteit.agenda.models import AgendaItem
+    from voteit.organisation.models import Organisation
     from django.contrib.auth.models import AbstractUser
 
 
@@ -76,7 +77,7 @@ class MeetingContext(ABCModel):
 
 class ProviderResponseAdapter(ABC):
     @cached_property
-    def User(self):
+    def User(self) -> AbstractUser:
         return get_user_model()
 
     @property
@@ -92,8 +93,10 @@ class ProviderResponseAdapter(ABC):
     def identity_id(self) -> str:
         pass
 
-    def register(self):
-        return self.User.objects.create(username=self.identity_id)
+    def register(self, organisation: Organisation):
+        return self.User.objects.create(
+            username=self.identity_id, organisation=organisation
+        )
 
     @abstractmethod
     def update(self, user: AbstractUser):
