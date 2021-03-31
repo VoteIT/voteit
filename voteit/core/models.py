@@ -89,9 +89,10 @@ class OAuth2Provider(models.Model):
         verbose_name = "OAuth2Provider"
         verbose_name_plural = "OAuth2Providers"
         constraints = [
-            models.UniqueConstraint(
-                fields=["provider_id", "organisation"], name="unique provider id"
-            ),
+            # FIXME: While testing we'll want to allow this at least
+            # models.UniqueConstraint(
+            #     fields=["provider_id", "organisation"], name="unique provider id"
+            # ),
         ]
 
     @property
