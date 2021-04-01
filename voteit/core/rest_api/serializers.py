@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from django.contrib.auth import get_user_model
 from django.core.serializers.json import DjangoJSONEncoder
@@ -126,13 +127,21 @@ class BeginProviderAuthSerializer(serializers.ModelSerializer):
     def get_begin_url(self, instance: OAuth2Provider):
         # Get scopes from organisation or provider?
         request = self.context["request"]
-        # Only local path for "next" - add domain later
+        # Note: This is not for security, only to make sure a cookie has been set for the same domain
+        # the user will be returned to :)
+        redirect_host = urlparse(instance.redirect_url).netloc
+        if redirect_host != request.META["HTTP_HOST"]:
+            raise serializers.ValidationError(
+                "host in redirect_url and request host doesn't match, login would never work. Host must be: %s"
+                % redirect_host,
+            )
         auth_session = OAuth2Session(
             client_id=instance.client_id,
             scope=instance.scopes,
             redirect_uri=instance.redirect_url,
         )
         authorization_url, state = auth_session.authorization_url(instance.auth_url)
+        # Only local path for "next" - add domain later
         state_data = OAuthStateSchema(
             provider_pk=instance.pk, next=request.GET.get("next", "/"), state=state
         )
