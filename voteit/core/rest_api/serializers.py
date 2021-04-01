@@ -140,7 +140,10 @@ class BeginProviderAuthSerializer(serializers.ModelSerializer):
             scope=instance.scopes,
             redirect_uri=instance.redirect_url,
         )
-        authorization_url, state = auth_session.authorization_url(instance.auth_url)
+        authorization_url, state = auth_session.authorization_url(
+            instance.auth_url,
+            approval_prompt="auto",
+        )
         # Only local path for "next" - add domain later
         state_data = OAuthStateSchema(
             provider_pk=instance.pk, next=request.GET.get("next", "/"), state=state
