@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from logging import getLogger
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.auth import login
@@ -6,13 +9,49 @@ from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
 from django.http import HttpResponseBadRequest
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from pydantic import ValidationError
 from requests_oauthlib import OAuth2Session
-from voteit.core.models import OAuth2Provider
-from voteit.core.schemas import OAuthStateSchema
+
+from voteit.organisation.models import OAuth2Provider
+from voteit.organisation.models import Organisation
+from voteit.organisation.schemas import OAuthStateSchema
 
 logger = getLogger(__name__)
+
+
+def begin_auth(request, org_pk: int):
+    # FIXME: Very early, for testing
+    organisation = get_object_or_404(Organisation, pk=org_pk)
+    provider = organisation.provider
+    if not provider:
+        raise Http404("No provider for organisation")
+    # Get scopes from organisation or provider?
+    # Note: This is not for security, only to make sure a cookie has been set for the same domain
+    # the user will be returned to :)
+    redirect_host = urlparse(provider.redirect_url).netloc
+    if redirect_host != request.META["HTTP_HOST"]:
+        return HttpResponseBadRequest(
+            "host in redirect_url and request host doesn't match, login would never work. Host must be: %s"
+            % redirect_host,
+        )
+    auth_session = OAuth2Session(
+        client_id=provider.client_id,
+        scope=provider.scopes,
+        redirect_uri=provider.redirect_url,
+    )
+    authorization_url, state = auth_session.authorization_url(
+        provider.auth_url,
+        approval_prompt="auto",
+    )
+    # Only local path for "next" - add domain later
+    state_data = OAuthStateSchema(
+        provider_pk=provider.pk, next=request.GET.get("next", "/"), state=state
+    )
+    request.session["oauth_state"] = state_data.dict()
+    request.session.save()
+    return HttpResponseRedirect(authorization_url)
 
 
 def finish_auth(request):

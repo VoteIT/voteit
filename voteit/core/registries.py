@@ -1,4 +1,3 @@
-# from typing import TYPE_CHECKING
 from typing import Generator
 from typing import Union
 
@@ -6,10 +5,7 @@ from rules import Predicate
 from typing import Type
 from django.db.models import Model
 
-from voteit.core.abcs import ProviderResponseAdapter
-
 from voteit.core.component import Registry
-
 from voteit.core.permissions import Permission
 from voteit.core.predicate import PredicateRegistry
 from voteit.core.utils import get_model_by_shortname
@@ -165,4 +161,3 @@ class PermissionRegistry(Registry):
 predicates = PredicateRegistry(Predicate)
 permissions = PermissionRegistry(Permission)
 content_types = ContentRegistry(Model)
-provider_response_adapters = Registry(ProviderResponseAdapter)

@@ -3,8 +3,6 @@ from datetime import datetime
 from django.test import RequestFactory
 from django.test import TestCase
 
-# from voteit.core.testing import mk_hashtag
-
 
 class OrganisationSerializerTests(TestCase):
     def setUp(self):
@@ -23,9 +21,15 @@ class OrganisationSerializerTests(TestCase):
         data = serializer.data
         self.assertEqual(data.pop("pk"), self.org.pk)
         self.assertEqual(data.pop("title"), self.org.title)
+        self.assertIsNone(data.pop("login_url"))
 
-        # Make sure we checked everything
-        # self.assertFalse(data.keys())
+    def test_get_with_provider(self):
+        from voteit.organisation.models import OAuth2Provider
+
+        OAuth2Provider(organisation=self.org)
+        serializer = self._cut(self.org)
+        data = serializer.data
+        self.assertEqual(data.pop("login_url"), f"/begin-auth/{self.org.pk}/")
 
     def test_patch(self):
         serializer = self._cut(self.org, {"body": "Bye!"}, partial=True)

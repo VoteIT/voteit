@@ -1,24 +1,18 @@
 from __future__ import annotations
 
-from abc import ABC
 from abc import ABCMeta
 from abc import abstractmethod
-from typing import Dict
 from typing import Optional
 from typing import TYPE_CHECKING
 
-from django.contrib.auth import get_user_model
 from django.db import models
-from django.utils.functional import cached_property
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
     from voteit.agenda.models import AgendaItem
     from voteit.organisation.models import Organisation
-    from django.contrib.auth.models import AbstractUser
 
-
-__all__ = ("ABCModel", "AgendaItemContext", "MeetingContext", "ProviderResponseAdapter")
+__all__ = ("ABCModel", "AgendaItemContext", "MeetingContext", "OrganisationContext")
 
 
 class _AbstractModelMeta(ABCMeta, type(models.Model)):
@@ -75,37 +69,13 @@ class MeetingContext(ABCModel):
         abstract = True
 
 
-class ProviderResponseAdapter(ABC):
-    @cached_property
-    def User(self) -> AbstractUser:
-        return get_user_model()
+class OrganisationContext(ABCModel):
+    """ This class may be within the scope of an organisation."""
 
     @property
     @abstractmethod
-    def name(self) -> str:
-        """Name of the adapter"""
+    def organisation(self) -> Optional[Organisation]:
+        """ Return the organisation object. It could be a ForeignKey relation or a property"""
 
-    def __init__(self, response: Dict):
-        self.response = response
-
-    @property
-    @abstractmethod
-    def identity_id(self) -> str:
-        pass
-
-    def register(self, organisation: Organisation):
-        return self.User.objects.create(
-            username=self.identity_id, organisation=organisation
-        )
-
-    @abstractmethod
-    def update(self, user: AbstractUser):
-        pass
-
-    def store_token(self, token_response: Dict, **kw):
-        # FIXME: Perhaps implement this later?
-        pass
-
-    def get_user(self, default=None):
-        user = self.User.objects.filter(username=self.identity_id).first()
-        return user and user or default
+    class Meta:
+        abstract = True

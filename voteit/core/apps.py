@@ -7,9 +7,6 @@ class CoreConfig(AppConfig):
     verbose_name = _("VoteIT Core")
 
     def ready(self):
-        from voteit.core import rules
-        from voteit.core import signals
-        from voteit.core import messages
         from voteit.core.registries import content_types
         from voteit.core.registries import permissions
         from voteit.core import models_to_register
@@ -20,9 +17,6 @@ class CoreConfig(AppConfig):
 
         # Make sure linked permissions make sense
         permissions.validate_registry()
-
-        # Register providers
-        from voteit.core import providers
 
 
 def register_model(model, registry):

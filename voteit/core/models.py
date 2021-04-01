@@ -14,12 +14,10 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import UserManager
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
-from typing import Type
 from voteit.core.abcs import ABCModel
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
-from voteit.core.utils import get_provider_response_adapters
 from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
 from voteit.core.utils import strict_clean_html
@@ -27,10 +25,9 @@ from voteit.core.validators import UserIDValidator
 
 if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
-    from voteit.core.abcs import ProviderResponseAdapter
 
 
-__all__ = ("RoleContextMixin", "Roles", "BaseContent", "User", "OAuth2Provider")
+__all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
 
 
 class User(AbstractUser):
@@ -62,59 +59,6 @@ class User(AbstractUser):
         ]
 
     objects = UserManager()
-
-
-class OAuth2Provider(models.Model):
-    name = "oauth2_provider"
-    provider_id = models.CharField(max_length=30)
-    title = models.CharField(max_length=50)
-    active: bool = models.BooleanField(default=True)
-    organisation: Organisation = models.ForeignKey(
-        "organisation.Organisation", on_delete=models.CASCADE, related_name="providers"
-    )
-    scopes: str = models.CharField(
-        verbose_name="OAuth scopes, separated by space. Must exist on provider",
-        max_length=300,
-    )
-    client_id: str = models.CharField(max_length=100)
-    client_secret: str = models.CharField(max_length=200)
-    redirect_url: str = models.URLField()
-    auth_url: str = models.URLField()
-    token_url: str = models.URLField()
-    identity_url: str = models.URLField(
-        verbose_name="Should return json with information that can be used to register the user"
-    )
-
-    class Meta:
-        verbose_name = "OAuth2Provider"
-        verbose_name_plural = "OAuth2Providers"
-        constraints = [
-            # FIXME: While testing we'll want to allow this at least
-            # models.UniqueConstraint(
-            #     fields=["provider_id", "organisation"], name="unique provider id"
-            # ),
-        ]
-
-    @property
-    def response_adapter(self) -> Type[ProviderResponseAdapter]:
-        return get_provider_response_adapters()[self.provider_id]
-
-    def save(self, **kw):
-        adapters = get_provider_response_adapters()
-        if self.provider_id not in adapters:
-            raise ValueError(
-                "%s is not registered in provider_response_adapters", self.provider_id
-            )
-        super().save(**kw)
-
-    def __str__(self):
-        return self.title
-
-    def __repr__(self):
-        return f"OAuth2Provider {self.title}"
-
-    # Type annotations
-    objects: models.Manager
 
 
 def real_user_only(method):

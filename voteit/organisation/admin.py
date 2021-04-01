@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
+from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserConsent
@@ -26,4 +27,10 @@ class TermsOfServiceAdmin(admin.ModelAdmin):
 
 @admin.register(UserConsent)
 class UserConsentAdmin(admin.ModelAdmin):
+    pass
+
+
+
+@admin.register(OAuth2Provider)
+class OAuth2ProviderAdmin(admin.ModelAdmin):
     pass

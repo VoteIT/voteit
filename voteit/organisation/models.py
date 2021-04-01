@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from abc import abstractmethod
 from datetime import datetime
 from typing import Optional
 from typing import TYPE_CHECKING
@@ -8,25 +7,16 @@ from django.utils.translation import gettext_lazy as _
 
 from django.conf import settings
 from django.db import models
-from voteit.core.abcs import ABCModel
+from typing import Type
+from voteit.core.abcs import OrganisationContext
 from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
+from voteit.organisation.utils import get_provider_response_adapters
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
-
-
-class OrganisationContext(ABCModel):
-    """ This class may be within the scope of an organisation."""
-
-    @property
-    @abstractmethod
-    def organisation(self) -> Optional[Organisation]:
-        """ Return the organisation object. It could be a ForeignKey relation or a property"""
-
-    class Meta:
-        abstract = True
+    from voteit.organisation.abcs import ProviderResponseAdapter
 
 
 class OrganisationRoles(Roles):
@@ -63,10 +53,66 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
         return f"Organisation {self.title}"
 
     # Type annotations
-    providers: models.QuerySet
+    provider: Optional[OAuth2Provider]
     objects: models.Manager
     tos: models.QuerySet
     users: models.QuerySet
+
+
+class OAuth2Provider(OrganisationContext):
+    """
+    This is the identity provider, which uses OAuth2 protocol for exchange.
+    We (currently) don't allow more than one.
+    Login providers from other services should be added via the id proxy instead.
+    """
+
+    name = "oauth2_provider"
+    provider_id = models.CharField(max_length=30)
+    title = models.CharField(max_length=50)
+    organisation: Organisation = models.OneToOneField(
+        "organisation.Organisation",
+        on_delete=models.CASCADE,
+        related_name="provider",
+        blank=True,
+        null=True,
+    )
+    scopes: str = models.CharField(
+        verbose_name="OAuth scopes, separated by space. Must exist on provider",
+        max_length=300,
+    )
+    client_id: str = models.CharField(max_length=100)
+    client_secret: str = models.CharField(max_length=200)
+    redirect_url: str = models.URLField()
+    auth_url: str = models.URLField()
+    token_url: str = models.URLField()
+    identity_url: str = models.URLField(
+        verbose_name="Should return json with information that can be used to register the user"
+    )
+
+    class Meta:
+        verbose_name = "OAuth2Provider"
+        verbose_name_plural = "OAuth2Providers"
+
+    @property
+    def response_adapter(self) -> Type[ProviderResponseAdapter]:
+        return get_provider_response_adapters()[self.provider_id]
+
+    def save(self, **kw):
+        adapters = get_provider_response_adapters()
+        if self.provider_id not in adapters:
+            raise ValueError(
+                "%s is not registered in provider_response_adapters", self.provider_id
+            )
+        super().save(**kw)
+
+    def __str__(self):
+        return self.title
+
+    def __repr__(self):
+        return f"OAuth2Provider {self.title}"
+
+    # Type annotations
+    objects: models.Manager
 
 
 class TermsOfService(BaseContent, OrganisationContext):

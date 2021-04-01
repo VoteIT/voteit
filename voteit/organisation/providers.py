@@ -1,6 +1,6 @@
 from django.contrib.auth.models import AbstractUser
-from voteit.core.abcs import ProviderResponseAdapter
-from voteit.core.registries import provider_response_adapters
+from voteit.organisation.abcs import ProviderResponseAdapter
+from voteit.organisation.registries import provider_response_adapters
 
 
 @provider_response_adapters

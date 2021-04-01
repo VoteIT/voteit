@@ -11,3 +11,4 @@ class OrganisationConfig(AppConfig):
         from voteit.organisation import roles
         from voteit.organisation import rules
         from voteit.organisation import rest_api
+        from voteit.organisation import providers
