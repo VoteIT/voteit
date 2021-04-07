@@ -4,6 +4,7 @@ from string import digits
 
 from pydantic import BaseModel
 from pydantic import validator
+from typing import List
 
 _chars = ascii_letters + digits
 
@@ -23,3 +24,12 @@ class OAuthStateSchema(BaseModel):
         if not v.startswith("/"):
             raise ValueError("Must start with /")
         return v
+
+
+class OAuthTokenSchema(BaseModel):
+    access_token: str
+    expires_in: int
+    token_type: str
+    scope: List[str]
+    refresh_token: str
+    expires_at: float

@@ -86,7 +86,8 @@ class OAuth2Provider(OrganisationContext):
     auth_url: str = models.URLField()
     token_url: str = models.URLField()
     identity_url: str = models.URLField(
-        verbose_name="Should return json with information that can be used to register the user"
+        verbose_name="Identity URL. "
+        "Should return json with information that can be used to register the user"
     )
 
     class Meta:

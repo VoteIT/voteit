@@ -9,9 +9,12 @@ from django.contrib.auth import get_user_model
 from django.utils.functional import cached_property
 from typing import Dict
 
+from voteit.organisation.schemas import OAuthTokenSchema
+
 if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
     from django.contrib.auth.models import AbstractUser
+    from django.contrib.sessions.base_session import AbstractBaseSession
 
 
 class ProviderResponseAdapter(ABC):
@@ -41,9 +44,14 @@ class ProviderResponseAdapter(ABC):
     def update(self, user: AbstractUser):
         pass
 
-    def store_token(self, token_response: Dict, **kw):
-        # FIXME: Perhaps implement this later?
-        pass
+    def store_token(self, session: AbstractBaseSession, token_response: Dict, **kw):
+        """
+        OAuth information will be used later to make API calls to the identity server.
+        """
+        # FIXME: We'll want to change this procedure later on
+        schema = OAuthTokenSchema(**token_response)
+        session["oauth_token"] = schema.dict()
+        session.save()
 
     def get_user(self, default=None):
         user = self.User.objects.filter(username=self.identity_id).first()
