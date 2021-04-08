@@ -81,3 +81,24 @@ class MeetingInviteManagerTests(TestCase):
     def test_bad_query_type(self):
         self.assertRaises(ValueError, self.manager.find_invites, email=123)
         self.assertRaises(ValueError, self.manager.find_invites, dummy="abc")
+
+
+class MeetingInviteTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.access_policy.models import MeetingInvite
+
+        cls.meeting = Meeting.objects.create()
+        cls.user = User.objects.create(username="someone")
+
+        cls.invite: MeetingInvite = MeetingInvite.objects.create(
+            meeting=cls.meeting,
+            created_by=cls.user,
+            data={"email": "a@betahaus.net"},
+            roles=["participant"],
+        )
+
+    def test_accept(self):
+        self.invite.accept(self.user)
+        self.assertEqual(self.user, self.invite.used_by)
+        self.assertEqual({"participant"}, self.meeting.get_roles(self.user))

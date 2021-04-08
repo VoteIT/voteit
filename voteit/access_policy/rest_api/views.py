@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.models import QuerySet
 from requests_oauthlib import OAuth2Session
 from rest_framework import mixins
@@ -53,26 +54,63 @@ class MeetingInviteViewSet(DefaultModelViewSet):
     queryset = MeetingInvite.objects.all()
     model = MeetingInvite
 
+    # def get_queryset(self):
+    # FIXMELimit to meetings where user have moderator role
 
-class UserMatchedInviteViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+
+class UserMatchedInviteViewSet(
+    mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet
+):
     serializer_class = serializers.MeetingInviteSerializer
 
     def get_queryset(self):
-        # FIXME: Error checking etc
-        data = self.request.session["oauth_token"]
-        token = OAuthTokenSchema(**data)
-        provider: OAuth2Provider = self.request.user.organisation.provider
-        # FIXME: Refresh etc
-        auth_session = OAuth2Session(client_id=provider.client_id, token=token.dict())
-        # FIXME URL
-        # Expiring LRU-cache?
-        response = auth_session.get(
-            "http://localhost:8001/service-api/validated-user-data/"
-        )
-        if not response.ok:
-            response.raise_for_status()
-        sdata = {}
-        for item in response.json():
-            values = sdata.setdefault(item["scope"], set())
-            values.add(item["data"])
-        return MeetingInvite.objects.find_invites(**sdata)
+        print(self.action)
+        if self.action in ("list", "accept", "reject"):
+            # FIXME: Error checking etc
+            data = self.request.session["oauth_token"]
+            token = OAuthTokenSchema(**data)
+            provider: OAuth2Provider = self.request.user.organisation.provider
+            # FIXME: Refresh etc
+            auth_session = OAuth2Session(
+                client_id=provider.client_id, token=token.dict()
+            )
+            # FIXME URL
+            # Expiring LRU-cache?
+            response = auth_session.get(
+                "http://localhost:8001/service-api/validated-user-data/"
+            )
+            if not response.ok:
+                response.raise_for_status()
+            sdata = {}
+            for item in response.json():
+                values = sdata.setdefault(item["scope"], set())
+                values.add(item["data"])
+            return MeetingInvite.objects.find_invites(**sdata)
+        elif self.action == "retrieve":
+            # Retrieve is permissive in another way - mostly for testing anyway
+            return self.request.user.used_invites.all()
+        return MeetingInvite.objects.none()
+
+    @action(
+        methods=["post"],
+        detail=True,
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def accept(self, request, pk):
+        instance: MeetingInvite = self.get_object()
+        with transaction.atomic():
+            instance.accept(request.user)
+            instance.save()
+        return Response(status=200, data=self.serializer_class(instance).data)
+
+    @action(
+        methods=["post"],
+        detail=True,
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def reject(self, request, pk):
+        instance: MeetingInvite = self.get_object()
+        with transaction.atomic():
+            instance.reject(request.user)
+            instance.save()
+        return Response(status=200, data=self.serializer_class(instance).data)

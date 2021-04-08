@@ -13,15 +13,16 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django_fsm import FSMField
 from django_fsm import transition
+from voteit.access_policy.permissions import MeetingInvitePermissions
 
 from voteit.access_policy.utils import get_invite_data_registry
 from voteit.access_policy.workflows import InviteWf
 from voteit.core.abcs import MeetingContext
 from voteit.core.permissions import NOT_ALLOWED
+from django.contrib.auth.models import AbstractUser
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
-    from django.contrib.auth.models import AbstractUser
 
 logger = getLogger(__name__)
 
@@ -138,13 +139,33 @@ class MeetingInvite(MeetingContext):
         self.validate_invite_data()  # Crash and burn is better than corrupt db
         super().save(**kw)
 
-    # @transition(
-    #     field=state,
-    #     source=InviteWf.OPEN,
-    #     target=InviteWf.EXPIRED,
-    #     permission=NOT_ALLOWED,
-    # )
-    # def expire(self):
-    #     pass
+    @transition(
+        field=state,
+        source=InviteWf.OPEN,
+        target=InviteWf.ACCEPTED,
+        permission=NOT_ALLOWED,  # Special view, not a normal transition
+    )
+    def accept(self, user: AbstractUser):
+        """ Important! Must always run within an atomic block!"""
+        self.used_by = user
+        self.meeting.add_roles(user, *self.roles)
+
+    @transition(
+        field=state,
+        source=InviteWf.OPEN,
+        target=InviteWf.REJECTED,
+        permission=NOT_ALLOWED,  # Special view, not a normal transition
+    )
+    def reject(self, user: AbstractUser):
+        self.used_by = user
+
+    @transition(
+        field=state,
+        source=InviteWf.OPEN,
+        target=InviteWf.REVOKED,
+        permission=MeetingInvitePermissions.CHANGE,
+    )
+    def revoke(self):
+        pass
 
     objects = MeetingInviteManager()
