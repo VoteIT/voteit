@@ -268,4 +268,6 @@ class AlwaysTrueSet(set):
 
 
 ANY_SET = AlwaysTrueSet()
-NOT_ALLOWED = Permission("__not_allowed", model=ANY_SET, context=ANY_SET)
+NOT_ALLOWED = Permission(
+    "__not_allowed", model=ANY_SET, context=ANY_SET
+)  # Not manually anyway!

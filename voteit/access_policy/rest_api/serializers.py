@@ -1,40 +1,22 @@
+from pydantic import ValidationError
 from rest_framework import serializers
 from typing import List
 
 from voteit.access_policy.app.policies import ModeratorApprovedAccess, AutomaticAccess
+from voteit.access_policy.models import MeetingInvite
+from voteit.access_policy.utils import get_invite_data_registry
 from voteit.access_policy.utils import get_policies
+from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.meeting.models import Meeting
 
 
 class AutomaticAccessSerializer(serializers.ModelSerializer):
-    """
-    >>> from voteit.meeting.models import Meeting
-    >>> meeting = Meeting.objects.create()
-    >>> ap = AutomaticAccess.objects.create(meeting=meeting, active=True, roles_given=["participant"])
-    >>> data = AutomaticAccessSerializer(ap).data
-    >>> data["pk"] == ap.pk
-    True
-    >>> data["name"] == AutomaticAccess.name
-    True
-    """
-
     class Meta:
         model = AutomaticAccess
         fields = "pk", "meeting", "active", "name", "roles_given"
 
 
 class ModeratorApprovedAccessSerializer(serializers.ModelSerializer):
-    """
-    >>> from voteit.meeting.models import Meeting
-    >>> meeting = Meeting.objects.create()
-    >>> ap = ModeratorApprovedAccess.objects.create(meeting=meeting, active=True)
-    >>> data = ModeratorApprovedAccessSerializer(ap).data
-    >>> data["pk"] == ap.pk
-    True
-    >>> data["name"] == ModeratorApprovedAccess.name
-    True
-    """
-
     class Meta:
         model = ModeratorApprovedAccess
         fields = "pk", "meeting", "active", "name"
@@ -47,18 +29,6 @@ ap_to_serializer = {
 
 
 class MeetingAccessPoliciesSerializer(serializers.ModelSerializer):
-    """
-    Return serialized version of policies for a specific meeting
-    >>> from voteit.meeting.models import Meeting
-    >>> meeting = Meeting.objects.create()
-    >>> ap = AutomaticAccess.objects.create(meeting=meeting, active=True, roles_given=["participant"])
-    >>> data = MeetingAccessPoliciesSerializer(meeting).data
-    >>> data["pk"] == meeting.pk
-    True
-
-    >>> len(data["policies"])
-    1
-    """
 
     policies = serializers.SerializerMethodField("get_enabled_policies")
 
@@ -72,3 +42,23 @@ class MeetingAccessPoliciesSerializer(serializers.ModelSerializer):
             serializer = ap_to_serializer[ap.name]
             result.append(serializer(ap).data)
         return result
+
+
+class MeetingInviteSerializer(BaseModelSerializer):
+    author_kw = "created_by"
+
+    class Meta:
+        model = MeetingInvite
+        # FIXME: Readonly etc
+        fields = ["pk"] + [f.name for f in MeetingInvite._meta.get_fields()]
+        read_only_fields = ["created_by"]  # Forced via BaseModelSerailizer
+
+    def validate_data(self, value):
+        reg = get_invite_data_registry()
+        try:
+            reg.validate(value)
+        except ValidationError as exc:
+            raise serializers.ValidationError(str(exc))
+        except ValueError as exc:
+            raise serializers.ValidationError("Invalid keys within data")
+        return value
