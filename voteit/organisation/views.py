@@ -129,4 +129,4 @@ def finish_auth(request):
         # Any session login kind with http only cookie would do
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         next_url = "localhost:8080" + state_data.next
-        return HttpResponse(f"You're logged in, go here next: {next_url}")
+        return HttpResponse(f"You're logged in as {user}, go here next: {next_url}")

@@ -2,6 +2,7 @@ from django.contrib import admin
 from fsm_admin.mixins import FSMTransitionMixin
 from voteit.access_policy.app.policies import ModeratorApprovedAccess, AutomaticAccess
 from voteit.access_policy.app.policies.moderator_approved import AccessRequest
+from voteit.access_policy.models import MeetingInvite
 
 
 @admin.register(AutomaticAccess)
@@ -33,5 +34,11 @@ class ModeratorApprovedAccessAdmin(admin.ModelAdmin):
 
 @admin.register(AccessRequest)
 class AccessRequestAdmin(FSMTransitionMixin, admin.ModelAdmin):
+    fsm_field = ["state"]
+    readonly_fields = ("state",)
+
+
+@admin.register(MeetingInvite)
+class MeetingInviteAdmin(FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = ["state"]
     readonly_fields = ("state",)
