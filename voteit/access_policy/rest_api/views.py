@@ -73,10 +73,6 @@ class UserMatchedInviteViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             response.raise_for_status()
         sdata = {}
         for item in response.json():
-            # FIXME {'pk': 1, 'identities': [1], 'id': 1, 'user': 1, 'validated': '2021-03-25T10:36:59Z', 'data': {'email': 'admin@betahaus.net'}, 'scope': 'email'},
-            for (k, v) in item["data"].items():
-                values = sdata.setdefault(k, set())
-                values.add(v)
+            values = sdata.setdefault(item["scope"], set())
+            values.add(item["data"])
         return MeetingInvite.objects.find_invites(**sdata)
-
-        # identity_response = auth_session.get(provider.identity_url)
