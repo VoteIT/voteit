@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import QuerySet
+from django.http import HttpResponseForbidden
 from requests_oauthlib import OAuth2Session
 from rest_framework import mixins
 from rest_framework import permissions
@@ -12,6 +13,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from voteit.access_policy.app.policies import AutomaticAccess
 from voteit.access_policy.models import MeetingInvite
+from voteit.access_policy.permissions import MeetingInvitePermissions
 
 from voteit.access_policy.rest_api import serializers
 from voteit.core.rest_api.base import DefaultModelViewSet
@@ -51,11 +53,21 @@ class MeetingInviteViewSet(DefaultModelViewSet):
     serializer_class = serializers.MeetingInviteSerializer
     context_queryset = Meeting.objects.all()
     context_lookup_kwarg = "meeting"
-    queryset = MeetingInvite.objects.all()
     model = MeetingInvite
 
-    # def get_queryset(self):
-    # FIXMELimit to meetings where user have moderator role
+    def get_queryset(self):
+        """
+        Generic searches without meeting as part of the query aren't allowed for this view.
+        """
+        if self.detail:
+            # Permission checked against obj
+            return MeetingInvite.objects.all()
+        else:
+            context: Meeting = self.get_context(self.request)
+            # This permission can be checked against meetings too
+            if not self.request.user.has_perm(MeetingInvitePermissions.VIEW, context):
+                return HttpResponseForbidden("You lack the required moderator role")
+            return context.invites
 
 
 class UserMatchedInviteViewSet(
@@ -63,13 +75,16 @@ class UserMatchedInviteViewSet(
 ):
     serializer_class = serializers.MeetingInviteSerializer
 
+    def get_token(self):
+        # FIXME: Error handling, other persistence???
+        data = self.request.session["oauth_token"]
+        return OAuthTokenSchema(**data)
+
     def get_queryset(self):
-        print(self.action)
         if self.action in ("list", "accept", "reject"):
             # FIXME: Error checking etc
-            data = self.request.session["oauth_token"]
-            token = OAuthTokenSchema(**data)
             provider: OAuth2Provider = self.request.user.organisation.provider
+            token = self.get_token()
             # FIXME: Refresh etc
             auth_session = OAuth2Session(
                 client_id=provider.client_id, token=token.dict()

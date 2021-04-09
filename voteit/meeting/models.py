@@ -208,6 +208,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
 
     objects = Manager()
     groups: models.QuerySet
+    invites: models.QuerySet
 
 
 class MeetingGroup(BaseContent, MeetingContext):

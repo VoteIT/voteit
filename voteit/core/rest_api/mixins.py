@@ -132,8 +132,8 @@ class ModelContextMixin(ABC):
         # FIXME: Request is probably present here already, right?
         lookup_val = request.data.get(self.context_lookup_kwarg)
         # FIXME: Maybe fallback to GET?
-        # if lookup_val is None:
-        #    lookup_val = request.GET.get(self.context_lookup_kwarg)
+        if lookup_val is None:
+            lookup_val = request.GET.get(self.context_lookup_kwarg)
         if lookup_val is None:
             raise exceptions.ValidationError(
                 detail=f"{self.context_lookup_kwarg} not specified"
