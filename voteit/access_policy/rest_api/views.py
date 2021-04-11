@@ -70,6 +70,12 @@ class MeetingInviteViewSet(DefaultModelViewSet):
             return context.invites
 
 
+# Current implementation notes:
+# This requires the user to allow voteit to read their data before they can even query for invites.
+# We might want to refactor this later on, but right now during the testing phase
+# let's be lazy.
+
+
 class UserMatchedInviteViewSet(
     mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet
 ):
@@ -89,8 +95,8 @@ class UserMatchedInviteViewSet(
             auth_session = OAuth2Session(
                 client_id=provider.client_id, token=token.dict()
             )
-            # FIXME URL
             # Expiring LRU-cache?
+            # FIXME URL
             response = auth_session.get(
                 "http://localhost:8001/service-api/validated-user-data/"
             )
@@ -112,6 +118,7 @@ class UserMatchedInviteViewSet(
         permission_classes=[permissions.IsAuthenticated],
     )
     def accept(self, request, pk):
+        # Note: Permissions doesn't apply here since it's handled by the queryset
         instance: MeetingInvite = self.get_object()
         with transaction.atomic():
             instance.accept(request.user)
@@ -124,6 +131,7 @@ class UserMatchedInviteViewSet(
         permission_classes=[permissions.IsAuthenticated],
     )
     def reject(self, request, pk):
+        # Note: Permissions doesn't apply here since it's handled by the queryset
         instance: MeetingInvite = self.get_object()
         with transaction.atomic():
             instance.reject(request.user)
