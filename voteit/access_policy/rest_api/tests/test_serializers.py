@@ -70,6 +70,23 @@ class MeetingAccessPoliciesSerializerTests(TestCase):
         self.assertEqual(1, len(data["policies"]))
 
 
+# class InviteQuerySerializerTests(TestCase):
+#     @property
+#     def _cut(self):
+#         from voteit.access_policy.rest_api.serializers import InviteQuerySerializer
+#
+#         return InviteQuerySerializer
+#
+#     def test_multiple_query(self):
+#         data = [
+#             {
+#                 "scope": "email",
+#                 "data": "hello@betahaus.net",
+#                 "validated": "2021-03-24T15:56:00.043000Z",
+#             }
+#         ]
+
+
 class MeetingInviteSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):

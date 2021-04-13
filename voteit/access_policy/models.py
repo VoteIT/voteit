@@ -124,6 +124,12 @@ class MeetingInvite(MeetingContext):
     data: Dict[str, str] = models.JSONField(
         verbose_name="Data to match invite against", encoder=DjangoJSONEncoder
     )
+    matched: List[Dict[str, str]] = models.JSONField(
+        verbose_name="Data that matched",
+        encoder=DjangoJSONEncoder,
+        blank=True,
+        null=True,
+    )
 
     def validate_invite_data(self, data=_marker):
         """

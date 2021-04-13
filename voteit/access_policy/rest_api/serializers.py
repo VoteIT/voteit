@@ -1,8 +1,10 @@
-from pydantic import ValidationError
-from rest_framework import serializers
 from typing import List
 
-from voteit.access_policy.app.policies import ModeratorApprovedAccess, AutomaticAccess
+from pydantic import ValidationError
+from rest_framework import serializers
+
+from voteit.access_policy.app.policies import AutomaticAccess
+from voteit.access_policy.app.policies import ModeratorApprovedAccess
 from voteit.access_policy.models import MeetingInvite
 from voteit.access_policy.utils import get_invite_data_registry
 from voteit.access_policy.utils import get_policies
@@ -42,6 +44,14 @@ class MeetingAccessPoliciesSerializer(serializers.ModelSerializer):
             serializer = ap_to_serializer[ap.name]
             result.append(serializer(ap).data)
         return result
+
+
+class InviteQuerySerializer(serializers.Serializer):
+    scope = serializers.CharField()
+    data = serializers.CharField()
+    validated = serializers.DateTimeField()
+
+    # FIXME: Validate scope, data and validated
 
 
 class MeetingInviteSerializer(BaseModelSerializer):

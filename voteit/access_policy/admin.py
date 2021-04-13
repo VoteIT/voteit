@@ -42,3 +42,16 @@ class AccessRequestAdmin(FSMTransitionMixin, admin.ModelAdmin):
 class MeetingInviteAdmin(FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = ["state"]
     readonly_fields = ("state",)
+    list_display = (
+        "meeting",
+        "state",
+        "created_by",
+        "used_by",
+        "roles",
+    )
+    list_filter = (
+        "meeting",
+        "state",
+        "created_by",
+        "used_by",
+    )
