@@ -3,7 +3,10 @@ from __future__ import annotations
 from abc import ABC
 from typing import Union
 
+from django.contrib.auth.models import AbstractUser
+from pydantic import validator
 from pydantic.main import BaseModel
+from typing import List
 
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import BaseOutgoingMessage
@@ -15,8 +18,10 @@ from voteit.messaging.messages.base import BaseObjectAdded
 from voteit.messaging.messages.base import BaseObjectChanged
 from voteit.messaging.messages.base import BaseObjectDeleted
 from voteit.messaging.messages.text import TextResponse
+from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
+from voteit.poll.permissions import ElectoralRegisterPermissions
 from voteit.poll.permissions import VotePermissions
 from voteit.poll.schemas import GenericExistingVoteSchema
 
@@ -174,3 +179,59 @@ class GenericVoteResponse(BaseOutgoingMessage):
     name = "vote.get"
     schema = GenericExistingVoteSchema
     data: GenericExistingVoteSchema
+
+
+class GetERVoteCountSchema(BaseModel):
+    electoral_register: int
+
+
+@incoming
+class GetERVoteCount(BaseIncomingMessage, DeferredJob, ContextAction):
+    """ Returns vote count for each user in a specific electoral register."""
+
+    name = "er.vote_count"
+    permission = ElectoralRegisterPermissions.VIEW
+    model = ElectoralRegister
+    context: ElectoralRegister
+    schema = GetERVoteCountSchema
+    data: GetERVoteCountSchema
+    context_pk_attr = "electoral_register"
+
+    def run_job(self) -> ERVoteCount:
+        self.assert_perm()
+        er = self.context
+        weights = [
+            {"user": x.user, "weight": x.weight} for x in er.voterweight_set.all()
+        ]
+        msg = ERVoteCount.from_message(
+            self,
+            total=er.get_total_vote_weight(),
+            weights=weights,
+        )
+        msg.send_outgoing(self.mm.consumer_name, success=True)
+        return msg
+
+
+class VoteWeight(BaseModel):
+    user: int
+    weight: int
+
+    @validator("user", pre=True)
+    def transform_user(cls, value):
+        if isinstance(value, int):
+            return value
+        elif isinstance(value, AbstractUser):
+            return value.pk
+        raise ValueError("Wrong user type")
+
+
+class ERVoteCountSchema(BaseModel):
+    weights: List[VoteWeight]
+    total: int
+
+
+@outgoing
+class ERVoteCount(BaseOutgoingMessage):
+    name = "er.vote_count"
+    schema = ERVoteCountSchema
+    data: ERVoteCountSchema

@@ -1,7 +1,13 @@
 from django.test import TestCase
+from django.test import override_settings
 from voteit.messaging.errors import UnauthorizedError
 
+_channel_layers_setting = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}
 
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AddVoteTests(TestCase):
     """ Since this is an abstract class, we'll use simple vote to test it"""
 
@@ -62,6 +68,7 @@ class AddVoteTests(TestCase):
         self.assertEqual("yes", vote.vote_data)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AbstainTests(TestCase):
     def setUp(self):
         from voteit.poll.models import Poll
@@ -106,6 +113,7 @@ class AbstainTests(TestCase):
         self.test_abstain()
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ChangeVoteTests(TestCase):
     """ Since this is an abstract class, we'll use simple vote to test it"""
 
@@ -148,6 +156,7 @@ class ChangeVoteTests(TestCase):
         self.assertRaises(UnauthorizedError, msg.run_job)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class GetVoteTests(TestCase):
     """ Tests rely on simple poll method. """
 
@@ -198,3 +207,44 @@ class GetVoteTests(TestCase):
         response = msg.run_job()
         self.assertIsInstance(response, TextResponse)
         self.assertEqual(response.data.msg, "No vote")
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class GetERVoteCountTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.poll.models import Poll
+
+        cls.meeting = Meeting.objects.create()
+        cls.er = cls.meeting.electoral_registers.create()
+        cls.voter_participant = cls.er.voters.create(username="voter1")
+        cls.voter_unknown = cls.er.voters.create(username="voter2")
+        cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="simple")
+        cls.meeting.add_roles(cls.voter_participant, "participant")
+
+    @property
+    def _cut(self):
+        from voteit.poll.messages import GetERVoteCount
+
+        return GetERVoteCount
+
+    def _mk_one(self, user, **kw):
+        kw.setdefault("electoral_register", self.er.pk)
+        return self._cut({"user_pk": user.pk, "consumer_name": "abc"}, **kw)
+
+    def test_get(self):
+        from voteit.poll.messages import ERVoteCount
+
+        msg = self._mk_one(self.voter_participant)
+        response = msg.run_job()
+        self.assertIsInstance(response, ERVoteCount)
+        self.assertEqual(response.data.total, 2)
+        self.assertEqual(
+            {self.voter_participant.pk, self.voter_unknown.pk},
+            set([x.user for x in response.data.weights]),
+        )
+
+    def test_get_unauthorized_user(self):
+        msg = self._mk_one(self.voter_unknown)
+        self.assertRaises(UnauthorizedError, msg.run_job)

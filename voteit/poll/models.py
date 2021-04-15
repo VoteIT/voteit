@@ -54,7 +54,8 @@ class VoterWeight(models.Model):
     register = models.ForeignKey("ElectoralRegister", on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     weight = models.PositiveIntegerField(default=1)
-    objects = models.Manager()  # Type hinting
+    # Annotations
+    objects: models.Manager
 
 
 class ElectoralRegister(MeetingContext):
