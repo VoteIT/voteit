@@ -55,6 +55,8 @@ rules.add_perm(OrgPermissions.CHANGE, is_manager)
 rules.add_perm(OrgPermissions.DELETE, is_manager)
 rules.add_perm(OrgPermissions.VIEW, is_org_user)
 rules.add_perm(OrgPermissions.MANAGE, is_manager)
+rules.add_perm(OrgPermissions.CHANGE_ROLES, is_manager)
+rules.add_perm(OrgPermissions.VIEW_ROLES, is_manager)  # We might want to change this?
 
 
 rules.add_perm(TOSPermissions.ADD, is_manager)

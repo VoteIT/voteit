@@ -116,3 +116,5 @@ rules.add_perm(MeetingPermissions.MODERATE, is_not_archived & is_moderator)
 # We might want to add editor role later on
 rules.add_perm(MeetingPermissions.CHANGE, is_not_archived & is_moderator)
 rules.add_perm(MeetingPermissions.DELETE, is_not_archived & is_moderator)
+rules.add_perm(MeetingPermissions.CHANGE_ROLES, is_not_archived & is_moderator)
+rules.add_perm(MeetingPermissions.VIEW_ROLES, can_view_meeting)

@@ -8,6 +8,8 @@ class SpeakerSystemPermissions(ModelPermissions):
     CHANGE = P("speaker.change_speakerlistsystem")
     DELETE = P("speaker.delete_speakerlistsystem")
     VIEW = P("speaker.view_speakerlistsystem")
+    CHANGE_ROLES = P("speaker.change_roles_speakerlistsystem")
+    VIEW_ROLES = P("speaker.view_roles_speakerlistsystem")
 
 
 class SpeakerListPermissions(ModelPermissions):

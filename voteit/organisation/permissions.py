@@ -10,6 +10,8 @@ class OrgPermissions(ModelPermissions):
     DELETE = P("organisation.delete_organisation")
     VIEW = P("organisation.view_organisation")
     MANAGE = P("organisation.manage_organisation")
+    CHANGE_ROLES = P("organisation.change_roles_organisation")
+    VIEW_ROLES = P("organisation.view_roles_organisation")
 
 
 class TOSPermissions(ModelPermissions):

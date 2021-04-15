@@ -11,6 +11,5 @@ class MeetingPermissions(ModelPermissions):
     VIEW = P("meeting.view_meeting")
     MODERATE = P("meeting.moderate_meeting")
     ARCHIVE = P("meeting.archive_meeting")
-    ADD_ROLES = P("meeting.add_roles_meeting")
     CHANGE_ROLES = P("meeting.change_roles_meeting")
     VIEW_ROLES = P("meeting.view_roles_meeting")

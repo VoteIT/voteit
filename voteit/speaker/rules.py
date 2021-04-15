@@ -137,3 +137,11 @@ rules.add_perm(
     SpeakerSystemPermissions.VIEW,
     can_view_meeting | has_speaker_role | is_speaker_moderator,
 )
+rules.add_perm(
+    SpeakerSystemPermissions.CHANGE_ROLES,
+    is_moderator & meeting_upcoming_ongoing & is_system_not_archived,
+)
+rules.add_perm(
+    SpeakerSystemPermissions.VIEW_ROLES,
+    can_view_meeting | has_speaker_role | is_speaker_moderator,
+)
