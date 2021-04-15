@@ -11,6 +11,7 @@ from rest_framework.fields import JSONField
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
+    from django_fsm import Transition
 
 
 class BaseModelSerializer(serializers.ModelSerializer):
@@ -112,3 +113,14 @@ class PydanticFieldSerializer(JSONField):
         if isinstance(value, BaseModel):
             value = value.dict()
         return super().to_representation(value)
+
+
+class FSMTransitionSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    permission = serializers.CharField(required=False)
+    source = serializers.CharField(required=False)
+    target = serializers.CharField()
+    title = serializers.SerializerMethodField()
+
+    def get_title(self, field: Transition):
+        return field.custom.get("title", field.name.title())

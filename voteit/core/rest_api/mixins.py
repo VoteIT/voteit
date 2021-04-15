@@ -10,6 +10,7 @@ from rest_framework import exceptions
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
+from voteit.core.rest_api.serializers import FSMTransitionSerializer
 from voteit.core.utils import get_permission_registry
 
 from .serializers import TransitionSerializer
@@ -187,9 +188,10 @@ class TransitionsMixin(SerializerClassesMixin):
             for x in instance.get_available_user_state_transitions(request.user)
         )
         if request.method == "GET":
-            return Response(
-                {"available_transitions": list(available_transitions.keys())}
+            transition_serializer = FSMTransitionSerializer(
+                list(available_transitions.values()), many=True
             )
+            return Response(transition_serializer.data)
         else:
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
