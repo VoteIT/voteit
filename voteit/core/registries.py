@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from typing import Generator
+from typing import TYPE_CHECKING
 from typing import Union
 
 from rules import Predicate
@@ -9,6 +12,9 @@ from voteit.core.component import Registry
 from voteit.core.permissions import Permission
 from voteit.core.predicate import PredicateRegistry
 from voteit.core.utils import get_model_by_shortname
+
+if TYPE_CHECKING:
+    from voteit.core.permissions import ModelPermissions
 
 
 class ContentRegistry(Registry):
@@ -66,6 +72,13 @@ class PermissionRegistry(Registry):
 
     ATTRS_TO_CHECK = ("add", "change", "view", "delete")
 
+    def __init__(self, required):
+        super().__init__(required)
+        self.model_permissions = {}  # Relations to actual model permissions
+
+    def get_model_permissions(self, name) -> ModelPermissions:
+        return self.model_permissions[name]
+
     def for_model(self, model: str) -> Generator[Permission, None, None]:
         for perm in self.values():
             if model == perm.model:
@@ -87,7 +100,6 @@ class PermissionRegistry(Registry):
         {'bye_world'}
         >>> set(registry.for_context("yay")) == {'bye_world', 'hello_world'}
         True
-
         """
         for perm in self.values():
             if model in perm.context:

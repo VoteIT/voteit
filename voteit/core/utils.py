@@ -6,6 +6,7 @@ from typing import Optional
 from typing import Set
 from typing import Type
 from typing import Union
+from typing import TYPE_CHECKING
 
 from bleach import ALLOWED_ATTRIBUTES
 from bleach import ALLOWED_TAGS
@@ -13,6 +14,8 @@ from bleach import Cleaner
 from bs4 import BeautifulSoup
 from django.db.models import Model
 
+if TYPE_CHECKING:
+    from voteit.core.permissions import PermissionRegistry
 
 _tag_pattern = re.compile(r"#([\w\-]+)")
 # FIXME: Do a proper regex. I'm crappy with this /rho
@@ -196,7 +199,7 @@ def get_content_registry():
     return content_types
 
 
-def get_permission_registry():
+def get_permission_registry() -> PermissionRegistry:
     from .registries import permissions
 
     return permissions
