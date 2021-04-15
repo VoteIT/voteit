@@ -27,6 +27,7 @@ from pydantic.main import BaseModel
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
+from voteit.core.permissions import NOT_ALLOWED
 from voteit.meeting.models import Meeting
 from voteit.poll.exceptions import (
     BallotChecksumError,
@@ -37,6 +38,7 @@ from voteit.poll.exceptions import (
     PollNotFinished,
     NotAllowedToVote,
 )
+from voteit.poll.permissions import PollPermissions
 from voteit.poll.schemas import PollResult
 from voteit.poll.utils import get_poll_method_registry
 from voteit.poll.workflows import PollWf
@@ -97,7 +99,7 @@ class ElectoralRegister(MeetingContext):
 
 class Poll(BaseContent, MeetingContext, AgendaItemContext):
     name = "poll"
-    state = FSMField(default=PollWf.initial, choices=PollWf.choices(), protected=True)
+    state = FSMField(default=PollWf.initial, choices=PollWf.choices(), editable=False)
     title = models.CharField(max_length=70)
     description = models.CharField(max_length=200)
     meeting: Optional[Meeting] = models.ForeignKey(
@@ -230,6 +232,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         source=PollWf.PRIVATE,
         target=PollWf.UPCOMING,
         conditions=[validate_settings_guard],
+        permission=PollPermissions.CHANGE_STATE,
+        custom={"title": _("Make upcoming")},
     )
     def upcoming(self):
         for proposal in self.proposals.all():
@@ -242,6 +246,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         source=PollWf.UPCOMING,
         target=PollWf.ONGOING,
         conditions=[validate_settings_guard, start_check],
+        permission=PollPermissions.CHANGE_STATE,
+        custom={"title": _("Start")},
     )
     def ongoing(self):
         # The guard should've taken care of this already
@@ -253,6 +259,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         source=[PollWf.ONGOING, PollWf.FAILED, PollWf.CLOSED],
         target=PollWf.CLOSED,
+        permission=PollPermissions.CHANGE_STATE,
+        custom={"title": _("Close")},
     )
     def close(self):
         """Close the poll for further votes.
@@ -265,6 +273,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         source=PollWf.CLOSED,
         target=PollWf.FINISHED,
         on_error=PollWf.FAILED,
+        permission=NOT_ALLOWED,
+        custom={"title": _("Finish")},
     )
     def finish(self):
         """ Count the votes and finish up. """
@@ -286,13 +296,25 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
                 proposal.denied()
                 proposal.save()
 
-    @transition(field=state, source=PollWf.ONGOING, target=PollWf.CANCELED)
+    @transition(
+        field=state,
+        source=PollWf.ONGOING,
+        target=PollWf.CANCELED,
+        permission=PollPermissions.CHANGE_STATE,
+        custom={"title": _("Cancel")},
+    )
     def cancel(self):
         self._mark_closed()
         for proposal in self.proposals.all():
             proposal.publish()
 
-    @transition(field=state, source=PollWf.UPCOMING, target=PollWf.PRIVATE)
+    @transition(
+        field=state,
+        source=PollWf.UPCOMING,
+        target=PollWf.PRIVATE,
+        permission=PollPermissions.CHANGE_STATE,
+        custom={"title": _("Revert to private")},
+    )
     def unpublish(self):
         for proposal in self.proposals.all():
             proposal.publish()

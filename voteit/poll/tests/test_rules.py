@@ -7,30 +7,37 @@ User = get_user_model()
 
 
 class PollRulesTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
         from voteit.meeting.models import Meeting
 
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create(meeting=self.meeting)
-        self.ai.upcoming()
-        self.poll = Poll.objects.create(
-            method_name="simple", agenda_item=self.ai, meeting=self.meeting
+        cls.meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create(meeting=cls.meeting)
+        cls.ai.upcoming()
+        cls.ai.save()
+        cls.poll = Poll.objects.create(
+            method_name="simple", agenda_item=cls.ai, meeting=cls.meeting
         )
-        self.poll.proposals.create()
-        self.er = ElectoralRegister.objects.create()
-        self.poll.electoral_register = self.er
-        self.poll.save()
-        self.anon = AnonymousUser()
-        self.outsider = User.objects.create(username="anon")
-        self.participant_user = User.objects.create(username="participant")
-        self.meeting.add_roles(self.participant_user, "participant")
-        self.voter_user = self.er.voters.create(username="voter")
+        cls.poll.proposals.create()
+        cls.er = ElectoralRegister.objects.create()
+        cls.poll.electoral_register = cls.er
+        cls.poll.save()
+        cls.anon = AnonymousUser()
+        cls.outsider = User.objects.create(username="anon")
+        cls.participant_user = User.objects.create(username="participant")
+        cls.meeting.add_roles(cls.participant_user, "participant")
+        cls.voter_user = cls.er.voters.create(username="voter")
         # Voters should always be participants too
-        self.meeting.add_roles(self.voter_user, "participant")
-        self.moderator = User.objects.create(username="moderator")
-        self.meeting.add_roles(self.moderator, "moderator")
+        cls.meeting.add_roles(cls.voter_user, "participant")
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, "moderator")
+
+    def setUp(self):
+        self.meeting.refresh_from_db()
+        self.poll.refresh_from_db()
+        self.ai.refresh_from_db()
 
     def p(self, perm):
         from voteit.poll.permissions import PollPermissions
@@ -145,8 +152,15 @@ class PollRulesTests(TestCase):
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.close()
+        self.poll.save()
         self.meeting.archive()
+        self.meeting.save()
+        # Due to state changes
+        self.poll.refresh_from_db()
         self.ai.refresh_from_db()
+        self.assertEqual("archived", self.meeting.state)
+        self.assertEqual("archived", self.ai.state)
+        self.assertEqual("finished", self.poll.state)
         DELETE = self.p("DELETE")
         self.assertFalse(self.anon.has_perm(DELETE, self.poll))
         self.assertFalse(self.outsider.has_perm(DELETE, self.poll))
@@ -165,6 +179,7 @@ class PollRulesTests(TestCase):
 
     def test_view_upcoming_poll_private_ai(self):
         self.ai.unpublish()
+        self.ai.save()
         self.poll.upcoming()
         self.assertEqual(self.poll.state, "upcoming")
         self.assertEqual(self.ai.state, "private")
@@ -205,6 +220,22 @@ class PollRulesTests(TestCase):
         self.assertFalse(self.voter_user.has_perm(VIEW, self.poll))
         self.assertTrue(self.moderator.has_perm(VIEW, self.poll))
         self.assertFalse(self.participant_user.has_perm(VIEW, self.poll))
+
+    def test_change_state(self):
+        CHANGE_STATE = self.p("CHANGE_STATE")
+        self.assertFalse(self.anon.has_perm(CHANGE_STATE, self.poll))
+        self.assertFalse(self.outsider.has_perm(CHANGE_STATE, self.poll))
+        self.assertFalse(self.voter_user.has_perm(CHANGE_STATE, self.poll))
+        self.assertTrue(self.moderator.has_perm(CHANGE_STATE, self.poll))
+
+    def test_change_state_archived(self):
+        self.ai.archive()
+        self.ai.save()
+        CHANGE_STATE = self.p("CHANGE_STATE")
+        self.assertFalse(self.anon.has_perm(CHANGE_STATE, self.poll))
+        self.assertFalse(self.outsider.has_perm(CHANGE_STATE, self.poll))
+        self.assertFalse(self.voter_user.has_perm(CHANGE_STATE, self.poll))
+        self.assertFalse(self.moderator.has_perm(CHANGE_STATE, self.poll))
 
 
 class VoteRulesTests(TestCase):

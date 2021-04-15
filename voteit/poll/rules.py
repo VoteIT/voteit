@@ -97,6 +97,7 @@ rules.add_perm(
     PollPermissions.VIEW,
     is_moderator | (is_not_private & can_view_polls_context),
 )
+rules.add_perm(PollPermissions.CHANGE_STATE, is_moderator & polls_context_not_archived)
 
 
 @predicate
