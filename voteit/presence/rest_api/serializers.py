@@ -33,12 +33,12 @@ class PresenceCheckDetailSerializer(serializers.ModelSerializer):
 
 
 class PresenceSystemDetailSerializer(serializers.ModelSerializer):
-    # serializer_url_field = OptionalHyperlinkedIdentityField
-    # FIXME: "url" doesn't work here...?
-
     class Meta:
         model = models.PresenceSystem
-        read_only_fields = ["meeting", "pk"]
+        read_only_fields = [
+            "meeting",
+            "pk",
+        ]
         fields = read_only_fields
 
 
