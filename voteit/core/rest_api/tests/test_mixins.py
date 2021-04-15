@@ -40,7 +40,7 @@ class TransitionsMixinTests(APITestCase):
                     "permission": "meeting.moderate_meeting",
                     "source": "upcoming",
                     "target": "ongoing",
-                    "title": "Ongoing",
+                    "title": "Make ongoing",
                 }
             ],
             response.json(),
@@ -67,7 +67,7 @@ class TransitionsMixinTests(APITestCase):
                     "permission": "meeting.moderate_meeting",
                     "source": "ongoing",
                     "target": "upcoming",
-                    "title": "Upcoming",
+                    "title": "Back to upcoming",
                 },
             ],
             response.json(),

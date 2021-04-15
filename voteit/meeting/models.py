@@ -130,6 +130,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         source=MeetingWf.ONGOING,
         target=MeetingWf.UPCOMING,
         permission=MeetingPermissions.MODERATE,
+        custom={"title": _("Back to upcoming")},
     )
     def upcoming(self):
         pass
@@ -140,6 +141,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         target=MeetingWf.ONGOING,
         permission=MeetingPermissions.MODERATE,
         conditions=[valid_er_policy_guard],
+        custom={"title": _("Make ongoing")},
     )
     def ongoing(self):
         self.start_time = timezone.now()
@@ -149,6 +151,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         source=MeetingWf.ONGOING,
         target=MeetingWf.CLOSED,
         permission=MeetingPermissions.MODERATE,
+        custom={"title": _("Close")},
     )
     def close(self):
         self.end_time = timezone.now()
@@ -158,6 +161,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         source=MeetingWf.CLOSED,
         target=MeetingWf.ARCHIVING,
         permission=MeetingPermissions.ARCHIVE,
+        custom={"title": _("Request archiving")},
     )
     def request_archiving(self):
         self.archive_after = now() + timedelta(days=3)
@@ -168,6 +172,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         source=MeetingWf.ARCHIVING,
         target=MeetingWf.CLOSED,
         permission=MeetingPermissions.ARCHIVE,
+        custom={"title": _("Undo archiving request")},
     )
     def abort_archiving(self):
         self.archive_after = None
