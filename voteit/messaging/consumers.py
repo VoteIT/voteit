@@ -75,15 +75,15 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         self.enable_connection_signals = enable_connection_signals
 
     async def connect(self):
-        try:
-            connection_token = self.scope["url_route"]["kwargs"]["connection_token"]
-        except KeyError:
-            connection_token = None
-        self.user = await self.get_token_user(key=connection_token)
-        if self.user is None:
-            # FIXME: get_user ie refresh_user is the correct way to go
-            # When using session auth instead of token:
-            self.user = await self.refresh_user()
+        # try:
+        #     connection_token = self.scope["url_route"]["kwargs"]["connection_token"]
+        # except KeyError:
+        #     connection_token = None
+        # self.user = await self.get_token_user(key=connection_token)
+        # if self.user is None:
+        # FIXME: get_user ie refresh_user is the correct way to go
+        # When using session auth instead of token:
+        self.user = await self.refresh_user()
         if self.user is None:
             logger.debug("Invalid token, closing connection")
             raise DenyConnection()
@@ -92,7 +92,7 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         # And mark action
         self.last_sent = self.last_recv = now()
         logger.debug(
-            "Connection for user: %s with token '%s'", self.user, connection_token
+            "Connection for user: %s", self.user
         )
         await self.accept()
         logger.debug("Connection accepted for user %s (%s)", self.user, self.user.pk)

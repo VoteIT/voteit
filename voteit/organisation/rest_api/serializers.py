@@ -1,11 +1,13 @@
 from contextlib import suppress
+from typing import Optional
 
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
+from rest_framework.reverse import reverse
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserConsent
-from voteit.organisation.models import OAuth2Provider
 
 
 class OrganisationSerializer(serializers.ModelSerializer):
@@ -16,10 +18,10 @@ class OrganisationSerializer(serializers.ModelSerializer):
         read_only_fields = ["pk", "login_url"]
         fields = read_only_fields + ["title", "body"]
 
-    def get_login_url(self, instance: Organisation):
-        with suppress(OAuth2Provider.DoesNotExist):  # Oh django
+    def get_login_url(self, instance: Organisation) -> Optional[str]:
+        with suppress(ObjectDoesNotExist):
             if instance.provider:
-                return f"/begin-auth/{instance.pk}/"
+                return reverse('begin-auth', args=[instance.pk], request=self.context.get('request'))
 
 
 class TOSSerializer(serializers.ModelSerializer):

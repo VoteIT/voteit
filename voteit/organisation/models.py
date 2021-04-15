@@ -84,7 +84,8 @@ class OAuth2Provider(OrganisationContext):
         null=True,
     )
     scopes: str = models.CharField(
-        verbose_name="OAuth scopes, separated by space. Must exist on provider",
+        verbose_name="OAuth scopes",
+        help_text="Space separated. Must exist on provider.",
         max_length=300,
     )
     client_id: str = models.CharField(max_length=100)
@@ -93,8 +94,8 @@ class OAuth2Provider(OrganisationContext):
     auth_url: str = models.URLField()
     token_url: str = models.URLField()
     identity_url: str = models.URLField(
-        verbose_name="Identity URL. "
-        "Should return json with information that can be used to register the user"
+        verbose_name="Identity URL",
+        help_text="URL that returns Json data that can be used to register the user."
     )
 
     class Meta:

@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth import login
 from django.db import DatabaseError
 from django.db import transaction
-from django.http import Http404
+from django.http import Http404, HttpRequest
 from django.http import HttpResponse
 from django.http import HttpResponseBadRequest
 from django.http import HttpResponseRedirect
@@ -63,7 +63,7 @@ def begin_auth(request, org_pk: int):
     return HttpResponseRedirect(authorization_url)
 
 
-def finish_auth(request):
+def finish_auth(request: HttpRequest):
     # FIXME: Very early, for testing
     error = request.GET.get("error", None)
     if error is not None:
@@ -128,5 +128,7 @@ def finish_auth(request):
     else:
         # Any session login kind with http only cookie would do
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-        next_url = "localhost:8080" + state_data.next
-        return HttpResponse(f"You're logged in as {user}, go here next: {next_url}")
+        if settings.DEBUG:
+            # For dev environment only, redirect back to Vue JS
+            return HttpResponseRedirect("http://localhost:8080" + state_data.next)
+        return HttpResponseRedirect(state_data.next)
