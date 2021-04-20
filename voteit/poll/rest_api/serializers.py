@@ -38,6 +38,8 @@ class PollDetailSerializer(serializers.ModelSerializer):
             "url",
             "body",
             "title",
+            "started",
+            "closed",
         )
         fields = read_only_fields
 
