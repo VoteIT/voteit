@@ -23,6 +23,7 @@ from voteit.poll.models import Poll
 from voteit.poll.models import Vote
 from voteit.poll.permissions import ElectoralRegisterPermissions
 from voteit.poll.permissions import VotePermissions
+from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.schemas import GenericExistingVoteSchema
 
 
@@ -80,14 +81,11 @@ class AddVote(VoteBase, ABC):
                 self, type_name=type_name, vote=self.data.vote, pk=existing_vote.pk
             )
             msg.send_internal(self.mm.consumer_name)
-            TextResponse.from_message(self, msg="Changed").send_outgoing(
-                self.mm.consumer_name, success=True
-            )
             return msg
         else:
-            poll.votes.create(user=self.user, vote=self.data.vote)
-            msg = TextResponse.from_message(self, msg="Added")
-            # FIXME: Vote might not be saved, add on_commit for send_outgoing
+            vote = poll.votes.create(user=self.user, vote=self.data.vote)
+            serializer = VoteSerializer(vote)
+            msg = GenericVoteResponse.from_message(self, **serializer.data)
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg
 
@@ -111,13 +109,14 @@ class AbstainVote(VoteBase):
     def run_job(self):
         self.assert_perm()
         poll = self.context
-        existing_vote: Vote = poll.votes.filter(user=self.user).first()
-        if existing_vote is None:
-            poll.votes.create(user=self.user, abstain=True)
+        vote: Vote = poll.votes.filter(user=self.user).first()
+        if vote is None:
+            vote = poll.votes.create(user=self.user, abstain=True)
         else:
-            existing_vote.abstain = True
-            existing_vote.save()
-        msg = TextResponse.from_message(self, msg="Abstained")
+            vote.abstain = True
+            vote.save()
+        serializer = VoteSerializer(vote)
+        msg = GenericVoteResponse.from_message(self, **serializer.data)
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
 
@@ -138,13 +137,14 @@ class ChangeVote(VoteBase, ABC):
         self.context.vote = self.data.vote
         self.context.abstain = False
         self.context.save()
-        msg = TextResponse.from_message(self, msg="Changed")
+        serializer = VoteSerializer(self.context)
+        msg = GenericVoteResponse.from_message(self, **serializer.data)
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
 
 
 class GetVoteSchema(BaseModel):
-    pk: int  # Vote
+    poll: int  # Poll!
 
 
 @incoming
@@ -157,6 +157,7 @@ class GetVote(VoteBase):
     context: Poll
     schema = GetVoteSchema
     data: GetVoteSchema
+    context_pk_attr = "poll"
 
     def run_job(self) -> Union[GenericVoteResponse, TextResponse]:
         self.assert_perm()
@@ -164,7 +165,7 @@ class GetVote(VoteBase):
         try:
             vote: Vote = poll.votes.get(user=self.user)
             msg = GenericVoteResponse.from_message(
-                self, vote=vote.vote, abstain=vote.abstain, pk=self.context.pk
+                self, vote=vote.vote, abstain=vote.abstain, pk=vote.pk
             )
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg

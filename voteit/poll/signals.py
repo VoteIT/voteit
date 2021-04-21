@@ -1,23 +1,27 @@
 from __future__ import annotations
 
-from django.db.models.signals import post_save, pre_delete
+from django.contrib.auth.models import AbstractUser
+from django.db.models.signals import post_save
+from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-from django_fsm import post_transition
-
+from django_fsm.signals import post_transition
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
-from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.signals import channel_subscribed
 from voteit.poll.channels import PollChannel
+from voteit.poll.messages import GenericVoteResponse
 from voteit.poll.messages import PollAdded
 from voteit.poll.messages import PollChanged
 from voteit.poll.messages import PollDeleted
 from voteit.poll.messages import PollStatus
 from voteit.poll.models import Poll
+from voteit.poll.models import Vote
 from voteit.poll.rest_api.serializers import PollDetailSerializer
+from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.workflows import PollWf
 
 
@@ -33,7 +37,9 @@ def poll_subscribed(context: Poll, app_state: AppState, **kw):
 
 
 @receiver(channel_subscribed, sender=ParticipantsChannel)
-def participants_subscribed(context: Meeting, app_state: AppState, **kw):
+def participants_subscribed(
+    context: Meeting, app_state: AppState, user: AbstractUser, **kw
+):
     """ Populate app_state with current meeting polls, except private ones """
     app_state.append_from_queryset(
         context.polls.exclude(state=PollWf.PRIVATE).exclude(
@@ -41,6 +47,14 @@ def participants_subscribed(context: Meeting, app_state: AppState, **kw):
         ),
         PollDetailSerializer,
         PollAdded,
+    )
+    # FIXME: Transmitting all vote data is probably not a good idea for large meetings.
+    # Perhaps change this?
+    # We're sending all votes, it is the users own data so private ai shouldn't matter here.
+    app_state.append_from_queryset(
+        Vote.objects.filter(poll__in=context.polls.all(), user=user),
+        VoteSerializer,
+        GenericVoteResponse,
     )
 
 
@@ -90,8 +104,10 @@ def poll_delete(instance: Poll = None, **kw):
 
 @receiver(post_transition, sender=AgendaItem)
 def private_ai_published(instance: AgendaItem, source: str, **kw):
-    """Notify participants of any existing polls
-    Note that polls may appear before the agenda item does!"""
+    """
+    Notify participants of any existing polls
+    Note that polls may appear before the agenda item does!
+    """
     if source == AgendaItemWf.PRIVATE and instance.meeting is not None:
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         for poll in instance.polls.exclude(state=PollWf.PRIVATE):

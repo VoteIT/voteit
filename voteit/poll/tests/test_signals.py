@@ -43,24 +43,27 @@ class PollSubscribedTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ParticipantsSubscribedTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.poll.models import ElectoralRegister
 
         er = ElectoralRegister.objects.create()
-        self.meeting = Meeting.objects.create()
-        self.poll = self.meeting.polls.create(
+        cls.meeting = Meeting.objects.create()
+        cls.poll = cls.meeting.polls.create(method_name="simple", electoral_register=er)
+        cls.poll.upcoming()
+        cls.poll.save()
+        cls.poll_private = cls.meeting.polls.create(
             method_name="simple", electoral_register=er
         )
-        self.poll.upcoming()
-        self.poll.save()
-        self.poll_private = self.meeting.polls.create(
-            method_name="simple", electoral_register=er
-        )
-        self.user = User.objects.create(username="user")
-        self.meeting.add_roles(self.user, "moderator")
+        # cls.user = User.objects.create(username="user")
+        cls.user = er.voters.create(username="user")
+        cls.meeting.add_roles(cls.user, "moderator")
+        # Create a vote
+        cls.poll.proposals.create()
+        cls.vote = cls.poll.votes.create(user=cls.user, vote="yes")
 
-    def test_app_state_sent_participants(self):
+    def test_app_state_sent_participants_poll_added(self):
         command = Subscribe(
             {"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
@@ -69,6 +72,16 @@ class ParticipantsSubscribedTests(TestCase):
         msg = command.run_job()
         pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "poll.added"])
         self.assertEqual({self.poll.pk}, pks)
+
+    def test_app_state_sent_participants_votes(self):
+        command = Subscribe(
+            {"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.meeting.pk,
+            channel_type=ParticipantsChannel.name,
+        )
+        msg = command.run_job()
+        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "vote.get"])
+        self.assertEqual({self.vote.pk}, pks)
 
     def test_app_state_sent_moderators(self):
         command = Subscribe(
@@ -83,19 +96,24 @@ class ParticipantsSubscribedTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class PollChangedTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.poll.models import ElectoralRegister
 
-        self.er = ElectoralRegister.objects.create()
-        self.meeting = Meeting.objects.create()
-        self.poll = self.meeting.polls.create(
-            method_name="simple", electoral_register=self.er
+        cls.er = ElectoralRegister.objects.create()
+        cls.meeting = Meeting.objects.create()
+        cls.poll = cls.meeting.polls.create(
+            method_name="simple", electoral_register=cls.er
         )
-        self.poll.upcoming()
-        self.poll.save()
-        self.user = User.objects.create(username="user")
-        self.meeting.add_roles(self.user, "participant")
+        cls.poll_pk = cls.poll.pk
+        cls.poll.upcoming()
+        cls.poll.save()
+        cls.user = User.objects.create(username="user")
+        cls.meeting.add_roles(cls.user, "participant")
+
+    def setUp(self):
+        self.poll = self.meeting.polls.get(pk=self.poll_pk)
 
     @patch.object(ParticipantsChannel, "publish")
     def test_added_participants(self, mock_publish):

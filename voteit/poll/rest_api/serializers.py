@@ -10,10 +10,11 @@ from voteit.poll.abcs import PollMethod
 from voteit.poll.utils import get_poll_method_registry
 
 __all__ = (
+    "ElectoralRegisterSerializer",
     "PollListSerializer",
     "PollDetailSerializer",
     "PollCreateSerializer",
-    "ElectoralRegisterSerializer",
+    "VoteSerializer",
 )
 
 
@@ -140,4 +141,20 @@ class ElectoralRegisterSerializer(serializers.ModelSerializer):
             "pk",
             "voters",
             "url",
+        )
+
+
+class VoteSerializer(serializers.ModelSerializer):
+    vote = PydanticFieldSerializer(allow_null=True)
+
+    class Meta:
+        model = models.Vote
+        fields = read_only_fields = (
+            "pk",
+            "user",
+            "poll",
+            "created",
+            "changed",
+            "abstain",
+            "vote",
         )

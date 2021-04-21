@@ -11,17 +11,20 @@ _channel_layers_setting = {
 class AddVoteTests(TestCase):
     """ Since this is an abstract class, we'll use simple vote to test it"""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
 
-        self.er = ElectoralRegister.objects.create()
-        self.voter = self.er.voters.create(username="voter")
-        self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="simple"
-        )
-        self.poll.proposals.create()
-        self.poll.upcoming()
+        cls.er = ElectoralRegister.objects.create()
+        cls.voter = cls.er.voters.create(username="voter")
+        cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="simple")
+        cls.poll.proposals.create()
+        cls.poll.upcoming()
+        cls.poll.save()
+
+    def setUp(self):
+        self.poll.refresh_from_db()
 
     @property
     def _cut(self):
@@ -70,19 +73,21 @@ class AddVoteTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AbstainTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
 
-        self.er = ElectoralRegister.objects.create()
-        self.voter = self.er.voters.create(username="voter")
-        self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="simple"
-        )
-        self.poll.proposals.create()
-        self.poll.upcoming()
-        self.poll.ongoing()
-        self.poll.save()
+        cls.er = ElectoralRegister.objects.create()
+        cls.voter = cls.er.voters.create(username="voter")
+        cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="simple")
+        cls.poll.proposals.create()
+        cls.poll.upcoming()
+        cls.poll.ongoing()
+        cls.poll.save()
+
+    def setUp(self):
+        self.poll.refresh_from_db()
 
     @property
     def _cut(self):
@@ -183,7 +188,7 @@ class GetVoteTests(TestCase):
 
     def _mk_one(self, voter=None, **kw):
         voter = voter or self.voter
-        kw.setdefault("pk", self.poll.pk)
+        kw.setdefault("poll", self.poll.pk)
         return self._cut({"user_pk": voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_get(self):

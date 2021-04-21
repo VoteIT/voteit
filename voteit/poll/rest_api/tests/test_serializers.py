@@ -45,6 +45,9 @@ class PollDetailSerializerTests(TestCase):
 
     def test_serializer_simple(self):
         serializer = self._cut(self.poll)
+        data = serializer.data
+        data.pop("started")
+        data.pop("closed")
         self.assertEqual(
             {
                 "pk": self.poll.pk,
@@ -61,7 +64,7 @@ class PollDetailSerializerTests(TestCase):
                 "state": "private",
                 "url": None,
             },
-            serializer.data,
+            data,
         )
 
     def test_serializer_repeated_schulze(self):
@@ -253,3 +256,39 @@ class ElectoralRegisterSerializerTests(TestCase):
             f"http://testserver/api/electoral-registers/{self.er.pk}/",
             serializer.data["url"],
         )
+
+
+class VoteSerializerTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+
+        cls.meeting = Meeting.objects.create()
+        cls.er = cls.meeting.electoral_registers.create()
+        cls.ai = cls.meeting.agenda_items.create(title="Hello")
+        cls.poll = cls.meeting.polls.create(
+            agenda_item=cls.ai,
+            meeting=cls.meeting,
+            method_name="simple",
+            body="<b>Hello</b>",
+            title="world",
+            electoral_register=cls.er,
+        )
+        cls.prop = cls.poll.proposals.create()
+        cls.user = cls.er.voters.create(username="voter")
+        cls.vote = cls.poll.votes.create(user=cls.user, vote="yes")
+
+    @property
+    def _cut(self):
+        from voteit.poll.rest_api.serializers import VoteSerializer
+
+        return VoteSerializer
+
+    def test_serializer(self):
+        serializer = self._cut(self.vote)
+        data = serializer.data
+        self.assertEqual(self.vote.pk, data.pop("pk"))
+        self.assertEqual(self.vote.user.pk, data.pop("user"))
+        self.assertEqual(self.vote.poll.pk, data.pop("poll"))
+        self.assertEqual(self.vote.abstain, data.pop("abstain"))
+        self.assertEqual({"choice": "yes"}, data.pop("vote"))
