@@ -24,7 +24,7 @@ from voteit.poll.models import Vote
 from voteit.poll.permissions import ElectoralRegisterPermissions
 from voteit.poll.permissions import VotePermissions
 from voteit.poll.rest_api.serializers import VoteSerializer
-from voteit.poll.schemas import GenericExistingVoteSchema
+from voteit.poll.schemas import AddedVoteSchema
 
 
 @outgoing
@@ -177,9 +177,9 @@ class GetVote(VoteBase):
 
 @outgoing
 class GenericVoteResponse(BaseOutgoingMessage):
-    name = "vote.get"
-    schema = GenericExistingVoteSchema
-    data: GenericExistingVoteSchema
+    name = "vote.added"
+    schema = AddedVoteSchema
+    data: AddedVoteSchema
 
 
 class GetERVoteCountSchema(BaseModel):

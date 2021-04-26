@@ -13,7 +13,12 @@ class GenericAddVoteSchema(_GenericVoteSchema):
 
 
 class GenericExistingVoteSchema(_GenericVoteSchema):
-    pk: int  # Votes pk
+    pk: int  # Vote pk
+
+
+class AddedVoteSchema(_GenericVoteSchema):
+    pk: int
+    poll: int
 
 
 class PollResult(BaseModel):

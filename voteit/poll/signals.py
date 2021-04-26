@@ -7,7 +7,7 @@ from django.dispatch import receiver
 from django_fsm.signals import post_transition
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
-from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ModeratorsChannel, MeetingChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.messaging.messages.app_state import AppState
@@ -48,6 +48,12 @@ def participants_subscribed(
         PollDetailSerializer,
         PollAdded,
     )
+
+
+@receiver(channel_subscribed, sender=MeetingChannel)
+def meeting_subscribed(
+    context: Meeting, app_state: AppState, user: AbstractUser, **kw
+):
     # FIXME: Transmitting all vote data is probably not a good idea for large meetings.
     # Perhaps change this?
     # We're sending all votes, it is the users own data so private ai shouldn't matter here.
@@ -59,7 +65,9 @@ def participants_subscribed(
 
 
 @receiver(channel_subscribed, sender=ModeratorsChannel)
-def moderators_subscribed(context: Meeting, app_state: AppState, **kw):
+def moderators_subscribed(
+    context: Meeting, app_state: AppState, user: AbstractUser, **kw
+):
     """ Populate app_state with current meeting polls """
     app_state.append_from_queryset(context.polls.all(), PollDetailSerializer, PollAdded)
 
