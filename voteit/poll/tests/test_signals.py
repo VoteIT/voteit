@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ParticipantsChannel, ModeratorsChannel
 from voteit.messaging.messages.channels import Subscribe
 
@@ -42,7 +43,7 @@ class PollSubscribedTests(TestCase):
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
-class ParticipantsSubscribedTests(TestCase):
+class MeetingSubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         from voteit.meeting.models import Meeting
@@ -73,16 +74,6 @@ class ParticipantsSubscribedTests(TestCase):
         pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "poll.added"])
         self.assertEqual({self.poll.pk}, pks)
 
-    def test_app_state_sent_participants_votes(self):
-        command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type=ParticipantsChannel.name,
-        )
-        msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "vote.get"])
-        self.assertEqual({self.vote.pk}, pks)
-
     def test_app_state_sent_moderators(self):
         command = Subscribe(
             {"consumer_name": "abc", "user_pk": self.user.pk},
@@ -92,6 +83,16 @@ class ParticipantsSubscribedTests(TestCase):
         msg = command.run_job()
         pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "poll.added"])
         self.assertEqual({self.poll.pk, self.poll_private.pk}, pks)
+
+    def test_app_state_sent_votes(self):
+        command = Subscribe(
+            {"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.meeting.pk,
+            channel_type=MeetingChannel.name,
+        )
+        msg = command.run_job()
+        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "vote.added"])
+        self.assertEqual({self.vote.pk}, pks)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

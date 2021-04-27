@@ -7,7 +7,8 @@ from django.dispatch import receiver
 from django_fsm.signals import post_transition
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
-from voteit.meeting.channels import ModeratorsChannel, MeetingChannel
+from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.messaging.messages.app_state import AppState

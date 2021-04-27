@@ -165,7 +165,7 @@ class GetVote(VoteBase):
         try:
             vote: Vote = poll.votes.get(user=self.user)
             msg = GenericVoteResponse.from_message(
-                self, vote=vote.vote, abstain=vote.abstain, pk=vote.pk
+                self, vote=vote.vote, abstain=vote.abstain, pk=vote.pk, poll=poll.pk
             )
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg
