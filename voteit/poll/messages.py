@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import Union
 
 from django.contrib.auth.models import AbstractUser
 from pydantic import validator
@@ -17,7 +16,6 @@ from voteit.messaging.decorators import outgoing
 from voteit.messaging.messages.base import BaseObjectAdded
 from voteit.messaging.messages.base import BaseObjectChanged
 from voteit.messaging.messages.base import BaseObjectDeleted
-from voteit.messaging.messages.text import TextResponse
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
@@ -143,36 +141,36 @@ class ChangeVote(VoteBase, ABC):
         return msg
 
 
-class GetVoteSchema(BaseModel):
-    poll: int  # Poll!
-
-
-@incoming
-class GetVote(VoteBase):
-    """Get users vote in a generic format."""
-
-    name = "vote.get"
-    permission = VotePermissions.ADD
-    model = Poll
-    context: Poll
-    schema = GetVoteSchema
-    data: GetVoteSchema
-    context_pk_attr = "poll"
-
-    def run_job(self) -> Union[GenericVoteResponse, TextResponse]:
-        self.assert_perm()
-        poll = self.context
-        try:
-            vote: Vote = poll.votes.get(user=self.user)
-            msg = GenericVoteResponse.from_message(
-                self, vote=vote.vote, abstain=vote.abstain, pk=vote.pk, poll=poll.pk
-            )
-            msg.send_outgoing(self.mm.consumer_name, success=True)
-            return msg
-        except Vote.DoesNotExist:
-            msg = TextResponse.from_message(self, msg="No vote")
-            msg.send_outgoing(self.mm.consumer_name, success=False)
-            return msg
+# class GetVoteSchema(BaseModel):
+#     poll: int  # Poll!
+#
+#
+# @incoming
+# class GetVote(VoteBase):
+#     """Get users vote in a generic format."""
+#
+#     name = "vote.get"
+#     permission = VotePermissions.ADD
+#     model = Poll
+#     context: Poll
+#     schema = GetVoteSchema
+#     data: GetVoteSchema
+#     context_pk_attr = "poll"
+#
+#     def run_job(self) -> Union[GenericVoteResponse, TextResponse]:
+#         self.assert_perm()
+#         poll = self.context
+#         try:
+#             vote: Vote = poll.votes.get(user=self.user)
+#             msg = GenericVoteResponse.from_message(
+#                 self, vote=vote.vote, abstain=vote.abstain, pk=vote.pk, poll=poll.pk
+#             )
+#             msg.send_outgoing(self.mm.consumer_name, success=True)
+#             return msg
+#         except Vote.DoesNotExist:
+#             msg = TextResponse.from_message(self, msg="No vote")
+#             msg.send_outgoing(self.mm.consumer_name, success=False)
+#             return msg
 
 
 @outgoing

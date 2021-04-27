@@ -161,57 +161,58 @@ class ChangeVoteTests(TestCase):
         self.assertRaises(UnauthorizedError, msg.run_job)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
-class GetVoteTests(TestCase):
-    """ Tests rely on simple poll method. """
-
-    def setUp(self):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-
-        self.er = ElectoralRegister.objects.create()
-        self.voter = self.er.voters.create(username="voter")
-        self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="simple"
-        )
-        self.poll.proposals.create()
-        self.poll.upcoming()
-        self.poll.ongoing()
-        self.poll.save()
-        self.vote = self.poll.votes.create(user=self.voter, vote_data="yes")
-
-    @property
-    def _cut(self):
-        from voteit.poll.messages import GetVote
-
-        return GetVote
-
-    def _mk_one(self, voter=None, **kw):
-        voter = voter or self.voter
-        kw.setdefault("poll", self.poll.pk)
-        return self._cut({"user_pk": voter.pk, "consumer_name": "abc"}, **kw)
-
-    def test_get(self):
-        msg = self._mk_one()
-        response = msg.run_job()
-        self.assertEqual(response.data.vote, self.vote.vote)
-        self.assertEqual(response.data.abstain, False)
-
-    def test_abstain_vote(self):
-        self.vote.abstain = True
-        self.vote.save()
-        msg = self._mk_one()
-        response = msg.run_job()
-        self.assertEqual(response.data.abstain, True)
-
-    def test_no_vote(self):
-        from voteit.messaging.messages.text import TextResponse
-
-        voter = self.er.voters.create(username="second_voter")
-        msg = self._mk_one(voter=voter)
-        response = msg.run_job()
-        self.assertIsInstance(response, TextResponse)
-        self.assertEqual(response.data.msg, "No vote")
+#
+# @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+# class GetVoteTests(TestCase):
+#     """ Tests rely on simple poll method. """
+#
+#     def setUp(self):
+#         from voteit.poll.models import Poll
+#         from voteit.poll.models import ElectoralRegister
+#
+#         self.er = ElectoralRegister.objects.create()
+#         self.voter = self.er.voters.create(username="voter")
+#         self.poll = Poll.objects.create(
+#             electoral_register=self.er, method_name="simple"
+#         )
+#         self.poll.proposals.create()
+#         self.poll.upcoming()
+#         self.poll.ongoing()
+#         self.poll.save()
+#         self.vote = self.poll.votes.create(user=self.voter, vote_data="yes")
+#
+#     @property
+#     def _cut(self):
+#         from voteit.poll.messages import GetVote
+#
+#         return GetVote
+#
+#     def _mk_one(self, voter=None, **kw):
+#         voter = voter or self.voter
+#         kw.setdefault("poll", self.poll.pk)
+#         return self._cut({"user_pk": voter.pk, "consumer_name": "abc"}, **kw)
+#
+#     def test_get(self):
+#         msg = self._mk_one()
+#         response = msg.run_job()
+#         self.assertEqual(response.data.vote, self.vote.vote)
+#         self.assertEqual(response.data.abstain, False)
+#
+#     def test_abstain_vote(self):
+#         self.vote.abstain = True
+#         self.vote.save()
+#         msg = self._mk_one()
+#         response = msg.run_job()
+#         self.assertEqual(response.data.abstain, True)
+#
+#     def test_no_vote(self):
+#         from voteit.messaging.messages.text import TextResponse
+#
+#         voter = self.er.voters.create(username="second_voter")
+#         msg = self._mk_one(voter=voter)
+#         response = msg.run_job()
+#         self.assertIsInstance(response, TextResponse)
+#         self.assertEqual(response.data.msg, "No vote")
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
