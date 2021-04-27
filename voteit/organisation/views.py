@@ -108,11 +108,17 @@ def finish_auth(request: HttpRequest):
     data = identity_response.json()
     logger.debug("Identity response: %s", data)
     adapted: ProviderResponseAdapter = provider.response_adapter(data)
-    user = adapted.get_user()
+    users = adapted.get_users()
     try:
         with transaction.atomic():
-            if user:
-                logger.debug("Identity matched user: %s", user.pk)
+            if users:
+                if len(users) > 1:
+                    # FIXME: How's this choice made?
+                    logger.debug("Identity matched users: %s", [x.pk for x in users])
+                    user = users[0]
+                else:
+                    user = users[0]
+                    logger.debug("Identity matched user: %s", user.pk)
             else:
                 user = adapted.register(organisation=provider.organisation)
                 logger.debug("Creating new user: %s", user.pk)

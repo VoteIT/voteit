@@ -50,6 +50,7 @@ class User(AbstractUser):
         null=True,
         validators=[userid_validator],
     )
+    identity_id: str = models.CharField(max_length=80, blank=True, null=True)
 
     class Meta:
         constraints = [

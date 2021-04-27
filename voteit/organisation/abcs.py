@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
+from typing import Dict
+from typing import List
 from typing import Optional
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.utils.functional import cached_property
-from typing import Dict
-
 from voteit.organisation.schemas import OAuthTokenSchema
 
 if TYPE_CHECKING:
@@ -37,7 +38,9 @@ class ProviderResponseAdapter(ABC):
 
     def register(self, organisation: Organisation):
         return self.User.objects.create(
-            username=self.identity_id, organisation=organisation
+            username=str(uuid4()),
+            identity_id=self.identity_id,
+            organisation=organisation,
         )
 
     @abstractmethod
@@ -53,6 +56,7 @@ class ProviderResponseAdapter(ABC):
         session["oauth_token"] = schema.dict()
         session.save()
 
-    def get_user(self, default=None):
-        user = self.User.objects.filter(username=self.identity_id).first()
-        return user and user or default
+    def get_users(self, default=None) -> Optional[List[AbstractUser]]:
+        users = self.User.objects.filter(identity_id=self.identity_id).all()
+        users = list(users)
+        return users and users or default
