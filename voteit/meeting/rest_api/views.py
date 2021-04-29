@@ -1,49 +1,67 @@
+from django.db import transaction
 from django.db.models import QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import viewsets, permissions
+from rest_framework import permissions
+from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
-
-from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.meeting import roles
-
 from voteit.meeting.models import *
 from voteit.meeting.rest_api.filters import UserPkFilter
+from voteit.organisation.models import Organisation
 
 from . import serializers
 
-__all__ = ('MeetingViewSet', 'MeetingRolesViewSet', )
+__all__ = (
+    "MeetingViewSet",
+    "MeetingRolesViewSet",
+)
 
 
-class MeetingViewSet(
-    TransitionsMixin,
-    # CreateModelPermissionsMixin,
-    viewsets.ModelViewSet,
-):
+class MeetingViewSet(DefaultModelViewSet):
     model = Meeting
-    # context_queryset = Organisation.objects.all()
-    # context_lookup_kwarg = 'organisation'
     serializer_class = serializers.MeetingDetailSerializer
     serializer_classes = {
-        'retrieve': serializers.MeetingDetailSerializer,
-        'list': serializers.MeetingSerializer,
-        'set_agenda_order': serializers.AgendaOrderSerializer,
+        "list": serializers.MeetingSerializer,
+        "set_agenda_order": serializers.AgendaOrderSerializer,
     }
-    filter_backends = DjangoFilterBackend, SearchFilter,
-    search_fields = 'title',
-    filterset_fields = 'public',
+    filter_backends = (
+        DjangoFilterBackend,
+        SearchFilter,
+    )
+    search_fields = ("title",)
+    filterset_fields = ("public",)
+    context_queryset = (
+        Organisation.objects.none()
+    )  # We've overridden get_context instead
 
-    @action(methods=['post'], detail=True)
+    def get_context(self, request):
+        """ Override to fetch organisation from the user directly"""
+        organisation = request.user.organisation
+        if organisation is None:
+            raise ValidationError(detail=f"User has no related organisation")
+        return organisation
+
+    @property
+    def permission_type_map(self):
+        data = super().permission_type_map.copy()
+        data["set_agenda_order"] = "change"
+        return data
+
+    @action(methods=["post"], detail=True)
     def set_agenda_order(self, request, pk):
         serializer = serializers.AgendaOrderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        order = serializer.validated_data['order']
+        order = serializer.validated_data["order"]
         meeting: Meeting = self.get_object()
         agenda_items = meeting.agenda_items.filter(pk__in=order)
-        for i, ai in enumerate(agenda_items):
-            ai.order = order.index(ai.pk)
-            ai.save()
+        with transaction.atomic():
+            for ai in agenda_items:
+                ai.order = order.index(ai.pk) + 1
+                ai.save()
         return Response(status=201)
 
     def get_queryset(self) -> QuerySet:
@@ -58,10 +76,16 @@ class MeetingRolesViewSet(viewsets.ReadOnlyModelViewSet):
     model = MeetingRoles
     queryset = MeetingRoles.objects.all()
     serializer_class = serializers.MeetingRolesSerializer
-    filter_backends = DjangoFilterBackend, SearchFilter,
+    filter_backends = (
+        DjangoFilterBackend,
+        SearchFilter,
+    )
     filter_class = UserPkFilter
-    search_fields = '^user__first_name', '^user__last_name',
-    permission_classes = permissions.IsAuthenticated,
+    search_fields = (
+        "^user__first_name",
+        "^user__last_name",
+    )
+    permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
         # TODO who can see?

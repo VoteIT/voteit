@@ -1,0 +1,80 @@
+- model: core.user
+  pk: 1
+  fields:
+    username: moderator
+    first_name: Moderator
+    email: moderator@voteit.se
+    is_active: true
+    organisation: 1
+    userid: moderator
+    identity_id: null
+- model: core.user
+  pk: 2
+  fields:
+    username: participant
+    first_name: Participant
+    email: participant@voteit.se
+    is_active: true
+    organisation: 1
+    userid: participant
+    identity_id: null
+- model: core.user
+  pk: 3
+  fields:
+    username: org_manager
+    first_name: Organisation
+    last_name: Manager
+    email: orgman@voteit.se
+    is_active: true
+    organisation: 1
+    userid: org_manager
+    identity_id: null
+- model: organisation.organisationroles
+  pk: 1
+  fields:
+    assigned: '["org_manager"]'
+    user: 3
+    context: 1
+- model: meeting.meetingroles
+  pk: 1
+  fields:
+    assigned: '["participant", "moderator"]'
+    user: 1
+    context: 1
+- model: meeting.meetingroles
+  pk: 2
+  fields:
+    assigned: '["participant"]'
+    user: 2
+    context: 1
+- model: meeting.meeting
+  pk: 1
+  fields:
+    body: I wish a was a text about this meeting
+    title: Testfixture meeting
+    state: upcoming
+    public: false
+    er_policy_name: auto_before_poll
+    organisation: 1
+    created: 2021-01-28T18:12:28.792Z
+    modified: 2021-01-28T18:12:28.792Z
+- model: organisation.organisation
+  pk: 1
+  fields:
+    body: Important things will be done here
+    title: Testfixture organisation
+    created: 2021-01-28T18:12:28.792Z
+    modified: 2021-01-28T18:12:28.792Z
+- model: organisation.oauth2provider
+  pk: 1
+  fields:
+    provider_id: idproxy
+    title: ID Proxy
+    organisation: 1
+    scopes: email
+    client_id: cid_org1
+    client_secret: cs_org1
+    redirect_url: http://127.0.0.1:8000/finish-auth/
+    auth_url: http://id.localhost:8001/o/authorize/
+    token_url: http://localhost:8001/o/token/
+    identity_url: http://localhost:8001/api/identity/

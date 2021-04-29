@@ -1,0 +1,27 @@
+- model: agenda.agendaitem
+  pk: 1
+  fields:
+    title: Pickles
+    body: could be tasty
+    created: 2021-01-28T18:12:28.792Z
+    modified: 2021-01-28T18:12:28.792Z
+    meeting: 1
+    order: 1
+- model: agenda.agendaitem
+  pk: 2
+  fields:
+    title: Crisps
+    body: must be considered
+    created: 2021-01-28T18:12:28.792Z
+    modified: 2021-01-28T18:12:28.792Z
+    meeting: 1
+    order: 2
+- model: agenda.agendaitem
+  pk: 3
+  fields:
+    title: Hot dogs
+    body: as long as they're vegetarian
+    created: 2021-01-28T18:12:28.792Z
+    modified: 2021-01-28T18:12:28.792Z
+    meeting: 1
+    order: 3

@@ -115,3 +115,9 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     @property
     def is_private(self) -> bool:
         return self.state == AgendaItemWf.PRIVATE
+
+    # Annotations
+    objects: models.Manager
+    proposals: models.QuerySet
+    polls: models.QuerySet
+    discussions: models.QuerySet

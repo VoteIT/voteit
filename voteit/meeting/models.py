@@ -7,7 +7,6 @@ from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db import transaction
 from django.utils import timezone
@@ -32,6 +31,7 @@ if TYPE_CHECKING:
     from voteit.poll.models import ElectoralRegister
     from voteit.poll.abcs import ElectoralRegisterPolicy
     from voteit.organisation.models import Organisation
+    from voteit.core.models import User
 
 __all__ = "Meeting", "MeetingRoles", "MeetingGroup"
 
@@ -41,7 +41,7 @@ class MeetingRoles(Roles, MeetingContext):
 
     name = "meeting_roles"
 
-    user: AbstractUser = models.ForeignKey(
+    user: User = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="meeting_roles"
     )
     context: Meeting = models.ForeignKey(
@@ -193,28 +193,33 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
 
     @property
     def meeting(self) -> Meeting:
-        """ To fullfill the MeetingContext ABC."""
+        """ To fulfill the MeetingContext ABC."""
         return self
 
     class QuerySet(models.QuerySet):
-        def for_user(self, user: AbstractUser):
+        def for_user(self, user: User):
             if user.is_superuser:
                 return self.all()
-            return self.filter(
-                models.Q(public=True) | models.Q(participants=user)
-            ).distinct()
+            if user.organisation is None:
+                return self.none()
+            return (
+                self.filter(organisation=user.organisation)
+                .filter(models.Q(public=True) | models.Q(participants=user))
+                .distinct()
+            )
 
     class Manager(models.Manager):
         def get_queryset(self):
             return Meeting.QuerySet(self.model, using=self._db)
 
-        def for_user(self, user: AbstractUser):
+        def for_user(self, user: User):
             return self.get_queryset().for_user(user)
 
     objects = Manager()
     groups: models.QuerySet
     invites: models.QuerySet
     electoral_registers: models.QuerySet
+    agenda_items: models.QuerySet
 
 
 class MeetingGroup(BaseContent, MeetingContext):

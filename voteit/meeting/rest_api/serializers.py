@@ -7,6 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 from voteit.core.models import Roles
+from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.meeting import models
 
@@ -25,7 +26,7 @@ class UserRolesMixin(serializers.Serializer):
 class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
     class Meta:
         model = models.Meeting
-        fields = (
+        fields = read_only_fields = (
             "url",
             "pk",
             "title",
@@ -37,19 +38,28 @@ class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
         )
 
 
-class MeetingDetailSerializer(UserRolesMixin, serializers.ModelSerializer):
+class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
     class Meta:
         model = models.Meeting
-        fields = (
+        read_only_fields = [
             "pk",
-            "title",
-            "body",
             "state",
             "start_time",
             "end_time",
-            "public",
+            "organisation",
             "current_user_roles",
-        )
+        ]
+        fields = read_only_fields + [
+            "title",
+            "body",
+            "public",
+        ]
+
+    def create(self, validated_data):
+        user = self.get_request_user()
+        if user.organisation is not None:
+            validated_data["organisation"] = user.organisation
+        return super().create(validated_data)
 
 
 class AgendaOrderSerializer(serializers.Serializer):
@@ -62,7 +72,7 @@ class MeetingRolesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.MeetingRoles
-        fields = "pk", "user", "meeting", "assigned"
+        fields = read_only_fields = "pk", "user", "meeting", "assigned"
 
 
 class MeetingAddParticipantSerializer(serializers.ModelSerializer):

@@ -254,6 +254,9 @@ class Roles(ABCModel):
         related = cls.context.field.related_model
         return f"{related._meta.app_label}.{related._meta.model_name.lower()}"
 
+    # annotations
+    objects: models.Manager
+
 
 class BaseContent(ABCModel):
     body: str = models.TextField(blank=True, default="")

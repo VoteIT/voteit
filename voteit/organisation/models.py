@@ -64,6 +64,7 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     objects: models.Manager
     tos: models.QuerySet
     users: models.QuerySet
+    meetings: models.QuerySet
 
 
 class OAuth2Provider(OrganisationContext):
@@ -95,7 +96,7 @@ class OAuth2Provider(OrganisationContext):
     token_url: str = models.URLField()
     identity_url: str = models.URLField(
         verbose_name="Identity URL",
-        help_text="URL that returns Json data that can be used to register the user."
+        help_text="URL that returns Json data that can be used to register the user.",
     )
 
     class Meta:
