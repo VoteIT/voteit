@@ -66,7 +66,7 @@ class MeetingRolesSerializerTests(TestCase):
         self.assertEqual(
             {
                 "pk": 1,
-                "username": "moderator",
+                "userid": "moderator",
                 "first_name": "Moderator",
                 "full_name": "Moderator",
                 "last_name": "",

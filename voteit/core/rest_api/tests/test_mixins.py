@@ -14,9 +14,11 @@ class TransitionsMixinTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         from voteit.meeting.models import Meeting
+        from voteit.organisation.models import Organisation
 
-        cls.meeting = Meeting.objects.create(er_policy_name="auto_before_poll")
-        cls.moderator = cls.meeting.participants.create(username="moderator")
+        org = Organisation.objects.create()
+        cls.meeting = Meeting.objects.create(er_policy_name="auto_before_poll", organisation=org)
+        cls.moderator = cls.meeting.participants.create(username="moderator", organisation=org)
         cls.meeting.add_roles(cls.moderator, "moderator")
 
     def setUp(self):
@@ -28,10 +30,13 @@ class TransitionsMixinTests(APITestCase):
 
         return TransitionsMixin
 
+    @property
+    def _url(self):
+        return reverse("meeting-transitions", kwargs={"pk": self.meeting.pk})
+
     def test_available_upcoming(self):
-        url = reverse("meeting-transitions", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.moderator)
-        response = self.client.get(url)
+        response = self.client.get(self._url)
         self.assertEqual(200, response.status_code)
         self.assertEqual(
             [
@@ -49,9 +54,8 @@ class TransitionsMixinTests(APITestCase):
     def test_available_ongoing(self):
         self.meeting.ongoing()
         self.meeting.save()
-        url = reverse("meeting-transitions", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.moderator)
-        response = self.client.get(url)
+        response = self.client.get(self._url)
         self.assertEqual(200, response.status_code)
         self.assertEqual(
             [
@@ -74,9 +78,8 @@ class TransitionsMixinTests(APITestCase):
         )
 
     def test_do_transition(self):
-        url = reverse("meeting-transitions", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.moderator)
-        response = self.client.post(url, data={"transition": "ongoing"})
+        response = self.client.post(self._url, data={"transition": "ongoing"})
         self.assertEqual(201, response.status_code)
         self.meeting.refresh_from_db()
         self.assertEqual("ongoing", self.meeting.state)
