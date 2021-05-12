@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.db import models
+from django.utils.timezone import now
 from django_fsm import FSMField, transition
 from django.utils.translation import gettext as _
 
@@ -34,6 +37,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         verbose_name=_("Block new proposals"), default=False
     )
     order = models.PositiveSmallIntegerField(default=0)
+    related_modified = models.DateTimeField(editable=False, auto_now_add=True)
 
     @property
     def agenda_item(self) -> AgendaItem:
@@ -64,6 +68,37 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
 
     def get_discussions(self):
         return self.discussions.all()
+
+    def maybe_mark_related_modified(self):
+        """This is a "poor man's" avoid duplicate pushes."""
+        if self.state != AgendaItemWf.ARCHIVED:
+            really_now = now()
+            if self.related_modified + timedelta(seconds=3) < really_now:
+                self.related_modified = really_now
+                self.save()
+                return really_now
+
+    def revert_to_last_related_modified(self):
+        """
+        In case something's deleted that was contained by this agenda item,
+        set related_modified to the highest reasonable value.
+        No need to notify users that content was changed if it's just missing.
+        """
+        if self.state != AgendaItemWf.ARCHIVED:
+            candidates = [
+                x.modified
+                for x in [
+                    self.proposals.order_by("-modified").first(),
+                    self.discussions.order_by("-modified").first(),
+                ]
+                if x is not None
+            ]
+            if candidates:
+                latest = sorted(candidates, reverse=True)[0]
+                if self.related_modified != latest:
+                    self.related_modified = latest
+                    self.save()
+                    return latest
 
     @transition(
         field=state,

@@ -17,4 +17,4 @@ class AgendaItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = AgendaItem
         fields = "pk", "meeting", "title", "body", "state", "order"  # 'proposals',
-        read_only_fields = ("order",)
+        read_only_fields = ("order", "related_modified")
