@@ -204,14 +204,12 @@ class SignalListChangesTests(TestCase):
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalSystemChangesTests(TestCase):
     def setUp(self):
-
         from voteit.speaker.models import SpeakerListSystem
-
         from voteit.meeting.models import Meeting
 
-        self.meeting = Meeting.objects.create()
+        self.meeting: Meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create()
-        self.system = SpeakerListSystem.objects.create(
+        self.system: SpeakerListSystem = SpeakerListSystem.objects.create(
             method_name="simple", meeting=self.meeting, title="We speak in order"
         )
 
@@ -253,6 +251,33 @@ class SignalSystemChangesTests(TestCase):
         self.assertIsInstance(msg, SpeakerSystemDeleted)
         data = msg.data
         self.assertEqual(system_pk, data.pk)
+
+    @patch.object(MeetingChannel, "publish")
+    def test_system_changes_active_list(self, mock_publish):
+        from voteit.speaker.messages import SpeakerSystemChanged
+        from voteit.speaker.messages import SpeakerListChanged
+        from voteit.speaker.messages import SpeakerListOrder
+
+        list_one = self.system.speaker_lists.create()
+        list_two = self.system.speaker_lists.create()
+        user = User.objects.create(username="user")
+        list_one.speaker_items.create(user=user)
+        list_two.speaker_items.create(user=user)
+        mock_publish.reset_mock()
+        self.system.active_list = list_one
+        self.system.save()
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        message_names = [x.name for x in messages]
+        self.assertIn(SpeakerSystemChanged.name, message_names)
+        self.assertIn(SpeakerListChanged.name, message_names)
+        self.assertIn(SpeakerListOrder.name, message_names)
+        self.assertEqual(list_one.pk, messages[1].data.pk)
+        self.assertEqual([user.pk], messages[2].data.queue)
+        mock_publish.reset_mock()
+        self.system.active_list = list_two
+        self.system.save()
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(list_two.pk, messages[1].data.pk)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

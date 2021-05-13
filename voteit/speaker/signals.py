@@ -164,6 +164,15 @@ def notify_added_or_changed_speaker_system(
         msg = msg_class(**data)
         ch = MeetingChannel.from_instance(instance.meeting)
         ch.publish(msg)
+        # Also push list and order when speaker system changes since it may have changed active list
+        if instance.active_list:
+            msg_class = SpeakerListChanged
+            data = SpeakerListSerializer(instance.active_list).data
+            list_msg = msg_class(**data)
+            ch.publish(list_msg)
+            # And the order
+            order_msg = _get_list_order_msg(instance.active_list)
+            ch.publish(order_msg)
 
 
 @receiver(post_delete, sender=SpeakerListSystem)
