@@ -9,11 +9,13 @@ from django.dispatch import receiver
 from voteit.agenda.messages import AgendaAdded
 from voteit.agenda.messages import AgendaChanged
 from voteit.agenda.messages import AgendaDeleted
+from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import AgendaItemSerializer
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.abcs import AgendaItemContext
 from voteit.discussion.models import DiscussionPost
+from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
@@ -45,6 +47,22 @@ def moderators_channel_subscribed(
         AgendaItemSerializer,
         AgendaAdded,
     )
+
+
+@receiver(channel_subscribed, sender=MeetingChannel)
+def meeting_channel_subscribed(
+    context: Meeting, app_state: AppState, user: AbstractUser, **kw
+):
+    for last_read in context.last_read_set.filter(user=user).prefetch_related(
+        "agenda_item"
+    ):
+        # This will cause last read to be sent for private agenda items that the user has visited,
+        # but that shouldn't be a problem.
+        app_state.append(
+            LastReadChanged(
+                timestamp=last_read.timestamp, agenda_item=last_read.agenda_item.pk
+            )
+        )
 
 
 @receiver(post_save, sender=AgendaItem)

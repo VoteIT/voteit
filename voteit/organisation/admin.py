@@ -30,7 +30,6 @@ class UserConsentAdmin(admin.ModelAdmin):
     pass
 
 
-
 @admin.register(OAuth2Provider)
 class OAuth2ProviderAdmin(admin.ModelAdmin):
     pass

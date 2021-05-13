@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from pytz import UTC
+from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.messaging.messages.channels import Subscribe
@@ -19,14 +20,16 @@ class SubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         from voteit.meeting.models import Meeting
+        from voteit.agenda.models import AgendaItem
 
-        cls.meeting = Meeting.objects.create()
-        cls.ai = cls.meeting.agenda_items.create()
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create()
         cls.ai.upcoming()
         cls.ai.save()
-        cls.ai_private = cls.meeting.agenda_items.create()
+        cls.ai_private: AgendaItem = cls.meeting.agenda_items.create()
         cls.user = User.objects.create(username="user")
         cls.meeting.add_roles(cls.user, "moderator")
+        cls.ai_private.mark_read(cls.user)
 
     def test_app_state_sent_participants(self):
         command = Subscribe(
@@ -47,6 +50,22 @@ class SubscribedTests(TestCase):
         msg = command.run_job()
         pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "agenda_item.added"])
         self.assertEqual({self.ai.pk, self.ai_private.pk}, pks)
+
+    def test_app_state_last_read_sent(self):
+        command = Subscribe(
+            {"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.meeting.pk,
+            channel_type=MeetingChannel.name,
+        )
+        msg = command.run_job()
+        agenda_pks = set(
+            [
+                x.p["agenda_item"]
+                for x in msg.data.app_state
+                if x.t == "last_read.changed"
+            ]
+        )
+        self.assertEqual({self.ai_private.pk}, agenda_pks)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
