@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
+from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserConsent
 
@@ -20,6 +21,22 @@ class OrganisationAdmin(admin.ModelAdmin):
     meeting_count.short_description = _("Meetings")
 
 
+@admin.register(OrganisationRoles)
+class OrganisationRolesAdmin(admin.ModelAdmin):
+    autocomplete_fields = "user", "context"
+    list_display = "user", "assigned", "context"
+    list_filter = (
+        "context",
+        "user",
+    )
+    search_fields = (
+        "context__title",
+        "user__last_name",
+        "user__first_name",
+        "user__userid",
+    )
+
+
 @admin.register(TermsOfService)
 class TermsOfServiceAdmin(admin.ModelAdmin):
     pass
@@ -28,7 +45,6 @@ class TermsOfServiceAdmin(admin.ModelAdmin):
 @admin.register(UserConsent)
 class UserConsentAdmin(admin.ModelAdmin):
     pass
-
 
 
 @admin.register(OAuth2Provider)

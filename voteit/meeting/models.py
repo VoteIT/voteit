@@ -52,6 +52,9 @@ class MeetingRoles(Roles, MeetingContext):
     def meeting(self) -> Meeting:
         return self.context
 
+    class Meta:
+        verbose_name = verbose_name_plural = _("Meeting roles")
+
 
 class Meeting(BaseContent, RoleContextMixin, MeetingContext):
     name = "meeting"

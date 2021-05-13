@@ -38,6 +38,9 @@ class OrganisationRoles(Roles):
         "Organisation", on_delete=models.CASCADE, related_name="roles"
     )
 
+    class Meta:
+        verbose_name = verbose_name_plural = _("Organisation roles")
+
 
 class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     name = "organisation"

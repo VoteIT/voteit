@@ -50,6 +50,9 @@ class SpeakerSystemRoles(Roles, MeetingContext):
     def meeting(self) -> Optional[Meeting]:
         return self.context.meeting
 
+    class Meta:
+        verbose_name = verbose_name_plural = _("Speaker system roles")
+
 
 class SpeakerListSystem(RoleContextMixin, MeetingContext):
     """All speaker list things relate here, while this in turn might relate to a meeting.
