@@ -235,3 +235,25 @@ def get_model_shortname(model: Union[Type[Model], Model]) -> str:
     if isinstance(name, str):
         return name
     return model.__name__.lower()
+
+
+_cached_available_transitions = {}
+
+
+def prepare_available_transitions():
+    from voteit.core.rest_api.serializers import FSMTransitionSerializer
+
+    content_reg = get_content_registry()
+    for (name, content) in content_reg.items():
+        # FIXME: This may change, but currently all models use "state" as attr.
+        if hasattr(content, "state"):
+            # breakpoint()
+            # [x for x in content.state.field.get_all_transitions(content)]
+            serializer = FSMTransitionSerializer(
+                list(content.state.field.get_all_transitions(content)), many=True
+            )
+            _cached_available_transitions[name] = serializer.data
+
+
+def get_available_transitions() -> dict:
+    return _cached_available_transitions

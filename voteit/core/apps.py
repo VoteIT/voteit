@@ -10,6 +10,7 @@ class CoreConfig(AppConfig):
         from voteit.core.registries import content_types
         from voteit.core.registries import permissions
         from voteit.core import models_to_register
+        from voteit.core.utils import prepare_available_transitions
 
         for model in models_to_register:
             register_model(model, content_types)
@@ -17,6 +18,9 @@ class CoreConfig(AppConfig):
 
         # Make sure linked permissions make sense
         permissions.validate_registry()
+
+        # Cache all workflow transitions
+        prepare_available_transitions()
 
 
 def register_model(model, registry):

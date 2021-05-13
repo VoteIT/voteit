@@ -124,4 +124,5 @@ class FSMTransitionSerializer(serializers.Serializer):
     title = serializers.SerializerMethodField()
 
     def get_title(self, field: Transition):
-        return field.custom.get("title", field.name.title())
+        # Title might be a lazy gettext, which doesn't work
+        return str(field.custom.get("title", field.name.title()))
