@@ -13,12 +13,11 @@ class AgendaItemSerializer(BaseModelSerializer):
     # FIXME: This needs testing and separation - one serializer for create and one for the other
     class Meta:
         model = AgendaItem
-        fields = (
+        read_only_fields = ("order", "related_modified")
+        fields = read_only_fields + (
             "pk",
             "meeting",
             "title",
             "body",
             "state",
-            "order",
         )
-        read_only_fields = ("order", "related_modified")
