@@ -61,6 +61,9 @@ class User(AbstractUser):
 
     objects = UserManager()
 
+    # Annotations
+    last_read_set: models.QuerySet
+
 
 def real_user_only(method):
     """Role method should never return true for anon users."""

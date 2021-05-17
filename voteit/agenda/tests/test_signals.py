@@ -1,7 +1,10 @@
+from datetime import datetime
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from pytz import UTC
+from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.messaging.messages.channels import Subscribe
@@ -14,16 +17,19 @@ _channel_layers_setting = {
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SubscribedTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
+        from voteit.agenda.models import AgendaItem
 
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.ai.upcoming()
-        self.ai.save()
-        self.ai_private = self.meeting.agenda_items.create()
-        self.user = User.objects.create(username="user")
-        self.meeting.add_roles(self.user, "moderator")
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create()
+        cls.ai.upcoming()
+        cls.ai.save()
+        cls.ai_private: AgendaItem = cls.meeting.agenda_items.create()
+        cls.user = User.objects.create(username="user")
+        cls.meeting.add_roles(cls.user, "moderator")
+        cls.ai_private.mark_read(cls.user)
 
     def test_app_state_sent_participants(self):
         command = Subscribe(
@@ -45,14 +51,35 @@ class SubscribedTests(TestCase):
         pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "agenda_item.added"])
         self.assertEqual({self.ai.pk, self.ai_private.pk}, pks)
 
+    def test_app_state_last_read_sent(self):
+        command = Subscribe(
+            {"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.meeting.pk,
+            channel_type=MeetingChannel.name,
+        )
+        msg = command.run_job()
+        agenda_pks = set(
+            [
+                x.p["agenda_item"]
+                for x in msg.data.app_state
+                if x.t == "last_read.changed"
+            ]
+        )
+        self.assertEqual({self.ai_private.pk}, agenda_pks)
+
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AgendaChangedTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
+        cls.meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.ai_pk = cls.ai.pk
+
+    def setUp(self):
+        self.ai = self.meeting.agenda_items.get(pk=self.ai_pk)
 
     @patch.object(ParticipantsChannel, "publish")
     def test_added_participants(self, mock_publish):
@@ -134,3 +161,88 @@ class ArchiveAgendaTests(TestCase):
         self.meeting.archive()
         ai = self.meeting.agenda_items.first()
         self.assertEqual("archived", ai.state)
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class RelatedItemsTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.agenda.models import AgendaItem
+
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="upcoming")
+        cls.prop = cls.ai.proposals.create()
+        cls.prop.modified = datetime(2021, 1, 1, 12, 0, tzinfo=UTC)
+        cls.prop.save()
+        cls.prop_pk = cls.prop.pk
+        cls.disc = cls.ai.discussions.create()
+        cls.disc.modified = datetime(2021, 2, 2, 12, 0, tzinfo=UTC)
+        cls.disc.save()
+        cls.disc_pk = cls.disc.pk
+        # Make sure related will be triggered
+        cls.ai.related_modified = datetime(2021, 3, 3, 12, 0, tzinfo=UTC)
+        cls.ai.save()
+
+    def setUp(self):
+        self.prop = self.ai.proposals.get(pk=self.prop_pk)
+        self.disc = self.ai.discussions.get(pk=self.disc_pk)
+        self.ai.refresh_from_db()
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_proposal_deleted(self, mock_publish):
+        self.prop.delete()
+        self.assertEqual(
+            1,
+            len(
+                [
+                    x.args[0]
+                    for x in mock_publish.mock_calls
+                    if x.args[0].name == "agenda_item.changed"
+                ]
+            ),
+        )
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_discussion_deleted(self, mock_publish):
+        self.disc.delete()
+        self.assertEqual(
+            1,
+            len(
+                [
+                    x.args[0]
+                    for x in mock_publish.mock_calls
+                    if x.args[0].name == "agenda_item.changed"
+                ]
+            ),
+        )
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_proposal_changed(self, mock_publish):
+        self.prop.text = "Hello"
+        self.prop.save()
+        self.assertEqual(
+            1,
+            len(
+                [
+                    x.args[0]
+                    for x in mock_publish.mock_calls
+                    if x.args[0].name == "agenda_item.changed"
+                ]
+            ),
+        )
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_discussion_changed(self, mock_publish):
+        self.disc.text = "Hello"
+        self.disc.save()
+        self.assertEqual(
+            1,
+            len(
+                [
+                    x.args[0]
+                    for x in mock_publish.mock_calls
+                    if x.args[0].name == "agenda_item.changed"
+                ]
+            ),
+        )

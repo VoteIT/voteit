@@ -223,6 +223,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
     invites: models.QuerySet
     electoral_registers: models.QuerySet
     agenda_items: models.QuerySet
+    last_read_set: models.QuerySet
 
 
 class MeetingGroup(BaseContent, MeetingContext):

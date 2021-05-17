@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
+from datetime import timedelta
+
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils.timezone import now
 from django_fsm import FSMField, transition
 from django.utils.translation import gettext as _
 
@@ -17,23 +23,24 @@ __all__ = ("AgendaItem",)
 
 
 class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
-    name = "agenda_item"
+    name: str = "agenda_item"
     title: str = models.CharField(max_length=100)
-    state = FSMField(
+    state: str = FSMField(
         default=AgendaItemWf.initial,
         choices=AgendaItemWf.choices(),
         editable=False,
     )
-    meeting = models.ForeignKey(
+    meeting: Meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="agenda_items"
     )
-    block_discussion = models.BooleanField(
+    block_discussion: bool = models.BooleanField(
         verbose_name=_("Block new discussion posts"), default=False
     )
-    block_proposals = models.BooleanField(
+    block_proposals: bool = models.BooleanField(
         verbose_name=_("Block new proposals"), default=False
     )
-    order = models.PositiveSmallIntegerField(default=0)
+    order: int = models.PositiveSmallIntegerField(default=0)
+    related_modified: datetime = models.DateTimeField(editable=False, auto_now_add=True)
 
     @property
     def agenda_item(self) -> AgendaItem:
@@ -64,6 +71,37 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
 
     def get_discussions(self):
         return self.discussions.all()
+
+    def maybe_mark_related_modified(self):
+        """This is a "poor man's" avoid duplicate pushes."""
+        if self.state != AgendaItemWf.ARCHIVED:
+            really_now = now()
+            if self.related_modified + timedelta(seconds=3) < really_now:
+                self.related_modified = really_now
+                self.save()
+                return really_now
+
+    def revert_to_last_related_modified(self):
+        """
+        In case something's deleted that was contained by this agenda item,
+        set related_modified to the highest reasonable value.
+        No need to notify users that content was changed if it's just missing.
+        """
+        if self.state != AgendaItemWf.ARCHIVED:
+            candidates = [
+                x.modified
+                for x in [
+                    self.proposals.order_by("-modified").first(),
+                    self.discussions.order_by("-modified").first(),
+                ]
+                if x is not None
+            ]
+            if candidates:
+                latest = sorted(candidates, reverse=True)[0]
+                if self.related_modified != latest:
+                    self.related_modified = latest
+                    self.save()
+                    return latest
 
     @transition(
         field=state,
@@ -116,8 +154,49 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     def is_private(self) -> bool:
         return self.state == AgendaItemWf.PRIVATE
 
+    def mark_read(self, user: AbstractUser) -> datetime:
+        last_read, created = self.last_read_set.get_or_create(user=user)
+        last_read: LastRead
+        if not created:
+            last_read.timestamp = now()
+            last_read.save()
+        return last_read.timestamp
+
     # Annotations
     objects: models.Manager
     proposals: models.QuerySet
     polls: models.QuerySet
     discussions: models.QuerySet
+    last_read_set: models.QuerySet
+
+
+class LastRead(AgendaItemContext, MeetingContext):
+    """
+    Tracks last time a user read an agenda item.
+    Frontend checks modified against timestamp to see if there are any new posts.
+    """
+
+    agenda_item: AgendaItem = models.ForeignKey(
+        AgendaItem,
+        on_delete=models.CASCADE,
+        related_name="last_read_set",
+    )
+    meeting: Meeting = models.ForeignKey(
+        Meeting,
+        on_delete=models.CASCADE,
+        related_name="last_read_set",
+    )
+    user: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="last_read_set",
+    )
+    timestamp: datetime = models.DateTimeField(auto_now_add=True)
+
+    def save(self, **kwargs):
+        if self.pk is None:  # created
+            self.meeting = self.agenda_item.meeting
+        super().save(**kwargs)
+
+    # Annotations
+    objects: models.Manager
