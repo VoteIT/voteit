@@ -74,6 +74,9 @@ class AgendaItemTests(TestCase):
         disc.delete()
         ai.revert_to_last_related_modified()
         self.assertEqual(prop.modified, ai.related_modified)
+        prop.delete()
+        ai.revert_to_last_related_modified()
+        self.assertIsNone(ai.related_modified)
 
     @patch.object(ModeratorsChannel, "publish")
     def test_only_one_push_when_several_proposals_changed(self, mock_channel):

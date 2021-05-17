@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from datetime import timedelta
+from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -40,7 +41,9 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         verbose_name=_("Block new proposals"), default=False
     )
     order: int = models.PositiveSmallIntegerField(default=0)
-    related_modified: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    related_modified: Optional[datetime] = models.DateTimeField(
+        editable=False, null=True, blank=True
+    )
 
     @property
     def agenda_item(self) -> AgendaItem:
@@ -76,7 +79,14 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         """This is a "poor man's" avoid duplicate pushes."""
         if self.state != AgendaItemWf.ARCHIVED:
             really_now = now()
-            if self.related_modified + timedelta(seconds=3) < really_now:
+            # Check if we really need to touch the database
+            if (
+                self.related_modified is not None
+                and self.related_modified + timedelta(seconds=3) < really_now
+            ) or (
+                self.related_modified is None
+                and (self.proposals.exists() or self.discussions.exists())
+            ):
                 self.related_modified = really_now
                 self.save()
                 return really_now
@@ -102,6 +112,10 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
                     self.related_modified = latest
                     self.save()
                     return latest
+            elif self.related_modified is not None:
+                # Blank out related_modified since last entry was deleted
+                self.related_modified = None
+                self.save()
 
     @transition(
         field=state,
