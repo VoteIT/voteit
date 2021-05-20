@@ -7,37 +7,42 @@ from datetime import datetime
 from hashlib import sha512
 from json import dumps
 from logging import getLogger
+from typing import Dict
+from typing import Optional
+from typing import TYPE_CHECKING
+from typing import Type
+from typing import Union
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
-from django.db.models import UniqueConstraint, Sum
+from django.db.models import Sum
+from django.db.models import UniqueConstraint
 from django.dispatch import receiver
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField, transition, post_transition, TransitionNotAllowed
-from typing import Optional, Dict, Type, TYPE_CHECKING, Union
+from django_fsm import FSMField
+from django_fsm import TransitionNotAllowed
+from django_fsm import post_transition
+from django_fsm import transition
 from pydantic import ValidationError
 from pydantic.main import BaseModel
-
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.meeting.models import Meeting
-from voteit.poll.exceptions import (
-    BallotChecksumError,
-    ElectoralRegisterEmpty,
-    ElectoralRegisterMissing,
-    InvalidPollMethod,
-    InvalidProposalCount,
-    PollNotFinished,
-    NotAllowedToVote,
-)
+from voteit.poll.exceptions import BallotChecksumError
+from voteit.poll.exceptions import ElectoralRegisterEmpty
+from voteit.poll.exceptions import ElectoralRegisterMissing
+from voteit.poll.exceptions import InvalidPollMethod
+from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.exceptions import NotAllowedToVote
+from voteit.poll.exceptions import PollNotFinished
 from voteit.poll.permissions import PollPermissions
 from voteit.poll.schemas import PollResult
 from voteit.poll.utils import get_poll_method_registry

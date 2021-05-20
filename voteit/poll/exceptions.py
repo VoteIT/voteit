@@ -1,3 +1,4 @@
+# TODO: Do we want these exceptions or something else that's transmittable?
 
 
 class PollError(Exception):
@@ -21,15 +22,12 @@ class InvalidProposalCount(PollError):
 
 
 class NotAllowedToVote(PollError):
-    """ User isn't in the electoral register.
-    """
+    """User isn't in the electoral register."""
 
 
 class PollNotFinished(PollError):
-    """ Access to this method isn't allowed until the poll has closed and there's an actual result.
-    """
+    """Access to this method isn't allowed until the poll has closed and there's an actual result."""
 
 
 class BallotChecksumError(PollError):
-    """ Checksum doesn't match or doesn't exist.
-    """
+    """Checksum doesn't match or doesn't exist."""
