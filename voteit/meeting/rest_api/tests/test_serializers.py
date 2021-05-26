@@ -71,6 +71,7 @@ class MeetingRolesSerializerTests(TestCase):
                 "full_name": "Moderator",
                 "last_name": "",
                 "organisation": 1,
+                "organisation_roles": [],
             },
             dict(data["user"]),
         )
