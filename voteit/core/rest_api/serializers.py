@@ -36,9 +36,14 @@ class OptionalHyperlinkedIdentityField(serializers.HyperlinkedIdentityField):
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
+    organisation_roles = serializers.SerializerMethodField()
 
     def get_full_name(self, instance: AbstractUser):
         return instance.get_full_name()
+
+    def get_organisation_roles(self, instance: AbstractUser):
+        roles = instance.organisation_roles.first()
+        return [] if roles is None else roles.assigned
 
     class Meta:
         model = get_user_model()
@@ -50,6 +55,7 @@ class UserSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "organisation",
+            "organisation_roles",
         )
 
 
