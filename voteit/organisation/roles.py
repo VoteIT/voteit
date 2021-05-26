@@ -9,3 +9,5 @@ ROLE_MEETING_CREATOR = Role("meeting_creator")
 
 
 OrganisationRoles.add_valid(ROLE_ORG_MANAGER, ROLE_MEETING_CREATOR)
+
+ROLE_ORG_MANAGER.add_requirement(ROLE_MEETING_CREATOR)
