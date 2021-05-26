@@ -24,6 +24,7 @@ from voteit.core.permissions import NOT_ALLOWED
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.utils import get_electoral_policy_registry
+from voteit.proposal import DEFAULT_PROPOSAL_ID_POLICY
 from voteit.proposal.utils import get_proposal_id_registry
 
 if TYPE_CHECKING:
@@ -102,7 +103,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext):
         reg = get_proposal_id_registry()
         if self.proposal_id_policy_name:
             return reg[self.proposal_id_policy_name](self)
-        return reg["username"](self)
+        return reg[DEFAULT_PROPOSAL_ID_POLICY](self)
 
     @cached_property
     def er_policy(self) -> ElectoralRegisterPolicy:

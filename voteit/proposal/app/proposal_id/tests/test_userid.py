@@ -2,18 +2,21 @@ from django.test import TestCase
 
 
 class ProposalTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
-        self.meeting: Meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.user = self.meeting.participants.create(username="jane-doe")
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.user = cls.meeting.participants.create(
+            username="not-used", userid="jane-doe"
+        )
 
     @property
     def _cut(self):
-        from voteit.proposal.app.proposal_id import UsernamePID
+        from voteit.proposal.app.proposal_id import UseridPID
 
-        return UsernamePID
+        return UseridPID
 
     def test_username(self):
         prop = self.ai.proposals.create(author=self.user)

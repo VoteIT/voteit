@@ -8,23 +8,26 @@ from voteit.proposal.abcs import ProposalIDPolicy
 from voteit.proposal.registry import proposal_id_registry
 from voteit.proposal.models import Proposal
 
-__all__ = ("UsernamePID",)
+__all__ = ("UseridPID",)
 
 
 @proposal_id_registry
-class UsernamePID(ProposalIDPolicy):
-    name = "username"
+class UseridPID(ProposalIDPolicy):
+    name = "userid"
 
     def __call__(self, proposal: Proposal) -> Optional[str]:
-        if proposal.meeting is None:
+        if proposal.meeting is None or proposal.author is None:
             return None
-        if proposal.author is None:
-            return None
-            # raise ValueError(f"Proposal {proposal.pk} has no author")
-        # TODO Switch to slugify(user.nickname or user.get_full_name()) when implemented
-        username = slugify(proposal.author.username)
-        if username:
-            meeting_proposals = Proposal.objects.filter(agenda_item__meeting=proposal.meeting)
+
+        if proposal.author.userid:
+            base_suggestion = proposal.author.userid
+        else:
+            base_suggestion = slugify(proposal.author.get_full_name())
+
+        if base_suggestion:
+            meeting_proposals = Proposal.objects.filter(
+                agenda_item__meeting=proposal.meeting
+            )
             author_proposals = meeting_proposals.filter(author=proposal.author)
             try:
                 last_prop = author_proposals.latest("created")
@@ -34,6 +37,6 @@ class UsernamePID(ProposalIDPolicy):
             except ValueError:
                 num_part = author_proposals.count()
             for i in itertools.count(num_part + 1):
-                suggestion = f"{username}-{i}"
+                suggestion = f"{base_suggestion}-{i}"
                 if not meeting_proposals.filter(prop_id=suggestion).exists():
                     return suggestion

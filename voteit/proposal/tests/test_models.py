@@ -34,10 +34,9 @@ class ProposalTests(TestCase):
         with self.assertRaises(IntegrityError):
             self._mk_one(prop_id="hello", agenda_item=ai)
 
-    def test_default_prop_id_based_on_username(self):
-        user = User.objects.create(username="hi")
-        user2 = User.objects.create(username="Hi")
-        user3 = User.objects.create(username="Hii")
+    def test_default_prop_id_based_on_userid(self):
+        user = User.objects.create(username="not-used", userid="hi")
+        user2 = User.objects.create(username="for-this", userid="hello")
         meeting = Meeting.objects.create()
         ai = meeting.agenda_items.create()
         prop = self._mk_one(agenda_item=ai, author=user)
@@ -45,6 +44,4 @@ class ProposalTests(TestCase):
         prop = self._mk_one(agenda_item=ai, author=user)
         self.assertEqual("hi-2", prop.prop_id)
         prop = self._mk_one(agenda_item=ai, author=user2)
-        self.assertEqual("hi-3", prop.prop_id)
-        prop = self._mk_one(agenda_item=ai, author=user3)
-        self.assertEqual("hii-1", prop.prop_id)
+        self.assertEqual("hello-1", prop.prop_id)

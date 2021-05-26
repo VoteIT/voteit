@@ -135,19 +135,12 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
             self.tags.append(self.prop_id)
 
     def save(self, **kw):
-        try:
+        if not self.prop_id and self.meeting is not None:
             pid_policy = self.meeting.pid_policy
-        except AttributeError:
-            pid_policy = _new_proposal_id
-        if not self.prop_id:
             suggestion = pid_policy(self)
             if suggestion:
                 self.prop_id = suggestion
             else:
-                logger.debug(
-                    "Proposal id for policy '%s' returned None, using random prop_id.",
-                    self.meeting.proposal_id_policy_name,
-                )
                 self.prop_id = _new_proposal_id(self)
         super().save(**kw)
 
