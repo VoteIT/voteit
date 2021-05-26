@@ -5,6 +5,7 @@ from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
+from django_fsm import post_transition
 
 from voteit.agenda.messages import AgendaAdded
 from voteit.agenda.messages import AgendaChanged
@@ -75,17 +76,21 @@ def agenda_change(instance=None, created=None, **kw):
         msg = AgendaAdded({}, **data)
     else:
         msg = AgendaChanged({}, **data)
-    if instance.is_private:
-        # This signal is for moderators only.
-        # Send deleted to users channel in case it was published before
-        if not created:
-            msg_deleted = AgendaDeleted(pk=instance.pk)
-            participants_ch.publish(msg_deleted)
-        # Moderators get the new agenda item
-    else:
+    if not instance.is_private:
         # The agenda item isn't private so publish to everyone
         participants_ch.publish(msg)
     moderators_ch.publish(msg)
+
+
+@receiver(post_transition, sender=AgendaItem)
+def ai_made_private(instance: AgendaItem, source: str, target: str, **kw):
+    """
+    Set as deleted for participants
+    """
+    if target == AgendaItemWf.PRIVATE and instance.meeting is not None:
+        participants_ch = ParticipantsChannel.from_instance(instance.meeting)
+        msg_deleted = AgendaDeleted(pk=instance.pk)
+        participants_ch.publish(msg_deleted)
 
 
 @receiver(pre_delete, sender=AgendaItem)

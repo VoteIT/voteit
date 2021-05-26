@@ -107,15 +107,12 @@ class AgendaChangedTests(TestCase):
         self.assertFalse(mock_publish.called)
         self.ai.title = "Hello"
         self.ai.save()
-        # Still private, so deleted was sent here
-        self.assertTrue(mock_publish.called)
-        msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, AgendaDeleted)
-        self.assertEqual(self.ai.pk, msg.data.pk)
+        # Still private, so nothing sent
+        self.assertFalse(mock_publish.called)
         self.ai.upcoming()
         self.ai.save()
         # But now it's published
-        msg = mock_publish.mock_calls[1].args[0]
+        msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, AgendaChanged)
         self.assertEqual(self.ai.pk, msg.data.pk)
 
