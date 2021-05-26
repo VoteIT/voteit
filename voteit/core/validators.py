@@ -82,9 +82,9 @@ def root_validate_roles_and_model(cls, values: Dict):
 
 @deconstructible
 class UserIDValidator(validators.RegexValidator):
-    regex = r"^[\w.@+-]+\Z"
+    regex = r"^[a-z0-9-]+\Z"
     message = _(
-        "Enter a valid username. This value may contain only letters, "
+        "Enter a valid username. This value may contain only a-z, "
         "numbers, and /-/_ characters."
     )
     flags = 0

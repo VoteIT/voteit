@@ -13,7 +13,9 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import UserManager
 from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
 from voteit.core.abcs import ABCModel
@@ -65,9 +67,23 @@ class User(AbstractUser):
             ),
         ]
 
+    def valid_userid_guard(self) -> bool:
+        """
+        Check if user has a valid userid
+        """
+        if self.userid:
+            try:
+                self.userid_validator(self.userid)
+                return True
+            except ValidationError:
+                pass
+        return False
+
     @transition(
         field=state,
         target=UserWf.ACTIVE,
+        conditions=[valid_userid_guard],
+        custom={"title": _("Make user active")},
         # permission=Organisation manager or not manual?,
     )
     def activate(self):

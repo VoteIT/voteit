@@ -4,6 +4,23 @@ from django.test import TestCase
 from voteit.core.testing import mk_usertag, mk_hashtag
 
 
+class UserTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.core.models import User
+
+        cls.user = User.objects.create(username="blaha")
+
+    def test_valid_userid_guard(self):
+        self.assertFalse(self.user.valid_userid_guard())  # Empty
+        self.user.userid = "blaha"
+        self.assertTrue(self.user.valid_userid_guard())
+        self.user.userid = "äö"
+        self.assertFalse(self.user.valid_userid_guard())  # Bad!
+        self.user.userid = "ABC"
+        self.assertFalse(self.user.valid_userid_guard())  # Bad too!
+
+
 class RolesTests(TestCase):
     # The roles tests use the MeetingRoles class instead, since it's kind of hard to test abstract db models in django
 
