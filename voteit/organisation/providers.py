@@ -30,9 +30,6 @@ class IDProxy(ProviderResponseAdapter):
             # Other identity parts in identity obj?
         # FIXME: This should probably be a setting if we want to trust this or not.
         is_superuser = self.response.get("is_superuser", None)
-        if is_superuser is not None and user.organisation is not None:
-            if is_superuser:
-                user.organisation.add_roles(user, ROLE_ORG_MANAGER)
-            else:
-                user.organisation.remove_roles(user, ROLE_ORG_MANAGER)
+        if is_superuser and user.organisation is not None:
+            user.organisation.add_roles(user, ROLE_ORG_MANAGER)
         user.save()
