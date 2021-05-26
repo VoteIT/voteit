@@ -16,3 +16,19 @@ class AcceptanceWf:
     @classmethod
     def choices(cls):
         return cls.states.items()
+
+
+class UserWf:
+    INCOMPLETE = "incomplete"
+    ACTIVE = "active"
+    # BANNED = "banned"
+    # REMOVED?
+    states = {
+        INCOMPLETE: _("Registering"),
+        ACTIVE: _("Active"),
+    }
+    initial = INCOMPLETE
+
+    @classmethod
+    def choices(cls):
+        return cls.states.items()

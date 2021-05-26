@@ -14,6 +14,8 @@ from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import UserManager
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
+from django_fsm import FSMField
+from django_fsm import transition
 from voteit.core.abcs import ABCModel
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
@@ -22,6 +24,7 @@ from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
 from voteit.core.utils import strict_clean_html
 from voteit.core.validators import UserIDValidator
+from voteit.core.workflows import UserWf
 
 if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
@@ -36,6 +39,9 @@ class User(AbstractUser):
     name = "user"
     userid_validator = UserIDValidator()
 
+    state: str = FSMField(
+        default=UserWf.initial, choices=UserWf.choices(), editable=False
+    )
     # Note that this is only null to make testing easier, it should never be null!
     organisation: Organisation = models.ForeignKey(
         "organisation.Organisation",
@@ -58,6 +64,22 @@ class User(AbstractUser):
                 fields=["userid", "organisation"], name="unique org userid"
             ),
         ]
+
+    @transition(
+        field=state,
+        target=UserWf.ACTIVE,
+        # permission=Organisation manager or not manual?,
+    )
+    def activate(self):
+        pass
+
+    @transition(
+        field=state,
+        target=UserWf.INCOMPLETE,
+        # permission=Organisation manager or not manual?,
+    )
+    def incomplete(self):
+        pass
 
     objects = UserManager()
 
