@@ -22,7 +22,6 @@ from django.db.models import Sum
 from django.db.models import UniqueConstraint
 from django.dispatch import receiver
 from django.utils.functional import cached_property
-from django.utils.text import slugify
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
@@ -387,9 +386,9 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
                 and self.meeting is not None
             ):
                 # Create a unique slugified title
-                base = slugify(self.agenda_item.title)
+                base = self.agenda_item.title
                 for x in itertools.count(1):
-                    self.title = f"{base}-{x}"
+                    self.title = f"{base} {x}"
                     if not self.meeting.polls.filter(title=self.title).exists():
                         break
         # Make sure we don't have bad settings
