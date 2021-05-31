@@ -5,10 +5,13 @@ from django.test import TestCase
 
 
 class OrganisationSerializerTests(TestCase):
-    def setUp(self):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
         from voteit.organisation.models import Organisation
 
-        self.org = Organisation.objects.create(title="Test org")
+        cls.org = Organisation.objects.get(pk=1)
 
     @property
     def _cut(self):
@@ -21,7 +24,8 @@ class OrganisationSerializerTests(TestCase):
         data = serializer.data
         self.assertEqual(data.pop("pk"), self.org.pk)
         self.assertEqual(data.pop("title"), self.org.title)
-        self.assertIsNone(data.pop("login_url"))
+        self.assertEqual(data.pop("login_url"), "/begin-auth/1/")
+        self.assertEqual(data.pop("scopes"), ["email"])
 
     def test_get_with_provider(self):
         from voteit.organisation.models import OAuth2Provider

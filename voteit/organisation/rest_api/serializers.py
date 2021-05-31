@@ -4,6 +4,7 @@ from typing import Optional
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from rest_framework.reverse import reverse
+from typing import List
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import TermsOfService
@@ -12,16 +13,27 @@ from voteit.organisation.models import UserConsent
 
 class OrganisationSerializer(serializers.ModelSerializer):
     login_url = serializers.SerializerMethodField()
+    scopes = serializers.SerializerMethodField()
 
     class Meta:
         model = Organisation
-        read_only_fields = ["pk", "login_url"]
+        read_only_fields = ["pk", "login_url", "scopes"]
         fields = read_only_fields + ["title", "body"]
 
     def get_login_url(self, instance: Organisation) -> Optional[str]:
         with suppress(ObjectDoesNotExist):
             if instance.provider:
-                return reverse('begin-auth', args=[instance.pk], request=self.context.get('request'))
+                return reverse(
+                    "begin-auth",
+                    args=[instance.pk],
+                    request=self.context.get("request"),
+                )
+
+    def get_scopes(self, instance: Organisation) -> List[str]:
+        with suppress(ObjectDoesNotExist):
+            if instance.provider:
+                return instance.provider.scopes.split()
+        return []
 
 
 class TOSSerializer(serializers.ModelSerializer):
