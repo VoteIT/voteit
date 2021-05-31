@@ -49,6 +49,7 @@ from voteit.poll.workflows import PollWf
 
 if TYPE_CHECKING:
     from voteit.poll.abcs import PollMethod
+    from voteit.agenda.models import AgendaItem
 
 
 __all__ = "VoterWeight", "ElectoralRegister", "Poll", "Vote"
@@ -103,13 +104,15 @@ class ElectoralRegister(MeetingContext):
 
 class Poll(BaseContent, MeetingContext, AgendaItemContext):
     name = "poll"
-    state = FSMField(default=PollWf.initial, choices=PollWf.choices(), editable=False)
-    title = models.CharField(max_length=70)
-    description = models.CharField(max_length=200)
+    state: str = FSMField(
+        default=PollWf.initial, choices=PollWf.choices(), editable=False
+    )
+    title: str = models.CharField(max_length=70)
+    description: str = models.CharField(max_length=200)
     meeting: Optional[Meeting] = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="polls", null=True
     )
-    agenda_item = models.ForeignKey(
+    agenda_item: Optional[AgendaItem] = models.ForeignKey(
         "agenda.AgendaItem", on_delete=models.CASCADE, null=True, related_name="polls"
     )
     proposals = models.ManyToManyField("proposal.Proposal", related_name="polls")
@@ -208,7 +211,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             raise ValueError(f"{value} is not a result schema or a dict")
         self.result_data = data.dict()
 
-    def validate_settings_guard(self):
+    def validate_settings_guard(self) -> bool:
         """ Guard for transitions to upcoming or ongoing. """
         try:
             pset = self.settings  # Will raise exceptions on bad settings
@@ -400,8 +403,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     def is_private(self) -> bool:
         return self.state == PollWf.PRIVATE
 
-    # Type hinting
-    objects = models.Manager()
+    # Annotations
+    objects: models.Manager
     votes: models.QuerySet
 
 
@@ -460,8 +463,8 @@ class Vote(models.Model):
             self.vote_data = None
         super().save(**kw)
 
-    # Instantiate this manually for type hinting
-    objects = models.Manager()
+    # Annotations
+    objects: models.Manager
 
 
 @receiver(post_transition, sender=Poll)
