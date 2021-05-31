@@ -10,6 +10,7 @@ class MessagingConfig(AppConfig):
         from voteit.messaging import channels
         from voteit.messaging import signals
         from voteit.messaging import messages
+        from voteit.messaging import rest_api
 
         channels.register()
         messages.register()

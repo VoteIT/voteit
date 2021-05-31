@@ -272,7 +272,8 @@ class BaseOutgoingMessage(MessageABC, ABC):
 
 
 class AsyncRunnable(ABC):
-    """This message is ment to be processed within the consumer.
+    """
+    This message is meant to be processed within the consumer.
     It mustn't be blocking or run database queries.
     Anything locking up the consumer will cause it to stop processing messages for that user.
     """

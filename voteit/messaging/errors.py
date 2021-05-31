@@ -4,6 +4,7 @@ from typing import Optional
 from typing import Union
 
 from django.utils.translation import gettext as _
+from pydantic import validator
 from voteit.core.permissions import Permission
 from voteit.messaging.abcs import BaseError
 from voteit.messaging.abcs import ErrorSchema
@@ -37,13 +38,16 @@ class UnauthorizedSchema(ErrorSchema):
     '{"msg": null, "permission": "meeting.add_meeting"}'
     """
 
-    permission: Optional[Union[str, Permission]]
+    permission: Optional[str]
 
     class Config:
         arbitrary_types_allowed = True
-        json_encoders = {
-            Permission: lambda v: str(v),
-        }
+
+    @validator("permission", pre=True)
+    def change_permission(cls, v):
+        if isinstance(v, Permission):
+            return str(v)
+        return v
 
 
 @outgoing
