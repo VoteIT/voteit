@@ -48,7 +48,7 @@ class ListMethod(ABC):
         This method returns the primary keys of the speakers according to the new order.
         Make sure to include the safe speakers!
         """
-        new_order = [x.pk for x in speaker_list.safe_speakers_qs().all()]
+        new_order = list(speaker_list.safe_speakers_qs().values_list('pk', flat=True))
         result = speaker_list.speaker_items.filter(
             order__isnull=False, safe_pos=True
         ).aggregate(Max("order"))

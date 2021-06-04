@@ -397,6 +397,21 @@ class SpeakerList(AgendaItemContext, MeetingContext):
             self.save()
             speaker.signal_stopped()
 
+    def undo_speaker(self) -> bool:
+        """ Move current speaker back to top of queue """
+        speaker = self.current
+        if speaker is None:
+            return False
+        else:
+            speaker.order = 0  # FIXME Is this OK? //JS
+            speaker.started = None
+            speaker.save()
+            self.current = None
+            self.save()
+            speaker.signal_stopped()
+            self.signal_list_updated()
+            return True
+
     def save(self, **kw):
         if self.title is None:
             self.title = "list @ " + self.agenda_item.title
