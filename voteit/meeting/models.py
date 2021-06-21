@@ -17,6 +17,7 @@ from django_fsm import FSMField
 from django_fsm import transition
 
 from voteit.core.abcs import MeetingContext
+from voteit.core.abcs import OrganisationContext
 from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
@@ -57,7 +58,7 @@ class MeetingRoles(Roles, MeetingContext):
         verbose_name = verbose_name_plural = _("Meeting roles")
 
 
-class Meeting(BaseContent, RoleContextMixin, MeetingContext):
+class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext):
     name = "meeting"
     title: str = models.CharField(max_length=100)
     state: str = FSMField(
