@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from abc import abstractmethod
 from logging import getLogger
-from typing import Dict
+from typing import Dict, Generic, TypeVar
 from typing import Optional
 from typing import TYPE_CHECKING
 from typing import Type
@@ -366,7 +366,10 @@ class DeferredJob(ABC):
         pass
 
 
-class ContextAction(MessageABC, ABC):
+M = TypeVar('M')  # Inherit ContextAction using ContextAction[Model] for correct type annotation of context.
+
+
+class ContextAction(MessageABC, ABC, Generic[M]):
     """An action performed on a specific context.
     It has a permission and a model. The schema itself must contain an attribute that will be
     used for lookup of the context to perform the action on. (context_pk_attr)
@@ -405,7 +408,7 @@ class ContextAction(MessageABC, ABC):
         return self.user.has_perm(self.permission, self.context)
 
     @cached_property
-    def context(self) -> models.Model:
+    def context(self) -> M:
         try:
             pk = getattr(self.data, self.context_pk_attr)
         except AttributeError:

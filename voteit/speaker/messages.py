@@ -2,6 +2,7 @@ from abc import ABC
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
 from pydantic.main import BaseModel
 from django.utils.translation import gettext as _
 from typing import List, Optional, Dict
@@ -28,20 +29,20 @@ class SpeakerListUserSchema(SpeakerListActionSchema):
     userid: int  # Moderators may also enter someone else.
 
 
-class ListMessage(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
+class ListMessage(BaseIncomingMessage, DeferredJob, ContextAction[SpeakerList], ABC):
     model = SpeakerList
     schema = SpeakerListActionSchema
     data: SpeakerListActionSchema
     context_pk_attr = "pk"
 
 
-class ModeratorListMessage(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
+class ModeratorListMessage(BaseIncomingMessage, DeferredJob, ContextAction[SpeakerList], ABC):
     model = SpeakerList
     schema = SpeakerListUserSchema
     data: SpeakerListUserSchema
     context_pk_attr = "pk"
 
-    def get_user(self):
+    def get_user(self) -> AbstractUser:
         User = get_user_model()
         try:
             return User.objects.get(pk=self.data.userid)
@@ -93,7 +94,6 @@ class SpeakerListLeave(ListMessage):
 class SetActiveList(ListMessage):
     name = "speaker_list.set_active"
     permission = SpeakerListPermissions.CHANGE
-    context: SpeakerList
 
     def run_job(self):
         self.assert_perm()
@@ -125,7 +125,6 @@ class StartSpeakerInList(ModeratorListMessage):
 
     name = "speaker_list.start_user"
     permission = SpeakerListPermissions.START
-    context: SpeakerList
 
     def run_job(self):
         self.assert_perm()
@@ -159,7 +158,6 @@ class StopSpeakerInList(ModeratorListMessage):
 
     name = "speaker_list.stop_user"
     permission = SpeakerListPermissions.STOP
-    context: SpeakerList
 
     def run_job(self):
         self.assert_perm()
@@ -200,7 +198,7 @@ class SpeakerStatsSchema(BaseModel):
     pk: int  # Speaker pk
     userid: int  # User speaker
     speaker_list: int
-    started: datetime
+    started: Optional[datetime]
     seconds: Optional[int]
 
 
@@ -220,7 +218,7 @@ class SpeakerStopped(BaseOutgoingMessage):
 
 @incoming
 class ModeratorSpeakerListEnter(ModeratorListMessage):
-    name = "mod_speaker_list.enter"
+    name = "speaker_list.mod_enter"
     permission = SpeakerListPermissions.ENTER
 
     def run_job(self):
@@ -240,7 +238,7 @@ class ModeratorSpeakerListEnter(ModeratorListMessage):
 
 @incoming
 class ModeratorSpeakerListLeave(ModeratorListMessage):
-    name = "mod_speaker_list.leave"
+    name = "speaker_list.mod_leave"
     permission = SpeakerListPermissions.LEAVE
 
     def run_job(self):
@@ -254,6 +252,21 @@ class ModeratorSpeakerListLeave(ModeratorListMessage):
             msg = TextResponse.from_message(self, msg=_("Removed from list"))
         else:
             msg = TextResponse.from_message(self, msg=_("Not in list"))
+        msg.send_outgoing(self.mm.consumer_name, success=True)
+        return msg
+
+
+@incoming
+class ModeratorSpeakerListUndo(ListMessage):
+    name = "speaker_list.mod_undo"
+    permission = SpeakerListPermissions.STOP
+
+    def run_job(self):
+        self.assert_perm()
+        if self.context.undo_speaker():
+            msg = TextResponse.from_message(self, msg=_("Speaker undone"))
+        else:
+            msg = TextResponse.from_message(self, msg=_("No active speaker"))
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
 

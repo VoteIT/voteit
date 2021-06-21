@@ -1,8 +1,10 @@
-from collections import UserDict
 from inspect import isclass, isfunction
+from typing import TypeVar, Union, Dict, Callable, overload
+
+T = TypeVar('T')
 
 
-class Registry(UserDict):
+class Registry(Dict[str, T]):
     """A simple dict registry for classes or other kind of factories.
     Will validate abstract classes and subclasses.
 
@@ -34,14 +36,21 @@ class Registry(UserDict):
 
 
     """
+    required: type
 
-    def __init__(self, required):
+    def __init__(self, required: T):
         if not isinstance(required, type):  # pragma: no coverage
             raise TypeError(f"{required} is not a class")
         self.required = required
         super().__init__()
 
-    def __call__(self, factory_or_name):
+    @overload
+    def __call__(self, factory: T) -> T: ...
+
+    @overload
+    def __call__(self, name: str) -> Callable[[T], T]: ...
+
+    def __call__(self, factory_or_name: Union[T, str]):
         if isinstance(factory_or_name, str):
 
             def _decorator(cls):
@@ -67,7 +76,7 @@ class Registry(UserDict):
         self[name] = factory_or_name
         return factory_or_name
 
-    def __setitem__(self, key: str, factory):
+    def __setitem__(self, key: str, factory: T):
         if isinstance(factory, type):
             # Class based factory
             if not issubclass(factory, self.required):

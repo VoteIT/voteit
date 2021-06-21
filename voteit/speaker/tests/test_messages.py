@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 from voteit.messaging.errors import UnauthorizedError, NotFoundError, ValidationErrorMsg
 
 User = get_user_model()
@@ -324,7 +325,6 @@ class ModeratorSpeakerListLeaveTests(TestCase):
         self.system.add_roles(self.user, "speaker")
         self.speaker = self.list.speaker_items.create(user=self.user)
         self.moderator = User.objects.create(username="moderator")
-        self.system.add_roles(self.user, "speaker")
         self.system.add_roles(self.moderator, "list_moderator")
 
     @property
@@ -360,3 +360,42 @@ class ModeratorSpeakerListLeaveTests(TestCase):
         msg = self._mk_one()
         msg.run_job()
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
+
+
+class ModeratorSpeakerListUndoTests(TestCase):
+    def setUp(self):
+        from voteit.speaker.models import SpeakerList
+        from voteit.meeting.models import Meeting
+
+        meeting = Meeting.objects.create()
+        user = User.objects.create(username="jane")
+        system = meeting.speaker_systems.create(
+            method_name="simple", state="active"
+        )
+        system.add_roles(user, "speaker")
+        self.list = system.speaker_lists.create()
+        system.active_list = self.list
+        system.save()
+        self.speaker = self.list.speaker_items.create(user=user)
+        self.list.start_speaker(self.speaker)
+        self.moderator = User.objects.create(username="moderator")
+        system.add_roles(self.moderator, "list_moderator")
+
+    @property
+    def _cut(self):
+        from voteit.speaker.messages import ModeratorSpeakerListUndo
+        return ModeratorSpeakerListUndo
+
+    def _mk_one(self, **kw):
+        kw.setdefault("pk", self.list.pk)
+        return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
+
+    def test_undo(self):
+        self.assertEqual(self.list.current, self.speaker)
+        msg = self._mk_one()
+        response = msg.run_job()
+        self.list.refresh_from_db()
+        self.assertIs(self.list.current, None)
+        self.assertEqual(response.data.msg, 'Speaker undone')
+        response = msg.run_job()
+        self.assertEqual(response.data.msg, 'No active speaker')
