@@ -20,4 +20,6 @@ class AgendaItemSerializer(BaseModelSerializer):
             "title",
             "body",
             "state",
+            "block_proposals",
+            "block_discussion",
         )
