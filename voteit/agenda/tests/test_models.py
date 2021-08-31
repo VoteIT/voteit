@@ -81,15 +81,11 @@ class AgendaItemTests(TestCase):
     @patch.object(ModeratorsChannel, "publish")
     def test_only_one_push_when_several_proposals_changed(self, mock_channel):
         ai = self.meeting.agenda_items.create()
-        prop1 = ai.proposals.create()
-        prop2 = ai.proposals.create()
         ai.related_modified = now() - timedelta(minutes=1)
         ai.save()
         mock_channel.reset_mock()
-        prop1.text = "Hello"
-        prop1.save()
-        prop2.text = "World"
-        prop2.save()
+        ai.proposals.create()
+        ai.proposals.create()
         messages = set([x.args[0] for x in mock_channel.mock_calls])
         agenda_messages = [x for x in messages if x.name == "agenda_item.changed"]
         self.assertEqual(1, len(agenda_messages))

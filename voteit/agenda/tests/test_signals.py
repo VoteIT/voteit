@@ -215,31 +215,47 @@ class RelatedItemsTests(TestCase):
         )
 
     @patch.object(ParticipantsChannel, "publish")
+    def test_proposal_created(self, mock_publish):
+        self.ai.proposals.create(body="Hello")
+        self.assertTrue(
+            [
+                x.args[0]
+                for x in mock_publish.mock_calls
+                if x.args[0].name == "agenda_item.changed"
+            ]
+        )
+
+    @patch.object(ParticipantsChannel, "publish")
     def test_proposal_changed(self, mock_publish):
-        self.prop.text = "Hello"
+        self.prop.body = "Hello"
         self.prop.save()
-        self.assertEqual(
-            1,
-            len(
-                [
-                    x.args[0]
-                    for x in mock_publish.mock_calls
-                    if x.args[0].name == "agenda_item.changed"
-                ]
-            ),
+        self.assertFalse(
+            [
+                x.args[0]
+                for x in mock_publish.mock_calls
+                if x.args[0].name == "agenda_item.changed"
+            ]
+        )
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_discussion_created(self, mock_publish):
+        self.ai.discussions.create(body="Hello")
+        self.assertTrue(
+            [
+                x.args[0]
+                for x in mock_publish.mock_calls
+                if x.args[0].name == "agenda_item.changed"
+            ]
         )
 
     @patch.object(ParticipantsChannel, "publish")
     def test_discussion_changed(self, mock_publish):
-        self.disc.text = "Hello"
+        self.disc.body = "Hello"
         self.disc.save()
-        self.assertEqual(
-            1,
-            len(
-                [
-                    x.args[0]
-                    for x in mock_publish.mock_calls
-                    if x.args[0].name == "agenda_item.changed"
-                ]
-            ),
+        self.assertFalse(
+            [
+                x.args[0]
+                for x in mock_publish.mock_calls
+                if x.args[0].name == "agenda_item.changed"
+            ]
         )

@@ -112,8 +112,8 @@ def archive_agenda_items(meeting: Meeting, **kw):
 
 @receiver(post_save, sender=DiscussionPost)
 @receiver(post_save, sender=Proposal)
-def mark_ai_as_updated(instance: AgendaItemContext, **kwargs):
-    if instance.agenda_item is not None:
+def mark_ai_as_updated(instance: AgendaItemContext, created=None, **kwargs):
+    if created and instance.agenda_item is not None:
         instance.agenda_item.maybe_mark_related_modified()
 
 
