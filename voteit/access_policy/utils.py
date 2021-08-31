@@ -5,9 +5,10 @@ if TYPE_CHECKING:
     from voteit.core.component import Registry
     from voteit.meeting.models import Meeting
     from voteit.access_policy.registries import InviteDataRegistry
+    from voteit.access_policy.models import AccessPolicy
 
 
-def get_policies(meeting: Meeting, only_active=True) -> List:
+def get_policies(meeting: Meeting, only_active=True) -> List[AccessPolicy]:
     """
     Return meeting access policies
     """

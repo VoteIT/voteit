@@ -52,6 +52,7 @@ class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
         fields = read_only_fields + [
             "title",
             "body",
+            "er_policy_name",
             "public",
         ]
 
