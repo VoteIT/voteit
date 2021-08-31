@@ -41,6 +41,13 @@ class OrganisationViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual(self.org.pk, data["pk"])
 
+    def test_get_anon(self):
+        url = f"/api/organisations/{self.org.pk}/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(self.org.pk, data["pk"])
+
     def test_patch_manager(self):
         url = f"/api/organisations/{self.org.pk}/"
         self.client.force_login(self.manager)

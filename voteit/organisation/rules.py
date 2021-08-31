@@ -45,7 +45,7 @@ def is_org_user(user: User, org_context):
     # Django has several ways and we could remove the link to the organisation too.
     return (
         isinstance(org_context, OrganisationContext)
-        and user.organisation is not None
+        and getattr(user, "organisation", None) is not None
         and user.organisation == org_context.organisation
     )
 
@@ -53,7 +53,7 @@ def is_org_user(user: User, org_context):
 # FIXME: This is a stub
 rules.add_perm(OrgPermissions.CHANGE, is_manager)
 rules.add_perm(OrgPermissions.DELETE, is_manager)
-rules.add_perm(OrgPermissions.VIEW, is_org_user)
+rules.add_perm(OrgPermissions.VIEW, rules.always_allow)
 rules.add_perm(OrgPermissions.MANAGE, is_manager)
 rules.add_perm(OrgPermissions.CHANGE_ROLES, is_manager)
 rules.add_perm(OrgPermissions.VIEW_ROLES, is_manager)  # We might want to change this?
