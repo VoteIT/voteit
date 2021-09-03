@@ -1,9 +1,11 @@
+from __future__ import annotations
 from typing import Optional
 
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext as _
 from pydantic import validator
 from pydantic.main import BaseModel
+from typing import List
 
 from voteit.core.utils import get_model_by_shortname
 from voteit.core.validators import validate_model_shortname
@@ -13,12 +15,14 @@ from voteit.messaging.decorators import outgoing
 from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.messages.base import BaseAddObject
 from voteit.messaging.messages.base import BaseDeleteObject
+from voteit.messaging.messages.base import BaseObjectAction
 from voteit.messaging.messages.base import BaseObjectAdded
 from voteit.messaging.messages.base import BaseObjectChanged
 from voteit.messaging.messages.base import BaseObjectDeleted
 from voteit.messaging.messages.text import TextResponse
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
+from voteit.reactions.permissions import ReactionButtonPermissions
 from voteit.reactions.permissions import ReactionPermissions
 
 
@@ -46,12 +50,13 @@ class ReactionSchema(BaseModel):
         validate_model_shortname
     )
 
-    class Config:
-        arbitrary_types_allowed = True
-
 
 class ReactionCountSchema(ReactionSchema):
     count: int
+
+
+class ReactionUserListSchema(ReactionSchema):
+    userids: List[int]
 
 
 class UserReactionResponseSchema(ReactionSchema):
@@ -81,15 +86,6 @@ class UserReactionDeleted(BaseObjectDeleted):
     name = "reaction.deleted"
 
 
-class AddReactionSchema(BaseModel):
-    button: int
-    content_type: str  # model shortname, like "proposal"
-    object_id: int
-    _validate_content_type = validator("content_type", allow_reuse=True)(
-        validate_model_shortname
-    )
-
-
 @incoming
 class AddReaction(BaseAddObject):
     name = "reaction.add"
@@ -97,8 +93,8 @@ class AddReaction(BaseAddObject):
     model = ReactionButton  # This is the context for the action!
     add_model = Reaction
     relation_queryset_attribute = "reactions"
-    schema = AddReactionSchema
-    data: AddReactionSchema
+    schema = ReactionSchema
+    data: ReactionSchema
     context: ReactionButton
     context_pk_attr = "button"
 
@@ -143,3 +139,37 @@ class DeleteReaction(BaseDeleteObject):
         response = TextResponse.from_message(self, msg="")
         response.send_outgoing(self.mm.consumer_name, success=True)
         return response
+
+
+@incoming
+class ListReactionUsers(BaseObjectAction):
+    name = "reaction.list"
+    permission = ReactionButtonPermissions.LIST_REACTIONS
+    model = ReactionButton  # This is the context for the action!
+    schema = ReactionSchema
+    data: ReactionSchema
+    context: ReactionButton
+    context_pk_attr = "button"
+
+    def run_job(self) -> ReactionUserListResponse:
+        self.assert_perm()
+        model_shortname = self.data.content_type
+        # Already validated
+        model = get_model_by_shortname(model_shortname)
+        ct = ContentType.objects.get_for_model(model)
+        userids = self.context.reactions.filter(
+            object_id=self.data.object_id, content_type=ct
+        ).values_list("user", flat=True)
+        response = ReactionUserListResponse.from_message(
+            self, userids=list(userids), **self.data.dict()
+        )
+        response.send_outgoing(self.mm.consumer_name, success=True)
+        return response
+
+
+@outgoing
+class ReactionUserListResponse(BaseOutgoingMessage):
+
+    name = "reaction.list"
+    schema = ReactionUserListSchema
+    data: ReactionUserListSchema

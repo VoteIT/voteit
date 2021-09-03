@@ -15,21 +15,22 @@ _channel_layers_setting = {
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AddReactionTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.reactions.models import ReactionButton
 
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.prop = self.ai.proposals.create()
-        self.disc = self.ai.discussions.create()
-        self.button: ReactionButton = self.meeting.reaction_buttons.create(
+        cls.meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.prop = cls.ai.proposals.create()
+        cls.disc = cls.ai.discussions.create()
+        cls.button: ReactionButton = cls.meeting.reaction_buttons.create(
             change_roles=["potential_voter"]
         )
-        self.voter = User.objects.create(username="voter")
-        self.participant = User.objects.create(username="participant")
-        self.meeting.add_roles(self.voter, "potential_voter")
-        self.meeting.add_roles(self.participant, "participant")
+        cls.voter = User.objects.create(username="voter")
+        cls.participant = User.objects.create(username="participant")
+        cls.meeting.add_roles(cls.voter, "potential_voter")
+        cls.meeting.add_roles(cls.participant, "participant")
 
     @property
     def _cut(self):
@@ -122,3 +123,62 @@ class DeleteReactionTests(TestCase):
         msg = self._mk_one()
         msg.run_job()
         self.assertFalse(self.prop.reaction_set.count())
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class ListReactionUsersTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+
+        cls.meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.prop = cls.ai.proposals.create()
+        cls.disc = cls.ai.discussions.create()
+        cls.button = cls.meeting.reaction_buttons.create(
+            change_roles=["potential_voter"],
+            list_roles=["potential_voter"],
+        )
+        cls.voter = User.objects.create(username="voter")
+        cls.participant = User.objects.create(username="participant")
+        cls.outsider = User.objects.create(username="outsider")
+        cls.meeting.add_roles(cls.voter, "potential_voter")
+        cls.meeting.add_roles(cls.participant, "participant")
+        for user in [cls.voter, cls.participant]:
+            cls.prop.reaction_set.create(
+                user=user,
+                button=cls.button,
+                object_id=cls.disc.id,
+                agenda_item=cls.ai,
+                content_type=cls.disc,
+            )
+
+    @property
+    def _cut(self):
+        from voteit.reactions.messages import ListReactionUsers
+
+        return ListReactionUsers
+
+    def _mk_one(self, user, context):
+        return self._cut(
+            {"consumer_name": "abc", "user_pk": user.pk},
+            button=self.button.pk,
+            content_type=context.name,
+            object_id=context.pk,
+        )
+
+    def test_wrong_role(self):
+        msg = self._mk_one(self.participant, self.prop)
+        self.assertRaises(UnauthorizedError, msg.run_job)
+
+    def test_outsider(self):
+        msg = self._mk_one(self.outsider, self.prop)
+        self.assertRaises(UnauthorizedError, msg.run_job)
+
+    def test_has_correct_role(self):
+        msg = self._mk_one(self.voter, self.prop)
+        response = msg.run_job()
+        self.assertEqual("reaction.list", response.name)
+        self.assertEqual(
+            {self.voter.pk, self.participant.pk}, set(response.data.userids)
+        )
