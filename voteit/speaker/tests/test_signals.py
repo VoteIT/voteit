@@ -394,4 +394,4 @@ class RolesRelationsTests(TestCase):
 
     def test_adding_system_roles_adds_participant(self):
         self.system.add_roles(self.user, "speaker")
-        self.assertFalse(self.meeting.get_roles(self.user))
+        self.assertTrue(self.meeting.get_roles(self.user))

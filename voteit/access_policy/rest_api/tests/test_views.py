@@ -17,10 +17,12 @@ class MeetingInviteViewSetTests(APITestCase):
         from voteit.meeting.models import Meeting
         from voteit.access_policy.models import MeetingInvite
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
+        from voteit.organisation.models import Organisation
 
         cls.MeetingInvite = MeetingInvite
 
-        cls.meeting: Meeting = Meeting.objects.create(
+        cls.organisation = Organisation.objects.create()
+        cls.meeting: Meeting = cls.organisation.meetings.create(
             title="Test meeting", state="ongoing"
         )
         cls.participant: User = User.objects.create_user("participant")
@@ -144,10 +146,14 @@ class MatchInvitesViewSetTests(APITestCase):
     def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.access_policy.models import MeetingInvite
+        from voteit.organisation.models import Organisation
 
+        cls.MeetingInvite = MeetingInvite
+
+        cls.organisation = Organisation.objects.create()
         User.objects.create_user(username="invite_service", password="secret")
 
-        cls.meeting: Meeting = Meeting.objects.create(
+        cls.meeting: Meeting = cls.organisation.meetings.create(
             title="Test meeting",
             state="ongoing",  # organisation=cls.organisation
         )

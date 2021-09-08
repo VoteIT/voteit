@@ -90,9 +90,11 @@ class MeetingAccessPoliciesSerializerTests(TestCase):
 class MeetingInviteSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        from voteit.organisation.models import Organisation
         from voteit.meeting.models import Meeting
 
-        cls.meeting = Meeting.objects.create()
+        cls.organisation = Organisation.objects.create()
+        cls.meeting: Meeting = cls.organisation.meetings.create(title="Some meeting")
         cls.user = cls.meeting.participants.create(username="inviter")
 
     @property
@@ -117,6 +119,16 @@ class MeetingInviteSerializerTests(TestCase):
         self.assertFalse(serializer.errors)
         instance = serializer.save()
         self.assertEqual(self.user, instance.created_by)
+
+    def test_get(self):
+        invite = self.meeting.invites.create(
+            data={"email": "hello@betahaus.net"}, created_by=self.user
+        )
+        serializer = self._cut(invite, context={"request": self._mk_request()})
+        data = serializer.data
+        self.assertEqual(self.organisation.pk, data["organisation_pk"])
+        self.assertEqual(self.meeting.title, data["meeting_title"])
+        self.assertEqual(self.user.pk, data["created_by"])
 
     def test_validate_bogus_email_invite_data(self):
         data = {
