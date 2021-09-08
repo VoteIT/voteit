@@ -18,7 +18,19 @@ and API-points for things that the organisation might need.
     >>> from voteit.organisation.models import Organisation
     >>> org = Organisation.objects.create(title="VoteIT")
 
-Organisations have managers - they should have access to all
+
+Meeting creators should only have the option to create a meeting
+but can't touch anything else.
+
+    >>> from voteit.organisation.rules import is_meeting_creator
+    >>> org.add_roles(jane, "meeting_creator")
+    [meeting_creator]
+
+    >>> is_meeting_creator(jane, org)
+    True
+
+
+Organisation managers should have access to all
 settings and meetings. The rule is_manager checks that.
 
     >>> from voteit.organisation.rules import is_manager
@@ -34,15 +46,7 @@ Most permissions checks are done directly from the user model though.
     >>> jane.has_perm(OrgPermissions.MANAGE, org)
     True
 
-Meeting creators should only have the option to create a meeting
-but can't touch anything else.
 
-    >>> from voteit.organisation.rules import is_meeting_creator
-    >>> org.add_roles(jane, "meeting_creator")
-    [meeting_creator]
-
-    >>> is_meeting_creator(jane, org)
-    True
 
 ## Meetings
 
