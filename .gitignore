@@ -3,3 +3,4 @@
 *.egg-info
 voteit/*/migrations/*
 !voteit/*/migrations/__init__.py
+.DS_Store
