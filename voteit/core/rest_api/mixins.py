@@ -1,21 +1,30 @@
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 from typing import Dict
 
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ImproperlyConfigured
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.query import QuerySet
+from django.utils import translation
+from django.utils.translation import gettext as _
+from rest_framework import exceptions
 from rest_framework import permissions
 from rest_framework.decorators import action
-from rest_framework import exceptions
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
+
 from voteit.core.rest_api.serializers import FSMTransitionSerializer
+from voteit.core.rest_api.serializers import TransitionSerializer
 from voteit.core.utils import get_permission_registry
 
-from .serializers import TransitionSerializer
 
-from django.core.exceptions import ImproperlyConfigured
+def perm_denied_msg(perm, obj):
+    return _("You're missing the permission '%(perm)s' on %(obj)s.") % {
+        "perm": perm,
+        "obj": obj,
+    }
 
 
 class AutoPermissionViewSetMixin:
@@ -64,7 +73,7 @@ class AutoPermissionViewSetMixin:
             if self.allow_unauthenticated:
                 return
             else:
-                raise self.permission_denied(self.request, f"Unauthenticated")
+                raise exceptions.AuthenticationFailed()
 
         # Get the handler for the HTTP method in use
         try:
@@ -103,18 +112,17 @@ class AutoPermissionViewSetMixin:
         if obj:
             perm = self.get_model_perm(obj, perm_type)
             if not self.request.user.has_perm(perm, obj):
-                raise self.permission_denied(
-                    self.request,
-                    f"{perm} not allowed for user {self.request.user} on {obj}",
-                )
+                raise exceptions.PermissionDenied(perm_denied_msg(perm, obj))
 
 
 class SerializerClassesMixin:
     serializer_classes: Dict[str, Serializer] = {}
 
     def get_serializer_class(self):
-        """Use serializer_classes and fall back to serializer_class.
-        Return empty serializer for transition actions."""
+        """
+        Use serializer_classes and fall back to serializer_class.
+        Return empty serializer for transition actions.
+        """
         if self.name == "Transition action":
             return Serializer
         return self.serializer_classes.get(self.action, self.serializer_class)
@@ -137,20 +145,25 @@ class ModelContextMixin(ABC):
             lookup_val = request.GET.get(self.context_lookup_kwarg)
         if lookup_val is None:
             raise exceptions.ValidationError(
-                detail=f"{self.context_lookup_kwarg} not specified"
+                detail=_("%(lookup_kw)s not specified")
+                % {"lookup_kw": self.context_lookup_kwarg}
             )
         try:
             return self.context_queryset.get(**{self.context_lookup_field: lookup_val})
         except ObjectDoesNotExist:
             raise exceptions.NotFound(
-                detail=f"No item found where {self.context_lookup_field}=={lookup_val}"
+                _("No item found where %(lookup_field)s==%(lookup_val)s")
+                % {
+                    "lookup_field": self.context_lookup_field,
+                    "lookup_val": lookup_val,
+                }
             )
 
 
 class CreateModelPermissionsMixin(
     AutoPermissionViewSetMixin, CreateModelMixin, ModelContextMixin, ABC
 ):
-    create_permission_denied_message: str = "Permission denied"
+    # create_permission_denied_message: str = "Permission denied"
     _ignore_model_permissions = True
 
     @property
@@ -162,10 +175,7 @@ class CreateModelPermissionsMixin(
         context = self.get_context(request)
         perm = self.get_model_perm(self.model, "add")
         if not request.user.has_perm(perm, context):
-            raise self.permission_denied(
-                request,
-                f"{perm} not allowed for user {request.user} on {context}",
-            )
+            raise exceptions.PermissionDenied(perm_denied_msg(perm, context))
         self.check_object_permissions(request, context)
         return super().create(request, *args, **kwargs)
 
@@ -179,7 +189,8 @@ class TransitionsMixin(SerializerClassesMixin):
         permission_classes=[permissions.IsAuthenticated],
     )
     def transitions(self, request, pk):
-        """Generic transitions action for 'state' field.
+        """
+        Generic transitions action for 'state' field.
         Checks against available transitions for current user before calling.
         """
         instance = self.get_object()
@@ -197,22 +208,20 @@ class TransitionsMixin(SerializerClassesMixin):
             serializer.is_valid(raise_exception=True)
             name = serializer.data["transition"]
             if name not in available_transitions:
-                return Response(
-                    {
-                        "error": f"Invalid transition: {name}",
-                        "available_transitions": list(available_transitions.keys()),
-                    },
-                    status=400,
+                raise exceptions.ValidationError(
+                    detail={
+                        "transition": _("Invalid transition: %(name)s") % {"name": name}
+                    }
                 )
             transition = available_transitions[name]
             if transition.has_perm(instance, request.user):
                 getattr(instance, name)()
                 instance.save()
                 # TODO Possibly return serialized object, but strictly speaking not necessary.
-                return Response(status=201)
+                return Response(status=201, data={})
             else:
-                return self.permission_denied(
-                    request, f"You need the permission {transition.permission}"
+                raise exceptions.PermissionDenied(
+                    perm_denied_msg(transition.permission, instance)
                 )
 
     def get_serializer_class(self):

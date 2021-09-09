@@ -24,7 +24,7 @@ class UserWf:
     # BANNED = "banned"
     # REMOVED?
     states = {
-        INCOMPLETE: _("Registering"),
+        INCOMPLETE: _("Incomplete"),
         ACTIVE: _("Active"),
     }
     initial = INCOMPLETE

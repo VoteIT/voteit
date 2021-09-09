@@ -92,6 +92,7 @@ class User(AbstractUser):
     @transition(
         field=state,
         target=UserWf.INCOMPLETE,
+        custom={"title": _("Mark user as incomplete")},
         # permission=Organisation manager or not manual?,
     )
     def incomplete(self):
@@ -359,4 +360,10 @@ class BaseContent(ABCModel):
         return f"<{self.__class__.__name__}: {self}>"
 
     def __str__(self):
-        return getattr(self, "title", self.body)[:50]
+        for attr in ("title", "body"):
+            v = getattr(self, attr, None)
+            if v:
+                break
+        if not v:
+            v = f"M:{self.pk}"
+        return v[:50]

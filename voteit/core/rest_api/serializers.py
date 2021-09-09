@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.core.serializers.json import DjangoJSONEncoder
+from django.utils import translation
 from pydantic.main import BaseModel
 from rest_framework import serializers
 from rest_framework.fields import JSONField
@@ -131,4 +132,4 @@ class FSMTransitionSerializer(serializers.Serializer):
 
     def get_title(self, field: Transition):
         # Title might be a lazy gettext, which doesn't work
-        return str(field.custom.get("title", field.name.title()))
+        return translation.gettext(field.custom.get("title", field.name.title()))

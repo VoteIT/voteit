@@ -3,7 +3,6 @@ from typing import Dict
 
 from django.core import validators
 from django.utils.deconstruct import deconstructible
-from django.utils.translation import gettext_lazy as _
 from voteit.core.utils import get_model_by_shortname
 
 
@@ -83,7 +82,7 @@ def root_validate_roles_and_model(cls, values: Dict):
 @deconstructible
 class UserIDValidator(validators.RegexValidator):
     regex = r"^[a-z0-9-]+\Z"
-    message = _(
+    message = (
         "Enter a valid username. This value may contain only a-z, "
         "numbers, and /-/_ characters."
     )

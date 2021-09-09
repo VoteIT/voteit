@@ -36,7 +36,9 @@ class ListMessage(BaseIncomingMessage, DeferredJob, ContextAction[SpeakerList], 
     context_pk_attr = "pk"
 
 
-class ModeratorListMessage(BaseIncomingMessage, DeferredJob, ContextAction[SpeakerList], ABC):
+class ModeratorListMessage(
+    BaseIncomingMessage, DeferredJob, ContextAction[SpeakerList], ABC
+):
     model = SpeakerList
     schema = SpeakerListUserSchema
     data: SpeakerListUserSchema
@@ -106,8 +108,13 @@ class SetActiveList(ListMessage):
                     errors=[
                         {
                             "loc": ("pk",),
-                            "msg": _("List '%s' with id %s is active")
-                            % (system.active_list.title, system.active_list),
+                            "msg": _(
+                                "List '%(title)s' with id %(id)s is active"
+                                % {
+                                    "title": system.active_list.title,
+                                    "id": system.active_list,
+                                }
+                            ),
                             "type": "value.error",
                         }
                     ],
