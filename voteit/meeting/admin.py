@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.utils.translation import gettext_lazy as _
 from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.agenda.models import AgendaItem
@@ -35,12 +34,12 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
     def ai_count(self, obj: Meeting):
         return obj.agenda_items.count()
 
-    ai_count.short_description = _("Agenda items")
+    ai_count.short_description = "Agenda items"
 
     def proposal_count(self, obj: Meeting):
         return Proposal.objects.filter(agenda_item__meeting=obj).count()
 
-    proposal_count.short_description = _("Proposals")
+    proposal_count.short_description = "Proposals"
 
 
 @admin.register(MeetingRoles)

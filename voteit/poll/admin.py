@@ -1,6 +1,5 @@
 from django.contrib import admin
 from fsm_admin.mixins import FSMTransitionMixin
-from django.utils.translation import gettext_lazy as _
 
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
@@ -22,4 +21,4 @@ class PollAdmin(FSMTransitionMixin, admin.ModelAdmin):
     def vote_count(self, poll: Poll):
         return poll.votes.count()
 
-    vote_count.short_description = _("Votes")
+    vote_count.short_description = "Votes"

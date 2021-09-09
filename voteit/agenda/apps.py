@@ -1,10 +1,9 @@
 from django.apps import AppConfig
-from django.utils.translation import gettext_lazy as _
 
 
 class AgendaConfig(AppConfig):
-    name = 'voteit.agenda'
-    verbose_name = _('Agenda')
+    name = "voteit.agenda"
+    verbose_name = "Agenda"
 
     def ready(self):
         from voteit.agenda import rules

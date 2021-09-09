@@ -1,0 +1,51 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-09 14:34+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: voteit/presence/messages.py:45
+msgid "You're not allowed to set yourself as present here."
+msgstr ""
+
+#: voteit/presence/messages.py:62
+msgid "You're not allowed to remove yourself."
+msgstr ""
+
+#: voteit/presence/messages.py:90
+msgid "You're not allowed to change presence check."
+msgstr ""
+
+#: voteit/presence/messages.py:95
+msgid "User doesn't exist"
+msgstr ""
+
+#: voteit/presence/messages.py:108
+msgid "User can't be present here. Perhaps that user isn't a participant?"
+msgstr ""
+
+#: voteit/presence/messages.py:123
+msgid "You're not allowed to delete presence."
+msgstr ""
+
+#: voteit/presence/workflows.py:7
+msgid "Open"
+msgstr ""
+
+#: voteit/presence/workflows.py:7
+msgid "Closed"
+msgstr ""

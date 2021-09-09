@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.utils.translation import gettext_lazy as _
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
@@ -18,7 +17,7 @@ class OrganisationAdmin(admin.ModelAdmin):
     def meeting_count(self, obj: Organisation):
         return obj.meetings.count()
 
-    meeting_count.short_description = _("Meetings")
+    meeting_count.short_description = "Meetings"
 
 
 @admin.register(OrganisationRoles)

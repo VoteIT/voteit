@@ -1,0 +1,137 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-09-09 14:34+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: voteit/speaker/messages.py:53
+#, python-format
+msgid "User with pk %(pk)s"
+msgstr ""
+
+#: voteit/speaker/messages.py:68 voteit/speaker/messages.py:238
+msgid "Already in list"
+msgstr ""
+
+#: voteit/speaker/messages.py:71 voteit/speaker/messages.py:241
+msgid "Added"
+msgstr ""
+
+#: voteit/speaker/messages.py:88 voteit/speaker/messages.py:259
+msgid "Removed from list"
+msgstr ""
+
+#: voteit/speaker/messages.py:90 voteit/speaker/messages.py:261
+msgid "Not in list"
+msgstr ""
+
+#: voteit/speaker/messages.py:107
+msgid "Another list has an active speaker."
+msgstr ""
+
+#: voteit/speaker/messages.py:112
+#, python-format
+msgid "List '%(title)s' with id %(id)s is active"
+msgstr ""
+
+#: voteit/speaker/messages.py:124
+msgid "Active list changed"
+msgstr ""
+
+#: voteit/speaker/messages.py:145
+msgid "No such user in queue."
+msgstr ""
+
+#: voteit/speaker/messages.py:149
+#, python-format
+msgid "user_pk %s not in queue"
+msgstr ""
+
+#: voteit/speaker/messages.py:157
+msgid "Started"
+msgstr ""
+
+#: voteit/speaker/messages.py:176
+msgid "No current speaker"
+msgstr ""
+
+#: voteit/speaker/messages.py:188
+msgid "That user isn't speaking."
+msgstr ""
+
+#: voteit/speaker/messages.py:192
+#, python-format
+msgid "user_pk %s"
+msgstr ""
+
+#: voteit/speaker/messages.py:199
+msgid "Stopped"
+msgstr ""
+
+#: voteit/speaker/messages.py:274
+msgid "Speaker undone"
+msgstr ""
+
+#: voteit/speaker/messages.py:276
+msgid "No active speaker"
+msgstr ""
+
+#: voteit/speaker/models.py:54
+msgid "Speaker system roles"
+msgstr ""
+
+#: voteit/speaker/models.py:71
+msgid "Related meeting"
+msgstr ""
+
+#: voteit/speaker/models.py:78
+msgid "JSON-serialized settings data"
+msgstr ""
+
+#: voteit/speaker/models.py:85
+msgid ""
+"When a list is active, mark the top X positions as safe automatically. Safe "
+"speakers will never be moved down."
+msgstr ""
+
+#: voteit/speaker/models.py:94
+msgid "Currently active speaker list"
+msgstr ""
+
+#: voteit/speaker/models.py:266
+msgid "Current speaker, if any"
+msgstr ""
+
+#: voteit/speaker/workflows.py:8
+msgid "Open"
+msgstr ""
+
+#: voteit/speaker/workflows.py:9
+msgid "Closed"
+msgstr ""
+
+#: voteit/speaker/workflows.py:23
+msgid "inactive"
+msgstr ""
+
+#: voteit/speaker/workflows.py:24
+msgid "Active"
+msgstr ""
+
+#: voteit/speaker/workflows.py:25
+msgid "Archived"
+msgstr ""
