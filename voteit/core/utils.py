@@ -247,8 +247,6 @@ def prepare_available_transitions():
     for (name, content) in content_reg.items():
         # FIXME: This may change, but currently all models use "state" as attr.
         if hasattr(content, "state"):
-            # breakpoint()
-            # [x for x in content.state.field.get_all_transitions(content)]
             serializer = FSMTransitionSerializer(
                 list(content.state.field.get_all_transitions(content)), many=True
             )

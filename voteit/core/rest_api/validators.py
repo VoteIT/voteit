@@ -25,7 +25,6 @@ class ValidateGroupAIContext:
                 # AI needed for both tests
                 agenda_item = value["agenda_item"]
                 if isinstance(agenda_item, int):
-                    breakpoint()
                     agenda_item = AgendaItem.objects.get(pk=agenda_item)
                 # Check group in meeting
                 if agenda_item.meeting is None:

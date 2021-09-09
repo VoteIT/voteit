@@ -96,10 +96,8 @@ class TOSCreateSerializerTests(TestCase):
             context={"request": request},
         )
         serializer.is_valid()
-        # breakpoint()
         self.assertFalse(serializer.errors)
         instance = serializer.save()
-        # data = serializer.data
         self.assertEqual("Important", instance.title)
 
 
