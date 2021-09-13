@@ -7,8 +7,11 @@ from typing import TYPE_CHECKING
 
 from django.apps import apps
 from django.dispatch import receiver
+from django.utils import translation
+from django.utils.translation import gettext as _
 from pydantic import BaseModel
 from pydantic import validator
+
 from voteit.messaging.abcs import AsyncRunnable
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import BaseOutgoingMessage
@@ -25,14 +28,37 @@ if TYPE_CHECKING:
     from voteit.messaging.consumers import WebsocketDemuxConsumer
 
 
+class HelloSchema(BaseModel):
+    use_worker: bool = False
+
+
 @incoming_messages
-class Hello(BaseIncomingMessage, AsyncRunnable):
+class Hello(BaseIncomingMessage, AsyncRunnable, DeferredJob):
+    """
+    Used in unittests and integration tests
+    """
+
     name = "testing.hello"
+    should_run = False
+    schema = HelloSchema
+    data: HelloSchema
 
     async def run(self, consumer):
-        greeting = f"Hello you too {self.user.username}!"
-        msg = HelloResponse.from_message(self, greeting=greeting)
-        await msg.async_send_outgoing(self.mm.consumer_name, success=True)
+        # Note: These translations run in tests, keep them! :)
+        if self.data.use_worker:
+            self.should_run = True
+        else:
+            msg = self._mk_msg()
+            await msg.async_send_outgoing(self.mm.consumer_name, success=True)
+
+    def run_job(self):
+        msg = self._mk_msg()
+        msg.send_outgoing(self.mm.consumer_name, success=True)
+
+    def _mk_msg(self):
+        greeting = _("Hello %(username)s!") % {"username": self.user.username}
+        print("Active language in hello message: ", translation.get_language())
+        return HelloResponse.from_message(self, greeting=greeting)
 
 
 class Greeting(BaseModel):
@@ -46,7 +72,8 @@ class HelloResponse(BaseOutgoingMessage):
 
 
 def greet_user(user, consumer_name, message_id=None):
-    greeting = f"Welcome {user.username}!"
+    print("Active language in automatic greeting: ", translation.get_language())
+    greeting = _("Hello %(username)s!") % {"username": user.username}
     msg = HelloResponse.create(message_id=message_id, greeting=greeting)
     msg.send_outgoing(consumer_name, success=True)
 

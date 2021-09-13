@@ -15,6 +15,7 @@ class BaseEnvelope(BaseModel):
     p: Union[Dict, str] = dict()
     t: str
     i: Optional[str] = None
+    l: Optional[str] = None
 
 
 class IncomingEnvelope(BaseEnvelope):

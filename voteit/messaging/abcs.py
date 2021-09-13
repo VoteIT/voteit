@@ -46,6 +46,7 @@ class MessageMeta(BaseModel):
     user_pk: Optional[int]
     consumer_name: Optional[str]
     internal: bool = False
+    language: Optional[str] = None
 
 
 class NoPayload(BaseModel):
@@ -131,6 +132,7 @@ class MessageABC(ABC):
             p=self.data.json(),
             i=self.mm.message_id,
             t=self.mm.type,
+            l=self.mm.language,
             incoming=isinstance(self, BaseIncomingMessage),
         )
         if group:
@@ -180,7 +182,11 @@ class MessageABC(ABC):
             else:
                 state = self.FAILED
         envelope = OutgoingEnvelope(
-            p=self.data.json(), i=self.mm.message_id, t=self.mm.type, s=state
+            p=self.data.json(),
+            i=self.mm.message_id,
+            t=self.mm.type,
+            s=state,
+            l=self.mm.language,
         )
         if group:
             await self.channel_layer.group_send(channel_name, envelope.dict())
@@ -200,6 +206,7 @@ class MessageABC(ABC):
             message_id=envelope.i,
             type=envelope.t,
             internal=getattr(envelope, "type", None) == INTERNAL_MESSAGE,
+            language=envelope.l,
         )
         msg_cls = cls.get_registry()[mm.type]  # Already validated
         inst = msg_cls(mm, envelope.p)
@@ -208,7 +215,13 @@ class MessageABC(ABC):
 
     @classmethod
     def create(
-        cls, type_name=None, message_id=None, consumer_name=None, user_pk=None, **kwargs
+        cls,
+        type_name=None,
+        message_id=None,
+        consumer_name=None,
+        user_pk=None,
+        language=None,
+        **kwargs,
     ):
         if type_name is None:
             assert (
@@ -220,6 +233,7 @@ class MessageABC(ABC):
             message_id=message_id,
             consumer_name=consumer_name,
             user_pk=user_pk,
+            language=language,
         )
         return cls.get_registry()[type_name](mm, kwargs)
 
@@ -366,7 +380,9 @@ class DeferredJob(ABC):
         pass
 
 
-M = TypeVar('M')  # Inherit ContextAction using ContextAction[Model] for correct type annotation of context.
+M = TypeVar(
+    "M"
+)  # Inherit ContextAction using ContextAction[Model] for correct type annotation of context.
 
 
 class ContextAction(MessageABC, ABC, Generic[M]):

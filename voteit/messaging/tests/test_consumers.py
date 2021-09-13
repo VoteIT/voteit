@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import json
 from datetime import datetime
+from typing import TYPE_CHECKING
 from unittest import mock
 
 from asgiref.sync import async_to_sync
@@ -20,6 +23,10 @@ from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.registries import incoming_messages
 
+if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractUser
+    from voteit.messaging.consumers import WebsocketDemuxConsumer
+
 User = get_user_model()
 
 
@@ -33,7 +40,7 @@ class ConsumerTests(TestCase):
     _connected = False
 
     def setUp(self):
-        self.user = User.objects.create(username="sockety")
+        self.user: AbstractUser = User.objects.create(username="sockety")
         self.fakeredis_conn = FakeRedis()
 
         super().setUp()
@@ -51,8 +58,8 @@ class ConsumerTests(TestCase):
 
         return WebsocketDemuxConsumer
 
-    def _mk_one(self):
-        consumer = self._cut()
+    def _mk_one(self, **kwargs) -> WebsocketDemuxConsumer:
+        consumer = self._cut(**kwargs)
         consumer.refresh_user = mock.AsyncMock(return_value=self.user)
         consumer.get_queue = mock.MagicMock(
             return_value=get_queue(name=TESTING_QUEUE, connection=self.fakeredis_conn)
@@ -71,13 +78,16 @@ class ConsumerTests(TestCase):
             log_job_description=False,
         )
 
-    async def fixture(self):
-        # FIXME: This is not the way tokens should work so this test will need to be changed later on.
-        self.consumer = self._mk_one()
-        self.communicator = WebsocketCommunicator(self.consumer, "/testws")
+    async def _mk_communicator(self, consumer, **kwargs):
+        self.communicator = WebsocketCommunicator(consumer, "/testws", **kwargs)
         connected, subprotocol = await self.communicator.connect()
         assert connected
         self._connected = True
+
+    async def fixture(self):
+        # FIXME: This is not the way tokens should work so this test will need to be changed later on.
+        self.consumer = self._mk_one()
+        await self._mk_communicator(self.consumer)
 
     def _mk_deferred_job(self):
         class Schema(BaseModel):
@@ -241,9 +251,16 @@ class ConsumerTests(TestCase):
         msg = json.dumps({"t": "testing.hello"})
         await consumer.receive(msg)
         response = await self.communicator.receive_from()
+        data = json.loads(response)
         self.assertEqual(
-            '{"p": {"greeting": "Hello you too sockety!"}, "t": "testing.hello", "i": null, "s": "s"}',
-            response,
+            {
+                "p": {"greeting": "Hello sockety!"},
+                "t": "testing.hello",
+                "i": None,
+                "l": "en",
+                "s": "s",
+            },
+            data,
         )
 
     async def test_outgoing_with_action(self):
@@ -257,6 +274,50 @@ class ConsumerTests(TestCase):
         envelope = {"p": msg.data.dict(), "t": msg.name}
         await consumer.internal_receive(envelope)
         self.assertTrue(consumer.refresh_user.called)
+
+    # FIXME: I have no idea how to test this
+    # async def test_lang_from_cookie(self):
+    #     self.client.get("/ws/")
+    # consumer = await self._mk_one()
+    # communicator = await self._mk_communicator()
+    # consumer = self.consumer
+
+    async def test_lang_from_header(self):
+        consumer = self._mk_one()
+        await self._mk_communicator(consumer, headers=[("accept-language", "sv")])
+        self.assertEqual("sv", consumer.user_lang)
+
+    async def test_translation_async_runnable(self):
+        consumer = self._mk_one()
+        await self._mk_communicator(consumer, headers=[("accept-language", "sv")])
+        self.assertEqual("sv", consumer.user_lang)
+        msg = json.dumps({"t": "testing.hello"})
+        await self.communicator.send_to(msg)
+        response = await self.communicator.receive_from()
+        data = json.loads(response)
+        self.assertEqual(
+            {
+                "p": {"greeting": "Hej sockety!"},
+                "t": "testing.hello",
+                "i": None,
+                "l": "sv",
+                "s": "s",
+            },
+            data,
+        )
+
+    async def test_translation_passed_to_deferred_task(self):
+        from rq.queue import Queue
+
+        Queue.enqueue = mock.MagicMock()
+        consumer = self._mk_one()
+        await self._mk_communicator(consumer, headers=[(b"accept-language", b"sv")])
+        self.assertEqual("sv", consumer.user_lang)
+        msg = json.dumps({"t": "testing.hello", "p": {"use_worker": "true"}})
+        await consumer.receive(msg)
+        self.assertEqual(
+            "sv", Queue.enqueue.mock_calls[-1].kwargs["mm_data"].get("language")
+        )
 
     # FIXME
     # async def test_websocket_send(self):
