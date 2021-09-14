@@ -17,7 +17,6 @@ from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.messages.base import BaseObjectDeleted
 from voteit.messaging.messages.status import StatusDone
 from voteit.messaging.errors import BadRequestError
-from voteit.messaging.messages.text import TextResponse
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.speaker.models import SpeakerList

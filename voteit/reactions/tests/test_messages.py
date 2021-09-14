@@ -3,7 +3,7 @@ from django.test import TestCase, override_settings
 from voteit.core.utils import get_model_shortname
 from voteit.messaging.errors import UnauthorizedError
 from voteit.messaging.errors import ValidationErrorMsg
-from voteit.messaging.messages.text import TextResponse
+from voteit.messaging.messages.status import StatusDone
 
 User = get_user_model()
 
@@ -51,14 +51,14 @@ class AddReactionTests(TestCase):
         self.assertFalse(self.prop.reaction_set.count())
         msg = self._mk_one(self.prop)
         response = msg.run_job()
-        self.assertIsInstance(response, TextResponse)
+        self.assertIsInstance(response, StatusDone)
         self.assertTrue(self.prop.reaction_set.count())
 
     def test_add_on_discussion(self):
         self.assertFalse(self.prop.reaction_set.count())
         msg = self._mk_one(self.disc)
         response = msg.run_job()
-        self.assertIsInstance(response, TextResponse)
+        self.assertIsInstance(response, StatusDone)
         self.assertTrue(self.disc.reaction_set.count())
 
     def test_add_wrong_type(self):
