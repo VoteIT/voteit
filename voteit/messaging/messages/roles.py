@@ -31,7 +31,8 @@ from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.messages.channels import RecheckChannelSubscriptions
-from voteit.messaging.messages.text import TextResponse
+from voteit.messaging.messages.status import StatusDone
+
 
 User = get_user_model()
 
@@ -97,13 +98,14 @@ class AddRoles(BaseRoles):
     schema = ChangeRolesSchema
     data: ChangeRolesSchema
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         users_qs = self.validate_and_fetch()
         for user in users_qs:
             self.context.add_roles(user, *self.data.roles)
         if self.mm.consumer_name:  # If this is a script, consumer_name will be None
-            response = TextResponse.from_message(self, msg="Added")
+            response = StatusDone.from_message(self)
             response.send_outgoing(self.mm.consumer_name, success=True)
+            return response
 
 
 @incoming
@@ -112,19 +114,22 @@ class RemoveRoles(BaseRoles):
     schema = ChangeRolesSchema
     data: ChangeRolesSchema
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         users_qs = self.validate_and_fetch()
         notify_users = set()
         for user in users_qs:
             if self.context.remove_roles(user, *self.data.roles):
                 notify_users.add(user)
+        response = None
         if self.mm.consumer_name:  # If this is a script, consumer_name will be None
-            response = TextResponse.from_message(self, msg="Removed")
+            response = StatusDone.from_message(self)
             response.send_outgoing(self.mm.consumer_name, success=True)
         msg = RecheckChannelSubscriptions()
         for user in notify_users:
             user_channel = UserChannel.from_instance(user)
             user_channel.publish(msg, internal=True)
+        if response:
+            return response
 
 
 class GetRolesSchema(BaseModel):

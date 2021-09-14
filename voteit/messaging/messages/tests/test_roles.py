@@ -44,6 +44,7 @@ class AvalableMeetingRolesTests(TestCase):
         self.assertRaises(ValidationError, self._mk_one, natural_key="poll.poll")
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class MeetingRolesTests(TestCase):
     def setUp(self):
         self.user_a = User.objects.create(username="abel")
@@ -75,6 +76,7 @@ class MeetingRolesTests(TestCase):
             self.assertEqual({"participant", "moderator"}, set(data.items[0][1]))
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class RolesIntegrationTests(TransactionTestCase):
     def setUp(self):
         self.user_a = User.objects.create(username="abel")
@@ -126,7 +128,6 @@ class RolesIntegrationTests(TransactionTestCase):
         communicator_b = WebsocketCommunicator(consumer_b, "/testws")
         connected_b, subprotocol = await communicator_b.connect()
         assert connected_b
-
         try:
             # User A sends this message
             msg = RemoveRoles(

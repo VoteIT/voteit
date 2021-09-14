@@ -43,8 +43,6 @@ class ConsumerTests(TestCase):
         self.user: AbstractUser = User.objects.create(username="sockety")
         self.fakeredis_conn = FakeRedis()
 
-        super().setUp()
-
     def tearDown(self):
         super().tearDown()
         # mock patch is probably the right way to do this
