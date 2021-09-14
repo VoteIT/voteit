@@ -12,7 +12,7 @@ from voteit.messaging.messages.base import BaseDeleteObject
 from voteit.messaging.messages.base import BaseObjectAdded
 from voteit.messaging.messages.base import BaseObjectChanged
 from voteit.messaging.messages.base import BaseObjectDeleted
-from voteit.messaging.messages.text import TextResponse
+from voteit.messaging.messages.status import StatusDone
 from voteit.presence.models import Presence
 from voteit.presence.models import PresenceCheck
 from voteit.presence.permissions import PresenceCheckPermissions
@@ -41,11 +41,11 @@ class AddPresence(BaseAddObject):
     context_pk_attr = "presence_check"
     context: PresenceCheck
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm(msg=_("You're not allowed to set yourself as present here."))
         self.context.presences.create(user=self.user)
         if self.mm.consumer_name is not None:
-            response = TextResponse.from_message(self, msg="Added")
+            response = StatusDone.from_message(self)
             response.send_outgoing(self.mm.consumer_name, success=True)
             return response
 
@@ -58,12 +58,13 @@ class DeletePresence(BaseDeleteObject):
     permission = PresencePermissions.DELETE
     model = Presence
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm(msg=_("You're not allowed to remove yourself."))
         self.context.delete()
         if self.mm.consumer_name is not None:
-            response = TextResponse.from_message(self, msg="Removed")
+            response = StatusDone.from_message(self)
             response.send_outgoing(self.mm.consumer_name, success=True)
+            return response
 
 
 class AddUserPresenceSchema(AddPresenceSchema):
@@ -86,7 +87,7 @@ class AddUserPresence(BaseAddObject):
     context_pk_attr = "presence_check"
     context: PresenceCheck
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm(msg=_("You're not allowed to change presence check."))
         user = User.objects.filter(pk=self.data.userid).first()
         if user is None:
@@ -98,7 +99,7 @@ class AddUserPresence(BaseAddObject):
         if user.has_perm(PresencePermissions.ADD, self.context):
             self.context.presences.create(user=user)
             if self.mm.consumer_name is not None:
-                response = TextResponse.from_message(self, msg="Added")
+                response = StatusDone.from_message(self)
                 response.send_outgoing(self.mm.consumer_name, success=True)
                 return response  # For testing
         else:
@@ -119,11 +120,11 @@ class DeleteUserPresence(BaseDeleteObject):
     schema = PresenceSchema
     data: PresenceSchema
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm(msg=_("You're not allowed to delete presence."))
         self.context.delete()
         if self.mm.consumer_name is not None:
-            response = TextResponse.from_message(self, msg="Deleted")
+            response = StatusDone.from_message(self)
             response.send_outgoing(self.mm.consumer_name, success=True)
             return response  # For testing
 

@@ -19,7 +19,7 @@ from voteit.messaging.messages.base import BaseObjectAction
 from voteit.messaging.messages.base import BaseObjectAdded
 from voteit.messaging.messages.base import BaseObjectChanged
 from voteit.messaging.messages.base import BaseObjectDeleted
-from voteit.messaging.messages.text import TextResponse
+from voteit.messaging.messages.status import StatusDone
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
 from voteit.reactions.permissions import ReactionButtonPermissions
@@ -98,7 +98,7 @@ class AddReaction(BaseAddObject):
     context: ReactionButton
     context_pk_attr = "button"
 
-    def run_job(self) -> TextResponse:
+    def run_job(self) -> StatusDone:
         self.assert_perm()
         model_shortname = self.data.content_type
         if model_shortname not in self.context.allowed_models:
@@ -115,14 +115,14 @@ class AddReaction(BaseAddObject):
         reactable = model.objects.get(pk=self.data.object_id)
         ai = getattr(reactable, "agenda_item", None)
         # FIXME: set object directly? Reverse relation doesn't seem to work now
-        reaction, created = Reaction.objects.get_or_create(
+        Reaction.objects.get_or_create(
             user=self.user,
             button=self.context,
             object_id=reactable.id,
             agenda_item=ai,
             content_type=ct,
         )
-        response = TextResponse.from_message(self, msg="")
+        response = StatusDone.from_message(self)
         response.send_outgoing(self.mm.consumer_name, success=True)
         return response
 
@@ -133,10 +133,10 @@ class DeleteReaction(BaseDeleteObject):
     permission = ReactionPermissions.DELETE
     model = Reaction
 
-    def run_job(self) -> TextResponse:
+    def run_job(self) -> StatusDone:
         self.assert_perm(msg=_("You're not allowed to change this now"))
         self.context.delete()
-        response = TextResponse.from_message(self, msg="")
+        response = StatusDone.from_message(self)
         response.send_outgoing(self.mm.consumer_name, success=True)
         return response
 

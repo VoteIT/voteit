@@ -13,7 +13,7 @@ from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import ContextAction
 from voteit.messaging.abcs import DeferredJob
-from voteit.messaging.messages.text import TextResponse
+from voteit.messaging.messages.status import StatusDone
 
 if TYPE_CHECKING:
     from django.db.models import Model
@@ -77,7 +77,7 @@ class BaseAddObject(BaseObjectAction, ABC):
         For instance, on agenda items the relation has the name 'proposals'
         """
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm(
             msg=_("You're not allowed to add %(ctype)s here")
             % {"ctype": self.add_model}
@@ -87,15 +87,16 @@ class BaseAddObject(BaseObjectAction, ABC):
             self.data.kwargs.setdefault("author", self.user)
         relation = getattr(self.context, self.relation_queryset_attribute)
         relation.create(**self.data.kwargs)
-        response = TextResponse.from_message(self, msg="Added")
+        response = StatusDone.from_message(self)
         response.send_outgoing(self.mm.consumer_name, success=True)
+        return response
 
 
 class BaseChangeObject(BaseObjectAction, ABC):
     schema = GenericObjectSchema
     data: GenericObjectSchema
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm(
             msg=_("You're not allowed to change %(ctype)s here" % {"ctype": self.model})
         )
@@ -104,18 +105,20 @@ class BaseChangeObject(BaseObjectAction, ABC):
         for key, value in self.data.kwargs.items():
             setattr(self.context, key, value)
         self.context.save()
-        response = TextResponse.from_message(self, msg="Changed")
+        response = StatusDone.from_message(self)
         response.send_outgoing(self.mm.consumer_name, success=True)
+        return StatusDone
 
 
 class BaseDeleteObject(BaseObjectAction, ABC):
     schema = GenericDeleteSchema
     data: GenericDeleteSchema
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm(
             msg=_("You're not allowed to delete %(ctype)s here" % {"ctype": self.model})
         )
         self.context.delete()
-        response = TextResponse.from_message(self, msg="Deleted")
+        response = StatusDone.from_message(self, msg="Deleted")
         response.send_outgoing(self.mm.consumer_name, success=True)
+        return response

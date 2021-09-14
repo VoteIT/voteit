@@ -66,3 +66,11 @@ class NotFoundError(BaseError):
 
     name = "error.not_found"
     default_msg = _("Not found")
+
+
+@outgoing
+class BadRequestError(BaseError):
+    """ Pretty much HTTP 400"""
+
+    name = "error.bad_request"
+    default_msg = _("Bad request")

@@ -2,6 +2,7 @@ from typing import List
 
 from pydantic import ValidationError
 from rest_framework import serializers
+from rest_framework import exceptions
 
 from voteit.access_policy.app.policies import AutomaticAccess
 from voteit.access_policy.app.policies import ModeratorApprovedAccess
@@ -79,7 +80,7 @@ class MeetingInviteSerializer(BaseModelSerializer):
         try:
             reg.validate(value)
         except ValidationError as exc:
-            raise serializers.ValidationError(str(exc))
+            raise exceptions.ValidationError(str(exc))
         except ValueError as exc:
-            raise serializers.ValidationError("Invalid keys within data")
+            raise exceptions.ValidationError("Invalid keys within data")
         return value

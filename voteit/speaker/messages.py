@@ -1,5 +1,6 @@
 from abc import ABC
 from datetime import datetime
+from typing import Union
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
@@ -14,6 +15,8 @@ from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.errors import NotFoundError
 from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.messages.base import BaseObjectDeleted
+from voteit.messaging.messages.status import StatusDone
+from voteit.messaging.errors import BadRequestError
 from voteit.messaging.messages.text import TextResponse
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
@@ -50,7 +53,7 @@ class ModeratorListMessage(
             return User.objects.get(pk=self.data.userid)
         except User.DoesNotExist:
             raise NotFoundError.from_message(
-                self, msg=_("User with pk %(pk)s") % {"pk": self.data.pk}
+                self, msg=_("No user with pk %(pk)s") % {"pk": self.data.pk}
             )
 
 
@@ -59,16 +62,15 @@ class SpeakerListEnter(ListMessage):
     name = "speaker_list.enter"
     permission = SpeakerListPermissions.ENTER
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm()
         existing_obj = self.context.speaker_items.filter(
             user=self.user, order__isnull=False
         ).first()
         if existing_obj is not None:
-            msg = TextResponse.from_message(self, msg=_("Already in list"))
-        else:
-            self.context.speaker_items.create(user=self.user)
-            msg = TextResponse.from_message(self, msg=_("Added"))
+            raise BadRequestError.from_message(self, msg=_("Already in list"))
+        self.context.speaker_items.create(user=self.user)
+        msg = StatusDone.from_message(self)
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
 
@@ -78,16 +80,15 @@ class SpeakerListLeave(ListMessage):
     name = "speaker_list.leave"
     permission = SpeakerListPermissions.LEAVE
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm()
         existing_obj = self.context.speaker_items.filter(
             user=self.user, order__isnull=False
         ).first()
-        if existing_obj is not None:
-            existing_obj.delete()
-            msg = TextResponse.from_message(self, msg=_("Removed from list"))
-        else:
-            msg = TextResponse.from_message(self, msg=_("Not in list"))
+        if existing_obj is None:
+            raise BadRequestError.from_message(self, msg=_("Not in list"))
+        existing_obj.delete()
+        msg = StatusDone.from_message(self)
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
 
@@ -97,7 +98,7 @@ class SetActiveList(ListMessage):
     name = "speaker_list.set_active"
     permission = SpeakerListPermissions.CHANGE
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm()
         system = self.context.speaker_system
         if not self.context.is_active_list:
@@ -121,7 +122,7 @@ class SetActiveList(ListMessage):
                 )
             system.active_list = self.context
             system.save()
-            msg = TextResponse.from_message(self, msg=_("Active list changed"))
+            msg = StatusDone.from_message(self)
             msg.send_outgoing(self.mm.consumer_name, success=True)
             return msg
 
@@ -133,7 +134,7 @@ class StartSpeakerInList(ModeratorListMessage):
     name = "speaker_list.start_user"
     permission = SpeakerListPermissions.START
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm()
         user = self.get_user()
         speaker = self.context.speaker_items.filter(
@@ -151,12 +152,11 @@ class StartSpeakerInList(ModeratorListMessage):
                     }
                 ],
             )
-        else:
-            self.context.start_speaker(speaker)
-            self.context.signal_list_updated()
-            msg = TextResponse.from_message(self, msg=_("Started"))
-            msg.send_outgoing(self.mm.consumer_name, success=True)
-            return msg
+        self.context.start_speaker(speaker)
+        self.context.signal_list_updated()
+        msg = StatusDone.from_message(self)
+        msg.send_outgoing(self.mm.consumer_name, success=True)
+        return msg
 
 
 @incoming
@@ -166,7 +166,7 @@ class StopSpeakerInList(ModeratorListMessage):
     name = "speaker_list.stop_user"
     permission = SpeakerListPermissions.STOP
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm()
         user = self.get_user()
         speaker = self.context.current
@@ -196,7 +196,7 @@ class StopSpeakerInList(ModeratorListMessage):
             )
         self.context.stop_speaker()
         self.context.signal_list_updated()
-        msg = TextResponse.from_message(self, msg=_("Stopped"))
+        msg = StatusDone.from_message(self)
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
 
@@ -228,17 +228,16 @@ class ModeratorSpeakerListEnter(ModeratorListMessage):
     name = "speaker_list.mod_enter"
     permission = SpeakerListPermissions.ENTER
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm()
         user = self.get_user()
         existing_obj = self.context.speaker_items.filter(
             user=user, order__isnull=False
         ).first()
         if existing_obj is not None:
-            msg = TextResponse.from_message(self, msg=_("Already in list"))
-        else:
-            self.context.speaker_items.create(user=user)
-            msg = TextResponse.from_message(self, msg=_("Added"))
+            raise BadRequestError.from_message(self, msg=_("Already in list"))
+        self.context.speaker_items.create(user=user)
+        msg = StatusDone.from_message(self)
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
 
@@ -248,17 +247,16 @@ class ModeratorSpeakerListLeave(ModeratorListMessage):
     name = "speaker_list.mod_leave"
     permission = SpeakerListPermissions.LEAVE
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm()
         user = self.get_user()
         existing_obj = self.context.speaker_items.filter(
             user=user, order__isnull=False
         ).first()
-        if existing_obj is not None:
-            existing_obj.delete()
-            msg = TextResponse.from_message(self, msg=_("Removed from list"))
-        else:
-            msg = TextResponse.from_message(self, msg=_("Not in list"))
+        if existing_obj is None:
+            raise BadRequestError.from_message(self, msg=_("Not in list"))
+        existing_obj.delete()
+        msg = StatusDone.from_message(self)
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
 
@@ -268,12 +266,11 @@ class ModeratorSpeakerListUndo(ListMessage):
     name = "speaker_list.mod_undo"
     permission = SpeakerListPermissions.STOP
 
-    def run_job(self):
+    def run_job(self) -> StatusDone:
         self.assert_perm()
-        if self.context.undo_speaker():
-            msg = TextResponse.from_message(self, msg=_("Speaker undone"))
-        else:
-            msg = TextResponse.from_message(self, msg=_("No active speaker"))
+        if not self.context.undo_speaker():
+            raise BadRequestError.from_message(self, msg=_("No active speaker"))
+        msg = StatusDone.from_message(self)
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
 

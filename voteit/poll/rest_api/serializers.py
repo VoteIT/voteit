@@ -1,6 +1,7 @@
 from typing import Type
 
 from django.db import transaction
+from django.utils.translation import gettext as _
 from rest_framework import serializers
 
 from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField

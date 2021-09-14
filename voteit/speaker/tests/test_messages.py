@@ -3,7 +3,11 @@ from datetime import datetime
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
-from voteit.messaging.errors import UnauthorizedError, NotFoundError, ValidationErrorMsg
+from voteit.messaging.errors import BadRequestError
+from voteit.messaging.errors import UnauthorizedError
+from voteit.messaging.errors import NotFoundError
+from voteit.messaging.errors import ValidationErrorMsg
+from voteit.messaging.messages.status import StatusDone
 
 User = get_user_model()
 
@@ -37,13 +41,10 @@ class SpeakerListEnterTests(TestCase):
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
 
     def test_enter_already_in_list(self):
-        from voteit.messaging.messages.text import TextResponse
-
         self.list.speaker_items.create(user=self.user)
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
         msg = self._mk_one()
-        response = msg.run_job()
-        self.assertIsInstance(response, TextResponse)
+        self.assertRaises(BadRequestError, msg.run_job)
 
     def test_enter_closed_list(self):
         self.list.close()
@@ -53,14 +54,16 @@ class SpeakerListEnterTests(TestCase):
 
 
 class SpeakerListLeaveTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.speaker.models import SpeakerListSystem
-        from voteit.speaker.models import SpeakerList
 
-        self.system = SpeakerListSystem.objects.create(method_name="simple")
-        self.list = SpeakerList.objects.create(speaker_system=self.system)
-        self.user = User.objects.create(username="jane")
-        self.system.add_roles(self.user, "speaker")
+        cls.system = SpeakerListSystem.objects.create(method_name="simple")
+        cls.user = User.objects.create(username="jane")
+        cls.system.add_roles(cls.user, "speaker")
+
+    def setUp(self):
+        self.list = self.system.speaker_lists.create()
         self.speaker = self.list.speaker_items.create(user=self.user)
 
     @property
@@ -80,21 +83,17 @@ class SpeakerListLeaveTests(TestCase):
         self.assertFalse(self.list.speakers.filter(pk=self.user.pk).exists())
 
     def test_leave_not_in_list(self):
-        from voteit.messaging.messages.text import TextResponse
-
         self.speaker.delete()
         self.assertFalse(self.list.speakers.filter(pk=self.user.pk).exists())
         msg = self._mk_one()
-        response = msg.run_job()
-        self.assertIsInstance(response, TextResponse)
+        self.assertRaises(BadRequestError, msg.run_job)
 
     def test_leave_with_old_entry(self):
         self.speaker.order = None
         self.speaker.save()
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
         msg = self._mk_one()
-        msg.run_job()
-        self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
+        self.assertRaises(BadRequestError, msg.run_job)
 
 
 class SpeakerListSetActiveTests(TestCase):
@@ -121,11 +120,10 @@ class SpeakerListSetActiveTests(TestCase):
         return self._cut({"user_pk": self.user.pk, "consumer_name": "abc"}, **kw)
 
     def test_set_active(self):
-        from voteit.messaging.messages.text import TextResponse
 
         msg = self._mk_one()
         response = msg.run_job()
-        self.assertIsInstance(response, TextResponse)
+        self.assertIsInstance(response, StatusDone)
         self.system.refresh_from_db()
         self.assertEqual(self.system.active_list, self.list)
 
@@ -291,13 +289,10 @@ class ModeratorSpeakerListEnterTests(TestCase):
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
 
     def test_enter_already_in_list(self):
-        from voteit.messaging.messages.text import TextResponse
-
         self.list.speaker_items.create(user=self.user)
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
         msg = self._mk_one()
-        response = msg.run_job()
-        self.assertIsInstance(response, TextResponse)
+        self.assertRaises(BadRequestError, msg.run_job)
 
     def test_enter_closed_list(self):
         self.list.close()
@@ -345,33 +340,26 @@ class ModeratorSpeakerListLeaveTests(TestCase):
         self.assertFalse(self.list.speakers.filter(pk=self.user.pk).exists())
 
     def test_leave_not_in_list(self):
-        from voteit.messaging.messages.text import TextResponse
-
         self.speaker.delete()
         self.assertFalse(self.list.speakers.filter(pk=self.user.pk).exists())
         msg = self._mk_one()
-        response = msg.run_job()
-        self.assertIsInstance(response, TextResponse)
+        self.assertRaises(BadRequestError, msg.run_job)
 
     def test_leave_with_old_entry(self):
         self.speaker.order = None
         self.speaker.save()
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
         msg = self._mk_one()
-        msg.run_job()
-        self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
+        self.assertRaises(BadRequestError, msg.run_job)
 
 
 class ModeratorSpeakerListUndoTests(TestCase):
     def setUp(self):
-        from voteit.speaker.models import SpeakerList
         from voteit.meeting.models import Meeting
 
         meeting = Meeting.objects.create()
         user = User.objects.create(username="jane")
-        system = meeting.speaker_systems.create(
-            method_name="simple", state="active"
-        )
+        system = meeting.speaker_systems.create(method_name="simple", state="active")
         system.add_roles(user, "speaker")
         self.list = system.speaker_lists.create()
         system.active_list = self.list
@@ -384,6 +372,7 @@ class ModeratorSpeakerListUndoTests(TestCase):
     @property
     def _cut(self):
         from voteit.speaker.messages import ModeratorSpeakerListUndo
+
         return ModeratorSpeakerListUndo
 
     def _mk_one(self, **kw):
@@ -396,6 +385,9 @@ class ModeratorSpeakerListUndoTests(TestCase):
         response = msg.run_job()
         self.list.refresh_from_db()
         self.assertIs(self.list.current, None)
-        self.assertEqual(response.data.msg, 'Speaker undone')
-        response = msg.run_job()
-        self.assertEqual(response.data.msg, 'No active speaker')
+
+    def test_undo_no_active_speaker(self):
+        self.list.stop_speaker()
+        self.assertFalse(self.list.current)
+        msg = self._mk_one()
+        self.assertRaises(BadRequestError, msg.run_job)

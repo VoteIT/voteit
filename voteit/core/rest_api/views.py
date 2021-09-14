@@ -34,4 +34,4 @@ class UserView(TransitionsMixin, viewsets.GenericViewSet):
     @action(methods=["POST"], detail=False)
     def logout(self, request):
         logout(request)
-        return Response("You have been logged out")
+        return Response()

@@ -9,6 +9,7 @@ from requests_oauthlib import OAuth2Session
 from rest_framework import mixins
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -176,7 +177,7 @@ class HandleMatchedInvitesViewSet(
         matched = list(self.get_matching(instance))
         if not matched:
             # Since queryset has already evaluated this, it shouldn't happen
-            raise serializers.ValidationError("Couldn't find matching invite")
+            raise ValidationError("Couldn't find matching invite")
         with transaction.atomic():
             instance.accept(request.user)
             instance.matched = matched
@@ -193,7 +194,7 @@ class HandleMatchedInvitesViewSet(
         matched = list(self.get_matching(instance))
         if not matched:
             # Since queryset has already evaluated this, it shouldn't happen
-            raise serializers.ValidationError("Couldn't find matching invite")
+            raise ValidationError("Couldn't find matching invite")
         with transaction.atomic():
             instance.reject(request.user)
             instance.matched = matched
