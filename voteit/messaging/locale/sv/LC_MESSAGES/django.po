@@ -7,29 +7,34 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-09-10 14:53+0000\n"
-"PO-Revision-Date: 2021-09-10 16:53+0200\n"
+"POT-Creation-Date: 2021-09-14 08:48+0000\n"
+"PO-Revision-Date: 2021-09-14 10:55+0200\n"
+"Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
+"Language-Team: \n"
 "Language: sv\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
-"Language-Team: \n"
 "X-Generator: Poedit 2.3\n"
 
-#: voteit/messaging/abcs.py:426
+#: voteit/messaging/abcs.py:442
 #, python-format
 msgid "No %(context)s with pk %(pk)s"
 msgstr ""
 
-#: voteit/messaging/abcs.py:448
+#: voteit/messaging/abcs.py:464
 msgid "An unknown error occurred"
 msgstr ""
 
-#: voteit/messaging/abcs.py:633
+#: voteit/messaging/abcs.py:651
 msgid "Context for this channel doesn't exist"
 msgstr ""
+
+#: voteit/messaging/envelopes.py:31
+#, python-format
+msgid "No incoming message type with name %(name)s"
+msgstr "Ingen inkommande meddelandetyp med namn %(name)s"
 
 #: voteit/messaging/errors.py:28
 msgid "Validation error"
@@ -74,7 +79,8 @@ msgstr ""
 msgid "Some users don't exist, aborting"
 msgstr ""
 
-#: voteit/messaging/messages/testing.py:36
+#: voteit/messaging/messages/testing.py:59
+#: voteit/messaging/messages/testing.py:76
 #, python-format
 msgid "Hello %(username)s!"
 msgstr "Hej %(username)s!"
