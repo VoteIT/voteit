@@ -5,6 +5,8 @@ from typing import Union
 from pydantic import BaseModel
 from pydantic import Field
 from pydantic import validator
+from django.utils.translation import gettext as _
+
 from voteit.messaging import INTERNAL_MESSAGE
 from voteit.messaging import WEBSOCKET_OUTGOING
 from voteit.messaging.utils import get_incoming_registry
@@ -25,7 +27,9 @@ class IncomingEnvelope(BaseEnvelope):
     def validate_type(cls, v):
         registry = get_incoming_registry()
         if v not in registry:
-            raise ValueError(f"No such incoming message type ({v})")
+            raise ValueError(
+                _("No incoming message type with name %(name)s") % {"name": v}
+            )
         return v
 
 

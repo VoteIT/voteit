@@ -319,6 +319,35 @@ class ConsumerTests(TestCase):
             "sv", Queue.enqueue.mock_calls[-1].kwargs["mm_data"].get("language")
         )
 
+    async def test_translation_from_async_error(self):
+        consumer = self._mk_one()
+        await self._mk_communicator(consumer, headers=[("accept-language", "sv")])
+        self.assertEqual("sv", consumer.user_lang)
+        msg = json.dumps({"t": "i_dont_exist", "i": 1})
+        await self.communicator.send_to(msg)
+        response = await self.communicator.receive_from()
+        data = json.loads(response)
+        self.assertEqual("sv", data["l"])
+        self.assertEqual(
+            {
+                "p": {
+                    "errors": [
+                        {
+                            "loc": ["t"],
+                            "msg": "Ingen inkommande meddelandetyp med namn i_dont_exist",
+                            "type": "value_error",
+                        }
+                    ],
+                    "msg": "Validation error",
+                },
+                "t": "error.validation",
+                "i": "1",
+                "l": "sv",
+                "s": "f",
+            },
+            data,
+        )
+
     # FIXME
     # async def test_websocket_send(self):
     #     pass

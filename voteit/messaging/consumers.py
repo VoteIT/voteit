@@ -236,7 +236,9 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
             envelope = IncomingEnvelope(**base_payload)
         except ValidationError as exc:
             message_id = base_payload.get("i", None)
-            err = ValidationErrorMsg.create(message_id=message_id, errors=exc.errors())
+            err = ValidationErrorMsg.create(
+                message_id=message_id, errors=exc.errors(), language=self.user_lang
+            )
             await self.send_error(err)
             self.message_errors += 1
             return await self.post_error()
@@ -308,10 +310,16 @@ class WebsocketDemuxConsumer(AsyncWebsocketConsumer):
         """
         self.last_error = now()
         assert isinstance(error, BaseError)
+        if error.mm.language is None:
+            error.mm.language = self.user_lang
         envelope = OutgoingEnvelope(
-            p=error.data, i=error.mm.message_id, t=error.mm.type, s=error.FAILED
+            p=error.data,
+            i=error.mm.message_id,
+            t=error.mm.type,
+            s=error.FAILED,
+            l=error.mm.language,
         )
-        payload = envelope.json()
+        payload = envelope.json(exclude={"type"})
         logger.debug("Error sent: %s", payload)
         await self.send(text_data=payload)
 

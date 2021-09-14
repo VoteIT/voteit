@@ -469,6 +469,7 @@ class BaseError(BaseOutgoingMessage, Exception, ABC):
         type_name=None,
         message_id=None,
         consumer_name=None,
+        language=None,
         user_pk=None,
         msg=None,
         **kwargs,
@@ -478,6 +479,7 @@ class BaseError(BaseOutgoingMessage, Exception, ABC):
             message_id=message_id,
             consumer_name=consumer_name,
             user_pk=user_pk,
+            language=None,
             **kwargs,
         )
         assert isinstance(inst, BaseError), f"Error is not inherited from {BaseError}"
