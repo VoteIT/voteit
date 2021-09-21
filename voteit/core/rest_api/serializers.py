@@ -5,10 +5,13 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db.models import Q
 from django.utils import translation
 from pydantic.main import BaseModel
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 from rest_framework.fields import JSONField
+from voteit.core.validators import valid_userid
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -60,6 +63,26 @@ class UserSerializer(serializers.ModelSerializer):
         )
 
 
+class UpdateUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = get_user_model()
+        fields = (
+            "pk",
+            "userid",
+        )
+
+    def validate_userid(self, value: str):
+        user = self.context["request"].user
+        try:
+            valid_userid(value)
+        # FIXME We may want to change to djangos default exception
+        except ValueError as exc:
+            raise ValidationError(str(exc))
+        if self.Meta.model.objects.filter(~Q(pk=user.pk)).filter(userid=value).exists():
+            raise ValidationError("Not unique, try something else")
+        return value
+
+
 class TransitionSerializer(serializers.Serializer):
     transition = serializers.CharField(max_length=20)
 
@@ -108,7 +131,7 @@ class PydanticFieldSerializer(JSONField):
     # datetime.datetime(1999, 12, 24, 0, 0)
 
     def __init__(self, *args, **kwargs):
-        """ Defualt to DjangoJSONEncoder since it handles more formats"""
+        """Defualt to DjangoJSONEncoder since it handles more formats"""
         kwargs.setdefault("encoder", DjangoJSONEncoder)
         super().__init__(*args, **kwargs)
 
