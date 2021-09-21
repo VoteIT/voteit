@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser
+from voteit.core.utils import generate_valid_userid
 from voteit.organisation.abcs import ProviderResponseAdapter
 from voteit.organisation.registries import provider_response_adapters
 from voteit.organisation.roles import ROLE_ORG_MANAGER
@@ -20,10 +21,14 @@ class IDProxy(ProviderResponseAdapter):
         family_name = self.response.get("family_name", None)
         if family_name:
             user.last_name = family_name
+        if user.userid is None:
+            suggestion = generate_valid_userid(user)
+            if suggestion:
+                user.userid = suggestion
         identity = self.response.get("identity", None)
         if identity is not None:
             # Handle all scopes here
-            # Email - should only be one
+            # Email - FIXME there might be multiple emails
             for item in identity:
                 if item["scope"] == "email":
                     user.email = item["data"]

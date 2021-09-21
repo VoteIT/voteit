@@ -1,5 +1,6 @@
-from unittest import TestCase
+from django.contrib.auth import get_user_model
 
+User = get_user_model()
 
 evil_text_snippet = """
     <a href="javascript:evil_function()">a link</a>
@@ -34,6 +35,37 @@ evil_full_example = (
     % evil_text_snippet
 )
 
+from django.test import TestCase
+
 
 class CleaningUtilsTests(TestCase):
     pass
+
+
+class GenerateValidUseridTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create(
+            username="jeff", first_name="Jeff", last_name="Benzies"
+        )
+
+    @property
+    def _fut(self):
+        from voteit.core.utils import generate_valid_userid
+
+        return generate_valid_userid
+
+    def test_generate(self):
+        self.assertEqual(self._fut(self.user), "jeff-benzies")
+
+    def test_generate_omit_current_user(self):
+        self.user.userid = "jeff-benzies"
+        self.assertEqual(self._fut(self.user), "jeff-benzies")
+
+    def test_already_exists(self):
+        other = User.objects.create(
+            username="other",
+            first_name="Jeff",
+            last_name="Benzies",
+            userid="jeff-benzies",
+        )
+        self.assertNotEqual(self._fut(self.user), "jeff-benzies")

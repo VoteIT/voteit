@@ -2,6 +2,7 @@
 from typing import Dict
 
 from django.core import validators
+from django.core.exceptions import ValidationError
 from django.utils.deconstruct import deconstructible
 from voteit.core.utils import get_model_by_shortname
 
@@ -81,9 +82,30 @@ def root_validate_roles_and_model(cls, values: Dict):
 
 @deconstructible
 class UserIDValidator(validators.RegexValidator):
-    regex = r"^[a-z0-9-]+\Z"
+    regex = r"^[a-z0-9-\_]+\Z"
     message = (
         "Enter a valid username. This value may contain only a-z, "
         "numbers, and /-/_ characters."
     )
     flags = 0
+
+
+def valid_userid(value: str) -> str:
+    """
+    Check if something is a reasonable userid. Won't check if it exists.
+
+    >>> valid_userid('hello-world')
+    'hello-world'
+    >>> valid_userid('123-321_')
+    '123-321_'
+    >>> valid_userid('öl')
+    Traceback (most recent call last):
+    ...
+    ValueError:
+    """
+    validator = UserIDValidator()
+    try:
+        validator(value)
+    except ValidationError as exc:
+        raise ValueError(exc.message)
+    return value

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from inspect import isclass
+from random import randint
 from typing import Optional
 from typing import Set
 from typing import Type
@@ -13,8 +14,11 @@ from bleach import ALLOWED_TAGS
 from bleach import Cleaner
 from bs4 import BeautifulSoup
 from django.db.models import Model
+from django.db.models import Q
+from django.utils.text import slugify
 
 if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractUser
     from voteit.core.permissions import PermissionRegistry
 
 _tag_pattern = re.compile(r"#([\w\-]+)")
@@ -188,7 +192,7 @@ def strict_clean_html(text: str):
 
 
 def relaxed_clean_html(text: str):
-    """ Clean HTML for moderators and trusted users. Note that trusted users may have viruses too..."""
+    """Clean HTML for moderators and trusted users. Note that trusted users may have viruses too..."""
     # FIXME: Implement
     raise NotImplementedError()
 
@@ -255,3 +259,28 @@ def prepare_available_transitions():
 
 def get_available_transitions() -> dict:
     return _cached_available_transitions
+
+
+def generate_valid_userid(user: AbstractUser) -> Optional[str]:
+    """
+    Try to generate a valid userid for a specific user. In case one can't be found safely, simply return None
+    """
+    from voteit.core.validators import valid_userid  # Avoid circular
+
+    name = f"{user.first_name} {user.last_name}".strip()
+    slugified_name = slugify(name)
+    try:
+        slugified_name = valid_userid(slugified_name)
+    except ValueError:
+        # Log bad names?
+        return None
+    # Omit the current user
+    base_qs = user.__class__.objects.filter(~Q(pk=user.pk))
+    if not base_qs.filter(userid=slugified_name).exists():
+        return slugified_name
+    # Try finding something
+    for i in range(10):
+        suffix = str(randint(1, 9999))
+        suggestion = f"{slugified_name}-{suffix}"
+        if not base_qs.filter(userid=suggestion).exists():
+            return suggestion
