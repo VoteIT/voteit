@@ -36,7 +36,7 @@ __all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
 
 
 class User(AbstractUser):
-    """ Custom user model linked to organisation"""
+    """Custom user model linked to organisation"""
 
     name = "user"
     userid_validator = UserIDValidator()
@@ -59,6 +59,7 @@ class User(AbstractUser):
         validators=[userid_validator],
     )
     identity_id: str = models.CharField(max_length=80, blank=True, null=True)
+    img_url: str = models.URLField("Profile image url")  # FIXME Validator and scheme
 
     class Meta:
         constraints = [
@@ -117,7 +118,7 @@ def real_user_only(method):
 
 
 class RoleContextMixin(ABCModel):
-    """ A model where roles can be assigned. """
+    """A model where roles can be assigned."""
 
     @property
     @abstractmethod
@@ -194,7 +195,7 @@ class RoleContextMixin(ABCModel):
 
 
 class Roles(ABCModel):
-    """ Context for role assignments"""
+    """Context for role assignments"""
 
     valid_roles: Dict = None  # Don't instantiate dict here!
     # It's a good idea to override the user relation to have a sane related_name
@@ -252,7 +253,7 @@ class Roles(ABCModel):
         return required
 
     def get_reverse_required_roles(self, *roles: Role) -> Set[Role]:
-        """ If you aim to remove for instance the role Proposer - the participant role will be removed also. """
+        """If you aim to remove for instance the role Proposer - the participant role will be removed also."""
         required = set()
         to_check = set(roles)
         for role in self.valid_roles.values():

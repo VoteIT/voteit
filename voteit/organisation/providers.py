@@ -1,8 +1,16 @@
+from urllib.parse import urlparse
+
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from voteit.core.utils import generate_valid_userid
 from voteit.organisation.abcs import ProviderResponseAdapter
 from voteit.organisation.registries import provider_response_adapters
 from voteit.organisation.roles import ROLE_ORG_MANAGER
+
+
+_allowed_url_schemes = ["https"]
+if settings.DEBUG:
+    _allowed_url_schemes.append("http")
 
 
 @provider_response_adapters
@@ -27,6 +35,12 @@ class IDProxy(ProviderResponseAdapter):
                 user.userid = suggestion
         identity = self.response.get("identity", None)
         if identity is not None:
+            img_url = identity.get("img_url")
+            if img_url:
+                # We'll have to use trusted sources here
+                parsed = urlparse(img_url)
+                if parsed.scheme in _allowed_url_schemes:
+                    user.img_url = img_url
             # Handle all scopes here
             # Email - FIXME there might be multiple emails
             for item in identity:
