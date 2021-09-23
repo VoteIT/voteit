@@ -59,7 +59,9 @@ class User(AbstractUser):
         validators=[userid_validator],
     )
     identity_id: str = models.CharField(max_length=80, blank=True, null=True)
-    img_url: str = models.URLField("Profile image url")  # FIXME Validator and scheme
+    img_url: str = models.URLField(
+        "Profile image url", blank=True, null=True
+    )  # FIXME Validator and scheme
 
     class Meta:
         constraints = [
