@@ -70,6 +70,7 @@ class MeetingRolesSerializerTests(TestCase):
                 "first_name": "Moderator",
                 "full_name": "Moderator",
                 "last_name": "",
+                "img_url": None,
                 "organisation": 1,
                 "organisation_roles": [],
                 "state": "incomplete",

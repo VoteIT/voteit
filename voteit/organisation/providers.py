@@ -33,17 +33,17 @@ class IDProxy(ProviderResponseAdapter):
             suggestion = generate_valid_userid(user)
             if suggestion:
                 user.userid = suggestion
-        identity = self.response.get("identity", None)
-        if identity is not None:
-            img_url = identity.get("img_url")
-            if img_url:
-                # We'll have to use trusted sources here
-                parsed = urlparse(img_url)
-                if parsed.scheme in _allowed_url_schemes:
-                    user.img_url = img_url
+        img_url = self.response.get("img_url")
+        if img_url:
+            # We'll have to use trusted sources here
+            parsed = urlparse(img_url)
+            if parsed.scheme in _allowed_url_schemes:
+                user.img_url = img_url
+        user_data = self.response.get("user_data", None)
+        if user_data is not None:
             # Handle all scopes here
             # Email - FIXME there might be multiple emails
-            for item in identity:
+            for item in user_data:
                 if item["scope"] == "email":
                     user.email = item["data"]
             # Other identity parts in identity obj?
