@@ -57,7 +57,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
 
     @property
     def meeting(self) -> Optional[Meeting]:
-        """ While not directly related, it still good to be able to do lookups this way"""
+        """While not directly related, it still good to be able to do lookups this way"""
         if self.agenda_item:
             return self.agenda_item.meeting
 
@@ -76,7 +76,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         permission=ProposalPermissions.RETRACT,
     )
     def retract(self):
-        """ Normal user operation to retract. Or for moderators."""
+        """Normal user operation to retract. Or for moderators."""
         pass
 
     @transition(
@@ -94,22 +94,22 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
 
     @transition(
         field=state,
-        source=[ProposalWf.PUBLISHED, ProposalWf.VOTING],
+        source=[ProposalWf.PUBLISHED, ProposalWf.VOTING, ProposalWf.DENIED],
         target=ProposalWf.APPROVED,
         permission=ProposalPermissions.CHANGE,
     )
     def approved(self):
-        """ Proposal approved via poll or moderator. """
+        """Proposal approved via poll or moderator."""
         pass
 
     @transition(
         field=state,
-        source=[ProposalWf.PUBLISHED, ProposalWf.VOTING],
+        source=[ProposalWf.PUBLISHED, ProposalWf.VOTING, ProposalWf.APPROVED],
         target=ProposalWf.DENIED,
         permission=ProposalPermissions.CHANGE,
     )
     def denied(self):
-        """ Proposal denied via poll or moderator. """
+        """Proposal denied via poll or moderator."""
         pass
 
     @transition(
@@ -119,14 +119,14 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         permission=ProposalPermissions.CHANGE,
     )
     def unhandled(self):
-        """ Proposal was never handled. Automatic transition or from moderator. """
+        """Proposal was never handled. Automatic transition or from moderator."""
         pass
 
     @transition(
         field=state, target=ProposalWf.PUBLISHED, permission=ProposalPermissions.CHANGE
     )
     def publish(self):
-        """ Reset proposal back to published. """
+        """Reset proposal back to published."""
         pass
 
     def set_tags(self):
