@@ -15,6 +15,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from typing import Dict
 
+from rest_framework.serializers import Serializer
 from voteit.access_policy.app.policies import AutomaticAccess
 from voteit.access_policy.models import MeetingInvite
 from voteit.access_policy.permissions import MeetingInvitePermissions
@@ -73,10 +74,6 @@ class MeetingInviteViewSet(DefaultModelViewSet):
                 return HttpResponseForbidden("You lack the required moderator role")
             return context.invites
 
-    ## FIXME post from service with profile id and make sure that user exists
-    # Error message to suggest registration
-    # Clean up the other views!!!
-
 
 class MatchInvitesViewSet(viewsets.GenericViewSet):
     """
@@ -100,7 +97,8 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
         serializer = self.get_serializer(self.get_queryset(), many=True)
         return Response(serializer.data)
 
-    def get_queryset(self):
+    @cached_property
+    def search_data(self) -> Dict:
         many = isinstance(self.request.data, list)
         serializer = serializers.InviteQuerySerializer(
             data=self.request.data, many=many
@@ -111,7 +109,31 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
         for item in serializer.to_internal_value(serializer.data):
             values = search_data.setdefault(item["scope"], set())
             values.add(item["data"])
-        return MeetingInvite.objects.find_invites(**search_data)
+        return search_data
+
+    def get_queryset(self):
+        return MeetingInvite.objects.find_invites(**self.search_data)
+
+    @action(
+        methods=["post"],
+        detail=True,
+    )
+    def reject(self, request, pk):
+        # Note: Permissions doesn't apply here since it's handled by the queryset
+        instance: MeetingInvite = self.get_object()
+        matched = []
+        for scope, data_items in self.search_data.items():
+            invite_data = instance.data.get(scope, _marker)
+            if invite_data == _marker:
+                continue
+            for data in data_items:
+                if invite_data == data:
+                    matched.append({scope: data})
+        with transaction.atomic():
+            instance.reject(request.user)
+            instance.matched = matched
+            instance.save()
+        return Response(status=200, data=self.serializer_class(instance).data)
 
 
 class UsedInvitesViewSet(viewsets.ReadOnlyModelViewSet):
@@ -157,13 +179,13 @@ class HandleMatchedInvitesViewSet(
 
     def get_queryset(self):
         sdata = {}
-        for item in self.identity_data["identity"]:
+        for item in self.identity_data["user_data"]:
             values = sdata.setdefault(item["scope"], set())
             values.add(item["data"])
         return MeetingInvite.objects.find_invites(**sdata)
 
     def get_matching(self, instance: MeetingInvite):
-        for item in self.identity_data["identity"]:
+        for item in self.identity_data["user_data"]:
             if instance.data.get(item["scope"], _marker) == item["data"]:
                 yield item
 

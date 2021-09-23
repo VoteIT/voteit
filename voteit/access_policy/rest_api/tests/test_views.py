@@ -212,6 +212,36 @@ class MatchInvitesViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual(0, len(data))
 
+    def test_reject(self):
+        payload = [
+            {
+                "scope": "email",
+                "data": "hello@betahaus.net",
+                "validated": "2021-03-24T15:56:00.043000Z",
+            }
+        ]
+        url = reverse("match-invites-reject", kwargs={"pk": self.invite.pk})
+        response = self.client.post(url, data=payload, **self._mk_auth())
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(self.invite.pk, data["pk"])
+        self.assertEqual("rejected", data["state"])
+        self.assertEqual([{"email": "hello@betahaus.net"}], data["matched"])
+        self.invite.refresh_from_db()
+        self.assertEqual("rejected", self.invite.state)
+
+    def test_reject_no_match(self):
+        payload = [
+            {
+                "scope": "email",
+                "data": "idontexist@betahaus.net",
+                "validated": "2021-03-24T15:56:00.043000Z",
+            }
+        ]
+        url = reverse("match-invites-reject", kwargs={"pk": self.invite.pk})
+        response = self.client.post(url, data=payload, **self._mk_auth())
+        self.assertEqual(404, response.status_code)
+
 
 class UserMatchedInviteViewSetTests(APITestCase):
     @classmethod
@@ -268,7 +298,7 @@ class UserMatchedInviteViewSetTests(APITestCase):
             "given_name": "Hello",
             "family_name": "Is it me you are looking for?",
             "identity_id": "123",
-            "identity": [
+            "user_data": [
                 {
                     "pk": 1,
                     "scope": "email",
