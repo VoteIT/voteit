@@ -15,6 +15,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from pydantic import ValidationError
 from requests_oauthlib import OAuth2Session
+from voteit.organisation.models import AccessToken
 
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
@@ -42,12 +43,12 @@ def begin_auth(request, org_pk: int):
             % redirect_host,
         )
 
-    scopes = provider.scopes
-    if "identity" not in scopes.split():
-        scopes += " identity"  # Base identity information
+    scope = provider.scope
+    if "identity" not in scope.split():
+        scope += " identity"  # Base identity information
     auth_session = OAuth2Session(
         client_id=provider.client_id,
-        scope=scopes,
+        scope=scope,
         redirect_uri=provider.redirect_url,
     )
     authorization_url, state = auth_session.authorization_url(
@@ -123,7 +124,7 @@ def finish_auth(request: HttpRequest):
                 user = adapted.register(organisation=provider.organisation)
                 logger.debug("Creating new user: %s", user.pk)
             adapted.update(user)
-            adapted.store_token(request.session, token_response)
+            AccessToken.objects.from_response(token_response, user, provider)
             request.session.pop("oauth_state", None)
             request.session.save()
     except DatabaseError:

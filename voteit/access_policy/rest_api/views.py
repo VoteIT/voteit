@@ -23,7 +23,6 @@ from voteit.access_policy.rest_api import serializers
 from voteit.access_policy.rest_api.authentication import InviteBasicAuthentication
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.meeting.models import Meeting
-from voteit.organisation.schemas import OAuthTokenSchema
 
 if TYPE_CHECKING:
     from voteit.organisation.models import OAuth2Provider
@@ -159,21 +158,14 @@ class HandleMatchedInvitesViewSet(
     serializer_class = serializers.MeetingInviteSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_token(self):
-        # FIXME: Error handling, other persistence???
-        data = self.request.session["oauth_token"]
-        return OAuthTokenSchema(**data)
-
     @cached_property
     def identity_data(self) -> Dict:
         # FIXME: Error checking etc
         provider: OAuth2Provider = self.request.user.organisation.provider
-        token = self.get_token()
-        # FIXME: Refresh etc
-        auth_session = OAuth2Session(client_id=provider.client_id, token=token.dict())
-        # Expiring LRU-cache?
-        response = auth_session.get(provider.identity_url)
+        oauth_session = self.request.user.oauth_session()
+        response = oauth_session.get(provider.identity_url)
         if not response.ok:
+            # FIXME: Wrong exception for this context
             response.raise_for_status()
         return response.json()
 

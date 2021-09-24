@@ -71,7 +71,7 @@
     provider_id: idproxy
     title: ID Proxy
     organisation: 1
-    scopes: email
+    scope: email
     client_id: cid_org1
     client_secret: cs_org1
     redirect_url: http://127.0.0.1:8000/finish-auth/

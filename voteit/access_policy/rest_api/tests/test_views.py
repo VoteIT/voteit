@@ -1,14 +1,22 @@
+from __future__ import annotations
+
 from base64 import b64encode
-from unittest import mock
+from datetime import timedelta
+from typing import TYPE_CHECKING
 
 import responses
 from django.contrib.auth import get_user_model
 from django.test import override_settings
+from django.utils.timezone import now
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
+
 from voteit.organisation.schemas import OAuthTokenSchema
 
-User = get_user_model()
+if TYPE_CHECKING:
+    from voteit.core.models import User as UserType
+
+User: UserType = get_user_model()
 
 
 class MeetingInviteViewSetTests(APITestCase):
@@ -251,7 +259,6 @@ class UserMatchedInviteViewSetTests(APITestCase):
         from voteit.meeting.roles import ROLE_MODERATOR
         from voteit.organisation.models import OAuth2Provider
         from voteit.organisation.models import Organisation
-        from voteit.access_policy.rest_api.views import HandleMatchedInvitesViewSet
 
         cls.organisation = Organisation.objects.create()
         cls.provider = OAuth2Provider.objects.create(
@@ -273,23 +280,29 @@ class UserMatchedInviteViewSetTests(APITestCase):
         cls.outsider: User = User.objects.create_user(
             "outsider", organisation=cls.organisation
         )
+        later = now() + timedelta(hours=1)
+        token_mod = OAuthTokenSchema(
+            access_token="123",
+            expires_in=3600,
+            scope=["identity", "email"],
+            refresh_token="abc",
+            expires_at=later,
+        )
+        token_outsider = OAuthTokenSchema(**token_mod.dict())
+        token_outsider.access_token = "1234"
+        token_outsider.refresh_token = "abcd"
+        cls.mod_access_token = cls.moderator.access_tokens.create_from_pydantic(
+            token_mod, provider=cls.provider, user=cls.moderator
+        )
+        cls.outsider_access_token = cls.outsider.access_tokens.create_from_pydantic(
+            token_outsider, provider=cls.provider, user=cls.outsider
+        )
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.invite: MeetingInvite = cls.meeting.invites.create(
             data={"email": "hello@betahaus.net"}, created_by=cls.moderator
         )
         cls.invite2: MeetingInvite = cls.meeting.invites.create(
             data={"email": "goodbye@betahaus.net"}, created_by=cls.moderator
-        )
-        cls.oauth_like = OAuthTokenSchema(
-            access_token="123",
-            expires_in=3600,
-            token_type="bearer",
-            scope=["identity", "email"],
-            refresh_token="abc",
-            expires_at=23487842333,
-        )
-        HandleMatchedInvitesViewSet.get_token = mock.MagicMock(
-            return_value=cls.oauth_like
         )
 
         cls.mock_api_return = {

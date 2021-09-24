@@ -1,4 +1,5 @@
 from django.contrib import admin
+from voteit.organisation.models import AccessToken
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
@@ -34,6 +35,13 @@ class OrganisationRolesAdmin(admin.ModelAdmin):
         "user__first_name",
         "user__userid",
     )
+
+
+@admin.register(AccessToken)
+class AccessTokenAdmin(admin.ModelAdmin):
+    autocomplete_fields = ("user",)
+    list_display = "user", "updated"
+    list_filter = ("user",)
 
 
 @admin.register(TermsOfService)

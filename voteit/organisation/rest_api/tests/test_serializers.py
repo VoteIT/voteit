@@ -25,7 +25,7 @@ class OrganisationSerializerTests(TestCase):
         self.assertEqual(data.pop("pk"), self.org.pk)
         self.assertEqual(data.pop("title"), self.org.title)
         self.assertEqual(data.pop("login_url"), "/begin-auth/1/")
-        self.assertEqual(data.pop("scopes"), ["email"])
+        self.assertEqual(data.pop("scope"), ["email"])
 
     def test_get_with_provider(self):
         from voteit.organisation.models import OAuth2Provider

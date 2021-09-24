@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 from datetime import datetime
-from datetime import timedelta
+from typing import Dict
+from typing import List
 from typing import Optional
 from typing import TYPE_CHECKING
-
-from django.utils.timezone import make_aware
-from django.utils.timezone import now
-from django.utils.translation import gettext_lazy as _
-
-from django.conf import settings
-from django.db import models
 from typing import Type
 
-from typing import Dict
+from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
+from django.db import models
+from django.utils.timezone import now
+from django.utils.translation import gettext_lazy as _
+from pytz import utc
+from requests_oauthlib import OAuth2Session
+
 from voteit.core.abcs import OrganisationContext
 from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
@@ -25,9 +26,11 @@ if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from voteit.organisation.abcs import ProviderResponseAdapter
 
+_marker = object()
+
 
 class OrganisationRoles(Roles):
-    """ Contains assigned meeting roles for a specific meeting and user"""
+    """Contains assigned meeting roles for a specific meeting and user"""
 
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -87,7 +90,7 @@ class OAuth2Provider(OrganisationContext):
         blank=True,
         null=True,
     )
-    scopes: str = models.CharField(
+    scope: str = models.CharField(
         verbose_name="OAuth scopes",
         help_text="Space separated. Must exist on provider.",
         max_length=300,
@@ -129,76 +132,120 @@ class OAuth2Provider(OrganisationContext):
     access_tokens: models.QuerySet
 
 
-# _marker = object()
-#
-#
-# class AccessTokenManager(models.Manager):
-#     def valid(self) -> models.QuerySet:
-#         return self.get_queryset().filter(expires__lt=now())
-#
-#     def from_response(
-#         self,
-#         token_response: OAuthTokenSchema,
-#         user: Optional[AbstractUser] = _marker,  # Don't update unless explicitly set
-#         **kw,
-#     ) -> AccessToken:
-#         """
-#         Create or update an access token from response
-#         """
-#         expires = datetime.utcfromtimestamp(token_response.expires_at)
-#         defaults = {
-#             "expires": make_aware(expires),
-#             "scope": " ".join(token_response.scope),
-#             "refresh_token": token_response.refresh_token,
-#         }
-#         if user is not _marker:
-#             defaults["user"] = user
-#         defaults.update(kw)
-#         access_token, _created = AccessToken.objects.update_or_create(
-#             token=token_response.access_token,
-#             defaults=defaults,
-#         )
-#         return access_token
+class AccessTokenManager(models.Manager):
+    def from_response(
+        self,
+        response: Dict,
+        user: AbstractUser,
+        provider: OAuth2Provider,
+    ) -> AccessToken:
+        """
+        Create or update an access token from response
+        """
+        token = OAuthTokenSchema(**response)
+        access_token: Optional[AccessToken] = AccessToken.objects.filter(
+            user=user,
+            provider=provider,
+        ).first()
+        # We could use get or create but we would still need to touch all attributes
+        if access_token is None:
+            return self.create_from_pydantic(token, user=user, provider=provider)
+        else:
+            access_token.save_from_pydantic(token)
+            return access_token
+
+    def create_from_pydantic(
+        self,
+        token: OAuthTokenSchema,
+        user: AbstractUser = None,
+        provider: OAuth2Provider = None,
+    ) -> AccessToken:
+        # FIXME: This should use the already filtered user as default
+        return AccessToken.objects.create(
+            scope=token.scope,
+            expires_at=datetime.fromtimestamp(token.expires_at, tz=utc),
+            expires_in=token.expires_in,
+            access_token=token.access_token,
+            refresh_token=token.refresh_token,
+            user=user,
+            provider=provider,
+        )
 
 
-# class AccessToken(models.Model):
-#     """
-#     OAuth AccessToken
-#
-#     Note that we're not authenticating these ourselves but they're for other resources.
-#     """
-#
-#     name: str = "access_token"
-#     user: Optional[AbstractUser] = models.ForeignKey(
-#         settings.AUTH_USER_MODEL,
-#         verbose_name="User, if applicable",
-#         on_delete=models.CASCADE,
-#         blank=True,
-#         null=True,
-#         related_name="access_tokens",
-#     )
-#     token: str = models.CharField(
-#         max_length=255,
-#         unique=True,
-#     )
-#     refresh_token: Optional[str] = models.CharField(
-#         max_length=255,
-#         unique=True,
-#     )
-#     client: OAuth2Provider = models.ForeignKey(
-#         OAuth2Provider,
-#         on_delete=models.CASCADE,
-#         related_name="access_tokens",
-#     )
-#     expires: datetime = models.DateTimeField()
-#     scope: str = models.TextField(blank=True, default="")
-#     created: datetime = models.DateTimeField(auto_now_add=True)
-#     updated: datetime = models.DateTimeField(auto_now=True)
-#
-#     def __str__(self):
-#         return self.token
-#
-#     objects = AccessTokenManager()
+class AccessToken(models.Model):
+    """
+    OAuth AccessToken
+
+    Note that we're not authenticating these ourselves but they're for other resources.
+    """
+
+    name: str = "access_token"
+    user: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="access_tokens",
+    )
+    provider: OAuth2Provider = models.ForeignKey(
+        OAuth2Provider,
+        on_delete=models.CASCADE,
+        related_name="access_tokens",
+    )
+    created: datetime = models.DateTimeField(auto_now_add=True)
+    updated: datetime = models.DateTimeField(auto_now=True)
+    scope: List[str] = ArrayField(models.CharField(max_length=50), default=list)
+    expires_at: datetime = models.DateTimeField()
+    expires_in: int = models.PositiveIntegerField()
+    access_token: str = models.CharField(max_length=100)
+    refresh_token: str = models.CharField(max_length=100)
+
+    @property
+    def is_expired(self) -> bool:
+        """
+        Essentially if it should refresh
+        """
+        return now() > self.expires_at
+
+    def save_from_pydantic(self, token: OAuthTokenSchema):
+        self.scope = token.scope
+        self.expires_at = datetime.fromtimestamp(token.expires_at, tz=utc)
+        self.expires_in = token.expires_in
+        self.access_token = token.access_token
+        self.refresh_token = token.refresh_token
+        self.save()
+
+    def as_dict(self) -> Dict:
+        """
+        This dict is what OAuthLib expects as "token" kwarg
+        """
+        return OAuthTokenSchema(
+            scope=self.scope,
+            expires_at=self.expires_at,
+            expires_in=self.expires_in,
+            access_token=self.access_token,
+            refresh_token=self.refresh_token,
+        ).dict()
+
+    def token_handler(self, response: Dict):
+        token = OAuthTokenSchema(**response)
+        self.save_from_pydantic(token)
+
+    def get_session(self) -> OAuth2Session:
+        refresh_kwargs = {
+            "client_id": self.provider.client_id,
+            "client_secret": self.provider.client_secret,
+        }
+        return OAuth2Session(
+            self.provider.client_id,
+            token=self.as_dict(),
+            auto_refresh_url=self.provider.token_url,
+            auto_refresh_kwargs=refresh_kwargs,
+            token_updater=self.token_handler,
+        )
+
+    def __str__(self):
+        return f"Access token for {self.user.userid}"
+
+    objects = AccessTokenManager()
 
 
 class TermsOfService(BaseContent, OrganisationContext):

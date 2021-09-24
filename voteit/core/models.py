@@ -13,6 +13,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import UserManager
 from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -29,7 +30,9 @@ from voteit.core.validators import UserIDValidator
 from voteit.core.workflows import UserWf
 
 if TYPE_CHECKING:
+    from requests_oauthlib import OAuth2Session
     from voteit.organisation.models import Organisation
+    from voteit.organisation.models import AccessToken
 
 
 __all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
@@ -101,10 +104,21 @@ class User(AbstractUser):
     def incomplete(self):
         pass
 
+    def oauth_session(self) -> OAuth2Session:
+        access_token: Optional[AccessToken] = self.access_tokens.filter(
+            provider=self.organisation.provider
+        ).first()
+        if access_token is None:
+            raise PermissionDenied(
+                "There's something wrong with the access to your profile. Please login again"
+            )
+        return access_token.get_session()
+
     objects = UserManager()
 
     # Annotations
     last_read_set: models.QuerySet
+    access_tokens: models.QuerySet
 
 
 def real_user_only(method):

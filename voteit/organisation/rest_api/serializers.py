@@ -13,11 +13,11 @@ from voteit.organisation.models import UserConsent
 
 class OrganisationSerializer(serializers.ModelSerializer):
     login_url = serializers.SerializerMethodField()
-    scopes = serializers.SerializerMethodField()
+    scope = serializers.SerializerMethodField()
 
     class Meta:
         model = Organisation
-        read_only_fields = ["pk", "login_url", "scopes"]
+        read_only_fields = ["pk", "login_url", "scope"]
         fields = read_only_fields + ["title", "body"]
 
     def get_login_url(self, instance: Organisation) -> Optional[str]:
@@ -29,10 +29,10 @@ class OrganisationSerializer(serializers.ModelSerializer):
                     request=self.context.get("request"),
                 )
 
-    def get_scopes(self, instance: Organisation) -> List[str]:
+    def get_scope(self, instance: Organisation) -> List[str]:
         with suppress(ObjectDoesNotExist):
             if instance.provider:
-                return instance.provider.scopes.split()
+                return instance.provider.scope.split()
         return []
 
 
