@@ -1,11 +1,16 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from voteit.poll.exceptions import (
-    ElectoralRegisterMissing,
-    ElectoralRegisterEmpty,
-    InvalidProposalCount,
-    InvalidPollMethod,
-)
+from typing import Type
+from voteit.poll.exceptions import ElectoralRegisterEmpty
+from voteit.poll.exceptions import ElectoralRegisterMissing
+from voteit.poll.exceptions import InvalidPollMethod
+from voteit.poll.exceptions import InvalidProposalCount
+
+if TYPE_CHECKING:
+    from voteit.proposal.models import Proposal
 
 
 User = get_user_model()
@@ -59,7 +64,7 @@ class PollTests(TestCase):
         return ElectoralRegister
 
     @property
-    def Proposal(self):
+    def Proposal(self) -> Type[Proposal]:
         from voteit.proposal.models import Proposal
 
         return Proposal
@@ -172,7 +177,6 @@ class PollTests(TestCase):
         self.poll.close()
         self.poll.save()
         self.assertEqual(
-            # "81567db4add4931106515ce10f9c5c6025765de626c1c13d60bf550d428e2fdf66e48b06a62b4462c50abe5eff1e1dc99f3dd440687a3d3b9ea375201e094e30",
             self.poll.ballot_checksum,
             "062cb36e77dd5f6c5d7fb29b96b43d2c54a7f993d37c1887e987acb47f3b03d80dd3e95a30e4197946264234595bd503782114deb1ce2d84aca0e674ab68d76f",
         )
@@ -182,8 +186,8 @@ class PollTests(TestCase):
     def test_proposal_state_exceptions(self):
         from voteit.proposal.workflows import ProposalWf
 
-        prop = self.poll.proposals.create()
-        prop.approved()
+        prop: Proposal = self.poll.proposals.create()
+        prop.unhandled()
         prop.save()
         # Must not cause exception
         self.poll.upcoming()
@@ -194,8 +198,8 @@ class PollTests(TestCase):
         self.poll.save()
         self.assertEqual(
             self.poll.proposals.get().state,
-            ProposalWf.APPROVED,
-            "Proposal state must not have changed automatically from approved.",
+            ProposalWf.UNHANDLED,
+            "Proposal state must not cause an exception if it can't change.",
         )
 
 
@@ -273,7 +277,7 @@ class ElectoralRegisterTests(TestCase):
         user = User.objects.create(username=f"user-{_id}")
         meeting.add_roles(user, roles.ROLE_POTENTIAL_VOTER)
 
-        ai = meeting.agenda_items.create(title='Test agenda item')
+        ai = meeting.agenda_items.create(title="Test agenda item")
         ai.ongoing()
         ai.save()
 
@@ -289,8 +293,13 @@ class ElectoralRegisterTests(TestCase):
 
     def test_manager(self):
         from voteit.poll.models import ElectoralRegister
+
         meeting1, user1 = self._mk_meeting_user(1)
         meeting2, _ = self._mk_meeting_user(2)
         self.assertEqual(ElectoralRegister.objects.for_user(user1).count(), 1)
-        self.assertEqual(ElectoralRegister.objects.for_user(user1).get().meeting, meeting1)
-        self.assertNotEqual(ElectoralRegister.objects.for_user(user1).get().meeting, meeting2)
+        self.assertEqual(
+            ElectoralRegister.objects.for_user(user1).get().meeting, meeting1
+        )
+        self.assertNotEqual(
+            ElectoralRegister.objects.for_user(user1).get().meeting, meeting2
+        )
