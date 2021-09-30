@@ -20,6 +20,7 @@ from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
 from voteit.core.abcs import ABCModel
+from voteit.core.fields import RichTextField
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
@@ -318,7 +319,7 @@ class Roles(ABCModel):
 
 
 class BaseContent(ABCModel):
-    body: str = models.TextField(blank=True, default="")
+    body: str = RichTextField(blank=True, default="", html_cleaner=strict_clean_html)
     created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
     author: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -338,40 +339,14 @@ class BaseContent(ABCModel):
     mentions = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name="mentions_%(app_label)s_%(class)s",
-        editable=False,
+        blank=True,
     )
     tags: List = ArrayField(
-        models.CharField(max_length=100), default=list, editable=False
+        models.CharField(max_length=100), default=list, blank=True, editable=True
     )
 
     class Meta:
         abstract = True
-
-    def html_cleaner(self, text):
-        # FIXME: Override in a better way
-        return strict_clean_html(text)
-
-    def set_tags(self):
-        # FIXME: Should be generic
-        current_tags = set(self.tags)
-        tags = get_tagged_hashtags(self.body)
-        if tags != current_tags:
-            self.tags = sorted(tags)
-
-    def set_mentions(self):
-        # FIXME: Should be generic
-        mentions = get_tagged_userids(self.body)
-        current_user_pks = set(self.mentions.all().values_list("pk", flat=True))
-        if mentions != current_user_pks:
-            # Only real users are allowed as mentions
-            result = User.objects.filter(pk__in=mentions).values_list("pk", flat=True)
-            self.mentions.set(result)
-
-    def save(self, **kw):
-        self.body = self.html_cleaner(self.body)
-        self.set_tags()
-        super().save(**kw)
-        self.set_mentions()
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self}>"

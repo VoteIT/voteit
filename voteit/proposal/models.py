@@ -129,11 +129,6 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         """Reset proposal back to published."""
         pass
 
-    def set_tags(self):
-        super().set_tags()
-        if self.prop_id not in self.tags:
-            self.tags.append(self.prop_id)
-
     def save(self, **kw):
         if not self.prop_id and self.meeting is not None:
             pid_policy = self.meeting.pid_policy
@@ -142,6 +137,8 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
                 self.prop_id = suggestion
             else:
                 self.prop_id = _new_proposal_id(self)
+        if self.prop_id not in self.tags:
+            self.tags.append(self.prop_id)
         super().save(**kw)
 
 

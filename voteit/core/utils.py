@@ -97,10 +97,10 @@ def get_tagged_userids(text: str) -> Set:
     >>> sorted(get_tagged_userids(mk_usertag(123)))
     [123]
 
-    >>> sorted(get_tagged_userids(mk_usertag("abc")))
+    >>> sorted(get_tagged_userids(mk_usertag("abc", any=True)))
     []
 
-    >>> sorted(get_tagged_userids(mk_usertag("abc123")))
+    >>> sorted(get_tagged_userids(mk_usertag("abc123", any=True)))
     []
 
     >>> sorted(get_tagged_userids(mk_usertag("1") + " and " + mk_usertag("2")))

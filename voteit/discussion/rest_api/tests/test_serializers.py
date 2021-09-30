@@ -18,7 +18,10 @@ class DiscussionPostDetailSerializerTests(TestCase):
         self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
         tag_html = mk_hashtag("world")
         self.disc = self.ai.discussions.create(
-            author=self.user, body=f"Hello {tag_html}", meeting_group=self.group
+            author=self.user,
+            body=f"Hello {tag_html}",
+            meeting_group=self.group,
+            tags=["world"],
         )
 
     @property
@@ -44,8 +47,11 @@ class DiscussionPostDetailSerializerTests(TestCase):
         self.assertFalse(data.keys())
 
     def test_patch(self):
-        serializer = self._cut(self.disc, {"body": "Bye!"}, partial=True)
-        self.assertTrue(serializer.is_valid())
+        self.disc.body = "Bye!"
+        self.disc.save()
+        serializer = self._cut(self.disc, {"tags": []}, partial=True)
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
         serializer.save()
         self.assertEqual(self.disc.body, "Bye!")
         self.assertEqual(self.disc.tags, [])

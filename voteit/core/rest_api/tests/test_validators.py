@@ -41,8 +41,7 @@ class ValidateGroupAIContextTests(TestCase):
         request = self._mk_request()
         serializer = self._cut(data=data, context={"request": request})
         self.assertTrue(serializer.is_valid())
-        instance = serializer.save()
-        self.assertEqual(["world"], instance.tags)
+        instance = serializer.create(serializer.validated_data)
         self.assertEqual(self.ai, instance.agenda_item)
         self.assertEqual(self.user, instance.author)
 
@@ -56,7 +55,7 @@ class ValidateGroupAIContextTests(TestCase):
         request = self._mk_request()
         serializer = self._cut(data=data, context={"request": request})
         self.assertTrue(serializer.is_valid())
-        instance = serializer.save()
+        instance = serializer.create(serializer.validated_data)
         self.assertEqual(self.group, instance.meeting_group)
 
     def test_create_unrelated_group(self):
@@ -80,5 +79,5 @@ class ValidateGroupAIContextTests(TestCase):
         request = self._mk_request()
         serializer = self._cut(data=data, context={"request": request})
         self.assertTrue(serializer.is_valid())
-        instance = serializer.save()
+        instance = serializer.create(serializer.validated_data)
         self.assertEqual(self.group, instance.meeting_group)

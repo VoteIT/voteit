@@ -1,13 +1,14 @@
 from rest_framework import serializers
 
 from voteit.core.rest_api.serializers import BaseModelSerializer
+from voteit.core.rest_api.serializers import RichTextSerializerMixin
 from voteit.core.rest_api.validators import ValidateGroupAIContext
 from voteit.proposal.models import Proposal
 
 __all__ = ("ProposalDetailSerializer", "ProposalCreateSerializer")
 
 
-class ProposalDetailSerializer(serializers.ModelSerializer):
+class ProposalDetailSerializer(RichTextSerializerMixin, serializers.ModelSerializer):
     class Meta:
         model = Proposal
         read_only_fields = [
@@ -18,20 +19,23 @@ class ProposalDetailSerializer(serializers.ModelSerializer):
             "state",
             "pk",
             "agenda_item",
-            "tags",
             "meeting_group",
         ]
         fields = read_only_fields + [
             "body",
+            "tags",
+            "mentions",
         ]
 
 
-class ProposalCreateSerializer(BaseModelSerializer):
+class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
     class Meta:
         model = Proposal
         fields = [
             "agenda_item",
             "body",
             "meeting_group",
+            "tags",
+            "mentions",
         ]
         validators = (ValidateGroupAIContext(),)

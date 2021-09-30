@@ -3,6 +3,7 @@ from __future__ import annotations
 import doctest
 from pkgutil import walk_packages
 
+from django.contrib.auth import get_user_model
 
 user_tag = """
 <span class="mention" data-index="0" data-denotation-char="@" data-id="{userid}" data-value="{name}">
@@ -10,8 +11,19 @@ user_tag = """
 """
 
 
-def mk_usertag(userid, name="Jane Doe") -> str:
-    return user_tag.format(userid=userid, name=name)
+def mk_usertag(value, name="Jane Doe", any=False) -> str:
+    User = get_user_model()
+    if isinstance(value, User):
+        return user_tag.format(userid=value.pk, name=name)
+    try:
+        value = int(value)
+    except ValueError:
+        pass
+    if isinstance(value, int):
+        return user_tag.format(userid=value, name=name)
+    if any:
+        return user_tag.format(userid=value, name=name)
+    raise TypeError("Must be a user or an int")
 
 
 hashtag_tag = """

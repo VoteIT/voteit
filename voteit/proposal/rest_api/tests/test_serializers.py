@@ -18,7 +18,10 @@ class ProposalDetailSerializerTests(TestCase):
         self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
         tag_html = mk_hashtag("world")
         self.prop = self.ai.proposals.create(
-            author=self.user, body=f"Hello {tag_html}", meeting_group=self.group
+            author=self.user,
+            body=f"Hello {tag_html}",
+            meeting_group=self.group,
+            tags=["world"],
         )
 
     @property
@@ -44,15 +47,16 @@ class ProposalDetailSerializerTests(TestCase):
         self.assertIsInstance(prop_id, str)
         self.assertEqual("published", data.pop("state"))
         self.assertEqual(self.group.pk, data.pop("meeting_group"))
+        self.assertEqual([], data.pop("mentions"))
         # Make sure we checked everything
         self.assertFalse(data.keys())
 
     def test_patch(self):
-        serializer = self._cut(self.prop, {"body": "Bye!"}, partial=True)
+        serializer = self._cut(self.prop, {"body": "Bye!", "tags": []}, partial=True)
         self.assertTrue(serializer.is_valid())
         serializer.save()
         self.assertEqual(self.prop.body, "Bye!")
-        self.assertEqual(1, len(self.prop.tags))  # prop_id
+        self.assertEqual(1, len(self.prop.tags))  # prop_id is still there
 
 
 class ProposalCreateSerializer(TestCase):

@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 from typing import Optional
+from typing import OrderedDict
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Q
 from django.utils import translation
+from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.fields import JSONField
+
+from voteit.core.utils import get_tagged_hashtags
+from voteit.core.utils import get_tagged_userids
 from voteit.core.validators import valid_userid
 
 if TYPE_CHECKING:
@@ -22,9 +27,8 @@ class BaseModelSerializer(serializers.ModelSerializer):
     author_kw = "author"
 
     def create(self, validated_data):
-        ModelClass = self.Meta.model
         validated_data[self.author_kw] = self.get_request_user()
-        return ModelClass.objects.create(**validated_data)
+        return super().create(validated_data)
 
     def get_request_user(self) -> Optional[AbstractUser]:
         # Validate user?
@@ -157,3 +161,56 @@ class FSMTransitionSerializer(serializers.Serializer):
     def get_title(self, field: Transition):
         # Title might be a lazy gettext, which doesn't work
         return translation.gettext(field.custom.get("title", field.name.title()))
+
+
+class RichTextSerializerMixin:
+    """
+    On models with body, tags and mentions, like voteit.core.models.BaseContent
+
+    Beware of this since it overrides the validate method
+    """
+
+    partial: bool
+
+    # FIXME: body might contain bad tags. That will be cleaned on save, but do we want to send error messages?
+    def validate(self, attrs: OrderedDict):
+        """
+        We'll use this to populate attrs. Pretty silly but there's not other obvious way?
+        """
+        if self.partial and "body" not in attrs:
+            body = self.instance.body
+        else:
+            body = attrs.get("body", "")
+        body_tags = get_tagged_hashtags(body)
+        body_mentions = get_tagged_userids(body)
+        if self.partial and "tags" not in attrs:
+            tags = self.instance.tags and set(self.instance.tags) or set()
+        else:
+            tags = set(attrs.get("tags", []))
+        tags.update(body_tags)
+        attrs["tags"] = sorted(tags)
+        User = get_user_model()
+        if self.partial and "mentions" not in attrs:
+            mentions = set(self.instance.mentions.all().values_list("pk", flat=True))
+        else:
+            mentions = set(
+                map(
+                    lambda x: isinstance(x, User) and x.pk or x,
+                    attrs.get("mentions", []),
+                )
+            )
+        # Validate in 2 steps so we know where things went wrong
+        combined_mentions = mentions | body_mentions
+        # FIXME: Probably check participants instead...?
+        found_users = set(
+            User.objects.filter(pk__in=combined_mentions).values_list("pk", flat=True)
+        )
+        invalid = combined_mentions - found_users
+        if invalid:
+            msg = _("You can only pick existing users")
+            if invalid & mentions:
+                raise ValidationError({"mentions": msg})
+            else:
+                raise ValidationError({"body": msg})
+        attrs["mentions"] = combined_mentions
+        return super().validate(attrs)
