@@ -194,9 +194,11 @@ def strict_clean_html(text: str):
 
 
 _relaxed = deepcopy(_STRICT)
-_relaxed["tags"].extend(["h2", "h3", "h4", "sup", "sub"])
+_relaxed["tags"].extend(["h2", "h3", "h4", "sup", "sub", "img", "iframe"])
 for tag in "h2", "h3", "h4", "p", "blockquote":
     _relaxed["attributes"].setdefault(tag, []).append("class")
+_relaxed["attributes"].setdefault("img", []).append("src")
+_relaxed["attributes"].setdefault("iframe", []).extend(["class", "frameborder", "allowfullscreen", "src"])
 
 
 def relaxed_clean_html(text: str):
