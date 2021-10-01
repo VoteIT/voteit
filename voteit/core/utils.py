@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from copy import deepcopy
 from inspect import isclass
 from random import randint
 from typing import Optional
@@ -155,10 +156,12 @@ def get_tagged_hashtags(text: str, lower=True) -> Set:
     return found
 
 
-_allowed_attributes = ALLOWED_ATTRIBUTES.copy()
-_allowed_attributes["a"].extend(["data-userid", "data-tag"])
-_allowed_attributes.setdefault("span", [])
-_allowed_attributes["span"].extend(
+_STRICT = {
+    "attributes": deepcopy(ALLOWED_ATTRIBUTES),
+    "tags": ALLOWED_TAGS + ["p", "span", "br"],
+}
+_STRICT["attributes"]["a"].extend(["data-userid", "data-tag"])
+_STRICT["attributes"].setdefault("span", []).extend(
     [
         "class",
         "contenteditable",
@@ -169,7 +172,6 @@ _allowed_attributes["span"].extend(
         "ql-mention-denotation-char",
     ]
 )
-_allowed_tags = ALLOWED_TAGS + ["p", "span", "br"]
 
 
 def strict_clean_html(text: str):
@@ -186,15 +188,22 @@ def strict_clean_html(text: str):
     """
     # The cleaner instance isn't thread-safe
     # https://bleach.readthedocs.io/en/latest/clean.html
-    cleaner = Cleaner(strip=False, tags=_allowed_tags, attributes=_allowed_attributes)
+    cleaner = Cleaner(strip=False, **_STRICT)
     # FIXME: The cleaned version of this moves exclamation mark inside the tag? '<a data-userid="1"/>!'
     return cleaner.clean(text)
 
 
+_relaxed = deepcopy(_STRICT)
+_relaxed["tags"].extend(["h2", "h3", "h4", "sup", "sub"])
+for tag in "h2", "h3", "h4", "p", "blockquote":
+    _relaxed["attributes"].setdefault(tag, []).append("class")
+
+
 def relaxed_clean_html(text: str):
     """Clean HTML for moderators and trusted users. Note that trusted users may have viruses too..."""
-    # FIXME: Implement
-    raise NotImplementedError()
+    cleaner = Cleaner(strip=False, **_relaxed)
+    # FIXME: The cleaned version of this moves exclamation mark inside the tag? '<a data-userid="1"/>!'
+    return cleaner.clean(text)
 
 
 def get_content_registry():

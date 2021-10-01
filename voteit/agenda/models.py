@@ -15,8 +15,10 @@ from voteit.agenda.permissions import AgendaPermissions
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
+from voteit.core.fields import RichTextField
 from voteit.core.models import BaseContent
 from voteit.core.permissions import NOT_ALLOWED
+from voteit.core.utils import relaxed_clean_html
 from voteit.meeting.models import Meeting
 
 
@@ -25,6 +27,7 @@ __all__ = ("AgendaItem",)
 
 class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     name: str = "agenda_item"
+    body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
     title: str = models.CharField(max_length=100)
     state: str = FSMField(
         default=AgendaItemWf.initial,
