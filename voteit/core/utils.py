@@ -241,6 +241,39 @@ def get_model_shortname(model: Union[Type[Model], Model]) -> str:
     return model.__name__.lower()
 
 
+def get_model_by_type(value: Union[Type[Model], Model, str]) -> Set[Type[Model]]:
+    """
+    Fetch all models that inherits from that class
+    >>> from voteit.meeting.models import Meeting
+    >>> res1 = get_model_by_type("meeting")
+    >>> res2 = get_model_by_type(Meeting)
+    >>> res3 = get_model_by_type(Meeting())
+    >>> res1 == res2 == res3
+    True
+    >>> Meeting in res1
+    True
+    >>> from voteit.core.models import BaseContent
+    >>> res = get_model_by_type(BaseContent)
+    >>> Meeting in res
+    True
+
+    """
+    if isinstance(value, str):
+        model = get_model_by_shortname(value)
+        if model is None:
+            raise KeyError(f"No model named {value}")
+    elif isinstance(value, Model):
+        model = value.__class__
+    else:
+        model = value
+    assert isclass(model)
+    found = set()
+    for klass in get_content_registry().values():
+        if issubclass(klass, model):
+            found.add(klass)
+    return found
+
+
 _cached_available_transitions = {}
 
 
