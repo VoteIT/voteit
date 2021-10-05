@@ -6,6 +6,7 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django_fsm import post_transition
+from voteit.agenda.channels import AgendaItemChannel
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
@@ -16,8 +17,13 @@ from voteit.messaging.signals import channel_subscribed
 from voteit.proposal.messages import ProposalAdded
 from voteit.proposal.messages import ProposalChanged
 from voteit.proposal.messages import ProposalDeleted
+from voteit.proposal.messages import TextParagraphAdded
+from voteit.proposal.messages import TextParagraphChanged
+from voteit.proposal.messages import TextParagraphDeleted
 from voteit.proposal.models import Proposal
+from voteit.proposal.models import TextParagraph
 from voteit.proposal.rest_api.serializers import GenericProposalSerializer
+from voteit.proposal.rest_api.serializers import TextParagraphSerializer
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
@@ -83,3 +89,37 @@ def private_ai_published(instance: AgendaItem, source: str, **kw):
             data = GenericProposalSerializer(proposal).data
             msg = ProposalAdded({}, **data)
             participants_ch.publish(msg)
+
+
+@receiver(channel_subscribed, sender=AgendaItemChannel)
+def agenda_item_channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
+    """
+    Populate app_state with TextParagraphs
+    """
+    app_state.append_from_queryset(
+        TextParagraph.objects.filter(agenda_item=context),
+        TextParagraphSerializer,
+        TextParagraphAdded,
+    )
+
+
+@receiver(post_save, sender=TextParagraph)
+def text_paragraph_updated(instance: TextParagraph = None, created=None, **kw):
+    if instance.agenda_item is None:
+        return
+    ch = AgendaItemChannel.from_instance(instance.agenda_item)
+    data = TextParagraphSerializer(instance).data
+    if created:
+        msg = TextParagraphAdded({}, **data)
+    else:
+        msg = TextParagraphChanged({}, **data)
+    ch.publish(msg)
+
+
+@receiver(pre_delete, sender=TextParagraph)
+def text_paragraph_delete(instance: TextParagraph = None, **kw):
+    if instance.agenda_item is None:
+        return
+    ch = AgendaItemChannel.from_instance(instance.agenda_item)
+    msg = TextParagraphDeleted({}, pk=instance.pk)
+    ch.publish(msg)

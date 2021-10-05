@@ -15,7 +15,10 @@ __all__ = (
     "ProposalCreateSerializer",
     "DiffProposalCreateSerializer",
     "DiffProposalDetailSerializer",
+    "TextParagraphSerializer",
 )
+
+from voteit.proposal.models import TextParagraph
 
 
 class GenericCreateProposalSerializer(serializers.Serializer):
@@ -131,3 +134,18 @@ GenericProposalSerializer.registry["proposal"] = ProposalDetailSerializer
 GenericProposalSerializer.registry["diff_proposal"] = DiffProposalDetailSerializer
 GenericCreateProposalSerializer.registry["proposal"] = ProposalCreateSerializer
 GenericCreateProposalSerializer.registry["diff_proposal"] = DiffProposalCreateSerializer
+
+
+class TextParagraphSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TextParagraph
+        read_only_fields = [
+            "created",
+            "modified",
+            "paragraph_id",
+            "pk",
+            "agenda_item",
+        ]
+        fields = read_only_fields + [
+            "body",
+        ]

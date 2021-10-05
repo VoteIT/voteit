@@ -13,6 +13,7 @@ from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import is_proposer
 from voteit.proposal.models import Proposal
 from voteit.proposal.permissions import ProposalPermissions
+from voteit.proposal.permissions import TextParagraphPermissions
 from voteit.proposal.workflows import ProposalWf
 
 if TYPE_CHECKING:
@@ -29,6 +30,7 @@ def is_published(user: AbstractUser, proposal: Proposal):
     return isinstance(proposal, Proposal) and proposal.state == ProposalWf.PUBLISHED
 
 
+# Proposal and variants
 rules.add_perm(
     ProposalPermissions.ADD,
     (is_moderator & upcoming_ongoing_or_private_ai)
@@ -46,4 +48,21 @@ rules.add_perm(
     ProposalPermissions.RETRACT,
     (is_moderator & upcoming_ongoing_or_private_ai)
     | (upcoming_or_ongoing_ai & is_published & is_author & ai_proposals_not_blocked),
+)
+
+
+# TextParagraph
+rules.add_perm(
+    TextParagraphPermissions.ADD,
+    is_moderator & upcoming_ongoing_or_private_ai,
+)
+rules.add_perm(TextParagraphPermissions.VIEW, can_view_ai)
+# FIXME: Restrict in frontend
+rules.add_perm(
+    TextParagraphPermissions.CHANGE, upcoming_ongoing_or_private_ai & is_moderator
+)
+# FIXME: Are we okay with this...?
+rules.add_perm(
+    TextParagraphPermissions.DELETE,
+    is_moderator & upcoming_ongoing_or_private_ai,
 )

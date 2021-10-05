@@ -3,27 +3,32 @@ from django.test import TestCase
 
 
 class RulesTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR
         from voteit.meeting.roles import ROLE_PARTICIPANT
         from voteit.meeting.roles import ROLE_PROPOSER
 
         User = get_user_model()
-        self.meeting = Meeting.objects.create(er_policy_name="auto_before_poll")
-        self.anon_user = User.objects.create(username="anon")
-        self.participant = User.objects.create(username="participant")
-        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
-        self.moderator = User.objects.create(username="moderator")
-        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
-        self.proposer = User.objects.create(username="proposer")
-        self.proposer_author = User.objects.create(username="proposer_author")
-        self.meeting.add_roles(self.proposer, ROLE_PROPOSER)
-        self.meeting.add_roles(self.proposer_author, ROLE_PROPOSER)
-        self.ai = self.meeting.agenda_items.create()
-        self.ai.upcoming()
-        self.ai.save()
-        self.proposal = self.ai.proposals.create(author=self.proposer_author)
+        cls.meeting = Meeting.objects.create(er_policy_name="auto_before_poll")
+        cls.anon_user = User.objects.create(username="anon")
+        cls.participant = User.objects.create(username="participant")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.proposer = User.objects.create(username="proposer")
+        cls.proposer_author = User.objects.create(username="proposer_author")
+        cls.meeting.add_roles(cls.proposer, ROLE_PROPOSER)
+        cls.meeting.add_roles(cls.proposer_author, ROLE_PROPOSER)
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.ai.upcoming()
+        cls.ai.save()
+        cls.proposal = cls.ai.proposals.create(author=cls.proposer_author)
+
+    def setUp(self):
+        self.ai.refresh_from_db()
+        self.meeting.refresh_from_db()
 
     def p(self, perm):
         from voteit.proposal.permissions import ProposalPermissions

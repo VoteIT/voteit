@@ -19,3 +19,18 @@ class ProposalChanged(BaseObjectChanged):
 @outgoing
 class ProposalDeleted(BaseObjectDeleted):
     name = "proposal.deleted"
+
+
+@outgoing
+class TextParagraphAdded(BaseObjectAdded):
+    name = "text_paragraph.added"
+
+
+@outgoing
+class TextParagraphChanged(BaseObjectChanged):
+    name = "text_paragraph.changed"
+
+
+@outgoing
+class TextParagraphDeleted(BaseObjectDeleted):
+    name = "text_paragraph.deleted"

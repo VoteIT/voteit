@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from voteit.agenda.channels import AgendaItemChannel
 
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
@@ -14,18 +15,22 @@ _channel_layers_setting = {
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
-class SubscribedTests(TestCase):
-    def setUp(self):
+class MeetingSubscribedTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.ai.upcoming()
-        self.ai.save()
-        self.prop1 = self.ai.proposals.create()
-        self.prop2 = self.ai.proposals.create()
-        self.user = User.objects.create(username="user")
-        self.meeting.add_roles(self.user, "moderator")
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.ai.upcoming()
+        cls.ai.save()
+        cls.prop1 = cls.ai.proposals.create()
+        cls.prop2 = cls.ai.proposals.create()
+        cls.user = User.objects.create(username="user")
+        cls.meeting.add_roles(cls.user, "moderator")
+
+    def setUp(self):
+        self.ai.refresh_from_db()
 
     def test_app_state_sent_moderators(self):
         command = Subscribe(
@@ -220,3 +225,71 @@ class PrivateAIPublishedTests(TestCase):
         messages = [x.args[0] for x in mock_publish.mock_calls]
         self.assertEqual(1, len([x for x in messages if isinstance(x, AgendaChanged)]))
         self.assertEqual(1, len([x for x in messages if isinstance(x, ProposalAdded)]))
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class AgendaItemChannelTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.agenda.models import AgendaItem
+
+        cls.meeting: Meeting = Meeting.objects.create(state="upcoming")
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="upcoming")
+        cls.para = cls.ai.text_paragraphs.create()
+        cls.user = cls.meeting.participants.create(username="participant")
+        cls.meeting.add_roles(cls.user, "participant")
+
+    @patch.object(AgendaItemChannel, "publish")
+    def test_create(self, mock_publish):
+        from voteit.proposal.messages import TextParagraphAdded
+
+        para = self.ai.text_paragraphs.create()
+        self.assertTrue(mock_publish.called)
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(
+            1, len([x for x in messages if isinstance(x, TextParagraphAdded)])
+        )
+        msg = messages[0]
+        self.assertEqual(para.pk, msg.data.pk)
+
+    @patch.object(AgendaItemChannel, "publish")
+    def test_delete(self, mock_publish):
+        from voteit.proposal.messages import TextParagraphDeleted
+
+        deleted_pk = self.para.pk
+        self.para.delete()
+        self.assertTrue(mock_publish.called)
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(
+            1, len([x for x in messages if isinstance(x, TextParagraphDeleted)])
+        )
+        msg = messages[0]
+        self.assertEqual(deleted_pk, msg.data.pk)
+
+    @patch.object(AgendaItemChannel, "publish")
+    def test_update(self, mock_publish):
+        from voteit.proposal.messages import TextParagraphChanged
+
+        self.para.body = "Blaha"
+        self.para.save()
+        self.assertTrue(mock_publish.called)
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(
+            1, len([x for x in messages if isinstance(x, TextParagraphChanged)])
+        )
+        msg = messages[0]
+        self.assertEqual(self.para.pk, msg.data.pk)
+        self.assertEqual("Blaha", msg.data.body)
+
+    def test_subscribe_fetches_text_para(self):
+        command = Subscribe(
+            {"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.ai.pk,
+            channel_type="agenda_item",
+        )
+        msg = command.run_job()
+        pks = set(
+            [x.p["pk"] for x in msg.data.app_state if x.t == "text_paragraph.added"]
+        )
+        self.assertEqual({self.para.pk}, pks)
