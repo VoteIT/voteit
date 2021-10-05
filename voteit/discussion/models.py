@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Callable
 
 from django.conf import settings
 from django.db import models
@@ -48,3 +48,6 @@ class DiscussionPost(
         """ While not directly related, it still good to be able to do lookups this way"""
         if self.agenda_item:
             return self.agenda_item.meeting
+
+
+calla = Callable[[int, bool], str]

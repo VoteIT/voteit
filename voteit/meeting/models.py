@@ -18,10 +18,12 @@ from django_fsm import transition
 
 from voteit.core.abcs import MeetingContext
 from voteit.core.abcs import OrganisationContext
+from voteit.core.fields import RichTextField
 from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.permissions import NOT_ALLOWED
+from voteit.core.utils import relaxed_clean_html
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.utils import get_electoral_policy_registry
@@ -61,6 +63,7 @@ class MeetingRoles(Roles, MeetingContext):
 class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext):
     name = "meeting"
     title: str = models.CharField(max_length=100)
+    body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
     state: str = FSMField(
         default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False
     )
