@@ -1,12 +1,12 @@
-import rules
-from django.contrib.auth.models import AbstractUser
+from __future__ import annotations
+from typing import TYPE_CHECKING
 
-from voteit.agenda.rules import (
-    upcoming_or_ongoing_ai,
-    ai_proposals_not_blocked,
-    can_view_ai,
-    upcoming_ongoing_or_private_ai,
-)
+import rules
+
+from voteit.agenda.rules import ai_proposals_not_blocked
+from voteit.agenda.rules import can_view_ai
+from voteit.agenda.rules import upcoming_ongoing_or_private_ai
+from voteit.agenda.rules import upcoming_or_ongoing_ai
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_author
 from voteit.meeting.rules import is_moderator
@@ -14,6 +14,9 @@ from voteit.meeting.rules import is_proposer
 from voteit.proposal.models import Proposal
 from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractUser
 
 
 @predicate
