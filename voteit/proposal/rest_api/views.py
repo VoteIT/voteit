@@ -9,12 +9,10 @@ __all__ = ["ProposalViewSet"]
 
 
 class ProposalViewSet(DefaultModelViewSet):
-    model = Proposal
+    model = Proposal  # And ALL subtypes!
     queryset = Proposal.objects.all()
-    serializer_class = serializers.ProposalDetailSerializer
-    serializer_classes = {
-        "create": serializers.ProposalCreateSerializer,
-    }
+    serializer_class = serializers.GenericProposalSerializer  # Morphic
+    serializer_classes = {"create": serializers.GenericCreateProposalSerializer}
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = (
         "agenda_item",

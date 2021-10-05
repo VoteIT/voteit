@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from logging import getLogger
 from random import sample
 from string import ascii_lowercase
@@ -11,6 +12,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django_fsm import FSMField
 from django_fsm import transition
+from model_utils.managers import InheritanceManager
 
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
@@ -24,12 +26,13 @@ if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
     from voteit.meeting.models import MeetingGroup
 
-__all__ = ("Proposal",)
+__all__ = ("Proposal", "DiffProposal", "TextParagraph")
 
 logger = getLogger(__name__)
 
 
 class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
+    name = "proposal"
     state: str = FSMField(
         default=ProposalWf.initial, choices=ProposalWf.choices(), protected=True
     )
@@ -140,6 +143,62 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         if self.prop_id not in self.tags:
             self.tags.append(self.prop_id)
         super().save(**kw)
+
+    objects = InheritanceManager()
+
+
+class TextParagraph(AgendaItemContext, MeetingContext):
+    """
+    Text paragraphs are the basis for diff-text functionality.
+    These are the initial text body other proposals diff against.
+    """
+
+    name = "text_paragraph"
+    body: str = models.TextField()
+    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    modified: datetime = models.DateTimeField(editable=False, auto_now=True)
+    paragraph_id: str = models.PositiveSmallIntegerField(default=1)
+    agenda_item: AgendaItem = models.ForeignKey(
+        "agenda.AgendaItem",
+        on_delete=models.CASCADE,
+        related_name="text_paragraphs",
+    )
+
+    @property
+    def meeting(self) -> Optional[Meeting]:
+        """While not directly related, it still good to be able to do lookups this way"""
+        if self.agenda_item:
+            return self.agenda_item.meeting
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["paragraph_id", "agenda_item"],
+                name="paragraph_id_unique_for_ai",
+            )
+        ]
+
+    def save(self, **kw):
+        """
+        Set paragraph_id when initially saving.
+        """
+        if not self.pk:
+            max_val = self.agenda_item.text_paragraphs.aggregate(
+                max_val=models.Max("paragraph_id")
+            )["max_val"]
+            if max_val is not None:
+                self.paragraph_id = max_val + 1
+        super().save(**kw)
+
+    objects: models.Manager
+    proposals: models.QuerySet
+
+
+class DiffProposal(Proposal):
+    name = "diff_proposal"
+    paragraph: TextParagraph = models.ForeignKey(
+        TextParagraph, on_delete=models.PROTECT, related_name="proposals"
+    )
 
 
 def _new_proposal_id(proposal: Proposal) -> str:

@@ -17,7 +17,7 @@ from voteit.proposal.messages import ProposalAdded
 from voteit.proposal.messages import ProposalChanged
 from voteit.proposal.messages import ProposalDeleted
 from voteit.proposal.models import Proposal
-from voteit.proposal.rest_api.serializers import ProposalDetailSerializer
+from voteit.proposal.rest_api.serializers import GenericProposalSerializer
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
@@ -25,22 +25,22 @@ if TYPE_CHECKING:
 
 @receiver(channel_subscribed, sender=ParticipantsChannel)
 def participants_channel_subscribed(context: Meeting, app_state: AppState, **kw):
-    """ Populate app_state with current proposals """
+    """Populate app_state with current proposals"""
     app_state.append_from_queryset(
-        Proposal.objects.filter(agenda_item__meeting=context).exclude(
-            agenda_item__state=AgendaItemWf.PRIVATE
-        ),
-        ProposalDetailSerializer,
+        Proposal.objects.filter(agenda_item__meeting=context)
+        .exclude(agenda_item__state=AgendaItemWf.PRIVATE)
+        .select_subclasses(),
+        GenericProposalSerializer,
         ProposalAdded,
     )
 
 
 @receiver(channel_subscribed, sender=ModeratorsChannel)
 def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
-    """ Populate app_state with current proposals """
+    """Populate app_state with current proposals"""
     app_state.append_from_queryset(
-        Proposal.objects.filter(agenda_item__meeting=context),
-        ProposalDetailSerializer,
+        Proposal.objects.filter(agenda_item__meeting=context).select_subclasses(),
+        GenericProposalSerializer,
         ProposalAdded,
     )
 
@@ -50,7 +50,7 @@ def proposal_updated(instance: Proposal = None, created=None, **kw):
     if instance.meeting is None:
         return
     moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
-    data = ProposalDetailSerializer(instance).data
+    data = GenericProposalSerializer(instance).data
     if created:
         msg = ProposalAdded({}, **data)
     else:
@@ -80,6 +80,6 @@ def private_ai_published(instance: AgendaItem, source: str, **kw):
     if source == AgendaItemWf.PRIVATE and instance.meeting is not None:
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         for proposal in instance.proposals.all():
-            data = ProposalDetailSerializer(proposal).data
+            data = GenericProposalSerializer(proposal).data
             msg = ProposalAdded({}, **data)
             participants_ch.publish(msg)

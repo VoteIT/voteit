@@ -182,6 +182,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     polls: models.QuerySet
     discussions: models.QuerySet
     last_read_set: models.QuerySet
+    text_paragraphs: models.QuerySet
 
 
 class LastRead(AgendaItemContext, MeetingContext):

@@ -30,6 +30,7 @@ class ProposalTestCase(APITestCase):
         data = {
             "title": "My proposal",
             "agenda_item": self.agenda_item.pk,
+            "shortname": "proposal",
         }
         for user, status in (
             (None, 401),

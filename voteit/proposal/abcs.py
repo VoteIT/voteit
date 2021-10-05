@@ -11,12 +11,15 @@ if TYPE_CHECKING:
 
 
 class ProposalIDPolicy(ABC):
-
-    """ Policy that decides how proposal IDs should be generated"""
+    """
+    Policy that decides how proposal IDs should be generated
+    """
 
     def __init__(self, meeting: Meeting):
         self.meeting = meeting
 
     @abstractmethod
     def __call__(self, proposal: Proposal) -> str:
-        """ Return name suggestion. It should be unique"""
+        """
+        Return name suggestion. It should be unique
+        """
