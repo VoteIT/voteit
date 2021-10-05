@@ -5,6 +5,7 @@ from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import RichTextSerializerMixin
 from voteit.core.rest_api.validators import ValidateGroupAIContext
 from voteit.core.utils import get_model_shortname
+from voteit.proposal.diff import Changes
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
 
@@ -122,12 +123,19 @@ class DiffProposalCreateSerializer(ProposalCreateSerializer):
 
 
 class DiffProposalDetailSerializer(ProposalDetailSerializer):
+    body_diff = serializers.SerializerMethodField()
+
     class Meta(ProposalDetailSerializer.Meta):
         model = DiffProposal
         read_only_fields = [
-            "paragraph"
+            "paragraph",
+            "body_diff",
         ] + ProposalDetailSerializer.Meta.read_only_fields
-        fields = ["paragraph"] + ProposalDetailSerializer.Meta.fields
+        fields = read_only_fields + ProposalDetailSerializer.Meta.fields
+
+    def get_body_diff(self, instance: DiffProposal) -> str:
+        ch = Changes(instance.paragraph.body, instance.body)
+        return ch.get_html(brief=False, no_deleted=False)
 
 
 GenericProposalSerializer.registry["proposal"] = ProposalDetailSerializer

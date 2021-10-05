@@ -133,3 +133,41 @@ class ProposalCreateSerializer(TestCase):
         self.assertEqual(self.ai, instance.agenda_item)
         self.assertEqual(self.user, instance.author)
         self.assertEqual(self.group, instance.meeting_group)
+
+
+class DiffProposalDetailSerializerTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.agenda.models import AgendaItem
+        from voteit.proposal.models import TextParagraph
+        from voteit.proposal.models import DiffProposal
+
+        cls.meeting: Meeting = Meeting.objects.create(
+            title="Test meeting", state="ongoing"
+        )
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(
+            state="ongoing", title="Ongoing"
+        )
+        cls.para: TextParagraph = cls.ai.text_paragraphs.create(
+            body="I am the eggman\nI am the walrus"
+        )
+        cls.diff_prop: DiffProposal = cls.para.proposals.create(
+            body="I am the eggman\nI am some kind of mamal"
+        )
+
+    @property
+    def _cut(self):
+        from voteit.proposal.rest_api.serializers import DiffProposalDetailSerializer
+
+        return DiffProposalDetailSerializer
+
+    def test_get(self):
+        serializer = self._cut(self.diff_prop)
+        data = serializer.data
+        self.assertEqual(self.diff_prop.pk, data["pk"])
+        self.assertEqual(self.diff_prop.body, data["body"])
+        self.assertEqual(
+            'I am the eggman <br/> I am <span class="text-diff-removed">the walrus</span> <span class="text-diff-added">some kind of mamal</span>',
+            data["body_diff"],
+        )
