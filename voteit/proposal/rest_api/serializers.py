@@ -1,6 +1,7 @@
 from django.db.models import QuerySet
 from rest_framework import exceptions
 from rest_framework import serializers
+
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import RichTextSerializerMixin
 from voteit.core.rest_api.validators import ValidateGroupAIContext
@@ -17,7 +18,10 @@ __all__ = (
     "DiffProposalCreateSerializer",
     "DiffProposalDetailSerializer",
     "TextParagraphSerializer",
+    "TextDocumentSerializer",
 )
+
+from voteit.proposal.models import TextDocument
 
 from voteit.proposal.models import TextParagraph
 
@@ -148,12 +152,47 @@ class TextParagraphSerializer(serializers.ModelSerializer):
     class Meta:
         model = TextParagraph
         read_only_fields = [
-            "created",
-            "modified",
             "paragraph_id",
             "pk",
+            "body",
+            "tag",
+        ]
+        fields = read_only_fields
+
+
+class CreateTextDocumentSerializer(BaseModelSerializer):
+    class Meta:
+        model = TextDocument
+        read_only_fields = [
+            "created",
+            "modified",
+            "pk",
+        ]
+        fields = read_only_fields + [
             "agenda_item",
+            "body",
+            "base_tag",
+        ]
+
+
+class TextDocumentSerializer(serializers.ModelSerializer):
+    paragraphs = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TextDocument
+        read_only_fields = [
+            "created",
+            "modified",
+            "pk",
+            "agenda_item",
+            "paragraphs",
         ]
         fields = read_only_fields + [
             "body",
+            "base_tag",
         ]
+
+    def get_paragraphs(self, instance: TextDocument):
+        return TextParagraphSerializer(
+            instance.text_paragraphs.all().order_by("paragraph_id"), many=True
+        ).data

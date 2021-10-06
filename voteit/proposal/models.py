@@ -8,11 +8,12 @@ from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db import transaction
 from django_fsm import FSMField
 from django_fsm import transition
 from model_utils.managers import InheritanceManager
+from typing import List
 
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
@@ -22,11 +23,17 @@ from voteit.proposal.workflows import ProposalWf
 from voteit.reactions.mixins import Reactable
 
 if TYPE_CHECKING:
+    from voteit.core.models import User
     from voteit.agenda.models import AgendaItem
     from voteit.meeting.models import Meeting
     from voteit.meeting.models import MeetingGroup
 
-__all__ = ("Proposal", "DiffProposal", "TextParagraph")
+__all__ = (
+    "Proposal",
+    "DiffProposal",
+    "TextDocument",
+    "TextParagraph",
+)
 
 logger = getLogger(__name__)
 
@@ -36,7 +43,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     state: str = FSMField(
         default=ProposalWf.initial, choices=ProposalWf.choices(), protected=True
     )
-    author: AbstractUser = models.ForeignKey(
+    author: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         blank=True,
@@ -147,6 +154,93 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     objects = InheritanceManager()
 
 
+class TextDocument(AgendaItemContext, MeetingContext):
+    """
+    The full text that's the basis for diff proposals.
+    """
+
+    name = "text_document"
+    _should_refresh: bool = False
+    body: str = models.TextField(default="")
+    base_tag: str = models.CharField(max_length=30)
+    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    modified: datetime = models.DateTimeField(editable=False, auto_now=True)
+    author: User = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        editable=False,
+        null=True,
+        related_name="text_documents",
+    )
+    last_modified_by: User = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        editable=False,
+        null=True,
+        related_name="text_documents_last_modified",
+    )
+    agenda_item: AgendaItem = models.ForeignKey(
+        "agenda.AgendaItem",
+        on_delete=models.CASCADE,
+        related_name="text_documents",
+    )
+
+    @property
+    def meeting(self) -> Optional[Meeting]:
+        if self.agenda_item:
+            return self.agenda_item.meeting
+
+    def create_text_paragraphs(self):
+        paragraphs = get_paragraphs(self.body)
+        i = 1
+        for para in paragraphs:
+            self.text_paragraphs.create(
+                body=para, agenda_item=self.agenda_item, paragraph_id=i
+            )
+            i += 1
+        self._should_refresh = False
+
+    @property
+    def should_refresh(self):
+        return self._should_refresh
+
+    def save(self, **kw):
+        if self.pk is None:
+            self._should_refresh = True
+        else:
+            old = TextDocument.objects.get(pk=self.pk)
+            if old.body != self.body:
+                self._should_refresh = True
+        # We want all the subsequent creates that comes from the save signal to be within
+        # the same transaction. Empty TextDocuments won't make anyone happy.
+        with transaction.atomic():
+            super().save(**kw)
+
+    # Annotations
+    objects: models.Manager
+    text_paragraphs: models.QuerySet
+
+
+def get_paragraphs(text: str) -> List[str]:
+    """
+    Split text into paragraphs. Two linebreaks means new.
+    """
+    output = []
+    new_para = True
+    for row in text.splitlines():
+        row = row.strip()
+        if row:
+            if new_para:
+                output.append(row)
+            else:
+                output[-1] += "\n"
+                output[-1] += row
+            new_para = False
+        else:
+            new_para = True
+    return output
+
+
 class TextParagraph(AgendaItemContext, MeetingContext):
     """
     Text paragraphs are the basis for diff-text functionality.
@@ -154,15 +248,24 @@ class TextParagraph(AgendaItemContext, MeetingContext):
     """
 
     name = "text_paragraph"
-    body: str = models.TextField()
+    body: str = models.TextField(editable=False)
     created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
     modified: datetime = models.DateTimeField(editable=False, auto_now=True)
     paragraph_id: str = models.PositiveSmallIntegerField(default=1)
+    text_document: TextDocument = models.ForeignKey(
+        "TextDocument",
+        on_delete=models.CASCADE,
+        related_name="text_paragraphs",
+    )
     agenda_item: AgendaItem = models.ForeignKey(
         "agenda.AgendaItem",
         on_delete=models.CASCADE,
         related_name="text_paragraphs",
     )
+
+    @property
+    def tag(self):
+        return f"{self.text_document.base_tag}-{self.paragraph_id}"
 
     @property
     def meeting(self) -> Optional[Meeting]:
@@ -173,16 +276,16 @@ class TextParagraph(AgendaItemContext, MeetingContext):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["paragraph_id", "agenda_item"],
-                name="paragraph_id_unique_for_ai",
+                fields=["paragraph_id", "text_document"],
+                name="paragraph_id_unique_for_text",
             )
         ]
 
     def save(self, **kw):
         """
-        Set paragraph_id when initially saving.
+        Set paragraph_id when initially saving if it isn't set
         """
-        if not self.pk:
+        if not self.pk and not self.paragraph_id:
             max_val = self.agenda_item.text_paragraphs.aggregate(
                 max_val=models.Max("paragraph_id")
             )["max_val"]
@@ -190,6 +293,7 @@ class TextParagraph(AgendaItemContext, MeetingContext):
                 self.paragraph_id = max_val + 1
         super().save(**kw)
 
+    # Annotations
     objects: models.Manager
     proposals: models.QuerySet
 
@@ -199,6 +303,14 @@ class DiffProposal(Proposal):
     paragraph: TextParagraph = models.ForeignKey(
         TextParagraph, on_delete=models.PROTECT, related_name="proposals"
     )
+
+    def save(self, **kw):
+        """
+        Force paragraph tag
+        """
+        if self.paragraph.tag not in self.tags:
+            self.tags.append(self.paragraph.tag)
+        super().save(**kw)
 
 
 def _new_proposal_id(proposal: Proposal) -> str:

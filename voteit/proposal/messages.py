@@ -22,15 +22,15 @@ class ProposalDeleted(BaseObjectDeleted):
 
 
 @outgoing
-class TextParagraphAdded(BaseObjectAdded):
-    name = "text_paragraph.added"
+class TextDocumentAdded(BaseObjectAdded):
+    name = "text_document.added"
 
 
 @outgoing
-class TextParagraphChanged(BaseObjectChanged):
-    name = "text_paragraph.changed"
+class TextDocumentChanged(BaseObjectChanged):
+    name = "text_document.changed"
 
 
 @outgoing
-class TextParagraphDeleted(BaseObjectDeleted):
-    name = "text_paragraph.deleted"
+class TextDocumentDeleted(BaseObjectDeleted):
+    name = "text_document.deleted"

@@ -2,7 +2,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.rest_api.base import DefaultModelViewSet
-from voteit.proposal.models import TextParagraph
+from voteit.proposal.models import TextDocument
 from voteit.proposal.models import Proposal
 from voteit.proposal.rest_api import serializers
 
@@ -23,15 +23,15 @@ class ProposalViewSet(DefaultModelViewSet):
     context_lookup_kwarg = "agenda_item"
 
 
-# class TextParahraphViewSet(DefaultModelViewSet):
-#     model = TextParagraph
-#     queryset = TextParagraph.objects.all()
-#     serializer_class = serializers.TextParagraphSerializer
-#     # serializer_classes = {"create": serializers.GenericCreateProposalSerializer}
-#     filter_backends = (DjangoFilterBackend,)
-#     filterset_fields = (
-#         "agenda_item",
-#         "agenda_item__meeting",
-#     )
-#     context_queryset = AgendaItem.objects.all()
-#     context_lookup_kwarg = "agenda_item"
+class TextDocumentViewSet(DefaultModelViewSet):
+    model = TextDocument
+    queryset = TextDocument.objects.all()
+    serializer_class = serializers.TextDocumentSerializer
+    serializer_classes = {"create": serializers.CreateTextDocumentSerializer}
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = (
+        "agenda_item",
+        "agenda_item__meeting",
+    )
+    context_queryset = AgendaItem.objects.all()
+    context_lookup_kwarg = "agenda_item"

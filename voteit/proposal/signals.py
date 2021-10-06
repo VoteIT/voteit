@@ -6,8 +6,8 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django_fsm import post_transition
-from voteit.agenda.channels import AgendaItemChannel
 
+from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.meeting.channels import ModeratorsChannel
@@ -17,13 +17,13 @@ from voteit.messaging.signals import channel_subscribed
 from voteit.proposal.messages import ProposalAdded
 from voteit.proposal.messages import ProposalChanged
 from voteit.proposal.messages import ProposalDeleted
-from voteit.proposal.messages import TextParagraphAdded
-from voteit.proposal.messages import TextParagraphChanged
-from voteit.proposal.messages import TextParagraphDeleted
+from voteit.proposal.messages import TextDocumentAdded
+from voteit.proposal.messages import TextDocumentChanged
+from voteit.proposal.messages import TextDocumentDeleted
 from voteit.proposal.models import Proposal
-from voteit.proposal.models import TextParagraph
+from voteit.proposal.models import TextDocument
 from voteit.proposal.rest_api.serializers import GenericProposalSerializer
-from voteit.proposal.rest_api.serializers import TextParagraphSerializer
+from voteit.proposal.rest_api.serializers import TextDocumentSerializer
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
@@ -94,32 +94,40 @@ def private_ai_published(instance: AgendaItem, source: str, **kw):
 @receiver(channel_subscribed, sender=AgendaItemChannel)
 def agenda_item_channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
     """
-    Populate app_state with TextParagraphs
+    Populate app_state with TextDocuments
     """
     app_state.append_from_queryset(
-        TextParagraph.objects.filter(agenda_item=context),
-        TextParagraphSerializer,
-        TextParagraphAdded,
+        TextDocument.objects.filter(agenda_item=context),
+        TextDocumentSerializer,
+        TextDocumentAdded,
     )
 
 
-@receiver(post_save, sender=TextParagraph)
-def text_paragraph_updated(instance: TextParagraph = None, created=None, **kw):
+@receiver(post_save, sender=TextDocument)
+def text_document_updated(instance: TextDocument = None, created=None, **kw):
+    """
+    Create TextParagraphs and push result.
+    We need to create text paragraphs post save but we want to do it before the message is sent
+    """
+    if instance.should_refresh:
+        instance.text_paragraphs.all().delete()
+        instance.create_text_paragraphs()
+    # No need to notify
     if instance.agenda_item is None:
         return
     ch = AgendaItemChannel.from_instance(instance.agenda_item)
-    data = TextParagraphSerializer(instance).data
+    data = TextDocumentSerializer(instance).data
     if created:
-        msg = TextParagraphAdded({}, **data)
+        msg = TextDocumentAdded({}, **data)
     else:
-        msg = TextParagraphChanged({}, **data)
+        msg = TextDocumentChanged({}, **data)
     ch.publish(msg)
 
 
-@receiver(pre_delete, sender=TextParagraph)
-def text_paragraph_delete(instance: TextParagraph = None, **kw):
+@receiver(pre_delete, sender=TextDocument)
+def text_paragraph_delete(instance: TextDocument = None, **kw):
     if instance.agenda_item is None:
         return
     ch = AgendaItemChannel.from_instance(instance.agenda_item)
-    msg = TextParagraphDeleted({}, pk=instance.pk)
+    msg = TextDocumentDeleted({}, pk=instance.pk)
     ch.publish(msg)

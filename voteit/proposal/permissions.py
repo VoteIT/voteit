@@ -11,12 +11,12 @@ class ProposalPermissions(ModelPermissions):
     RETRACT = P("proposal.retract_proposal")
 
 
-class TextParagraphPermissions(ModelPermissions):
-    model = "text_paragraph"
-    ADD = P("proposal.add_textparagraph", context="agenda_item")
-    CHANGE = P("proposal.change_textparagraph")
-    DELETE = P("proposal.delete_textparagraph")
-    VIEW = P("proposal.view_textparagraph")
+class TextDocumentPermissions(ModelPermissions):
+    model = "text_document"
+    ADD = P("proposal.add_textdocument", context="agenda_item")
+    CHANGE = P("proposal.change_textdocument")
+    DELETE = P("proposal.delete_textdocument")
+    VIEW = P("proposal.view_textdocument")
 
 
 # class DiffProposalPermissions(ModelPermissions):

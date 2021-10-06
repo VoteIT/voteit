@@ -45,3 +45,45 @@ class ProposalTests(TestCase):
         self.assertEqual("hi-2", prop.prop_id)
         prop = self._mk_one(agenda_item=ai, author=user2)
         self.assertEqual("hello-1", prop.prop_id)
+
+
+TEXT = """
+The bureaucracy is expanding to meet the needs of the expanding bureaucracy.
+
+-- Oscar Wilde
+"""
+
+
+class TextDocumentTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.agenda.models import AgendaItem
+
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create()
+
+    def test_create_makes_paragraphs_too(self):
+        obj = self.ai.text_documents.create(body=TEXT, base_tag="oscar")
+        paras = list(obj.text_paragraphs.order_by("paragraph_id"))
+        self.assertEqual(
+            "The bureaucracy is expanding to meet the needs of the expanding bureaucracy.",
+            paras[0].body,
+        )
+        self.assertEqual(1, paras[0].paragraph_id)
+        self.assertEqual("oscar-1", paras[0].tag)
+        self.assertEqual(
+            "-- Oscar Wilde",
+            paras[1].body,
+        )
+        self.assertEqual(2, paras[1].paragraph_id)
+        self.assertEqual("oscar-2", paras[1].tag)
+
+    def test_new_body_detected(self):
+        obj = self.ai.text_documents.create(body=TEXT, base_tag="oscar")
+        obj.body = "new"
+        obj.save()
+        self.assertFalse(obj.should_refresh)
+        para = obj.text_paragraphs.first()
+        self.assertEqual("new", para.body)

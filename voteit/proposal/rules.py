@@ -12,8 +12,9 @@ from voteit.core.rules import is_author
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import is_proposer
 from voteit.proposal.models import Proposal
+from voteit.proposal.models import TextDocument
 from voteit.proposal.permissions import ProposalPermissions
-from voteit.proposal.permissions import TextParagraphPermissions
+from voteit.proposal.permissions import TextDocumentPermissions
 from voteit.proposal.workflows import ProposalWf
 
 if TYPE_CHECKING:
@@ -28,6 +29,16 @@ def is_not_used_in_poll(user: AbstractUser, proposal: Proposal):
 @predicate
 def is_published(user: AbstractUser, proposal: Proposal):
     return isinstance(proposal, Proposal) and proposal.state == ProposalWf.PUBLISHED
+
+
+@predicate
+def has_no_proposals(user: AbstractUser, text_document: TextDocument):
+    return (
+        isinstance(text_document, TextDocument)
+        and not text_document.text_paragraphs.all()
+        .filter(proposals__isnull=False)
+        .exists()
+    )
 
 
 # Proposal and variants
@@ -51,18 +62,17 @@ rules.add_perm(
 )
 
 
-# TextParagraph
+# TextDocument
 rules.add_perm(
-    TextParagraphPermissions.ADD,
+    TextDocumentPermissions.ADD,
     is_moderator & upcoming_ongoing_or_private_ai,
 )
-rules.add_perm(TextParagraphPermissions.VIEW, can_view_ai)
-# FIXME: Restrict in frontend
+rules.add_perm(TextDocumentPermissions.VIEW, can_view_ai)
 rules.add_perm(
-    TextParagraphPermissions.CHANGE, upcoming_ongoing_or_private_ai & is_moderator
+    TextDocumentPermissions.CHANGE,
+    upcoming_ongoing_or_private_ai & is_moderator & has_no_proposals,
 )
-# FIXME: Are we okay with this...?
 rules.add_perm(
-    TextParagraphPermissions.DELETE,
-    is_moderator & upcoming_ongoing_or_private_ai,
+    TextDocumentPermissions.DELETE,
+    is_moderator & upcoming_ongoing_or_private_ai & has_no_proposals,
 )
