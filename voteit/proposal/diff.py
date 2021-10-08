@@ -2,7 +2,7 @@ import re
 from difflib import SequenceMatcher
 
 
-class ChangeGroup(object):
+class ChangeGroup:
     WORD_CAP = 3
     LINE_CAP = 1
     CAP_FILL = ["[...]"]
@@ -36,7 +36,7 @@ class ChangeGroup(object):
         return txt
 
 
-class Changes(object):
+class Changes:
     WHITESPACES = re.compile("\s+", re.UNICODE)
     FIRST_TAG = re.compile(r"^(#\w+)", re.UNICODE)
     BULLETS = "•*→-‐‑‒–—―‣"
