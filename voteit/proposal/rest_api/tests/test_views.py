@@ -186,16 +186,17 @@ class TextDocumentAPITests(APITestCase):
     def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.agenda.models import AgendaItem
-        from voteit.proposal.models import TextParagraph
+
+        # from voteit.proposal.models import TextParagraph
         from voteit.proposal.models import TextDocument
 
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
-        cls.ai = cls.meeting.agenda_items.create(state="ongoing")
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="ongoing")
         User = get_user_model()
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
         cls.outsider = User.objects.create(username="outsider")
-        cls.text_doc = cls.ai.text_documents.create(body="Hello")
+        cls.text_doc: TextDocument = cls.ai.text_documents.create(body="Hello")
 
     def test_create(self):
         url = reverse("text-document-list")
@@ -247,3 +248,25 @@ class TextDocumentAPITests(APITestCase):
             204,
         )
         self.assertRaises(ObjectDoesNotExist, self.text_doc.refresh_from_db)
+
+    def test_put(self):
+        url = reverse("text-document-detail", kwargs={"pk": self.text_doc.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.put(url, {"body": "World", "base_tag": "hoho"})
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+        self.text_doc.refresh_from_db()
+        self.assertEqual("World", self.text_doc.body)
+
+    def test_patch(self):
+        url = reverse("text-document-detail", kwargs={"pk": self.text_doc.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, {"body": "World"})
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+        self.text_doc.refresh_from_db()
+        self.assertEqual("World", self.text_doc.body)
