@@ -12,6 +12,7 @@ from typing import Union
 from asgiref.sync import async_to_sync
 from channels import DEFAULT_CHANNEL_LAYER
 from channels.layers import get_channel_layer
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -80,6 +81,10 @@ class MessageABC(ABC):
     def from_message(cls, message: MessageABC, type_name=None, **kwargs) -> MessageABC:
         pass
 
+    @property
+    def is_on_commit_disabled(self):
+        return getattr(settings, "DISABLE_MESSAGE_ON_COMMIT", False)
+
     def __init__(
         self,
         mm: Union[Dict, MessageMeta] = None,
@@ -119,7 +124,7 @@ class MessageABC(ABC):
         def _hook():
             async_to_sync(self.async_send_internal)(channel_name, group=group)
 
-        if on_commit:
+        if on_commit and not self.is_on_commit_disabled:
             transaction.on_commit(_hook)
         else:
             _hook()
@@ -157,7 +162,7 @@ class MessageABC(ABC):
                 channel_name, state=state, success=success, group=group
             )
 
-        if on_commit:
+        if on_commit and not self.is_on_commit_disabled:
             transaction.on_commit(_hook)
         else:
             _hook()
@@ -547,6 +552,10 @@ class AbstractChannel(ABC):
         self.channel_layer = channel_layer and channel_layer or get_channel_layer()
         self.consumer_channel = consumer_channel
 
+    @property
+    def is_on_commit_disabled(self):
+        return getattr(settings, "DISABLE_MESSAGE_ON_COMMIT", False)
+
     @classmethod
     def from_consumer(cls, consumer: WebsocketDemuxConsumer, channel_name=None):
         return cls(
@@ -578,7 +587,7 @@ class AbstractChannel(ABC):
         def _hook():
             async_to_sync(self.async_publish)(message, internal=internal, **kwargs)
 
-        if on_commit:
+        if on_commit and not self.is_on_commit_disabled:
             transaction.on_commit(_hook)
         else:
             _hook()
