@@ -193,6 +193,8 @@ class TextDocumentSerializer(serializers.ModelSerializer):
         ]
 
     def get_paragraphs(self, instance: TextDocument):
-        return TextParagraphSerializer(
+        data = TextParagraphSerializer(
             instance.text_paragraphs.all().order_by("paragraph_id"), many=True
         ).data
+        # FIXME: This is probably NOT the correct way to handle the serialized data
+        return [dict(x) for x in data]
