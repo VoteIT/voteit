@@ -1,11 +1,15 @@
+from logging import getLogger
+from typing import Dict
+from typing import Optional
 from typing import TYPE_CHECKING
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import QuerySet
 from django.http import HttpResponseForbidden
 from django.utils.functional import cached_property
-from requests_oauthlib import OAuth2Session
+from requests import HTTPError
 from rest_framework import mixins
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -13,9 +17,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
-from typing import Dict
 
-from rest_framework.serializers import Serializer
 from voteit.access_policy.app.policies import AutomaticAccess
 from voteit.access_policy.models import MeetingInvite
 from voteit.access_policy.permissions import MeetingInvitePermissions
@@ -26,6 +28,8 @@ from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
     from voteit.organisation.models import OAuth2Provider
+
+logger = getLogger(__name__)
 
 
 class AccessPoliciesViewSet(viewsets.ReadOnlyModelViewSet):
@@ -160,12 +164,18 @@ class HandleMatchedInvitesViewSet(
 
     @cached_property
     def identity_data(self) -> Dict:
-        # FIXME: Error checking etc
-        provider: OAuth2Provider = self.request.user.organisation.provider
+        try:
+            provider: Optional[OAuth2Provider] = self.request.user.organisation.provider
+        except AttributeError:
+            raise ValidationError(
+                "Your user isn't attached to an organisation so login this way will never work"
+            )
+        if provider is None:
+            raise ValidationError("No login provider found for your organisation")
         oauth_session = self.request.user.oauth_session()
         response = oauth_session.get(provider.identity_url)
         if not response.ok:
-            # FIXME: Wrong exception for this context
+            # Not the correct serializer exception, but this is kind of the crash and burn...
             response.raise_for_status()
         return response.json()
 
