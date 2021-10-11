@@ -20,7 +20,7 @@ class UpdateLastReadTests(TestCase):
     def _mk_one(self, **kw):
         from voteit.agenda.messages import UpdateLastRead
 
-        return UpdateLastRead({"user_pk": 2}, **kw)
+        return UpdateLastRead({"user_pk": 2, "consumer_name": "abc"}, **kw)
 
     def test_message_job(self):
         msg = self._mk_one(agenda_item=1)
