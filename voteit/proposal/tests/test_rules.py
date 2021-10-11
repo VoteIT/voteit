@@ -3,27 +3,32 @@ from django.test import TestCase
 
 
 class RulesTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR
         from voteit.meeting.roles import ROLE_PARTICIPANT
         from voteit.meeting.roles import ROLE_PROPOSER
 
         User = get_user_model()
-        self.meeting = Meeting.objects.create(er_policy_name="auto_before_poll")
-        self.anon_user = User.objects.create(username="anon")
-        self.participant = User.objects.create(username="participant")
-        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
-        self.moderator = User.objects.create(username="moderator")
-        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
-        self.proposer = User.objects.create(username="proposer")
-        self.proposer_author = User.objects.create(username="proposer_author")
-        self.meeting.add_roles(self.proposer, ROLE_PROPOSER)
-        self.meeting.add_roles(self.proposer_author, ROLE_PROPOSER)
-        self.ai = self.meeting.agenda_items.create()
-        self.ai.upcoming()
-        self.ai.save()
-        self.proposal = self.ai.proposals.create(author=self.proposer_author)
+        cls.meeting = Meeting.objects.create(er_policy_name="auto_before_poll")
+        cls.anon_user = User.objects.create(username="anon")
+        cls.participant = User.objects.create(username="participant")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.proposer = User.objects.create(username="proposer")
+        cls.proposer_author = User.objects.create(username="proposer_author")
+        cls.meeting.add_roles(cls.proposer, ROLE_PROPOSER)
+        cls.meeting.add_roles(cls.proposer_author, ROLE_PROPOSER)
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.ai.upcoming()
+        cls.ai.save()
+        cls.proposal = cls.ai.proposals.create(author=cls.proposer_author)
+
+    def setUp(self):
+        self.ai.refresh_from_db()
+        self.meeting.refresh_from_db()
 
     def p(self, perm):
         from voteit.proposal.permissions import ProposalPermissions
@@ -250,3 +255,112 @@ class RulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(RETRACT, self.proposal))
+
+
+TEXT = """
+I'm sorry, but I don't want to be an emperor
+
+That's not my business
+
+I don't want to rule or conquer anyone
+"""
+
+
+class TextDocumentPermissionsTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.agenda.models import AgendaItem
+        from voteit.proposal.models import TextDocument
+        from voteit.proposal.models import TextParagraph
+
+        User = get_user_model()
+
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.meeting.state = "ongoing"
+        cls.meeting.save()
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="ongoing")
+        cls.participant = cls.meeting.participants.get(username="participant")
+        cls.moderator = cls.meeting.participants.get(username="moderator")
+        cls.outsider = User.objects.create(username="outsider")
+        cls.text_doc: TextDocument = cls.ai.text_documents.create(body=TEXT)
+        cls.para: TextParagraph = cls.text_doc.text_paragraphs.first()  # Any will do
+
+    def setUp(self):
+        self.ai.refresh_from_db()
+
+    def p(self, perm):
+        from voteit.proposal.permissions import TextDocumentPermissions
+
+        return getattr(TextDocumentPermissions, perm)
+
+    def _mk_prop(self):
+        self.para.proposals.create()
+
+    def test_add_ongoing_ai(self):
+        ADD = self.p("ADD")
+        self.assertFalse(self.participant.has_perm(ADD, self.ai))
+        self.assertTrue(self.moderator.has_perm(ADD, self.ai))
+        self.assertFalse(self.outsider.has_perm(ADD, self.ai))
+
+    def test_add_closed_ai(self):
+        self.ai.close()
+        ADD = self.p("ADD")
+        self.assertFalse(self.participant.has_perm(ADD, self.ai))
+        self.assertFalse(self.moderator.has_perm(ADD, self.ai))
+        self.assertFalse(self.outsider.has_perm(ADD, self.ai))
+
+    def test_change_ongoing_ai(self):
+        CHANGE = self.p("CHANGE")
+        self.assertFalse(self.participant.has_perm(CHANGE, self.text_doc))
+        self.assertTrue(self.moderator.has_perm(CHANGE, self.text_doc))
+        self.assertFalse(self.outsider.has_perm(CHANGE, self.text_doc))
+
+    def test_change_closed_ai(self):
+        self.ai.close()
+        CHANGE = self.p("CHANGE")
+        self.assertFalse(self.participant.has_perm(CHANGE, self.text_doc))
+        self.assertFalse(self.moderator.has_perm(CHANGE, self.text_doc))
+        self.assertFalse(self.outsider.has_perm(CHANGE, self.text_doc))
+
+    def test_change_ongoing_ai_with_proposals(self):
+        self._mk_prop()
+        CHANGE = self.p("CHANGE")
+        self.assertFalse(self.participant.has_perm(CHANGE, self.text_doc))
+        self.assertFalse(self.moderator.has_perm(CHANGE, self.text_doc))
+        self.assertFalse(self.outsider.has_perm(CHANGE, self.text_doc))
+
+    def test_view_ongoing_ai(self):
+        VIEW = self.p("VIEW")
+        self.assertTrue(self.participant.has_perm(VIEW, self.text_doc))
+        self.assertTrue(self.moderator.has_perm(VIEW, self.text_doc))
+        self.assertFalse(self.outsider.has_perm(VIEW, self.text_doc))
+
+    def test_view_private_ai(self):
+        self.ai.unpublish()
+        VIEW = self.p("VIEW")
+        self.assertFalse(self.participant.has_perm(VIEW, self.text_doc))
+        self.assertTrue(self.moderator.has_perm(VIEW, self.text_doc))
+        self.assertFalse(self.outsider.has_perm(VIEW, self.text_doc))
+
+    def test_delete_ongoing_ai(self):
+        DELETE = self.p("DELETE")
+        self.assertFalse(self.participant.has_perm(DELETE, self.text_doc))
+        self.assertTrue(self.moderator.has_perm(DELETE, self.text_doc))
+        self.assertFalse(self.outsider.has_perm(DELETE, self.text_doc))
+
+    def test_delete_closed_ai(self):
+        self.ai.close()
+        DELETE = self.p("DELETE")
+        self.assertFalse(self.participant.has_perm(DELETE, self.text_doc))
+        self.assertFalse(self.moderator.has_perm(DELETE, self.text_doc))
+        self.assertFalse(self.outsider.has_perm(DELETE, self.text_doc))
+
+    def test_delete_ongoing_ai_proposals(self):
+        self._mk_prop()
+        DELETE = self.p("DELETE")
+        self.assertFalse(self.participant.has_perm(DELETE, self.text_doc))
+        self.assertFalse(self.moderator.has_perm(DELETE, self.text_doc))
+        self.assertFalse(self.outsider.has_perm(DELETE, self.text_doc))

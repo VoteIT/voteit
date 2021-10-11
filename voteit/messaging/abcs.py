@@ -101,7 +101,7 @@ class MessageABC(ABC):
 
     @cached_property
     def user(self) -> Optional[AbstractUser]:
-        """ Retrieve user from MessageMeta.user_pk, if it exists"""
+        """Retrieve user from MessageMeta.user_pk, if it exists"""
         if self.mm.user_pk:
             User: AbstractUser = get_user_model()
             return User.objects.filter(pk=self.mm.user_pk).first()
@@ -376,7 +376,7 @@ class DeferredJob(ABC):
 
     @abstractmethod
     def run_job(self):
-        """ Run this within the worker to do the actual job"""
+        """Run this within the worker to do the actual job"""
         pass
 
 
@@ -397,22 +397,22 @@ class ContextAction(MessageABC, ABC, Generic[M]):
     @property
     @abstractmethod
     def context_pk_attr(self) -> str:
-        """ Fetch context from this attribute in the schema"""
+        """Fetch context from this attribute in the schema"""
 
     @property
     @abstractmethod
     def schema(self) -> Type[BaseModel]:
-        """ This really must have a valid schema"""
+        """This really must have a valid schema"""
 
     @property
     @abstractmethod
     def permission(self) -> Optional[str]:
-        """ Text permission, None means allow any. """
+        """Text permission, None means allow any."""
 
     @property
     @abstractmethod
     def model(self) -> Type[models.Model]:
-        """ Model class this operates on."""
+        """Model class this operates on."""
 
     def allowed(self) -> bool:
         if self.user is None:
@@ -510,7 +510,7 @@ class BaseError(BaseOutgoingMessage, Exception, ABC):
         group: bool = False,
         on_commit=None,
     ):
-        """ Override and default to error."""
+        """Override and default to error."""
         assert on_commit is None, "This argument doesn't work on async calls!"
         if state is not None:
             assert state == self.FAILED, "Error messages must be sent as failed state"
@@ -530,13 +530,13 @@ class AbstractChannel(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        """ The name of the channel factory, not the specific channel name. """
+        """The name of the channel factory, not the specific channel name."""
         pass
 
     @property
     @abstractmethod
     def channel_name(self) -> str:
-        """ Return name of this channel, probably based on the primary key of an object"""
+        """Return name of this channel, probably based on the primary key of an object"""
         pass
 
     def __init__(
@@ -616,13 +616,13 @@ class AbstractObjectChannel(AbstractChannel):
     @property
     @abstractmethod
     def model(self) -> models.Model:
-        """ Set as property on subclass. Model should be the type of model this object channel is for."""
+        """Set as property on subclass. Model should be the type of model this object channel is for."""
         pass
 
     @property
     @abstractmethod
     def permission(self) -> str:
-        """ Set as property on subclass. The permission to evaluate subscribe commands against."""
+        """Set as property on subclass. The permission to evaluate subscribe commands against."""
         pass
 
     @classmethod

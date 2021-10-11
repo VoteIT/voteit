@@ -1,7 +1,13 @@
-from inspect import isclass, isfunction
-from typing import TypeVar, Union, Dict, Callable, overload
+from inspect import isclass
+from inspect import isfunction
+from typing import Dict
+from typing import TypeVar
+from typing import Union
+from typing import overload
 
-T = TypeVar('T')
+from typing import Callable
+
+T = TypeVar("T")
 
 
 class Registry(Dict[str, T]):
@@ -36,6 +42,7 @@ class Registry(Dict[str, T]):
 
 
     """
+
     required: type
 
     def __init__(self, required: T):
@@ -94,3 +101,6 @@ class Registry(Dict[str, T]):
                     f"{factory} isn't an instance of the required: {self.required}"
                 )
         super().__setitem__(key, factory)
+
+    def choices(self):
+        return [(k, getattr(v, "title", k)) for k, v in self.items()]

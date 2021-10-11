@@ -5,7 +5,7 @@ from typing import Optional
 
 from django.utils.text import slugify
 from voteit.proposal.abcs import ProposalIDPolicy
-from voteit.proposal.registry import proposal_id_registry
+from voteit.proposal.registries import proposal_id_registry
 from voteit.proposal.models import Proposal
 
 __all__ = ("UseridPID",)
