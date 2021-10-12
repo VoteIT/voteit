@@ -197,7 +197,7 @@ class ProposalsAPITests(APITestCase):
         url = reverse("proposal-preview")
         data = {
             "agenda_item": self.ai.pk,
-            "body": "Hello " + mk_hashtag("world"),
+            "body": "Hello world!",
             "shortname": "diff_proposal",
             "paragraph": self.para.pk,
         }
@@ -206,9 +206,12 @@ class ProposalsAPITests(APITestCase):
         self.assertEqual(200, response.status_code)
         data = response.json()
         self.assertEqual(
-            'Hello \n<span class="mention" data-index="0" data-denotation-char="#" data-id="world" data-value="world">\n'
-            '<span contenteditable="false"><span class="ql-mention-denotation-char">#</span>world</span></span>',
+            "Hello world!",
             data["body"],
+        )
+        self.assertEqual(
+            '<span class="text-diff-removed">I am the eggman <br/> I am the walrus</span> <span class="text-diff-added">Hello world!</span>',
+            data["body_diff"],
         )
 
 

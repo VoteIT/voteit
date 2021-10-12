@@ -1,4 +1,5 @@
 from typing import OrderedDict
+from typing import Union
 
 from django.db.models import QuerySet
 from django.utils.text import slugify
@@ -133,9 +134,27 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
 
 
 class DiffProposalCreateSerializer(ProposalCreateSerializer):
+    body_diff = serializers.SerializerMethodField()
+
     class Meta(ProposalCreateSerializer.Meta):
         model = DiffProposal
-        fields = ["paragraph"] + ProposalCreateSerializer.Meta.fields
+        fields = [
+            "paragraph",
+            "body_diff",
+        ] + ProposalCreateSerializer.Meta.fields
+
+    def get_body_diff(self, instance: Union[OrderedDict, DiffProposal]) -> str:
+        if isinstance(instance, DiffProposal):
+            ch = Changes(instance.paragraph.body, instance.body)
+        elif isinstance(instance, dict):
+            para = instance["paragraph"]
+            if isinstance(para, TextParagraph):
+                para = para.pk
+            text = TextParagraph.objects.get(pk=para)
+            ch = Changes(text.body, instance["body"])
+        else:
+            raise TypeError("Not a diff proposal or a dict")
+        return ch.get_html(brief=False, no_deleted=False)
 
 
 class DiffProposalDetailSerializer(ProposalDetailSerializer):
