@@ -8,18 +8,18 @@ from typing import List
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django_fsm import FSMField
 from django_fsm import transition
-from voteit.access_policy.permissions import MeetingInvitePermissions
 
+from voteit.access_policy.permissions import MeetingInvitePermissions
 from voteit.access_policy.utils import get_invite_data_registry
 from voteit.access_policy.workflows import InviteWf
 from voteit.core.abcs import MeetingContext
 from voteit.core.permissions import NOT_ALLOWED
-from django.contrib.auth.models import AbstractUser
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
@@ -28,7 +28,8 @@ logger = getLogger(__name__)
 
 
 class AccessPolicy(MeetingContext):
-    """Subclass this to create an access policy.
+    """
+    Subclass this to create an access policy.
 
     The tests for this class are in voteit.access_policy.app.automatic
     """
@@ -58,7 +59,9 @@ class AccessPolicy(MeetingContext):
 
 
 class MeetingInviteManager(models.Manager):
-    """ Helper to find invites matching a specific users data."""
+    """
+    Helper to find invites matching a specific users data.
+    """
 
     def find_invites(self, **kw) -> models.QuerySet:
         """
@@ -152,7 +155,9 @@ class MeetingInvite(MeetingContext):
         permission=NOT_ALLOWED,  # Special view, not a normal transition
     )
     def accept(self, user: AbstractUser):
-        """ Important! Must always run within an atomic block!"""
+        """
+        Important! Must always run within an atomic block!
+        """
         self.used_by = user
         self.meeting.add_roles(user, *self.roles)
 
