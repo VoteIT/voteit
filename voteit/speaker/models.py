@@ -135,6 +135,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
 
     @transition(
         field=state,
+        source=SpeakerSystemWf.INACTIVE,
         target=SpeakerSystemWf.ACTIVE,
         permission=SpeakerSystemPermissions.CHANGE,
     )
@@ -145,6 +146,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
 
     @transition(
         field=state,
+        source=SpeakerSystemWf.ACTIVE,
         target=SpeakerSystemWf.INACTIVE,
         permission=SpeakerSystemPermissions.CHANGE,
     )
