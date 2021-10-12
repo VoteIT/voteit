@@ -40,13 +40,16 @@ class IDProxy(ProviderResponseAdapter):
             if parsed.scheme in _allowed_url_schemes:
                 user.img_url = img_url
         user_data = self.response.get("user_data", None)
+        emails = set()
         if user_data is not None:
             # Handle all scopes here
-            # Email - FIXME there might be multiple emails
             for item in user_data:
                 if item["scope"] == "email":
-                    user.email = item["data"]
-            # Other identity parts in identity obj?
+                    emails.add(item["data"])
+        if emails and user.email not in emails:
+            # Any correct email is better than a falsy one...
+            user.email = emails.pop()
+        # Other identity parts in identity obj?
         # FIXME: This should probably be a setting if we want to trust this or not.
         is_superuser = self.response.get("is_superuser", None)
         if is_superuser and user.organisation is not None:
