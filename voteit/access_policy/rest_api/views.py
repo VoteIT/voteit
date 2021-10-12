@@ -24,6 +24,7 @@ from voteit.access_policy.permissions import MeetingInvitePermissions
 from voteit.access_policy.rest_api import serializers
 from voteit.access_policy.rest_api.authentication import InviteBasicAuthentication
 from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.utils import get_identity_data
 from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
@@ -164,20 +165,7 @@ class HandleMatchedInvitesViewSet(
 
     @cached_property
     def identity_data(self) -> Dict:
-        try:
-            provider: Optional[OAuth2Provider] = self.request.user.organisation.provider
-        except AttributeError:
-            raise ValidationError(
-                "Your user isn't attached to an organisation so login this way will never work"
-            )
-        if provider is None:
-            raise ValidationError("No login provider found for your organisation")
-        oauth_session = self.request.user.oauth_session()
-        response = oauth_session.get(provider.identity_url)
-        if not response.ok:
-            # Not the correct serializer exception, but this is kind of the crash and burn...
-            response.raise_for_status()
-        return response.json()
+        return get_identity_data(self.request.user)
 
     def get_queryset(self):
         sdata = {}

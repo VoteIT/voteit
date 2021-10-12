@@ -110,9 +110,7 @@ class User(AbstractUser):
             provider=self.organisation.provider
         ).first()
         if access_token is None:
-            raise PermissionDenied(
-                "There's something wrong with the access to your profile. Please login again"
-            )
+            raise PermissionDenied("No access token. Please login again.")
         return access_token.get_session()
 
     objects = UserManager()

@@ -1,8 +1,20 @@
+from datetime import timedelta
+from typing import TYPE_CHECKING
+
+import responses
 from django.contrib.auth import get_user_model
-from rest_framework.serializers import ModelSerializer
-from rest_framework.serializers import Serializer
-from voteit.core.testing import mk_usertag, mk_hashtag
+from django.test import RequestFactory
 from django.test import TestCase
+from django.utils.timezone import now
+from rest_framework.serializers import ModelSerializer
+
+from voteit.core.testing import mk_hashtag
+from voteit.core.testing import mk_usertag
+
+User = get_user_model()
+
+if TYPE_CHECKING:
+    from voteit.core.models import User as UserType
 
 
 class RichTextSerializerMixinTests(TestCase):
@@ -133,3 +145,93 @@ class RichTextSerializerMixinTests(TestCase):
         self.assertEqual(
             [self.user.pk], list(instance.mentions.all().values_list("pk", flat=True))
         )
+
+
+class UpdateUserSerializerTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.organisation.models import OAuth2Provider
+
+        cls.mock_api_return = {
+            "pk": 1,
+            "application": 1,
+            "given_name": "Hello",
+            "family_name": "Is it me you are looking for?",
+            "identity_id": "123",
+            "user_data": [
+                {
+                    "pk": 1,
+                    "scope": "email",
+                    "data": "hello@betahaus.net",
+                    "validated": "2021-03-24T15:56:00.043000Z",
+                },
+                {
+                    "pk": 2,
+                    "scope": "cell_phone",
+                    "data": "+123-123-123",
+                    "validated": "2021-03-24T15:56:00.043000Z",
+                },
+            ],
+        }
+
+        cls.provider: OAuth2Provider = OAuth2Provider.objects.get(pk=1)
+        cls.user: UserType = User.objects.get(pk=1)
+        cls.user.access_tokens.create(
+            expires_at=now() + timedelta(hours=1),
+            expires_in=3600,
+            provider=cls.provider,
+            access_token="abc",
+            refresh_token="123",
+        )
+
+        cls.responses = responses.RequestsMock()
+        cls.responses.start()
+        cls.responses.add(
+            responses.GET, cls.provider.identity_url, json=cls.mock_api_return
+        )
+
+    def setUp(self):
+        self.user.refresh_from_db()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.responses.stop()
+        cls.responses.reset()
+
+    @property
+    def _cut(self):
+        from voteit.core.rest_api.serializers import UpdateUserSerializer
+
+        return UpdateUserSerializer
+
+    def _mk_serializer(self, data):
+        request = RequestFactory().get("/")
+        request.user = self.user
+        serializer = self._cut(
+            self.user, data=data, partial=True, context={"request": request}
+        )
+        serializer.is_valid()
+        return serializer
+
+    def test_update_email(self):
+        serializer = self._mk_serializer({"email": "hello@betahaus.net"})
+        self.assertFalse(serializer.errors)
+
+    def test_update_email_not_in_identity_data(self):
+        serializer = self._mk_serializer({"email": "idontexist@betahaus.net"})
+        self.assertIn("email", serializer.errors)
+
+    def test_update_userid(self):
+        serializer = self._mk_serializer({"userid": "something_new"})
+        self.assertFalse(serializer.errors)
+
+    def test_update_userid_already_exists(self):
+        serializer = self._mk_serializer({"userid": "participant"})
+        self.assertIn("userid", serializer.errors)
+
+    def test_update_userid_bad_name(self):
+        serializer = self._mk_serializer({"userid": "HELLO"})
+        self.assertIn("userid", serializer.errors)

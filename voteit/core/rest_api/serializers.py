@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Q
 from django.utils import translation
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.fields import JSONField
+from voteit.core.rest_api.utils import get_identity_data
 
 from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
@@ -66,6 +66,7 @@ class UserSerializer(serializers.ModelSerializer):
             "organisation",
             "organisation_roles",
         )
+        read_only_fields = fields
 
 
 class UpdateUserSerializer(serializers.ModelSerializer):
@@ -74,17 +75,32 @@ class UpdateUserSerializer(serializers.ModelSerializer):
         fields = (
             "pk",
             "userid",
+            "email",
         )
 
     def validate_userid(self, value: str):
-        user = self.context["request"].user
         try:
             valid_userid(value)
         # FIXME We may want to change to djangos default exception
         except ValueError as exc:
             raise ValidationError(str(exc))
-        if self.Meta.model.objects.filter(~Q(pk=user.pk)).filter(userid=value).exists():
+        user = self.context["request"].user
+        if self.Meta.model.objects.exclude(pk=user.pk).filter(userid=value).exists():
             raise ValidationError("Not unique, try something else")
+        return value
+
+    def validate_email(self, value: str):
+        user = self.context["request"].user
+        if user.email == value:
+            return value
+        identity_data = get_identity_data(user)
+        valid_emails = set(
+            [x["data"] for x in identity_data["user_data"] if x["scope"] == "email"]
+        )
+        if value not in valid_emails:
+            raise ValidationError(
+                _("Email you specified isn't validated. It must exist on your profile.")
+            )
         return value
 
 
