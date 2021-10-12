@@ -46,12 +46,17 @@ class GenericCreateProposalSerializer(serializers.Serializer):
     >>> serializer = GenericCreateProposalSerializer(data={'shortname': 'diff_proposal'})
     >>> serializer.__class__.__name__
     'DiffProposalCreateSerializer'
+
+    The default is a regular proposal
+    >>> serializer = GenericCreateProposalSerializer(data={})
+    >>> serializer.__class__.__name__
+    'ProposalCreateSerializer'
     """
 
     registry = {}
 
     def __new__(cls, *args, **kwargs):
-        shortname = kwargs.get("data", {}).get("shortname", None)
+        shortname = kwargs.get("data", {}).get("shortname", "proposal")
         if shortname is None:
             raise exceptions.ValidationError({"shortname": "Required"})
         try:
