@@ -183,6 +183,7 @@ class CreateTextDocumentSerializer(BaseModelSerializer):
             "agenda_item",
             "body",
             "base_tag",
+            "title",
         ]
 
     def validate(self, attrs: Dict) -> Dict:
@@ -211,6 +212,7 @@ class TextDocumentSerializer(serializers.ModelSerializer):
         fields = read_only_fields + [
             "body",
             "base_tag",
+            "title",
         ]
 
     def get_paragraphs(self, instance: TextDocument):
