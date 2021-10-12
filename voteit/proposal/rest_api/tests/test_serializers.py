@@ -211,3 +211,76 @@ class TextDocumentSerializerTests(TestCase):
         self.assertEqual(2, len(data["paragraphs"]))
         self.assertEqual("hi-1", data["paragraphs"][0]["tag"])
         self.assertEqual("I am the eggman", data["paragraphs"][0]["body"])
+
+    def test_modify(self):
+        serializer = self._cut(self.text_doc, data=dict(base_tag="hi"))
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+
+    def test_modify_other(self):
+        new_text_doc = self.ai.text_documents.create(
+            body="I am the eggman\n\nI am the walrus", base_tag="hello"
+        )
+        serializer = self._cut(new_text_doc, data=dict(base_tag="hi"))
+        serializer.is_valid()
+        self.assertIn("base_tag", serializer.errors)
+
+
+class CreateTextDocumentSerializerTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.agenda.models import AgendaItem
+        from voteit.proposal.models import TextDocument
+
+        cls.meeting: Meeting = Meeting.objects.create(
+            title="Test meeting", state="ongoing"
+        )
+        cls.user = cls.meeting.participants.create(username="participant")
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(
+            state="ongoing", title="Ongoing"
+        )
+        cls.text_doc: TextDocument = cls.ai.text_documents.create(
+            body="I am the eggman\n\nI am the walrus", base_tag="hi"
+        )
+
+    @property
+    def _cut(self):
+        from voteit.proposal.rest_api.serializers import CreateTextDocumentSerializer
+
+        return CreateTextDocumentSerializer
+
+    def _mk_request(self):
+        request = RequestFactory().get("/")
+        request.user = self.user
+        return request
+
+    def test_create(self):
+        serializer = self._cut(
+            data={"agenda_item": self.ai.pk, "base_tag": "hej", "body": "Hello"},
+            context={"request": self._mk_request()},
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.create(serializer.validated_data)
+
+    def test_create_duplicate(self):
+        serializer = self._cut(
+            data={"agenda_item": self.ai.pk, "base_tag": "hi", "body": "Hello"},
+            context={"request": self._mk_request()},
+        )
+        serializer.is_valid()
+        self.assertIn("base_tag", serializer.errors)
+
+    def test_base_tag_sluggified(self):
+        request = self._mk_request()
+        serializer = self._cut(
+            data={
+                "agenda_item": self.ai.pk,
+                "base_tag": "Hur mår du?",
+                "body": "Hello",
+            },
+            context={"request": request},
+        )
+        serializer.is_valid()
+        self.assertEqual("hur-mar-du", serializer.data["base_tag"])

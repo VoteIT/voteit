@@ -1,7 +1,14 @@
+from typing import OrderedDict
+
 from django.db.models import QuerySet
+from django.utils.text import slugify
+from django.utils.translation import gettext as _
 from rest_framework import exceptions
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+from typing import Dict
 
+from voteit.agenda.models import AgendaItem
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import RichTextSerializerMixin
 from voteit.core.rest_api.validators import ValidateGroupAIContext
@@ -160,6 +167,10 @@ class TextParagraphSerializer(serializers.ModelSerializer):
         fields = read_only_fields
 
 
+def adjust_tag(value: str) -> str:
+    return slugify(value)[:25]
+
+
 class CreateTextDocumentSerializer(BaseModelSerializer):
     class Meta:
         model = TextDocument
@@ -173,6 +184,16 @@ class CreateTextDocumentSerializer(BaseModelSerializer):
             "body",
             "base_tag",
         ]
+
+    def validate(self, attrs: Dict) -> Dict:
+        attrs = super().validate(attrs)
+        attrs["base_tag"] = base_tag = adjust_tag(attrs["base_tag"])
+        ai = attrs["agenda_item"]
+        if isinstance(ai, AgendaItem):
+            ai = ai.pk
+        if TextDocument.objects.filter(agenda_item=ai, base_tag=base_tag).exists():
+            raise ValidationError({"base_tag": _("Must be unique for agenda item")})
+        return attrs
 
 
 class TextDocumentSerializer(serializers.ModelSerializer):
@@ -198,3 +219,15 @@ class TextDocumentSerializer(serializers.ModelSerializer):
         ).data
         # FIXME: This is probably NOT the correct way to handle the serialized data
         return [dict(x) for x in data]
+
+    def validate(self, attrs: Dict) -> Dict:
+        attrs = super().validate(attrs)
+        if "base_tag" in attrs:
+            attrs["base_tag"] = base_tag = adjust_tag(attrs["base_tag"])
+            if (
+                self.instance.agenda_item.text_documents.filter(base_tag=base_tag)
+                .exclude(pk=self.instance.pk)
+                .exists()
+            ):
+                raise ValidationError({"base_tag": _("Must be unique for agenda item")})
+        return attrs
