@@ -178,6 +178,39 @@ class ProposalsAPITests(APITestCase):
         )
         self.assertRaises(ObjectDoesNotExist, prop.refresh_from_db)
 
+    def test_preview_proposal(self):
+        url = reverse("proposal-preview")
+        data = {
+            "agenda_item": self.ai.pk,
+            "body": "Hello!",
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(
+            "Hello!",
+            data["body"],
+        )
+
+    def test_preview_diff_proposal(self):
+        url = reverse("proposal-preview")
+        data = {
+            "agenda_item": self.ai.pk,
+            "body": "Hello " + mk_hashtag("world"),
+            "shortname": "diff_proposal",
+            "paragraph": self.para.pk,
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(
+            'Hello \n<span class="mention" data-index="0" data-denotation-char="#" data-id="world" data-value="world">\n'
+            '<span contenteditable="false"><span class="ql-mention-denotation-char">#</span>world</span></span>',
+            data["body"],
+        )
+
 
 class TextDocumentAPITests(APITestCase):
     fixtures = ["meeting_test_fixture"]
