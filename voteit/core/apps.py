@@ -11,9 +11,9 @@ class CoreConfig(AppConfig):
         from voteit.core import models_to_register
         from voteit.core.utils import prepare_available_transitions
 
-        for model in models_to_register:
+        while models_to_register:
+            model = models_to_register.pop()
             register_model(model, content_types)
-        del models_to_register
 
         # Make sure linked permissions make sense
         permissions.validate_registry()
