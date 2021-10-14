@@ -13,7 +13,7 @@ __all__ = ["ProposalViewSet"]
 
 class ProposalViewSet(DefaultModelViewSet):
     model = Proposal  # And ALL subtypes!
-    queryset = Proposal.objects.all()
+    queryset = Proposal.objects.all().select_subclasses()
     serializer_class = serializers.GenericProposalSerializer  # Morphic
     serializer_classes = {
         "create": serializers.GenericCreateProposalSerializer,

@@ -1,8 +1,12 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from voteit.core.testing import mk_hashtag
+from voteit.meeting.channels import ParticipantsChannel
+
 
 User = get_user_model()
 
@@ -213,6 +217,25 @@ class ProposalsAPITests(APITestCase):
             '<span class="text-diff-removed">I am the eggman <br/> I am the walrus</span> <span class="text-diff-added">Hello world!</span>',
             data["body_diff"],
         )
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_transition_on_diff_triggers_correct_push(self, mock_publish):
+        from voteit.proposal.messages import ProposalChanged
+
+        diff_prop = self.para.proposals.create(agenda_item=self.ai)
+        mock_publish.reset_mock()
+        self.assertFalse(mock_publish.called)
+
+        self.client.force_login(self.moderator)
+        url = reverse("proposal-transitions", kwargs={"pk": diff_prop.pk})
+        response = self.client.post(url, data={"transition": "approved"})
+        self.assertEqual(201, response.status_code)
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, ProposalChanged)
+        self.assertEqual(diff_prop.pk, msg.data.pk)
+        self.assertEqual("diff_proposal", msg.data.shortname)
+        self.assertEqual(self.para.pk, msg.data.paragraph)
 
 
 class TextDocumentAPITests(APITestCase):
