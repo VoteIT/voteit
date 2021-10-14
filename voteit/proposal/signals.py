@@ -10,6 +10,7 @@ from django_fsm import post_transition
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
+from voteit.core.decorators import receiver_all_subclasses
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.messaging.messages.app_state import AppState
@@ -51,7 +52,7 @@ def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
     )
 
 
-@receiver(post_save, sender=Proposal)
+@receiver_all_subclasses(post_save, sender=Proposal)
 def proposal_updated(instance: Proposal = None, created=None, **kw):
     if instance.meeting is None:
         return
@@ -67,7 +68,7 @@ def proposal_updated(instance: Proposal = None, created=None, **kw):
         participants_ch.publish(msg)
 
 
-@receiver(pre_delete, sender=Proposal)
+@receiver_all_subclasses(pre_delete, sender=Proposal)
 def proposal_delete(instance=None, **kw):
     if instance.meeting is None:
         return

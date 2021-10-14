@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -7,6 +9,10 @@ from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.messaging.messages.channels import Subscribe
+
+if TYPE_CHECKING:
+    from voteit.proposal.models import DiffProposal
+
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -81,15 +87,34 @@ class MeetingSubscribedTests(TestCase):
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
-class ProposalChangedTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
+class AnyProposalChangedTests(TestCase):
+    """
+    Must catch other types too
+    """
 
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.ai.upcoming()
-        self.ai.save()
-        self.prop = self.ai.proposals.create()
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.proposal.models import DiffProposal
+        from voteit.proposal.models import TextDocument
+
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.ai.upcoming()
+        cls.ai.save()
+        cls.text_doc: TextDocument = cls.ai.text_documents.create(
+            body="Hello", base_tag="hi"
+        )
+        cls.para = cls.text_doc.text_paragraphs.first()
+        cls.prop = cls.ai.proposals.create()
+        cls.diff_prop: DiffProposal = cls.para.proposals.create(
+            agenda_item=cls.ai,  # paragraph=cls.para
+        )
+
+    def _mk_diff_prop(self) -> DiffProposal:
+        return self.para.proposals.create(
+            agenda_item=self.ai,  # paragraph=cls.para
+        )
 
     @patch.object(ParticipantsChannel, "publish")
     def test_added_participant(self, mock_publish):
@@ -101,11 +126,27 @@ class ProposalChangedTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalAdded)
         self.assertEqual(prop.pk, msg.data.pk)
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_added_in_private_ai_participant(self, mock_publish):
+        self.assertFalse(mock_publish.called)
         self.ai.unpublish()
         self.ai.save()
         mock_publish.reset_mock()
         self.ai.proposals.create()
         self.assertFalse(mock_publish.called)
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_diff_proposal_added(self, mock_publish):
+        from voteit.proposal.messages import ProposalAdded
+
+        self.assertFalse(mock_publish.called)
+        diff_prop = self._mk_diff_prop()
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, ProposalAdded)
+        self.assertEqual(diff_prop.pk, msg.data.pk)
+        self.assertEqual(msg.data.paragraph, diff_prop.paragraph.pk)
 
     @patch.object(ModeratorsChannel, "publish")
     def test_added_moderator(self, mock_publish):
@@ -136,10 +177,27 @@ class ProposalChangedTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalChanged)
         self.assertEqual(self.prop.pk, msg.data.pk)
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_diff_changed_participant(self, mock_publish):
+        from voteit.proposal.messages import ProposalChanged
+
+        self.assertFalse(mock_publish.called)
+        self.diff_prop.body = "Hello"
+        self.diff_prop.save()
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, ProposalChanged)
+        self.assertEqual(self.diff_prop.pk, msg.data.pk)
+        self.assertEqual(self.diff_prop.paragraph.pk, msg.data.paragraph)
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_changed_private_ai_participant(self, mock_publish):
         self.ai.unpublish()
         self.ai.save()
         mock_publish.reset_mock()
-        self.prop.body = "World"
+        self.assertFalse(mock_publish.called)
+        self.prop.body = "Hello"
         self.prop.save()
         self.assertFalse(mock_publish.called)
 
@@ -172,11 +230,26 @@ class ProposalChangedTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalDeleted)
         self.assertEqual(prop_pk, msg.data.pk)
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_deleted_diff_participants(self, mock_publish):
+        from voteit.proposal.messages import ProposalDeleted
+
+        self.assertFalse(mock_publish.called)
+        diff_prop_pk = self.diff_prop.pk
+        self.diff_prop.delete()
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, ProposalDeleted)
+        self.assertEqual(diff_prop_pk, msg.data.pk)
+
+    @patch.object(ParticipantsChannel, "publish")
+    def test_deleted_participants_private_ai(self, mock_publish):
         self.ai.unpublish()
         self.ai.save()
-        prop = self.ai.proposals.create()
         mock_publish.reset_mock()
-        prop.delete()
+        self.assertFalse(mock_publish.called)
+        self.prop.delete()
         self.assertFalse(mock_publish.called)
 
     @patch.object(ModeratorsChannel, "publish")
