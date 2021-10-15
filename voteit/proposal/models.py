@@ -12,11 +12,11 @@ from django.db import models
 from django.db import transaction
 from django_fsm import FSMField
 from django_fsm import transition
-from model_utils.managers import InheritanceManager
 from typing import List
 
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
+from voteit.core.managers import AutoInheritanceManager
 from voteit.core.models import BaseContent
 from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
@@ -151,7 +151,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
             self.tags.append(self.prop_id)
         super().save(**kw)
 
-    objects = InheritanceManager()
+    objects = AutoInheritanceManager()
 
 
 class TextDocument(AgendaItemContext, MeetingContext):
