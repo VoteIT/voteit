@@ -34,9 +34,7 @@ class GenericProposalSerializerTests(TestCase):
         return GenericProposalSerializer
 
     def test_serializer_from_queryset(self):
-        items = sorted(
-            self.ai.proposals.all(), key=lambda x: x.name
-        )
+        items = sorted(self.ai.proposals.all(), key=lambda x: x.name)
         results = []
         for inst in items:
             results.append(self._cut(inst).data)
@@ -104,16 +102,17 @@ class ProposalDetailSerializerTests(TestCase):
 
 
 class ProposalCreateSerializer(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
-        self.meeting: Meeting = Meeting.objects.create(
+        cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        self.user = self.meeting.participants.create(username="jane")
-        self.group = self.meeting.groups.create()
-        self.group.members.add(self.user)
-        self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
+        cls.user = cls.meeting.participants.create(username="jane")
+        cls.group = cls.meeting.groups.create()
+        cls.group.members.add(cls.user)
+        cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
 
     @property
     def _cut(self):
@@ -138,6 +137,18 @@ class ProposalCreateSerializer(TestCase):
         self.assertEqual(self.ai, instance.agenda_item)
         self.assertEqual(self.user, instance.author)
         self.assertEqual(self.group, instance.meeting_group)
+
+    def test_create_agenda_reqiured(self):
+        rf = RequestFactory()
+        request = rf.request()
+        request.user = self.user
+        data = {
+            "body": "Hello " + mk_hashtag("world"),
+            "meeting_group": self.group.pk,
+        }
+        serializer = self._cut(data=data, context={"request": request})
+        serializer.is_valid()
+        self.assertIn("agenda_item", serializer.errors)
 
 
 class DiffProposalDetailSerializerTests(TestCase):

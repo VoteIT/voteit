@@ -136,6 +136,9 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "mentions",
         ]
         validators = (ValidateGroupAIContext(),)
+        extra_kwargs = {
+            "agenda_item": {"required": True},
+        }
 
 
 class DiffProposalCreateSerializer(ProposalCreateSerializer):
@@ -214,6 +217,9 @@ class CreateTextDocumentSerializer(BaseModelSerializer):
             "base_tag",
             "title",
         ]
+        extra_kwargs = {
+            "agenda_item": {"required": True},
+        }
 
     def validate(self, attrs: Dict) -> Dict:
         attrs = super().validate(attrs)

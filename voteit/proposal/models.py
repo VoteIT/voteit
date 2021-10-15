@@ -184,6 +184,7 @@ class TextDocument(AgendaItemContext, MeetingContext):
         "agenda.AgendaItem",
         on_delete=models.CASCADE,
         related_name="text_documents",
+        null=True,  # Normally no, forced in serializer
     )
 
     @property
@@ -262,6 +263,7 @@ class TextParagraph(AgendaItemContext, MeetingContext):
         "agenda.AgendaItem",
         on_delete=models.CASCADE,
         related_name="text_paragraphs",
+        null=True,  # Normally no, forced in serializer
     )
 
     @property

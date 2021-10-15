@@ -47,6 +47,27 @@ class ProposalTests(TestCase):
         self.assertEqual("hello-1", prop.prop_id)
 
 
+class DiffProposalTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.agenda.models import AgendaItem
+        from voteit.proposal.models import TextDocument
+        from voteit.proposal.models import DiffProposal
+
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create()
+        cls.text_doc: TextDocument = TextDocument.objects.create(
+            body="Hello", base_tag="hi"
+        )
+        cls.para = cls.text_doc.text_paragraphs.first()
+        cls.diff_prop: DiffProposal = cls.para.proposals.create(agenda_item=cls.ai)
+        cls.prop = cls.ai.proposals.create()
+
+    def test_manager_fetches_all_types_by_default(self):
+        self.assertEqual({self.diff_prop, self.prop}, set(self.ai.proposals.all()))
+
+
 TEXT = """
 The bureaucracy is expanding to meet the needs of the expanding bureaucracy.
 
