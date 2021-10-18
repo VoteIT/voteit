@@ -1,11 +1,12 @@
+from __future__ import annotations
 from typing import Dict
 from typing import Optional
 from typing import Union
 
+from django.utils.translation import gettext as _
 from pydantic import BaseModel
 from pydantic import Field
 from pydantic import validator
-from django.utils.translation import gettext as _
 
 from voteit.messaging import INTERNAL_MESSAGE
 from voteit.messaging import WEBSOCKET_OUTGOING
@@ -21,7 +22,7 @@ class BaseEnvelope(BaseModel):
 
 
 class IncomingEnvelope(BaseEnvelope):
-    """ Received from websocket - either a command or a query. """
+    """Received from websocket - either a command or a query."""
 
     @validator("t")
     def validate_type(cls, v):
@@ -42,7 +43,7 @@ class InternalEnvelope(BaseEnvelope):
 
 
 class OutgoingEnvelope(BaseEnvelope):
-    """ Transmission to an open websocket. Some kind of response or push. """
+    """Transmission to an open websocket. Some kind of response or push."""
 
     type: str = Field(WEBSOCKET_OUTGOING, const=True)
     s: Optional[str]
