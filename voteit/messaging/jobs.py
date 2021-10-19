@@ -40,7 +40,7 @@ def run_job(msg_data: Dict, mm_data: Dict, incoming=True, atomic=True):
     _set_lang(instance.mm.language)
     try:
         if atomic:
-            with transaction.atomic():
+            with transaction.atomic(durable=True):
                 instance.run_job()
         else:
             instance.run_job()
@@ -55,7 +55,7 @@ def run_job(msg_data: Dict, mm_data: Dict, incoming=True, atomic=True):
 def signal_websocket_connect(
     user_pk: int = None, consumer_name: str = "", language: Optional[str] = None
 ):
-    """ This job handles the sync code for a user connecting to a consumer. """
+    """This job handles the sync code for a user connecting to a consumer."""
     user = User.objects.get(
         pk=user_pk
     )  # User should always exist when this job is dispatched

@@ -311,8 +311,8 @@ class DeferredJob(ABC):
     # autocommit = True
     # is_async = True
     job_func = "voteit.messaging.jobs.handle_job_message"
-    # job_atomic = True
-    on_worker = False
+    job_atomic: bool = True
+    on_worker: bool = False
     # Markers for type checking
     mm: MessageMeta
     data: BaseModel  # But really the schema
@@ -333,7 +333,7 @@ class DeferredJob(ABC):
             msg_data=self.data.dict(),  # FIXME: Json encode instead?
             mm_data=self.mm.dict(),
             incoming=isinstance(self, BaseIncomingMessage),
-            atomic=True,
+            atomic=self.job_atomic,
         )
         if queue:
             return queue.enqueue(run_job, **kwargs)
