@@ -1,10 +1,8 @@
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 
 class InviteWf:
     OPEN = "open"
-    # PROCESSING = "processing"
-    # FAILED = "failed"
     EXPIRED = "expired"
     REVOKED = "revoked"
     ACCEPTED = "accepted"
@@ -12,8 +10,6 @@ class InviteWf:
 
     states = {
         OPEN: _("Open"),
-        # PROCESSING: _("Processing"),
-        # FAILED: _("Failed"),
         EXPIRED: _("Expired"),
         REVOKED: _("Revoked"),
         ACCEPTED: _("Accepted"),
