@@ -1,6 +1,9 @@
+from django.conf import settings
 from rest_framework import mixins
 from rest_framework import permissions
+from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.organisation.models import Organisation
@@ -21,13 +24,18 @@ class OrganisationViewSet(
     queryset = Organisation.objects.all()
     serializer_class = serializers.OrganisationSerializer
 
-    # FIXME: We'll allow access to all organisations right now. This might change
-    # def get_queryset(self):
-    #     if self.request.user.is_superuser:
-    #         return self.queryset
-    #     if self.request.user.organisation:
-    #         return self.queryset.filter(pk=self.request.user.organisation.pk)
-    #     return self.queryset.none()
+    # TODO: Not decided haw to host multiple organisations. For now, always return a list of one.
+    def get_queryset(self):
+        if self.request.user.is_authenticated and self.request.user.organisation:
+            return self.queryset.filter(pk=self.request.user.organisation.pk)
+        if settings.DEFAULT_ORGANISATION_ID is not None:
+            return self.queryset.filter(pk=settings.DEFAULT_ORGANISATION_ID)
+        return self.queryset
+
+    def list(self, request, *args, **kwargs):
+        """ Always return a list of one. """
+        serializer = self.get_serializer(self.get_queryset()[:1], many=True)
+        return Response(serializer.data)
 
 
 class TOSViewSet(DefaultModelViewSet):

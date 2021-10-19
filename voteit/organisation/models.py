@@ -16,9 +16,11 @@ from pytz import utc
 from requests_oauthlib import OAuth2Session
 
 from voteit.core.abcs import OrganisationContext
+from voteit.core.fields import RichTextField
 from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
+from voteit.core.utils import relaxed_clean_html
 from voteit.organisation.schemas import OAuthTokenSchema
 from voteit.organisation.utils import get_provider_response_adapters
 
@@ -49,10 +51,12 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     name = "organisation"
     roles_cls = OrganisationRoles
     title: str = models.CharField(max_length=100)
+    body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
 
     class Meta:
         verbose_name = _("Organisation")
         verbose_name_plural = _("Organisations")
+        ordering = ("title",)
 
     @property
     def organisation(self) -> Optional[Organisation]:
