@@ -55,27 +55,22 @@ class InviteQuerySerializer(serializers.Serializer):
     # FIXME: Validate scope, data and validated
 
 
-class MeetingInviteSerializer(BaseModelSerializer):
+class CreateMeetingInviteSerializer(BaseModelSerializer):
     author_kw = "created_by"
-    organisation_pk = serializers.SerializerMethodField()
-    meeting_title = serializers.SerializerMethodField()
 
     class Meta:
         model = MeetingInvite
-        # FIXME: Readonly etc
-        fields = ["pk", "organisation_pk", "meeting_title"] + [
-            f.name for f in MeetingInvite._meta.get_fields()
+        read_only_fields = [
+            "created_by",
+            "pk",
         ]
-        # Forced via BaseModelSerailizer?
-        read_only_fields = ["created_by", "organisation_pk", "meeting_title"]
+        fields = read_only_fields + [
+            "invite_data",
+            "roles",
+            "meeting",
+        ]
 
-    def get_organisation_pk(self, instance: MeetingInvite) -> int:
-        return instance.meeting.organisation.pk
-
-    def get_meeting_title(self, instance: MeetingInvite) -> str:
-        return instance.meeting.title
-
-    def validate_data(self, value):
+    def validate_invite_data(self, value):
         reg = get_invite_data_registry()
         try:
             reg.validate(value)
@@ -84,3 +79,66 @@ class MeetingInviteSerializer(BaseModelSerializer):
         except ValueError as exc:
             raise exceptions.ValidationError("Invalid keys within data")
         return value
+
+
+class MeetingInviteSerializer(CreateMeetingInviteSerializer):
+    """For update and read operations"""
+
+    class Meta(CreateMeetingInviteSerializer.Meta):
+        read_only_fields = [
+            "created",
+            "created_by",
+            "last_modified_by",
+            "last_sent",
+            "matched",
+            "meeting",
+            "modified",
+            "pk",
+            "send_state",
+            "state",
+            "used_at",
+            "used_by",
+        ]
+        fields = read_only_fields + [
+            "invite_data",
+            "roles",
+        ]
+
+
+class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
+    """Used when querying from login service."""
+
+    organisation_pk = serializers.SerializerMethodField()
+    meeting_title = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MeetingInvite
+        read_only_fields = [
+            "created",
+            "created_by",
+            "invite_data",
+            "last_modified_by",
+            "last_sent",
+            "matched",
+            "meeting",
+            "meeting_title",
+            "modified",
+            "organisation_pk",
+            "pk",
+            "roles",
+            "send_state",
+            "state",
+            "used_at",
+            "used_by",
+        ]
+        fields = read_only_fields
+
+    def get_organisation_pk(self, instance: MeetingInvite) -> int:
+        try:
+            return instance.meeting.organisation.pk
+        except AttributeError:
+            # Only unittests!
+            pass
+
+    def get_meeting_title(self, instance: MeetingInvite) -> str:
+        return instance.meeting.title

@@ -25,12 +25,12 @@ class MeetingInviteManagerTests(TestCase):
         cls.inv1 = MeetingInvite.objects.create(
             meeting=cls.meeting,
             created_by=cls.user,
-            data={"email": "a@betahaus.net", "dummy": 1},
+            invite_data={"email": "a@betahaus.net", "dummy": 1},
         )
         cls.inv2 = MeetingInvite.objects.create(
             meeting=cls.meeting,
             created_by=cls.user,
-            data={"email": "b@betahaus.net"},
+            invite_data={"email": "b@betahaus.net"},
         )
 
     @classmethod
@@ -94,7 +94,7 @@ class MeetingInviteTests(TestCase):
         cls.invite: MeetingInvite = MeetingInvite.objects.create(
             meeting=cls.meeting,
             created_by=cls.user,
-            data={"email": "a@betahaus.net"},
+            invite_data={"email": "a@betahaus.net"},
             roles=["participant"],
         )
 

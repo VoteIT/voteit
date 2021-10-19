@@ -39,7 +39,7 @@ class MeetingInviteViewSetTests(APITestCase):
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.invite: MeetingInvite = cls.meeting.invites.create(
-            data={"email": "hello@betahaus.net"}, created_by=cls.moderator
+            invite_data={"email": "hello@betahaus.net"}, created_by=cls.moderator
         )
 
     def setUp(self):
@@ -48,7 +48,10 @@ class MeetingInviteViewSetTests(APITestCase):
 
     def test_create(self):
         url = reverse("meeting-invites-list")
-        data = {"meeting": self.meeting.pk, "data": {"email": "hello@betahaus.net"}}
+        data = {
+            "meeting": self.meeting.pk,
+            "invite_data": {"email": "hello@betahaus.net"},
+        }
         for user, status in (
             (None, 401),
             (self.participant, 403),
@@ -169,10 +172,10 @@ class MatchInvitesViewSetTests(APITestCase):
             "moderator",  # organisation=cls.organisation
         )
         cls.invite: MeetingInvite = cls.meeting.invites.create(
-            data={"email": "hello@betahaus.net"}, created_by=cls.moderator
+            invite_data={"email": "hello@betahaus.net"}, created_by=cls.moderator
         )
         cls.invite2: MeetingInvite = cls.meeting.invites.create(
-            data={"email": "goodbye@betahaus.net"}, created_by=cls.moderator
+            invite_data={"email": "goodbye@betahaus.net"}, created_by=cls.moderator
         )
 
     def setUp(self):
@@ -299,10 +302,10 @@ class UserMatchedInviteViewSetTests(APITestCase):
         )
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.invite: MeetingInvite = cls.meeting.invites.create(
-            data={"email": "hello@betahaus.net"}, created_by=cls.moderator
+            invite_data={"email": "hello@betahaus.net"}, created_by=cls.moderator
         )
         cls.invite2: MeetingInvite = cls.meeting.invites.create(
-            data={"email": "goodbye@betahaus.net"}, created_by=cls.moderator
+            invite_data={"email": "goodbye@betahaus.net"}, created_by=cls.moderator
         )
 
         cls.mock_api_return = {

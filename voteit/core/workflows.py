@@ -1,5 +1,5 @@
 """ Common workflows. """
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 
 class AcceptanceWf:
@@ -28,6 +28,27 @@ class UserWf:
         ACTIVE: _("Active"),
     }
     initial = INCOMPLETE
+
+    @classmethod
+    def choices(cls):
+        return cls.states.items()
+
+
+class SendWf:
+    CREATED = "created"
+    SCHEDULED = "scheduled"
+    SENDING = "sending"
+    SENT = "sent"
+    FAILED = "failed"
+
+    states = {
+        CREATED: _("Created"),
+        SCHEDULED: _("Scheduled"),
+        SENDING: _("Sending"),
+        SENT: _("Sent"),
+        FAILED: _("Failed"),
+    }
+    initial = CREATED
 
     @classmethod
     def choices(cls):

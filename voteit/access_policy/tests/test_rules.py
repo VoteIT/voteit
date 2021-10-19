@@ -20,7 +20,7 @@ class MeetingInvitePermissionsTests(TestCase):
         cls.invite = MeetingInvite.objects.create(
             meeting=cls.meeting,
             created_by=cls.moderator,
-            data={"email": "yeah@betahaus.net"},
+            invite_data={"email": "yeah@betahaus.net"},
         )
         cls.wf = InviteWf
 

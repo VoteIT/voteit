@@ -60,6 +60,9 @@ class AccessPoliciesViewSet(viewsets.ReadOnlyModelViewSet):
 
 class MeetingInviteViewSet(DefaultModelViewSet):
     serializer_class = serializers.MeetingInviteSerializer
+    serializer_classes = {
+        "create": serializers.CreateMeetingInviteSerializer,
+    }
     context_queryset = Meeting.objects.all()
     context_lookup_kwarg = "meeting"
     model = MeetingInvite
@@ -89,7 +92,7 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
     Settings must contain the service users
     """
 
-    serializer_class = serializers.MeetingInviteSerializer
+    serializer_class = serializers.ExternalMeetingInviteSerializer
     authentication_classes = (InviteBasicAuthentication,)
     permission_classes = (IsAuthenticated,)
 
@@ -127,7 +130,7 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
         instance: MeetingInvite = self.get_object()
         matched = []
         for scope, data_items in self.search_data.items():
-            invite_data = instance.data.get(scope, _marker)
+            invite_data = instance.invite_data.get(scope, _marker)
             if invite_data == _marker:
                 continue
             for data in data_items:
@@ -176,7 +179,7 @@ class HandleMatchedInvitesViewSet(
 
     def get_matching(self, instance: MeetingInvite):
         for item in self.identity_data["user_data"]:
-            if instance.data.get(item["scope"], _marker) == item["data"]:
+            if instance.invite_data.get(item["scope"], _marker) == item["data"]:
                 yield item
 
     @action(

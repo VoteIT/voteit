@@ -71,6 +71,8 @@ class InviteDataRegistry(Registry):
         ValidationError:
 
         """
+        if not data:
+            raise ValueError("Invite must contain data")
         no_such_data = set(data.keys()) - set(self.keys())
         if no_such_data:
             raise ValueError(
