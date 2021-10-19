@@ -19,7 +19,7 @@ from voteit.access_policy.models import MeetingInvite
 from voteit.access_policy.permissions import MeetingInvitePermissions
 from voteit.access_policy.utils import get_dispatchers_registry
 from voteit.access_policy.utils import get_invite_data_registry
-from voteit.access_policy.utils import send_invites
+from voteit.access_policy.utils import create_dispatch_and_schedule_invites
 from voteit.access_policy.workflows import InviteWf
 from voteit.core.validators import root_validate_roles_and_model
 from voteit.core.workflows import SendWf
@@ -235,7 +235,10 @@ class SendInvites(BaseIncomingMessage, ContextAction, DeferredJob):
 
     def run_job(self):
         self.assert_perm()
-        send_invites(created_by=self.user, **self.data.dict())
+        invite_dispatch = create_dispatch_and_schedule_invites(
+            created_by=self.user, **self.data.dict()
+        )
+        invite_dispatch.send_scheduled()
 
 
 @outgoing

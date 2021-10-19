@@ -16,6 +16,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils.functional import cached_property
+from django.utils.timezone import now
 from django_fsm import FSMField
 from django_fsm import transition
 
@@ -219,17 +220,22 @@ class MeetingInvite(MeetingContext):
         pass
 
     # SEND STATE TRANSITIONS
-    # @transition(
-    #     field=send_state,
-    #     source=SendWf.SCHEDULED,
-    #     target=SendWf.SENDING,
-    #     permission=NOT_ALLOWED,  # Special view, not a normal transition
-    # )
-    # def mark_sending(self):
-    #     pass
-    #
+    @transition(
+        field=send_state,
+        source=[x for x in SendWf.states.keys() if x != SendWf.SCHEDULED],
+        target=SendWf.SCHEDULED,
+        permission=NOT_ALLOWED,  # Special view, not a normal transition
+    )
+    def schedule(self):
+        pass
 
     objects = MeetingInviteManager()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self}>"
+
+    def __str__(self):
+        return f"invite:{self.pk}"
 
 
 class InviteDispatch(models.Model):
@@ -256,3 +262,33 @@ class InviteDispatch(models.Model):
 
     def send(self, invite: MeetingInvite) -> bool:
         return self.dispatcher.send(invite)
+
+    def send_scheduled(self):
+        sent = 0
+        failed = 0
+        skipped = self.invites.exclude(send_state=SendWf.SCHEDULED).count()
+        for invite in self.invites.filter(send_state=SendWf.SCHEDULED):
+            invite: MeetingInvite
+            invite.send_state = SendWf.SENDING
+            invite.save()
+            try:
+                self.send(invite)
+            except Exception as exc:
+                invite.send_state = SendWf.FAILED
+                logger.exception("Invite %s failed while sending", invite.pk)
+                failed += 1
+            else:
+                invite.send_state = SendWf.SENT
+                invite.last_sent = now()
+                sent += 1
+            invite.save()
+        return sent, failed, skipped
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self}>"
+
+    def __str__(self):
+        v = getattr(self, "subject", None)
+        if not v:
+            v = f"Dispatch:{self.pk}"
+        return v

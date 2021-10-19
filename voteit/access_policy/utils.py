@@ -59,7 +59,9 @@ def get_dispatchers_registry() -> Registry:
     return invite_dispatchers
 
 
-def send_invites(created_by: User = None, **kwargs):
+def create_dispatch_and_schedule_invites(
+    created_by: User = None, **kwargs
+) -> InviteDispatch:
     from voteit.access_policy.messages import SendInvitesSchema
 
     send_data = SendInvitesSchema(**kwargs)
@@ -77,16 +79,4 @@ def send_invites(created_by: User = None, **kwargs):
         )
         invite_dispatch.invites.set(invites_qs)
         invites_qs.update(send_state=SendWf.SCHEDULED)
-    # breakpoint()
-    for invite in invite_dispatch.invites.filter(send_state=SendWf.SCHEDULED):
-        invite: MeetingInvite
-        invite.send_state = SendWf.SENDING
-        invite.save()
-        try:
-            invite_dispatch.send(invite)
-        except Exception as exc:
-            invite.send_state = SendWf.FAILED
-            logger.exception("Invite %s failed while sending", invite.pk)
-        else:
-            invite.send_state = SendWf.SENT
-        invite.save()
+    return invite_dispatch
