@@ -66,3 +66,17 @@ class OrganisationViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(1, len(data))
+
+    def test_list_of_one(self):
+        # Note: This is subject to change. For now you should get only one organisation.
+        from voteit.organisation.models import Organisation
+
+        other_org = Organisation.objects.create(title="Test org 2")
+        url = "/api/organisations/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(1, len(response.json()))
+        # Even though not in list, you can still retrieve each organisation. Yes, this is kind of weird.
+        for org in (self.org, other_org):
+            response = self.client.get(f"/api/organisations/{org.pk}/")
+            self.assertEqual(response.status_code, 200)
