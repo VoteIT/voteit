@@ -1,42 +1,47 @@
 from __future__ import annotations
-from abc import ABC
-from datetime import datetime
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AbstractUser
+from datetime import timedelta
+from logging import getLogger
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import TYPE_CHECKING
+
+from django.db import transaction
+from django.utils.timezone import now
+from django.utils.translation import gettext as _
 from pydantic import Field
 from pydantic import root_validator
 from pydantic import validator
 from pydantic.main import BaseModel
-from django.utils.translation import gettext as _
-from typing import List, Optional, Dict
 
 from voteit.access_policy.models import MeetingInvite
 from voteit.access_policy.permissions import MeetingInvitePermissions
+from voteit.access_policy.utils import get_dispatchers_registry
 from voteit.access_policy.utils import get_invite_data_registry
+from voteit.access_policy.utils import send_invites
 from voteit.access_policy.workflows import InviteWf
 from voteit.core.validators import root_validate_roles_and_model
+from voteit.core.workflows import SendWf
 from voteit.meeting.models import Meeting
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import ContextAction
 from voteit.messaging.abcs import DeferredJob
-from voteit.messaging.errors import NotFoundError
-from voteit.messaging.errors import ValidationErrorMsg
-from voteit.messaging.messages.base import BaseAddObject
+from voteit.messaging.decorators import incoming
+from voteit.messaging.decorators import outgoing
+from voteit.messaging.errors import BadRequestError
 from voteit.messaging.messages.base import BaseObjectAdded
 from voteit.messaging.messages.base import BaseObjectChanged
 from voteit.messaging.messages.base import BaseObjectDeleted
-from voteit.messaging.messages.status import StatusDone
-from voteit.messaging.errors import BadRequestError
-from voteit.messaging.decorators import incoming
-from voteit.messaging.decorators import outgoing
-from voteit.speaker.models import SpeakerList
-from voteit.speaker.permissions import SpeakerListPermissions
+
+if TYPE_CHECKING:
+    from voteit.access_policy.models import InviteDispatch
+
+logger = getLogger(__name__)
 
 
 class AddInvitesSchema(BaseModel):
-    body: str = ""  # FIXME validations?
     roles: List[str]
     model: str = Field("meeting", const=True)  # Constant
     invite_data: List[Dict[str, str]]
@@ -51,7 +56,7 @@ class AddInvitesSchema(BaseModel):
     def validate_invite_data(cls, v):
         """
         >>> AddInvitesSchema(roles=['participant'], invite_data=[{'email': 'hello@betahaus.net'}], meeting=1)
-        AddInvitesSchema(body='', roles=['participant'], model='meeting', invite_data=[{'email': 'hello@betahaus.net'}], meeting=1)
+        AddInvitesSchema(roles=['participant'], model='meeting', invite_data=[{'email': 'hello@betahaus.net'}], meeting=1)
 
         >>> AddInvitesSchema(roles=['participant'], invite_data=[{'email': 'bad_email'}], meeting=1)
         Traceback (most recent call last):
@@ -118,17 +123,18 @@ class AddInvites(BaseIncomingMessage, ContextAction, DeferredJob):
                 # So we need to update this single existing invite and set permissions according to the new state
                 invite: MeetingInvite = invite_qs.first()
                 user = invite.used_by
-                # Adjust existing roles
-                requested_roles = set(invite.roles)
-                current_roles = meeting.get_roles(user)
-                if not current_roles:
-                    current_roles = set()
-                remove_roles = requested_roles - current_roles
-                if remove_roles:
-                    meeting.remove_roles(user, *remove_roles)
-                add_roles = current_roles - requested_roles
-                if add_roles:
-                    meeting.add_roles(user, *add_roles)
+                if user:
+                    # Adjust existing roles
+                    requested_roles = set(invite.roles)
+                    current_roles = meeting.get_roles(user)
+                    if not current_roles:
+                        current_roles = set()
+                    remove_roles = requested_roles - current_roles
+                    if remove_roles:
+                        meeting.remove_roles(user, *remove_roles)
+                    add_roles = current_roles - requested_roles
+                    if add_roles:
+                        meeting.add_roles(user, *add_roles)
                 # Update invite
                 invite.invite_data = row
                 invite.roles = self.data.roles
@@ -166,6 +172,70 @@ class InvitesAdded(BaseOutgoingMessage):
     name = "invites.added"
     schema = InvitesAddedSchema
     data: InvitesAddedSchema
+
+
+VALID_STATES = set(SendWf.states.keys()) - {SendWf.SENDING, SendWf.SCHEDULED}
+
+
+class SendInvitesSchema(BaseModel):
+    meeting: int
+    subject: Optional[str]  # FIXME - None means default from send dispatcher
+    body: str  # FIXME
+    states: List[str] = [SendWf.FAILED, SendWf.SENT, SendWf.CREATED]
+    dispatcher_name: str = "send_email"
+    resend_minimum: int = 24  # Don't resend before this
+
+    @validator("states")
+    def validate_states(cls, v: List[str]):
+        """
+        >>> SendInvitesSchema.validate_states(['hello'])
+        Traceback (most recent call last):
+        ...
+        ValueError:
+
+        >>> SendInvitesSchema.validate_states([SendWf.SENT, SendWf.CREATED])
+        ['sent', 'created']
+
+        """
+        specified = set(v)
+        invalid = specified - VALID_STATES
+        if invalid:
+            raise ValueError(
+                f"The following invite send states aren't valid: '{', '.join(invalid)}'"
+            )
+        return v
+
+    @validator("dispatcher_name")
+    def validate_dispatcher_name(cls, v: str):
+        """
+        >>> SendInvitesSchema.validate_dispatcher_name('hello')
+        Traceback (most recent call last):
+        ...
+        ValueError:
+
+        >>> SendInvitesSchema.validate_dispatcher_name('send_email')
+        'send_email'
+
+        """
+        reg = get_dispatchers_registry()
+        if v not in reg:
+            raise ValueError(f"No invite dispatcher with the name '{v}'")
+        return v
+
+
+@incoming
+class SendInvites(BaseIncomingMessage, ContextAction, DeferredJob):
+    name = "invites.send"
+    permission = MeetingInvitePermissions.ADD
+    schema = SendInvitesSchema
+    data: SendInvitesSchema
+    model = Meeting
+    context_pk_attr = "meeting"
+    job_atomic = False
+
+    def run_job(self):
+        self.assert_perm()
+        send_invites(created_by=self.user, **self.data.dict())
 
 
 @outgoing

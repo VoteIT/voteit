@@ -20,6 +20,7 @@ from django_fsm import FSMField
 from django_fsm import transition
 
 from voteit.access_policy.permissions import MeetingInvitePermissions
+from voteit.access_policy.utils import get_dispatchers_registry
 from voteit.access_policy.utils import get_invite_data_registry
 from voteit.access_policy.workflows import InviteWf
 from voteit.core.abcs import MeetingContext
@@ -29,6 +30,7 @@ from voteit.core.workflows import SendWf
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
+    from voteit.access_policy.abcs import InviteDispatcher
 
 logger = getLogger(__name__)
 
@@ -176,6 +178,14 @@ class MeetingInvite(MeetingContext):
         null=True,
     )
 
+    def get_scope_value(self, scope: str, default=None):
+        if self.invite_data:
+            reg = get_invite_data_registry()
+            if scope in reg:
+                data = reg[scope](**self.invite_data)
+                return getattr(data, scope)
+        return default
+
     # INVITE STATE TRANSITIONS
     @transition(
         field=state,
@@ -209,7 +219,15 @@ class MeetingInvite(MeetingContext):
         pass
 
     # SEND STATE TRANSITIONS
-    # FIXME
+    # @transition(
+    #     field=send_state,
+    #     source=SendWf.SCHEDULED,
+    #     target=SendWf.SENDING,
+    #     permission=NOT_ALLOWED,  # Special view, not a normal transition
+    # )
+    # def mark_sending(self):
+    #     pass
+    #
 
     objects = MeetingInviteManager()
 
@@ -217,7 +235,9 @@ class MeetingInvite(MeetingContext):
 class InviteDispatch(models.Model):
     name = "invite_dispatch"
     invites = models.ManyToManyField(MeetingInvite)
+    subject: str = models.CharField(max_length=100, default="")
     body: str = RichTextField(verbose_name="Message body", default="")
+    dispatcher_name: str = models.CharField(max_length=30, default="send_email")
     created: datetime = models.DateTimeField(auto_now_add=True)
     created_by: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -228,3 +248,11 @@ class InviteDispatch(models.Model):
         on_delete=models.CASCADE,
         related_name="invite_dispatches",
     )
+
+    @cached_property
+    def dispatcher(self) -> InviteDispatcher:
+        reg = get_dispatchers_registry()
+        return reg[self.dispatcher_name](self)
+
+    def send(self, invite: MeetingInvite) -> bool:
+        return self.dispatcher.send(invite)

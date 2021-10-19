@@ -41,7 +41,7 @@ __all__ = "Meeting", "MeetingRoles", "MeetingGroup"
 
 
 class MeetingRoles(Roles, MeetingContext):
-    """ Contains assigned meeting roles for a specific meeting and user"""
+    """Contains assigned meeting roles for a specific meeting and user"""
 
     name = "meeting_roles"
 
@@ -201,7 +201,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
 
     @property
     def meeting(self) -> Meeting:
-        """ To fulfill the MeetingContext ABC."""
+        """To fulfill the MeetingContext ABC."""
         return self
 
     class QuerySet(models.QuerySet):
@@ -226,6 +226,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     objects = Manager()
     groups: models.QuerySet
     invites: models.QuerySet
+    invite_dispatches: models.QuerySet
     electoral_registers: models.QuerySet
     agenda_items: models.QuerySet
     last_read_set: models.QuerySet

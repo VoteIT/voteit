@@ -1,11 +1,26 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, List
+
+from datetime import timedelta
+from logging import getLogger
+from typing import List
+from typing import TYPE_CHECKING
+
+from django.db import transaction
+from django.utils.timezone import now
+
+from voteit.core.workflows import SendWf
+from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
+    from voteit.core.models import User
     from voteit.core.component import Registry
-    from voteit.meeting.models import Meeting
     from voteit.access_policy.registries import InviteDataRegistry
+    from voteit.access_policy.messages import SendInvitesSchema
     from voteit.access_policy.models import AccessPolicy
+    from voteit.access_policy.models import InviteDispatch
+    from voteit.access_policy.models import MeetingInvite
+
+logger = getLogger(__name__)
 
 
 def get_policies(meeting: Meeting, only_active=True) -> List[AccessPolicy]:
@@ -36,3 +51,42 @@ def get_invite_data_registry() -> InviteDataRegistry:
     from .registries import invite_data
 
     return invite_data
+
+
+def get_dispatchers_registry() -> Registry:
+    from .registries import invite_dispatchers
+
+    return invite_dispatchers
+
+
+def send_invites(created_by: User = None, **kwargs):
+    from voteit.access_policy.messages import SendInvitesSchema
+
+    send_data = SendInvitesSchema(**kwargs)
+    meeting: Meeting = Meeting.objects.get(pk=send_data.meeting)
+    send_exclude_ts = now() - timedelta(hours=send_data.resend_minimum)
+    invites_qs = meeting.invites.filter(send_state__in=send_data.states).exclude(
+        last_sent__gt=send_exclude_ts
+    )
+    with transaction.atomic(durable=True):
+        invite_dispatch: InviteDispatch = meeting.invite_dispatches.create(
+            subject=send_data.subject,
+            body=send_data.body,
+            dispatcher_name=send_data.dispatcher_name,
+            created_by=created_by,
+        )
+        invite_dispatch.invites.set(invites_qs)
+        invites_qs.update(send_state=SendWf.SCHEDULED)
+    # breakpoint()
+    for invite in invite_dispatch.invites.filter(send_state=SendWf.SCHEDULED):
+        invite: MeetingInvite
+        invite.send_state = SendWf.SENDING
+        invite.save()
+        try:
+            invite_dispatch.send(invite)
+        except Exception as exc:
+            invite.send_state = SendWf.FAILED
+            logger.exception("Invite %s failed while sending", invite.pk)
+        else:
+            invite.send_state = SendWf.SENT
+        invite.save()

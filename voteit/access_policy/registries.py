@@ -1,5 +1,7 @@
 from pydantic.main import BaseModel
 from typing import Dict
+
+from voteit.access_policy.abcs import InviteDispatcher
 from voteit.access_policy.models import AccessPolicy
 from voteit.core.component import Registry
 
@@ -86,3 +88,4 @@ class InviteDataRegistry(Registry):
 
 access_policies = Registry(AccessPolicy)
 invite_data = InviteDataRegistry(BaseModel)
+invite_dispatchers = Registry(InviteDispatcher)
