@@ -3,8 +3,8 @@ from difflib import SequenceMatcher
 
 
 class ChangeGroup:
-    WORD_CAP = 3
-    LINE_CAP = 1
+    WORD_CAP = (8, 4)      # Cap at, cap to
+    LINE_CAP = (2, 1)
     CAP_FILL = ["[...]"]
     first = False
     last = False
@@ -17,18 +17,18 @@ class ChangeGroup:
         return len(self.parts)
 
     def brief_parts(self, joiner):
-        cap = joiner == " " and self.WORD_CAP or self.LINE_CAP
-        if self.state == "equal" and len(self) > cap + 1:
+        cap_at, cap_to = self.WORD_CAP if joiner == " " else self.LINE_CAP
+        if self.state == "equal" and len(self) > cap_at:
             if self.first:
-                return self.CAP_FILL + self.parts[-cap:]
+                return self.CAP_FILL + self.parts[-cap_to:]
             elif self.last:
-                return self.parts[:cap] + self.CAP_FILL
-            elif len(self) > (cap * 2) + 1:
-                return self.parts[:cap] + self.CAP_FILL + self.parts[-cap:]
+                return self.parts[:cap_to] + self.CAP_FILL
+            elif len(self) > (cap_at * 2) + 1:
+                return self.parts[:cap_to] + self.CAP_FILL + self.parts[-cap_to:]
         return self.parts
 
     def get_html(self, joiner, brief=False):
-        txt = joiner.join(brief and self.brief_parts(joiner) or self.parts)
+        txt = joiner.join(self.brief_parts(joiner) if brief else self.parts)
         if self.state == "insert":
             return '<span class="text-diff-added">{0}</span>'.format(txt)
         if self.state == "delete":
