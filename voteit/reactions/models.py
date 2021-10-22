@@ -44,6 +44,7 @@ class ReactionButton(MeetingContext):
         ("mdi-currency-eur", _("Currency")),
     )
     COLOR_CHOICES = (  # TODO, don't know how to define these. Using BS4 standard names 4 now. Should follow theme.
+        ("accent", _("Accent")),
         ("primary", _("Primary")),
         ("secondary", _("Secondary")),
         ("error", _("Error")),
