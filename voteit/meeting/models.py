@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from voteit.poll.abcs import ElectoralRegisterPolicy
     from voteit.organisation.models import Organisation
     from voteit.core.models import User
+    from voteit.participant_number.models import PNSystem
 
 __all__ = "Meeting", "MeetingRoles", "MeetingGroup"
 
@@ -230,6 +231,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     electoral_registers: models.QuerySet
     agenda_items: models.QuerySet
     last_read_set: models.QuerySet
+    pn_system: Optional[PNSystem]
 
 
 class MeetingGroup(BaseContent, MeetingContext):
