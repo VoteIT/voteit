@@ -129,6 +129,7 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
     class Meta:
         model = Proposal
         fields = [
+            "author",
             "agenda_item",
             "body",
             "meeting_group",
@@ -143,15 +144,17 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
 
 class DiffProposalCreateSerializer(ProposalCreateSerializer):
     body_diff = serializers.SerializerMethodField()
+    body_diff_brief = serializers.SerializerMethodField()
 
     class Meta(ProposalCreateSerializer.Meta):
         model = DiffProposal
         fields = [
             "paragraph",
             "body_diff",
+            "body_diff_brief",
         ] + ProposalCreateSerializer.Meta.fields
 
-    def get_body_diff(self, instance: Union[OrderedDict, DiffProposal]) -> str:
+    def get_body_diff(self, instance: Union[OrderedDict, DiffProposal], brief: bool = False) -> str:
         if isinstance(instance, DiffProposal):
             ch = Changes(instance.paragraph.body, instance.body)
         elif isinstance(instance, dict):
@@ -162,7 +165,10 @@ class DiffProposalCreateSerializer(ProposalCreateSerializer):
             ch = Changes(text.body, instance["body"])
         else:
             raise TypeError("Not a diff proposal or a dict")
-        return ch.get_html(brief=False, no_deleted=False)
+        return ch.get_html(brief=brief)
+
+    def get_body_diff_brief(self, instance: Union[OrderedDict, DiffProposal]) -> str:
+        return self.get_body_diff(instance, brief=True)
 
 
 class DiffProposalDetailSerializer(ProposalDetailSerializer):
@@ -180,11 +186,11 @@ class DiffProposalDetailSerializer(ProposalDetailSerializer):
 
     def get_body_diff(self, instance: DiffProposal) -> str:
         ch = Changes(instance.paragraph.body, instance.body)
-        return ch.get_html(brief=False, no_deleted=False)
+        return ch.get_html()
 
     def get_body_diff_brief(self, instance: DiffProposal) -> str:
         ch = Changes(instance.paragraph.body, instance.body)
-        return ch.get_html(brief=True, no_deleted=False)
+        return ch.get_html(brief=True)
 
 
 GenericProposalSerializer.registry["proposal"] = ProposalDetailSerializer
