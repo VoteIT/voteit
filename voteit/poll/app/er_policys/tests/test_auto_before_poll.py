@@ -1,28 +1,31 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django_fsm import TransitionNotAllowed
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 User = get_user_model()
 
 
 class AutoBeforePollTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.poll.models import Poll
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-
-        self.meeting = Meeting.objects.create(er_policy_name=self.ABF.name)
-        self.user1 = User.objects.create(username="one")
-        self.user2 = User.objects.create(username="two")
-        self.meeting.add_roles(self.user1, ROLE_POTENTIAL_VOTER)
-        self.meeting.add_roles(self.user2, ROLE_POTENTIAL_VOTER)
-        self.poll = Poll.objects.create(meeting=self.meeting, method_name="simple")
-
-    @property
-    def ABF(self):
         from voteit.poll.app.er_policys import AutoBeforePoll
 
-        return AutoBeforePoll
+        cls.ABF = AutoBeforePoll
+
+        cls.meeting: Meeting = Meeting.objects.create(er_policy_name=cls.ABF.name)
+        cls.user1 = User.objects.create(username="one")
+        cls.user2 = User.objects.create(username="two")
+        cls.meeting.add_roles(cls.user1, ROLE_POTENTIAL_VOTER)
+        cls.meeting.add_roles(cls.user2, ROLE_POTENTIAL_VOTER)
+        cls.poll = Poll.objects.create(meeting=cls.meeting, method_name="simple")
+
+    def setUp(self):
+        self.meeting.refresh_from_db()
+        self.poll.refresh_from_db()
 
     @property
     def ElectoralRegister(self):
@@ -83,3 +86,13 @@ class AutoBeforePollTests(TestCase):
             self.poll.initial_electoral_register, self.poll.electoral_register
         )
         self.assertNotEqual(self.poll.initial_electoral_register, first_er)
+
+    # def test_er_set_at_wrong_time(self):
+    #     self.meeting.er_policy_name = None
+    #     self.meeting.save()
+    #     self.poll.upcoming()
+    #     self.poll.proposals.create()
+    #     self.assertRaises(TransitionNotAllowed, self.poll.ongoing)
+    #     self.meeting.er_policy_name = self.ABF.name
+    #     self.meeting.save()
+    #     self.poll.ongoing()
