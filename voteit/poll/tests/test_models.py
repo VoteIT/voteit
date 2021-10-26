@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from typing import Type
+
+from django_fsm import TransitionNotAllowed
 from voteit.poll.exceptions import ElectoralRegisterEmpty
 from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidPollMethod
@@ -84,14 +86,18 @@ class PollTests(TestCase):
 
     def test_start_check_no_electoral_register(self):
         self.poll.electoral_register = None
-        self.assertRaises(ElectoralRegisterMissing, self.poll.start_check)
+        self.assertRaises(
+            ElectoralRegisterMissing, self.poll.start_check, exceptions=True
+        )
 
     def test_start_check_electoral_register_empty(self):
         self.er.voters.remove(self.user, self.user2)
-        self.assertRaises(ElectoralRegisterEmpty, self.poll.start_check)
+        self.assertRaises(
+            ElectoralRegisterEmpty, self.poll.start_check, exceptions=True
+        )
 
     def test_start_check_no_proposals(self):
-        self.assertRaises(InvalidProposalCount, self.poll.start_check)
+        self.assertRaises(InvalidProposalCount, self.poll.start_check, exceptions=True)
 
     def test_start_check(self):
         prop = self.Proposal.objects.create()
@@ -101,7 +107,7 @@ class PollTests(TestCase):
     def test_opening_poll_empty_poll(self):
         self.poll.electoral_register = None
         self.poll.upcoming()
-        self.assertRaises(ElectoralRegisterMissing, self.poll.ongoing)
+        self.assertRaises(TransitionNotAllowed, self.poll.ongoing)
 
     def test_opening_poll(self):
         self.poll.upcoming()

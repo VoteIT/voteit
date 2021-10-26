@@ -41,6 +41,7 @@ from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidPollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.exceptions import NotAllowedToVote
+from voteit.poll.exceptions import PollError
 from voteit.poll.exceptions import PollNotFinished
 from voteit.poll.permissions import PollPermissions
 from voteit.poll.schemas import PollResult
@@ -212,26 +213,32 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         self.result_data = data.dict()
 
     def validate_settings_guard(self) -> bool:
-        """ Guard for transitions to upcoming or ongoing. """
+        """Guard for transitions to upcoming or ongoing."""
         try:
             pset = self.settings  # Will raise exceptions on bad settings
         except ValidationError:
             return False
         return pset is None or isinstance(pset, BaseModel)
 
-    def start_check(self) -> bool:
+    def start_check(self, exceptions=False) -> bool:
         """Check that this poll could be started. A very basic check for the most obvious things.
         Note that it's used as a transition condition, so it must return True if everything is ok!
         """
-        if self.electoral_register is None:
-            raise ElectoralRegisterMissing()
-        if self.electoral_register.voters.count() < 1:
-            raise ElectoralRegisterEmpty()
-        if self.proposals.count() < 1:
-            raise InvalidProposalCount("No proposals")
-        method = self.method  # Will raise exception if doesn't exist
-        # And check the specifics for the poll method
-        method.start_check()
+        try:
+            if self.electoral_register is None:
+                raise ElectoralRegisterMissing()
+            if self.electoral_register.voters.count() < 1:
+                raise ElectoralRegisterEmpty()
+            if self.proposals.count() < 1:
+                raise InvalidProposalCount("No proposals")
+            method = self.method  # Will raise exception if doesn't exist
+            # And check the specifics for the poll method
+            method.start_check()
+        except PollError as exc:
+            if exceptions:
+                raise exc
+            logger.exception("Poll can't start:")
+            return False
         return True
 
     @transition(
@@ -284,7 +291,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         custom={"title": _("Finish")},
     )
     def finish(self):
-        """ Count the votes and finish up. """
+        """Count the votes and finish up."""
         # Remove bad votes due to a change in electoral register during the poll.
         # This is probably not allowed in most meetings.
         self.vote_cleanup_set().delete()
