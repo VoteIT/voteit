@@ -46,14 +46,12 @@ class AddInvitesTests(TestCase):
             data.append({"email": f"{name}@betahaus.net"})
         msg = self._mk_one(roles=["participant"], invite_data=data)
         response = msg.run_job()
-        self.assertTrue(mock_publish.called)
-        self.assertEqual(3, len(mock_publish.mock_calls))
-        # Check response
         self.assertEqual(3, len(response.data.added))
         self.assertEqual(0, len(response.data.changed))
         self.assertEqual(0, response.data.skipped_count)
-
         # Check pushes
+        self.assertTrue(mock_publish.called)
+        self.assertEqual(3, len(mock_publish.mock_calls))
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingInviteAdded)
         self.assertEqual({"email": "one@betahaus.net"}, msg.data.invite_data)

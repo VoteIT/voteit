@@ -1,22 +1,18 @@
 from __future__ import annotations
 
-from datetime import timedelta
 from logging import getLogger
 from typing import Dict
 from typing import List
 from typing import Optional
-from typing import TYPE_CHECKING
-
-from django.db import transaction
-from django.utils.timezone import now
-from django.utils.translation import gettext as _
 from pydantic import Field
 from pydantic import root_validator
 from pydantic import validator
 from pydantic.main import BaseModel
+from typing import Set
 
-from voteit.access_policy.models import MeetingInvite
+from voteit.access_policy.exceptions import InviteError
 from voteit.access_policy.permissions import MeetingInvitePermissions
+from voteit.access_policy.utils import create_invites
 from voteit.access_policy.utils import get_dispatchers_registry
 from voteit.access_policy.utils import get_invite_data_registry
 from voteit.access_policy.utils import create_dispatch_and_schedule_invites
@@ -35,8 +31,6 @@ from voteit.messaging.messages.base import BaseObjectAdded
 from voteit.messaging.messages.base import BaseObjectChanged
 from voteit.messaging.messages.base import BaseObjectDeleted
 
-if TYPE_CHECKING:
-    from voteit.access_policy.models import InviteDispatch
 
 logger = getLogger(__name__)
 
@@ -44,6 +38,9 @@ logger = getLogger(__name__)
 class AddInvitesSchema(BaseModel):
     roles: List[str]
     model: str = Field("meeting", const=True)  # Constant
+    skip_states: Set[str] = Field(
+        {InviteWf.REVOKED, InviteWf.REVOKED}, const=True
+    )  # Allow changes later
     invite_data: List[Dict[str, str]]
     meeting: int
 
@@ -56,7 +53,7 @@ class AddInvitesSchema(BaseModel):
     def validate_invite_data(cls, v):
         """
         >>> AddInvitesSchema(roles=['participant'], invite_data=[{'email': 'hello@betahaus.net'}], meeting=1)
-        AddInvitesSchema(roles=['participant'], model='meeting', invite_data=[{'email': 'hello@betahaus.net'}], meeting=1)
+        AddInvitesSchema(roles=['participant'], model='meeting', skip_states={'revoked'}, invite_data=[{'email': 'hello@betahaus.net'}], meeting=1)
 
         >>> AddInvitesSchema(roles=['participant'], invite_data=[{'email': 'bad_email'}], meeting=1)
         Traceback (most recent call last):
@@ -88,7 +85,6 @@ class AddInvites(BaseIncomingMessage, ContextAction, DeferredJob):
     data: AddInvitesSchema
     model = Meeting
     context_pk_attr = "meeting"
-    _SKIP_STATES = {InviteWf.REVOKED, InviteWf.REVOKED}
 
     def run_job(self) -> InvitesAdded:
         """
@@ -98,59 +94,15 @@ class AddInvites(BaseIncomingMessage, ContextAction, DeferredJob):
 
         """
         self.assert_perm()
-        meeting: Meeting = self.context
-        added = []
-        changed = []
-        skipped_count = 0
-        i = 1
-        for row in self.data.invite_data:
-            invite_qs = meeting.invites.filter_on_any(row)
-            if invite_qs.exists():
-                # First filter out excludable
-                invite_qs = invite_qs.exclude(state__in=self._SKIP_STATES)
-                if not invite_qs.exists():
-                    skipped_count += 1
-                    continue
-                # Do we hit multiple active invites?
-                if invite_qs.count() > 1:
-                    raise BadRequestError.from_message(
-                        self,
-                        msg=_(
-                            "Data on row %(row)s matched different invites that already exist. You need to clear them first."
-                        )
-                        % {"row": i},
-                    )
-                # So we need to update this single existing invite and set permissions according to the new state
-                invite: MeetingInvite = invite_qs.first()
-                user = invite.used_by
-                if user:
-                    # Adjust existing roles
-                    requested_roles = set(invite.roles)
-                    current_roles = meeting.get_roles(user)
-                    if not current_roles:
-                        current_roles = set()
-                    remove_roles = requested_roles - current_roles
-                    if remove_roles:
-                        meeting.remove_roles(user, *remove_roles)
-                    add_roles = current_roles - requested_roles
-                    if add_roles:
-                        meeting.add_roles(user, *add_roles)
-                # Update invite
-                invite.invite_data = row
-                invite.roles = self.data.roles
-                invite.last_modified_by = self.user
-                invite.save()
-                changed.append(invite.pk)
-            else:
-                # We need to create a new invite
-                invite = meeting.invites.create(
-                    invite_data=row,
-                    created_by=self.user,
-                    roles=self.data.roles,
-                    last_modified_by=self.user,
-                )
-                added.append(invite.pk)
-            i += 1
+        try:
+            added, changed, skipped_count = create_invites(
+                created_by=self.user, **self.data.dict()
+            )
+        except InviteError as exc:
+            raise BadRequestError.from_message(
+                self,
+                msg=exc.message,
+            )
         response = InvitesAdded.from_message(
             self,
             added=added,
