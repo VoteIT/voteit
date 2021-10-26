@@ -151,6 +151,12 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
             self.tags.append(self.prop_id)
         super().save(**kw)
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self}>"
+
+    def __str__(self):
+        return f"P:{self.prop_id}"
+
     objects = AutoInheritanceManager()
 
 
