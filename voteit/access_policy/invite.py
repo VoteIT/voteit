@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from django.core.mail import send_mail
 from django.utils.translation import gettext_lazy as _
 from pydantic import EmailStr
+from pydantic import validator
 from pydantic.main import BaseModel
 from voteit.access_policy.abcs import InviteDispatcher
 from voteit.access_policy.registries import invite_data
@@ -16,6 +17,10 @@ if TYPE_CHECKING:
 @invite_data
 class Email(BaseModel):
     email: EmailStr
+
+    @validator("email")
+    def transform_email(cls, v: str):
+        return v.lower()
 
 
 @invite_dispatchers

@@ -55,6 +55,9 @@ class AddInvitesSchema(BaseModel):
         >>> AddInvitesSchema(roles=['participant'], invite_data=[{'email': 'hello@betahaus.net'}], meeting=1)
         AddInvitesSchema(roles=['participant'], model='meeting', skip_states={'revoked'}, invite_data=[{'email': 'hello@betahaus.net'}], meeting=1)
 
+        >>> AddInvitesSchema(roles=['participant'], invite_data=[{'email': 'HELLO@betahaus.net'}], meeting=1)
+        AddInvitesSchema(roles=['participant'], model='meeting', skip_states={'revoked'}, invite_data=[{'email': 'hello@betahaus.net'}], meeting=1)
+
         >>> AddInvitesSchema(roles=['participant'], invite_data=[{'email': 'bad_email'}], meeting=1)
         Traceback (most recent call last):
         ...

@@ -54,8 +54,14 @@ class InviteDataRegistry(Registry):
     def validate(self, data: Dict):
         """
         Validate invite data to make sure we don't store things that would never work.
+        Transforms data in place too.
 
         >>> invite_data.validate({"email": "hello@world.com"})
+        {'email': 'hello@world.com'}
+
+        Invites have their data transformed too
+        >>> invite_data.validate({"email": "HELLO@world.com"})
+        {'email': 'hello@world.com'}
 
         >>> invite_data.validate({"bleh": 1})
         Traceback (most recent call last):
@@ -81,9 +87,11 @@ class InviteDataRegistry(Registry):
                 "data contains keys that doesn't match registered types: %s",
                 no_such_data,
             )
-        for (k, v) in data.items():
+        for (k, v) in data.copy().items():
             # Transform and validate
-            self[k](**{k: v})  # Might raise pydantics ValidationError
+            schema = self[k](**{k: v})  # Might raise pydantics ValidationError
+            data[k] = getattr(schema, k)
+        return data
 
 
 access_policies = Registry(AccessPolicy)
