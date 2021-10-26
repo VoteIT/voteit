@@ -84,6 +84,8 @@ class CreateMeetingInviteSerializer(BaseModelSerializer):
 class MeetingInviteSerializer(CreateMeetingInviteSerializer):
     """For update and read operations"""
 
+    meeting_title = serializers.SerializerMethodField()
+
     class Meta(CreateMeetingInviteSerializer.Meta):
         read_only_fields = [
             "created",
@@ -98,11 +100,15 @@ class MeetingInviteSerializer(CreateMeetingInviteSerializer):
             "state",
             "used_at",
             "used_by",
+            "meeting_title",
         ]
         fields = read_only_fields + [
             "invite_data",
             "roles",
         ]
+
+    def get_meeting_title(self, instance: MeetingInvite) -> str:
+        return instance.meeting.title
 
 
 class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
