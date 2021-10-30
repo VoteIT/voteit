@@ -77,6 +77,7 @@ class SimpleTests(TestCase):
                 },
                 "approved": [prop.pk],
                 "denied": [prop2.pk],
+                "vote_count": 3,
             },
         )
         self.assertEqual(self.poll.proposals.get(pk=prop.pk).state, ProposalWf.APPROVED)

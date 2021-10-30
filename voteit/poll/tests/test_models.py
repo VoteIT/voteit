@@ -132,8 +132,13 @@ class PollTests(TestCase):
         self.assertIn(vote2, votes)
         self.poll.close()
         self.assertEqual(
-            self.poll.result.dict(),
-            {"yes": 2, "no": 0, "approved": [prop.pk], "denied": []},
+            self.poll.result.dict(), {
+                "yes": 2,
+                "no": 0,
+                "approved": [prop.pk],
+                "denied": [],
+                "vote_count": 2,
+            },
         )
 
     def test_votes_from_non_voters_removed_on_close(self):
@@ -155,8 +160,13 @@ class PollTests(TestCase):
         self.assertIn(vote1, votes)
         self.assertNotIn(vote2, votes)
         self.assertEqual(
-            self.poll.result.dict(),
-            {"yes": 1, "no": 0, "approved": [prop.pk], "denied": []},
+            self.poll.result.dict(), {
+                "yes": 1,
+                "no": 0,
+                "approved": [prop.pk],
+                "denied": [],
+                "vote_count": 1,
+            },
         )
 
     def test_abstentions(self):
@@ -168,8 +178,13 @@ class PollTests(TestCase):
         self.poll.votes.create(user=self.user2, vote="yes")
         self.poll.close()
         self.assertEqual(
-            self.poll.result.dict(),
-            {"yes": 1, "no": 0, "approved": [prop.pk], "denied": []},
+            self.poll.result.dict(), {
+                "yes": 1,
+                "no": 0,
+                "approved": [prop.pk],
+                "denied": [],
+                "vote_count": 1,
+            },
         )
         self.assertEqual(1, self.poll.abstains)
 
@@ -255,8 +270,13 @@ class VoteWeightTests(TestCase):
         self.poll.votes.create(user=self.user3, vote_data="no")
         self.poll.close()
         self.assertEqual(
-            self.poll.result.dict(),
-            {"yes": 2, "no": 3, "approved": [], "denied": [prop.pk]},
+            self.poll.result.dict(), {
+                "yes": 2,
+                "no": 3,
+                "approved": [],
+                "denied": [prop.pk],
+                "vote_count": 5,
+            },
         )
 
     def test_get_voter_weight(self):

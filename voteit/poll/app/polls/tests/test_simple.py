@@ -62,6 +62,12 @@ class SimpleTests(TestCase):
         self.poll.votes.create(user=uc, vote="no")
         self.poll.close()
         self.assertEqual(
-            self.poll.result, {"yes": 2, "no": 1, "approved": [prop.pk], "denied": []}
+            self.poll.result, {
+                "yes": 2,
+                "no": 1,
+                "approved": [prop.pk],
+                "denied": [],
+                "vote_count": 3,
+            }
         )
         self.assertEqual(self.poll.proposals.get().state, ProposalWf.APPROVED)

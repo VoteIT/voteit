@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Optional
 
 from pydantic.main import BaseModel
 
@@ -24,6 +24,7 @@ class AddedVoteSchema(_GenericVoteSchema):
 class PollResult(BaseModel):
     approved: List[int] = []
     denied: List[int] = []
+    vote_count: Optional[int]   # Optional, so that it can be populated after method calculation
 
 
 class RankingSchema(BaseModel):

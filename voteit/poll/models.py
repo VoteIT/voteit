@@ -300,7 +300,11 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         counter = self.finalize_vote_data()
         assert self.ballot_data
         assert self.ballot_checksum
-        self.result = self.method.calculate_result(counter)
+        result_extra = {
+            # Ensure vote count is same as the poll method uses, including vote weight.
+            "vote_count": sum(counter.values())
+        }
+        self.result = self.method.calculate_result(counter).dict() | result_extra
         for proposal in self.proposals.filter(pk__in=self.result.approved):
             with suppress(TransitionNotAllowed):
                 proposal.approved()
