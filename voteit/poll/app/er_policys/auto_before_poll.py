@@ -3,7 +3,6 @@ from logging import getLogger
 from django.dispatch import receiver
 from django.utils.translation import gettext as _
 from django_fsm import pre_transition
-from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 from voteit.poll.abcs import ElectoralRegisterPolicy
 from voteit.poll.models import Poll
@@ -33,18 +32,7 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
         if meeting is None:  # pragma: no coverage
             # FIXME: We don't support this yet
             raise Exception("No meeting")
-        meetings_er = poll.meeting.get_latest_er()
-        if meetings_er is None:
-            self.logger.debug("%s has no electoral register, creating...", meeting)
-            meetings_er = self.create_er(meeting)
-        elif set(meetings_er.voters.all().values_list(flat=True)) != set(
-            meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
-        ):
-            # FIXME: Is there a smarter way to make this comparison?
-            self.logger.debug(
-                "%s electoral register is outdated. Creating a new one.", meeting
-            )
-            meetings_er = self.create_er(meeting)
+        meetings_er = meeting.new_electoral_register()
         if poll.electoral_register is None:
             self.logger.debug(
                 "%s has no electoral register. Attaching %s", poll, meetings_er

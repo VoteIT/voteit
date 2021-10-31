@@ -10,6 +10,8 @@ from voteit.poll.exceptions import ElectoralRegisterEmpty
 from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidPollMethod
 from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.exceptions import NotAllowedToVote
+from voteit.proposal.workflows import ProposalWf
 
 if TYPE_CHECKING:
     from voteit.proposal.models import Proposal
@@ -53,66 +55,58 @@ class PollMethodTests(TestCase):
 
 
 class PollTests(TestCase):
-    @property
-    def Poll(self):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.agenda.models import AgendaItem
         from voteit.poll.models import Poll
-
-        return Poll
-
-    @property
-    def ElectoralRegister(self):
         from voteit.poll.models import ElectoralRegister
+        from voteit.meeting.models import Meeting
+        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
-        return ElectoralRegister
-
-    @property
-    def Proposal(self) -> Type[Proposal]:
-        from voteit.proposal.models import Proposal
-
-        return Proposal
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create()
+        cls.poll: Poll = cls.ai.polls.create(method_name="simple")
+        cls.prop = cls.poll.proposals.create()
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.meeting.add_roles(cls.moderator, ROLE_POTENTIAL_VOTER)
+        cls.meeting.add_roles(cls.participant, ROLE_POTENTIAL_VOTER)
+        cls.er: ElectoralRegister = cls.meeting.new_electoral_register()
 
     def setUp(self):
-        self.poll = self.Poll.objects.create(method_name="simple")
-        self.user = User.objects.create(username="1")
-        self.user2 = User.objects.create(username="2")
-        self.poll.electoral_register = self.er = self.ElectoralRegister.objects.create()
-        self.er.voters.add(self.user, self.user2)
-        self.poll.save()
+        self.poll.refresh_from_db()
+        self.er.refresh_from_db()
 
     def test_method(self):
         from voteit.poll.app.polls.simple import Simple
 
         self.assertIsInstance(self.poll.method, Simple)
 
-    def test_start_check_no_electoral_register(self):
-        self.poll.electoral_register = None
+    def test_start_check_no_electoral_register_no_meeting(self):
+        self.poll.meeting = None
+        self.poll.save()
+        self.failUnless(self.poll.start_check(exceptions=True))
+
+    def test_start_check_no_electoral_register_checked_against_meeting(self):
+        self.er.delete()
         self.assertRaises(
             ElectoralRegisterMissing, self.poll.start_check, exceptions=True
         )
 
     def test_start_check_electoral_register_empty(self):
-        self.er.voters.remove(self.user, self.user2)
+        self.er.voters.remove(self.participant, self.moderator)
         self.assertRaises(
             ElectoralRegisterEmpty, self.poll.start_check, exceptions=True
         )
 
     def test_start_check_no_proposals(self):
+        self.poll.proposals.all().delete()
         self.assertRaises(InvalidProposalCount, self.poll.start_check, exceptions=True)
-
-    def test_start_check(self):
-        prop = self.Proposal.objects.create()
-        self.poll.proposals.add(prop)
-        self.assertTrue(self.poll.start_check())
-
-    def test_opening_poll_empty_poll(self):
-        self.poll.electoral_register = None
-        self.poll.upcoming()
-        self.assertRaises(TransitionNotAllowed, self.poll.ongoing)
 
     def test_opening_poll(self):
         self.poll.upcoming()
-        prop = self.Proposal.objects.create()
-        self.poll.proposals.add(prop)
         self.assertIsNone(self.poll.ongoing())
         self.assertEqual("ongoing", self.poll.state)
 
@@ -121,67 +115,62 @@ class PollTests(TestCase):
         self.assertRaises(InvalidPollMethod, self.poll.save)
 
     def test_closing_poll(self):
-        prop = self.Proposal.objects.create()
-        self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        vote1 = self.poll.votes.create(user=self.user, vote="yes")
-        vote2 = self.poll.votes.create(user=self.user2, vote="yes")
+        vote1 = self.poll.votes.create(user=self.participant, vote="yes")
+        vote2 = self.poll.votes.create(user=self.moderator, vote="yes")
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertIn(vote2, votes)
         self.poll.close()
         self.assertEqual(
-            self.poll.result.dict(), {
+            self.poll.result.dict(),
+            {
                 "yes": 2,
                 "no": 0,
-                "approved": [prop.pk],
+                "approved": [self.prop.pk],
                 "denied": [],
                 "vote_count": 2,
             },
         )
 
     def test_votes_from_non_voters_removed_on_close(self):
-        prop = self.Proposal.objects.create()
-        self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        vote1 = self.poll.votes.create(user=self.user, vote="yes")
-        vote2 = self.poll.votes.create(user=self.user2, vote="yes")
+        vote1 = self.poll.votes.create(user=self.participant, vote="yes")
+        vote2 = self.poll.votes.create(user=self.moderator, vote="yes")
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertIn(vote2, votes)
         # Change ER
-        self.poll.electoral_register = er2 = self.ElectoralRegister.objects.create()
-        er2.voters.add(self.user)
-        self.poll.save()
+        self.poll.electoral_register.voters.remove(self.moderator)
         self.poll.close()
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertNotIn(vote2, votes)
         self.assertEqual(
-            self.poll.result.dict(), {
+            self.poll.result.dict(),
+            {
                 "yes": 1,
                 "no": 0,
-                "approved": [prop.pk],
+                "approved": [self.prop.pk],
                 "denied": [],
                 "vote_count": 1,
             },
         )
 
     def test_abstentions(self):
-        prop = self.Proposal.objects.create()
-        self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        self.poll.votes.create(user=self.user, abstain=True)
-        self.poll.votes.create(user=self.user2, vote="yes")
+        self.poll.votes.create(user=self.moderator, abstain=True)
+        self.poll.votes.create(user=self.participant, vote="yes")
         self.poll.close()
         self.assertEqual(
-            self.poll.result.dict(), {
+            self.poll.result.dict(),
+            {
                 "yes": 1,
                 "no": 0,
-                "approved": [prop.pk],
+                "approved": [self.prop.pk],
                 "denied": [],
                 "vote_count": 1,
             },
@@ -189,12 +178,10 @@ class PollTests(TestCase):
         self.assertEqual(1, self.poll.abstains)
 
     def test_checksum(self):
-        prop = self.Proposal.objects.create()
-        self.poll.proposals.add(prop)
         self.poll.upcoming()
         self.poll.ongoing()
-        self.poll.votes.create(user=self.user, vote="no")
-        self.poll.votes.create(user=self.user2, vote="yes")
+        self.poll.votes.create(user=self.moderator, vote="no")
+        self.poll.votes.create(user=self.participant, vote="yes")
         self.poll.close()
         self.poll.save()
         self.assertEqual(
@@ -207,13 +194,12 @@ class PollTests(TestCase):
     def test_proposal_state_exceptions(self):
         from voteit.proposal.workflows import ProposalWf
 
-        prop: Proposal = self.poll.proposals.create()
-        prop.unhandled()
-        prop.save()
+        self.prop.unhandled()
+        self.prop.save()
         # Must not cause exception
         self.poll.upcoming()
         self.poll.ongoing()
-        self.poll.votes.create(user=self.user, vote="no")
+        self.poll.votes.create(user=self.moderator, vote="no")
         # Must not cause exception
         self.poll.close()
         self.poll.save()
@@ -222,6 +208,26 @@ class PollTests(TestCase):
             ProposalWf.UNHANDLED,
             "Proposal state must not cause an exception if it can't change.",
         )
+
+    def test_cancel_resets_proposals(self):
+        self.poll.upcoming()
+        self.poll.ongoing()
+        self.prop.refresh_from_db()
+        self.assertEqual(ProposalWf.VOTING, self.prop.state)
+        self.poll.votes.create(user=self.moderator, vote="no")
+        self.poll.votes.create(user=self.participant, vote="yes")
+        self.poll.cancel()
+        self.poll.save()
+        self.prop.refresh_from_db()
+        self.assertEqual(ProposalWf.PUBLISHED, self.prop.state)
+
+    def test_private_resets_proposals(self):
+        self.poll.upcoming()
+        self.prop.refresh_from_db()
+        self.assertEqual(ProposalWf.VOTING, self.prop.state)
+        self.poll.unpublish()
+        self.prop.refresh_from_db()
+        self.assertEqual(ProposalWf.PUBLISHED, self.prop.state)
 
 
 class VoteWeightTests(TestCase):
@@ -270,7 +276,8 @@ class VoteWeightTests(TestCase):
         self.poll.votes.create(user=self.user3, vote_data="no")
         self.poll.close()
         self.assertEqual(
-            self.poll.result.dict(), {
+            self.poll.result.dict(),
+            {
                 "yes": 2,
                 "no": 3,
                 "approved": [],
@@ -328,4 +335,61 @@ class ElectoralRegisterTests(TestCase):
         )
         self.assertNotEqual(
             ElectoralRegister.objects.for_user(user1).get().meeting, meeting2
+        )
+
+
+class VoteTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.agenda.models import AgendaItem
+        from voteit.poll.models import Poll
+
+        # from voteit.poll.models import ElectoralRegister
+        from voteit.meeting.models import Meeting
+        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create()
+        cls.poll: Poll = cls.ai.polls.create(method_name="simple")
+        cls.prop = cls.poll.proposals.create()
+        # cls.moderator = User.objects.get(username="moderator")
+        cls.voter = User.objects.get(username="participant")
+        cls.meeting.add_roles(cls.voter, ROLE_POTENTIAL_VOTER)
+        # cls.er: ElectoralRegister = cls.meeting.new_electoral_register()
+        cls.poll.upcoming()
+        cls.poll.ongoing()
+        cls.poll.save()
+
+    def setUp(self):
+        self.poll.refresh_from_db()
+
+    def test_add_vote(self):
+        self.poll.votes.create(user=self.voter, vote="yes")
+
+    def test_add_abstain_clears_vote(self):
+        vote = self.poll.votes.create(user=self.voter, vote="yes")
+        self.assertIsNotNone(vote.vote_data)
+        vote.abstain = True
+        vote.save()
+        self.assertIsNone(vote.vote_data)
+
+    def test_lacking_er(self):
+        self.poll.electoral_register = None
+        self.poll.save()
+        self.assertRaises(
+            ElectoralRegisterMissing,
+            self.poll.votes.create,
+            user=self.voter,
+            vote="yes",
+        )
+
+    def test_not_in_er(self):
+        self.poll.electoral_register.voters.remove(self.voter)
+        self.assertRaises(
+            NotAllowedToVote,
+            self.poll.votes.create,
+            user=self.voter,
+            vote="yes",
         )

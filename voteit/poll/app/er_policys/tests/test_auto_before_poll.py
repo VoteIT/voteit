@@ -87,12 +87,19 @@ class AutoBeforePollTests(TestCase):
         )
         self.assertNotEqual(self.poll.initial_electoral_register, first_er)
 
-    # def test_er_set_at_wrong_time(self):
-    #     self.meeting.er_policy_name = None
-    #     self.meeting.save()
-    #     self.poll.upcoming()
-    #     self.poll.proposals.create()
-    #     self.assertRaises(TransitionNotAllowed, self.poll.ongoing)
-    #     self.meeting.er_policy_name = self.ABF.name
-    #     self.meeting.save()
-    #     self.poll.ongoing()
+    def test_er_set_at_wrong_time(self):
+        self.meeting.er_policy_name = None
+        self.meeting.save()
+        self.poll.upcoming()
+        self.poll.proposals.create()
+        self.assertRaises(TransitionNotAllowed, self.poll.ongoing)
+        self.meeting.er_policy_name = self.ABF.name
+        self.meeting.save()
+        # FIX cache
+        self.meeting.er_policy = self.meeting._er_policy()
+        # We still need the meeting to have a policy
+        self.assertRaises(TransitionNotAllowed, self.poll.ongoing)
+        self.meeting.new_electoral_register()
+        self.poll.save()
+        self.poll.meeting.refresh_from_db()
+        self.poll.ongoing()

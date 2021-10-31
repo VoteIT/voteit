@@ -40,9 +40,7 @@ logger = getLogger(__name__)
 
 class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     name = "proposal"
-    state: str = FSMField(
-        default=ProposalWf.initial, choices=ProposalWf.choices(), protected=True
-    )
+    state: str = FSMField(default=ProposalWf.initial, choices=ProposalWf.choices())
     author: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

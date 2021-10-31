@@ -225,10 +225,15 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         Note that it's used as a transition condition, so it must return True if everything is ok!
         """
         try:
-            if self.electoral_register is None:
-                raise ElectoralRegisterMissing()
-            if self.electoral_register.voters.count() < 1:
-                raise ElectoralRegisterEmpty()
+            # Check meetings electoral register
+            if self.meeting is not None:
+                # Meeting should normally not be none.
+                # In case it is it's probably a unit test or outside of regular er context
+                meetings_er = self.meeting.get_latest_er()
+                if meetings_er is None:
+                    raise ElectoralRegisterMissing()
+                if meetings_er.voters.count() < 1:
+                    raise ElectoralRegisterEmpty()
             if self.proposals.count() < 1:
                 raise InvalidProposalCount("No proposals")
             method = self.method  # Will raise exception if doesn't exist
@@ -324,6 +329,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         self._mark_closed()
         for proposal in self.proposals.all():
             proposal.publish()
+            proposal.save()
 
     @transition(
         field=state,
@@ -335,6 +341,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     def unpublish(self):
         for proposal in self.proposals.all():
             proposal.publish()
+            proposal.save()
 
     def _mark_closed(self):
         if not self.closed:
@@ -404,6 +411,9 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
                     self.title = f"{base} {x}"
                     if not self.meeting.polls.filter(title=self.title).exists():
                         break
+        # At this point we must have an attached valid electoral register
+        # if self.state == PollWf.ONGOING and self.electoral_register is None:
+        #     raise ElectoralRegisterMissing()
         # Make sure we don't have bad settings
         if not self.validate_settings_guard():
             raise IntegrityError("Invalid settings")
