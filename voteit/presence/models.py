@@ -36,7 +36,9 @@ class Presence(MeetingContext):
 
     @property
     def meeting(self) -> Optional[Meeting]:
-        """ Find meeting from this instance"""
+        """
+        Find meeting from this instance
+        """
         return self.presence_check.meeting
 
     class Meta:
@@ -72,7 +74,6 @@ class PresenceCheck(MeetingContext):
     state: str = FSMField(
         default=PresenceCheckWf.initial,
         choices=PresenceCheckWf.choices(),
-        protected=True,
     )
     present_users = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through=Presence, related_name="presences"
@@ -80,9 +81,6 @@ class PresenceCheck(MeetingContext):
     meeting: Meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="presence_checks"
     )
-    # presence_system: PresenceSystem = models.ForeignKey(
-    #     "PresenceSystem", on_delete=models.CASCADE, related_name="presence_checks"
-    # )
     opened: datetime = models.DateTimeField(editable=False, auto_now_add=True)
     closed: Optional[datetime] = models.DateTimeField(
         editable=False, null=True, blank=True
@@ -96,10 +94,6 @@ class PresenceCheck(MeetingContext):
     )
     def close(self) -> None:
         self.closed = now()
-
-    # @property
-    # def meeting(self) -> Optional[Meeting]:
-    #     return self.presence_system.meeting
 
     @cached_property
     def presence_system(self):
@@ -116,12 +110,12 @@ class PresenceCheck(MeetingContext):
         super().save(**kw)
 
     class Manager(models.Manager):
-        """ Methods to get filtered QuerySets or currently open presence check. """
+        """Methods to get filtered QuerySets or currently open presence check."""
 
         def open(self) -> models.QuerySet:
             return self.get_queryset().filter(state=PresenceCheckWf.OPEN)
 
-        def latest_open(self) -> PresenceCheck:
+        def latest_open(self) -> Optional[PresenceCheck]:
             return self.open().latest("opened")
 
     objects = Manager()
