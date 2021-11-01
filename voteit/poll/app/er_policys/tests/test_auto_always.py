@@ -6,6 +6,7 @@ User = get_user_model()
 
 
 class AutoAlwaysTests(TestCase):
+    @classmethod
     def setUpTestData(cls):
         from voteit.poll.models import Poll
         from voteit.meeting.models import Meeting

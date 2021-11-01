@@ -94,7 +94,7 @@ class ElectoralRegisterPolicy(ABC):
         ...
 
     @abstractmethod
-    def get_voters(self) -> Set[int]:
+    def get_voters(self, **kwargs) -> Set[int]:
         """
         Return a Set with users that should (currently!) be voters according to this method.
         It doesn't mean that they are voters right now.
@@ -103,13 +103,13 @@ class ElectoralRegisterPolicy(ABC):
         self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
         """
 
-    def new_er_needed(self) -> bool:
+    def new_er_needed(self, **kwargs) -> bool:
         """
         Is a new ER needed?
         """
         if self.meeting.latest_er is None:
             return True
-        return self.get_voters() != set(
+        return self.get_voters(**kwargs) != set(
             self.meeting.latest_er.voters.all().values_list("pk", flat=True)
         )
 
@@ -157,7 +157,7 @@ class ElectoralRegisterPolicy(ABC):
         """
         if force or self.new_er_needed():
             er = self.meeting.electoral_registers.create()
-            er.voters.set(self.get_voters())
+            er.voters.set(self.get_voters(**kwargs))
             self.meeting.latest_er = er  # Clear cached
             return er
         return self.meeting.latest_er

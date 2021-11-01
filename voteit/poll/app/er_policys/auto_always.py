@@ -27,7 +27,7 @@ class AutoAlways(ElectoralRegisterPolicy):
     title = _("Demo meeting: Always update electoral register")
     logger = logger
 
-    def get_voters(self):
+    def get_voters(self, **kwargs):
         return set(self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER))
 
 
