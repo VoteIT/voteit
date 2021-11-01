@@ -38,6 +38,8 @@ if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
     from voteit.core.models import User
     from voteit.participant_number.models import PNSystem
+    from voteit.presence.models import PresenceSystem
+    from voteit.presence.models import PresenceCheck
 
 __all__ = "Meeting", "MeetingRoles", "MeetingGroup"
 
@@ -243,6 +245,8 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     agenda_items: models.QuerySet
     last_read_set: models.QuerySet
     pn_system: Optional[PNSystem]
+    presence_system: Optional[PresenceSystem]
+    presence_checks: PresenceCheck.Manager
 
 
 class MeetingGroup(BaseContent, MeetingContext):
