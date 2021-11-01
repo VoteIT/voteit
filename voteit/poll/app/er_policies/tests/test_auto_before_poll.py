@@ -12,7 +12,7 @@ class AutoBeforePollTests(TestCase):
         from voteit.poll.models import Poll
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-        from voteit.poll.app.er_policys import AutoBeforePoll
+        from voteit.poll.app.er_policies import AutoBeforePoll
 
         cls.ABF = AutoBeforePoll
 

@@ -24,7 +24,7 @@ class MeetingTests(TestCase):
         self.assertEqual("archived", meeting.state)
 
     def test_er_policy(self):
-        from voteit.poll.app.er_policys.auto_before_poll import AutoBeforePoll
+        from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 
         meeting = self.Meeting.objects.create(er_policy_name=AutoBeforePoll.name)
         self.assertIsInstance(meeting.er_policy, AutoBeforePoll)

@@ -15,7 +15,7 @@ class PresenceCheckPolicyTests(TestCase):
         from voteit.poll.models import Poll
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-        from voteit.poll.app.er_policys import PresenceCheckPolicy
+        from voteit.poll.app.er_policies import PresenceCheckPolicy
         from voteit.presence.models import PresenceCheck
 
         cls.PresenceCheckPolicy = PresenceCheckPolicy
