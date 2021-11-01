@@ -73,7 +73,7 @@ class PollTests(TestCase):
         cls.participant = User.objects.get(username="participant")
         cls.meeting.add_roles(cls.moderator, ROLE_POTENTIAL_VOTER)
         cls.meeting.add_roles(cls.participant, ROLE_POTENTIAL_VOTER)
-        cls.er: ElectoralRegister = cls.meeting.new_electoral_register()
+        cls.er: ElectoralRegister = cls.meeting.er_policy.create_er()
 
     def setUp(self):
         self.poll.refresh_from_db()

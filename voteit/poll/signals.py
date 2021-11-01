@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from logging import getLogger
+
 from django.contrib.auth.models import AbstractUser
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
+from django_fsm import pre_transition
 from django_fsm.signals import post_transition
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
@@ -14,6 +17,7 @@ from voteit.meeting.models import Meeting
 from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.signals import channel_subscribed
 from voteit.poll.channels import PollChannel
+from voteit.poll.exceptions import InvalidPollMethod
 from voteit.poll.messages import GenericVoteResponse
 from voteit.poll.messages import PollAdded
 from voteit.poll.messages import PollChanged
@@ -26,9 +30,12 @@ from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.workflows import PollWf
 
 
+logger = getLogger(__name__)
+
+
 @receiver(channel_subscribed, sender=PollChannel)
 def poll_subscribed(context: Poll, app_state: AppState, **kw):
-    """ Populate app_state with current poll status """
+    """Populate app_state with current poll status"""
     msg = PollStatus.create(
         pk=context.pk,
         voted=context.votes.count(),
@@ -41,7 +48,7 @@ def poll_subscribed(context: Poll, app_state: AppState, **kw):
 def participants_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    """ Populate app_state with current meeting polls, except private ones """
+    """Populate app_state with current meeting polls, except private ones"""
     app_state.append_from_queryset(
         context.polls.exclude(state=PollWf.PRIVATE).exclude(
             agenda_item__state=AgendaItemWf.PRIVATE
@@ -52,9 +59,7 @@ def participants_subscribed(
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
-def meeting_subscribed(
-    context: Meeting, app_state: AppState, user: AbstractUser, **kw
-):
+def meeting_subscribed(context: Meeting, app_state: AppState, user: AbstractUser, **kw):
     # FIXME: Transmitting all vote data is probably not a good idea for large meetings.
     # Perhaps change this?
     # We're sending all votes, it is the users own data so private ai shouldn't matter here.
@@ -69,7 +74,7 @@ def meeting_subscribed(
 def moderators_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    """ Populate app_state with current meeting polls """
+    """Populate app_state with current meeting polls"""
     app_state.append_from_queryset(context.polls.all(), PollDetailSerializer, PollAdded)
 
 
@@ -99,7 +104,7 @@ def poll_change(instance: Poll = None, created: bool = None, **kw):
 
 @receiver(pre_delete, sender=Poll)
 def poll_delete(instance: Poll = None, **kw):
-    """ Poll deleted is only sent to moderators if the poll's private"""
+    """Poll deleted is only sent to moderators if the poll's private"""
     if instance.meeting is not None:
         moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
         msg = PollDeleted({}, pk=instance.pk)
@@ -123,3 +128,18 @@ def private_ai_published(instance: AgendaItem, source: str, **kw):
             data = PollDetailSerializer(poll).data
             msg = PollAdded({}, **data)
             participants_ch.publish(msg)
+
+
+@receiver(pre_transition, sender=Poll)
+def maybe_apply_er_when_poll_changes_state(
+    instance: Poll, source: str, target: str, **kwargs
+):
+    if target not in (PollWf.UPCOMING, PollWf.ONGOING):
+        return
+    try:
+        er_policy = instance.meeting.er_policy
+    except (KeyError, AttributeError):
+        logger.warning("Poll %s lacks valid meeting or er policy", instance)
+        # No need to die here
+        return
+    er_policy.apply(instance, target)

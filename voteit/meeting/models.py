@@ -118,36 +118,18 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     def er_policy(self) -> ElectoralRegisterPolicy:
         return self._er_policy()
 
+    @cached_property
+    def latest_er(self) -> Optional[ElectoralRegister]:
+        return self.get_latest_er()
+
     def _er_policy(self):
         reg = get_electoral_policy_registry()
         return reg[self.er_policy_name](self)
 
-    def get_latest_er(self) -> ElectoralRegister:
+    def get_latest_er(self) -> Optional[ElectoralRegister]:
         return (
             self.electoral_registers.filter(meeting=self).order_by("-created").first()
         )
-
-    def new_electoral_register(self, force=False) -> ElectoralRegister:
-        """
-        Maybe create a new electoral register. Return the newly created or the currently
-        active if no new is needed. Force will always create.
-        """
-        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER  # Avoid circular import
-
-        er = self.get_latest_er()
-        if er is None or force:
-            if force:
-                logger.debug("Forcing new electoral register on %s ", self)
-            else:
-                logger.debug("%s has no electoral register, creating...", self)
-            return self.er_policy.create_er(self)
-        elif set(er.voters.all().values_list(flat=True)) != set(
-            self.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
-        ):
-            # FIXME: Is there a smarter way to make this comparison?
-            logger.debug("%s electoral register is outdated. Creating a new one.", self)
-            return self.er_policy.create_er(self)
-        return er
 
     def get_access_policies(self, only_active=True) -> Generator[AccessPolicy]:
         from voteit.access_policy.registries import access_policies

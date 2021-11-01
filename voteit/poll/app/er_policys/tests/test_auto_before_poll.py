@@ -99,7 +99,7 @@ class AutoBeforePollTests(TestCase):
         self.meeting.er_policy = self.meeting._er_policy()
         # We still need the meeting to have a policy
         self.assertRaises(TransitionNotAllowed, self.poll.ongoing)
-        self.meeting.new_electoral_register()
+        self.meeting.er_policy.create_er()
         self.poll.save()
         self.poll.meeting.refresh_from_db()
         self.poll.ongoing()

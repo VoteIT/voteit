@@ -6,30 +6,26 @@ User = get_user_model()
 
 
 class AutoAlwaysTests(TestCase):
-    def setUp(self):
+    def setUpTestData(cls):
         from voteit.poll.models import Poll
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-
-        self.meeting = Meeting.objects.create(er_policy_name=self._cut.name)
-        self.user1 = User.objects.create(username="one")
-        self.user2 = User.objects.create(username="two")
-        self.meeting.add_roles(self.user1, ROLE_POTENTIAL_VOTER)
-        self.meeting.add_roles(self.user2, ROLE_POTENTIAL_VOTER)
-        self.poll = Poll.objects.create(meeting=self.meeting, method_name="simple")
-        self.poll.proposals.create()
-
-    @property
-    def _cut(self):
         from voteit.poll.app.er_policys import AutoAlways
-
-        return AutoAlways
-
-    @property
-    def ElectoralRegister(self):
         from voteit.poll.models import ElectoralRegister
 
-        return ElectoralRegister
+        cls.AutoAlways = AutoAlways
+        cls.ElectoralRegister = ElectoralRegister
+
+        cls.meeting = Meeting.objects.create(er_policy_name=AutoAlways.name)
+        cls.user1 = User.objects.create(username="one")
+        cls.user2 = User.objects.create(username="two")
+        cls.meeting.add_roles(cls.user1, ROLE_POTENTIAL_VOTER)
+        cls.meeting.add_roles(cls.user2, ROLE_POTENTIAL_VOTER)
+        cls.poll = Poll.objects.create(meeting=cls.meeting, method_name="simple")
+        cls.poll.proposals.create()
+
+    def setUp(self):
+        self.poll.refresh_from_db()
 
     def test_new_er_on_upcoming(self):
         self.poll.upcoming()
