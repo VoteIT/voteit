@@ -29,6 +29,7 @@ from voteit.core.abcs import MeetingContext
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.permissions import NOT_ALLOWED
+from voteit.core.utils import ensure_atomic
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.speaker.permissions import SpeakerListPermissions
@@ -324,31 +325,38 @@ class SpeakerList(AgendaItemContext, MeetingContext):
     def close(self):
         pass
 
+    @ensure_atomic
+    def shuffle(self):
+        """
+        Randomize the order of the speakers. Run reorder afterwards to make sure any other priorities gets applied.
+        """
+        self.method.shuffle(self)
+        self.reorder(force_signal=True)
+
+    @ensure_atomic
     def reorder(self, force_signal=False):
-        """Something have changed within the list that makes reordering necessary.
+        """
+        Something have changed within the list that makes reordering necessary.
         Usually when a user is added or removed, but it can be triggered for attribute changes on users too.
         """
         current = self.current_order()
-        with transaction.atomic():
-            new_order = self.method.reorder(self)
-            safe_updated = False
-            # Check if a speaker should be moved to a safe position - only if the list is active.
-            if self.is_active_list:
-                system = self.speaker_system
-                safe_pos = system.safe_positions
-                if (
-                    safe_pos
-                    and safe_pos
-                    > self.speaker_items.filter(
-                        order__isnull=False, safe_pos=True
-                    ).count()
-                ):
-                    # FIXME: Do something smarter
-                    for speaker in self.speakers_qs()[:safe_pos]:
-                        if not speaker.safe_pos:
-                            speaker.safe_pos = True
-                            speaker.save()
-                            safe_updated = True
+        new_order = self.method.reorder(self)
+        safe_updated = False
+        # Check if a speaker should be moved to a safe position - only if the list is active.
+        if self.is_active_list:
+            system = self.speaker_system
+            safe_pos = system.safe_positions
+            if (
+                safe_pos
+                and safe_pos
+                > self.speaker_items.filter(order__isnull=False, safe_pos=True).count()
+            ):
+                # FIXME: Do something smarter
+                for speaker in list(self.speakers_qs()[:safe_pos]):
+                    if not speaker.safe_pos:
+                        speaker.safe_pos = True
+                        speaker.save()
+                        safe_updated = True
         # Outside of transaction block, the save must be done first!
         if current != new_order or safe_updated or force_signal:
             self.signal_list_updated()
@@ -361,9 +369,10 @@ class SpeakerList(AgendaItemContext, MeetingContext):
         list_updated.send(sender=self.__class__, instance=self)
 
     def current_order(self):
-        """Return an ordered list of primary keys for speaker items that are in the queue."""
-        # FIXME: There's probably an optimisation to be done here :)
-        return [x.pk for x in self.speakers_qs().all()]
+        """
+        Return an ordered list of primary keys for speaker items that are in the queue.
+        """
+        return list(self.speakers_qs().values_list("pk", flat=True))
 
     def safe_speakers_qs(self) -> models.QuerySet:
         return self.speaker_items.filter(order__isnull=False, safe_pos=True).order_by(

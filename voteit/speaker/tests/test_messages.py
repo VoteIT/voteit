@@ -1,8 +1,8 @@
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
+from django.db.transaction import atomic
 from django.test import TestCase
-from django.utils import timezone
 from voteit.messaging.errors import BadRequestError
 from voteit.messaging.errors import UnauthorizedError
 from voteit.messaging.errors import NotFoundError
@@ -391,3 +391,43 @@ class ModeratorSpeakerListUndoTests(TestCase):
         self.assertFalse(self.list.current)
         msg = self._mk_one()
         self.assertRaises(BadRequestError, msg.run_job)
+
+
+class SpeakerListShuffleTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.speaker.models import SpeakerListSystem
+        from voteit.speaker.models import SpeakerList
+
+        cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
+            method_name="simple", state="active"
+        )
+        cls.moderator = User.objects.create(username="moderator")
+        cls.system.add_roles(cls.moderator, "list_moderator")
+        cls.list: SpeakerList = SpeakerList.objects.create(speaker_system=cls.system)
+        for i in range(10):
+            user = cls.list.speakers.create(username=f"user-{i}")
+            cls.list.speaker_items.create(user=user, order=i)
+
+    @property
+    def _cut(self):
+        from voteit.speaker.messages import ModeratorSpeakerListShuffle
+
+        return ModeratorSpeakerListShuffle
+
+    def _mk_one(self, **kw):
+        kw.setdefault("pk", self.list.pk)
+        return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
+
+    def test_shuffle_causes_new_order(self):
+        current_order = self.list.current_order()
+        self.assertEqual(10, len(current_order))
+        msg = self._mk_one()
+        order_changed = False
+        for i in range(5):
+            msg.run_job()
+            if current_order != self.list.current_order():
+                order_changed = True
+                break
+
+        self.assertTrue(order_changed)

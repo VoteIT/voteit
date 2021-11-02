@@ -1,24 +1,25 @@
 from abc import ABC
 from datetime import datetime
-from typing import Union
+from typing import Dict
+from typing import List
+from typing import Optional
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
-from pydantic.main import BaseModel
 from django.utils.translation import gettext as _
-from typing import List, Optional, Dict
+from pydantic.main import BaseModel
 
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import ContextAction
 from voteit.messaging.abcs import DeferredJob
+from voteit.messaging.decorators import incoming
+from voteit.messaging.decorators import outgoing
+from voteit.messaging.errors import BadRequestError
 from voteit.messaging.errors import NotFoundError
 from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.messages.base import BaseObjectDeleted
 from voteit.messaging.messages.status import StatusDone
-from voteit.messaging.errors import BadRequestError
-from voteit.messaging.decorators import incoming
-from voteit.messaging.decorators import outgoing
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.permissions import SpeakerListPermissions
 
@@ -128,7 +129,7 @@ class SetActiveList(ListMessage):
 
 @incoming
 class StartSpeakerInList(ModeratorListMessage):
-    """ Start userid. Ignore if not found or already speaking. """
+    """Start userid. Ignore if not found or already speaking."""
 
     name = "speaker_list.start_user"
     permission = SpeakerListPermissions.START
@@ -160,7 +161,7 @@ class StartSpeakerInList(ModeratorListMessage):
 
 @incoming
 class StopSpeakerInList(ModeratorListMessage):
-    """ Stop userid. Ignore if not speaking. """
+    """Stop userid. Ignore if not speaking."""
 
     name = "speaker_list.stop_user"
     permission = SpeakerListPermissions.STOP
@@ -269,6 +270,19 @@ class ModeratorSpeakerListUndo(ListMessage):
         self.assert_perm()
         if not self.context.undo_speaker():
             raise BadRequestError.from_message(self, msg=_("No active speaker"))
+        msg = StatusDone.from_message(self)
+        msg.send_outgoing(self.mm.consumer_name, success=True)
+        return msg
+
+
+@incoming
+class ModeratorSpeakerListShuffle(ListMessage):
+    name = "speaker_list.mod_shuffle"
+    permission = SpeakerListPermissions.CHANGE
+
+    def run_job(self) -> StatusDone:
+        self.assert_perm()
+        self.context.shuffle()
         msg = StatusDone.from_message(self)
         msg.send_outgoing(self.mm.consumer_name, success=True)
         return msg
