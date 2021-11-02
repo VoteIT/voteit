@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from typing import Type
 
 from django.db import models
+from django.db.models.signals import pre_delete
 from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
 from django.dispatch import Signal
@@ -144,7 +145,7 @@ def notify_stopped_speaker(speaker: Speaker, **kwargs):
     _publish_active_list_msg(speaker.speaker_list, msg)
 
 
-@receiver(post_delete, sender=SpeakerList)
+@receiver(pre_delete, sender=SpeakerList)
 def notify_deleted_speaker_list(instance: SpeakerList, **kw):
     msg = SpeakerListDeleted(pk=instance.pk)
     _publish_list_msg(instance, msg)
@@ -154,7 +155,7 @@ def notify_deleted_speaker_list(instance: SpeakerList, **kw):
 def notify_added_or_changed_speaker_system(
     instance: SpeakerListSystem, created=None, **kw
 ):
-    """ Updates to speaker system, pushed to meeting channel."""
+    """Updates to speaker system, pushed to meeting channel."""
     if instance.meeting is not None:
         if created:
             msg_class = SpeakerSystemAdded
@@ -175,9 +176,9 @@ def notify_added_or_changed_speaker_system(
             ch.publish(order_msg)
 
 
-@receiver(post_delete, sender=SpeakerListSystem)
+@receiver(pre_delete, sender=SpeakerListSystem)
 def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
-    """ Notify meeting that the speaker system is no more."""
+    """Notify meeting that the speaker system is no more."""
     if instance.meeting is not None:
         msg = SpeakerSystemDeleted(pk=instance.pk)
         ch = MeetingChannel.from_instance(instance.meeting)
