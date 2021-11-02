@@ -68,20 +68,19 @@ class SpeakerListTests(TestCase):
     with a bare minimal implementation.
     """
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
 
-        self.system = SpeakerListSystem.objects.create(method_name="simple")
-        self.speaker_list = SpeakerList.objects.create(speaker_system=self.system)
-        self.user_one = User.objects.create(username="one")
-        self.user_two = User.objects.create(username="two")
-        self.user_three = User.objects.create(username="three")
-        self.speaker_one = self.speaker_list.speaker_items.create(user=self.user_one)
-        self.speaker_two = self.speaker_list.speaker_items.create(user=self.user_two)
-        self.speaker_three = self.speaker_list.speaker_items.create(
-            user=self.user_three
-        )
+        cls.system = SpeakerListSystem.objects.create(method_name="simple")
+        cls.speaker_list = SpeakerList.objects.create(speaker_system=cls.system)
+        cls.user_one = User.objects.create(username="one")
+        cls.user_two = User.objects.create(username="two")
+        cls.user_three = User.objects.create(username="three")
+        cls.speaker_one = cls.speaker_list.speaker_items.create(user=cls.user_one)
+        cls.speaker_two = cls.speaker_list.speaker_items.create(user=cls.user_two)
+        cls.speaker_three = cls.speaker_list.speaker_items.create(user=cls.user_three)
 
     def test_current_order(self):
         self.assertEqual(

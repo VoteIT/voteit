@@ -84,17 +84,18 @@ class HistoricSpeakerListSerializerTests(TestCase):
 
 
 class SpeakerListSystemSerializerTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
-        self.meeting: Meeting = Meeting.objects.create(
+        cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
         # self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
-        self.system = self.meeting.speaker_systems.create(
+        cls.system = cls.meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        self.slist = self.system.speaker_lists.create()
+        cls.slist = cls.system.speaker_lists.create()
 
     @property
     def _cut(self):
@@ -116,6 +117,7 @@ class SpeakerListSystemSerializerTests(TestCase):
                 "safe_positions": None,
                 "state": "active",
                 "active_list": None,
+                "meeting_roles_to_speaker": [],
             },
             data,
         )
@@ -130,6 +132,27 @@ class SpeakerListSystemSerializerTests(TestCase):
         serializer.save()
         self.assertEqual(self.system.title, "Hello")
         self.assertEqual(self.slist, self.system.active_list)
+
+    def test_patch_meeting_roles_to_speaker_bad_roles(self):
+        serializer = self._cut(
+            self.system,
+            data={"meeting_roles_to_speaker": ["Hello"]},
+            partial=True,
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("meeting_roles_to_speaker", serializer.errors)
+
+    def test_patch_meeting_roles_to_speaker(self):
+        serializer = self._cut(
+            self.system,
+            data={"meeting_roles_to_speaker": ["potential_voter", "proposer"]},
+            partial=True,
+        )
+        self.assertTrue(serializer.is_valid())
+        serializer.save()
+        self.assertEqual(
+            self.system.meeting_roles_to_speaker, ["potential_voter", "proposer"]
+        )
 
     def test_patch_with_settings(self):
         serializer = self._cut(

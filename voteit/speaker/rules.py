@@ -36,9 +36,20 @@ def has_speaker_role(
 ) -> bool:
     """Check if a user has speaker role status within this speaker list system."""
     if isinstance(obj, SpeakerListSystem):
-        return obj.has_roles(user, ROLE_SPEAKER)
+        if obj.has_roles(user, ROLE_SPEAKER):
+            return True
+        if obj.meeting_roles_to_speaker:
+            return obj.meeting.has_any_roles(user, *obj.meeting_roles_to_speaker)
+        return False
+
     elif isinstance(obj, SpeakerList):
-        return obj.speaker_system.has_roles(user, ROLE_SPEAKER)
+        if obj.speaker_system.has_roles(user, ROLE_SPEAKER):
+            return True
+        if obj.speaker_system.meeting_roles_to_speaker:
+            return obj.meeting.has_any_roles(
+                user, *obj.speaker_system.meeting_roles_to_speaker
+            )
+        return False
     else:  # pragma: no cover
         return False
 

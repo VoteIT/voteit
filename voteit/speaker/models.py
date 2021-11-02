@@ -11,6 +11,7 @@ from typing import Union
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
+from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
@@ -20,6 +21,7 @@ from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
 from pydantic.main import BaseModel
+from typing import List
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.abcs import AgendaItemContext
@@ -28,6 +30,7 @@ from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingRoles
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.permissions import SpeakerSystemPermissions
 from voteit.speaker.utils import get_list_method_registry
@@ -65,7 +68,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         choices=SpeakerSystemWf.choices(),
         editable=False,
     )
-    title = models.CharField(max_length=200, null=True)
+    title: Optional[str] = models.CharField(max_length=200, null=True)
     meeting: Optional[Meeting] = models.ForeignKey(
         Meeting,
         verbose_name=_("Related meeting"),
@@ -80,7 +83,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         null=True,
         encoder=DjangoJSONEncoder,
     )
-    safe_positions = models.PositiveSmallIntegerField(
+    safe_positions: Optional[int] = models.PositiveSmallIntegerField(
         verbose_name=_(
             "When a list is active, mark the top X positions as safe automatically. "
             "Safe speakers will never be moved down."
@@ -89,13 +92,16 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         null=True,
         blank=True,
     )
-    active_list = models.OneToOneField(
+    active_list: Optional[SpeakerList] = models.OneToOneField(
         "SpeakerList",
         verbose_name=_("Currently active speaker list"),
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="active_in_system",
+    )
+    meeting_roles_to_speaker: List[str] = ArrayField(
+        models.CharField(max_length=20), default=tuple
     )
 
     roles_cls = SpeakerSystemRoles
@@ -172,6 +178,9 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     def save(self, **kw):
         # Will raise error if there's something bogus with settings or referenced method
         self.settings
+        for role in self.meeting_roles_to_speaker:
+            if role not in MeetingRoles.valid_roles:
+                raise ValueError(f"{role} is not a valid meeting role")
         super(SpeakerListSystem, self).save(**kw)
 
     @property
@@ -234,7 +243,7 @@ class Speaker(models.Model):
 
     @property
     def in_queue(self) -> bool:
-        """ The definition of being in the queue is that order is set to a number"""
+        """The definition of being in the queue is that order is set to a number"""
         return self.order is not None
 
     # Type hinting
@@ -282,7 +291,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
 
     @property
     def meeting(self) -> Optional[Meeting]:
-        """ While not directly related, it still good to be able to do lookups this way"""
+        """While not directly related, it still good to be able to do lookups this way"""
         if self.speaker_system:
             return self.speaker_system.meeting
 
@@ -292,7 +301,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
 
     @property
     def is_active_list(self) -> bool:
-        """ Is this the currently active list? """
+        """Is this the currently active list?"""
         with suppress(SpeakerListSystem.DoesNotExist):
             return self.active_in_system is not None
         return False
@@ -400,7 +409,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
             speaker.signal_stopped()
 
     def undo_speaker(self) -> bool:
-        """ Move current speaker back to top of queue """
+        """Move current speaker back to top of queue"""
         speaker = self.current
         if speaker is None:
             return False

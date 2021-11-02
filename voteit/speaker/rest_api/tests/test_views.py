@@ -12,25 +12,26 @@ User = get_user_model()
 
 
 class SpeakerListsViewTestCase(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
         from voteit.speaker.roles import ROLE_LIST_MODERATOR
 
-        self.meeting: Meeting = Meeting.objects.create(
+        cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
-        self.ai_private = self.meeting.agenda_items.create(title="Private")
-        self.system = self.meeting.speaker_systems.create(method_name="simple")
-        self.list_moderator: User = User.objects.create_user("list_moderator")
-        self.participant: User = User.objects.create_user("participant")
-        self.moderator: User = User.objects.create_user("moderator")
-        self.outsider: User = User.objects.create_user("outsider")
-        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
-        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
-        self.system.add_roles(self.list_moderator, ROLE_LIST_MODERATOR)
+        cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
+        cls.ai_private = cls.meeting.agenda_items.create(title="Private")
+        cls.system = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.list_moderator: User = User.objects.create_user("list_moderator")
+        cls.participant: User = User.objects.create_user("participant")
+        cls.moderator: User = User.objects.create_user("moderator")
+        cls.outsider: User = User.objects.create_user("outsider")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.system.add_roles(cls.list_moderator, ROLE_LIST_MODERATOR)
 
     def test_create(self):
         url = reverse("speaker-lists-list")

@@ -7,22 +7,34 @@ User = get_user_model()
 
 
 class SpeakerListTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.speaker.roles import ROLE_SPEAKER, ROLE_LIST_MODERATOR
         from voteit.meeting.models import Meeting
+        from voteit.speaker.models import SpeakerListSystem
+        from voteit.meeting.roles import ROLE_PROPOSER
 
-        meeting = Meeting.objects.create()
-        self.system = meeting.speaker_systems.create(
-            method_name="simple", state="active"
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.system: SpeakerListSystem = cls.meeting.speaker_systems.create(
+            method_name="simple",
+            state="active",
+            meeting_roles_to_speaker=[ROLE_PROPOSER],
         )
-        self.user_moderator = User.objects.create(username="moderator")
-        self.system.add_roles(self.user_moderator, ROLE_LIST_MODERATOR)
-        self.user_speaker = User.objects.create(username="in")
-        self.system.add_roles(self.user_speaker, ROLE_SPEAKER)
-        self.user_any = User.objects.create(username="jane")
-        self.list = self.system.speaker_lists.create()
-        self.system.active_list = self.list
-        self.system.save()
+        cls.user_moderator = User.objects.create(username="moderator")
+        cls.system.add_roles(cls.user_moderator, ROLE_LIST_MODERATOR)
+        cls.user_speaker = User.objects.create(username="in")
+        cls.user_proposer = User.objects.create(username="proposer")
+        cls.system.add_roles(cls.user_speaker, ROLE_SPEAKER)
+        cls.meeting.add_roles(cls.user_proposer, ROLE_PROPOSER)
+        cls.user_any = User.objects.create(username="jane")
+        cls.list = cls.system.speaker_lists.create()
+        cls.system.active_list = cls.list
+        cls.system.save()
+
+    def setUp(self):
+        self.system.refresh_from_db()
+        self.meeting.refresh_from_db()
+        self.list.refresh_from_db()
 
     def p(self, name):
         from voteit.speaker.permissions import SpeakerListPermissions
@@ -71,6 +83,7 @@ class SpeakerListTests(TestCase):
         ENTER = self.p("ENTER")
         self.assertTrue(self.user_moderator.has_perm(ENTER, self.list))
         self.assertTrue(self.user_speaker.has_perm(ENTER, self.list))
+        self.assertTrue(self.user_proposer.has_perm(ENTER, self.list))
         self.assertFalse(self.user_any.has_perm(ENTER, self.list))
 
     def test_enter_speaker_list_closed(self):
@@ -79,12 +92,14 @@ class SpeakerListTests(TestCase):
         self.list.save()
         self.assertTrue(self.user_moderator.has_perm(ENTER, self.list))
         self.assertFalse(self.user_speaker.has_perm(ENTER, self.list))
+        self.assertFalse(self.user_proposer.has_perm(ENTER, self.list))
         self.assertFalse(self.user_any.has_perm(ENTER, self.list))
 
     def test_leave_speaker_list_open(self):
         LEAVE = self.p("LEAVE")
         self.assertTrue(self.user_moderator.has_perm(LEAVE, self.list))
         self.assertTrue(self.user_speaker.has_perm(LEAVE, self.list))
+        self.assertTrue(self.user_proposer.has_perm(LEAVE, self.list))
         self.assertFalse(self.user_any.has_perm(LEAVE, self.list))
 
     def test_leave_currently_speaking(self):
@@ -92,6 +107,7 @@ class SpeakerListTests(TestCase):
         speaker = self.list.speaker_items.create(user=self.user_speaker)
         self.assertTrue(self.user_moderator.has_perm(LEAVE, self.list))
         self.assertTrue(self.user_speaker.has_perm(LEAVE, self.list))
+        self.assertTrue(self.user_proposer.has_perm(LEAVE, self.list))
         self.assertFalse(self.user_any.has_perm(LEAVE, self.list))
         self.list.current = speaker
         self.list.save()
@@ -129,19 +145,24 @@ class SpeakerListTests(TestCase):
 
 
 class SpeakerListSystemTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.speaker.roles import ROLE_LIST_MODERATOR, ROLE_SPEAKER
         from voteit.meeting.models import Meeting
 
-        meeting = Meeting.objects.create()
-        self.system = meeting.speaker_systems.create(method_name="simple")
-        self.user_meeting_moderator = User.objects.create(username="m_moderator")
-        meeting.add_roles(self.user_meeting_moderator, ROLE_MODERATOR)
-        self.user_moderator = User.objects.create(username="s_moderator")
-        self.system.add_roles(self.user_moderator, ROLE_LIST_MODERATOR)
-        self.user_speaker = User.objects.create(username="in")
-        self.system.add_roles(self.user_speaker, ROLE_SPEAKER)
-        self.user_any = User.objects.create(username="jane")
+        cls.meeting = Meeting.objects.create()
+        cls.system = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.user_meeting_moderator = User.objects.create(username="m_moderator")
+        cls.meeting.add_roles(cls.user_meeting_moderator, ROLE_MODERATOR)
+        cls.user_moderator = User.objects.create(username="s_moderator")
+        cls.system.add_roles(cls.user_moderator, ROLE_LIST_MODERATOR)
+        cls.user_speaker = User.objects.create(username="in")
+        cls.system.add_roles(cls.user_speaker, ROLE_SPEAKER)
+        cls.user_any = User.objects.create(username="jane")
+
+    def setUp(self):
+        self.system.refresh_from_db()
+        self.meeting.refresh_from_db()
 
     def p(self, name):
         from voteit.speaker.permissions import SpeakerSystemPermissions

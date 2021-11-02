@@ -1,8 +1,10 @@
 from typing import List
 
 from rest_framework import serializers
+from rest_framework import exceptions
 
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
+from voteit.meeting.models import MeetingRoles
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 
@@ -75,8 +77,15 @@ class SpeakerListSystemSerializer(serializers.ModelSerializer):
             "settings",
             "active_list",
             "safe_positions",
+            "meeting_roles_to_speaker",
         ] + read_only_fields
         extra_kwargs = {
             # At least right now...
             "meeting": {"required": True},
         }
+
+    def validate_meeting_roles_to_speaker(self, value):
+        for role in value:
+            if role not in MeetingRoles.valid_roles:
+                raise exceptions.ValidationError(f"{role} is not a valid meeting role")
+        return value
