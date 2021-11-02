@@ -16,6 +16,7 @@ from bleach import Cleaner
 from bs4 import BeautifulSoup
 from django.db.models import Model
 from django.db.models import Q
+from django.db.transaction import get_connection
 from django.utils.text import slugify
 
 if TYPE_CHECKING:
@@ -198,7 +199,9 @@ _relaxed["tags"].extend(["h2", "h3", "h4", "sup", "sub", "img", "iframe"])
 for tag in "h2", "h3", "h4", "p", "blockquote":
     _relaxed["attributes"].setdefault(tag, []).append("class")
 _relaxed["attributes"].setdefault("img", []).append("src")
-_relaxed["attributes"].setdefault("iframe", []).extend(["class", "frameborder", "allowfullscreen", "src"])
+_relaxed["attributes"].setdefault("iframe", []).extend(
+    ["class", "frameborder", "allowfullscreen", "src"]
+)
 
 
 def relaxed_clean_html(text: str):
@@ -328,3 +331,37 @@ def generate_valid_userid(user: AbstractUser) -> Optional[str]:
         suggestion = f"{slugified_name}-{suffix}"
         if not base_qs.filter(userid=suggestion).exists():
             return suggestion
+
+
+def ensure_atomic(method):
+    """
+    Decorator to ensure that something is within an atomic transaction.
+
+    Remember that djangos tests use atomic transactions all the time, but doctests don't.
+
+    >>> @ensure_atomic
+    ... def hello():
+    ...     pass
+    ...
+
+    >>> failed = False
+    >>> try:
+    ...     hello()
+    ... except RuntimeError:
+    ...     failed = True
+    >>> failed
+    True
+
+    >>> from django.db.transaction import atomic
+    >>> with atomic():
+    ...     hello()
+    ...
+    """
+
+    def _inner(*args, **kwargs):
+        connection = get_connection()
+        if not connection.in_atomic_block:
+            raise RuntimeError("Must be run while atomic is enabled")
+        return method(*args, **kwargs)
+
+    return _inner
