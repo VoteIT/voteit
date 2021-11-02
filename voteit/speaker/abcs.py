@@ -55,6 +55,7 @@ class ListMethod(ABC):
         new_created_base = now() - timedelta(seconds=len(list_items))
         for order, speaker in enumerate(list_items, 1):
             speaker.order = order
+            speaker.safe_pos = False
             speaker.created = new_created_base + timedelta(seconds=order)
             speaker.save()
             new_order.append(speaker.pk)
