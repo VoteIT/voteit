@@ -429,7 +429,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
             self.current = None
             self.save()
             speaker.signal_stopped()
-            self.signal_list_updated()
+            self.reorder(force_signal=True)
             return True
 
     def save(self, **kw):

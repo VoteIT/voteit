@@ -73,8 +73,12 @@ class SpeakerListTests(TestCase):
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
 
-        cls.system = SpeakerListSystem.objects.create(method_name="simple")
-        cls.speaker_list = SpeakerList.objects.create(speaker_system=cls.system)
+        cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
+            method_name="simple"
+        )
+        cls.speaker_list: SpeakerList = SpeakerList.objects.create(
+            speaker_system=cls.system
+        )
         cls.user_one = User.objects.create(username="one")
         cls.user_two = User.objects.create(username="two")
         cls.user_three = User.objects.create(username="three")
@@ -189,6 +193,18 @@ class SpeakerListTests(TestCase):
         new_ai = new_meeting.agenda_items.create()
         self.speaker_list.agenda_item = new_ai
         self.assertRaises(IntegrityError, self.speaker_list.save)
+
+    def test_undo(self):
+        self.speaker_list.start_speaker(self.speaker_two)
+        self.assertEqual(
+            [self.speaker_one.pk, self.speaker_three.pk],
+            self.speaker_list.current_order(),
+        )
+        self.speaker_list.undo_speaker()
+        self.assertEqual(
+            [self.speaker_one.pk, self.speaker_two.pk, self.speaker_three.pk],
+            self.speaker_list.current_order(),
+        )
 
 
 class SpeakerListSystemsTests(TestCase):
