@@ -128,8 +128,6 @@ class MajorityTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AddMajorityVoteTests(TestCase):
-    # fixtures = ["meeting_test_fixture"]
-
     @classmethod
     def setUpTestData(cls):
         from voteit.poll.models import Poll
@@ -141,8 +139,6 @@ class AddMajorityVoteTests(TestCase):
         cls.Majority = Majority
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter = cls.er.voters.create(username="a")
-        # cls.voter_b = cls.er.voters.create(username="b")
-        # cls.voter_c = cls.er.voters.create(username="c")
         cls.poll: Poll = Poll.objects.create(
             electoral_register=cls.er, method_name="majority", state=PollWf.ONGOING
         )
