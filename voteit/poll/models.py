@@ -296,18 +296,19 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         custom={"title": _("Finish")},
     )
     def finish(self):
-        """Count the votes and finish up."""
+        """
+        Count the votes and finish up.
+        """
         # Remove bad votes due to a change in electoral register during the poll.
         # This is probably not allowed in most meetings.
         self.vote_cleanup_set().delete()
-        # ballots, abstains = self.get_ballots()
-        # self.store_ballots(ballots, abstains)
         counter = self.finalize_vote_data()
         assert self.ballot_data
         assert self.ballot_checksum
         result = self.method.calculate_result(counter)
         # Ensure vote count is same as the poll method uses, including vote weight.
-        result.vote_count = sum(counter.values()) + self.abstains
+        # Abstains aren't included here
+        result.vote_count = sum(counter.values())
         self.result = result
         for proposal in self.proposals.filter(pk__in=self.result.approved):
             with suppress(TransitionNotAllowed):
@@ -348,7 +349,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             self.closed = now()
 
     def finalize_vote_data(self) -> Counter:
-        """Return JSON-serializable result counter.
+        """
+        Return JSON-serializable result counter.
         Will also save ballot data and create a checksum + store abstentions.
         """
         counter = Counter()
