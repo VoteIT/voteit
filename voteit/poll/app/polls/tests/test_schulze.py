@@ -1,10 +1,14 @@
 from collections import Counter
 
 from django.test import TestCase
-from django_fsm import TransitionNotAllowed
+from django.test import override_settings
 
 from voteit.messaging.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
+
+_channel_layers_setting = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}
 
 
 def wiki_example_ballots(method) -> Counter:
@@ -258,6 +262,7 @@ class RepeatedSchulzeTests(TestCase):
         self.assertEqual(4, result.rounds[1].winner)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AddSchulzeVoteTests(TestCase):
     def setUp(self):
         from voteit.poll.models import Poll
