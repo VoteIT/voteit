@@ -8,7 +8,7 @@ from stvpoll import IncompleteResult
 from stvpoll import STVPollBase
 
 from voteit.messaging.decorators import incoming
-from voteit.poll.app.polls import ScottishSTV
+from voteit.poll.app.polls.scottish_stv import ScottishSTV
 from voteit.poll.app.polls.scottish_stv import STVResultSchema
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote
@@ -21,7 +21,7 @@ __all__ = ("IRV",)
 
 
 def irv_quota(poll: STVPollBase) -> int:
-    """ Majority should be more than half of the votes. """
+    """Majority should be more than half of the votes."""
     return ((poll.ballot_count + poll.result.empty_ballot_count) // 2) + 1
 
 
