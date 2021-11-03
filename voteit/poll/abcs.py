@@ -16,13 +16,13 @@ if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
     from voteit.poll.messages import VoteBase
     from voteit.poll.schemas import PollResult
-    from voteit.core.models import User
 
 logger = getLogger(__name__)
 
 
 class PollMethod(ABC):
-    """This is a wrapper for polls that handles calculation of the result
+    """
+    This is a wrapper for polls that handles calculation of the result
     and the implementation of the poll method.
     """
 
@@ -68,12 +68,12 @@ class PollMethod(ABC):
         May raise ValidationErrorMsg in case something goes wrong.
         """
 
-    def start_check(self) -> bool:  # pragma: no cover
-        """Specifics for this poll method except the ones for the base Poll.
+    def start_check(self) -> None:  # pragma: no cover
+        """
+        Specifics for this poll method except the ones for the base Poll.
         Things like if there's enough proposals to start the poll.
         Raise exceptions for conditions that aren't met.
         """
-        return True
 
 
 class ElectoralRegisterPolicy(ABC):

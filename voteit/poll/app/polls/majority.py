@@ -113,7 +113,7 @@ class Majority(PollMethod):
         Finally with a winner
         >>> counter['{"choice": 2}'] = 10
         >>> majority.calculate_result(counter)
-        MajorityPollResult(approved=[], denied=[], vote_count=None, results=[ProposalResult(proposal=1, votes=5), ProposalResult(proposal=2, votes=10)])
+        MajorityPollResult(approved=[2], denied=[1], vote_count=None, results=[ProposalResult(proposal=1, votes=5), ProposalResult(proposal=2, votes=10)])
         """
         results = []
         for (vote_str, count) in counter.items():

@@ -5,20 +5,21 @@ User = get_user_model()
 
 
 class PollDetailSerializerTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create(title="Hello")
-        self.poll = self.meeting.polls.create(
-            agenda_item=self.ai,
-            meeting=self.meeting,
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create(title="Hello")
+        cls.poll = cls.meeting.polls.create(
+            agenda_item=cls.ai,
+            meeting=cls.meeting,
             method_name="simple",
             body="<b>Hello</b>",
             title="world",
         )
-        self.prop1 = self.poll.proposals.create()
-        self.prop2 = self.poll.proposals.create()
+        cls.prop1 = cls.poll.proposals.create()
+        cls.prop2 = cls.poll.proposals.create()
 
     @property
     def _cut(self):
@@ -80,7 +81,10 @@ class PollDetailSerializerTests(TestCase):
             set(expected_data.pop("proposals")),
         )
         self.assertEqual("repeated_schulze", expected_data.pop("method_name"))
-        self.assertEqual({"winners": 2}, expected_data.pop("settings"))
+        self.assertEqual(
+            {"deny_proposal": None, "stars": 5, "winners": 2},
+            expected_data.pop("settings"),
+        )
 
     def test_schulze_result(self):
         self.poll.method_name = "schulze"
@@ -190,6 +194,21 @@ class PollCreateSerializerTests(TestCase):
         data = self._fixture(
             method_name="repeated_schulze",
             proposals=[self.prop.pk, prop2.pk, prop3.pk],
+        )
+        serializer = self._cut(data=data)
+        self.assertTrue(serializer.is_valid())
+        instance = serializer.save()
+        instance.electoral_register = self.er
+        instance.upcoming()
+        instance.ongoing()
+        instance.save()
+
+    def test_serializer_repeated_schulze_with_deny(self):
+        prop2 = self.ai.proposals.create()
+        data = self._fixture(
+            method_name="repeated_schulze",
+            settings={"deny_proposal": 0},
+            proposals=[self.prop.pk, prop2.pk],
         )
         serializer = self._cut(data=data)
         self.assertTrue(serializer.is_valid())

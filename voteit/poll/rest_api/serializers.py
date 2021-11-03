@@ -1,7 +1,6 @@
 from typing import Type
 
 from django.db import transaction
-from django.utils.translation import gettext as _
 from rest_framework import serializers
 
 from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
@@ -74,7 +73,9 @@ class PollCreateSerializer(serializers.ModelSerializer):
     settings = serializers.JSONField(allow_null=True, write_only=True, required=False)
 
     def validate(self, attrs):
-        """ Run some extended validation. """
+        """
+        Run some extended validation.
+        """
         agenda_item = attrs.get("agenda_item")
         proposals = set(attrs.get("proposals"))
         method_name = attrs.get("method_name")
