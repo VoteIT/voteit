@@ -20,7 +20,8 @@ from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote
 from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericAddVoteSchema, GenericExistingVoteSchema
+from voteit.poll.schemas import GenericAddVoteSchema
+from voteit.poll.schemas import GenericExistingVoteSchema
 from voteit.poll.schemas import PollResult
 
 __all__ = ("Schulze", "RepeatedSchulze")
@@ -77,7 +78,9 @@ class SchulzePollResult(PollResult):
 
 @poll_methods
 class Schulze(PollMethod):
-    """One-winner method with multiple proposals. Will produce Condorcet winner/looser(s)."""
+    """
+    One-winner method with multiple proposals. Will produce Condorcet winner/looser(s).
+    """
 
     title = _("Schulze")
     name = "schulze"
@@ -107,7 +110,9 @@ class Schulze(PollMethod):
         return self.vote_schema(ranking=vals)
 
     def schulze_format(self, counter: Counter) -> List[Dict]:
-        """ Internal helper to fix expected input."""
+        """
+        Internal helper to fix expected input.
+        """
         input = []
         for (text, count) in counter.items():
             ballot = self.vote_to_obj(text)
@@ -206,7 +211,9 @@ class RepeatedSchulzeSettingsSchema(BaseModel):
 
 @poll_methods
 class RepeatedSchulze(Schulze):
-    """ Schulze polls that iterate until sufficient number of winners are picked."""
+    """
+    Schulze polls that iterate until sufficient number of winners are picked.
+    """
 
     title = _("Repeated Schulze")
     name = "repeated_schulze"

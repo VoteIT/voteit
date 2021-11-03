@@ -31,16 +31,15 @@ def wiki_example_ballots(method) -> Counter:
 
 
 class SchulzeTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
 
-        self.er = ElectoralRegister.objects.create()
-        self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="schulze"
-        )
-        self.poll.upcoming()
-        self.poll.save()
+        cls.er = ElectoralRegister.objects.create()
+        cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="schulze")
+        cls.poll.upcoming()
+        cls.poll.save()
 
     @property
     def _cut(self):
@@ -160,16 +159,17 @@ class SchulzeTests(TestCase):
 
 
 class RepeatedSchulzeTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
 
-        self.er = ElectoralRegister.objects.create()
-        self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="repeated_schulze"
+        cls.er = ElectoralRegister.objects.create()
+        cls.poll = Poll.objects.create(
+            electoral_register=cls.er, method_name="repeated_schulze"
         )
-        self.poll.upcoming()
-        self.poll.save()
+        cls.poll.upcoming()
+        cls.poll.save()
 
     @property
     def _cut(self):
@@ -264,20 +264,19 @@ class RepeatedSchulzeTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AddSchulzeVoteTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
 
-        self.er = ElectoralRegister.objects.create()
-        self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="schulze"
-        )
-        self.prop1 = self.poll.proposals.create()
-        self.prop2 = self.poll.proposals.create()
-        self.prop3 = self.poll.proposals.create()
-        self.voter = self.er.voters.create(username="voter")
-        self.poll.upcoming()
-        self.poll.save()
+        cls.er = ElectoralRegister.objects.create()
+        cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="schulze")
+        cls.prop1 = cls.poll.proposals.create()
+        cls.prop2 = cls.poll.proposals.create()
+        cls.prop3 = cls.poll.proposals.create()
+        cls.voter = cls.er.voters.create(username="voter")
+        cls.poll.upcoming()
+        cls.poll.save()
 
     @property
     def _cut(self):
