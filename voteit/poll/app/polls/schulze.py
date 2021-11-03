@@ -76,6 +76,18 @@ class SchulzePollResult(PollResult):
     tied_winners: Optional[List[int]]
 
 
+class SchulzeSettingsSchema(BaseModel):
+    stars: int = 5
+
+    @validator("stars")
+    def validate_stars(cls, v):
+        if v > 20:
+            raise ValueError("Must be 20 or less")
+        if v < 3:
+            raise ValueError("Must be 3 or more")
+        return v
+
+
 @poll_methods
 class Schulze(PollMethod):
     """
@@ -86,6 +98,7 @@ class Schulze(PollMethod):
     name = "schulze"
     vote_schema = SchulzeVoteSchema
     result_schema = SchulzePollResult
+    settings_schema = SchulzeSettingsSchema
 
     def vote_to_str(self, data: SchulzeVoteSchema) -> str:
         """
@@ -196,7 +209,7 @@ class RepeatedSchulzeResult(PollResult):
     candidates: List[int]
 
 
-class RepeatedSchulzeSettingsSchema(BaseModel):
+class RepeatedSchulzeSettingsSchema(SchulzeSettingsSchema):
     winners: Optional[int]  # None means all
 
     @validator("winners")

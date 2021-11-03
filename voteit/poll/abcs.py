@@ -62,7 +62,8 @@ class PollMethod(ABC):
         """Takes the counted ballots, calculate the result and store it."""
 
     def validate_vote(self, msg: VoteBase) -> None:
-        """Run extra validation based on how the vote itself looks.
+        """
+        Run extra validation based on how the vote itself looks.
         For instance checking that a ranked vote actually ranks real proposals.
         May raise ValidationErrorMsg in case something goes wrong.
         """
