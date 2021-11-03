@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from collections import Counter
 from typing import List
+from typing import Union
 
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext as _
 from pydantic import BaseModel
 from pydantic import validator
 
 from voteit.messaging.decorators import incoming
+from voteit.messaging.errors import ValidationErrorMsg
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote
@@ -135,3 +137,17 @@ class Majority(PollMethod):
     def start_check(self):
         if self.poll.proposals.count() != 2:
             raise InvalidProposalCount(_("Must be exactly two proposals"))
+
+    def validate_vote(self, msg: Union[AddMajorityVote, ChangeMajorityVote]) -> None:
+        if not self.poll.proposals.filter(pk=msg.data.vote.choice).exists():
+            raise ValidationErrorMsg.from_message(
+                msg,
+                msg=_("Invalid vote"),
+                errors=[
+                    {
+                        "loc": ("vote.choice",),
+                        "msg": "Invalid choice",
+                        "type": "value.error",
+                    }
+                ],
+            )

@@ -1,9 +1,15 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.test import override_settings
+from pydantic import ValidationError
+from voteit.messaging.errors import ValidationErrorMsg
 
 from voteit.poll.exceptions import InvalidProposalCount
 
 User = get_user_model()
+_channel_layers_setting = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}
 
 
 class MajorityTests(TestCase):
@@ -118,3 +124,54 @@ class MajorityTests(TestCase):
         self.prop2.refresh_from_db()
         self.assertEqual(ProposalWf.APPROVED, self.prop1.state)
         self.assertEqual(ProposalWf.DENIED, self.prop2.state)
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class AddMajorityVoteTests(TestCase):
+    # fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.poll.models import Poll
+        from voteit.poll.models import ElectoralRegister
+        from voteit.poll.app.polls import Majority
+        from voteit.proposal.models import Proposal
+        from voteit.poll.workflows import PollWf
+
+        cls.Majority = Majority
+        cls.er: ElectoralRegister = ElectoralRegister.objects.create()
+        cls.voter = cls.er.voters.create(username="a")
+        # cls.voter_b = cls.er.voters.create(username="b")
+        # cls.voter_c = cls.er.voters.create(username="c")
+        cls.poll: Poll = Poll.objects.create(
+            electoral_register=cls.er, method_name="majority", state=PollWf.ONGOING
+        )
+        cls.prop1: Proposal = cls.poll.proposals.create()
+        cls.prop2: Proposal = cls.poll.proposals.create()
+
+    @property
+    def _cut(self):
+        from voteit.poll.app.polls.majority import AddMajorityVote
+
+        return AddMajorityVote
+
+    def _mk_one(self, choice, **kw):
+        kw.setdefault("vote", {"choice": choice})
+        kw.setdefault("poll", self.poll.pk)
+        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+
+    def test_add_msg(self):
+        msg = self._mk_one(self.prop1.pk)
+        msg.run_job()
+        self.assertEqual(1, self.voter.vote_set.count())
+        vote = self.voter.vote_set.first()
+        self.assertEqual(self.prop1.pk, vote.vote.choice)
+
+    def test_add_msg_obvious_bad_choice(self):
+        # Handled by pydantic
+        self.assertRaises(ValidationError, self._mk_one, 0)
+
+    def test_add_msg_bad_proposal(self):
+        bad_prop_pk = self.prop1.pk - 5
+        msg = self._mk_one(bad_prop_pk)
+        self.assertRaises(ValidationErrorMsg, msg.run_job)
