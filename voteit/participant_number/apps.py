@@ -7,4 +7,5 @@ class PNConfig(AppConfig):
     verbose_name = _("Participant number")
 
     def ready(self):
-        pass
+        from voteit.participant_number import signals
+        from voteit.participant_number import messages
