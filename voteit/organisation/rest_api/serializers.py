@@ -1,6 +1,8 @@
 from contextlib import suppress
 from typing import Optional
+from urllib.parse import urlparse
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from rest_framework.reverse import reverse
@@ -13,11 +15,12 @@ from voteit.organisation.models import UserConsent
 
 class OrganisationSerializer(serializers.ModelSerializer):
     login_url = serializers.SerializerMethodField()
+    id_host = serializers.SerializerMethodField()
     scope = serializers.SerializerMethodField()
 
     class Meta:
         model = Organisation
-        read_only_fields = ["pk", "login_url", "scope"]
+        read_only_fields = ["pk", "login_url", "scope", "id_host"]
         fields = read_only_fields + ["title", "body"]
 
     def get_login_url(self, instance: Organisation) -> Optional[str]:
@@ -29,7 +32,16 @@ class OrganisationSerializer(serializers.ModelSerializer):
                     request=self.context.get("request"),
                 )
 
-    def get_scope(self, instance: Organisation) -> List[str]:
+    @staticmethod
+    def get_id_host(instance: Organisation) -> Optional[str]:
+        if host := getattr(settings, 'ID_HOST', None):
+            return host
+        with suppress(ObjectDoesNotExist):
+            url = urlparse(instance.provider.auth_url)
+            return f'{url.scheme}://{url.netloc}'
+
+    @staticmethod
+    def get_scope(instance: Organisation) -> List[str]:
         with suppress(ObjectDoesNotExist):
             if instance.provider:
                 return instance.provider.scope.split()

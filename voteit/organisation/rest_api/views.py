@@ -24,7 +24,7 @@ class OrganisationViewSet(
     queryset = Organisation.objects.all()
     serializer_class = serializers.OrganisationSerializer
 
-    # TODO: Not decided haw to host multiple organisations. For now, always return a list of one.
+    # TODO: Not decided how to host multiple organisations. For now, always return a list of one.
     def get_queryset(self):
         if self.request.user.is_authenticated and self.request.user.organisation:
             return self.queryset.filter(pk=self.request.user.organisation.pk)

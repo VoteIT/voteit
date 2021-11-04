@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -24,14 +26,14 @@ def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
     """
     Populate app_state with participant numbers
     """
-    if context.pn_system:
-        for item in context.pn_system.numbers.all().values_list(
+    with suppress(ObjectDoesNotExist):
+        for item in context.pn_system.numbers.all().values(
             "number",
             "user",
             "pk",
         ):
             app_state.append(
-                PNAdded(meeting=context.pk, number=item[0], user=item[1], pk=item[2])
+                PNAdded(meeting=context.pk, **item)
             )
 
 
