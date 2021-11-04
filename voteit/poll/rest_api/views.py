@@ -40,6 +40,8 @@ class ElectoralRegisterViewSet(ReadonlyModelViewSet):
         **ReadonlyModelViewSet.permission_type_map,
         "methods": None,
     }
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = "meeting",
 
     def get_queryset(self):
         return ElectoralRegister.objects.for_user(self.request.user)

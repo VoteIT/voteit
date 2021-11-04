@@ -156,7 +156,7 @@ class ElectoralRegisterPolicy(ABC):
         Some will probably implement their own.
         Note that new electoral registers shouldn't be created unless needed or forced.
         """
-        if force or self.new_er_needed():
+        if force or self.new_er_needed(**kwargs):
             er = self.meeting.electoral_registers.create()
             er.voters.set(self.get_voters(**kwargs))
             self.meeting.latest_er = er  # Clear cached
