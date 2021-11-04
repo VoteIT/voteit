@@ -18,7 +18,7 @@ class ParticipantNumber(models.Model):
     could then have signs with a number on that the moderator simply enters to queue them.
     """
 
-    number: int = models.PositiveSmallIntegerField()
+    number: int = models.PositiveSmallIntegerField(blank=True)
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT
     )
@@ -39,6 +39,21 @@ class ParticipantNumber(models.Model):
             ),
         ]
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self.number}>"
+
+    def __str__(self):
+        return f"{self.user}: PN-{self.number}"
+
+    def save(self, **kwargs):
+        if self.number is None:
+            pn = self.pns.numbers.order_by("-number").first()
+            if pn is None:
+                self.number = 1
+            else:
+                self.number = pn.number + 1
+        super().save(**kwargs)
+
 
 class PNSystem(models.Model):
     """
@@ -56,6 +71,12 @@ class PNSystem(models.Model):
         for pn_obj in self.numbers.filter(number=pn).all().prefetch_related("user"):
             return pn_obj.user
         return default
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self.meeting}>"
+
+    def __str__(self):
+        return f"PN: {self.meeting}"
 
     # Annotations
     numbers: models.QuerySet
