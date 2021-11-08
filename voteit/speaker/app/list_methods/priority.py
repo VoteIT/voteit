@@ -31,10 +31,10 @@ class Priority(ListMethod):
 
     def get_cmp_val(self, speaker_list: SpeakerList, user: AbstractUser) -> int:
         count = self.get_spoken_count(speaker_list, user)
-        max_times = self.speaker_system.settings.max_times
-        if max_times and count > max_times:
-            return max_times
-        return count
+        max_times = self.speaker_system.settings.max_times           # max_times is the number of extra lists
+        if max_times == 0:                                           # 0 = eternity
+            return count
+        return min(count, max_times + 1)
 
     def reorder(self, speaker_list: SpeakerList) -> List[int]:
         """ Prioritise according to spoken times """
