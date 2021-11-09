@@ -350,6 +350,7 @@ class SpeakerSystemSchema(BaseModel):
     settings: Optional[Dict]
     safe_positions: Optional[int]
     active_list: Optional[int]
+    meeting_roles_to_speaker: List[str]
 
 
 @outgoing

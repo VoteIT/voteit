@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth import logout
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework import serializers
 from rest_framework import viewsets
@@ -21,7 +22,8 @@ class UserSearchViewSet(viewsets.ModelViewSet):
     permission_classes = (DjangoModelPermissions,)
     queryset = UserModel.objects.all()
     serializer_class = UserSerializer
-    filter_backends = (filters.SearchFilter,)
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter,)
+    filterset_fields = "meeting",
     search_fields = "username", "email", "first_name", "last_name"
 
 
