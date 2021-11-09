@@ -263,7 +263,7 @@ def make_speaker_system_users_participants(instance: SpeakerSystemRoles, **kw):
 
 
 @receiver(roles_removed, sender=MeetingRoles)
-def make_speaker_system_users_participants(instance: MeetingRoles, roles, **kw):
+def remove_list_roles_when_participant_removed(instance: MeetingRoles, roles, **kw):
     """
     If someone is removed as a participant from the meeting,
     remove their speaker system roles too.

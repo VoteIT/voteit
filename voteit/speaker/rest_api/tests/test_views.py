@@ -42,7 +42,7 @@ class SpeakerListsViewTestCase(APITestCase):
         }
         for user, status in (
             (None, 401),
-            (self.moderator, 403),
+            (self.moderator, 201),
             (self.participant, 403),
             (self.list_moderator, 201),
         ):
@@ -166,22 +166,23 @@ class SpeakerListsViewTestCase(APITestCase):
 
 
 class SpeakerListSystemViewTestCase(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
 
-        self.meeting: Meeting = Meeting.objects.create(
+        cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        self.system = self.meeting.speaker_systems.create(method_name="simple")
-        self.participant: User = User.objects.create_user("participant")
-        self.moderator: User = User.objects.create_user("moderator")
-        self.outsider: User = User.objects.create_user("outsider")
-        self.list_moderator: User = User.objects.create_user("list_moderator")
-        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
-        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
-        self.system.add_roles(self.list_moderator, ROLE_LIST_MODERATOR)
+        cls.system = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.participant: User = User.objects.create_user("participant")
+        cls.moderator: User = User.objects.create_user("moderator")
+        cls.outsider: User = User.objects.create_user("outsider")
+        cls.list_moderator: User = User.objects.create_user("list_moderator")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.system.add_roles(cls.list_moderator, ROLE_LIST_MODERATOR)
 
     def test_create(self):
         url = reverse("speakerlistsystem-list")
