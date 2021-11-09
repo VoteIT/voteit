@@ -87,16 +87,10 @@ class AgendaItemViewTestCase(APITestCase):
         url = f"/api/agenda-items/{self.ai.pk}/transitions/"
         data = {"transition": "upcoming"}
         response = self.client.post(url, data)
-        self.assertEqual(
-            response.status_code,
-            401,
-        )
+        self.assertEqual(response.status_code, 401)
         self.client.force_login(self.participant)
         response = self.client.post(url, data)
-        self.assertEqual(
-            response.status_code,
-            400,  # Raises invalid transition
-        )
+        self.assertEqual(response.status_code, 403)
 
     def test_transition_conditions_not_met(self):
         self.meeting.state = "upcoming"

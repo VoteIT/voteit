@@ -196,41 +196,50 @@ class TransitionsMixin(SerializerClassesMixin):
         Checks against available transitions for current user before calling.
         """
         instance = self.get_object()
-        available_transitions = dict(
-            (x.name, x)
-            for x in instance.get_available_user_state_transitions(request.user)
-        )
+
         if request.method == "GET":
+            available_transitions = dict(
+                (x.name, x)
+                for x in instance.get_available_user_state_transitions(request.user)
+            )
             transition_serializer = FSMTransitionSerializer(
                 list(available_transitions.values()), many=True
             )
             return Response(transition_serializer.data)
         else:
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            name = serializer.data["transition"]
-            if name not in available_transitions:
+            transition_name = request.data.get("transition", None)
+            if transition_name is None:
+                raise exceptions.ValidationError(
+                    detail={"transition": [_("Transition not specified")]}
+                )
+            all_transitions = dict(
+                (x.name, x) for x in instance.get_all_state_transitions()
+            )
+            if transition_name not in all_transitions:
                 raise exceptions.ValidationError(
                     detail={
-                        "transition": _("Invalid transition: %(name)s") % {"name": name}
+                        "transition": [
+                            _("Invalid transition: %(name)s")
+                            % {"name": transition_name}
+                        ]
                     }
                 )
-            transition = available_transitions[name]
+            transition = all_transitions[transition_name]
+            for condition in transition.conditions:
+                if not condition(instance):
+                    raise exceptions.ValidationError(
+                        detail={
+                            "transition": [
+                                _("Guard %(guard)s blocks transition %(name)s")
+                                % {"name": transition_name, "guard": condition.__name__}
+                            ]
+                        }
+                    )
             if not transition.has_perm(instance, request.user):
                 raise exceptions.PermissionDenied(
                     perm_denied_msg(transition.permission, instance)
                 )
-            method = getattr(instance, name)
-            # 'get_available_user_state_transitions' already filters out guards that haven't been met,
-            # so this is already checked and will have caused the 'transition not found' 400
-            # FIXME: Maybe delay check?
-            # if not can_proceed(method):
-            #     raise exceptions.ValidationError(
-            #         detail=_(
-            #             "Transition isn't allowed since all requirements haven't been met."
-            #         )
-            #     )
-            method()
+            getattr(instance, transition_name)()
             instance.save()
             # TODO Possibly return serialized object, but strictly speaking not necessary.
             return Response(status=201, data={})

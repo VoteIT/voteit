@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-09-10 14:53+0000\n"
-"PO-Revision-Date: 2021-09-09 16:21+0200\n"
+"POT-Creation-Date: 2021-11-09 14:56+0000\n"
+"PO-Revision-Date: 2021-11-09 15:58+0100\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -18,33 +18,50 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 2.3\n"
 
-#: voteit/core/models.py:86
+#: voteit/core/models.py:93
 msgid "Make user active"
 msgstr "Gör användaren aktiv"
 
-#: voteit/core/models.py:95
+#: voteit/core/models.py:102
 msgid "Mark user as incomplete"
 msgstr "Markera användaren som ofullständig"
 
-#: voteit/core/rest_api/mixins.py:24
+#: voteit/core/rest_api/mixins.py:23
 #, python-format
 msgid "You're missing the permission '%(perm)s' on %(obj)s."
 msgstr "Du saknar behörigheten ’%(perm)s’ på %(obj)s."
 
-#: voteit/core/rest_api/mixins.py:148
+#: voteit/core/rest_api/mixins.py:147
 #, python-format
 msgid "%(lookup_kw)s not specified"
 msgstr "%(lookup_kw)s har inte angetts"
 
-#: voteit/core/rest_api/mixins.py:155
+#: voteit/core/rest_api/mixins.py:154
 #, python-format
 msgid "No item found where %(lookup_field)s==%(lookup_val)s"
 msgstr "Inget objekt hittades där %(lookup_field)s==%(lookup_val)s"
 
 #: voteit/core/rest_api/mixins.py:213
+msgid "Transition not specified"
+msgstr "Handling måste anges"
+
+#: voteit/core/rest_api/mixins.py:222
 #, python-format
 msgid "Invalid transition: %(name)s"
 msgstr "Ogiltig handling: %(name)s"
+
+#: voteit/core/rest_api/mixins.py:233
+#, python-format
+msgid "Guard %(guard)s blocks transition %(name)s"
+msgstr "Regeln %(guard)s blockerar handlingen %(name)s"
+
+#: voteit/core/rest_api/serializers.py:102
+msgid "Email you specified isn't validated. It must exist on your profile."
+msgstr ""
+
+#: voteit/core/rest_api/serializers.py:226
+msgid "You can only pick existing users"
+msgstr "Du kan bara välja existerande användare"
 
 #: voteit/core/workflows.py:10
 msgid "Unhandled"
@@ -65,6 +82,26 @@ msgstr "Ofullständig"
 #: voteit/core/workflows.py:28
 msgid "Active"
 msgstr "Aktiv"
+
+#: voteit/core/workflows.py:45
+msgid "Created"
+msgstr ""
+
+#: voteit/core/workflows.py:46
+msgid "Scheduled"
+msgstr ""
+
+#: voteit/core/workflows.py:47
+msgid "Sending"
+msgstr ""
+
+#: voteit/core/workflows.py:48
+msgid "Sent"
+msgstr ""
+
+#: voteit/core/workflows.py:49
+msgid "Failed"
+msgstr ""
 
 #~ msgid "Permission '${perm}s' not allowed on ${context}s"
 #~ msgstr "Behörighet '${perm}s' tillåts inte på ${context}s"

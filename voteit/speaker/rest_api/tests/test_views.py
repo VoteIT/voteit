@@ -119,7 +119,7 @@ class SpeakerListsViewTestCase(APITestCase):
         response = self.client.post(url, data)
         self.assertEqual(
             response.status_code,
-            400,
+            403,
         )
 
     def test_put(self):
@@ -281,12 +281,12 @@ class SpeakerListSystemViewTestCase(APITestCase):
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 201)
 
-    def test_transition_list_moderator(self):
+    def test_transition_list_moderator_not_allowed(self):
         url = f"/api/speaker-list-systems/{self.system.pk}/transitions/"
         self.client.force_login(self.list_moderator)
         data = {"transition": "activate"}
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 403)
 
 
 class HistoricSpeakerViewTests(APITestCase):

@@ -48,7 +48,7 @@ class TranslationTests(APITestCase):
         self.assertEqual("sv", response.headers.get("Content-Language"))
         data = response.json()
         # No clue why this is a list but we're testing translations here :)
-        self.assertEqual(["Det här fältet är obligatoriskt."], data["transition"])
+        self.assertEqual(["Transition not specified"], data["transition"])
 
     def test_bad_transition(self):
         self.client.force_login(self.moderator)
@@ -58,7 +58,7 @@ class TranslationTests(APITestCase):
         self.assertEqual(400, response.status_code)
         self.assertEqual("sv", response.headers.get("Content-Language"))
         data = response.json()
-        self.assertEqual("Ogiltig handling: hello", data["transition"])
+        self.assertEqual(["Ogiltig handling: hello"], data["transition"])
 
     def test_no_obj(self):
         url = reverse("meeting-transitions", kwargs={"pk": 0})

@@ -95,10 +95,7 @@ class MeetingViewSetTests(APITestCase):
         participant = User.objects.get(username="participant")
         self.client.force_login(participant)
         response = self.client.post(url, data)
-        self.assertEqual(
-            response.status_code,
-            400,  # Raises invalid transition
-        )
+        self.assertEqual(response.status_code, 403)
 
     def test_delete(self):
         url = reverse("meeting-detail", kwargs={"pk": 1})
