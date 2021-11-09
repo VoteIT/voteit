@@ -158,10 +158,8 @@ class PresenceCheckTests(APITestCase):
             )
 
     def test_create_system_ne(self):
-        # FIXME Check when there is a setting for presence checks on/off
-        self.skipTest("Presence checks connects to meeting now")
         url = reverse("presence-checks-list")
-        data = {"presence_system": -1}
+        data = {"meeting": -1}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 404)

@@ -7,21 +7,23 @@ User = get_user_model()
 
 
 class _PresenceFixture:
-    def fixture(self):
+    @classmethod
+    def fixture(cls):
         from voteit.presence.models import PresenceSystem
         from voteit.presence.models import PresenceCheck
         from voteit.meeting.models import Meeting
 
-        self.user = User.objects.create(username="creeper")
-        self.meeting = Meeting.objects.create()
-        self.meeting.add_roles(self.user, "participant")
-        self.system = PresenceSystem.objects.create(meeting=self.meeting)
-        self.check = PresenceCheck.objects.create(meeting=self.meeting)
+        cls.user = User.objects.create(username="creeper")
+        cls.meeting = Meeting.objects.create()
+        cls.meeting.add_roles(cls.user, "participant")
+        cls.system = PresenceSystem.objects.create(meeting=cls.meeting)
+        cls.check = PresenceCheck.objects.create(meeting=cls.meeting)
 
 
 class AddPresenceTests(TestCase, _PresenceFixture):
-    def setUp(self):
-        self.fixture()
+    @classmethod
+    def setUpTestData(cls):
+        cls.fixture()
 
     @property
     def _cut(self):
@@ -54,13 +56,12 @@ class AddPresenceTests(TestCase, _PresenceFixture):
 
 
 class RemovePresenceTests(TestCase, _PresenceFixture):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.presence.models import Presence
 
-        self.fixture()
-        self.presence = Presence.objects.create(
-            user=self.user, presence_check=self.check
-        )
+        cls.fixture()
+        cls.presence = Presence.objects.create(user=cls.user, presence_check=cls.check)
 
     @property
     def _cut(self):
@@ -94,10 +95,11 @@ class RemovePresenceTests(TestCase, _PresenceFixture):
 
 
 class AddUserPresenceTests(TestCase, _PresenceFixture):
-    def setUp(self):
-        self.fixture()
-        self.moderator = User.objects.create(username="moderator")
-        self.meeting.add_roles(self.moderator, "moderator")
+    @classmethod
+    def setUpTestData(cls):
+        cls.fixture()
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, "moderator")
 
     @property
     def _cut(self):
@@ -141,15 +143,14 @@ class AddUserPresenceTests(TestCase, _PresenceFixture):
 
 
 class RemoveUserPresenceTests(TestCase, _PresenceFixture):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.presence.models import Presence
 
-        self.fixture()
-        self.presence = Presence.objects.create(
-            user=self.user, presence_check=self.check
-        )
-        self.moderator = User.objects.create(username="moderator")
-        self.meeting.add_roles(self.moderator, "moderator")
+        cls.fixture()
+        cls.presence = Presence.objects.create(user=cls.user, presence_check=cls.check)
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, "moderator")
 
     @property
     def _cut(self):

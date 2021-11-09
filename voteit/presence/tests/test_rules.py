@@ -5,18 +5,19 @@ User = get_user_model()
 
 
 class PresenceSystemTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.presence.models import PresenceSystem
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
 
-        self.meeting = Meeting.objects.create()
-        self.system = PresenceSystem.objects.create(meeting=self.meeting)
-        self.moderator = User.objects.create(username="moderator")
-        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
-        self.participant = User.objects.create(username="participant")
-        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
-        self.anon_user = User.objects.create(username="anon")
+        cls.meeting = Meeting.objects.create()
+        cls.system = PresenceSystem.objects.create(meeting=cls.meeting)
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.participant = User.objects.create(username="participant")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.anon_user = User.objects.create(username="anon")
 
     @property
     def P(self):
@@ -50,19 +51,20 @@ class PresenceSystemTests(TestCase):
 
 
 class PresenceCheckTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.presence.models import PresenceSystem
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
 
-        self.meeting = Meeting.objects.create()
-        self.system = PresenceSystem.objects.create(meeting=self.meeting)
-        self.presence_check = self.meeting.presence_checks.create()
-        self.moderator = User.objects.create(username="moderator")
-        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
-        self.participant = User.objects.create(username="participant")
-        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
-        self.anon_user = User.objects.create(username="anon")
+        cls.meeting = Meeting.objects.create()
+        cls.system = PresenceSystem.objects.create(meeting=cls.meeting)
+        cls.presence_check = cls.meeting.presence_checks.create()
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.participant = User.objects.create(username="participant")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.anon_user = User.objects.create(username="anon")
 
     @property
     def P(self):
@@ -118,24 +120,23 @@ class PresenceCheckTests(TestCase):
 
 
 class PresenceTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.presence.models import PresenceSystem
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
 
-        self.meeting = Meeting.objects.create()
-        self.system = PresenceSystem.objects.create(meeting=self.meeting)
-        self.presence_check = self.meeting.presence_checks.create()
-        self.moderator = User.objects.create(username="moderator")
-        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
-        self.participant = User.objects.create(username="participant")
-        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
-        self.anon_user = User.objects.create(username="anon")
-        self.present_participant = User.objects.create(username="present_participant")
-        self.meeting.add_roles(self.present_participant, ROLE_PARTICIPANT)
-        self.presence = self.presence_check.presences.create(
-            user=self.present_participant
-        )
+        cls.meeting = Meeting.objects.create()
+        cls.system = PresenceSystem.objects.create(meeting=cls.meeting)
+        cls.presence_check = cls.meeting.presence_checks.create()
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.participant = User.objects.create(username="participant")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.anon_user = User.objects.create(username="anon")
+        cls.present_participant = User.objects.create(username="present_participant")
+        cls.meeting.add_roles(cls.present_participant, ROLE_PARTICIPANT)
+        cls.presence = cls.presence_check.presences.create(user=cls.present_participant)
 
     @property
     def P(self):
