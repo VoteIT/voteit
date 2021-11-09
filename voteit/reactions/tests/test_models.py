@@ -1,5 +1,4 @@
 from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.models import ContentType
 from django.db import IntegrityError
 from django.test import TestCase
 
@@ -9,33 +8,35 @@ User = get_user_model()
 
 
 class ModelsTestCase(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.reactions.models import ReactionButton
 
-        self.meeting = Meeting.objects.create(title="Test meeting")
-        self.ai = self.meeting.agenda_items.create()
-        self.prop1 = self.ai.proposals.create()
-        self.prop2 = self.ai.proposals.create()
-        self.post1 = self.ai.discussions.create()
-        self.like_button = ReactionButton.objects.create(
-            title="Like", icon="thumb_up", color="success", meeting=self.meeting
+        cls.meeting: Meeting = Meeting.objects.create(title="Test meeting")
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.prop1 = cls.ai.proposals.create()
+        cls.prop2 = cls.ai.proposals.create()
+        cls.post1 = cls.ai.discussions.create()
+        cls.like_button: ReactionButton = ReactionButton.objects.create(
+            title="Like", icon="thumb_up", color="success", meeting=cls.meeting
         )
-        self.dislike_button = ReactionButton.objects.create(
-            title="Dislike", icon="thumb_up", color="danger", meeting=self.meeting
+        cls.dislike_button: ReactionButton = ReactionButton.objects.create(
+            title="Dislike", icon="thumb_up", color="danger", meeting=cls.meeting
         )
-        self.accessible_button = ReactionButton.objects.create(
-            title="Accessible", icon="accessible", color="primary", meeting=self.meeting
+        cls.accessible_button: ReactionButton = ReactionButton.objects.create(
+            title="Accessible", icon="accessible", color="primary", meeting=cls.meeting
         )
-        self.user1 = User.objects.create_user("user1")
-        self.user2 = User.objects.create_user("user2")
+        cls.user1 = User.objects.create_user("user1")
+        cls.user2 = User.objects.create_user("user2")
         # Make users participants
-        self.meeting.add_roles(self.user1, ROLE_PARTICIPANT)
-        self.meeting.add_roles(self.user2, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.user1, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.user2, ROLE_PARTICIPANT)
+
+    def setUp(self):
+        self.meeting.refresh_from_db()
 
     def test_unique(self):
-        from django.db import IntegrityError
-
         self.prop1.reaction_set.create(
             user=self.user1, button=self.like_button, agenda_item=self.ai
         )

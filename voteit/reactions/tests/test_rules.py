@@ -6,18 +6,22 @@ User = get_user_model()
 
 
 class ButtonPermissionTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
-        self.meeting = Meeting.objects.create()
-        self.anon_user = User.objects.create(username="anon")
-        self.moderator = User.objects.create(username="moderator")
-        self.participant = User.objects.create(username="participant")
-        self.meeting.add_roles(self.moderator, "moderator")
-        self.meeting.add_roles(self.participant, "participant")
-        self.button = self.meeting.reaction_buttons.create(
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.anon_user = User.objects.create(username="anon")
+        cls.moderator = User.objects.create(username="moderator")
+        cls.participant = User.objects.create(username="participant")
+        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.meeting.add_roles(cls.participant, "participant")
+        cls.button = cls.meeting.reaction_buttons.create(
             change_roles=["participant"], list_roles=["participant"]
         )
+
+    def setUp(self):
+        self.meeting.refresh_from_db()
 
     @property
     def p(self):
@@ -84,23 +88,27 @@ class ButtonPermissionTests(TestCase):
 
 
 class ReactionPermissionTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
-        self.meeting = Meeting.objects.create()
-        self.anon_user = User.objects.create(username="anon")
-        self.moderator = User.objects.create(username="moderator")
-        self.participant = User.objects.create(username="participant")
-        self.meeting.add_roles(self.moderator, "moderator")
-        self.meeting.add_roles(self.participant, "participant")
-        self.button = self.meeting.reaction_buttons.create(
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.anon_user = User.objects.create(username="anon")
+        cls.moderator = User.objects.create(username="moderator")
+        cls.participant = User.objects.create(username="participant")
+        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.meeting.add_roles(cls.participant, "participant")
+        cls.button = cls.meeting.reaction_buttons.create(
             change_roles=["participant"], list_roles=["participant"]
         )
-        self.ai = self.meeting.agenda_items.create()
-        self.disc = self.ai.discussions.create()
-        self.reaction = self.disc.reaction_set.create(
-            user=self.moderator, object=self.disc, button=self.button
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.disc = cls.ai.discussions.create()
+        cls.reaction = cls.disc.reaction_set.create(
+            user=cls.moderator, object=cls.disc, button=cls.button
         )
+
+    def setUp(self):
+        self.button.refresh_from_db()
 
     @property
     def p(self):
