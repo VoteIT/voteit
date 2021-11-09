@@ -9,6 +9,7 @@ from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
 
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.abcs import ContextAction
@@ -22,6 +23,7 @@ from voteit.messaging.messages.base import BaseObjectDeleted
 from voteit.messaging.messages.status import StatusDone
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.permissions import SpeakerListPermissions
+from voteit.speaker.rules import not_currently_speaking
 
 
 class SpeakerListActionSchema(BaseModel):
@@ -226,11 +228,21 @@ class SpeakerStopped(BaseOutgoingMessage):
 @incoming
 class ModeratorSpeakerListEnter(ModeratorListMessage):
     name = "speaker_list.mod_enter"
-    permission = SpeakerListPermissions.ENTER
+    # Note permission diff: Perms will be checked against moderator
+    permission = SpeakerListPermissions.CHANGE
 
     def run_job(self) -> StatusDone:
         self.assert_perm()
         user = self.get_user()
+        # Negating rules has unwanted side-effects, hence this silly thing :)
+        if not not_currently_speaking(user, self.context):
+            raise BadRequestError.from_message(self, msg=_("Currently speaking"))
+        if self.context.meeting is not None:
+            if not self.context.meeting.has_roles(user, ROLE_PARTICIPANT):
+                raise BadRequestError.from_message(
+                    self, msg=_("User isn't part of this meeting")
+                )
+
         existing_obj = self.context.speaker_items.filter(
             user=user, order__isnull=False
         ).first()
@@ -245,7 +257,8 @@ class ModeratorSpeakerListEnter(ModeratorListMessage):
 @incoming
 class ModeratorSpeakerListLeave(ModeratorListMessage):
     name = "speaker_list.mod_leave"
-    permission = SpeakerListPermissions.LEAVE
+    # Note permission diff: Perms will be checked against moderator
+    permission = SpeakerListPermissions.CHANGE
 
     def run_job(self) -> StatusDone:
         self.assert_perm()

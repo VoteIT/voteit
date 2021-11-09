@@ -1,8 +1,9 @@
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
-from django.db.transaction import atomic
+from django.test import override_settings
 from django.test import TestCase
+
 from voteit.messaging.errors import BadRequestError
 from voteit.messaging.errors import UnauthorizedError
 from voteit.messaging.errors import NotFoundError
@@ -10,8 +11,12 @@ from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.messages.status import StatusDone
 
 User = get_user_model()
+_channel_layers_setting = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SpeakerListEnterTests(TestCase):
     def setUp(self):
         from voteit.speaker.models import SpeakerListSystem
@@ -53,6 +58,7 @@ class SpeakerListEnterTests(TestCase):
         self.assertRaises(UnauthorizedError, msg.run_job)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SpeakerListLeaveTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -96,6 +102,7 @@ class SpeakerListLeaveTests(TestCase):
         self.assertRaises(BadRequestError, msg.run_job)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SpeakerListSetActiveTests(TestCase):
     def setUp(self):
         from voteit.speaker.models import SpeakerList
@@ -144,6 +151,7 @@ class SpeakerListSetActiveTests(TestCase):
         self.assertRaises(ValidationErrorMsg, msg.run_job)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class StartSpeakerInListTests(TestCase):
     def setUp(self):
         from voteit.speaker.models import SpeakerList
@@ -206,6 +214,7 @@ class StartSpeakerInListTests(TestCase):
         self.assertRaises(UnauthorizedError, msg.run_job)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class StopSpeakerInListTests(TestCase):
     def setUp(self):
         from voteit.speaker.models import SpeakerList
@@ -256,20 +265,26 @@ class StopSpeakerInListTests(TestCase):
         self.assertRaises(ValidationErrorMsg, msg.run_job)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ModeratorSpeakerListEnterTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.speaker.models import SpeakerList
+        from voteit.speaker.models import SpeakerListSystem
         from voteit.meeting.models import Meeting
 
-        meeting = Meeting.objects.create()
-        self.system = meeting.speaker_systems.create(
+        meeting: Meeting = Meeting.objects.create()
+        cls.system: SpeakerListSystem = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(speaker_system=self.system)
-        self.user = User.objects.create(username="jane")
-        self.moderator = User.objects.create(username="moderator")
-        self.system.add_roles(self.user, "speaker")
-        self.system.add_roles(self.moderator, "list_moderator")
+        cls.list: SpeakerList = cls.system.speaker_lists.create()
+        cls.user = User.objects.create(username="jane")
+        cls.moderator = User.objects.create(username="moderator")
+        cls.system.add_roles(cls.user, "speaker")
+        cls.system.add_roles(cls.moderator, "list_moderator")
+
+    def setUp(self):
+        self.list.refresh_from_db()
 
     @property
     def _cut(self):
@@ -305,7 +320,19 @@ class ModeratorSpeakerListEnterTests(TestCase):
         msg = self._mk_one(userid=-1)
         self.assertRaises(NotFoundError, msg.run_job)
 
+    def test_enter_user_not_in_meeting(self):
+        outsider = User.objects.create(username="newkid")
+        msg = self._mk_one(userid=outsider.pk)
+        self.assertRaises(BadRequestError, msg.run_job)
 
+    def test_enter_user_already_speaking(self):
+        speaker = self.list.speaker_items.create(user=self.user)
+        self.list.start_speaker(speaker)
+        msg = self._mk_one()
+        self.assertRaises(BadRequestError, msg.run_job)
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ModeratorSpeakerListLeaveTests(TestCase):
     def setUp(self):
         from voteit.speaker.models import SpeakerList
@@ -353,6 +380,7 @@ class ModeratorSpeakerListLeaveTests(TestCase):
         self.assertRaises(BadRequestError, msg.run_job)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ModeratorSpeakerListUndoTests(TestCase):
     def setUp(self):
         from voteit.meeting.models import Meeting
@@ -393,6 +421,7 @@ class ModeratorSpeakerListUndoTests(TestCase):
         self.assertRaises(BadRequestError, msg.run_job)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SpeakerListShuffleTests(TestCase):
     @classmethod
     def setUpTestData(cls):

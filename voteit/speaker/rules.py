@@ -128,7 +128,7 @@ rules.add_perm(
 )
 rules.add_perm(
     SpeakerListPermissions.ENTER,
-    (has_speaker_role & is_list_open & is_system_active)
+    not_currently_speaking & (has_speaker_role & is_list_open & is_system_active)
     | (is_system_not_archived & (is_speaker_moderator | is_moderator)),
 )
 

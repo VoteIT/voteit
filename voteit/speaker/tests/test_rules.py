@@ -14,6 +14,7 @@ class SpeakerListTests(TestCase):
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR
         from voteit.speaker.models import SpeakerListSystem
+        from voteit.speaker.models import SpeakerList
         from voteit.meeting.roles import ROLE_PROPOSER
 
         cls.meeting: Meeting = Meeting.objects.create()
@@ -31,7 +32,7 @@ class SpeakerListTests(TestCase):
         cls.system.add_roles(cls.user_speaker, ROLE_SPEAKER)
         cls.meeting.add_roles(cls.user_proposer, ROLE_PROPOSER)
         cls.user_any = User.objects.create(username="jane")
-        cls.list = cls.system.speaker_lists.create()
+        cls.list: SpeakerList = cls.system.speaker_lists.create()
         cls.system.active_list = cls.list
         cls.system.save()
 
@@ -104,6 +105,13 @@ class SpeakerListTests(TestCase):
         self.assertFalse(self.user_speaker.has_perm(ENTER, self.list))
         self.assertFalse(self.user_proposer.has_perm(ENTER, self.list))
         self.assertFalse(self.user_any.has_perm(ENTER, self.list))
+
+    def test_enter_speaker_list_speaking_user(self):
+        ENTER = self.p("ENTER")
+        self.assertIs(self.user_speaker.has_perm(ENTER, self.list), True)
+        speaker = self.list.speaker_items.create(user=self.user_speaker)
+        self.list.start_speaker(speaker)
+        self.assertIs(self.user_speaker.has_perm(ENTER, self.list), False)
 
     def test_leave_speaker_list_open(self):
         LEAVE = self.p("LEAVE")
