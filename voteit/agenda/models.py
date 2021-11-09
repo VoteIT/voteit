@@ -9,7 +9,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.timezone import now
 from django_fsm import FSMField, transition
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 from voteit.agenda.permissions import AgendaPermissions
 from voteit.agenda.workflows import AgendaItemWf
@@ -20,9 +20,11 @@ from voteit.core.models import BaseContent
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.utils import relaxed_clean_html
 from voteit.meeting.models import Meeting
+from voteit.meeting.workflows import MeetingWf
+from voteit.poll.workflows import PollWf
 
 
-__all__ = ("AgendaItem",)
+__all__ = ("AgendaItem", "LastRead")
 
 
 class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
@@ -120,28 +122,52 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
                 self.related_modified = None
                 self.save()
 
+    def guard_no_ongoing_polls(self) -> bool:
+        return not self.polls.filter(state=PollWf.ONGOING).exists()
+
+    def guard_meeting_ongoing(self) -> bool:
+        return self.meeting.state == MeetingWf.ONGOING
+
     @transition(
         field=state,
         target=AgendaItemWf.UPCOMING,
+        source=[AgendaItemWf.PRIVATE, AgendaItemWf.CLOSED, AgendaItemWf.ONGOING],
         permission=AgendaPermissions.CHANGE,
+        custom={"title": _("Make upcoming")},
+        conditions=[guard_no_ongoing_polls],
     )
     def upcoming(self):
-        """Make agenda item upcoming"""
+        """
+        Make agenda item upcoming
+        """
         pass
 
     @transition(
         field=state,
+        source=[
+            AgendaItemWf.PRIVATE,
+            AgendaItemWf.UPCOMING,
+            AgendaItemWf.CLOSED,
+            AgendaItemWf.ONGOING,
+        ],
         target=AgendaItemWf.PRIVATE,
         permission=AgendaPermissions.CHANGE,
+        custom={"title": _("Unpublish")},
+        conditions=[guard_no_ongoing_polls],
     )
     def unpublish(self):
-        """Make agenda item private"""
+        """
+        Make agenda item private
+        """
         pass
 
     @transition(
         field=state,
+        source=[AgendaItemWf.PRIVATE, AgendaItemWf.UPCOMING, AgendaItemWf.CLOSED],
         target=AgendaItemWf.ONGOING,
         permission=AgendaPermissions.CHANGE,
+        conditions=[guard_meeting_ongoing],
+        custom={"title": _("Make ongoing")},
     )
     def ongoing(self):
         """Make agenda item ongoing"""
@@ -150,10 +176,15 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     @transition(
         field=state,
         target=AgendaItemWf.CLOSED,
+        source=[AgendaItemWf.PRIVATE, AgendaItemWf.UPCOMING, AgendaItemWf.ONGOING],
         permission=AgendaPermissions.CHANGE,
+        conditions=[guard_no_ongoing_polls],
+        custom={"title": _("Close")},
     )
     def close(self):
-        """Close agenda item"""
+        """
+        Close agenda item
+        """
         pass
 
     @transition(

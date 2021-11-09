@@ -7,21 +7,26 @@ User = get_user_model()
 
 
 class AgendaItemViewTestCase(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
 
-        self.meeting: Meeting = Meeting.objects.create(
+        cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
-        self.ai_private = self.meeting.agenda_items.create(title="Private")
-        self.participant: User = User.objects.create_user("participant")
-        self.moderator: User = User.objects.create_user("moderator")
-        self.outsider: User = User.objects.create_user("outsider")
-        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
-        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
+        cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
+        cls.ai_private = cls.meeting.agenda_items.create(title="Private")
+        cls.participant: User = User.objects.create_user("participant")
+        cls.moderator: User = User.objects.create_user("moderator")
+        cls.outsider: User = User.objects.create_user("outsider")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+
+    def setUp(self):
+        self.meeting.refresh_from_db()
+        self.ai.refresh_from_db()
 
     def test_create(self):
         url = reverse("agendaitem-list")
@@ -91,4 +96,16 @@ class AgendaItemViewTestCase(APITestCase):
         self.assertEqual(
             response.status_code,
             400,  # Raises invalid transition
+        )
+
+    def test_transition_conditions_not_met(self):
+        self.meeting.state = "upcoming"
+        self.meeting.save()
+        url = f"/api/agenda-items/{self.ai_private.pk}/transitions/"
+        data = {"transition": "ongoing"}
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual(
+            response.status_code,
+            400,
         )

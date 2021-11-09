@@ -6,7 +6,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.query import QuerySet
-from django.utils import translation
 from django.utils.translation import gettext as _
 from rest_framework import exceptions
 from rest_framework import permissions
@@ -135,7 +134,7 @@ class ModelContextMixin(ABC):
     @property
     @abstractmethod
     def context_queryset(self) -> QuerySet:
-        """ Specify this as a base for lookups. Something like Meeting.objects.all()"""
+        """Specify this as a base for lookups. Something like Meeting.objects.all()"""
 
     def get_context(self, request):
         # FIXME: Request is probably present here already, right?
@@ -169,7 +168,7 @@ class CreateModelPermissionsMixin(
     @property
     @abstractmethod
     def model(self):
-        """ Override me"""
+        """Override me"""
 
     def create(self, request, *args, **kwargs):
         context = self.get_context(request)
@@ -181,7 +180,10 @@ class CreateModelPermissionsMixin(
 
 
 class TransitionsMixin(SerializerClassesMixin):
-    """ Since this is a mixin, it's tested in voteit.agenda.rest_api.tests.test_views"""
+    """
+    Since this is a mixin, it's tested in voteit.agenda.rest_api.tests.test_views
+    Note that it only works if the FSM field is called 'state'.
+    """
 
     @action(
         methods=["post", "get"],
@@ -214,15 +216,24 @@ class TransitionsMixin(SerializerClassesMixin):
                     }
                 )
             transition = available_transitions[name]
-            if transition.has_perm(instance, request.user):
-                getattr(instance, name)()
-                instance.save()
-                # TODO Possibly return serialized object, but strictly speaking not necessary.
-                return Response(status=201, data={})
-            else:
+            if not transition.has_perm(instance, request.user):
                 raise exceptions.PermissionDenied(
                     perm_denied_msg(transition.permission, instance)
                 )
+            method = getattr(instance, name)
+            # 'get_available_user_state_transitions' already filters out guards that haven't been met,
+            # so this is already checked and will have caused the 'transition not found' 400
+            # FIXME: Maybe delay check?
+            # if not can_proceed(method):
+            #     raise exceptions.ValidationError(
+            #         detail=_(
+            #             "Transition isn't allowed since all requirements haven't been met."
+            #         )
+            #     )
+            method()
+            instance.save()
+            # TODO Possibly return serialized object, but strictly speaking not necessary.
+            return Response(status=201, data={})
 
     def get_serializer_class(self):
         if self.action == "transitions":

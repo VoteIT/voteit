@@ -238,9 +238,8 @@ class VoteRulesTests(TestCase):
         from voteit.meeting.models import Meeting
 
         cls.PollWf = PollWf
-        cls.meeting = Meeting.objects.create()
-        cls.ai = cls.meeting.agenda_items.create(meeting=cls.meeting)
-        cls.ai.ongoing()
+        cls.meeting = Meeting.objects.create(state="ongoing")
+        cls.ai = cls.meeting.agenda_items.create(meeting=cls.meeting, state="ongoing")
         cls.poll = Poll.objects.create(
             method_name="simple", agenda_item=cls.ai, meeting=cls.meeting
         )
