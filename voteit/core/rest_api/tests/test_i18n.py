@@ -48,7 +48,7 @@ class TranslationTests(APITestCase):
         self.assertEqual("sv", response.headers.get("Content-Language"))
         data = response.json()
         # No clue why this is a list but we're testing translations here :)
-        self.assertEqual(["Transition not specified"], data["transition"])
+        self.assertEqual(["Handling måste anges"], data["transition"])
 
     def test_bad_transition(self):
         self.client.force_login(self.moderator)
