@@ -161,3 +161,12 @@ ANY_SET = AlwaysTrueSet()
 NOT_ALLOWED = Permission(
     "__not_allowed", model=ANY_SET, context=ANY_SET
 )  # Not manually anyway!
+
+
+class UserPermissions(ModelPermissions):
+    model = "user"
+
+    # ADD = Permission("core.add_user") - this is currently not allowed this way
+    CHANGE = Permission("core.change_user")
+    # DELETE = Permission("core.delete_user")
+    VIEW = Permission("core.view_user")
