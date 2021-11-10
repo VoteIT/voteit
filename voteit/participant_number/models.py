@@ -80,3 +80,4 @@ class PNSystem(models.Model):
 
     # Annotations
     numbers: models.QuerySet
+    objects: models.Manager
