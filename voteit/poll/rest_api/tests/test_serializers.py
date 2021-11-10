@@ -82,7 +82,7 @@ class PollDetailSerializerTests(TestCase):
         )
         self.assertEqual("repeated_schulze", expected_data.pop("method_name"))
         self.assertEqual(
-            {"deny_proposal": None, "stars": 5, "winners": 2},
+            {"deny_proposal": False, "stars": 5, "winners": 2},
             expected_data.pop("settings"),
         )
 
@@ -207,7 +207,7 @@ class PollCreateSerializerTests(TestCase):
         prop2 = self.ai.proposals.create()
         data = self._fixture(
             method_name="repeated_schulze",
-            settings={"deny_proposal": 0},
+            settings={"deny_proposal": True},
             proposals=[self.prop.pk, prop2.pk],
         )
         serializer = self._cut(data=data)

@@ -78,7 +78,7 @@ class SchulzePollResult(PollResult):
 
 class SchulzeSettingsSchema(BaseModel):
     stars: int = 5
-    deny_proposal: Optional[int]
+    deny_proposal: bool = False
 
     @validator("stars")
     def validate_stars(cls, v):
@@ -188,7 +188,7 @@ class Schulze(PollMethod):
         matched_pks = set(
             self.poll.proposals.filter(pk__in=ranked_pks).values_list("pk", flat=True)
         )
-        if self.poll.settings.deny_proposal == 0:
+        if self.poll.settings.deny_proposal:
             matched_pks.add(0)
         unmatched = set(ranked_pks) - matched_pks
         if unmatched:
@@ -210,13 +210,10 @@ class Schulze(PollMethod):
     def start_check(self):
         required_count = 3
         deny_proposal = self.poll.settings.deny_proposal
-        if deny_proposal is not None:
+        if deny_proposal:
             required_count = 2
         if self.poll.proposals.count() < required_count:
             raise InvalidProposalCount("Must be at least %s" % required_count)
-        if deny_proposal:  # Can be 0, None or the PK of a proposal
-            if not self.poll.proposals.filter(pk=deny_proposal).exists():
-                raise ValueError("No proposal with PK %s" % deny_proposal)
 
 
 class RepeatedSchulzeResult(PollResult):
@@ -269,7 +266,7 @@ class RepeatedSchulze(Schulze):
             for item in input_data:
                 item["ballot"].pop(this_round.winner, None)
             # Should we stop due to deny proposal winning?
-            if deny_proposal == this_round.winner:  # 0 or a proposal PK
+            if deny_proposal and this_round.winner == 0:
                 break
         # Fetch candidates from first round
         result = self.result_schema(rounds=rounds, candidates=rounds[0].candidates)

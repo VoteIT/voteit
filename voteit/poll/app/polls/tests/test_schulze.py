@@ -60,7 +60,7 @@ class SchulzeTests(TestCase):
 
     def test_start_check_with_deny(self):
         self.poll.proposals.create()
-        self.poll.settings = {"deny_proposal": 0}
+        self.poll.settings = {"deny_proposal": True}
         self.poll.save()
         self.assertRaises(InvalidProposalCount, self.poll.method.start_check)
         self.poll.proposals.create()
@@ -75,7 +75,7 @@ class SchulzeTests(TestCase):
         self.assertEqual(result.winner, 20)
 
     def test_calculate_result_deny_winning(self):
-        self.poll.settings = {"deny_proposal": 0}
+        self.poll.settings = {"deny_proposal": True}
         self.poll.save()
         counter = Counter()
         counter["[[10, 1], [0, 2], [30, 3]]"] = 5
@@ -240,7 +240,7 @@ class RepeatedSchulzeTests(TestCase):
 
         counter = Counter()
         counter["[[10, 1], [20, 2], [0, 3], [30, 4]]"] = 1
-        self.poll.settings = {"winners": 3, "deny_proposal": 0}
+        self.poll.settings = {"winners": 3, "deny_proposal": True}
         [self.poll.proposals.create() for x in range(3)]
         result = self.poll.method.calculate_result(counter)
         self.assertEqual(30, result.rounds[0].winner)
@@ -254,12 +254,12 @@ class RepeatedSchulzeTests(TestCase):
         from collections import Counter
 
         counter = Counter()
-        counter["[[10, 1], [20, 2], [30, 3], [40, 4]]"] = 1
-        self.poll.settings = {"winners": None, "deny_proposal": 40}
+        counter["[[10, 1], [20, 2], [30, 3], [0, 4]]"] = 1
+        self.poll.settings = {"winners": None, "deny_proposal": True}
         [self.poll.proposals.create() for x in range(3)]
         result = self.poll.method.calculate_result(counter)
         self.assertEqual(1, len(result.rounds), "Second round should be skipped")
-        self.assertEqual(40, result.rounds[0].winner)
+        self.assertEqual(0, result.rounds[0].winner)
         self.assertSetEqual(set(), set(result.approved), "No winners")
 
     def test_calc_vote_core_wiki_example_with_full_rounds(self):
