@@ -118,11 +118,11 @@ class ProposalDetailSerializer(RichTextSerializerMixin, serializers.ModelSeriali
         fields = read_only_fields + [
             "body",
             "tags",
-            # "mentions",
+            "mentions",
         ]
 
     def get_shortname(self, instance):
-        return getattr(instance, "name", "")
+        return get_model_shortname(instance)
 
 
 class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
@@ -134,7 +134,7 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "body",
             "meeting_group",
             "tags",
-            # "mentions",
+            "mentions",
         ]
         validators = (ValidateGroupAIContext(),)
         extra_kwargs = {
@@ -154,7 +154,9 @@ class DiffProposalCreateSerializer(ProposalCreateSerializer):
             "body_diff_brief",
         ] + ProposalCreateSerializer.Meta.fields
 
-    def get_body_diff(self, instance: Union[OrderedDict, DiffProposal], brief: bool = False) -> str:
+    def get_body_diff(
+        self, instance: Union[OrderedDict, DiffProposal], brief: bool = False
+    ) -> str:
         if isinstance(instance, DiffProposal):
             ch = Changes(instance.paragraph.body, instance.body)
         elif isinstance(instance, dict):

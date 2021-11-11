@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from contextlib import suppress
+from logging import getLogger
 from typing import Optional
 from typing import OrderedDict
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import models
 from django.utils import translation
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
@@ -21,6 +25,12 @@ from voteit.core.validators import valid_userid
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from django_fsm import Transition
+    from voteit.core.models import BaseContent
+    from voteit.meeting.models import Meeting
+    from voteit.agenda.models import AgendaItem
+
+
+logger = getLogger(__name__)
 
 
 class BaseModelSerializer(serializers.ModelSerializer):
@@ -112,47 +122,47 @@ class TransitionSerializer(serializers.Serializer):
 
 
 class PydanticFieldSerializer(JSONField):
-    """Handles Pydantic representations and changes them to a rest friendly format.
+    """
+    Handles Pydantic representations and changes them to a rest friendly format.
     It doesn't force pydantic in any way, if it's not a pydantic model it's handled as JSON.
     Note that it has no knowledge of what schema it should expect.
 
     The encoder/decoder doesn't use pydantic either
+    >>> from datetime import datetime
+
+    >>> class Greeting(BaseModel):
+    ...     msg: str = "Hello"
+    ...     timestamp: datetime = datetime(year=1999, month=12, day=24)
+    ...
+
+    Any other object just passes through since this is not really a validator
+    >>> field = PydanticFieldSerializer()
+    >>> field.to_internal_value({"hello": 1})
+    {'hello': 1}
+
+    JSON will be handled via pydantic instead
+    >>> result = field.to_internal_value(Greeting(msg="hello"))
+    >>> result["msg"]
+    'hello'
+    >>> result["timestamp"]
+    datetime.datetime(1999, 12, 24, 0, 0)
+
+    Empty should be okay too
+    >>> field.to_internal_value(None)
+
+    Same goes for the other way around - a dict or pydantic model loaded from model field
+    >>> field.to_representation({"hi": "there"})
+    {'hi': 'there'}
+
+    >>> result = field.to_representation(Greeting(msg="hello"))
+    >>> result["msg"]
+    'hello'
+    >>> result["timestamp"]
+    datetime.datetime(1999, 12, 24, 0, 0)
     """
 
-    # FIXME: Doctest isn't working as expected
-    # >>> from datetime import datetime
-    # >>> class Greeting(BaseModel):
-    # ...     msg: str = "Hello"
-    # ...     timestamp: datetime = datetime(year=1999, month=12, day=24)
-    # >>> Greeting.update_forward_refs()
-    #
-    # Any other object just passes through since this is not really a validator
-    # >>> field = PydanticFieldSerializer()
-    # >>> field.to_internal_value({"hello": 1})
-    # {'hello': 1}
-    #
-    # JSON will be handled via pydantic instead
-    # >>> result = field.to_internal_value(Greeting(msg="hello"))
-    # >>> result["msg"]
-    # 'hello'
-    # >>> result["timestamp"]
-    # datetime.datetime(1999, 12, 24, 0, 0)
-    #
-    # Empty should be okay too
-    # >>> field.to_internal_value(None)
-    #
-    # Same goes for the other way around - a dict or pydantic model loaded from model field
-    # >>> field.to_representation({"hi": "there"})
-    # {'hi': 'there'}
-    #
-    # >>> result = field.to_representation(Greeting(msg="hello"))
-    # >>> result["msg"]
-    # 'hello'
-    # >>> result["timestamp"]
-    # datetime.datetime(1999, 12, 24, 0, 0)
-
     def __init__(self, *args, **kwargs):
-        """Defualt to DjangoJSONEncoder since it handles more formats"""
+        """Default to DjangoJSONEncoder since it handles more formats"""
         kwargs.setdefault("encoder", DjangoJSONEncoder)
         super().__init__(*args, **kwargs)
 
@@ -187,6 +197,31 @@ class RichTextSerializerMixin:
     """
 
     partial: bool
+    instance: BaseContent
+
+    def get_user_queryset(self, attrs: OrderedDict) -> models.QuerySet:
+        """
+        Figure out which queryset to use depending on what's sent in attrs.
+        """
+        meeting = attrs.get("meeting", None)
+        if isinstance(meeting, models.Model):
+            meeting: Meeting
+            return meeting.participants
+        ai = attrs.get("agenda_item", None)
+        if isinstance(ai, models.Model):
+            ai: AgendaItem
+            return ai.meeting.participants
+        # We won't catch errors here. This is kind of the last chance to not "leak" data
+        # about users through mentions, so if this doesn't work we need to raise a validation error.
+        with suppress(AttributeError, ObjectDoesNotExist):
+            return self.instance.meeting.participants
+        logger.warning(
+            "There's no suitable context to pick up user mentions from. Serializer: %s Data:\n%s",
+            self.__class__.__name__,
+            attrs,
+        )
+        User = get_user_model()
+        return User.objects.none()
 
     # FIXME: body might contain bad tags. That will be cleaned on save, but do we want to send error messages?
     def validate(self, attrs: OrderedDict):
@@ -205,10 +240,10 @@ class RichTextSerializerMixin:
             tags = set(attrs.get("tags", []))
         tags.update(body_tags)
         attrs["tags"] = sorted(tags)
-        User = get_user_model()
         if self.partial and "mentions" not in attrs:
             mentions = set(self.instance.mentions.all().values_list("pk", flat=True))
         else:
+            User = get_user_model()
             mentions = set(
                 map(
                     lambda x: isinstance(x, User) and x.pk or x,
@@ -217,16 +252,14 @@ class RichTextSerializerMixin:
             )
         # Validate in 2 steps so we know where things went wrong
         combined_mentions = mentions | body_mentions
-        # FIXME: Probably check participants instead...?
-        found_users = set(
-            User.objects.filter(pk__in=combined_mentions).values_list("pk", flat=True)
-        )
-        invalid = combined_mentions - found_users
+        user_qs = self.get_user_queryset(attrs)
+        found_users_qs = user_qs.filter(pk__in=combined_mentions)
+        found_user_pks = set(found_users_qs.values_list("pk", flat=True))
+        invalid = combined_mentions - found_user_pks
         if invalid:
-            msg = _("You can only pick existing users")
-            if invalid & mentions:
-                raise ValidationError({"mentions": msg})
-            else:
+            msg = _("You can only pick existing users within this meeting")
+            if body_mentions - found_user_pks:
                 raise ValidationError({"body": msg})
-        attrs["mentions"] = combined_mentions
+            raise ValidationError({"mentions": msg})
+        attrs["mentions"] = list(found_users_qs)
         return super().validate(attrs)

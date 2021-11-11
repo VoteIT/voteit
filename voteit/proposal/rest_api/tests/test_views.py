@@ -5,6 +5,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from voteit.core.testing import mk_hashtag
+from voteit.core.testing import mk_usertag
 from voteit.meeting.channels import ParticipantsChannel
 
 
@@ -192,9 +193,21 @@ class ProposalsAPITests(APITestCase):
         response = self.client.post(url, data)
         self.assertEqual(200, response.status_code)
         data = response.json()
+        self.assertEqual("Hello!", data["body"])
+
+    def test_preview_proposal_mentions(self):
+        url = reverse("proposal-preview")
+        data = {
+            "agenda_item": self.ai.pk,
+            "body": f"Hello {mk_usertag(self.participant)}",
+            "mentions": [self.moderator.pk],
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
         self.assertEqual(
-            "Hello!",
-            data["body"],
+            {self.participant.pk, self.moderator.pk}, set(data["mentions"])
         )
 
     def test_preview_diff_proposal(self):
