@@ -84,6 +84,7 @@ class SchulzeTests(TestCase):
         result = method.calculate_result(counter)
         self.assertEqual(result.winner, 0)
         self.assertEqual(result.denied, [10, 30])
+        self.assertEqual(result.approved, [])
 
     def test_calc_vote_core_wiki_example(self):
         # Test from python-vote-core, rewritten as A=1 etc
@@ -222,8 +223,6 @@ class RepeatedSchulzeTests(TestCase):
             self.poll.settings.winners = 2
 
     def test_calc_results(self):
-        from collections import Counter
-
         counter = Counter()
         counter["[[10, 1], [20, 2], [30, 3]]"] = 1
         self.poll.settings = {"winners": 2}
@@ -236,8 +235,6 @@ class RepeatedSchulzeTests(TestCase):
         self.assertEqual({10}, set(result.denied))
 
     def test_calc_results_several_rounds_with_deny(self):
-        from collections import Counter
-
         counter = Counter()
         counter["[[10, 1], [20, 2], [0, 3], [30, 4]]"] = 1
         self.poll.settings = {"winners": 3, "deny_proposal": True}
@@ -249,10 +246,13 @@ class RepeatedSchulzeTests(TestCase):
         self.assertSetEqual(
             {30}, set(result.approved), "Only one winner since deny won second round"
         )
+        self.assertSetEqual(
+            {10, 20},
+            set(result.denied),
+            "Virtual deny shouldn't be in denied either since it's not a real proposal",
+        )
 
-    def test_calc_results_all_rounds_aborted_due_to_winning_deny(self):
-        from collections import Counter
-
+    def test_calc_results_sorting_all_rounds_aborted_due_to_winning_deny(self):
         counter = Counter()
         counter["[[10, 1], [20, 2], [30, 3], [0, 4]]"] = 1
         self.poll.settings = {"winners": None, "deny_proposal": True}
@@ -261,6 +261,26 @@ class RepeatedSchulzeTests(TestCase):
         self.assertEqual(1, len(result.rounds), "Second round should be skipped")
         self.assertEqual(0, result.rounds[0].winner)
         self.assertSetEqual(set(), set(result.approved), "No winners")
+        self.assertSetEqual(
+            set(),
+            set(result.denied),
+            "Sorting so nothing denied either",
+        )
+
+    def test_calc_results_3_winners_all_rounds_aborted_due_to_winning_deny(self):
+        counter = Counter()
+        counter["[[10, 1], [20, 2], [30, 3], [0, 4]]"] = 1
+        self.poll.settings = {"winners": 3, "deny_proposal": True}
+        [self.poll.proposals.create() for x in range(3)]
+        result = self.poll.method.calculate_result(counter)
+        self.assertEqual(1, len(result.rounds), "Second round should be skipped")
+        self.assertEqual(0, result.rounds[0].winner)
+        self.assertSetEqual(set(), set(result.approved), "No winners")
+        self.assertSetEqual(
+            {10, 20, 30},
+            set(result.denied),
+            "All real proposals should be denied",
+        )
 
     def test_calc_vote_core_wiki_example_with_full_rounds(self):
         # Test from python-vote-core, rewritten as A=1 etc

@@ -180,7 +180,7 @@ class Schulze(PollMethod):
             res.denied.extend([x for x in res.candidates if x])
         else:
             res.approved.append(res.winner)
-            res.denied.extend([x for x in res.candidates if x != res.winner])
+            res.denied.extend([x for x in res.candidates if x and x != res.winner])
         return res
 
     def validate_vote(self, msg: Union[AddSchulzeVote, ChangeSchulzeVote]) -> None:
@@ -278,7 +278,7 @@ class RepeatedSchulze(Schulze):
                     # Specific proposals that are deny proposals are still winners
                     approved.add(round_result.winner)
             result.approved.extend(approved)
-            denied = set(result.candidates) - approved
+            denied = set(result.candidates) - approved - {0}
             result.denied.extend(denied)
         return result
 
