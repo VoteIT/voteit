@@ -38,6 +38,7 @@ from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.models import SpeakerSystemRoles
 from voteit.speaker.rest_api.serializers import SpeakerListSerializer
 from voteit.speaker.rest_api.serializers import SpeakerListSystemSerializer
+from voteit.speaker.utils import publish_list_msg
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -83,16 +84,11 @@ def _get_list_order_msg(speaker_list: SpeakerList) -> SpeakerListOrder:
     return SpeakerListOrder(pk=speaker_list.pk, queue=user_pks, current=current)
 
 
-def _publish_list_msg(speaker_list: SpeakerList, msg: BaseOutgoingMessage):
-    if speaker_list.is_active_list and speaker_list.meeting:
-        ch = MeetingChannel.from_instance(speaker_list.meeting)
-        ch.publish(msg)
-    elif speaker_list.agenda_item is not None:
-        ai_ch = AgendaItemChannel.from_instance(speaker_list.agenda_item)
-        ai_ch.publish(msg)
-
-
-def _publish_active_list_msg(speaker_list: SpeakerList, msg: BaseOutgoingMessage):
+def publish_active_list_msg(speaker_list: SpeakerList, msg: BaseOutgoingMessage):
+    """
+    Push a message to the currently active list. Just use this if you can assume that this list is active.
+    Started/Stopped messages are always sent from the active list for instance.
+    """
     if speaker_list.meeting is not None:
         ch = MeetingChannel.from_instance(speaker_list.meeting)
         ch.publish(msg)
@@ -107,7 +103,7 @@ def push_list_order_change(instance: SpeakerList, **kw):
     Inactive lists are transmitted to each agenda item. Active lists to participants/moderators.
     """
     msg = _get_list_order_msg(instance)
-    _publish_list_msg(instance, msg)
+    publish_list_msg(instance, msg)
 
 
 @receiver(post_save, sender=SpeakerList)
@@ -119,7 +115,7 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
         msg_class = SpeakerListChanged
     data = SpeakerListSerializer(instance).data
     msg = msg_class(**data)
-    _publish_list_msg(instance, msg)
+    publish_list_msg(instance, msg)
 
 
 @receiver(speaker_started)
@@ -130,7 +126,7 @@ def notify_started_speaker(speaker: Speaker, **kwargs):
         speaker_list=speaker.speaker_list.pk,
         started=speaker.started,
     )
-    _publish_active_list_msg(speaker.speaker_list, msg)
+    publish_active_list_msg(speaker.speaker_list, msg)
 
 
 @receiver(speaker_stopped)
@@ -142,13 +138,13 @@ def notify_stopped_speaker(speaker: Speaker, **kwargs):
         started=speaker.started,
         seconds=speaker.seconds,
     )
-    _publish_active_list_msg(speaker.speaker_list, msg)
+    publish_active_list_msg(speaker.speaker_list, msg)
 
 
 @receiver(pre_delete, sender=SpeakerList)
 def notify_deleted_speaker_list(instance: SpeakerList, **kw):
     msg = SpeakerListDeleted(pk=instance.pk)
-    _publish_list_msg(instance, msg)
+    publish_list_msg(instance, msg)
 
 
 @receiver(post_save, sender=SpeakerListSystem)
