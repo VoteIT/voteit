@@ -11,7 +11,8 @@ if TYPE_CHECKING:
 
 
 class Connection(models.Model):
-    """These are created on websocket connect, and marked as online=False when client disconnects.
+    """
+    These are created on websocket connect, and marked as online=False when client disconnects.
     Since channels doesn't handle any kind of cleanup, it's important to check these now and then.
     """
 
@@ -45,6 +46,9 @@ class Connection(models.Model):
 
     class Meta:
         unique_together = (("user", "channel_name"),)
+
+    # Annotations
+    objects: models.Manager
 
 
 # FIXME Cleanup of channels should preferably be handled by the same iface as channels uses
