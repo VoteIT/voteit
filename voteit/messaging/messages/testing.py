@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from logging import getLogger
 from time import sleep
 from typing import List
 from typing import Optional
@@ -26,6 +28,8 @@ from voteit.messaging.utils import cleanup_connection_status
 
 if TYPE_CHECKING:
     from voteit.messaging.consumers import WebsocketDemuxConsumer
+
+logger = getLogger(__name__)
 
 
 class HelloSchema(BaseModel):
@@ -254,3 +258,33 @@ class CheckedResult(BaseOutgoingMessage):
     name = "testing.checked_result"
     schema = CheckedResultSchema
     data: CheckedResultSchema
+
+
+class SleepSchema(BaseModel):
+    seconds: int = 20
+
+    @validator("seconds")
+    def validate_seconds(cls, v):
+        if v > 60:
+            raise ValueError("No more than 60")
+        return v
+
+
+@incoming_messages
+class Sleep(BaseIncomingMessage, AsyncRunnable):
+    name = "testing.sleep"
+    schema = SleepSchema
+    data: SleepSchema
+
+    async def run(self, consumer: WebsocketDemuxConsumer):
+        logger.debug(
+            "Sleeping %s seconds, this will freeze the consumer", self.data.seconds
+        )
+        await asyncio.sleep(self.data.seconds)
+        response = AwakeAgain.from_message(self)
+        await response.async_send_outgoing(consumer.channel_name, success=True)
+
+
+@outgoing_messages
+class AwakeAgain(BaseOutgoingMessage):
+    name = "testing.awake"
