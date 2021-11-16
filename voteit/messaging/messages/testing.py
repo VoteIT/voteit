@@ -8,6 +8,8 @@ from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.apps import apps
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.dispatch import receiver
 from django.utils import translation
 from django.utils.translation import gettext as _
@@ -30,6 +32,12 @@ if TYPE_CHECKING:
     from voteit.messaging.consumers import WebsocketDemuxConsumer
 
 logger = getLogger(__name__)
+
+
+if not settings.DEBUG:
+    raise ImproperlyConfigured(
+        "%s should never be imported unless DEBUG mode is on." % __name__
+    )
 
 
 class HelloSchema(BaseModel):
