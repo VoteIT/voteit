@@ -26,6 +26,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         meeting: Meeting = Meeting.objects.get(pk=options.get("m"))
+        # FIXME: Seems to be problems with this. Aborted after transaction...?
         try:
             meeting.pn_system
         except PNSystem.DoesNotExist:

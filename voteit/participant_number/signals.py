@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextlib import suppress
+from logging import getLogger
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -20,21 +20,24 @@ from voteit.participant_number.models import ParticipantNumber
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
 
+logger = getLogger(__name__)
+
 
 @receiver(channel_subscribed, sender=ModeratorsChannel)
 def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
     """
     Populate app_state with participant numbers
     """
-    with suppress(ObjectDoesNotExist):
-        for item in context.pn_system.numbers.all().values(
-            "number",
-            "user",
-            "pk",
-        ):
-            app_state.append(
-                PNAdded(meeting=context.pk, **item)
-            )
+    try:
+        pn_system = context.pn_system
+    except ObjectDoesNotExist:
+        return
+    for item in pn_system.numbers.all().values(
+        "number",
+        "user",
+        "pk",
+    ):
+        app_state.append(PNAdded(meeting=context.pk, **item))
 
 
 @receiver_all_subclasses(post_save, sender=ParticipantNumber)
