@@ -43,7 +43,7 @@ class AddPresence(BaseAddObject):
 
     def run_job(self) -> StatusDone:
         self.assert_perm(msg=_("You're not allowed to set yourself as present here."))
-        self.context.presences.create(user=self.user)
+        self.context.presences.get_or_create(user=self.user)
         if self.mm.consumer_name is not None:
             response = StatusDone.from_message(self)
             response.send_outgoing(self.mm.consumer_name, success=True)

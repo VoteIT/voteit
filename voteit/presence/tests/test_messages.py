@@ -42,6 +42,8 @@ class AddPresenceTests(TestCase, _PresenceFixture):
         msg = self._mk_one()
         msg.run_job()
         self.assertTrue(self.check.present_users.count())
+        # Make sure duplicate doesn't kill it
+        msg.run_job()
 
     def test_add_closed_check(self):
         self.check.close()
