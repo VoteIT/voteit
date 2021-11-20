@@ -27,20 +27,20 @@ class PollDetailSerializer(serializers.ModelSerializer):
         model = models.Poll
         read_only_fields = (
             "agenda_item",
+            "body",
+            "closed",
             "electoral_register",
             "initial_electoral_register",
             "meeting",
-            "pk",
-            "settings",
             "method_name",
-            "result",
-            "state",
+            "pk",
             "proposals",
-            "url",
-            "body",
-            "title",
+            "result",
+            "settings",
             "started",
-            "closed",
+            "state",
+            "title",
+            "url",
         )
         fields = read_only_fields
 
@@ -116,16 +116,24 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Poll
-        read_only_fields = ["pk"]
+        read_only_fields = [
+            "closed",
+            "electoral_register",
+            "initial_electoral_register",
+            "pk",
+            "started",
+            "state",
+            "url",
+        ]
         fields = read_only_fields + [
-            "title",
-            "body",
             "agenda_item",
+            "body",
             "meeting",
             "method_name",
             "proposals",
-            "start",
             "settings",
+            "start",
+            "title",
         ]
         extra_kwargs = {
             "agenda_item": {"required": True},
