@@ -123,7 +123,3 @@ async def check_redis_keys(keys) -> set:
             if await connection.exists(k):
                 found.add(k)
     return found
-
-
-def ping_online_users():
-    cleanup_connection_status()
