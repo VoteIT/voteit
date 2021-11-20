@@ -26,11 +26,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         meeting: Meeting = Meeting.objects.get(pk=options.get("m"))
-        # FIXME: Seems to be problems with this. Aborted after transaction...?
         try:
-            meeting.pn_system
+            pn_system = meeting.pn_system
         except PNSystem.DoesNotExist:
-            meeting.pn_system = PNSystem.objects.create()
+            pn_system = PNSystem.objects.create(meeting=meeting)
         print(f"Adding participant numbers to meeting {meeting.title}")
         print(
             "Note! This command will freeze if you haven't piped any data to STDIN. Exit in case you didn't.\n\n"
@@ -59,9 +58,9 @@ class Command(BaseCommand):
         existed = 0
         with transaction.atomic():
             if options.get("clear"):
-                meeting.pn_system.numbers.all().delete()
+                pn_system.numbers.all().delete()
             for user in users_qs:
-                pn_obj, _ = meeting.pn_system.numbers.get_or_create(
+                pn_obj, _ = pn_system.numbers.get_or_create(
                     user=user, defaults={"number": email_to_pn[user.email]}
                 )
                 pn_obj: ParticipantNumber
