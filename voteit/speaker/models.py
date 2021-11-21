@@ -29,7 +29,7 @@ from voteit.core.abcs import MeetingContext
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.permissions import NOT_ALLOWED
-from voteit.core.utils import ensure_atomic
+from voteit.core.decorators import ensure_atomic
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.speaker.permissions import SpeakerListPermissions

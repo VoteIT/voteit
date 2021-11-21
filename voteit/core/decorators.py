@@ -4,6 +4,7 @@ from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.apps import apps
+from django.db.transaction import get_connection
 
 if TYPE_CHECKING:
     from voteit.core.role import Role
@@ -41,3 +42,37 @@ def receiver_all_subclasses(signal, sender=None, **kwargs):
         return func
 
     return _decorator
+
+
+def ensure_atomic(method):
+    """
+    Decorator to ensure that something is within an atomic transaction.
+
+    Remember that djangos tests use atomic transactions all the time, but doctests don't.
+
+    >>> @ensure_atomic
+    ... def hello():
+    ...     pass
+    ...
+
+    >>> failed = False
+    >>> try:
+    ...     hello()
+    ... except RuntimeError:
+    ...     failed = True
+    >>> failed
+    True
+
+    >>> from django.db.transaction import atomic
+    >>> with atomic():
+    ...     hello()
+    ...
+    """
+
+    def _inner(*args, **kwargs):
+        connection = get_connection()
+        if not connection.in_atomic_block:
+            raise RuntimeError("Must be run while atomic is enabled")
+        return method(*args, **kwargs)
+
+    return _inner
