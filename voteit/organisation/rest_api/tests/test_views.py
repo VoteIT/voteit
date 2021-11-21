@@ -3,16 +3,17 @@ from rest_framework.test import APITestCase
 
 
 class OrganisationViewSetTests(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.organisation.models import Organisation
         from voteit.organisation.roles import ROLE_ORG_MANAGER
 
-        self.org: Organisation = Organisation.objects.create(
+        cls.org: Organisation = Organisation.objects.create(
             title="Test org",
         )
-        self.manager = self.org.users.create(username="manager")
-        self.user = self.org.users.create(username="user")
-        self.org.add_roles(self.manager, ROLE_ORG_MANAGER)
+        cls.manager = cls.org.users.create(username="manager")
+        cls.user = cls.org.users.create(username="user")
+        cls.org.add_roles(cls.manager, ROLE_ORG_MANAGER)
 
     def test_create(self):
         url = f"/api/organisations/"
