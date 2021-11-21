@@ -10,6 +10,7 @@ from django_fsm import pre_transition
 from django_fsm.signals import post_transition
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
+from voteit.core.decorators import on_transaction_commit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
@@ -17,7 +18,6 @@ from voteit.meeting.models import Meeting
 from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.signals import channel_subscribed
 from voteit.poll.channels import PollChannel
-from voteit.poll.exceptions import InvalidPollMethod
 from voteit.poll.messages import GenericVoteResponse
 from voteit.poll.messages import PollAdded
 from voteit.poll.messages import PollChanged
@@ -79,11 +79,15 @@ def moderators_subscribed(
 
 
 @receiver(post_save, sender=Poll)
+@on_transaction_commit
 def poll_change(instance: Poll = None, created: bool = None, **kw):
+    """
+    Note: This message won't work properly if django admin is used for instance.
+    Proposals won't be attached unless it's during a transaction.
+    We have the option to add @ensure_atomic here, but that would break all ability to change polls
+    outside of a transaction.
+    """
     if instance.meeting is not None:
-        instance.refresh_from_db(
-            fields=["result_data"]
-        )  # FIXME somewhere else, preferably.
         data = PollDetailSerializer(instance).data
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
@@ -95,11 +99,11 @@ def poll_change(instance: Poll = None, created: bool = None, **kw):
             # Only care about transmitting to participants if it existed previously
             if not created:
                 participants_msg = PollDeleted(pk=instance.pk)
-                participants_ch.publish(participants_msg)
+                participants_ch.publish(participants_msg, on_commit=False)
         elif instance.agenda_item is None or not instance.agenda_item.is_private:
             # Publish if ai isn't private
-            participants_ch.publish(msg)
-        moderators_ch.publish(msg)
+            participants_ch.publish(msg, on_commit=False)
+        moderators_ch.publish(msg, on_commit=False)
 
 
 @receiver(pre_delete, sender=Poll)

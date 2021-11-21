@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from django.apps import apps
 from django.db.transaction import get_connection
+from django.db.transaction import on_commit
 
 if TYPE_CHECKING:
     from voteit.core.role import Role
@@ -74,5 +75,53 @@ def ensure_atomic(method):
         if not connection.in_atomic_block:
             raise RuntimeError("Must be run while atomic is enabled")
         return method(*args, **kwargs)
+
+    return _inner
+
+
+def on_transaction_commit(method):
+    """
+    Delay execution of a function until the database has commited.
+
+    Remember that djangos tests use atomic transactions all the time, but doctests don't.
+
+    Pass by referrence obj
+    >>> state = {'done': False}
+    >>> @on_transaction_commit
+    ... def do_stuff(state):
+    ...     state['done'] = True
+    ...
+
+    No transaction - will exec right away
+    >>> state = {'done': False}
+    >>> do_stuff(state)
+    >>> state['done']
+    True
+
+    Make sure the function runs after an atomic block.
+    >>> from django.db.transaction import atomic
+    >>> inner_done=False
+    >>> state['done'] = False
+    >>> with atomic():
+    ...     do_stuff(state)
+    ...     inner_done=state['done']
+    >>> state['done']
+    True
+    >>> inner_done
+    False
+
+    Exceptions should still be raised
+    >>> @on_transaction_commit
+    ... def loud_bang():
+    ...     raise ValueError(':(')
+    >>> with atomic():
+    ...     loud_bang()
+    Traceback (most recent call last):
+    ...
+    ValueError: ...
+    """
+
+    def _inner(*args, **kwargs):
+        on_commit(lambda: method(*args, **kwargs))
 
     return _inner

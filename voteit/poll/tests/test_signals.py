@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.test import TestCase, override_settings
+from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ParticipantsChannel, ModeratorsChannel
 from voteit.messaging.messages.channels import Subscribe
@@ -104,6 +106,8 @@ class PollChangedTests(TestCase):
 
         cls.er = ElectoralRegister.objects.create()
         cls.meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.prop = cls.ai.proposals.create()
         cls.poll = cls.meeting.polls.create(
             method_name="simple", electoral_register=cls.er
         )
@@ -126,13 +130,16 @@ class PollChangedTests(TestCase):
         from voteit.poll.messages import PollAdded
 
         self.assertFalse(mock_publish.called)
-        poll = self.meeting.polls.create(
-            method_name="simple", electoral_register=self.er
-        )
+        with FakeCommit():
+            poll = self.meeting.polls.create(
+                method_name="simple", electoral_register=self.er
+            )
+            poll.proposals.add(self.prop)
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, PollAdded)
         self.assertEqual(poll.pk, msg.data.pk)
+        self.assertEqual([self.prop.pk], msg.data.proposals)
 
     @patch.object(ParticipantsChannel, "publish")
     def test_changed_participants(self, mock_publish):
@@ -140,15 +147,17 @@ class PollChangedTests(TestCase):
         from voteit.poll.messages import PollDeleted
 
         self.assertFalse(mock_publish.called)
-        self.poll.title = "Hello"
-        self.poll.save()
+        with FakeCommit():
+            self.poll.title = "Hello"
+            self.poll.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, PollChanged)
         self.assertEqual(self.poll.pk, msg.data.pk)
         mock_publish.reset_mock()
-        self.poll.unpublish()
-        self.poll.save()
+        with FakeCommit():
+            self.poll.unpublish()
+            self.poll.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, PollDeleted)

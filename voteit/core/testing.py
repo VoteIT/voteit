@@ -4,6 +4,7 @@ import doctest
 from pkgutil import walk_packages
 
 from django.contrib.auth import get_user_model
+from django.db.transaction import get_connection
 
 user_tag = """
 <span class="mention" data-index="0" data-denotation-char="@" data-id="{userid}" data-value="{name}">
@@ -55,3 +56,34 @@ def load_doctests(tests, package) -> None:
         package.__path__, package.__name__ + "."
     ):
         tests.addTests(doctest.DocTestSuite(name, optionflags=opts))
+
+
+class FakeCommit:
+    """
+    A very destructive context manager that will wreck havoc if you use it outside of unittests!
+    So don't!
+
+    So why does it exist?
+    Most unittests start with mock data that's part of the tests own transaction.
+    So if we want to test on_commit hooks, it becomes very problematic since that initial test data may
+    have caused commit hooks - and theres no way we can start a new atomic transaction
+    within a regular unittest. (It does work with TransactionTestCase but that's painfully slow)
+    """
+
+    def __enter__(self):
+        """
+        Remove staged all on_commit methods on enter - yes this will destroy them for the
+        atomic block that's active!
+        """
+        self.connection = get_connection()
+        self.connection.run_on_commit = []
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Execute all on_commit hooks and cleanup.
+        """
+        current_run_on_commit = self.connection.run_on_commit
+        self.connection.run_on_commit = []
+        while current_run_on_commit:
+            sids, func = current_run_on_commit.pop(0)
+            func()
