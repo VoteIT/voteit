@@ -1,8 +1,9 @@
-from django.conf import settings
+from django.utils.translation import gettext as _
 from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from rest_framework.exceptions import AuthenticationFailed
 
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
@@ -24,17 +25,29 @@ class OrganisationViewSet(
     queryset = Organisation.objects.all()
     serializer_class = serializers.OrganisationSerializer
 
+    def get_subdomain(self) -> str:
+        host = self.request.get_host()
+        return host.split(":")[0].split(".")[0]
+
     # TODO: Not decided how to host multiple organisations. For now, always return a list of one.
     def get_queryset(self):
+        # Subdomain is forced for authenticated too
         if self.request.user.is_authenticated and self.request.user.organisation:
-            return self.queryset.filter(pk=self.request.user.organisation.pk)
-        if settings.DEFAULT_ORGANISATION_ID is not None:
-            return self.queryset.filter(pk=settings.DEFAULT_ORGANISATION_ID)
-        return self.queryset
+            subdomain = self.get_subdomain()
+            if subdomain != self.request.user.organisation.subdomain:
+                raise AuthenticationFailed(
+                    detail=_("You're logged in to another organisation")
+                )
+            return self.queryset.filter(
+                pk=self.request.user.organisation.pk, subdomain=subdomain
+            )
+        return self.queryset.filter(subdomain=self.get_subdomain())
 
     def list(self, request, *args, **kwargs):
-        """ Always return a list of one. """
-        serializer = self.get_serializer(self.get_queryset()[:1], many=True)
+        """
+        A list that may contain one item, but no more.
+        """
+        serializer = self.get_serializer(self.get_queryset(), many=True)
         return Response(serializer.data)
 
 
@@ -70,18 +83,3 @@ class UserConsentViewSet(DefaultModelViewSet):
                 tos__organisation=self.request.user.organisation
             )
         return self.model.objects.none()
-
-
-# FIXME Really show all providers...? Force filtering via org?
-# class ProviderViewSet(
-#     SerializerClassesMixin,
-#     viewsets.GenericViewSet,
-#     mixins.ListModelMixin,
-#     mixins.RetrieveModelMixin,
-# ):
-#     permission_classes = [permissions.AllowAny]
-#     model = OAuth2Provider
-#     queryset = OAuth2Provider.objects.all()
-#     serializer_class = serializers.BeginProviderAuthSerializer
-#     serializer_classes = {"list": serializers.ProviderSerializer}
-#     # lookup_field = "provider_id"

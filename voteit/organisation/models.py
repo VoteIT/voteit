@@ -52,6 +52,13 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     roles_cls = OrganisationRoles
     title: str = models.CharField(max_length=100)
     body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
+    subdomain: str = models.CharField(
+        verbose_name="Subdomain name, only the text part without dots",
+        max_length=30,
+        blank=True,
+        null=True,
+        unique=True,
+    )
 
     class Meta:
         verbose_name = _("Organisation")
