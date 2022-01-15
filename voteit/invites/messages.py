@@ -37,9 +37,7 @@ logger = getLogger(__name__)
 class AddInvitesSchema(BaseModel):
     roles: List[str]
     model: str = Field("meeting", const=True)  # Constant
-    skip_states: Set[str] = Field(
-        {InviteWf.REJECTED}, const=True
-    )  # Allow changes later
+    skip_states: Set[str] = {InviteWf.REJECTED}
     invite_data: List[str]
     type: str = "email"
     meeting: int
