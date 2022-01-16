@@ -74,6 +74,11 @@ class User(AbstractUser):
             ),
         ]
 
+    def __str__(self):
+        if self.userid:
+            return f"{self.get_full_name()} ({self.userid})"
+        return self.username
+
     def valid_userid_guard(self) -> bool:
         """
         Check if user has a valid userid
@@ -88,6 +93,7 @@ class User(AbstractUser):
 
     @transition(
         field=state,
+        source="+",
         target=UserWf.ACTIVE,
         conditions=[valid_userid_guard],
         custom={"title": _("Make user active")},
@@ -98,6 +104,7 @@ class User(AbstractUser):
 
     @transition(
         field=state,
+        source="+",
         target=UserWf.INCOMPLETE,
         custom={"title": _("Mark user as incomplete")},
         # permission=Organisation manager or not manual?,
