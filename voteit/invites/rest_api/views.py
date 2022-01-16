@@ -21,13 +21,12 @@ from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.invites.models import MeetingInvite
 from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.rest_api import serializers
-from voteit.invites.rest_api.authentication import InviteBasicAuthentication
-from voteit.core.rest_api.base import ReadonlyModelViewSet
+from voteit.invites.rest_api.permissions import HasInviteAPIKey
 from voteit.core.rest_api.utils import get_identity_data
 from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
-    from voteit.organisation.models import OAuth2Provider
+    pass
 
 logger = getLogger(__name__)
 
@@ -67,8 +66,7 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
     """
 
     serializer_class = serializers.ExternalMeetingInviteSerializer
-    authentication_classes = (InviteBasicAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (HasInviteAPIKey,)
 
     @action(
         methods=["post"],

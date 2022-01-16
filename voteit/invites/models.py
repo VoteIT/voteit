@@ -149,8 +149,11 @@ class MeetingInvite(MeetingContext):
         target=InviteWf.REJECTED,
         permission=NOT_ALLOWED,  # Special view, not a normal transition
     )
-    def reject(self, user: AbstractUser):
-        self.used_by = user
+    def reject(self, user: Optional[AbstractUser]):
+        if not user:
+            return
+        if user.pk is not None:
+            self.used_by = user
 
     @transition(
         field=state,

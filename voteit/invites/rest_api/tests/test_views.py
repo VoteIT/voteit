@@ -148,7 +148,7 @@ class MeetingInviteViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 403)
 
 
-@override_settings(INVITE_SERVICE_USERS=["invite_service"])
+@override_settings(INVITE_API_KEY="xxx")
 class MatchInvitesViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -179,9 +179,9 @@ class MatchInvitesViewSetTests(APITestCase):
         self.invite.refresh_from_db()
 
     def _mk_auth(self):
-        credentials = "invite_service:secret"
-        encoded = str(b64encode(credentials.encode("utf-8")), "utf-8")
-        return {"HTTP_AUTHORIZATION": f"Basic {encoded}"}
+        # credentials = "invite_service:secret"
+        # encoded = str(b64encode(credentials.encode("utf-8")), "utf-8")
+        return {"HTTP_AUTHORIZATION": f"api-key xxx"}
 
     def test_authenticated_no_payload(self):
         url = reverse("match-invites-query")
