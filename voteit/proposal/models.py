@@ -131,7 +131,10 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         pass
 
     @transition(
-        field=state, target=ProposalWf.PUBLISHED, permission=ProposalPermissions.CHANGE
+        field=state,
+        source="+",
+        target=ProposalWf.PUBLISHED,
+        permission=ProposalPermissions.CHANGE
     )
     def publish(self):
         """Reset proposal back to published."""

@@ -19,5 +19,8 @@ _user_fieldsets.insert(
 
 @admin.register(User)
 class UserAdmin(FSMTransitionMixin, DefaultUserAdmin):
-    fsm_field = ["state"]
+    fsm_field = ("state",)
     fieldsets = _user_fieldsets
+    list_display = ("__str__", "organisation", "email", "first_name", "last_name", "date_joined")
+    search_fields = ("first_name", "last_name", "email", "userid")
+    list_filter = ("organisation", "state", "is_active", "date_joined")
