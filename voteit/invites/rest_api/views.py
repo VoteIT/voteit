@@ -1,28 +1,23 @@
 from logging import getLogger
 from typing import Dict
-from typing import Optional
 from typing import TYPE_CHECKING
 
-from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import QuerySet
 from django.http import HttpResponseForbidden
 from django.utils.functional import cached_property
-from requests import HTTPError
 from rest_framework import mixins
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from voteit.core.rest_api.base import DefaultModelViewSet
 
+from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.utils import get_identity_data
 from voteit.invites.models import MeetingInvite
 from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.rest_api import serializers
 from voteit.invites.rest_api.permissions import HasInviteAPIKey
-from voteit.core.rest_api.utils import get_identity_data
 from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:

@@ -26,8 +26,7 @@ def get_identity_data(user: User) -> Dict:
         raise ValidationError("No login provider found for your organisation")
     oauth_session = user.oauth_session()
     response = oauth_session.get(provider.identity_url)
-    if not response.ok:
-        # Not the correct serializer exception, but this is kind of the crash and burn...
-        # FIXME: Cases to handle: Token expired, user not found etc
-        response.raise_for_status()
+    # Not the correct serializer exception, but this is kind of the crash and burn...
+    # FIXME: Cases to handle: Token expired, user not found etc
+    response.raise_for_status()
     return response.json()
