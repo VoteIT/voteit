@@ -1,4 +1,3 @@
-from typing import List
 from pydantic.main import BaseModel
 
 from voteit.invites.abcs import InviteDispatcher
@@ -49,47 +48,6 @@ class InviteDataRegistry(Registry):
             raise KeyError("%s clashes with an already registered name" % name)
         self[name] = factory
         return factory
-
-    def validate(self, data_type, data: List[str]):
-        """
-        Validate invite data to make sure we don't store things that would never work.
-        Transforms data in place too.
-
-        >>> invite_data.validate("email", ["hello@world.com"])
-        ['hello@world.com']
-
-        Invites have their data transformed too
-        >>> invite_data.validate("email", ["HELLO@world.com"])
-        ['hello@world.com']
-
-        >>> invite_data.validate("bleh", [1])
-        Traceback (most recent call last):
-        ...
-        ValueError:
-
-        >>> invite_data.validate("email", [1])
-        Traceback (most recent call last):
-        ...
-        ValidationError:
-
-        >>> invite_data.validate("email", [None])
-        Traceback (most recent call last):
-        ...
-        ValidationError:
-
-        """
-        if not data:
-            raise ValueError("Invite must contain data")
-        if data_type not in self:
-            raise ValueError(f"No such data type: {data_type}")
-        results = []
-        for v in data:
-            # Transform and validate
-            schema = self[data_type](
-                **{data_type: v}
-            )  # Might raise pydantics ValidationError
-            results.append(getattr(schema, data_type))
-        return results
 
 
 invite_data = InviteDataRegistry(BaseModel)

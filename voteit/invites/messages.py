@@ -62,7 +62,17 @@ class AddInvitesSchema(BaseModel):
         >>> AddInvitesSchema(roles=['participant'], invite_data=['HELLO@betahaus.net'], meeting=1)
         AddInvitesSchema(roles=['participant'], model='meeting', skip_states={'rejected'}, invite_data=['hello@betahaus.net'], type='email', meeting=1)
 
+        Blankspace should be skipped or trimmed
+        >>> AddInvitesSchema(roles=['participant'], invite_data=['', '    WoHo@betahaus.net', ' '], meeting=1)
+        AddInvitesSchema(roles=['participant'], model='meeting', skip_states={'rejected'}, invite_data=['woho@betahaus.net'], type='email', meeting=1)
+
         >>> AddInvitesSchema(roles=['participant'], invite_data=['bad_email'], meeting=1)
+        Traceback (most recent call last):
+        ...
+        pydantic.error_wrappers.ValidationError:
+
+        No real data
+        >>> AddInvitesSchema(roles=['participant'], invite_data=['  ', ''], meeting=1)
         Traceback (most recent call last):
         ...
         pydantic.error_wrappers.ValidationError:
@@ -79,7 +89,29 @@ class AddInvitesSchema(BaseModel):
         """
         reg = get_invite_data_registry()
         # Delegate all validation to the registry
-        values["invite_data"] = reg.validate(values["type"], values["invite_data"])
+        invite_type = values["type"]
+        if invite_type not in reg:
+            raise ValueError("No such invite type")
+        validator = reg[invite_type]
+
+        results = []
+        i = 1
+        for v in values["invite_data"]:
+            v = v.strip()
+            if v:
+                try:
+                    inst = validator(
+                        **{invite_type: v}
+                    )  # Might raise pydantics ValidationError
+                except ValueError:
+                    raise ValueError(
+                        f"Row {i} contains invite data that doesn't match type '{invite_type}'"
+                    )
+                results.append(getattr(inst, invite_type))
+            i += 1
+        if not results:
+            raise ValueError("invite_data required")
+        values["invite_data"] = results
         return values
 
 
