@@ -66,6 +66,7 @@ class ReactionButton(MeetingContext):
     allowed_models: List[str] = ArrayField(
         models.CharField(max_length=20),
         default=_default_allowed_models,
+        blank=True,
     )
 
     class Meta:
