@@ -6,11 +6,14 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 from rest_framework.reverse import reverse
+from rest_framework.exceptions import ValidationError
 from typing import List
 from voteit.core.rest_api.serializers import BaseModelSerializer
+from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserConsent
+from voteit.organisation.utils import get_provider_response_adapters
 
 
 class OrganisationSerializer(serializers.ModelSerializer):
@@ -34,11 +37,11 @@ class OrganisationSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_id_host(instance: Organisation) -> Optional[str]:
-        if host := getattr(settings, 'ID_HOST', None):
+        if host := getattr(settings, "ID_HOST", None):
             return host
         with suppress(ObjectDoesNotExist):
             url = urlparse(instance.provider.auth_url)
-            return f'{url.scheme}://{url.netloc}'
+            return f"{url.scheme}://{url.netloc}"
 
     @staticmethod
     def get_scope(instance: Organisation) -> List[str]:
@@ -46,6 +49,43 @@ class OrganisationSerializer(serializers.ModelSerializer):
             if instance.provider:
                 return instance.provider.scope.split()
         return []
+
+
+class IDOrganisationSerializer(serializers.ModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Organisation
+        fields = "__all__"
+
+
+class IDProviderSerializer(serializers.ModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = OAuth2Provider
+        exclude = (
+            "client_id",
+            "client_secret",
+        )
+
+
+class IDProviderUpdateSerializer(serializers.ModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = OAuth2Provider
+        fields = "__all__"
+        extra_kwargs = {
+            "provider_id": {"default": "idproxy"},
+            "scope": {"default": "email identity"},
+        }
+
+    def validate_provider_id(self, value):
+        adapters = get_provider_response_adapters()
+        if value not in adapters:
+            raise ValidationError("No provider_id with that name")
+        return value
 
 
 class TOSSerializer(serializers.ModelSerializer):

@@ -42,6 +42,103 @@ class OrganisationSerializerTests(TestCase):
         self.assertEqual(self.org.body, "Bye!")
 
 
+class IDOrganisationSerializerTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.organisation.models import Organisation
+
+        cls.org = Organisation.objects.get(pk=1)
+
+    @property
+    def _cut(self):
+        from voteit.organisation.rest_api.serializers import IDOrganisationSerializer
+
+        return IDOrganisationSerializer
+
+    def test_get(self):
+        serializer = self._cut(self.org)
+        data = serializer.data
+        self.assertEqual(data.pop("pk"), self.org.pk)
+        self.assertEqual(data.pop("title"), self.org.title)
+
+    def test_patch(self):
+        serializer = self._cut(self.org, {"body": "Bye!"}, partial=True)
+        self.assertTrue(serializer.is_valid())
+        serializer.save()
+        self.assertEqual(self.org.body, "Bye!")
+
+
+class IDProviderSerializerTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.organisation.models import OAuth2Provider
+
+        cls.provider = OAuth2Provider.objects.get(pk=1)
+
+    @property
+    def _cut(self):
+        from voteit.organisation.rest_api.serializers import IDProviderSerializer
+
+        return IDProviderSerializer
+
+    def test_get(self):
+        serializer = self._cut(self.provider)
+        data = serializer.data
+        self.assertEqual(data.pop("pk"), self.provider.pk)
+        self.assertEqual(data.pop("title"), self.provider.title)
+        self.assertNotIn("client_id", data)
+        self.assertNotIn("client_secret", data)
+
+
+class IDProviderUpdateSerializerTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.organisation.models import OAuth2Provider
+
+        cls.provider = OAuth2Provider.objects.get(pk=1)
+
+    @property
+    def _cut(self):
+        from voteit.organisation.rest_api.serializers import IDProviderUpdateSerializer
+
+        return IDProviderUpdateSerializer
+
+    def test_patch(self):
+        serializer = self._cut(self.provider, {"client_id": "hello"}, partial=True)
+        self.assertTrue(serializer.is_valid())
+        serializer.save()
+        self.assertEqual(self.provider.client_id, "hello")
+
+    def test_patch_bad_provider_id(self):
+        serializer = self._cut(self.provider, {"provider_id": "hello"}, partial=True)
+        serializer.is_valid()
+        self.assertIn("provider_id", serializer.errors)
+
+    def test_create(self):
+        serializer = self._cut(
+            self.provider,
+            {
+                "title": "Hello world",
+                "client_id": "hello",
+                "client_secret": "very_secret",
+                "redirect_url": "http://localhost/dummy",
+                "auth_url": "http://localhost/dummy",
+                "token_url": "http://localhost/dummy",
+                "identity_url": "http://localhost/dummy",
+            },
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.create(serializer.validated_data)
+        self.assertEqual("very_secret", instance.client_secret)
+
+
 class TOSSerializerTests(TestCase):
     def setUp(self):
         from voteit.organisation.models import Organisation

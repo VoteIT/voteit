@@ -135,3 +135,115 @@ class OrganisationViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(1, len(data))
+
+
+@override_settings(ID_PROXY_API_KEY="secret")
+class IDProxyOrganisationViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.organisation.models import Organisation
+
+        cls.org = Organisation.objects.get(pk=1)
+
+    def test_create(self):
+        url = reverse("id-organisations-list")
+        data = {
+            "title": "Item no 2?",
+        }
+        response = self.client.post(url, data, HTTP_AUTHORIZATION=f"api-key secret")
+        self.assertEqual(201, response.status_code)
+
+    def test_get(self):
+        url = reverse("id-organisations-detail", kwargs={"pk": self.org.pk})
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"api-key secret")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(self.org.pk, data["pk"])
+
+    def test_list(self):
+        url = reverse("id-organisations-list")
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"api-key secret")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(1, len(data))
+
+    def test_bad_auth(self):
+        url = reverse("id-organisations-list")
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"api-key not working")
+        self.assertEqual(response.status_code, 401)
+
+    def test_patch(self):
+        url = reverse("id-organisations-detail", kwargs={"pk": self.org.pk})
+        data = {
+            "title": "Item no 1",
+        }
+        response = self.client.patch(url, data, HTTP_AUTHORIZATION=f"api-key secret")
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.org.refresh_from_db()
+        self.assertEqual("Item no 1", self.org.title)
+        self.assertEqual("Item no 1", data["title"])
+
+
+@override_settings(ID_PROXY_API_KEY="secret")
+class IDProxyProviderViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.organisation.models import OAuth2Provider
+
+        cls.provider = OAuth2Provider.objects.get(pk=1)
+
+    def test_create(self):
+        url = reverse("id-providers-list")
+        data = {
+            "title": "Providerish",
+            "client_id": "client_id",
+            "client_secret": "sssshhhhh",
+            "redirect_url": "http://localhost/hello",
+            "auth_url": "http://localhost/hello",
+            "token_url": "http://localhost/hello",
+            "identity_url": "http://localhost/hello",
+        }
+        response = self.client.post(url, data, HTTP_AUTHORIZATION=f"api-key secret")
+        self.assertEqual(201, response.status_code)
+
+    def test_get(self):
+        url = reverse("id-providers-detail", kwargs={"pk": self.provider.pk})
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"api-key secret")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(self.provider.pk, data["pk"])
+        self.assertNotIn("client_id", data)
+        self.assertNotIn("client_secret", data)
+
+    def test_list(self):
+        url = reverse("id-providers-list")
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"api-key secret")
+        self.assertEqual(response.status_code, 200)
+        list_data = response.json()
+        self.assertEqual(1, len(list_data))
+        data = list_data[0]
+        self.assertNotIn("client_id", data)
+        self.assertNotIn("client_secret", data)
+        self.assertEqual(1, data["pk"])
+
+    def test_patch(self):
+        url = reverse("id-providers-detail", kwargs={"pk": self.provider.pk})
+        data = {
+            "title": "Item no 1",
+        }
+        response = self.client.patch(url, data, HTTP_AUTHORIZATION=f"api-key secret")
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.provider.refresh_from_db()
+        self.assertEqual("Item no 1", self.provider.title)
+        self.assertEqual("Item no 1", data["title"])
+
+    def test_bad_auth(self):
+        url = reverse("id-providers-list")
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"api-key not working")
+        self.assertEqual(response.status_code, 401)
