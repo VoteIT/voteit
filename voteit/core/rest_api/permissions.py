@@ -15,6 +15,8 @@ class HasIDProxyAPIKey(BasePermission):
     """
 
     def has_permission(self, request, view):
+        if hasattr(request, "user") and request.user.is_superuser:
+            return True
         try:
             api_key = settings.ID_PROXY_API_KEY
         except AttributeError:
