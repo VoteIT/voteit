@@ -11,16 +11,16 @@ User = get_user_model()
 class InviteApiKeyTests(TestCase):
     @property
     def _cut(self):
-        from voteit.invites.rest_api.permissions import (
-            HasInviteAPIKey,
+        from voteit.core.rest_api.permissions import (
+            HasIDProxyAPIKey,
         )
 
-        return HasInviteAPIKey
+        return HasIDProxyAPIKey
 
     def _mk_request(self, key="secret"):
         return RequestFactory().get("/", HTTP_AUTHORIZATION=f"api-key {key}")
 
-    @override_settings(INVITE_API_KEY="secret")
+    @override_settings(ID_PROXY_API_KEY="secret")
     def test_permission(self):
         request = self._mk_request()
         permission = self._cut()
@@ -28,7 +28,7 @@ class InviteApiKeyTests(TestCase):
 
     def test_not_set(self):
         try:
-            del settings.INVITE_API_KEY
+            del settings.ID_PROXY_API_KEY
         except AttributeError:
             pass
         request = self._mk_request()
@@ -37,7 +37,7 @@ class InviteApiKeyTests(TestCase):
             AuthenticationFailed, permission.has_permission, request, None
         )
 
-    @override_settings(INVITE_API_KEY="")
+    @override_settings(ID_PROXY_API_KEY="")
     def test_empty_keys(self):
         request = self._mk_request(key="")
         permission = self._cut()

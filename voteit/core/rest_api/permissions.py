@@ -9,18 +9,18 @@ from rest_framework.permissions import BasePermission
 logger = getLogger(__name__)
 
 
-class HasInviteAPIKey(BasePermission):
+class HasIDProxyAPIKey(BasePermission):
     """
     Allows access with a specific header in the request.
     """
 
     def has_permission(self, request, view):
         try:
-            api_key = settings.INVITE_API_KEY
+            api_key = settings.ID_PROXY_API_KEY
         except AttributeError:
-            raise AuthenticationFailed("INVITE_API_KEY not found in settings")
+            raise AuthenticationFailed("ID_PROXY_API_KEY not found in settings")
         if not api_key:
-            raise AuthenticationFailed("INVITE_API_KEY not set")
+            raise AuthenticationFailed("ID_PROXY_API_KEY not set")
         auth = get_authorization_header(request).split()
         if not auth or auth[0].lower() != b"api-key":
             return False

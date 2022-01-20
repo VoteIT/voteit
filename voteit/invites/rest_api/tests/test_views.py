@@ -148,7 +148,7 @@ class MeetingInviteViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 403)
 
 
-@override_settings(INVITE_API_KEY="xxx")
+@override_settings(ID_PROXY_API_KEY="xxx")
 class MatchInvitesViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):

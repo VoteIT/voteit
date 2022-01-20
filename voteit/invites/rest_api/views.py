@@ -14,10 +14,10 @@ from rest_framework.response import Response
 
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.utils import get_identity_data
+from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.invites.models import MeetingInvite
 from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.rest_api import serializers
-from voteit.invites.rest_api.permissions import HasInviteAPIKey
 from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
     """
 
     serializer_class = serializers.ExternalMeetingInviteSerializer
-    permission_classes = (HasInviteAPIKey,)
+    permission_classes = (HasIDProxyAPIKey,)
 
     @action(
         methods=["post"],
