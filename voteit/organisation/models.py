@@ -128,7 +128,7 @@ class OAuth2Provider(OrganisationContext):
         adapters = get_provider_response_adapters()
         if self.provider_id not in adapters:
             raise ValueError(
-                "%s is not registered in provider_response_adapters", self.provider_id
+                f"{self.provider_id} is not registered in provider_response_adapters",
             )
         super().save(**kw)
 
