@@ -276,13 +276,14 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
     @transition(
         field=state,
-        source=[PollWf.ONGOING, PollWf.FAILED, PollWf.CLOSED],
+        source=[PollWf.ONGOING, PollWf.FAILED, PollWf.CANCELED],
         target=PollWf.CLOSED,
         permission=PollPermissions.CHANGE_STATE,
         custom={"title": _("Close")},
     )
     def close(self):
-        """Close the poll for further votes.
+        """
+        Close the poll for further votes.
         The next step is always to count the votes via the method finish()
         """
         self._mark_closed()
