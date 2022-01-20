@@ -8,7 +8,7 @@ from rest_framework.exceptions import AuthenticationFailed
 User = get_user_model()
 
 
-class InviteApiKeyTests(TestCase):
+class IDProxyApiKeyTests(TestCase):
     @property
     def _cut(self):
         from voteit.core.rest_api.permissions import (
