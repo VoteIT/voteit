@@ -65,6 +65,12 @@ def root_validate_roles_and_model(cls, values: Dict):
     >>> v == res
     True
 
+    >>> v = {"model": "meeting", "roles": []}
+    >>> root_validate_roles_and_model(None, v)
+    Traceback (most recent call last):
+    ...
+    ValueError:
+
     >>> v = {"model": "meeting", "roles": ["participant", "404"]}
     >>> root_validate_roles_and_model(None, v)
     Traceback (most recent call last):
@@ -74,7 +80,10 @@ def root_validate_roles_and_model(cls, values: Dict):
     model = get_model_by_shortname(values.get("model"))
     # This should already have passed validation - use validate_roles_context_model
     assert model is not None
-    not_valid = set(values["roles"]) - set(model.roles_cls.valid_roles.keys())
+    roles = set(values["roles"])
+    if not roles:
+        raise ValueError("Specify roles")
+    not_valid = roles - set(model.roles_cls.valid_roles.keys())
     if not_valid:
         raise ValueError(f"Invalid roles for this context: {', '.join(not_valid)}")
     return values
