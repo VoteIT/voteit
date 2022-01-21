@@ -3,6 +3,7 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingGroup
 
 User = get_user_model()
 
@@ -150,3 +151,65 @@ class MeetingViewSetTests(APITestCase):
         self.assertEqual(2, one.order)
         self.assertEqual(3, two.order)
         self.assertEqual(1, three.order)
+
+
+class MeetingGroupViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.meeting_group: MeetingGroup = MeetingGroup.objects.create(
+            meeting=cls.meeting
+        )
+
+    # def setUp(self):
+    #    self.meeting = Meeting.objects.get(pk=1)
+
+    def test_create(self):
+        url = reverse("meeting-groups-list")
+        data = {"title": "Hello world", "meeting": self.meeting.pk}
+        participant = User.objects.get(username="participant")
+        moderator = User.objects.get(username="moderator")
+        for user, status in (
+            (None, 401),
+            (moderator, 201),
+            (participant, 403),
+        ):
+            if user:
+                self.client.force_login(user)
+            response = self.client.post(url, data)
+            self.assertEqual(
+                response.status_code,
+                status,
+                f"{user} action returned wrong response code",
+            )
+
+    def test_create_archived_meeting(self):
+        pass
+
+    def test_get_no_meeting(self):
+        url = reverse("meeting-groups-list")
+
+    def test_get(self):
+        pass
+
+    def test_list_no_meeting(self):
+        url = reverse("meeting-groups-list")
+
+    def test_list(self):
+        pass
+
+    def test_change(self):
+        pass
+
+    def test_change_archived_meeting(self):
+        pass
+
+    def test_delete(self):
+        pass
+
+    def test_delete_archived_meeting(self):
+        pass

@@ -13,3 +13,12 @@ class MeetingPermissions(ModelPermissions):
     ARCHIVE = P("meeting.archive_meeting")
     CHANGE_ROLES = P("meeting.change_roles_meeting")
     VIEW_ROLES = P("meeting.view_roles_meeting")
+
+
+class MeetingGroupPermissions(ModelPermissions):
+    model = "meeting_group"
+
+    ADD = P("meeting.add_meetinggroup", context="meeting")
+    CHANGE = P("meeting.change_meetinggroup")
+    DELETE = P("meeting.delete_meetinggroup")
+    VIEW = P("meeting.view_meetinggroup")

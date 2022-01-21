@@ -7,9 +7,12 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
+
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.meeting import roles
-from voteit.meeting.models import *
+from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingGroup
+from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api.filters import UserPkFilter
 from voteit.organisation.models import Organisation
 
@@ -18,6 +21,7 @@ from . import serializers
 __all__ = (
     "MeetingViewSet",
     "MeetingRolesViewSet",
+    "MeetingGroupViewSet",
 )
 
 
@@ -39,7 +43,7 @@ class MeetingViewSet(DefaultModelViewSet):
     )  # We've overridden get_context instead
 
     def get_context(self, request):
-        """ Override to fetch organisation from the user directly"""
+        """Override to fetch organisation from the user directly"""
         organisation = request.user.organisation
         if organisation is None:
             raise ValidationError(detail=f"User has no related organisation")
@@ -94,3 +98,14 @@ class MeetingRolesViewSet(viewsets.ReadOnlyModelViewSet):
         return self.queryset.filter(
             context__participants=self.request.user,
         )
+
+
+class MeetingGroupViewSet(DefaultModelViewSet):
+    model = MeetingGroup
+    serializer_class = serializers.MeetingGroupSerializer
+    context_lookup_kwarg: str = "meeting"
+    queryset = MeetingGroup.objects.all()
+
+    @property
+    def context_queryset(self) -> QuerySet:
+        return Meeting.objects.for_user(self.request.user)

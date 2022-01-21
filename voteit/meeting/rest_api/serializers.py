@@ -16,7 +16,7 @@ class UserRolesMixin(serializers.Serializer):
     current_user_roles = serializers.SerializerMethodField()
 
     def get_current_user_roles(self, instance) -> Optional[List[str]]:
-        """ Return current user roles, if available, for a meeting. """
+        """Return current user roles, if available, for a meeting."""
         if self.context:
             user = self.context["request"].user
             with suppress(ObjectDoesNotExist):
@@ -86,7 +86,7 @@ class MeetingAddParticipantSerializer(serializers.ModelSerializer):
 
 
 class RoleValidator:
-    """ Ensures that role name is valid for roles class provided on class instantiation. """
+    """Ensures that role name is valid for roles class provided on class instantiation."""
 
     roles_cls: Type[Roles]
 
@@ -106,13 +106,9 @@ class RoleSerializer(serializers.Serializer):
     )
 
 
-class MeetingGroupCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = models.MeetingRoles
+class MeetingGroupSerializer(BaseModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
 
-
-class MeetingGroupDetailSerializer(serializers.ModelSerializer):
-    # FIXME: Do we want to have a rest endpoint here?
     class Meta:
         model = models.MeetingGroup
-        fields = ["pk"] + [f.name for f in models.MeetingGroup._meta.get_fields()]
+        fields = "__all__"

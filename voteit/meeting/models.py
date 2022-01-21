@@ -262,3 +262,4 @@ class MeetingGroup(BaseContent, MeetingContext):
     # Type annotations - relations
     proposals: models.QuerySet
     discussions: models.QuerySet
+    objects: models.Manager

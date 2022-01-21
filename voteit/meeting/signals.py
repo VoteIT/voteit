@@ -17,7 +17,7 @@ from voteit.meeting.messages import MeetingGroupDeleted
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.rest_api.serializers import MeetingDetailSerializer
-from voteit.meeting.rest_api.serializers import MeetingGroupDetailSerializer
+from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
 from voteit.messaging.signals import channel_subscribed
 
 if TYPE_CHECKING:
@@ -57,14 +57,14 @@ def meeting_channel_subscribed(
         app_state.append(msg)
     # Append all groups
     app_state.append_from_queryset(
-        context.groups.all(), MeetingGroupDetailSerializer, MeetingGroupAdded
+        context.groups.all(), MeetingGroupSerializer, MeetingGroupAdded
     )
 
 
 @receiver(post_save, sender=MeetingGroup)
 def meeting_group_updated(instance: MeetingGroup = None, created=None, **kw):
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
-    data = MeetingGroupDetailSerializer(instance).data
+    data = MeetingGroupSerializer(instance).data
     if created:
         msg = MeetingGroupAdded(**data)
     else:

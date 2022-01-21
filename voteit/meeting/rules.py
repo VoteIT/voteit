@@ -9,6 +9,7 @@ from rules import is_authenticated
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_not_archived
+from voteit.meeting.permissions import MeetingGroupPermissions
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
 
 @predicate(role=ROLE_PARTICIPANT)
 def is_participant(user: AbstractUser, context: MeetingContext) -> bool:
-    """ Is this a meeting participant? """
+    """Is this a meeting participant?"""
     return (
         isinstance(context, MeetingContext)
         and context.meeting is not None
@@ -71,7 +72,7 @@ def is_proposer(user: AbstractUser, context: MeetingContext) -> bool:
 
 @predicate
 def is_public_meeting(user: AbstractUser, context: MeetingContext) -> bool:
-    """ The meeting is visible for everyone. """
+    """The meeting is visible for everyone."""
     return (
         isinstance(context, MeetingContext)
         and context.meeting is not None
@@ -81,7 +82,7 @@ def is_public_meeting(user: AbstractUser, context: MeetingContext) -> bool:
 
 @predicate
 def meeting_not_archived(user: AbstractUser, context: MeetingContext) -> bool:
-    """ The related meeting isn't archived or archiving. """
+    """The related meeting isn't archived or archiving."""
     return (
         isinstance(context, MeetingContext)
         and context.meeting is not None
@@ -120,3 +121,9 @@ rules.add_perm(
     MeetingPermissions.CHANGE_ROLES, is_not_archived & (is_moderator | is_manager)
 )
 rules.add_perm(MeetingPermissions.VIEW_ROLES, can_view_meeting | is_manager)
+
+
+rules.add_perm(MeetingGroupPermissions.ADD, is_not_archived & is_moderator)
+rules.add_perm(MeetingGroupPermissions.VIEW, can_view_meeting)
+rules.add_perm(MeetingGroupPermissions.CHANGE, is_not_archived & is_moderator)
+rules.add_perm(MeetingGroupPermissions.DELETE, is_not_archived & is_moderator)
