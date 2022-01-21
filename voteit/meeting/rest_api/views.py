@@ -13,6 +13,7 @@ from voteit.meeting import roles
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
+from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.rest_api.filters import UserPkFilter
 from voteit.organisation.models import Organisation
 
@@ -104,8 +105,16 @@ class MeetingGroupViewSet(DefaultModelViewSet):
     model = MeetingGroup
     serializer_class = serializers.MeetingGroupSerializer
     context_lookup_kwarg: str = "meeting"
-    queryset = MeetingGroup.objects.all()
 
     @property
     def context_queryset(self) -> QuerySet:
         return Meeting.objects.for_user(self.request.user)
+
+    def get_queryset(self):
+        if self.detail:
+            # Permission checked against object
+            return MeetingGroup.objects.all()
+        meeting = self.get_context(self.request)
+        if self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
+            return MeetingGroup.objects.filter(meeting=meeting)
+        return MeetingGroup.objects.none()

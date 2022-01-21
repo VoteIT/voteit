@@ -160,23 +160,23 @@ class MeetingGroupViewSetTests(APITestCase):
     def setUpTestData(cls):
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
+        cls.anon = User.objects.create(username="anon")
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.meeting_group: MeetingGroup = MeetingGroup.objects.create(
             meeting=cls.meeting
         )
 
-    # def setUp(self):
-    #    self.meeting = Meeting.objects.get(pk=1)
+    def setUp(self):
+        self.meeting.refresh_from_db()
 
     def test_create(self):
         url = reverse("meeting-groups-list")
         data = {"title": "Hello world", "meeting": self.meeting.pk}
-        participant = User.objects.get(username="participant")
-        moderator = User.objects.get(username="moderator")
+
         for user, status in (
             (None, 401),
-            (moderator, 201),
-            (participant, 403),
+            (self.moderator, 201),
+            (self.participant, 403),
         ):
             if user:
                 self.client.force_login(user)
@@ -188,28 +188,76 @@ class MeetingGroupViewSetTests(APITestCase):
             )
 
     def test_create_archived_meeting(self):
-        pass
-
-    def test_get_no_meeting(self):
+        self.meeting.archive()
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        data = {"title": "Hello world", "meeting": self.meeting.pk}
         url = reverse("meeting-groups-list")
+        response = self.client.post(url, data)
+        self.assertEqual(403, response.status_code)
+
+    def test_create_no_meeting(self):
+        self.client.force_login(self.moderator)
+        data = {"title": "Hello world"}
+        url = reverse("meeting-groups-list")
+        response = self.client.post(url, data)
+        self.assertEqual(400, response.status_code)
 
     def test_get(self):
-        pass
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(self.meeting_group.pk, data.get("pk", None))
+
+    def test_get_wrong_user(self):
+        self.client.force_login(self.anon)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.get(url)
+        self.assertEqual(403, response.status_code)
 
     def test_list_no_meeting(self):
         url = reverse("meeting-groups-list")
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(400, response.status_code)
 
     def test_list(self):
-        pass
+        url = reverse("meeting-groups-list")
+        self.client.force_login(self.moderator)
+        response = self.client.get(url, data={"meeting": self.meeting.pk})
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(1, len(data))
+        self.assertEqual(self.meeting_group.pk, data[0]["pk"])
 
     def test_change(self):
-        pass
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.patch(url, data={"title": "Hello"})
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual("Hello", data["title"])
 
     def test_change_archived_meeting(self):
-        pass
+        self.meeting.archive()
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.patch(url, data={"title": "Hello"})
+        self.assertEqual(403, response.status_code)
 
     def test_delete(self):
-        pass
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.delete(url)
+        self.assertEqual(204, response.status_code)
 
     def test_delete_archived_meeting(self):
-        pass
+        self.meeting.archive()
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.delete(url)
+        self.assertEqual(403, response.status_code)
