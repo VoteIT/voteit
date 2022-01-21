@@ -123,7 +123,7 @@ rules.add_perm(
 rules.add_perm(MeetingPermissions.VIEW_ROLES, can_view_meeting | is_manager)
 
 
-rules.add_perm(MeetingGroupPermissions.ADD, is_not_archived & is_moderator)
+rules.add_perm(MeetingGroupPermissions.ADD, meeting_not_archived & is_moderator)
 rules.add_perm(MeetingGroupPermissions.VIEW, can_view_meeting)
-rules.add_perm(MeetingGroupPermissions.CHANGE, is_not_archived & is_moderator)
-rules.add_perm(MeetingGroupPermissions.DELETE, is_not_archived & is_moderator)
+rules.add_perm(MeetingGroupPermissions.CHANGE, meeting_not_archived & is_moderator)
+rules.add_perm(MeetingGroupPermissions.DELETE, meeting_not_archived & is_moderator)
