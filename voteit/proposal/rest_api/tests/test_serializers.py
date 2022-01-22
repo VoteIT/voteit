@@ -109,9 +109,10 @@ class ProposalCreateSerializer(TestCase):
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        cls.user = cls.meeting.participants.create(username="jane")
+        cls.user = cls.meeting.participants.create(username="user")
         cls.group = cls.meeting.groups.create()
         cls.group.members.add(cls.user)
+        cls.non_group_user = cls.meeting.participants.create(username="non_group_user")
         cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
 
     @property
@@ -149,6 +150,19 @@ class ProposalCreateSerializer(TestCase):
         serializer = self._cut(data=data, context={"request": request})
         serializer.is_valid()
         self.assertIn("agenda_item", serializer.errors)
+
+    def test_create_with_wrong_group(self):
+        rf = RequestFactory()
+        request = rf.request()
+        request.user = self.non_group_user
+        data = {
+            "body": "Hello " + mk_hashtag("world"),
+            "agenda_item": self.ai.pk,
+            "meeting_group": self.group.pk,
+        }
+        serializer = self._cut(data=data, context={"request": request})
+        serializer.is_valid()
+        self.assertIn("meeting_group", serializer.errors)
 
 
 class DiffProposalDetailSerializerTests(TestCase):
