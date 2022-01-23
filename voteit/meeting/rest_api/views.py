@@ -118,3 +118,12 @@ class MeetingGroupViewSet(DefaultModelViewSet):
         if self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
             return MeetingGroup.objects.filter(meeting=meeting)
         return MeetingGroup.objects.none()
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
