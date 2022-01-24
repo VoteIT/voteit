@@ -18,7 +18,7 @@ class IDProxyApiKeyTests(TestCase):
         return HasIDProxyAPIKey
 
     def _mk_request(self, key="secret"):
-        return RequestFactory().get("/", HTTP_AUTHORIZATION=f"api-key {key}")
+        return RequestFactory().get("/", HTTP_API_KEY=key)
 
     @override_settings(ID_PROXY_API_KEY="secret")
     def test_permission(self):
