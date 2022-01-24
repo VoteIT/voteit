@@ -24,10 +24,9 @@ class HasIDProxyAPIKey(BasePermission):
             raise AuthenticationFailed("ID_PROXY_API_KEY not found in settings")
         if not api_key:
             raise AuthenticationFailed("ID_PROXY_API_KEY not set")
-        auth = request.headers.get("Api-Key", None)
+        auth = request.META.get("HTTP_API_KEY", None)
         if auth is None:
             raise AuthenticationFailed("Missing Api-Key header")
-
         if isinstance(auth, str):
             # Work around django test client oddness
             auth = auth.encode(HTTP_HEADER_ENCODING)
