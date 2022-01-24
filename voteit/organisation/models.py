@@ -116,20 +116,25 @@ class OAuth2Provider(OrganisationContext):
     # identity_url: http://localhost:8001/api/identity/
 
     def redirect_url(self, request) -> str:
-        path = reverse("begin-auth")
+        path = reverse("finish-auth")
         return request.build_absolute_uri(path)
 
     @property
+    def id_backend_host(self):
+        """ ID_BACKEND_HOST only needed in dev """
+        return getattr(settings, 'ID_HOST_BACKEND', settings.ID_HOST)
+
+    @property
     def auth_url(self) -> str:
-        return f"{settings.ID_HOST}/o/authorize/"
+        return f"{self.id_backend_host}/o/authorize/"
 
     @property
     def token_url(self) -> str:
-        return f"{settings.ID_HOST}/o/token/"
+        return f"{self.id_backend_host}/o/token/"
 
     @property
     def identity_url(self) -> str:
-        return f"{settings.ID_HOST}/api/identity/"
+        return f"{self.id_backend_host}/api/identity/"
 
     class Meta:
         verbose_name = "OAuth2Provider"
