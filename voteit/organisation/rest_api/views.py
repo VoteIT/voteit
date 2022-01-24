@@ -4,13 +4,11 @@ from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.viewsets import ModelViewSet
 
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.mixins import SerializerClassesMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
-from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserConsent
@@ -53,19 +51,6 @@ class OrganisationViewSet(
 
 
 class IDProxyOrganisationViewSet(
-    mixins.CreateModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.UpdateModelMixin,
-    mixins.ListModelMixin,
-    GenericViewSet,
-):
-    serializer_class = serializers.IDOrganisationSerializer
-    permission_classes = (HasIDProxyAPIKey,)
-    model = Organisation
-    queryset = Organisation.objects.all()
-
-
-class IDProxyProvidersViewSet(
     SerializerClassesMixin,
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
@@ -73,14 +58,15 @@ class IDProxyProvidersViewSet(
     mixins.ListModelMixin,
     GenericViewSet,
 ):
-    serializer_class = serializers.IDProviderSerializer
+    serializer_class = serializers.IDOrganisationSerializer
     serializer_classes = {
-        "create": serializers.IDProviderUpdateSerializer,
-        "update": serializers.IDProviderUpdateSerializer,
+        "create": serializers.IDOrganisationUpdateSerializer,
+        "update": serializers.IDOrganisationUpdateSerializer,
+        "partial_update": serializers.IDOrganisationUpdateSerializer,
     }
     permission_classes = (HasIDProxyAPIKey,)
-    model = OAuth2Provider
-    queryset = OAuth2Provider.objects.all()
+    model = Organisation
+    queryset = Organisation.objects.all()
 
 
 class TOSViewSet(DefaultModelViewSet):

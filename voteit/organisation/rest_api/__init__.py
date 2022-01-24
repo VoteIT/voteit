@@ -6,6 +6,5 @@ router.register("organisations", views.OrganisationViewSet, basename="organisati
 router.register(
     "id-organisations", views.IDProxyOrganisationViewSet, basename="id-organisations"
 )
-router.register("id-providers", views.IDProxyProvidersViewSet, basename="id-providers")
 router.register("tos", views.TOSViewSet, basename="tos")
 router.register("user_consents", views.UserConsentViewSet, basename="user_consents")

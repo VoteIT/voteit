@@ -3,6 +3,7 @@ from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 from rest_framework.exceptions import ValidationError
@@ -45,14 +46,6 @@ class OrganisationSerializer(serializers.ModelSerializer):
         return []
 
 
-class IDOrganisationSerializer(serializers.ModelSerializer):
-    pk = serializers.IntegerField(read_only=True)
-
-    class Meta:
-        model = Organisation
-        fields = "__all__"
-
-
 class IDProviderSerializer(serializers.ModelSerializer):
     pk = serializers.IntegerField(read_only=True)
 
@@ -80,6 +73,42 @@ class IDProviderUpdateSerializer(serializers.ModelSerializer):
         if value not in adapters:
             raise ValidationError("No provider_id with that name")
         return value
+
+
+class IDOrganisationSerializer(serializers.ModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
+    provider = IDProviderSerializer(read_only=True)
+
+    class Meta:
+        model = Organisation
+        fields = "__all__"
+
+
+class IDOrganisationUpdateSerializer(IDOrganisationSerializer):
+    provider = IDProviderUpdateSerializer()
+
+    class Meta(IDOrganisationSerializer.Meta):
+        pass
+
+    def create(self, validated_data):
+        provider_data = validated_data.pop("provider")
+        with transaction.atomic():
+            provider = OAuth2Provider.objects.create(**provider_data)
+            org = Organisation.objects.create(provider=provider, **validated_data)
+        return org
+
+    def update(self, instance: Organisation, validated_data):
+        provider_data = validated_data.pop("provider")
+        with transaction.atomic():
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
+            provider_serializer = IDProviderUpdateSerializer(
+                instance.provider, data=provider_data, partial=self.partial
+            )
+            provider_serializer.is_valid(raise_exception=True)
+            provider_serializer.save()
+        return instance
 
 
 class TOSSerializer(serializers.ModelSerializer):

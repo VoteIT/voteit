@@ -127,10 +127,6 @@ class IDProviderUpdateSerializerTests(TestCase):
                 "title": "Hello world",
                 "client_id": "hello",
                 "client_secret": "very_secret",
-                "redirect_url": "http://localhost/dummy",
-                "auth_url": "http://localhost/dummy",
-                "token_url": "http://localhost/dummy",
-                "identity_url": "http://localhost/dummy",
             },
         )
         serializer.is_valid()
