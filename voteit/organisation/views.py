@@ -27,17 +27,25 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-def begin_auth(request, org_pk: int):
+def begin_auth(request):
     # FIXME: Very early, for testing
-    organisation = get_object_or_404(Organisation, pk=org_pk)
+    host = request.get_host()
+    hostname = host.split(":")[0]
+    try:
+        organisation = Organisation.objects.get(host=hostname)
+    except Organisation.DoesNotExist:
+        raise Http404("No organisation with host %s" % hostname)
+
     provider = organisation.provider
     if not provider:
         raise Http404("No provider for organisation")
     # Get scopes from organisation or provider?
     # Note: This is not for security, only to make sure a cookie has been set for the same domain
     # the user will be returned to :)
-    redirect_host = urlparse(provider.redirect_url).netloc
-    if redirect_host != request.META["HTTP_HOST"]:
+    redirect_url = provider.redirect_url(request)
+    redirect_host = urlparse(redirect_url).netloc
+    # if redirect_host != request.META["HTTP_HOST"]:
+    if redirect_host != host:
         return HttpResponseBadRequest(
             "host in redirect_url and request host doesn't match, login would never work. Host must be: %s"
             % redirect_host,
@@ -49,7 +57,7 @@ def begin_auth(request, org_pk: int):
     auth_session = OAuth2Session(
         client_id=provider.client_id,
         scope=scope,
-        redirect_uri=provider.redirect_url,
+        redirect_uri=redirect_url,
     )
     authorization_url, state = auth_session.authorization_url(
         provider.auth_url,
@@ -93,7 +101,7 @@ def finish_auth(request: HttpRequest):
     )
     auth_session = OAuth2Session(
         client_id=provider.client_id,
-        redirect_uri=provider.redirect_url,
+        redirect_uri=provider.redirect_url(request),
     )
     # Use token response any other way?
     code = request.GET.get("code", "")
@@ -106,6 +114,11 @@ def finish_auth(request: HttpRequest):
     )
     logger.debug("Access token fetched, fetching identity")
     identity_response = auth_session.get(provider.identity_url)
+    if not identity_response.ok:
+        # FIXME: We need to change template or do a redirect here
+        # This probably causes errors if the user need to login
+        return HttpResponse(status=identity_response.status_code)
+
     data = identity_response.json()
     logger.debug("Identity response: %s", data)
     adapted: ProviderResponseAdapter = provider.response_adapter(data)

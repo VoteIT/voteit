@@ -1,6 +1,5 @@
 from contextlib import suppress
 from typing import Optional
-from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -31,17 +30,12 @@ class OrganisationSerializer(serializers.ModelSerializer):
             if instance.provider:
                 return reverse(
                     "begin-auth",
-                    args=[instance.pk],
                     request=self.context.get("request"),
                 )
 
     @staticmethod
     def get_id_host(instance: Organisation) -> Optional[str]:
-        if host := getattr(settings, "ID_HOST", None):
-            return host
-        with suppress(ObjectDoesNotExist):
-            url = urlparse(instance.provider.auth_url)
-            return f"{url.scheme}://{url.netloc}"
+        return settings.ID_HOST
 
     @staticmethod
     def get_scope(instance: Organisation) -> List[str]:

@@ -24,7 +24,7 @@ class OrganisationSerializerTests(TestCase):
         data = serializer.data
         self.assertEqual(data.pop("pk"), self.org.pk)
         self.assertEqual(data.pop("title"), self.org.title)
-        self.assertEqual(data.pop("login_url"), "/begin-auth/1/")
+        self.assertEqual(data.pop("login_url"), "/begin-auth/")
         self.assertEqual(data.pop("scope"), ["email"])
 
     def test_get_with_provider(self):
@@ -33,7 +33,7 @@ class OrganisationSerializerTests(TestCase):
         OAuth2Provider(organisation=self.org)
         serializer = self._cut(self.org)
         data = serializer.data
-        self.assertEqual(data.pop("login_url"), f"/begin-auth/{self.org.pk}/")
+        self.assertEqual(data.pop("login_url"), f"/begin-auth/")
 
     def test_patch(self):
         serializer = self._cut(self.org, {"body": "Bye!"}, partial=True)

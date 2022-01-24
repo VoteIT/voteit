@@ -133,6 +133,6 @@ class ExternalMeetingInviteSerializerTests(TestCase):
     def test_get(self):
         serializer = self._cut(self.invite)
         data = serializer.data
-        self.assertEqual(self.organisation.pk, data["organisation_pk"])
+        self.assertEqual(self.organisation.host, data["organisation_host"])
         self.assertEqual(self.meeting.title, data["meeting_title"])
         self.assertEqual(self.user.pk, data["created_by"])

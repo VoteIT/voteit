@@ -11,13 +11,13 @@ class OrganisationViewSetTests(APITestCase):
 
         # Note on these tests: The host for test client is always 'testserver'
         cls.org: Organisation = Organisation.objects.create(
-            title="Test org", subdomain="testserver"
+            title="Test org", host="testserver"
         )
         cls.manager = cls.org.users.create(username="manager")
         cls.user = cls.org.users.create(username="user")
         cls.org.add_roles(cls.manager, ROLE_ORG_MANAGER)
         cls.other_org: Organisation = Organisation.objects.create(
-            title="Other org", subdomain="other"
+            title="Other org", host="other.voteit.se"
         )
         cls.other_org_user = cls.other_org.users.create(username="other_org_user")
 
@@ -111,7 +111,7 @@ class OrganisationViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual("You're logged in to another organisation", data["detail"])
 
-    def test_list_subdomain_match(self):
+    def test_list_host_match(self):
         self.client.force_login(self.other_org_user)
         url = reverse("organisations-list")
         response = self.client.get(url, SERVER_NAME="other.voteit.se")
@@ -120,7 +120,7 @@ class OrganisationViewSetTests(APITestCase):
         self.assertEqual(1, len(data))
 
     @override_settings(USE_X_FORWARDED_HOST=True)
-    def test_list_subdomain_proxy(self):
+    def test_list_host_proxy(self):
         self.client.force_login(self.other_org_user)
         url = reverse("organisations-list")
         response = self.client.get(url, HTTP_X_FORWARDED_HOST="other.voteit.se")
@@ -128,7 +128,7 @@ class OrganisationViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual(1, len(data))
 
-    def test_list_subdomain_regular_host(self):
+    def test_list_host_regular_host(self):
         self.client.force_login(self.other_org_user)
         url = reverse("organisations-list")
         response = self.client.get(url, HTTP_HOST="other.voteit.se")

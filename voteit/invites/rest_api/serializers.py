@@ -100,7 +100,7 @@ class MeetingInviteSerializer(BaseModelSerializer):
 class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
     """Used when querying from login service."""
 
-    organisation_pk = serializers.SerializerMethodField()
+    organisation_host = serializers.SerializerMethodField()
     meeting_title = serializers.SerializerMethodField()
 
     class Meta:
@@ -114,7 +114,7 @@ class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
             "meeting",
             "meeting_title",
             "modified",
-            "organisation_pk",
+            "organisation_host",
             "pk",
             "roles",
             "send_state",
@@ -125,9 +125,9 @@ class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
         ]
         fields = read_only_fields
 
-    def get_organisation_pk(self, instance: MeetingInvite) -> int:
+    def get_organisation_host(self, instance: MeetingInvite) -> str:
         try:
-            return instance.meeting.organisation.pk
+            return instance.meeting.organisation.host
         except AttributeError:
             # Only unittests!
             pass
