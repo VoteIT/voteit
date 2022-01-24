@@ -65,6 +65,7 @@
     title: Testfixture organisation
     created: 2021-01-28T18:12:28.792Z
     modified: 2021-01-28T18:12:28.792Z
+    host: 127.0.0.1
 - model: organisation.oauth2provider
   pk: 1
   fields:
@@ -74,7 +75,3 @@
     scope: email
     client_id: cid_org1
     client_secret: cs_org1
-    redirect_url: http://127.0.0.1:8000/finish-auth/
-    auth_url: http://id.localhost:8001/o/authorize/
-    token_url: http://localhost:8001/o/token/
-    identity_url: http://localhost:8001/api/identity/

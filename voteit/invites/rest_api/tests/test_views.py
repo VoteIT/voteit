@@ -265,10 +265,10 @@ class UserMatchedInviteViewSetTests(APITestCase):
             organisation=cls.organisation,
             client_id="client_id",
             client_secret="client_secret",
-            redirect_url="https://voteit.se/dummy",
-            auth_url="https://voteit.se/dummy",
-            token_url="https://voteit.se/dummy",
-            identity_url="https://voteit.se/dummy",
+            # redirect_url="https://voteit.se/dummy",
+            # auth_url="https://voteit.se/dummy",
+            # token_url="https://voteit.se/dummy",
+            # identity_url="https://voteit.se/dummy",
         )
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing", organisation=cls.organisation

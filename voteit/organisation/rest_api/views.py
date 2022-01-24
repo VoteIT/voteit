@@ -29,23 +29,20 @@ class OrganisationViewSet(
     queryset = Organisation.objects.all()
     serializer_class = serializers.OrganisationSerializer
 
-    def get_subdomain(self) -> str:
-        host = self.request.get_host()
-        return host.split(":")[0].split(".")[0]
-
     # TODO: Not decided how to host multiple organisations. For now, always return a list of one.
     def get_queryset(self):
-        # Subdomain is forced for authenticated too
+        # Host is forced for authenticated too
+        host = self.request.get_host()
+        hostname = host.split(":")[0]
         if self.request.user.is_authenticated and self.request.user.organisation:
-            subdomain = self.get_subdomain()
-            if subdomain != self.request.user.organisation.subdomain:
+            if hostname != self.request.user.organisation.host:
                 raise AuthenticationFailed(
                     detail=_("You're logged in to another organisation")
                 )
             return self.queryset.filter(
-                pk=self.request.user.organisation.pk, subdomain=subdomain
+                pk=self.request.user.organisation.pk, host=hostname
             )
-        return self.queryset.filter(subdomain=self.get_subdomain())
+        return self.queryset.filter(host=hostname)
 
     def list(self, request, *args, **kwargs):
         """

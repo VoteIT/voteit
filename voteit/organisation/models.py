@@ -10,6 +10,7 @@ from typing import Type
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
+from django.urls import reverse
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from pytz import utc
@@ -52,9 +53,9 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     roles_cls = OrganisationRoles
     title: str = models.CharField(max_length=100)
     body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
-    subdomain: str = models.CharField(
-        verbose_name="Subdomain name, only the text part without dots",
-        max_length=30,
+    host: str = models.CharField(
+        verbose_name="Host name part, excluding ports. For instance: 'meeting.voteit.se'",
+        max_length=60,
         blank=True,
         null=True,
         unique=True,
@@ -108,13 +109,32 @@ class OAuth2Provider(OrganisationContext):
     )
     client_id: str = models.CharField(max_length=100)
     client_secret: str = models.CharField(max_length=200)
-    redirect_url: str = models.URLField()
-    auth_url: str = models.URLField()
-    token_url: str = models.URLField()
-    identity_url: str = models.URLField(
-        verbose_name="Identity URL",
-        help_text="URL that returns Json data that can be used to register the user.",
-    )
+
+    # redirect_url: http://127.0.0.1:8000/finish-auth/
+    # auth_url: http://id.localhost:8001/o/authorize/
+    # token_url: http://localhost:8001/o/token/
+    # identity_url: http://localhost:8001/api/identity/
+
+    def redirect_url(self, request) -> str:
+        path = reverse("finish-auth")
+        return request.build_absolute_uri(path)
+
+    @property
+    def id_backend_host(self):
+        """ ID_BACKEND_HOST only needed in dev """
+        return getattr(settings, 'ID_HOST_BACKEND', settings.ID_HOST)
+
+    @property
+    def auth_url(self) -> str:
+        return f"{self.id_backend_host}/o/authorize/"
+
+    @property
+    def token_url(self) -> str:
+        return f"{self.id_backend_host}/o/token/"
+
+    @property
+    def identity_url(self) -> str:
+        return f"{self.id_backend_host}/api/identity/"
 
     class Meta:
         verbose_name = "OAuth2Provider"

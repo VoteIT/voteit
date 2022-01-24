@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+from django.conf import settings
 
 
 class OrganisationConfig(AppConfig):
@@ -11,3 +12,7 @@ class OrganisationConfig(AppConfig):
         from voteit.organisation import rules
         from voteit.organisation import rest_api
         from voteit.organisation import providers
+
+        assert getattr(
+            settings, "ID_HOST", None
+        ), "ID_HOST required in settings. Specify as http://<url to id server>"
