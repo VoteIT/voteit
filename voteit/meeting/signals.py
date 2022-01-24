@@ -7,6 +7,7 @@ from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
 
+from voteit.core.decorators import on_transaction_commit
 from voteit.core.messages import RolesAdded
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
@@ -62,6 +63,7 @@ def meeting_channel_subscribed(
 
 
 @receiver(post_save, sender=MeetingGroup)
+@on_transaction_commit
 def meeting_group_updated(instance: MeetingGroup = None, created=None, **kw):
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
     data = MeetingGroupSerializer(instance).data
