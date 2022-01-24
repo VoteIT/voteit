@@ -150,5 +150,8 @@ def finish_auth(request: HttpRequest):
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         if settings.DEBUG:
             # For dev environment only, redirect back to Vue JS
-            return HttpResponseRedirect("http://localhost:8080" + state_data.next)
+            hostname = request.get_host().split(":")[0]
+            return HttpResponseRedirect(
+                f"{request.scheme}://{hostname}:8080" + state_data.next
+            )
         return HttpResponseRedirect(state_data.next)
