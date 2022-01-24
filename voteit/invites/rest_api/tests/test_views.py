@@ -181,7 +181,7 @@ class MatchInvitesViewSetTests(APITestCase):
     def _mk_auth(self):
         # credentials = "invite_service:secret"
         # encoded = str(b64encode(credentials.encode("utf-8")), "utf-8")
-        return {"HTTP_AUTHORIZATION": f"api-key xxx"}
+        return {"HTTP_API_KEY": "xxx"}
 
     def test_authenticated_no_payload(self):
         url = reverse("match-invites-query")
