@@ -3,6 +3,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+from voteit.core.testing import FakeCommit
 
 from voteit.meeting.channels import MeetingChannel
 
@@ -98,7 +99,8 @@ class MeetingGroupChangedTests(TestCase):
     def test_added(self, mock_publish):
         from voteit.meeting.messages import MeetingGroupAdded
 
-        group = self.meeting.groups.create()
+        with FakeCommit():
+            group = self.meeting.groups.create()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingGroupAdded)
@@ -108,8 +110,9 @@ class MeetingGroupChangedTests(TestCase):
     def test_changed(self, mock_publish):
         from voteit.meeting.messages import MeetingGroupChanged
 
-        self.group.title = "Hello"
-        self.group.save()
+        with FakeCommit():
+            self.group.title = "Hello"
+            self.group.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingGroupChanged)
