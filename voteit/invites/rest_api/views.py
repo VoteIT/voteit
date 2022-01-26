@@ -130,11 +130,14 @@ class HandleMatchedInvitesViewSet(
 
     def get_queryset(self):
         # bad request if no user org
+        organisation = self.request.user.organisation
+        if organisation is None:
+            raise ValidationError('Organisation required')
         sdata = {}
         for item in self.identity_data["user_data"]:
             values = sdata.setdefault(item["scope"], set())
             values.add(item["data"])
-        return MeetingInvite.objects.find_open_invites(**sdata)
+        return MeetingInvite.objects.find_open_invites(organisation, **sdata)
 
     def get_matching(self, instance: MeetingInvite):
         for item in self.identity_data["user_data"]:

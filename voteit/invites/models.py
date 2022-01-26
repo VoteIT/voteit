@@ -54,8 +54,13 @@ class MeetingInviteManager(models.Manager):
                 "Invite search with indexes that doesn't exist: %s", no_such_data
             )
 
-    def find_open_invites(self, **kw) -> models.QuerySet:
-        return self.find_invites(**kw).filter(state=InviteWf.OPEN)
+    def find_open_invites(self, organisation=None, /, **kw) -> models.QuerySet:
+        qs = self.find_invites(**kw).filter(
+            state=InviteWf.OPEN
+        )
+        if organisation is None:
+            return qs
+        return qs.filter(meeting__organisation=organisation)
 
     def find_invites(self, **kw) -> models.QuerySet:
         """

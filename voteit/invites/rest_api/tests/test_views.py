@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from base64 import b64encode
 from datetime import timedelta
+from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 import responses
@@ -392,3 +393,26 @@ class UserMatchedInviteViewSetTests(APITestCase):
         url = reverse("handle-matched-invites-reject", kwargs={"pk": self.invite2.pk})
         response = self.client.post(url)
         self.assertEqual(404, response.status_code)
+
+    def test_match_organisation(self):
+        from voteit.organisation.models import Organisation
+
+        org = Organisation.objects.create()
+        meeting = org.meetings.create()
+        meeting.invites.create(
+            invite_data="hello@betahaus.net", created_by=self.moderator
+        )
+
+        self.client.force_login(self.outsider)
+        url = reverse("handle-matched-invites-list")
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(1, len(data))
+        self.assertEqual(self.invite.pk, data[0]["pk"])
+
+    def test_no_organisation(self):
+        self.client.force_login(User.objects.create_user('virginia'))
+        url = reverse("handle-matched-invites-list")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
