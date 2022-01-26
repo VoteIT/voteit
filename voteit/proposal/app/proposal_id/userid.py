@@ -19,7 +19,9 @@ class UseridPID(ProposalIDPolicy):
         if proposal.meeting is None or proposal.author is None:
             return None
 
-        if proposal.author.userid:
+        if proposal.meeting_group:
+            base_suggestion = proposal.meeting_group.groupid
+        elif proposal.author.userid:
             base_suggestion = proposal.author.userid
         else:
             base_suggestion = slugify(proposal.author.get_full_name())
@@ -28,14 +30,13 @@ class UseridPID(ProposalIDPolicy):
             meeting_proposals = Proposal.objects.filter(
                 agenda_item__meeting=proposal.meeting
             )
-            author_proposals = meeting_proposals.filter(author=proposal.author)
-            try:
-                last_prop = author_proposals.latest("created")
-                num_part = int(last_prop.prop_id.rsplit("-", 1)[-1])
-            except Proposal.DoesNotExist:
+            matching_prop_ids = meeting_proposals.filter(
+                prop_id__startswith=base_suggestion
+            ).values_list('prop_id', flat=True)
+            if matching_prop_ids:
+                num_part = max(int(prop_id.rsplit("-", 1)[-1]) for prop_id in matching_prop_ids)
+            else:
                 num_part = 0
-            except ValueError:
-                num_part = author_proposals.count()
             for i in itertools.count(num_part + 1):
                 suggestion = f"{base_suggestion}-{i}"
                 if not meeting_proposals.filter(prop_id=suggestion).exists():
