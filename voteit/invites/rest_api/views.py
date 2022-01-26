@@ -129,6 +129,7 @@ class HandleMatchedInvitesViewSet(
         return get_identity_data(self.request.user)
 
     def get_queryset(self):
+        # bad request if no user org
         sdata = {}
         for item in self.identity_data["user_data"]:
             values = sdata.setdefault(item["scope"], set())

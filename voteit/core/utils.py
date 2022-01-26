@@ -314,20 +314,16 @@ def generate_valid_userid(user: AbstractUser) -> Optional[str]:
     """
     from voteit.core.validators import valid_userid  # Avoid circular
 
-    name = f"{user.first_name} {user.last_name}".strip()
-    slugified_name = slugify(name)
     try:
-        slugified_name = valid_userid(slugified_name)
+        slugified_name = suggestion = valid_userid(slugify(user.get_full_name()))
     except ValueError:
         # Log bad names?
         return None
+    # User organisation user manager, or alla users if no organisation (testing purposes)
+    user_manager = user.__class__.objects if user.organisation is None else user.organisation.users
     # Omit the current user
-    base_qs = user.__class__.objects.filter(~Q(pk=user.pk))
-    if not base_qs.filter(userid=slugified_name).exists():
-        return slugified_name
-    # Try finding something
+    base_qs = user_manager.exclude(pk=user.pk)
     for i in range(10):
-        suffix = str(randint(1, 9999))
-        suggestion = f"{slugified_name}-{suffix}"
         if not base_qs.filter(userid=suggestion).exists():
             return suggestion
+        suggestion = f"{slugified_name}-{randint(1, 9999)}"

@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
 
+from voteit.organisation.models import Organisation
+
 User = get_user_model()
 
 evil_text_snippet = """
@@ -47,6 +49,10 @@ class GenerateValidUseridTests(TestCase):
         self.user = User.objects.create(
             username="jeff", first_name="Jeff", last_name="Benzies"
         )
+        self.org_user = User.objects.create(
+            username="virginia", first_name="Virginia", last_name="Woolf",
+            organisation=Organisation.objects.create(title="King's College")
+        )
 
     @property
     def _fut(self):
@@ -59,13 +65,19 @@ class GenerateValidUseridTests(TestCase):
 
     def test_generate_omit_current_user(self):
         self.user.userid = "jeff-benzies"
+        self.user.save()
         self.assertEqual(self._fut(self.user), "jeff-benzies")
 
     def test_already_exists(self):
-        other = User.objects.create(
+        User.objects.create(
             username="other",
             first_name="Jeff",
             last_name="Benzies",
             userid="jeff-benzies",
         )
         self.assertNotEqual(self._fut(self.user), "jeff-benzies")
+
+    def test_generate_with_org(self):
+        self.user.userid = "virginia-woolf"
+        self.user.save()
+        self.assertEqual(self._fut(self.org_user), "virginia-woolf")
