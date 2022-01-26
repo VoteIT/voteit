@@ -117,3 +117,37 @@ class ManagerTests(TestCase):
         new_org = Organisation.objects.create()
         new_org_user = new_org.users.create(username="new_org_user")
         self.assertEqual(0, self.Meeting.objects.for_user(new_org_user).count())
+
+
+class MeetingGroupTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.organisation = Organisation.objects.create()
+        cls.meetings = [cls.organisation.meetings.create() for _ in range(2)]
+
+    @property
+    def Meeting(self):
+        from voteit.meeting.models import Meeting
+
+        return Meeting
+
+    @property
+    def MeetingGroup(self):
+        from voteit.meeting.models import MeetingGroup
+
+        return MeetingGroup
+
+    def test_unique_in_group(self):
+        group1 = self.meetings[0].groups.create(title="King's College")
+        group2 = self.meetings[1].groups.create(title="King's College")
+        group3 = self.meetings[0].groups.create(title="King's Cóllege")
+        self.assertEqual(group1.groupid, 'kings-college')
+        self.assertEqual(group2.groupid, 'kings-college')
+        self.assertEqual(group3.groupid, 'kings-college-1')
+
+    def test_unique_with_userid(self):
+        self.organisation.users.create(
+            first_name="King's", last_name="College", username="the-kings", userid="kings-college"
+        )
+        group = self.MeetingGroup.objects.create(title="King's College", meeting=self.meetings[0])
+        self.assertEqual(group.groupid, 'kings-college-1')

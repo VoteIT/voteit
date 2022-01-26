@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from datetime import datetime
 from datetime import timedelta
+from itertools import count
 from logging import getLogger
 from typing import Generator
 from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.db import transaction
 from django.utils import timezone
 from django.utils.functional import cached_property
+from django.utils.text import slugify
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
@@ -23,6 +26,7 @@ from voteit.core.fields import RichTextField
 from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
+from voteit.core.models import User
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.utils import relaxed_clean_html
 from voteit.meeting.permissions import MeetingPermissions
@@ -36,7 +40,6 @@ if TYPE_CHECKING:
     from voteit.poll.models import ElectoralRegister
     from voteit.poll.abcs import ElectoralRegisterPolicy
     from voteit.organisation.models import Organisation
-    from voteit.core.models import User
     from voteit.participant_number.models import PNSystem
     from voteit.presence.models import PresenceSystem
     from voteit.presence.models import PresenceCheck
@@ -253,12 +256,34 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
 class MeetingGroup(BaseContent, MeetingContext):
     name: str = "meeting_group"
     title: str = models.CharField(max_length=100, default="")
+    groupid: str = models.CharField(max_length=100, null=True)
     meeting: Meeting = models.ForeignKey(
         "Meeting", on_delete=models.CASCADE, related_name="groups"
     )
     members = models.ManyToManyField(
         settings.AUTH_USER_MODEL, blank=True, related_name="meeting_groups"
     )
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.groupid is None:
+            if self.meeting.organisation is None:             # For testing
+                user_qs = User.objects.all()
+            else:
+                user_qs = self.meeting.organisation.users.all()
+            group_qs = self.meeting.groups.all()
+            base = groupid = slugify(self.title)
+            for i in count(1):
+                if not (user_qs.filter(userid=groupid).exists() or group_qs.filter(groupid=groupid).exists()):
+                    self.groupid = groupid
+                    break
+                groupid = f"{base}-{i}"
+        super().save(force_insert, force_update, using, update_fields)
+
+    class Meta:
+        constraints = (
+            models.UniqueConstraint(fields=("groupid", "meeting"), name="unique_meeting_id"),
+        )
+
     # Type annotations - relations
     proposals: models.QuerySet
     discussions: models.QuerySet

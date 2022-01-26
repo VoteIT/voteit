@@ -15,9 +15,8 @@ from bleach import ALLOWED_TAGS
 from bleach import Cleaner
 from bs4 import BeautifulSoup
 from django.db.models import Model
-from django.db.models import Q
-from django.db.transaction import get_connection
 from django.utils.text import slugify
+
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -312,18 +311,23 @@ def generate_valid_userid(user: AbstractUser) -> Optional[str]:
     """
     Try to generate a valid userid for a specific user. In case one can't be found safely, simply return None
     """
-    from voteit.core.validators import valid_userid  # Avoid circular
+    # Avoid circular
+    from voteit.core.validators import valid_userid
+    from voteit.meeting.models import MeetingGroup
 
     try:
         slugified_name = suggestion = valid_userid(slugify(user.get_full_name()))
     except ValueError:
         # Log bad names?
         return None
-    # User organisation user manager, or alla users if no organisation (testing purposes)
-    user_manager = user.__class__.objects if user.organisation is None else user.organisation.users
-    # Omit the current user
-    base_qs = user_manager.exclude(pk=user.pk)
+    # Create base querysets
+    if user.organisation is None:                                # For testing
+        user_qs = user.__class__.objects.exclude(pk=user.pk)     # Omit current user
+        group_qs = MeetingGroup.objects.all()
+    else:
+        user_qs = user.organisation.users.exclude(pk=user.pk)    # Omit current user
+        group_qs = MeetingGroup.objects.filter(meeting__organisation=user.organisation)
     for i in range(10):
-        if not base_qs.filter(userid=suggestion).exists():
+        if not (user_qs.filter(userid=suggestion).exists() or group_qs.filter(groupid=suggestion).exists()):
             return suggestion
         suggestion = f"{slugified_name}-{randint(1, 9999)}"
