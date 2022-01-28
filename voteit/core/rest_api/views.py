@@ -43,10 +43,8 @@ class UserSearchViewSet(ModelContextMixin, viewsets.ReadOnlyModelViewSet):
         - moderators: all meeting participants
         """
         user = self.request.user
-        if user.is_superuser:
-            return UserModel.objects.all()
-        elif user.has_perm(OrgPermissions.MANAGE, user.organisation):
-            return UserModel.objects.filter(organisation=user.organisation)
+        if user.is_superuser or user.has_perm(OrgPermissions.MANAGE, user.organisation):
+            return user.organisation.users.all()
         # Method will raise 404 if meeting doesn't exist
         meeting = self.get_context(self.request)
         if user.has_perm(MeetingPermissions.MODERATE, meeting):

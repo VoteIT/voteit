@@ -224,11 +224,11 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     class QuerySet(models.QuerySet):
         def for_user(self, user: User):
             if user.is_superuser:
-                return self.all()
+                return user.organisation.meetings.all()
             if user.organisation is None:
                 return self.none()
             return (
-                self.filter(organisation=user.organisation)
+                user.organisation.meetings
                 .filter(models.Q(public=True) | models.Q(participants=user))
                 .distinct()
             )

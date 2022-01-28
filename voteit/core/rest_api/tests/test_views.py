@@ -28,7 +28,7 @@ class UserSearchViewSetTests(APITestCase):
         cls.other_org_manager = cls.other_org.users.create(username="other_org_manager")
         cls.other_org.add_roles(cls.other_org_manager, "org_manager")
         # And superuser
-        cls.superuser = User.objects.create(username="super", is_superuser=True)
+        cls.superuser = User.objects.create(username="super", is_superuser=True, organisation=cls.other_org)
 
     def test_list_superuser(self):
         url = reverse("users-list")
@@ -36,7 +36,7 @@ class UserSearchViewSetTests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
         data = response.json()
-        self.assertEqual(6, len(data))
+        self.assertEqual(3, len(data))
 
     def test_list_moderator_unspecified_context(self):
         url = reverse("users-list")
