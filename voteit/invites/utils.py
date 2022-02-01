@@ -5,6 +5,7 @@ from logging import getLogger
 from typing import Optional
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.db import transaction
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
@@ -50,38 +51,30 @@ def create_invites(created_by: User = None, **kwargs):
     added = []
     changed = []
     skipped_count = 0
-    i = 1
-    for row in add_data.invite_data:
+    for i, row in enumerate(add_data.invite_data, 1):
         invite_qs = meeting.invites.find_invites(**{add_data.type: row})
         if invite_qs.exists():
-            # First filter out excludable
-            invite_qs = invite_qs.exclude(state__in=add_data.skip_states)
-            if not invite_qs.exists():
+            try:
+                # First filter out excludable
+                invite: MeetingInvite = invite_qs.exclude(state__in=add_data.skip_states).get()
+            except ObjectDoesNotExist:
                 skipped_count += 1
                 continue
             # Do we hit multiple active invites?
-            if invite_qs.count() > 1:
+            except MultipleObjectsReturned:
                 raise InviteError(
-                    _(
-                        "Data on row %(row)s matched different invites that already exist. You need to clear them first."
-                    )
-                    % {"row": i}
+                    f"Data on row {i} matched different invites that already exist. You need to clear them first."
                 )
 
             # So we need to update this single existing invite and set permissions according to the new state
-            invite: MeetingInvite = invite_qs.first()
             user: Optional[User] = invite.used_by
             if user:
                 # Adjust existing roles
                 requested_roles = set(invite.roles)
-                current_roles = meeting.get_roles(user)
-                if not current_roles:
-                    current_roles = set()
-                remove_roles = requested_roles - current_roles
-                if remove_roles:
+                current_roles = meeting.get_roles(user) or set()
+                if remove_roles := requested_roles - current_roles:
                     meeting.remove_roles(user, *remove_roles)
-                add_roles = current_roles - requested_roles
-                if add_roles:
+                if add_roles := current_roles - requested_roles:
                     meeting.add_roles(user, *add_roles)
             # Update invite
             invite.invite_data = row
@@ -98,7 +91,6 @@ def create_invites(created_by: User = None, **kwargs):
                 last_modified_by=created_by,
             )
             added.append(invite.pk)
-        i += 1
     return added, changed, skipped_count
 
 
