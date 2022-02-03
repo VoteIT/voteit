@@ -1,5 +1,7 @@
+import logging
 from abc import ABC
 from abc import abstractmethod
+from logging import getLogger
 from typing import Dict
 
 from django.contrib.contenttypes.models import ContentType
@@ -17,6 +19,8 @@ from rest_framework.serializers import Serializer
 from voteit.core.rest_api.serializers import FSMTransitionSerializer
 from voteit.core.rest_api.serializers import TransitionSerializer
 from voteit.core.utils import get_permission_registry
+
+logger = getLogger(__name__)
 
 
 def perm_denied_msg(perm, obj):
@@ -125,6 +129,21 @@ class SerializerClassesMixin:
         if self.name == "Transition action":
             return Serializer
         return self.serializer_classes.get(self.action, self.serializer_class)
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Make sure subclasses that have 'update' specified also have 'partial_update'
+        """
+        if (
+            "update" in cls.serializer_classes
+            and "partial_update" not in cls.serializer_classes
+        ):
+            logger.warning(
+                "%s has 'update' in serializer_classes, but not 'partial_update'. "
+                "Adding serializer to partial update too.",
+                cls,
+            )
+            cls.serializer_classes["partial_update"] = cls.serializer_classes["update"]
 
 
 class ModelContextMixin(ABC):

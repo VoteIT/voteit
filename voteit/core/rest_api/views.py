@@ -60,6 +60,7 @@ class UserView(TransitionsMixin, mixins.UpdateModelMixin, viewsets.GenericViewSe
     serializer_classes = {
         "logout": serializers.Serializer,
         "update": UpdateUserSerializer,
+        "partial_update": UpdateUserSerializer,
     }
 
     def get_queryset(self):
