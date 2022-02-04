@@ -1,3 +1,4 @@
+from itertools import chain
 from typing import Optional
 from typing import Union
 
@@ -49,13 +50,13 @@ class MeetingExport:
     def select_fields(self) -> Optional[Set[str]]:
         if self.ignore_fields:
             concrete_model = self.model._meta.concrete_model
-            return set(
-                [
-                    x.name
-                    for x in concrete_model._meta.fields
-                    if x.name not in self.ignore_fields
-                ]
-            )
+            result = set()
+            for f in chain(
+                concrete_model._meta.fields, concrete_model._meta.local_many_to_many
+            ):
+                if f.name not in self.ignore_fields:
+                    result.add(f.name)
+            return result
 
 
 DEFAULT_IGNORE_FIELDS = (

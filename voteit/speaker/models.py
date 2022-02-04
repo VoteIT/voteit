@@ -57,6 +57,8 @@ class SpeakerSystemRoles(Roles, MeetingContext):
     class Meta:
         verbose_name = verbose_name_plural = _("Speaker system roles")
 
+    exporters = {"meeting": {"meeting_kw": "context__meeting"}}
+
 
 class SpeakerListSystem(RoleContextMixin, MeetingContext):
     """All speaker list things relate here, while this in turn might relate to a meeting.
@@ -106,7 +108,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     )
 
     roles_cls = SpeakerSystemRoles
-    exporters = {"meeting": {}}
+    exporters = {"meeting": {"ignore_fields": ("active_list",)}}
 
     def get_method_class(self) -> Type[ListMethod]:
         """Fetch the poll method class, a django proxy model."""
@@ -290,6 +292,13 @@ class SpeakerList(AgendaItemContext, MeetingContext):
     speakers = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through=Speaker, related_name="speaker_lists"
     )
+
+    exporters = {
+        "meeting": {
+            "meeting_kw": "speaker_system__meeting",
+            "ignore_fields": ["current"],
+        }
+    }
 
     @property
     def meeting(self) -> Optional[Meeting]:
