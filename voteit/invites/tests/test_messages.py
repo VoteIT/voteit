@@ -8,6 +8,7 @@ from django.core import mail
 from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
+from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.core.workflows import SendWf
 
@@ -45,7 +46,8 @@ class AddInvitesTests(TestCase):
         for name in ["one", "two", "three"]:
             data.append(f"{name}@betahaus.net")
         msg = self._mk_one(invite_data=data, roles=["participant"])
-        response = msg.run_job()
+        with FakeCommit():
+            response = msg.run_job()
         self.assertEqual(3, len(response.data.added))
         self.assertEqual(0, len(response.data.changed))
         self.assertEqual(0, response.data.skipped_count)
@@ -84,7 +86,8 @@ class AddInvitesTests(TestCase):
         msg = self._mk_one(
             user_pk=moderator.pk, invite_data=data, roles=["participant"]
         )
-        response = msg.run_job()
+        with FakeCommit():
+            response = msg.run_job()
         self.assertEqual(1, len(response.data.added))
         self.assertEqual(1, len(response.data.changed))
         self.assertEqual(1, response.data.skipped_count)
@@ -143,7 +146,8 @@ class SendInvitesTests(TestCase):
         from voteit.invites.messages import MeetingInviteChanged
 
         msg = self._mk_one()
-        msg.run_job()
+        with FakeCommit():
+            msg.run_job()
         self.assertTrue(mock_publish.called)
 
         messages = [
@@ -171,7 +175,8 @@ class SendInvitesTests(TestCase):
         self.inv1.save()
         mock_publish.reset_mock()
         msg = self._mk_one()
-        msg.run_job()
+        with FakeCommit():
+            msg.run_job()
         self.assertTrue(mock_publish.called)
         messages = [
             x

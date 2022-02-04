@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.meeting.models import Meeting
 from voteit.messaging.messages.channels import Subscribe
@@ -84,9 +85,10 @@ class MeetingInviteSignalTests(TestCase):
         from voteit.invites.messages import MeetingInviteAdded
 
         self.assertFalse(mock_publish.called)
-        invite = self.meeting.invites.create(
-            invite_data="hello@betahaus.net", created_by=self.moderator
-        )
+        with FakeCommit():
+            invite = self.meeting.invites.create(
+                invite_data="hello@betahaus.net", created_by=self.moderator
+            )
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingInviteAdded)
@@ -97,8 +99,9 @@ class MeetingInviteSignalTests(TestCase):
         from voteit.invites.messages import MeetingInviteChanged
 
         self.assertFalse(mock_publish.called)
-        self.invite.roles = ["participant", "moderator"]
-        self.invite.save()
+        with FakeCommit():
+            self.invite.roles = ["participant", "moderator"]
+            self.invite.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingInviteChanged)
