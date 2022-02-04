@@ -5,7 +5,6 @@ from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
-from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
 from django.db import models
 from django.utils.functional import cached_property
@@ -138,6 +137,8 @@ class PresenceSystem(MeetingContext):
     meeting: Optional[Meeting] = models.OneToOneField(
         Meeting, on_delete=models.CASCADE, null=True, related_name="presence_system"
     )
+
+    exporters = {"meeting": {}}
 
     def __str__(self):
         return f"Presence system ({self.pk})"

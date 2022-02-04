@@ -18,6 +18,7 @@ from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.managers import AutoInheritanceManager
 from voteit.core.models import BaseContent
+from voteit.core.exporters.meeting import MeetingExport
 from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
 from voteit.reactions.mixins import Reactable
@@ -77,6 +78,8 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
             )
         ]
 
+    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
+
     @transition(
         field=state,
         source=ProposalWf.PUBLISHED,
@@ -134,7 +137,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         field=state,
         source="+",
         target=ProposalWf.PUBLISHED,
-        permission=ProposalPermissions.CHANGE
+        permission=ProposalPermissions.CHANGE,
     )
     def publish(self):
         """Reset proposal back to published."""
@@ -193,6 +196,8 @@ class TextDocument(AgendaItemContext, MeetingContext):
         related_name="text_documents",
         null=True,  # Normally no, forced in serializer
     )
+
+    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
 
     @property
     def meeting(self) -> Optional[Meeting]:
@@ -273,6 +278,8 @@ class TextParagraph(AgendaItemContext, MeetingContext):
         null=True,  # Normally no, forced in serializer
     )
 
+    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
+
     @property
     def tag(self):
         return f"{self.text_document.base_tag}-{self.paragraph_id}"
@@ -313,6 +320,8 @@ class DiffProposal(Proposal):
     paragraph: TextParagraph = models.ForeignKey(
         TextParagraph, on_delete=models.PROTECT, related_name="proposals"
     )
+
+    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
 
     def save(self, **kw):
         """

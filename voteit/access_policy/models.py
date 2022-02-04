@@ -26,6 +26,7 @@ class AccessPolicy(MeetingContext):
         on_delete=models.CASCADE,
         related_name="%(app_label)s_%(class)s",
     )
+    exporters = {"meeting": {}}
 
     class Meta:
         abstract = True

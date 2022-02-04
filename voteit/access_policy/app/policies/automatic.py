@@ -10,6 +10,8 @@ from voteit.access_policy.models import AccessPolicy
 from voteit.access_policy.registries import access_policies
 
 __all__ = ["AutomaticAccess"]
+
+
 logger = getLogger(__name__)
 
 
@@ -22,6 +24,8 @@ class AutomaticAccess(AccessPolicy):
     name: str = "automatic"
     title: str = _("Give users access automatically")
     roles_given: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
+
+    exporters = {"meeting": {}}
 
     def assign(self, user: AbstractUser):
         if self.roles_given:

@@ -43,11 +43,10 @@ class DiscussionPost(
         related_name="discussions",
     )
 
+    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
+
     @property
     def meeting(self) -> Optional[Meeting]:
-        """ While not directly related, it still good to be able to do lookups this way"""
+        """While not directly related, it still good to be able to do lookups this way"""
         if self.agenda_item:
             return self.agenda_item.meeting
-
-
-calla = Callable[[int, bool], str]

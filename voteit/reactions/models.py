@@ -69,6 +69,8 @@ class ReactionButton(MeetingContext):
         blank=True,
     )
 
+    exporters = {"meeting": {}}
+
     class Meta:
         verbose_name = _("Reaction button")
         verbose_name_plural = _("Reaction buttons")

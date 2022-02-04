@@ -106,6 +106,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     )
 
     roles_cls = SpeakerSystemRoles
+    exporters = {"meeting": {}}
 
     def get_method_class(self) -> Type[ListMethod]:
         """Fetch the poll method class, a django proxy model."""

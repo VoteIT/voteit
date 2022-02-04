@@ -69,6 +69,8 @@ class MeetingRoles(Roles, MeetingContext):
     class Meta:
         verbose_name = verbose_name_plural = _("Meeting roles")
 
+    exporters = {"meeting": {"meeting_kw": "context"}}
+
 
 class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext):
     name = "meeting"
@@ -111,6 +113,17 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     participants = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through=MeetingRoles
     )
+
+    exporters = {
+        "meeting": {
+            "meeting_kw": "pk",
+            "ignore_fields": (
+                "archive_after",
+                "start_time",
+                "end_time",
+            ),
+        }
+    }
 
     @cached_property
     def pid_policy(self) -> ElectoralRegisterPolicy:
@@ -227,11 +240,9 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
                 return user.organisation.meetings.all()
             if user.organisation is None:
                 return self.none()
-            return (
-                user.organisation.meetings
-                .filter(models.Q(public=True) | models.Q(participants=user))
-                .distinct()
-            )
+            return user.organisation.meetings.filter(
+                models.Q(public=True) | models.Q(participants=user)
+            ).distinct()
 
     class Manager(models.Manager):
         def get_queryset(self):
@@ -264,16 +275,21 @@ class MeetingGroup(BaseContent, MeetingContext):
         settings.AUTH_USER_MODEL, blank=True, related_name="meeting_groups"
     )
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def save(
+        self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
         if self.groupid is None:
-            if self.meeting.organisation is None:             # For testing
+            if self.meeting.organisation is None:  # For testing
                 user_qs = User.objects.all()
             else:
                 user_qs = self.meeting.organisation.users.all()
             group_qs = self.meeting.groups.all()
             base = groupid = slugify(self.title)
             for i in count(1):
-                if not (user_qs.filter(userid=groupid).exists() or group_qs.filter(groupid=groupid).exists()):
+                if not (
+                    user_qs.filter(userid=groupid).exists()
+                    or group_qs.filter(groupid=groupid).exists()
+                ):
                     self.groupid = groupid
                     break
                 groupid = f"{base}-{i}"
@@ -281,8 +297,12 @@ class MeetingGroup(BaseContent, MeetingContext):
 
     class Meta:
         constraints = (
-            models.UniqueConstraint(fields=("groupid", "meeting"), name="unique_meeting_id"),
+            models.UniqueConstraint(
+                fields=("groupid", "meeting"), name="unique_meeting_id"
+            ),
         )
+
+    exporters = {"meeting": {}}
 
     # Type annotations - relations
     proposals: models.QuerySet
