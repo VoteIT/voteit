@@ -17,10 +17,11 @@ from bs4 import BeautifulSoup
 from django.db.models import Model
 from django.utils.text import slugify
 
-
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from voteit.core.permissions import PermissionRegistry
+    from voteit.core.registries import ContentRegistry
+
 
 _tag_pattern = re.compile(r"#([\w\-]+)")
 # FIXME: Do a proper regex. I'm crappy with this /rho
@@ -210,7 +211,7 @@ def relaxed_clean_html(text: str):
     return cleaner.clean(text)
 
 
-def get_content_registry():
+def get_content_registry() -> ContentRegistry:
     from .registries import content_types
 
     return content_types
@@ -321,13 +322,16 @@ def generate_valid_userid(user: AbstractUser) -> Optional[str]:
         # Log bad names?
         return None
     # Create base querysets
-    if user.organisation is None:                                # For testing
-        user_qs = user.__class__.objects.exclude(pk=user.pk)     # Omit current user
+    if user.organisation is None:  # For testing
+        user_qs = user.__class__.objects.exclude(pk=user.pk)  # Omit current user
         group_qs = MeetingGroup.objects.all()
     else:
-        user_qs = user.organisation.users.exclude(pk=user.pk)    # Omit current user
+        user_qs = user.organisation.users.exclude(pk=user.pk)  # Omit current user
         group_qs = MeetingGroup.objects.filter(meeting__organisation=user.organisation)
     for i in range(10):
-        if not (user_qs.filter(userid=suggestion).exists() or group_qs.filter(groupid=suggestion).exists()):
+        if not (
+            user_qs.filter(userid=suggestion).exists()
+            or group_qs.filter(groupid=suggestion).exists()
+        ):
             return suggestion
         suggestion = f"{slugified_name}-{randint(1, 9999)}"
