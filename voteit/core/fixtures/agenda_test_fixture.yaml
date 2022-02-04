@@ -31,3 +31,18 @@
     meeting: 1
     order: 3
     state: private
+- model: proposal.proposal
+  pk: 1
+  fields:
+    body: as long as they're vegetarian
+    created: 2021-01-28T18:12:28.792Z
+    modified: 2021-01-28T18:12:28.792Z
+    agenda_item: 1
+    meeting_group: 1
+- model: meeting.meetinggroup
+  pk: 1
+  fields:
+    title: The Hellos
+    created: 2021-01-28T18:12:28.792Z
+    modified: 2021-01-28T18:12:28.792Z
+    meeting: 1

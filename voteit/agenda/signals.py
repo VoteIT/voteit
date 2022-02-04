@@ -30,7 +30,7 @@ from voteit.proposal.models import Proposal
 def participants_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    """ Send non-private agenda items to regular users. """
+    """Send non-private agenda items to regular users."""
     app_state.append_from_queryset(
         context.agenda_items.exclude(state=AgendaItemWf.PRIVATE),
         AgendaItemSerializer,
@@ -42,7 +42,7 @@ def participants_channel_subscribed(
 def moderators_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    """ Send all agenda items"""
+    """Send all agenda items"""
     app_state.append_from_queryset(
         context.agenda_items.all(),
         AgendaItemSerializer,
@@ -121,4 +121,8 @@ def mark_ai_as_updated(instance: AgendaItemContext, created=None, **kwargs):
 @receiver(post_delete, sender=Proposal)
 def revert_to_last_updated(instance: AgendaItemContext, **kwargs):
     if instance.agenda_item is not None:
+        try:
+            instance.agenda_item.refresh_from_db(fields=["pk"])
+        except AgendaItem.DoesNotExist:
+            return
         instance.agenda_item.revert_to_last_related_modified()
