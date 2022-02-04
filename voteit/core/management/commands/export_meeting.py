@@ -13,7 +13,7 @@ from voteit.meeting.models import Meeting
 
 
 class Command(BaseCommand):
-    help = "Dump meeting"
+    help = "Export meeting"
 
     def add_arguments(self, parser):
         parser.add_argument("-m", help="Meeting primary key")

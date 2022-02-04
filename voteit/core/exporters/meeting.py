@@ -1,5 +1,7 @@
 from typing import Optional
+from typing import Union
 
+from django.db.models import Model
 from django.db.models import QuerySet
 from typing import List
 
@@ -8,8 +10,10 @@ from typing import Set
 from typing import Generator
 
 from django.utils.functional import cached_property
+from typing import Iterator
 from voteit.core.utils import get_content_registry
 from voteit.core.utils import get_model_by_shortname
+from voteit.core.utils import get_model_shortname
 
 
 class MeetingExport:
@@ -47,9 +51,9 @@ class MeetingExport:
             concrete_model = self.model._meta.concrete_model
             return set(
                 [
-                    x.attname
-                    for x in concrete_model._meta.local_fields
-                    if x.attname not in self.ignore_fields
+                    x.name
+                    for x in concrete_model._meta.fields
+                    if x.name not in self.ignore_fields
                 ]
             )
 
@@ -74,6 +78,7 @@ class MeetingExporters:
         assert isinstance(meeting, int)
         self.meeting = meeting
         self.ignore_fields = ignore_fields
+        self._data = None
 
     @staticmethod
     def get_exportable_models():
@@ -86,11 +91,23 @@ class MeetingExporters:
     def get_object_count(self) -> int:
         return sum([len(x) for x in self])
 
-    def __iter__(self) -> Generator:
-        for model in self.get_exportable_models():
-            yield MeetingExport(
-                model,
-                meeting=self.meeting,
-                global_ignore_fields=self.ignore_fields,
-                **model.exporters["meeting"],
-            )
+    @property
+    def data(self) -> dict:
+        if self._data is None:
+            self._data = {}
+            for model in self.get_exportable_models():
+                self._data[get_model_shortname(model)] = MeetingExport(
+                    model,
+                    meeting=self.meeting,
+                    global_ignore_fields=self.ignore_fields,
+                    **model.exporters["meeting"],
+                )
+        return self._data
+
+    def __iter__(self) -> Iterator[MeetingExport]:
+        return iter(self.data.values())
+
+    def __getitem__(self, item: Union[str, Model]) -> MeetingExport:
+        if isinstance(item, Model):
+            item = get_model_shortname(item)
+        return self.data[item]
