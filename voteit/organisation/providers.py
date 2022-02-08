@@ -39,13 +39,7 @@ class IDProxy(ProviderResponseAdapter):
             parsed = urlparse(img_url)
             if parsed.scheme in _allowed_url_schemes:
                 user.img_url = img_url
-        user_data = self.response.get("user_data", None)
-        emails = set()
-        if user_data is not None:
-            # Handle all scopes here
-            for item in user_data:
-                if item["scope"] == "email":
-                    emails.add(item["data"])
+        emails = self.get_emails()
         if emails and user.email not in emails:
             # Any correct email is better than a falsy one...
             user.email = emails.pop()

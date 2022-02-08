@@ -49,3 +49,17 @@ class ProviderResponseAdapter(ABC):
         users = self.User.objects.filter(identity_id=self.identity_id).all()
         users = list(users)
         return users and users or default
+
+    def get_emails(self):
+        user_data = self.response.get("user_data", None)
+        emails = set()
+        if user_data is not None:
+            # Handle all scopes here
+            for item in user_data:
+                if item["scope"] == "email":
+                    emails.add(item["data"])
+        return emails
+
+    def get_inheritable_users(self):
+        emails = self.get_emails()
+        return list(self.User.objects.filter(email__in=emails))
