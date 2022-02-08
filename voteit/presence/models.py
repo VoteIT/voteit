@@ -139,6 +139,7 @@ class PresenceSystem(MeetingContext):
     )
 
     exporters = {"meeting": {}}
+    importers = {"meeting": {}}
 
     def __str__(self):
         return f"Presence system ({self.pk})"

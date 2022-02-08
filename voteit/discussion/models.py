@@ -44,6 +44,7 @@ class DiscussionPost(
     )
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
+    importers = {"meeting": {}}
 
     @property
     def meeting(self) -> Optional[Meeting]:

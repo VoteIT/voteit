@@ -58,6 +58,7 @@ class SpeakerSystemRoles(Roles, MeetingContext):
         verbose_name = verbose_name_plural = _("Speaker system roles")
 
     exporters = {"meeting": {"meeting_kw": "context__meeting"}}
+    importers = {"meeting": {"remap_relations": {"speaker_system": "context"}}}
 
 
 class SpeakerListSystem(RoleContextMixin, MeetingContext):
@@ -109,6 +110,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
 
     roles_cls = SpeakerSystemRoles
     exporters = {"meeting": {"ignore_fields": ("active_list",)}}
+    importers = {"meeting": {}}
 
     def get_method_class(self) -> Type[ListMethod]:
         """Fetch the poll method class, a django proxy model."""
@@ -299,6 +301,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
             "ignore_fields": ["current"],
         }
     }
+    importers = {"meeting": {}}
 
     @property
     def meeting(self) -> Optional[Meeting]:

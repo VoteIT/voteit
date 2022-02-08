@@ -70,6 +70,8 @@ class ReactionButton(MeetingContext):
     )
 
     exporters = {"meeting": {}}
+    importers = {"meeting": {}}
+
 
     class Meta:
         verbose_name = _("Reaction button")

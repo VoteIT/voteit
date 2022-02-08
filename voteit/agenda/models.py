@@ -62,6 +62,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         )
 
     exporters = {"meeting": {}}
+    importers = {"meeting": {}}
 
     def save(self, **kw):
         """Set order as last agenda item for meeting when creating."""

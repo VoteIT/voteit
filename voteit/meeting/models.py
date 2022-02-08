@@ -70,6 +70,7 @@ class MeetingRoles(Roles, MeetingContext):
         verbose_name = verbose_name_plural = _("Meeting roles")
 
     exporters = {"meeting": {"meeting_kw": "context"}}
+    importers = {"meeting": {"remap_relations": {"meeting": "context"}}}
 
 
 class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext):
@@ -124,6 +125,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
             ),
         }
     }
+    importers = {"meeting": {}}
 
     @cached_property
     def pid_policy(self) -> ElectoralRegisterPolicy:
@@ -303,6 +305,7 @@ class MeetingGroup(BaseContent, MeetingContext):
         )
 
     exporters = {"meeting": {}}
+    importers = {"meeting": {}}
 
     # Type annotations - relations
     proposals: models.QuerySet

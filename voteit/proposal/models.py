@@ -18,7 +18,6 @@ from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.managers import AutoInheritanceManager
 from voteit.core.models import BaseContent
-from voteit.core.exporters.meeting import MeetingExport
 from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
 from voteit.reactions.mixins import Reactable
@@ -79,6 +78,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         ]
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
+    importers = {"meeting": {}}
 
     @transition(
         field=state,
@@ -198,6 +198,7 @@ class TextDocument(AgendaItemContext, MeetingContext):
     )
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
+    importers = {"meeting": {}}
 
     @property
     def meeting(self) -> Optional[Meeting]:
@@ -279,6 +280,7 @@ class TextParagraph(AgendaItemContext, MeetingContext):
     )
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
+    importers = {"meeting": {}}
 
     @property
     def tag(self):
@@ -322,6 +324,7 @@ class DiffProposal(Proposal):
     )
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
+    importers = {"meeting": {}}
 
     def save(self, **kw):
         """
