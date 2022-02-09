@@ -21,5 +21,5 @@ class BugReportSerializer(serializers.ModelSerializer):
         return super().create({
             **validated_data,
             'user': user,
-            'user_roles': meeting.get_roles(user)
+            'user_roles': tuple(meeting.get_roles(user))          # Roles at time of bug report
         })
