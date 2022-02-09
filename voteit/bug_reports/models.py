@@ -36,6 +36,9 @@ class BugReport(MeetingContext):
         verbose_name_plural = "Bug reports"
         ordering = "-created",
 
+    def __str__(self):
+        return f'Report by {self.user} from {self.user.organisation}'
+
     @transition(
         field=state,
         source='+',
