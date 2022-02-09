@@ -62,3 +62,5 @@ class BugReport(MeetingContext):
     )
     def resolve(self):
         pass
+
+    objects: models.Manager
