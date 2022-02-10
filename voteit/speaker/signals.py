@@ -12,6 +12,7 @@ from django.dispatch import receiver
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
+from voteit.core.decorators import disable_on_raw_save
 from voteit.core.messages import RolesAdded
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
@@ -50,13 +51,14 @@ speaker_stopped = Signal(providing_args=["sender", "speaker"])
 
 
 @receiver(post_save, sender=Speaker)
+@disable_on_raw_save
 def set_initial_order(instance: Speaker, created: bool, **kwargs):
     """
     Add order for newly created speakers. If the order attribute is anything but None,
     it means that the speaker is in the queue.
     Is this a new db record? We only care about the newly created for this method.
     """
-    if created:
+    if created and instance.order is not None:
         sl = instance.speaker_list
         results = sl.speaker_items.filter(order__isnull=False).aggregate(
             models.Max("order")
@@ -162,7 +164,12 @@ def notify_added_or_changed_speaker_system(
         ch = MeetingChannel.from_instance(instance.meeting)
         ch.publish(msg)
         # Also push list and order when speaker system changes since it may have changed active list
-        if instance.active_list:
+        active_list = None
+        try:
+            active_list = instance.active_list
+        except SpeakerList.DoesNotExist:
+            pass
+        if active_list:
             msg_class = SpeakerListChanged
             data = SpeakerListSerializer(instance.active_list).data
             list_msg = msg_class(**data)

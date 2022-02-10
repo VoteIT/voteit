@@ -7,6 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
+from voteit.core.decorators import disable_on_raw_save
 
 from voteit.core.decorators import receiver_all_subclasses
 from voteit.meeting.channels import ModeratorsChannel
@@ -41,6 +42,7 @@ def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
 
 
 @receiver_all_subclasses(post_save, sender=ParticipantNumber)
+@disable_on_raw_save
 def pn_updated(instance: ParticipantNumber = None, created=None, **kw):
     if instance.pns.meeting is None:
         return

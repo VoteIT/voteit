@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import wraps
 from typing import Optional
 from typing import TYPE_CHECKING
 
@@ -125,3 +126,17 @@ def on_transaction_commit(method):
         on_commit(lambda: method(*args, **kwargs))
 
     return _inner
+
+
+def disable_on_raw_save(signal_handler):
+    """
+    Decorator that turns off signal handlers when using raw save. For instance during loaddata and fixtures.
+    """
+
+    @wraps(signal_handler)
+    def wrapper(*args, **kwargs):
+        if kwargs.get("raw"):
+            return
+        signal_handler(*args, **kwargs)
+
+    return wrapper

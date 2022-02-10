@@ -266,7 +266,7 @@ class TextParagraph(AgendaItemContext, MeetingContext):
     body: str = models.TextField(editable=False)
     created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
     modified: datetime = models.DateTimeField(editable=False, auto_now=True)
-    paragraph_id: str = models.PositiveSmallIntegerField(default=1)
+    paragraph_id: int = models.PositiveSmallIntegerField(default=1)
     text_document: TextDocument = models.ForeignKey(
         "TextDocument",
         on_delete=models.CASCADE,
