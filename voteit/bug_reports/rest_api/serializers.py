@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from voteit.bug_reports.models import BugReport
+from voteit.core.loggers import slack_logger
 from voteit.meeting.models import Meeting
 
 
@@ -18,6 +19,9 @@ class BugReportSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context['request'].user
         meeting: Meeting = validated_data['meeting']
+        slack_logger.info(
+            f"Bug report in {meeting.organisation.title}/{meeting.title}:\n{validated_data['description']}"
+        )
         return super().create({
             **validated_data,
             'user': user,
