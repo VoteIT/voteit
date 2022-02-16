@@ -4,8 +4,8 @@ from voteit.speaker.models import Speaker
 
 
 class SpeakerFilterSet(filters.FilterSet):
-    meeting = filters.AllValuesFilter(field_name='speaker_list__speaker_system__meeting', label='Meeting')
-    speaker_system = filters.AllValuesFilter(field_name='speaker_list__speaker_system', label='Speaker system')
+    meeting = filters.NumberFilter(field_name='speaker_list__speaker_system__meeting', label='Meeting')
+    speaker_system = filters.NumberFilter(field_name='speaker_list__speaker_system', label='Speaker system')
 
     class Meta:
         model = Speaker
