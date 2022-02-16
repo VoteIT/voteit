@@ -44,26 +44,6 @@ class SpeakerListSerializerTests(TestCase):
 
 
 class HistoricSpeakerListSerializerTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-
-        self.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
-        self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
-        self.system = self.meeting.speaker_systems.create(method_name="simple")
-        self.slist = self.system.speaker_lists.create(agenda_item=self.ai)
-        self.user_one = self.slist.speakers.create(username="one")
-        self.user_two = self.slist.speakers.create(username="two")
-        for i in range(1, 4):
-            self.slist.speaker_items.create(
-                user=self.user_one,
-                seconds=i * 5,
-                # Make sure there's a diff between started, since it's sorted on that
-                started=now() - timedelta(seconds=10 - i),
-            )
-        self.slist.speaker_items.create(user=self.user_two, seconds=11)
-
     @property
     def _cut(self):
         from voteit.speaker.rest_api.serializers import HistoricSpeakerListSerializer
@@ -72,15 +52,15 @@ class HistoricSpeakerListSerializerTests(TestCase):
 
     def test_get(self):
         # Queue is not part of this
-        serializer = self._cut(self.slist)
+        serializer = self._cut({
+            "user": 1,
+            "times_spoken": 3,
+            "seconds_spoken": 200,
+        })
         data = serializer.data
-        self.assertEqual(self.slist.pk, data["pk"])
-        self.assertEqual(2, len(data["previous"]))
-        previous = data["previous"]
-        first = [x for x in previous if x[0] == self.user_one.pk][0]
-        second = [x for x in previous if x[0] == self.user_two.pk][0]
-        self.assertEqual([self.user_one.pk, [5, 10, 15]], first)
-        self.assertEqual([self.user_two.pk, [11]], second)
+        self.assertEqual(data["user"], 1)
+        self.assertEqual(data["times_spoken"], 3)
+        self.assertEqual(data["seconds_spoken"], 200)
 
 
 class SpeakerListSystemSerializerTests(TestCase):
