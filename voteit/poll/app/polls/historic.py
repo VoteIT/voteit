@@ -31,9 +31,3 @@ class SchulzePR(HistoricPollMethod):
 @poll_methods
 class SchulzeSTV(HistoricPollMethod):
     name = "schulze_stv"
-
-
-# FIXME: Not historic! :)
-@poll_methods
-class Dutt(HistoricPollMethod):
-    name = "dutt"
