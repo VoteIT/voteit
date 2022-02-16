@@ -5,6 +5,7 @@ from rest_framework import exceptions
 
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.meeting.models import MeetingRoles
+from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 
@@ -31,36 +32,14 @@ class SpeakerListSerializer(serializers.ModelSerializer):
 
 
 class HistoricSpeakerListSerializer(serializers.ModelSerializer):
-    previous = serializers.SerializerMethodField("get_previous")
+    user = serializers.IntegerField()
+    times_spoken = serializers.IntegerField()
+    seconds_spoken = serializers.IntegerField()
 
     class Meta:
-        model = SpeakerList
-        fields = ("pk", "previous")
+        model = Speaker
+        fields = ("user", "times_spoken", "seconds_spoken")
         read_only_fields = fields
-
-    def get_previous(self, speaker_list: SpeakerList) -> List[List]:
-        """Return historic speaker lists. Each item in the list is a tuple where userid is the
-        first value and then a list with the number of seconds they spoke for each entry.
-
-        A user with userid 1 that has spoken 10 seconds the first time and 20 seconds
-        the last time would look like this:
-
-        [[1, [10, 20],]
-        """
-        instance: SpeakerList = self.instance
-        # FIXME optimize query
-        results = []
-        for user_pk in list(
-            instance.speaker_items.values_list("user", flat=True).distinct()
-        ):
-            seconds = list(
-                instance.speaker_items.filter(seconds__isnull=False, user=user_pk)
-                .order_by("started")
-                .values_list("seconds", flat=True)
-            )
-            if seconds:
-                results.append([user_pk, seconds])
-        return results
 
 
 class SpeakerListSystemSerializer(serializers.ModelSerializer):

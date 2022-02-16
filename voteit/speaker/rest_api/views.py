@@ -1,9 +1,14 @@
+from django.db import models
+from django_filters.rest_framework import DjangoFilterBackend
+
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.base import ReadonlyModelViewSet
 from voteit.meeting.models import Meeting
+from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.rest_api import serializers
+from voteit.speaker.rest_api.filters import SpeakerFilterSet
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 
 
@@ -17,10 +22,23 @@ class SpeakerListViewSet(DefaultModelViewSet):
     context_queryset = SpeakerListSystem.objects.all()
 
 
-class HistoricSpeakerListViewSet(ReadonlyModelViewSet):
-    model = SpeakerList
-    queryset = SpeakerList.objects.all()
+class HistoricSpeakerViewSet(ReadonlyModelViewSet):
+    model = Speaker
+    # FIXME Robin
+    # context_lookup_kwarg: str = "speaker_system"
+    # context_lookup_field: str = "pk"
+    # context_queryset = Meeting.objects.all()
+    queryset = Speaker.objects.filter(
+        seconds__isnull=False,
+    ).values(
+        "user",
+    ).annotate(
+        times_spoken=models.Count("user"),
+        seconds_spoken=models.Sum("seconds"),
+    )
     serializer_class = serializers.HistoricSpeakerListSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = SpeakerFilterSet
 
 
 class SpeakerListSystemViewSet(DefaultModelViewSet):
