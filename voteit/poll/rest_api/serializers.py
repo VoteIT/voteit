@@ -92,6 +92,12 @@ class PollCreateSerializer(serializers.ModelSerializer):
                     "method_name": f"{method_name} is not a valid poll method. {repr(list(reg.keys()))}",
                 }
             )
+        if method.historic:
+            raise serializers.ValidationError(
+                {
+                    "method_name": f"{method_name} is a historic method not ment to be used.",
+                }
+            )
         if settings is not None:
             if method.settings_schema is None:
                 raise serializers.ValidationError(

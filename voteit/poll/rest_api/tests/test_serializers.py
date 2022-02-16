@@ -174,6 +174,13 @@ class PollCreateSerializerTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("method_name", serializer.errors)
 
+    def test_serializer_historic_method(self):
+        data = self._fixture(method_name="schulze_pr")
+        serializer = self._cut(data=data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("method_name", serializer.errors)
+        self.assertIn("historic", str(serializer.errors["method_name"][0]))
+
     def test_settings_with_no_settings_method(self):
         data = self._fixture(settings={"weee": "okay"})
         serializer = self._cut(data=data)

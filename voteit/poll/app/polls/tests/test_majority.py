@@ -17,7 +17,7 @@ class MajorityTests(TestCase):
     def setUpTestData(cls):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
-        from voteit.poll.app.polls import Majority
+        from voteit.poll.app.polls.majority import Majority
         from voteit.proposal.models import Proposal
 
         cls.Majority = Majority
@@ -132,7 +132,7 @@ class AddMajorityVoteTests(TestCase):
     def setUpTestData(cls):
         from voteit.poll.models import Poll
         from voteit.poll.models import ElectoralRegister
-        from voteit.poll.app.polls import Majority
+        from voteit.poll.app.polls.majority import Majority
         from voteit.proposal.models import Proposal
         from voteit.poll.workflows import PollWf
 

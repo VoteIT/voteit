@@ -28,6 +28,7 @@ class PollMethod(ABC):
 
     poll: Poll
     settings_schema: Optional[Type[BaseModel]] = None
+    historic = False
 
     def __init__(self, poll: Poll):
         self.poll = poll

@@ -299,7 +299,7 @@ class ElectoralRegisterTests(TestCase):
         from voteit.meeting.models import Meeting
         from voteit.meeting import roles
         from voteit.poll.app.er_policies import AutoBeforePoll
-        from voteit.poll.app.polls import Simple
+        from voteit.poll.app.polls.simple import Simple
 
         meeting = Meeting.objects.create(
             title="Test meeting",

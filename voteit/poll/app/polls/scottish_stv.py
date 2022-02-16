@@ -31,7 +31,7 @@ class ScottishSTVSettings(BaseModel):
 
     @validator("winners")
     def validate_winners(cls, v):
-        """ This doesn't check attached polls though!"""
+        """This doesn't check attached polls though!"""
         if v < ScottishSTV.min_winners:
             raise ValueError(f"Must have more winners than {ScottishSTV.min_winners}")
         return v
@@ -108,7 +108,9 @@ class ScottishSTV(PollMethod):
     settings_schema = ScottishSTVSettings
     vote_schema = RankingSchema
     result_schema = STVResultSchema
-    min_winners = 2
+    # Minimum winners set to 1 due to historic reasons,
+    # it should be changed to 2 when all V3 instances have migrated.
+    min_winners = 1
     min_losers = 1
 
     def vote_to_str(self, data: RankingSchema) -> str:

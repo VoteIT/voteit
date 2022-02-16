@@ -6,10 +6,13 @@ class PollConfig(AppConfig):
     verbose_name = "Polls"
 
     def ready(self):
-        from voteit.poll.app import polls
-        from voteit.poll.app import er_policies
         from voteit.poll import rules
         from voteit.poll import rest_api
         from voteit.poll import channels
         from voteit.poll import messages
         from voteit.poll import signals
+        from voteit.poll.app.polls import register
+
+        register()
+
+        from voteit.poll.app import er_policies
