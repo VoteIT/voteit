@@ -69,10 +69,10 @@ class ChangeRepeatedSchulzeVote(ChangeVote):
 
 
 class SchulzePollResult(PollResult):
-    pairs: List[Tuple[Tuple[int, int], int]]
+    pairs: List[Tuple[Tuple[int, int], int]] = []
     candidates: List[int]
     winner: int
-    strong_pairs: List[Tuple[Tuple[int, int], int]]
+    strong_pairs: List[Tuple[Tuple[int, int], int]] = []
     tied_winners: Optional[List[int]]
 
 
