@@ -326,7 +326,7 @@ class HistoricSpeakerViewTests(APITestCase):
         return HistoricSpeakerListSerializer
 
     def test_list_perms(self):
-        url = reverse("speaker-lists-history-list")
+        url = reverse("speaker-history-list")
         # FIXME: We might want to fix the permissions here
         # anon
         response = self.client.get(url)
@@ -352,46 +352,47 @@ class HistoricSpeakerViewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(0, len(response.json()))
 
-    def test_get_perms(self):
-        url = f"/api/speaker-lists-history/{self.slist.pk}/"
-        # anon
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 401)
-        # Speaker/Participant
-        self.client.force_login(self.user_one)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        # moderator
-        self.client.force_login(self.moderator)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        # list moderator
-        self.client.force_login(self.list_moderator)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        # outsider
-        self.client.force_login(self.outsider)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 403)
+    # No details needed
+    # def test_get_perms(self):
+    #     url = f"/api/speaker-history/{self.slist.pk}/"
+    #     # anon
+    #     response = self.client.get(url)
+    #     self.assertEqual(response.status_code, 401)
+    #     # Speaker/Participant
+    #     self.client.force_login(self.user_one)
+    #     response = self.client.get(url)
+    #     self.assertEqual(response.status_code, 200)
+    #     # moderator
+    #     self.client.force_login(self.moderator)
+    #     response = self.client.get(url)
+    #     self.assertEqual(response.status_code, 200)
+    #     # list moderator
+    #     self.client.force_login(self.list_moderator)
+    #     response = self.client.get(url)
+    #     self.assertEqual(response.status_code, 200)
+    #     # outsider
+    #     self.client.force_login(self.outsider)
+    #     response = self.client.get(url)
+    #     self.assertEqual(response.status_code, 403)
 
-    def test_get_content(self):
-        for i in range(1, 4):
-            self.slist.speaker_items.create(
-                user=self.user_one,
-                seconds=i * 5,
-                # Make sure there's a diff between started, since it's sorted on that
-                started=now() - timedelta(seconds=10 - i),
-            )
-        self.slist.speaker_items.create(user=self.user_two_nospeaker, seconds=11)
-        url = f"/api/speaker-lists-history/{self.slist.pk}/"
-        self.client.force_login(self.user_one)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(self.slist.pk, data["pk"])
-        self.assertEqual(2, len(data["previous"]))
-        previous = data["previous"]
-        first = [x for x in previous if x[0] == self.user_one.pk][0]
-        second = [x for x in previous if x[0] == self.user_two_nospeaker.pk][0]
-        self.assertEqual([self.user_one.pk, [5, 10, 15]], first)
-        self.assertEqual([self.user_two_nospeaker.pk, [11]], second)
+    # def test_get_content(self):
+    #     for i in range(1, 4):
+    #         self.slist.speaker_items.create(
+    #             user=self.user_one,
+    #             seconds=i * 5,
+    #             # Make sure there's a diff between started, since it's sorted on that
+    #             started=now() - timedelta(seconds=10 - i),
+    #         )
+    #     self.slist.speaker_items.create(user=self.user_two_nospeaker, seconds=11)
+    #     url = f"/api/speaker-lists-history/{self.slist.pk}/"
+    #     self.client.force_login(self.user_one)
+    #     response = self.client.get(url)
+    #     self.assertEqual(response.status_code, 200)
+    #     data = response.json()
+    #     self.assertEqual(self.slist.pk, data["pk"])
+    #     self.assertEqual(2, len(data["previous"]))
+    #     previous = data["previous"]
+    #     first = [x for x in previous if x[0] == self.user_one.pk][0]
+    #     second = [x for x in previous if x[0] == self.user_two_nospeaker.pk][0]
+    #     self.assertEqual([self.user_one.pk, [5, 10, 15]], first)
+    #     self.assertEqual([self.user_two_nospeaker.pk, [11]], second)

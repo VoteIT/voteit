@@ -23,6 +23,7 @@ class SpeakerListViewSet(DefaultModelViewSet):
 
 
 class HistoricSpeakerViewSet(ReadonlyModelViewSet):
+    # TODO Make this list only / disable detail views
     model = Speaker
     # FIXME Robin
     # context_lookup_kwarg: str = "speaker_system"
