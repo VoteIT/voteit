@@ -2,31 +2,31 @@ from contextlib import suppress
 
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models.signals import post_save
 from django.db.models.signals import post_delete
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+from voteit.core.decorators import disable_on_raw_save
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.messaging.channels.user import UserChannel
 from voteit.messaging.messages.app_state import AppState
 from voteit.messaging.signals import channel_subscribed
-from voteit.presence.messages import (
-    PresenceCheckStatus,
-    PresenceDeleted,
-    PresenceCheckAdded,
-    PresenceCheckChanged,
-    PresenceCheckDeleted,
-)
+from voteit.presence.channels import PresenceCheckChannel
 from voteit.presence.messages import PresenceAdded
+from voteit.presence.messages import PresenceCheckAdded
+from voteit.presence.messages import PresenceCheckChanged
+from voteit.presence.messages import PresenceCheckDeleted
+from voteit.presence.messages import PresenceCheckStatus
+from voteit.presence.messages import PresenceDeleted
 from voteit.presence.models import Presence
 from voteit.presence.models import PresenceCheck
-from voteit.presence.channels import PresenceCheckChannel
-from voteit.presence.rest_api.serializers import PresenceDetailSerializer
 from voteit.presence.rest_api.serializers import PresenceCheckDetailSerializer
+from voteit.presence.rest_api.serializers import PresenceDetailSerializer
 
 
 @receiver(post_save, sender=Presence)
+@disable_on_raw_save
 def presence_added(instance=None, created: bool = None, **kw):
     """Send presence item to user channel and a count to the specific presence check channel."""
     if created:
@@ -58,6 +58,7 @@ def presence_deleted(instance: Presence = None, **kw):
 
 
 @receiver(post_save, sender=PresenceCheck)
+@disable_on_raw_save
 def presence_check_changed(instance: PresenceCheck = None, created: bool = None, **kw):
     """Transmit presence check to meeting channel"""
     meeting = instance.meeting
@@ -85,7 +86,7 @@ def presence_check_deleted(instance=None, **kw):
 def _channel_subscribed(
     context: Meeting, user: AbstractUser, app_state: AppState, **kw
 ):
-    """ Populate app_state with current, if any, presence check objects. """
+    """Populate app_state with current, if any, presence check objects."""
     with suppress(ObjectDoesNotExist):
         if presence_check := context.presence_checks.latest_open():
             app_state.append_from(
@@ -101,7 +102,6 @@ def _channel_subscribed(
 def _check_channel_subscribed(
     context: PresenceCheck, user: AbstractUser, app_state: AppState, **kw
 ):
-    app_state.append(PresenceCheckStatus(
-        pk=context.pk,
-        present=context.presences.count()
-    ))
+    app_state.append(
+        PresenceCheckStatus(pk=context.pk, present=context.presences.count())
+    )

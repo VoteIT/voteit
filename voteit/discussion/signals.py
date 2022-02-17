@@ -6,6 +6,7 @@ from django.dispatch import receiver
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
+from voteit.core.decorators import disable_on_raw_save
 from voteit.discussion.messages import DiscussionPostAdded
 from voteit.discussion.messages import DiscussionPostChanged
 from voteit.discussion.messages import DiscussionPostDeleted
@@ -24,6 +25,7 @@ def _channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
 
 
 @receiver(post_save, sender=DiscussionPost)
+@disable_on_raw_save
 def discussion_post_change(instance=None, created=None, **kw):
     if instance.agenda_item is None:
         return

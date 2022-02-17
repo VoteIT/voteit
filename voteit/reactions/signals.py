@@ -9,6 +9,7 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
 from voteit.agenda.channels import AgendaItemChannel
+from voteit.core.decorators import disable_on_raw_save
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.signals import archive_meeting
@@ -64,6 +65,7 @@ def ai_channel_subscribed(
 
 
 @receiver(post_save, sender=ReactionButton)
+@disable_on_raw_save
 def reaction_button_updated(
     instance: ReactionButton = None, created: bool = None, **kw
 ):
@@ -108,6 +110,7 @@ def _send_count(instance: Reaction, pre_delete=False):
 
 
 @receiver(post_save, sender=Reaction)
+@disable_on_raw_save
 def send_count_saved(instance: Reaction = None, created: bool = None, **kw):
     if created:
         # Update should never happen
@@ -115,6 +118,7 @@ def send_count_saved(instance: Reaction = None, created: bool = None, **kw):
 
 
 @receiver(post_save, sender=Reaction)
+@disable_on_raw_save
 def send_added_to_user(instance: Reaction = None, created: bool = None, **kw):
     """This is a message that goes to the user channel for the specific user who added the reaction.
     It's not a reply to the action that the reaction was added, but a consequence.

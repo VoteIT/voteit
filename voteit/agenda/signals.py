@@ -15,6 +15,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import AgendaItemSerializer
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.abcs import AgendaItemContext
+from voteit.core.decorators import disable_on_raw_save
 from voteit.discussion.models import DiscussionPost
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
@@ -67,6 +68,7 @@ def meeting_channel_subscribed(
 
 
 @receiver(post_save, sender=AgendaItem)
+@disable_on_raw_save
 def agenda_change(instance=None, created=None, **kw):
     participants_ch = ParticipantsChannel.from_instance(instance.meeting)
     moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
@@ -112,6 +114,7 @@ def archive_agenda_items(meeting: Meeting, **kw):
 
 @receiver(post_save, sender=DiscussionPost)
 @receiver(post_save, sender=Proposal)
+@disable_on_raw_save
 def mark_ai_as_updated(instance: AgendaItemContext, created=None, **kwargs):
     if created and instance.agenda_item is not None:
         instance.agenda_item.maybe_mark_related_modified()

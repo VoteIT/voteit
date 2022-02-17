@@ -5,6 +5,7 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
+from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteAdded
@@ -41,6 +42,7 @@ def invites_channel_subscribed(
 
 
 @receiver(post_save, sender=MeetingInvite)
+@disable_on_raw_save
 @on_transaction_commit
 def meeting_invite_changed(instance: MeetingInvite = None, created=None, **kw):
     ch = MeetingInvitesChannel.from_instance(instance.meeting)

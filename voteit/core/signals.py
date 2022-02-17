@@ -8,6 +8,7 @@ from django.dispatch import Signal
 from django.dispatch import receiver
 
 from voteit.core.abcs import MeetingContext
+from voteit.core.decorators import disable_on_raw_save
 from voteit.core.messages import RolesAdded
 from voteit.core.messages import RolesRemoved
 from voteit.core.utils import get_model_shortname
@@ -39,6 +40,7 @@ def _publish(instance, msg):
 
 
 @receiver(roles_added)
+@disable_on_raw_save
 def push_roles_added(instance: Roles, roles: List[Role], **kwargs):
     msg = RolesAdded(
         mm=dict(),

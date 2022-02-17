@@ -10,6 +10,7 @@ from django_fsm import pre_transition
 from django_fsm.signals import post_transition
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
+from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
@@ -79,6 +80,7 @@ def moderators_subscribed(
 
 
 @receiver(post_save, sender=Poll)
+@disable_on_raw_save
 @on_transaction_commit
 def poll_change(instance: Poll = None, created: bool = None, **kw):
     """

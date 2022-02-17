@@ -10,6 +10,7 @@ from django_fsm import post_transition
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
+from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import receiver_all_subclasses
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
@@ -34,8 +35,9 @@ if TYPE_CHECKING:
 def participants_channel_subscribed(context: Meeting, app_state: AppState, **kw):
     """Populate app_state with current proposals"""
     app_state.append_from_queryset(
-        Proposal.objects.filter(agenda_item__meeting=context)
-        .exclude(agenda_item__state=AgendaItemWf.PRIVATE),
+        Proposal.objects.filter(agenda_item__meeting=context).exclude(
+            agenda_item__state=AgendaItemWf.PRIVATE
+        ),
         GenericProposalSerializer,
         ProposalAdded,
     )
@@ -52,6 +54,7 @@ def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
 
 
 @receiver_all_subclasses(post_save, sender=Proposal)
+@disable_on_raw_save
 def proposal_updated(instance: Proposal = None, created=None, **kw):
     if instance.meeting is None:
         return
@@ -104,6 +107,7 @@ def agenda_item_channel_subscribed(context: AgendaItem, app_state: AppState, **k
 
 
 @receiver(post_save, sender=TextDocument)
+# @disable_on_raw_save FIXME?
 def text_document_updated(instance: TextDocument = None, created=None, **kw):
     """
     Create TextParagraphs and push result.

@@ -97,6 +97,7 @@ def publish_active_list_msg(speaker_list: SpeakerList, msg: BaseOutgoingMessage)
 
 
 @receiver(list_updated)
+@disable_on_raw_save
 def push_list_order_change(instance: SpeakerList, **kw):
     """When speakers reorder, send an update of the order.
     This is not transmitted on save for the speaker list,
@@ -109,6 +110,7 @@ def push_list_order_change(instance: SpeakerList, **kw):
 
 
 @receiver(post_save, sender=SpeakerList)
+@disable_on_raw_save
 def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **kw):
     """Send to Agenda or meeting channel depending on if it's the active list."""
     if created:
@@ -150,6 +152,7 @@ def notify_deleted_speaker_list(instance: SpeakerList, **kw):
 
 
 @receiver(post_save, sender=SpeakerListSystem)
+@disable_on_raw_save
 def notify_added_or_changed_speaker_system(
     instance: SpeakerListSystem, created=None, **kw
 ):

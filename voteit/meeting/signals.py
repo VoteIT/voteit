@@ -7,6 +7,7 @@ from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
 
+from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.core.messages import RolesAdded
 from voteit.core.utils import get_model_shortname
@@ -31,6 +32,7 @@ archive_meeting = Signal(providing_args=["meeting"])
 
 # FIXME: What about deleted? Some kind of crash and burn message?
 @receiver(post_save, sender=Meeting)
+@disable_on_raw_save
 def meeting_change(instance, created=None, **kw):
     if not created:
         data = MeetingDetailSerializer(instance).data
@@ -63,6 +65,7 @@ def meeting_channel_subscribed(
 
 
 @receiver(post_save, sender=MeetingGroup)
+@disable_on_raw_save
 @on_transaction_commit
 def meeting_group_updated(instance: MeetingGroup = None, created=None, **kw):
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
