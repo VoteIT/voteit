@@ -58,7 +58,7 @@ def set_initial_order(instance: Speaker, created: bool, **kwargs):
     it means that the speaker is in the queue.
     Is this a new db record? We only care about the newly created for this method.
     """
-    if created and instance.order is not None:
+    if created:
         sl = instance.speaker_list
         results = sl.speaker_items.filter(order__isnull=False).aggregate(
             models.Max("order")
