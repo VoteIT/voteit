@@ -77,7 +77,7 @@ class AddVoteSchema(GenericAddVoteSchema):
 
 @incoming
 class AddDuttVote(AddVote):
-    name = "dutt.add"
+    name = "dutt_vote.add"
     schema = AddVoteSchema
     data: AddVoteSchema
 
@@ -88,7 +88,7 @@ class ExistingVoteSchema(GenericExistingVoteSchema):
 
 @incoming
 class ChangeDuttVote(ChangeVote):
-    name = "dutt.change"
+    name = "dutt_vote.change"
     schema = ExistingVoteSchema
     data: ExistingVoteSchema
 
