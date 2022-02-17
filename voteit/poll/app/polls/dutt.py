@@ -7,6 +7,7 @@ from typing import Union
 
 from pydantic import BaseModel
 from django.utils.translation import gettext as _
+from pydantic import root_validator
 from pydantic import validator
 
 from voteit.messaging.decorators import incoming
@@ -44,6 +45,21 @@ class DuttVoteSchema(BaseModel):
 class DuttSettingsSchema(BaseModel):
     max: int = 0
     min: int = 0
+
+    @root_validator(skip_on_failure=True)
+    def validate_max_min(cls, values):
+        """
+        >>> DuttSettingsSchema(max=2)
+        DuttSettingsSchema(max=2, min=0)
+
+        >>> DuttSettingsSchema(max=1, min=2)
+        Traceback (most recent call last):
+        ...
+        pydantic.error_wrappers.ValidationError: 1 validation error for DuttSettingsSchema
+        """
+        if values["max"] < values["min"]:
+            raise ValueError("min value can't be higher than max")
+        return values
 
 
 class DuttScore(BaseModel):
