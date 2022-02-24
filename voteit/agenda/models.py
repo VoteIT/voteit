@@ -62,7 +62,10 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         )
 
     exporters = {"meeting": {}}
-    importers = {"meeting": {}}
+    importers = {
+        "meeting": {},
+        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}},
+    }
 
     def save(self, **kw):
         """Set order as last agenda item for meeting when creating."""

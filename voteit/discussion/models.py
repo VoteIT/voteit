@@ -44,7 +44,12 @@ class DiscussionPost(
     )
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {"meeting": {}}
+    importers = {
+        "meeting": {"remap_relations": {"user": {"author"}}},
+        "organisation": {
+            "remap_relations": {"user": {"author", "mentions", "last_modified_by"}}
+        },
+    }
 
     @property
     def meeting(self) -> Optional[Meeting]:

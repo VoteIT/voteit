@@ -58,7 +58,10 @@ class SpeakerSystemRoles(Roles, MeetingContext):
         verbose_name = verbose_name_plural = _("Speaker system roles")
 
     exporters = {"meeting": {"meeting_kw": "context__meeting"}}
-    importers = {"meeting": {"remap_relations": {"speaker_system": "context"}}}
+    importers = {
+        "meeting": {"remap_relations": {"speaker_system": "context"}},
+        "organisation": {"remap_relations": {"speaker_system": "context"}},
+    }
 
 
 class SpeakerListSystem(RoleContextMixin, MeetingContext):
@@ -110,7 +113,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
 
     roles_cls = SpeakerSystemRoles
     exporters = {"meeting": {"ignore_fields": ("active_list",)}}
-    importers = {"meeting": {}}
+    importers = {"meeting": {}, "organisation": {}}
 
     def get_method_class(self) -> Type[ListMethod]:
         """Fetch the poll method class, a django proxy model."""
@@ -226,6 +229,8 @@ class Speaker(models.Model):
     started: Optional[datetime] = models.DateTimeField(null=True)
     seconds: Optional[int] = models.PositiveSmallIntegerField(null=True)
 
+    importers = {"organisation": {}}
+
     class Meta:
         constraints = [
             # Save doesn't work with this when we reorder. Really?
@@ -301,7 +306,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
             "ignore_fields": ["current"],
         }
     }
-    importers = {"meeting": {}}
+    importers = {"meeting": {}, "organisation": {}}
 
     @property
     def meeting(self) -> Optional[Meeting]:

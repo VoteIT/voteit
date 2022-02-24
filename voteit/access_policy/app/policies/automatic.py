@@ -26,7 +26,7 @@ class AutomaticAccess(AccessPolicy):
     roles_given: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
 
     exporters = {"meeting": {}}
-    importers = {"meeting": {}}
+    importers = {"meeting": {}, "organisation": {}}
 
     def assign(self, user: AbstractUser):
         if self.roles_given:

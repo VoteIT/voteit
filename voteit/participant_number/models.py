@@ -18,6 +18,8 @@ class ParticipantNumber(models.Model):
     could then have signs with a number on that the moderator simply enters to queue them.
     """
 
+    name = "participant_number"
+
     number: int = models.PositiveSmallIntegerField(blank=True)
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT
@@ -26,6 +28,8 @@ class ParticipantNumber(models.Model):
         "PNSystem", on_delete=models.CASCADE, related_name="numbers"
     )
     created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+
+    importers = {"organisation": {"remap_relations": {"pnsystem": {"pns"}}}}
 
     class Meta:
         constraints = [
@@ -63,9 +67,13 @@ class PNSystem(models.Model):
     so there's no separate role.
     """
 
+    name = "pnsystem"
+
     meeting: Optional[Meeting] = models.OneToOneField(
         Meeting, on_delete=models.CASCADE, null=True, related_name="pn_system"
     )
+
+    importers = {"organisation": {}}
 
     def get_user(self, pn: int, default=None) -> Optional[AbstractUser]:
         for pn_obj in self.numbers.filter(number=pn).all().prefetch_related("user"):

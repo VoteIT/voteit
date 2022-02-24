@@ -37,7 +37,7 @@ class ModeratorApprovedAccess(AccessPolicy):
     title: str = _("Users apply for access, moderators approve manually")
 
     exporters = {"meeting": {"ignore_fields": ("access_requests",)}}
-    importers = {"meeting": {}}
+    importers = {"meeting": {}, "organisation": {}}
 
     def request_access(self, user: AbstractUser, message: str = "") -> AccessRequest:
         #  FIXME: Block subsequent requests etc

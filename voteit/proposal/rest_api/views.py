@@ -13,7 +13,7 @@ __all__ = ["ProposalViewSet"]
 
 class ProposalViewSet(DefaultModelViewSet):
     model = Proposal  # And ALL subtypes!
-    queryset = Proposal.objects.all()
+    queryset = Proposal.objects.all().select_subclasses()
     serializer_class = serializers.GenericProposalSerializer  # Morphic
     serializer_classes = {
         "create": serializers.GenericCreateProposalSerializer,
@@ -26,7 +26,6 @@ class ProposalViewSet(DefaultModelViewSet):
     )
     context_queryset = AgendaItem.objects.all()
     context_lookup_kwarg = "agenda_item"
-
     permission_type_map = DefaultModelViewSet.permission_type_map.copy()
     permission_type_map["preview"] = None
 

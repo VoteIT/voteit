@@ -70,7 +70,14 @@ class MeetingRoles(Roles, MeetingContext):
         verbose_name = verbose_name_plural = _("Meeting roles")
 
     exporters = {"meeting": {"meeting_kw": "context"}}
-    importers = {"meeting": {"remap_relations": {"meeting": "context"}}}
+    importers = {
+        "meeting": {"remap_relations": {"meeting": "context"}},
+        "organisation": {
+            "remap_relations": {
+                "meeting": "context",
+            }
+        },
+    }
 
 
 class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext):
@@ -125,7 +132,10 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
             ),
         }
     }
-    importers = {"meeting": {}}
+    importers = {
+        "meeting": {},
+        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}},
+    }
 
     @cached_property
     def pid_policy(self) -> ElectoralRegisterPolicy:
@@ -224,9 +234,6 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         with transaction.atomic():
             archive_meeting.send(sender=self.__class__, meeting=self)
 
-    def archiving_allowed(self):
-        pass
-
     @property
     def is_archived(self):
         return self.state in MeetingWf.archived_states
@@ -305,7 +312,10 @@ class MeetingGroup(BaseContent, MeetingContext):
         )
 
     exporters = {"meeting": {}}
-    importers = {"meeting": {}}
+    importers = {
+        "meeting": {},
+        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}},
+    }
 
     # Type annotations - relations
     proposals: models.QuerySet

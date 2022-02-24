@@ -65,7 +65,10 @@ class DiffProposalTests(TestCase):
         cls.prop = cls.ai.proposals.create()
 
     def test_manager_fetches_all_types_by_default(self):
-        self.assertEqual({self.diff_prop, self.prop}, set(self.ai.proposals.all()))
+        self.assertEqual(
+            {self.diff_prop, self.prop},
+            set(self.ai.proposals.all().select_subclasses()),
+        )
 
 
 TEXT = """

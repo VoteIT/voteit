@@ -139,7 +139,7 @@ class PresenceSystem(MeetingContext):
     )
 
     exporters = {"meeting": {}}
-    importers = {"meeting": {}}
+    importers = {"meeting": {}, "organisation": {}}
 
     def __str__(self):
         return f"Presence system ({self.pk})"

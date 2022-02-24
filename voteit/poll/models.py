@@ -59,11 +59,19 @@ logger = getLogger(__name__)
 
 
 class VoterWeight(models.Model):
+    name = "voter_weight"
     register = models.ForeignKey("ElectoralRegister", on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     weight = models.PositiveIntegerField(default=1)
+
+    importers = {
+        "organisation": {"remap_relations": {"electoral_register": "register"}}
+    }
     # Annotations
     objects: models.Manager
+
+    def __str__(self):
+        return f"{self.__class__.__name__}:{self.pk} for {self.user.userid}"
 
 
 class ElectoralRegister(MeetingContext):
@@ -77,6 +85,10 @@ class ElectoralRegister(MeetingContext):
     meeting: Optional[Meeting] = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="electoral_registers", null=True
     )
+
+    importers = {
+        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}}
+    }
 
     def get_voter_weight(self, user: AbstractUser) -> int:
         """
@@ -101,6 +113,11 @@ class ElectoralRegister(MeetingContext):
             return self.get_queryset().for_user(user)
 
     objects = Manager()
+
+    def __str__(self):
+        return (
+            f"{self.__class__.__name__}:{self.pk} with {self.voters.count()} voter(s)"
+        )
 
 
 class Poll(BaseContent, MeetingContext, AgendaItemContext):
@@ -154,6 +171,19 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         null=True,
         encoder=DjangoJSONEncoder,
     )
+
+    importers = {
+        "organisation": {
+            "remap_relations": {
+                "electoral_register": {
+                    "initial_electoral_register",
+                    "electoral_register",
+                },
+                "proposal": {"proposals"},
+                "user": {"last_modified_by", "author"},
+            }
+        }
+    }
 
     def get_method_class(self) -> Type[PollMethod]:
         """Fetch the poll method class, a django proxy model."""
@@ -446,6 +476,8 @@ class Vote(models.Model):
         null=True, blank=True
     )  # This field should contain the value from PollMethod
 
+    importers = {"organisation": {}}
+
     @property
     def vote(self) -> BaseModel:
         return self.vote_data and self.poll.method.vote_to_obj(self.vote_data)
@@ -470,7 +502,7 @@ class Vote(models.Model):
         ]
 
     def __str__(self):  # pragma: no cover
-        return f"<{self.__class__.__name__} from {self.user}>"
+        return f"{self.__class__.__name__} from {self.user}"
 
     @property
     def weight(self) -> int:

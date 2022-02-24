@@ -34,7 +34,9 @@ class GenericProposalSerializerTests(TestCase):
         return GenericProposalSerializer
 
     def test_serializer_from_queryset(self):
-        items = sorted(self.ai.proposals.all(), key=lambda x: x.name)
+        items = sorted(
+            self.ai.proposals.all().select_subclasses(), key=lambda x: x.name
+        )
         results = []
         for inst in items:
             results.append(self._cut(inst).data)

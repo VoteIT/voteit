@@ -14,9 +14,10 @@ from django_fsm import FSMField
 from django_fsm import transition
 from typing import List
 
+from model_utils.managers import InheritanceManager
+
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
-from voteit.core.managers import AutoInheritanceManager
 from voteit.core.models import BaseContent
 from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
@@ -78,7 +79,12 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         ]
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {"meeting": {}}
+    importers = {
+        "meeting": {"remap_relations": {"user": {"author"}}},
+        "organisation": {
+            "remap_relations": {"user": {"author", "mentions", "last_modified_by"}}
+        },
+    }
 
     @transition(
         field=state,
@@ -161,7 +167,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     def __str__(self):
         return f"P:{self.prop_id}"
 
-    objects = AutoInheritanceManager()
+    objects = InheritanceManager()
 
 
 class TextDocument(AgendaItemContext, MeetingContext):
@@ -198,7 +204,10 @@ class TextDocument(AgendaItemContext, MeetingContext):
     )
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {"meeting": {}}
+    importers = {
+        "meeting": {"remap_relations": {"user": {"author"}}},
+        "organisation": {"remap_relations": {"user": {"author", "last_modified_by"}}},
+    }
 
     @property
     def meeting(self) -> Optional[Meeting]:
@@ -280,7 +289,10 @@ class TextParagraph(AgendaItemContext, MeetingContext):
     )
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {"meeting": {}}
+    importers = {
+        "meeting": {},
+        "organisation": {"remap_relations": {"user": "last_modified_by"}},
+    }
 
     @property
     def tag(self):
@@ -324,7 +336,20 @@ class DiffProposal(Proposal):
     )
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {"meeting": {}}
+    importers = {
+        "meeting": {
+            "remap_relations": {
+                "text_paragraph": {"paragraph"},
+                "proposal": {"proposal_ptr"},
+            }
+        },
+        "organisation": {
+            "remap_relations": {
+                "text_paragraph": {"paragraph"},
+                "proposal": {"proposal_ptr"},
+            }
+        },
+    }
 
     def save(self, **kw):
         """

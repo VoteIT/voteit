@@ -43,6 +43,7 @@ class OrganisationRoles(Roles):
     context: Organisation = models.ForeignKey(
         "Organisation", on_delete=models.CASCADE, related_name="roles"
     )
+    importers = {"organisation": {"remap_relations": {"organisation": "context"}}}
 
     class Meta:
         verbose_name = verbose_name_plural = _("Organisation roles")
@@ -121,8 +122,8 @@ class OAuth2Provider(OrganisationContext):
 
     @property
     def id_backend_host(self):
-        """ ID_BACKEND_HOST only needed in dev """
-        return getattr(settings, 'ID_HOST_BACKEND', settings.ID_HOST)
+        """ID_BACKEND_HOST only needed in dev"""
+        return getattr(settings, "ID_HOST_BACKEND", settings.ID_HOST)
 
     @property
     def auth_url(self) -> str:

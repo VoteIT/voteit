@@ -27,7 +27,7 @@ class AccessPolicy(MeetingContext):
         related_name="%(app_label)s_%(class)s",
     )
     exporters = {"meeting": {}}
-    importers = {"meeting": {}}
+    importers = {"meeting": {}, "organisation": {}}
 
     class Meta:
         abstract = True

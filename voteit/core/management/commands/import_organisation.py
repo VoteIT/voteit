@@ -6,10 +6,13 @@ from django.core.management import BaseCommand
 from django.db import DEFAULT_DB_ALIAS
 
 from voteit.core.importers.meeting import MeetingImporter
+from voteit.core.importers.organisation import OrganisationImporter
 
 
 class Command(BaseCommand):
-    help = "Import and create a new meeting. Won't overwrite existing meetings and can be run multiple times."
+    help = (
+        "Import all organisation related things. Merge with an existing organisation."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -21,12 +24,22 @@ class Command(BaseCommand):
             default=DEFAULT_DB_ALIAS,
             help='Nominates a specific database to load fixtures into. Defaults to the "default" database.',
         )
+        parser.add_argument(
+            "--dry-run",
+            default=False,
+            action="store_true",
+            help="Do nothing, just report",
+        )
+        parser.add_argument(
+            "--org",
+            help="Organisation pk to append content to",
+        )
 
     def handle(self, *args, **options):
-        importer = MeetingImporter(
+        importer = OrganisationImporter(
             using=options["database"], filename=options["filename"]
         )
-        try:
-            importer.run()
-        except ValueError as exc:
-            sys.exit(str(exc))
+        importer.run(dry=options["dry_run"], existing_organisation_pk=options["org"])
+        # try:
+        # except ValueError as exc:
+        #     sys.exit(str(exc))
