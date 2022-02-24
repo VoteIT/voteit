@@ -3,7 +3,6 @@ from __future__ import annotations
 from contextlib import suppress
 from datetime import datetime
 from datetime import timedelta
-from typing import Dict
 from typing import Optional
 from typing import TYPE_CHECKING
 from typing import Type
@@ -84,7 +83,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         related_name="speaker_systems",
     )
     method_name: str = models.CharField(max_length=20)
-    settings_data: Dict = models.JSONField(
+    settings_data: dict = models.JSONField(
         verbose_name=_("JSON-serialized settings data"),
         editable=False,
         null=True,
@@ -136,7 +135,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
             return schema(**data)
 
     @settings.setter
-    def settings(self, value: Union[Dict, BaseModel]):
+    def settings(self, value: Union[dict, BaseModel]):
         schema = self.method.settings_schema
         if schema is None:
             raise ValueError(f"Method {self.method.name} has no settings_schema")
@@ -402,6 +401,10 @@ class SpeakerList(AgendaItemContext, MeetingContext):
         return self.speaker_items.filter(order__isnull=False).order_by(
             "-safe_pos", "order"
         )
+
+    def history_qs(self) -> models.QuerySet:
+        """Return an ordered queryset with the speakers in the current list."""
+        return self.speaker_items.filter(seconds__isnull=False).order_by("-started")
 
     def speakers_unsafe_created_qs(self) -> models.QuerySet:
         return self.speaker_items.filter(order__isnull=False, safe_pos=False).order_by(
