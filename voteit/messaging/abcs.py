@@ -318,6 +318,26 @@ class DeferredJob(ABC):
     data: BaseModel  # But really the schema
     should_run: bool = True  # Mark as false to abort run
 
+    @staticmethod
+    def handle_failure(job, connection, exc_type, exc_value, traceback):
+        """
+        Failure callbacks are functions that accept job, connection, type, value and traceback arguments. type, value and traceback values returned by sys.exc_info(), which is the exception raised when executing your job.
+
+            def report_failure(job, connection, type, value, traceback):
+        """
+        print(job, connection, exc_type, exc_value, traceback)
+        mm = job.kwargs.get("mm_data", {})
+        if mm:
+            message_id = mm.get("message_id", None)
+            consumer_name = mm.get("consumer_name", None)
+            if message_id and consumer_name:
+                from voteit.messaging.errors import JobError
+
+                # FIXME: msg?
+                err = JobError(mm=mm, msg=str(exc_value))
+                err.send_outgoing(consumer_name, on_commit=False)
+                return err  # For testing, has no effect
+
     async def pre_queue(self, consumer: WebsocketDemuxConsumer):
         """Do something before entering the queue. Only applies to when the consumer receives the message.
         It's a good idea to avoid using this if it's not needed.
@@ -336,9 +356,9 @@ class DeferredJob(ABC):
             atomic=self.job_atomic,
         )
         if queue:
-            return queue.enqueue(run_job, **kwargs)
+            return queue.enqueue(run_job, on_failure=self.handle_failure, **kwargs)
         # Job-decorated queue
-        return run_job.delay(**kwargs)
+        return run_job.delay(on_failure=self.handle_failure, **kwargs)
 
         # kwargs = dict(
         #     atomic=self.job_atomic,

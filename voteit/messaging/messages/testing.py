@@ -16,6 +16,7 @@ from django.utils.translation import gettext as _
 from pydantic import BaseModel
 from pydantic import validator
 
+from voteit.core.queues import TESTING_QUEUE
 from voteit.messaging.abcs import AsyncRunnable
 from voteit.messaging.abcs import BaseIncomingMessage
 from voteit.messaging.abcs import BaseOutgoingMessage
@@ -296,3 +297,12 @@ class Sleep(BaseIncomingMessage, AsyncRunnable):
 @outgoing_messages
 class AwakeAgain(BaseOutgoingMessage):
     name = "testing.awake"
+
+
+@outgoing_messages
+class BadJob(BaseOutgoingMessage, DeferredJob):
+    name = "testing.badjob"
+    queue = TESTING_QUEUE
+
+    def run_job(self):
+        raise ValueError("No way")

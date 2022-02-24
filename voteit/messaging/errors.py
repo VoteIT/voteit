@@ -1,7 +1,6 @@
 from typing import Dict
 from typing import List
 from typing import Optional
-from typing import Union
 
 from django.utils.translation import gettext as _
 from pydantic import validator
@@ -52,7 +51,9 @@ class UnauthorizedSchema(ErrorSchema):
 
 @outgoing
 class UnauthorizedError(BaseError):
-    """ Pretty much HTTP 403 """
+    """
+    Pretty much HTTP 403
+    """
 
     name = "error.unauthorized"
     schema = UnauthorizedSchema
@@ -62,7 +63,9 @@ class UnauthorizedError(BaseError):
 
 @outgoing
 class NotFoundError(BaseError):
-    """ Pretty much HTTP 404 """
+    """
+    Pretty much HTTP 404
+    """
 
     name = "error.not_found"
     default_msg = _("Not found")
@@ -70,7 +73,20 @@ class NotFoundError(BaseError):
 
 @outgoing
 class BadRequestError(BaseError):
-    """ Pretty much HTTP 400"""
+    """
+    Pretty much HTTP 400
+    """
 
     name = "error.bad_request"
     default_msg = _("Bad request")
+
+
+@outgoing
+class JobError(BaseError):
+    """
+    A background task caused an exception/error. This is not meant for error checking, but merely to notify
+    frontend that there's no use waiting for this.
+    """
+
+    name = "error.job"
+    default_msg = _("Job error")

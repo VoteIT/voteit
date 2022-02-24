@@ -29,7 +29,8 @@ def _set_lang(lang=None):
 
 @job(DEFAULT_QUEUE, timeout=30)
 def run_job(msg_data: Dict, mm_data: Dict, incoming=True, atomic=True):
-    """This is the job that handles all DeferredJob messages.
+    """
+    This is the job that handles all DeferredJob messages.
     They're dispatched from the message consumer.
     """
     instance = DeferredJob.from_job(msg_data, mm_data, incoming=incoming)
@@ -44,6 +45,7 @@ def run_job(msg_data: Dict, mm_data: Dict, incoming=True, atomic=True):
                 instance.run_job()
         else:
             instance.run_job()
+
     except BaseError as err:  # Catchable, nice errors
         # Attach other things to error in case they aren't there
         if err.mm.message_id is None:
