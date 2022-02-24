@@ -134,6 +134,19 @@ class PollTests(TestCase):
             },
         )
 
+    def test_closing_de_facto_empty_poll(self):
+        # Add bad votes and close it
+        self.poll.upcoming()
+        self.poll.ongoing()
+        vote1 = self.poll.votes.create(user=self.participant, vote="yes")
+        votes = self.poll.votes.all()
+        self.assertIn(vote1, votes)
+        # Change ER
+        self.poll.electoral_register.voters.remove(self.participant)
+        self.poll.close()
+        self.assertFalse(self.poll.votes.count())
+        self.assertEqual("failed", self.poll.state)
+
     def test_votes_from_non_voters_removed_on_close(self):
         self.poll.upcoming()
         self.poll.ongoing()

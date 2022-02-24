@@ -330,9 +330,6 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         """
         Count the votes and finish up.
         """
-        # Remove bad votes due to a change in electoral register during the poll.
-        # This is probably not allowed in most meetings.
-        self.vote_cleanup_set().delete()
         counter = self.finalize_vote_data()
         assert self.ballot_data
         assert self.ballot_checksum
@@ -374,6 +371,19 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         for proposal in self.proposals.all():
             proposal.publish()
             proposal.save()
+
+    @transition(
+        field=state,
+        source="+",
+        target=PollWf.FAILED,
+        permission=NOT_ALLOWED,
+        custom={"title": _("Failed")},
+    )
+    def failed(self):
+        """
+        Transition to failed when we have some sort of error that's not recoverable.
+        """
+        self._mark_closed()
 
     def _mark_closed(self):
         if not self.closed:
@@ -530,4 +540,10 @@ def finish_closed_poll(
     This method should probably offload this transition change to a worker later on.
     """
     if target == PollWf.CLOSED:
-        instance.finish()
+        # Remove bad votes due to a change in electoral register during the poll.
+        # This is probably not allowed in most meetings.
+        instance.vote_cleanup_set().delete()
+        if instance.votes.count():
+            instance.finish()
+        else:
+            instance.failed()

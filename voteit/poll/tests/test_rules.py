@@ -141,8 +141,7 @@ class PollRulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(DELETE, self.poll))
 
     def test_delete_poll_archived_meeting(self):
-        self.poll.state = self.PollWf.ONGOING
-        self.poll.close()
+        self.poll.state = self.PollWf.FINISHED
         self.poll.save()
         self.meeting.archive()
         self.meeting.save()
