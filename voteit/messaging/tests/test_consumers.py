@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from typing import TYPE_CHECKING
 from unittest import mock
+from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
 from asgiref.sync import sync_to_async
@@ -307,15 +308,15 @@ class ConsumerTests(TestCase):
     async def test_translation_passed_to_deferred_task(self):
         from rq.queue import Queue
 
-        Queue.enqueue = mock.MagicMock()
-        consumer = self._mk_one()
-        await self._mk_communicator(consumer, headers=[(b"accept-language", b"sv")])
-        self.assertEqual("sv", consumer.user_lang)
-        msg = json.dumps({"t": "testing.hello", "p": {"use_worker": "true"}})
-        await consumer.receive(msg)
-        self.assertEqual(
-            "sv", Queue.enqueue.mock_calls[-1].kwargs["mm_data"].get("language")
-        )
+        with patch("rq.queue.Queue.enqueue", mock.MagicMock()):
+            consumer = self._mk_one()
+            await self._mk_communicator(consumer, headers=[(b"accept-language", b"sv")])
+            self.assertEqual("sv", consumer.user_lang)
+            msg = json.dumps({"t": "testing.hello", "p": {"use_worker": "true"}})
+            await consumer.receive(msg)
+            self.assertEqual(
+                "sv", Queue.enqueue.mock_calls[-1].kwargs["mm_data"].get("language")
+            )
 
     async def test_translation_from_async_error(self):
         consumer = self._mk_one()
