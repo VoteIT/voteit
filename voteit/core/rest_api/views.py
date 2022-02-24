@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth import login
 from django.contrib.auth import logout
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
@@ -52,8 +53,15 @@ class UserSearchViewSet(ModelContextMixin, viewsets.ReadOnlyModelViewSet):
         return UserModel.objects.none()
 
 
-class UserView(TransitionsMixin, mixins.UpdateModelMixin, viewsets.GenericViewSet):
-    """A single view to get data for currently logged in user."""
+class UserView(
+    TransitionsMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    """
+    A single view to get data for currently logged in user.
+    """
 
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = UserSerializer
@@ -63,11 +71,16 @@ class UserView(TransitionsMixin, mixins.UpdateModelMixin, viewsets.GenericViewSe
         "partial_update": UpdateUserSerializer,
     }
 
+    @property
+    def User(self):
+        return UserSerializer.Meta.model
+
     def get_queryset(self):
-        User = UserSerializer.Meta.model
-        if self.request.user.pk:
-            return User.objects.filter(pk=self.request.user.pk)
-        return User.objects.none()
+        if self.request.user.pk and self.request.user.identity_id:
+            return self.User.objects.filter(
+                identity_id=self.request.user.identity_id, is_active=True
+            )
+        return self.User.objects.none()
 
     def list(self, request):
         serializer = self.serializer_class(request.user)
@@ -77,3 +90,19 @@ class UserView(TransitionsMixin, mixins.UpdateModelMixin, viewsets.GenericViewSe
     def logout(self, request):
         logout(request)
         return Response()
+
+    @action(methods=["POST"], detail=True)
+    def switch(self, request, pk):
+        user = self.get_object()
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        serializer = self.serializer_class(user)
+        return Response(serializer.data)
+
+    @action(methods=["GET"], detail=False)
+    def alternate(self, request):
+        if request.user.identity_id:
+            qs = self.get_queryset().exclude(pk=request.user.pk)
+        else:
+            qs = self.User.objects.none()
+        serializer = self.serializer_class(qs, many=True)
+        return Response(serializer.data)

@@ -50,7 +50,6 @@ def begin_auth(request):
             "host in redirect_url and request host doesn't match, login would never work. Host must be: %s"
             % redirect_host,
         )
-
     scope = provider.scope
     if "identity" not in scope.split():
         scope += " identity"  # Base identity information
@@ -73,7 +72,7 @@ def begin_auth(request):
 
 
 def finish_auth(request: HttpRequest):
-    # FIXME: Very early, for testing
+    # FIXME This must pass any error state to frontend rather than trying to display errors here
     error = request.GET.get("error", None)
     if error is not None:
         return HttpResponseBadRequest(error)
@@ -122,32 +121,42 @@ def finish_auth(request: HttpRequest):
     data = identity_response.json()
     logger.debug("Identity response: %s", data)
     adapted: ProviderResponseAdapter = provider.response_adapter(data)
-    users = adapted.get_users()
+
     try:
         with transaction.atomic():
-            if users:
-                if len(users) > 1:
-                    # FIXME: How's this choice made?
-                    logger.debug("Identity matched users: %s", [x.pk for x in users])
-                    user = users[0]
-                else:
-                    user = users[0]
-                    logger.debug("Identity matched user: %s", user.pk)
+            inheritable_users_qs = adapted.get_inheritable_users(provider.organisation)
+            for user in inheritable_users_qs:
+                user.identity_id = adapted.identity_id
+                user.save()
+            # Including any newly inherited
+            users_qs = adapted.get_users(provider.organisation)
+            if users_qs.count():
+                logger.debug("Matched %s users", users_qs.count())
+                user = users_qs.first()
             else:
                 user = adapted.register(organisation=provider.organisation)
                 logger.debug("Creating new user: %s", user.pk)
-            adapted.update(user)
+            # FIXME - we want to implement this some other way - probably allow edit?
+            if not user.first_name:
+                adapted.update(user)
             AccessToken.objects.from_response(token_response, user, provider)
             request.session.pop("oauth_state", None)
             request.session.save()
     except DatabaseError:
         # Catch all exceptions here?
+        # FIXME: Sane redirect url
         logger.exception("User registration/login failed:")
         next_url = "localhost:8080/failed_login"  # FIXME
         return HttpResponse(f"Login failed, retry: {next_url}")
     else:
         # Any session login kind with http only cookie would do
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        if users_qs.count() > 1:
+            if "?" in state_data.next:
+                state_data.next += "&users="
+            else:
+                state_data.next += "?users="
+            state_data.next += str(users_qs.count())
         if settings.DEBUG:
             # For dev environment only, redirect back to Vue JS
             hostname = request.get_host().split(":")[0]

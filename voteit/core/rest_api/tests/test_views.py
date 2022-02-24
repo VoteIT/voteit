@@ -28,7 +28,9 @@ class UserSearchViewSetTests(APITestCase):
         cls.other_org_manager = cls.other_org.users.create(username="other_org_manager")
         cls.other_org.add_roles(cls.other_org_manager, "org_manager")
         # And superuser
-        cls.superuser = User.objects.create(username="super", is_superuser=True, organisation=cls.other_org)
+        cls.superuser = User.objects.create(
+            username="super", is_superuser=True, organisation=cls.other_org
+        )
 
     def test_list_superuser(self):
         url = reverse("users-list")
@@ -107,11 +109,20 @@ class UserSearchViewSetTests(APITestCase):
 class UserViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.moderator = User.objects.get(username="moderator")
+        cls.moderator.identity_id = "abc"
+        cls.moderator.save()
+        cls.participant = User.objects.get(username="participant")
+        cls.participant.identity_id = "abc"
+        cls.participant.save()
+
     def setUp(self):
-        self.user = User.objects.get(pk=2)
+        self.participant = User.objects.get(username="participant")
 
     def test_list(self):
-        self.client.force_login(self.user)
+        self.client.force_login(self.participant)
         url = reverse("user-list")
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
@@ -124,8 +135,8 @@ class UserViewSetTests(APITestCase):
         self.assertEqual(401, response.status_code)
 
     def test_update(self):
-        self.client.force_login(self.user)
-        url = reverse("user-detail", kwargs={"pk": self.user.pk})
+        self.client.force_login(self.participant)
+        url = reverse("user-detail", kwargs={"pk": self.participant.pk})
         response = self.client.put(url, data={"userid": "anewone"})
         self.assertEqual(200, response.status_code)
         data = response.json()
@@ -133,28 +144,97 @@ class UserViewSetTests(APITestCase):
         self.assertEqual("anewone", data["userid"])
 
     def test_update_other_user(self):
-        self.client.force_login(self.user)
-        url = reverse("user-detail", kwargs={"pk": 1})
-        response = self.client.put(url, data={"userid": "anewone"})
+        self.client.force_login(self.participant)
+        url = reverse("user-detail", kwargs={"pk": 3})
+        response = self.client.put(url, data={"userid": "aneeewooone"})
         self.assertEqual(404, response.status_code)
 
+    def test_update_owned_other_user(self):
+        self.client.force_login(self.participant)
+        url = reverse("user-detail", kwargs={"pk": 1})
+        response = self.client.put(url, data={"userid": "aneeewooone"})
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertIn("userid", data)
+        self.assertEqual("aneeewooone", data["userid"])
+
     def test_update_exists(self):
-        self.client.force_login(self.user)
-        url = reverse("user-detail", kwargs={"pk": self.user.pk})
+        self.client.force_login(self.participant)
+        url = reverse("user-detail", kwargs={"pk": self.participant.pk})
         response = self.client.put(url, data={"userid": "moderator"})
         self.assertEqual(400, response.status_code)
         data = response.json()
         self.assertIn("userid", data)
 
     def test_update_anon(self):
-        url = reverse("user-detail", kwargs={"pk": self.user.pk})
+        url = reverse("user-detail", kwargs={"pk": self.participant.pk})
         response = self.client.put(url, data={"userid": "moderator"})
         self.assertEqual(401, response.status_code)
 
     def test_update_bad_name(self):
-        self.client.force_login(self.user)
-        url = reverse("user-detail", kwargs={"pk": self.user.pk})
+        self.client.force_login(self.participant)
+        url = reverse("user-detail", kwargs={"pk": self.participant.pk})
         response = self.client.put(url, data={"userid": "öäå"})
         self.assertEqual(400, response.status_code)
         data = response.json()
         self.assertIn("userid", data)
+
+    def test_retrieve_alternate_users(self):
+        self.client.force_login(self.participant)
+        url = reverse("user-alternate")
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(1, len(data))
+        self.assertEqual(
+            {
+                "pk": 1,
+                "state": "incomplete",
+                "userid": "moderator",
+                "full_name": "Moderator",
+                "first_name": "Moderator",
+                "last_name": "",
+                "img_url": None,
+                "organisation": 1,
+                "organisation_roles": [],
+            },
+            data[0],
+        )
+
+    def test_switch_anon(self):
+        url = reverse("user-switch", kwargs={"pk": self.participant.pk})
+        response = self.client.post(url)
+        self.assertEqual(401, response.status_code)
+
+    def test_switch_authenticated(self):
+        self.client.force_login(self.participant)
+        url = reverse("user-switch", kwargs={"pk": self.moderator.pk})
+        response = self.client.post(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(
+            {
+                "first_name": "Moderator",
+                "full_name": "Moderator",
+                "img_url": None,
+                "last_name": "",
+                "organisation": 1,
+                "organisation_roles": [],
+                "pk": 1,
+                "state": "incomplete",
+                "userid": "moderator",
+            },
+            data,
+        )
+
+    def test_switch_authenticated_non_allowed_user(self):
+        self.client.force_login(self.participant)
+        url = reverse("user-switch", kwargs={"pk": 3})
+        response = self.client.post(url)
+        self.assertEqual(404, response.status_code)
+
+    def test_logout(self):
+        self.client.force_login(self.participant)
+        url = reverse("user-logout")
+        response = self.client.post(url)
+        # FIXME: Check destroyed session?

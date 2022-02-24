@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
+
 from typing import Dict
-from typing import List
-from typing import Optional
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -14,6 +13,7 @@ from django.utils.functional import cached_property
 if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
     from django.contrib.auth.models import AbstractUser
+    from django.db.models import QuerySet
 
 
 class ProviderResponseAdapter(ABC):
@@ -45,10 +45,15 @@ class ProviderResponseAdapter(ABC):
     def update(self, user: AbstractUser):
         pass
 
-    def get_users(self, default=None) -> Optional[List[AbstractUser]]:
-        users = self.User.objects.filter(identity_id=self.identity_id).all()
-        users = list(users)
-        return users and users or default
+    def get_users(self, organisation: Organisation) -> QuerySet:
+        """
+        Return users queryset sorted on last login.
+        """
+        return self.User.objects.filter(
+            identity_id=self.identity_id,
+            is_active=True,
+            organisation=organisation,
+        ).order_by("last_login")
 
     def get_emails(self):
         user_data = self.response.get("user_data", None)
@@ -60,6 +65,11 @@ class ProviderResponseAdapter(ABC):
                     emails.add(item["data"])
         return emails
 
-    def get_inheritable_users(self):
+    def get_inheritable_users(self, organisation: Organisation) -> QuerySet:
         emails = self.get_emails()
-        return list(self.User.objects.filter(email__in=emails))
+        return self.User.objects.filter(
+            email__in=emails,
+            is_active=True,
+            identity_id__isnull=True,
+            organisation=organisation,
+        )
