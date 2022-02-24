@@ -31,7 +31,7 @@ class Presence(MeetingContext):
     presence_check: PresenceCheck = models.ForeignKey(
         "PresenceCheck", on_delete=models.CASCADE, related_name="presences"
     )
-    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    created: datetime = models.DateTimeField(editable=False, default=now)
 
     @property
     def meeting(self) -> Optional[Meeting]:
@@ -80,7 +80,7 @@ class PresenceCheck(MeetingContext):
     meeting: Meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="presence_checks"
     )
-    opened: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    opened: datetime = models.DateTimeField(editable=False, default=now)
     closed: Optional[datetime] = models.DateTimeField(
         editable=False, null=True, blank=True
     )

@@ -31,14 +31,19 @@ class Connection(models.Model):
     awol: bool = models.BooleanField(default=False)
     # IP?
     first_seen = models.DateTimeField(
-        auto_now_add=True, verbose_name=_("When the connection was made")
+        auto_now_add=True,
+        editable=False,
+        verbose_name=_("When the connection was made"),
     )
     # Note that last_action is not done automatically, so this is an estimate
     last_action = models.DateTimeField(
-        auto_now=True, verbose_name=_("Last recorded action of this consumer.")
+        auto_now=True,
+        editable=False,
+        verbose_name=_("Last recorded action of this consumer."),
     )
     last_query = models.DateTimeField(
         auto_now_add=True,
+        editable=False,
         verbose_name=_(
             "Last time we sent a message to the consumer to check if it's online."
         ),

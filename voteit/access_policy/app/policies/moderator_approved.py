@@ -74,7 +74,7 @@ class AccessRequest(MeetingContext):
     )
     message: Optional[str] = models.TextField(blank=True, null=True)
     moderator_message: Optional[str] = models.TextField(blank=True, null=True)
-    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    created: datetime = models.DateTimeField(editable=False, default=now)
     handled_ts: Optional[datetime] = models.DateTimeField(
         blank=True, null=True, editable=False
     )

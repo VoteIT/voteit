@@ -4,17 +4,17 @@ from datetime import datetime
 from logging import getLogger
 from random import sample
 from string import ascii_lowercase
-from typing import Optional
-from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
 from django.db import transaction
+from django.utils.timezone import now
 from django_fsm import FSMField
 from django_fsm import transition
-from typing import List
-
 from model_utils.managers import InheritanceManager
+from typing import List
+from typing import Optional
+from typing import TYPE_CHECKING
 
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
@@ -180,7 +180,7 @@ class TextDocument(AgendaItemContext, MeetingContext):
     title: str = models.CharField(max_length=50, default="")
     body: str = models.TextField(default="")
     base_tag: str = models.CharField(max_length=30)
-    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    created: datetime = models.DateTimeField(editable=False, default=now)
     modified: datetime = models.DateTimeField(editable=False, auto_now=True)
     author: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -273,7 +273,7 @@ class TextParagraph(AgendaItemContext, MeetingContext):
 
     name = "text_paragraph"
     body: str = models.TextField(editable=False)
-    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    created: datetime = models.DateTimeField(editable=False, default=now)
     modified: datetime = models.DateTimeField(editable=False, auto_now=True)
     paragraph_id: int = models.PositiveSmallIntegerField(default=1)
     text_document: TextDocument = models.ForeignKey(

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from abc import ABC
 from datetime import datetime
+
+from typing import List
 from typing import Optional
 
 from django.contrib.auth import get_user_model
@@ -303,10 +305,8 @@ class ModeratorSpeakerListShuffle(ListMessage):
 
 class OrderSchema(BaseModel):
     pk: int  # speaker list pk
-    queue: list[int]  # user pks, unique values
-    history: list[
-        list[int, int]
-    ]  # List of [User pk, seconds] in descending spoken order
+    queue: List[int]  # user pks, unique values
+    history: List[List[int]]  # List of [User pk, seconds] in descending spoken order
     current: Optional[int]  # current user pk if speaker
 
 
@@ -353,7 +353,7 @@ class SpeakerSystemSchema(BaseModel):
     settings: Optional[dict]
     safe_positions: Optional[int]
     active_list: Optional[int]
-    meeting_roles_to_speaker: list[str]
+    meeting_roles_to_speaker: List[str]
 
 
 @outgoing

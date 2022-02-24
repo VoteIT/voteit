@@ -247,7 +247,7 @@ class LastRead(AgendaItemContext, MeetingContext):
         on_delete=models.CASCADE,
         related_name="last_read_set",
     )
-    timestamp: datetime = models.DateTimeField(auto_now_add=True)
+    timestamp: datetime = models.DateTimeField(auto_now_add=True, editable=False)
 
     def save(self, **kwargs):
         if self.pk is None:  # created

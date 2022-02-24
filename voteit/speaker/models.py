@@ -222,7 +222,7 @@ class Speaker(models.Model):
         "SpeakerList", on_delete=models.CASCADE, related_name="speaker_items"
     )
     # Note: Created is also needed for "historic" positions within a speaker list in case they're rearranged.
-    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    created: datetime = models.DateTimeField(editable=False, default=now)
     order: Optional[int] = models.PositiveSmallIntegerField(null=True)
     safe_pos: bool = models.BooleanField(default=False)
     started: Optional[datetime] = models.DateTimeField(null=True)

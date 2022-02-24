@@ -76,7 +76,7 @@ class VoterWeight(models.Model):
 
 class ElectoralRegister(MeetingContext):
     name = "electoral_register"
-    created = models.DateTimeField(editable=False, auto_now_add=True)
+    created = models.DateTimeField(editable=False, default=now)
     voters = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         through=VoterWeight,
@@ -136,7 +136,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     proposals = models.ManyToManyField("proposal.Proposal", related_name="polls")
     method_name: str = models.CharField(max_length=20)
     settings_data: Optional[Dict] = models.JSONField(null=True, blank=True)
-    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    created: datetime = models.DateTimeField(editable=False, default=now)
     started: Optional[datetime] = models.DateTimeField(editable=False, null=True)
     closed: Optional[datetime] = models.DateTimeField(editable=False, null=True)
     initial_electoral_register: Optional[ElectoralRegister] = models.ForeignKey(
@@ -479,7 +479,7 @@ class Vote(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT
     )
     poll: Poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name="votes")
-    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    created: datetime = models.DateTimeField(editable=False, default=now)
     changed: datetime = models.DateTimeField(editable=False, auto_now=True)
     abstain: bool = models.BooleanField(default=False)
     vote_data: Optional[str] = models.TextField(

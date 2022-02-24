@@ -55,9 +55,7 @@ class MeetingInviteManager(models.Manager):
             )
 
     def find_open_invites(self, organisation=None, /, **kw) -> models.QuerySet:
-        qs = self.find_invites(**kw).filter(
-            state=InviteWf.OPEN
-        )
+        qs = self.find_invites(**kw).filter(state=InviteWf.OPEN)
         if organisation is None:
             return qs
         return qs.filter(meeting__organisation=organisation)
@@ -94,7 +92,7 @@ class MeetingInvite(MeetingContext):
         default=SendWf.initial, choices=SendWf.choices(), editable=False
     )
     last_sent: Optional[datetime] = models.DateTimeField(blank=True, null=True)
-    created: datetime = models.DateTimeField(auto_now_add=True, editable=False)
+    created: datetime = models.DateTimeField(default=now, editable=False)
     created_by: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -194,7 +192,7 @@ class InviteDispatch(models.Model):
     subject: str = models.CharField(max_length=100, default="")
     body: str = RichTextField(verbose_name="Message body", default="")
     dispatcher_name: str = models.CharField(max_length=30, default="send_email")
-    created: datetime = models.DateTimeField(auto_now_add=True)
+    created: datetime = models.DateTimeField(default=now, editable=False)
     created_by: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils.timezone import now
+from typing import Optional
 
 from voteit.meeting.models import Meeting
 
@@ -27,7 +28,7 @@ class ParticipantNumber(models.Model):
     pns: PNSystem = models.ForeignKey(
         "PNSystem", on_delete=models.CASCADE, related_name="numbers"
     )
-    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    created: datetime = models.DateTimeField(editable=False, default=now)
 
     importers = {"organisation": {"remap_relations": {"pnsystem": {"pns"}}}}
 

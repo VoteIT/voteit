@@ -2,12 +2,6 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from datetime import datetime
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Set
-from typing import TYPE_CHECKING
-from typing import Union
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -16,16 +10,22 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Set
+from typing import TYPE_CHECKING
+from typing import Union
+
 from voteit.core.abcs import ABCModel
 from voteit.core.fields import RichTextField
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
-from voteit.core.utils import get_tagged_hashtags
-from voteit.core.utils import get_tagged_userids
 from voteit.core.utils import strict_clean_html
 from voteit.core.validators import UserIDValidator
 from voteit.core.workflows import UserWf
@@ -327,7 +327,7 @@ class Roles(ABCModel):
 
 class BaseContent(ABCModel):
     body: str = RichTextField(blank=True, default="", html_cleaner=strict_clean_html)
-    created: datetime = models.DateTimeField(editable=False, auto_now_add=True)
+    created: datetime = models.DateTimeField(editable=False, default=now)
     author: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
