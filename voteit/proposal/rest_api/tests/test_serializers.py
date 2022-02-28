@@ -1,9 +1,14 @@
+from __future__ import annotations
 from datetime import datetime
 
 from django.test import RequestFactory
 from django.test import TestCase
+from typing import TYPE_CHECKING
 
 from voteit.core.testing import mk_hashtag
+
+if TYPE_CHECKING:
+    from voteit.proposal.models import DiffProposal
 
 
 class GenericProposalSerializerTests(TestCase):
@@ -187,7 +192,8 @@ class DiffProposalDetailSerializerTests(TestCase):
         )
         cls.para: TextParagraph = cls.text_doc.text_paragraphs.first()
         cls.diff_prop: DiffProposal = cls.para.proposals.create(
-            body="I am the eggman\nI am some kind of mamal"
+            body="I am the eggman\nI am some kind of mamal",
+            agenda_item=cls.ai,
         )
 
     @property
@@ -205,6 +211,82 @@ class DiffProposalDetailSerializerTests(TestCase):
             'I am the eggman <br/> I am <span class="text-diff-removed">the walrus</span> <span class="text-diff-added">some kind of mamal</span>',
             data["body_diff"],
         )
+
+    def test_patch(self):
+        serializer = self._cut(
+            self.diff_prop, data={"body": "Hello world"}, partial=True
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+
+    def test_patch_identical(self):
+        serializer = self._cut(
+            self.diff_prop, data={"body": self.para.body}, partial=True
+        )
+        serializer.is_valid()
+        self.assertIn("body", serializer.errors)
+
+
+class DiffProposalCreateSerializerTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.agenda.models import AgendaItem
+        from voteit.proposal.models import TextParagraph
+        from voteit.proposal.models import TextDocument
+
+        cls.meeting: Meeting = Meeting.objects.create(
+            title="Test meeting", state="ongoing"
+        )
+        cls.user = cls.meeting.participants.create(username="participant")
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(
+            state="ongoing", title="Ongoing"
+        )
+        cls.text_doc: TextDocument = cls.ai.text_documents.create(
+            body="I am the eggman\nI am the walrus"
+        )
+        cls.para: TextParagraph = cls.text_doc.text_paragraphs.first()
+
+    @property
+    def _cut(self):
+        from voteit.proposal.rest_api.serializers import DiffProposalCreateSerializer
+
+        return DiffProposalCreateSerializer
+
+    def _mk_request(self):
+        request = RequestFactory().get("/")
+        request.user = self.user
+        return request
+
+    def test_create(self):
+        body = "I am the eggman\nI am a very small animal"
+        request = self._mk_request()
+        serializer = self._cut(
+            data={
+                "body": body,
+                "paragraph": self.para.pk,
+                "agenda_item": self.ai.pk,
+            },
+            context={"request": request},
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance: DiffProposal = serializer.save()
+        self.assertEqual(instance.body, body)
+
+    def test_create_without_difference(self):
+        body = "I am the eggman\nI am the walrus"
+        request = self._mk_request()
+        serializer = self._cut(
+            data={
+                "body": body,
+                "paragraph": self.para.pk,
+                "agenda_item": self.ai.pk,
+            },
+            context={"request": request},
+        )
+        serializer.is_valid()
+        self.assertIn("body", serializer.errors)
 
 
 class TextDocumentSerializerTests(TestCase):

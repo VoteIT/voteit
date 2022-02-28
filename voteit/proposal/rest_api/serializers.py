@@ -172,6 +172,15 @@ class DiffProposalCreateSerializer(ProposalCreateSerializer):
     def get_body_diff_brief(self, instance: Union[OrderedDict, DiffProposal]) -> str:
         return self.get_body_diff(instance, brief=True)
 
+    def validate(self, attrs: OrderedDict):
+        attrs = super().validate(attrs)
+        if isinstance(attrs["paragraph"], TextParagraph):
+            if attrs["paragraph"].body == attrs["body"]:
+                raise ValidationError({"body": [_("identical to original text")]})
+        else:
+            raise TypeError("Got something other than TextParagraph as 'paragraph'")
+        return attrs
+
 
 class DiffProposalDetailSerializer(ProposalDetailSerializer):
     body_diff = serializers.SerializerMethodField()
@@ -193,6 +202,11 @@ class DiffProposalDetailSerializer(ProposalDetailSerializer):
     def get_body_diff_brief(self, instance: DiffProposal) -> str:
         ch = Changes(instance.paragraph.body, instance.body)
         return ch.get_html(brief=True)
+
+    def validate_body(self, value):
+        if self.instance.paragraph.body == value:
+            raise ValidationError(_("identical to original text"))
+        return value
 
 
 GenericProposalSerializer.registry["proposal"] = ProposalDetailSerializer

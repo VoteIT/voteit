@@ -215,6 +215,8 @@ class RichTextSerializerMixin:
         # about users through mentions, so if this doesn't work we need to raise a validation error.
         with suppress(AttributeError, ObjectDoesNotExist):
             return self.instance.meeting.participants
+        with suppress(AttributeError, ObjectDoesNotExist):
+            return self.instance.agenda_item.meeting.participants
         logger.warning(
             "There's no suitable context to pick up user mentions from. Serializer: %s Data:\n%s",
             self.__class__.__name__,
