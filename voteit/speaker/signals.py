@@ -126,7 +126,7 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
 @receiver(speaker_started)
 def notify_started_speaker(speaker: Speaker, **kwargs):
     msg = SpeakerStarted(
-        userid=speaker.user.pk,
+        user=speaker.user.pk,
         pk=speaker.pk,
         speaker_list=speaker.speaker_list.pk,
         started=speaker.started,
@@ -137,7 +137,7 @@ def notify_started_speaker(speaker: Speaker, **kwargs):
 @receiver(speaker_stopped)
 def notify_stopped_speaker(speaker: Speaker, **kwargs):
     msg = SpeakerStopped(
-        userid=speaker.user.pk,
+        user=speaker.user.pk,
         pk=speaker.pk,
         speaker_list=speaker.speaker_list.pk,
         started=speaker.started,
@@ -230,7 +230,7 @@ def meeting_channel_subscribed(
                 speaker = system.active_list.current
                 # Append current ongoing speaker
                 msg = SpeakerStarted(
-                    userid=speaker.user.pk,
+                    user=speaker.user.pk,
                     pk=speaker.pk,
                     speaker_list=system.active_list.pk,
                     started=speaker.started,

@@ -178,7 +178,7 @@ class StartSpeakerInListTests(TestCase):
 
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
-        kw.setdefault("userid", self.user.pk)
+        kw.setdefault("user", self.user.pk)
         return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
 
     def test_start_speaker(self):
@@ -243,7 +243,7 @@ class StopSpeakerInListTests(TestCase):
 
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
-        kw.setdefault("userid", self.user.pk)
+        kw.setdefault("user", self.user.pk)
         return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
 
     def test_stop_speaker(self):
@@ -261,7 +261,7 @@ class StopSpeakerInListTests(TestCase):
 
     def test_stop_speaker_another_speaker_is_active(self):
         nonspeaking_user = self.list.speakers.create(username="falsy")
-        msg = self._mk_one(userid=nonspeaking_user.pk)
+        msg = self._mk_one(user=nonspeaking_user.pk)
         self.assertRaises(ValidationErrorMsg, msg.run_job)
 
 
@@ -294,7 +294,7 @@ class ModeratorSpeakerListEnterTests(TestCase):
 
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
-        kw.setdefault("userid", self.user.pk)
+        kw.setdefault("user", self.user.pk)
         return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
 
     def test_enter(self):
@@ -316,13 +316,13 @@ class ModeratorSpeakerListEnterTests(TestCase):
         msg.run_job()
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
 
-    def test_enter_wrong_userid(self):
-        msg = self._mk_one(userid=-1)
+    def test_enter_wrong_user(self):
+        msg = self._mk_one(user=-1)
         self.assertRaises(NotFoundError, msg.run_job)
 
     def test_enter_user_not_in_meeting(self):
         outsider = User.objects.create(username="newkid")
-        msg = self._mk_one(userid=outsider.pk)
+        msg = self._mk_one(user=outsider.pk)
         self.assertRaises(BadRequestError, msg.run_job)
 
     def test_enter_user_already_speaking(self):
@@ -357,7 +357,7 @@ class ModeratorSpeakerListLeaveTests(TestCase):
 
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
-        kw.setdefault("userid", self.user.pk)
+        kw.setdefault("user", self.user.pk)
         return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
 
     def test_leave(self):

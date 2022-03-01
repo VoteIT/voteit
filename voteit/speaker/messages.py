@@ -33,7 +33,7 @@ class SpeakerListActionSchema(BaseModel):
 
 
 class SpeakerListUserSchema(SpeakerListActionSchema):
-    userid: int  # Moderators may also enter someone else.
+    user: int  # Moderators may also enter someone else.
 
 
 class ListMessage(BaseIncomingMessage, DeferredJob, ContextAction[SpeakerList], ABC):
@@ -54,7 +54,7 @@ class ModeratorListMessage(
     def get_user(self) -> AbstractUser:
         User = get_user_model()
         try:
-            return User.objects.get(pk=self.data.userid)
+            return User.objects.get(pk=self.data.user)
         except User.DoesNotExist:
             raise NotFoundError.from_message(
                 self, msg=_("No user with pk %(pk)s") % {"pk": self.data.pk}
@@ -133,7 +133,7 @@ class SetActiveList(ListMessage):
 
 @incoming
 class StartSpeakerInList(ModeratorListMessage):
-    """Start userid. Ignore if not found or already speaking."""
+    """Start user. Ignore if not found or already speaking."""
 
     name = "speaker_list.start_user"
     permission = SpeakerListPermissions.START
@@ -150,7 +150,7 @@ class StartSpeakerInList(ModeratorListMessage):
                 msg=_("No such user in queue."),
                 errors=[
                     {
-                        "loc": ("userid",),
+                        "loc": ("user",),
                         "msg": _("user_pk %s not in queue") % user.pk,
                         "type": "value.error",
                     }
@@ -165,7 +165,7 @@ class StartSpeakerInList(ModeratorListMessage):
 
 @incoming
 class StopSpeakerInList(ModeratorListMessage):
-    """Stop userid. Ignore if not speaking."""
+    """Stop user. Ignore if not speaking."""
 
     name = "speaker_list.stop_user"
     permission = SpeakerListPermissions.STOP
@@ -180,7 +180,7 @@ class StopSpeakerInList(ModeratorListMessage):
                 msg=_("No current speaker"),
                 errors=[
                     {
-                        "loc": ("userid",),
+                        "loc": ("user",),
                         "msg": "",
                         "type": "value.error",
                     }
@@ -192,7 +192,7 @@ class StopSpeakerInList(ModeratorListMessage):
                 msg=_("That user isn't speaking."),
                 errors=[
                     {
-                        "loc": ("userid",),
+                        "loc": ("user",),
                         "msg": _("user_pk %s") % user.pk,
                         "type": "value.error",
                     }
@@ -207,7 +207,7 @@ class StopSpeakerInList(ModeratorListMessage):
 
 class SpeakerStatsSchema(BaseModel):
     pk: int  # Speaker pk
-    userid: int  # User speaker
+    user: int  # User speaker
     speaker_list: int
     started: Optional[datetime]
     seconds: Optional[int]
