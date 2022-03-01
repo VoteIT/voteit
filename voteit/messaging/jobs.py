@@ -27,7 +27,7 @@ def _set_lang(lang=None):
     activate(lang)
 
 
-@job(DEFAULT_QUEUE, timeout=30)
+@job(DEFAULT_QUEUE, timeout=30, ttl=20)
 def run_job(msg_data: Dict, mm_data: Dict, incoming=True, atomic=True):
     """
     This is the job that handles all DeferredJob messages.
@@ -53,7 +53,7 @@ def run_job(msg_data: Dict, mm_data: Dict, incoming=True, atomic=True):
         err.send_outgoing(instance.mm.consumer_name)
 
 
-@job(DEFAULT_QUEUE, timeout=5)
+@job(DEFAULT_QUEUE, timeout=5, ttl=20)
 def signal_websocket_connect(
     user_pk: int = None, consumer_name: str = "", language: Optional[str] = None
 ):
@@ -72,7 +72,7 @@ def signal_websocket_connect(
     )
 
 
-@job(DEFAULT_QUEUE, timeout=5)
+@job(DEFAULT_QUEUE, timeout=5, ttl=20)
 def signal_websocket_close(
     user_pk: int = None,
     consumer_name: str = "",
