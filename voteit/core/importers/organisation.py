@@ -22,7 +22,6 @@ class OrganisationImporter(BaseImporter):
 
     def run(self, dry=False, existing_organisation_pk=None):
         # We need to muck about with all objects so keeping them in memory (or later in a temp file) is required :/
-        # all_objects = list(self.load_objects())
         # Create new organisation if existing_organisation_pk isn't specified
         if existing_organisation_pk:
             organisation = Organisation.objects.get(pk=existing_organisation_pk)
@@ -31,7 +30,6 @@ class OrganisationImporter(BaseImporter):
         deserialized_organisation = None
         email_to_import_pk = {}
         username_to_import_pk = {}  # In case of duplicate run!
-        # import_pk_to_db_pk = {}
 
         for deserialized in self.load_objects():
             shortname = get_model_shortname(deserialized.object)
@@ -144,4 +142,5 @@ class OrganisationImporter(BaseImporter):
             if dry:
                 print("== Dry-run - aborting transaction ==")
                 transaction.set_rollback(True)
+
         self.stream.close()
