@@ -6,6 +6,7 @@ from voteit.meeting.models import Meeting
 
 class AgendaViewSet(DefaultModelViewSet):
     serializer_class = serializers.AgendaItemSerializer
+    serializer_classes = {"create": serializers.CreateAgendaItemSerializer}
     context_queryset = Meeting.objects.all()
     context_lookup_kwarg = "meeting"
     queryset = AgendaItem.objects.all()

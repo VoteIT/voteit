@@ -16,7 +16,12 @@ class AgendaItemViewTestCase(APITestCase):
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
+        cls.other_meeting: Meeting = Meeting.objects.create(
+            title="Other meeting", state="ongoing"
+        )
+        cls.ai = cls.meeting.agenda_items.create(
+            state="ongoing", title="Ongoing", tags=["hello", "world"]
+        )
         cls.ai_private = cls.meeting.agenda_items.create(title="Private")
         cls.participant: User = User.objects.create_user("participant")
         cls.moderator: User = User.objects.create_user("moderator")
@@ -70,21 +75,21 @@ class AgendaItemViewTestCase(APITestCase):
         self.assertEqual(0, len(response.json()))
 
     def test_transition_moderator(self):
-        url = f"/api/agenda-items/{self.ai.pk}/transitions/"
+        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
         data = {"transition": "upcoming"}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 201)
 
     def test_bad_transition_moderator(self):
-        url = f"/api/agenda-items/{self.ai.pk}/transitions/"
+        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
         data = {"transition": "wooohoooo"}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 400)
 
     def test_transition_unauthorized_users(self):
-        url = f"/api/agenda-items/{self.ai.pk}/transitions/"
+        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
         data = {"transition": "upcoming"}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 401)
@@ -95,11 +100,19 @@ class AgendaItemViewTestCase(APITestCase):
     def test_transition_conditions_not_met(self):
         self.meeting.state = "upcoming"
         self.meeting.save()
-        url = f"/api/agenda-items/{self.ai_private.pk}/transitions/"
+        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai_private.pk})
         data = {"transition": "ongoing"}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(
-            response.status_code,
-            400,
-        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_patch_change_meeting(self):
+        url = reverse("agendaitem-detail", kwargs={"pk": self.ai.pk})
+        data = {
+            "meeting": self.other_meeting.pk,
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(self.meeting.pk, data["meeting"])

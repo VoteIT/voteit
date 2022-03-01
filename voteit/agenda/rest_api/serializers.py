@@ -1,25 +1,34 @@
-from datetime import datetime
-from typing import Optional
-
 from rest_framework import serializers
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.rest_api.serializers import BaseModelSerializer
+from voteit.core.rest_api.serializers import RichTextSerializerMixin
 
 
-class AgendaItemSerializer(BaseModelSerializer):
-    # proposals = ProposalSerializer(many=True, read_only=True)
-    # Note: This won't have access to the request, so no url thingies here!
-    # FIXME: This needs testing and separation - one serializer for create and one for the other
+class AgendaItemSerializer(RichTextSerializerMixin, BaseModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = AgendaItem
-        read_only_fields = ("order", "related_modified")
-        fields = read_only_fields + (
-            "pk",
+        read_only_fields = (
+            "author",
             "meeting",
-            "title",
-            "body",
+            "mentions",
+            "order",
+            "related_modified",
             "state",
-            "block_proposals",
-            "block_discussion",
+        )
+        exclude = (
+            "author",
+            "last_modified_by",
+        )
+
+
+class CreateAgendaItemSerializer(AgendaItemSerializer):
+    class Meta(AgendaItemSerializer.Meta):
+        read_only_fields = (
+            "mentions",
+            "order",
+            "related_modified",
+            "state",
         )
