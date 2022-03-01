@@ -321,19 +321,18 @@ class DeferredJob(ABC):
     @staticmethod
     def handle_failure(job, connection, exc_type, exc_value, traceback):
         """
-        Failure callbacks are functions that accept job, connection, type, value and traceback arguments. type, value and traceback values returned by sys.exc_info(), which is the exception raised when executing your job.
+        Failure callbacks are functions that accept job, connection, type, value and traceback arguments.
+        type, value and traceback values returned by sys.exc_info(),
+        which is the exception raised when executing your job.
 
-            def report_failure(job, connection, type, value, traceback):
+        See RQs docs
         """
-        print(job, connection, exc_type, exc_value, traceback)
         mm = job.kwargs.get("mm_data", {})
         if mm:
             message_id = mm.get("message_id", None)
             consumer_name = mm.get("consumer_name", None)
             if message_id and consumer_name:
                 from voteit.messaging.errors import JobError
-
-                # FIXME: msg?
                 err = JobError(mm=mm, msg=str(exc_value))
                 err.send_outgoing(consumer_name, on_commit=False)
                 return err  # For testing, has no effect
