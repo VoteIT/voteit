@@ -180,5 +180,5 @@ class ListReactionUsersTests(TestCase):
         response = msg.run_job()
         self.assertEqual("reaction.list", response.name)
         self.assertEqual(
-            {self.voter.pk, self.participant.pk}, set(response.data.userids)
+            {self.voter.pk, self.participant.pk}, set(response.data.users)
         )

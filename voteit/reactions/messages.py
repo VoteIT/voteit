@@ -56,7 +56,7 @@ class ReactionCountSchema(ReactionSchema):
 
 
 class ReactionUserListSchema(ReactionSchema):
-    userids: List[int]
+    users: List[int]
 
 
 class UserReactionResponseSchema(ReactionSchema):
@@ -157,11 +157,11 @@ class ListReactionUsers(BaseObjectAction):
         # Already validated
         model = get_model_by_shortname(model_shortname)
         ct = ContentType.objects.get_for_model(model)
-        userids = self.context.reactions.filter(
+        user_pks = self.context.reactions.filter(
             object_id=self.data.object_id, content_type=ct
         ).values_list("user", flat=True)
         response = ReactionUserListResponse.from_message(
-            self, userids=list(userids), **self.data.dict()
+            self, users=list(user_pks), **self.data.dict()
         )
         response.send_outgoing(self.mm.consumer_name, success=True)
         return response
