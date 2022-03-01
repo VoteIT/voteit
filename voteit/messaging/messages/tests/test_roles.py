@@ -132,7 +132,7 @@ class RolesIntegrationTests(TransactionTestCase):
             # User A sends this message
             msg = RemoveRoles(
                 mm={"user_pk": self.user_a.pk},
-                userids=[self.user_a.pk, self.user_b.pk],
+                users=[self.user_a.pk, self.user_b.pk],
                 roles=["moderator"],
                 model="meeting",
                 pk=self.meeting.pk,

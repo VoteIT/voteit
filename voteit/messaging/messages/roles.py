@@ -40,18 +40,18 @@ User = get_user_model()
 class ChangeRolesSchema(BaseModel):
     """
     Typical valid input:
-    >>> ChangeRolesSchema(userids=[1], roles=["participant"], model="meeting", pk=2)
-    ChangeRolesSchema(pk=2, userids=[1], roles=['participant'], model='meeting')
+    >>> ChangeRolesSchema(users=[1], roles=["participant"], model="meeting", pk=2)
+    ChangeRolesSchema(pk=2, users=[1], roles=['participant'], model='meeting')
 
     Valid role but not for this context:
-    >>> ChangeRolesSchema(userids=[1], roles=["speaker"], model="meeting", pk=2)
+    >>> ChangeRolesSchema(users=[1], roles=["speaker"], model="meeting", pk=2)
     Traceback (most recent call last):
     ...
     pydantic.error_wrappers.ValidationError:
     """
 
     pk: int
-    userids: List[int]
+    users: List[int]
     roles: List[str]  # We have no clue of roles are valid here
     model: str  # The short name of the model to change roles in
 
@@ -82,12 +82,12 @@ class BaseRoles(BaseIncomingMessage, DeferredJob, ContextAction):
         # Permission
         self.assert_perm(msg=_("You're not allowed to change roles"))
         # Users
-        users_qs = User.objects.filter(pk__in=self.data.userids)
-        if len(self.data.userids) != users_qs.count():
+        users_qs = User.objects.filter(pk__in=self.data.users)
+        if len(self.data.users) != users_qs.count():
             raise ValidationErrorMsg.from_message(
                 self,
                 msg=_("Some users don't exist, aborting"),
-                errors=[{"loc": ("userids",), "msg": "Invalid", "type": "value.error"}],
+                errors=[{"loc": ("users",), "msg": "Invalid", "type": "value.error"}],
             )
         return users_qs
 
@@ -135,8 +135,8 @@ class RemoveRoles(BaseRoles):
 class GetRolesSchema(BaseModel):
     pk: int = Field(title="pk of context")
     model: str = Field(title="Model name, lowercased, like 'agenda_item'")
-    filter_userids: Optional[List[int]] = Field(
-        title="If set: Only check these userids"
+    filter_users: Optional[List[int]] = Field(
+        title="If set: Only check these users"
     )
     _validate_model = validator("model", allow_reuse=True)(validate_roles_context_model)
 
@@ -164,8 +164,8 @@ class GetRoles(BaseIncomingMessage, DeferredJob, ContextAction):
     def run_job(self) -> AssignedRolesResponse:
         self.assert_perm()
         kwargs = dict(context=self.context)
-        if self.data.filter_userids:
-            kwargs["user__in"] = self.data.userids
+        if self.data.filter_users:
+            kwargs["user__in"] = self.data.users
         qs = self.context.roles_cls.objects.filter(**kwargs).values(
             "user_id", "assigned"
         )
