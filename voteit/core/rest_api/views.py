@@ -62,7 +62,6 @@ class UserView(
     """
     A single view to get data for currently logged in user.
     """
-
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = UserSerializer
     serializer_classes = {
@@ -76,10 +75,13 @@ class UserView(
         return UserSerializer.Meta.model
 
     def get_queryset(self):
-        if self.request.user.pk and self.request.user.identity_id:
-            return self.User.objects.filter(
-                identity_id=self.request.user.identity_id, is_active=True
-            )
+        if self.request.user.pk:
+            if self.request.user.identity_id:
+                return self.User.objects.filter(
+                    identity_id=self.request.user.identity_id, is_active=True
+                )
+            # Only for manually created users, i.e. in dev environment
+            return self.User.objects.filter(pk=self.request.user.pk)
         return self.User.objects.none()
 
     def list(self, request):
