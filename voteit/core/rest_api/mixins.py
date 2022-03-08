@@ -269,11 +269,19 @@ class TransitionsMixin(SerializerClassesMixin):
         return super().get_serializer_class()
 
 
-class DefaultQS:
+class DefaultQS(ABC):
+    @abstractmethod
     def get_queryset(self):
-        if self.action in ("list",):  # Permission checks will never work
-            if self.request.user.is_superuser:
-                return self.queryset
-            else:
-                return self.queryset.none()
-        return self.queryset
+        """
+        Implement a proper check for list actions, like
+        if self.action == 'list':
+            ...
+
+        DRF doesn't handle permissions for list operations
+        """
+        # if self.action in ("list",):  # Permission checks will never work
+        #     if self.request.user.is_superuser:
+        #         return self.queryset
+        #     else:
+        #         return self.queryset.none()
+        # return self.queryset

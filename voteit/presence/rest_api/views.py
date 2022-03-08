@@ -3,6 +3,7 @@ from voteit.meeting.models import Meeting
 from voteit.presence.models import PresenceSystem, PresenceCheck
 
 from . import serializers
+from ...meeting.permissions import MeetingPermissions
 
 
 class PresenceSystemViewSet(DefaultModelViewSet):
@@ -14,7 +15,15 @@ class PresenceSystemViewSet(DefaultModelViewSet):
     context_lookup_kwarg = "meeting"
     model = PresenceSystem
     queryset = PresenceSystem.objects.all()
-    # FIXME: Queryset that actually works for list rather than default?
+
+    def get_queryset(self):
+        if self.action == "list":
+            meeting = self.get_context(self.request)
+            if self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
+                return self.queryset.filter(meeting=meeting)
+            else:
+                return self.queryset.none()
+        return self.queryset
 
 
 class PresenceCheckViewSet(DefaultModelViewSet):
@@ -23,3 +32,12 @@ class PresenceCheckViewSet(DefaultModelViewSet):
     context_lookup_kwarg = "meeting"
     model = PresenceCheck
     queryset = PresenceCheck.objects.all()
+
+    def get_queryset(self):
+        if self.action == "list":
+            meeting = self.get_context(self.request)
+            if self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
+                return self.queryset.filter(meeting=meeting)
+            else:
+                return self.queryset.none()
+        return self.queryset

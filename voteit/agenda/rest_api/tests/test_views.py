@@ -64,7 +64,7 @@ class AgendaItemViewTestCase(APITestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
 
-    def test_get(self):
+    def test_list(self):
         url = reverse("agendaitem-list")
         data = {
             "meeting": self.meeting.pk,
@@ -72,7 +72,7 @@ class AgendaItemViewTestCase(APITestCase):
         self.client.force_login(self.moderator)
         response = self.client.get(url, data)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(0, len(response.json()))
+        self.assertEqual(2, len(response.json()))
 
     def test_transition_moderator(self):
         url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})

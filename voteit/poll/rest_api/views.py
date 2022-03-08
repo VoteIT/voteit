@@ -14,6 +14,8 @@ __all__ = [
     "ElectoralRegisterViewSet",
 ]
 
+from ...agenda.permissions import AgendaPermissions
+
 
 class PollViewSet(DefaultModelViewSet):
     serializer_class = serializers.PollDetailSerializer
@@ -31,6 +33,15 @@ class PollViewSet(DefaultModelViewSet):
         "meeting",
     )
 
+    def get_queryset(self):
+        if self.action == "list":
+            # This isn't really necessary for QS since we use websockets
+            ai = self.get_context(self.request)
+            if self.request.user.has_perm(AgendaPermissions.VIEW, ai):
+                return self.queryset.filter(agenda_item=ai)
+            return self.queryset.none()
+        return self.queryset
+
 
 class ElectoralRegisterViewSet(ReadonlyModelViewSet):
     model = ElectoralRegister
@@ -41,14 +52,16 @@ class ElectoralRegisterViewSet(ReadonlyModelViewSet):
         "methods": None,
     }
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = "meeting",
+    filterset_fields = ("meeting",)
 
     def get_queryset(self):
         return ElectoralRegister.objects.for_user(self.request.user)
 
-    @action(detail=False, methods=['GET'])
+    @action(detail=False, methods=["GET"])
     def methods(self, request):
-        return Response([{
-            "name": p.title,            # TODO Translate
-            "value": p.name
-        } for p in er_policy.values()])
+        return Response(
+            [
+                {"name": p.title, "value": p.name}  # TODO Translate
+                for p in er_policy.values()
+            ]
+        )

@@ -88,7 +88,7 @@ class PollViewSetTests(APITestCase):
         # Participant
         self.client.force_login(self.participant)
         response = self.client.get(url)
-        self.assertEqual(0, len(response.json()))
+        self.assertEqual(1, len(response.json()))
         # Authenticated but not within meeting
         self.client.force_login(self.outsider)
         response = self.client.get(url)

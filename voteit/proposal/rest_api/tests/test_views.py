@@ -305,11 +305,11 @@ class TextDocumentAPITests(APITestCase):
 
     def test_list(self):
         url = reverse("text-document-list")
-        self.client.force_login(self.moderator)
+        self.client.force_login(self.participant)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        # We don't want to fetch items this way
-        self.assertFalse(response.json())
+        # We don't want to fetch items this way, but it's possible
+        self.assertEqual(1, len(response.json()))
 
     def test_delete(self):
         url = reverse("text-document-detail", kwargs={"pk": self.text_doc.pk})

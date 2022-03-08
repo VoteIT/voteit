@@ -3,27 +3,32 @@ from django.test import TestCase
 
 
 class RulesTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.meeting.roles import ROLE_MODERATOR
         from voteit.meeting.roles import ROLE_DISCUSSER
         from voteit.meeting.roles import ROLE_PARTICIPANT
 
         User = get_user_model()
-        self.meeting = Meeting.objects.create()
-        self.anon_user = User.objects.create(username="anon")
-        self.participant = User.objects.create(username="participant")
-        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
-        self.moderator = User.objects.create(username="moderator")
-        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
-        self.discusser = User.objects.create(username="discusser")
-        self.discusser_author = User.objects.create(username="discusser_author")
-        self.meeting.add_roles(self.discusser, ROLE_DISCUSSER)
-        self.meeting.add_roles(self.discusser_author, ROLE_DISCUSSER)
-        self.ai = self.meeting.agenda_items.create()
-        self.ai.upcoming()
-        self.ai.save()
-        self.discussion_post = self.ai.discussions.create(author=self.discusser_author)
+        cls.meeting = Meeting.objects.create()
+        cls.anon_user = User.objects.create(username="anon")
+        cls.participant = User.objects.create(username="participant")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.discusser = User.objects.create(username="discusser")
+        cls.discusser_author = User.objects.create(username="discusser_author")
+        cls.meeting.add_roles(cls.discusser, ROLE_DISCUSSER)
+        cls.meeting.add_roles(cls.discusser_author, ROLE_DISCUSSER)
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.ai.upcoming()
+        cls.ai.save()
+        cls.discussion_post = cls.ai.discussions.create(author=cls.discusser_author)
+
+    def setUp(self):
+        self.meeting.refresh_from_db()
+        self.ai.refresh_from_db()
 
     def p(self, perm):
         from voteit.discussion.permissions import DiscussionPermissions

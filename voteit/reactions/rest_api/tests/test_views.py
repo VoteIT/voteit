@@ -93,12 +93,11 @@ class ReactionButtonViewSetTests(APITestCase):
         url = reverse("reaction-buttons-list")
         self.client.force_login(self.moderator)
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(0, len(response.json()))
+        self.assertEqual(response.status_code, 400)
 
     def test_get(self):
         button = self._mk_one()
-        url = f"/api/reaction-buttons/{button.pk}/"
+        url = reverse("reaction-buttons-detail", kwargs={"pk": button.pk})
         self.client.force_login(self.moderator)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
@@ -108,7 +107,7 @@ class ReactionButtonViewSetTests(APITestCase):
 
     def test_delete(self):
         button = self._mk_one()
-        url = f"/api/reaction-buttons/{button.pk}/"
+        url = reverse("reaction-buttons-detail", kwargs={"pk": button.pk})
         self.client.force_login(self.moderator)
         response = self.client.delete(url)
         self.assertEqual(

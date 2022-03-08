@@ -31,13 +31,13 @@ class SpeakerListSerializer(serializers.ModelSerializer):
         }
 
 
-class HistoricSpeakerListSerializer(serializers.ModelSerializer):
+class HistoricSpeakerListSerializer(serializers.Serializer):
     user = serializers.IntegerField()
     times_spoken = serializers.IntegerField()
     seconds_spoken = serializers.IntegerField()
 
     class Meta:
-        model = Speaker
+        # model = Speaker
         fields = ("user", "times_spoken", "seconds_spoken")
         read_only_fields = fields
 

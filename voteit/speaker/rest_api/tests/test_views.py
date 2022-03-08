@@ -80,7 +80,7 @@ class SpeakerListsViewTestCase(APITestCase):
         # How do we get a sane exception here?
         # self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
 
-    def test_get(self):
+    def test_list(self):
         url = reverse("speaker-lists-list")
         data = {
             "speaker_system": self.system.pk,
@@ -221,16 +221,17 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
 
-    def test_get(self):
+    def test_list(self):
         url = reverse("speakerlistsystem-list")
-        data = {"meeting": self.meeting.pk, "method_name": "simple"}
+        data = {"meeting": self.meeting.pk}
         self.client.force_login(self.moderator)
         response = self.client.get(url, data)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(0, len(response.json()))
+        self.assertEqual(1, len(response.json()))
 
     def test_put(self):
-        url = f"/api/speaker-list-systems/{self.system.pk}/"
+        url = reverse("speakerlistsystem-detail", kwargs={"pk": self.system.pk})
+        # url = f"/api/speaker-list-systems/{self.system.pk}/"
         data = {"meeting": self.meeting.pk, "title": "Mkay", "method_name": "simple"}
         self.client.force_login(self.moderator)
         response = self.client.put(url, data)
@@ -290,34 +291,45 @@ class SpeakerListSystemViewTestCase(APITestCase):
 
 
 class HistoricSpeakerViewTests(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.agenda.models import AgendaItem
         from voteit.meeting.models import Meeting
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
 
-        self.meeting: Meeting = Meeting.objects.create(
+        cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
-        self.system: SpeakerListSystem = self.meeting.speaker_systems.create(
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(
+            state="ongoing", title="Ongoing"
+        )
+        cls.system: SpeakerListSystem = cls.meeting.speaker_systems.create(
             method_name="simple"
         )
-        self.slist: SpeakerList = self.system.speaker_lists.create(agenda_item=self.ai)
-        self.user_one: User = self.slist.speakers.create(username="one")
-        self.user_two_nospeaker: User = self.slist.speakers.create(username="two")
-        self.moderator: User = self.meeting.participants.create(username="moderator")
-        self.list_moderator: User = self.meeting.participants.create(
+        cls.slist: SpeakerList = cls.system.speaker_lists.create(agenda_item=cls.ai)
+        cls.user_one: User = cls.slist.speakers.create(username="one")
+        cls.user_two_nospeaker: User = cls.slist.speakers.create(username="two")
+        cls.moderator: User = cls.meeting.participants.create(username="moderator")
+        cls.list_moderator: User = cls.meeting.participants.create(
             username="list_moderator"
         )
-        self.participant: User = self.meeting.participants.create(
-            username="participant"
-        )
-        self.outsider: User = User.objects.create(username="outsider")
-        self.system.add_roles(self.user_one, "speaker")
-        self.system.add_roles(self.list_moderator, "list_moderator")
-        self.meeting.add_roles(self.user_one, "participant")
-        self.meeting.add_roles(self.user_two_nospeaker, "participant")
-        self.meeting.add_roles(self.moderator, "moderator")
+        cls.participant: User = cls.meeting.participants.create(username="participant")
+        cls.outsider: User = User.objects.create(username="outsider")
+        cls.system.add_roles(cls.user_one, "speaker")
+        cls.system.add_roles(cls.list_moderator, "list_moderator")
+        cls.meeting.add_roles(cls.user_one, "participant")
+        cls.meeting.add_roles(cls.user_two_nospeaker, "participant")
+        cls.meeting.add_roles(cls.moderator, "moderator")
+        # Add spoken time
+        for i in range(1, 4):
+            cls.slist.speaker_items.create(
+                user=cls.user_one,
+                seconds=i * 5,
+                # Make sure there's a diff between started, since it's sorted on that
+                started=now() - timedelta(seconds=10 - i),
+            )
+        cls.slist.speaker_items.create(user=cls.user_two_nospeaker, seconds=11)
 
     @property
     def _cut(self):
@@ -326,8 +338,7 @@ class HistoricSpeakerViewTests(APITestCase):
         return HistoricSpeakerListSerializer
 
     def test_list_perms(self):
-        url = reverse("speaker-history-list")
-        # FIXME: We might want to fix the permissions here
+        url = reverse("speaker-history-list") + f"?meeting={self.meeting.pk}"
         # anon
         response = self.client.get(url)
         self.assertEqual(response.status_code, 401)
@@ -335,64 +346,52 @@ class HistoricSpeakerViewTests(APITestCase):
         self.client.force_login(self.user_one)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(0, len(response.json()))
+        self.assertEqual(2, len(response.json()))
         # moderator
         self.client.force_login(self.moderator)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(0, len(response.json()))
+        self.assertEqual(2, len(response.json()))
         # list moderator
         self.client.force_login(self.list_moderator)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(0, len(response.json()))
+        self.assertEqual(2, len(response.json()))
         # outsider
         self.client.force_login(self.outsider)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(0, len(response.json()))
 
-    # No details needed
-    # def test_get_perms(self):
-    #     url = f"/api/speaker-history/{self.slist.pk}/"
-    #     # anon
-    #     response = self.client.get(url)
-    #     self.assertEqual(response.status_code, 401)
-    #     # Speaker/Participant
-    #     self.client.force_login(self.user_one)
-    #     response = self.client.get(url)
-    #     self.assertEqual(response.status_code, 200)
-    #     # moderator
-    #     self.client.force_login(self.moderator)
-    #     response = self.client.get(url)
-    #     self.assertEqual(response.status_code, 200)
-    #     # list moderator
-    #     self.client.force_login(self.list_moderator)
-    #     response = self.client.get(url)
-    #     self.assertEqual(response.status_code, 200)
-    #     # outsider
-    #     self.client.force_login(self.outsider)
-    #     response = self.client.get(url)
-    #     self.assertEqual(response.status_code, 403)
+    def test_without_meeting(self):
+        url = reverse("speaker-history-list")
+        self.client.force_login(self.user_one)
+        response = self.client.get(url)
+        self.assertEqual(400, response.status_code)
 
-    # def test_get_content(self):
-    #     for i in range(1, 4):
-    #         self.slist.speaker_items.create(
-    #             user=self.user_one,
-    #             seconds=i * 5,
-    #             # Make sure there's a diff between started, since it's sorted on that
-    #             started=now() - timedelta(seconds=10 - i),
-    #         )
-    #     self.slist.speaker_items.create(user=self.user_two_nospeaker, seconds=11)
-    #     url = f"/api/speaker-lists-history/{self.slist.pk}/"
-    #     self.client.force_login(self.user_one)
-    #     response = self.client.get(url)
-    #     self.assertEqual(response.status_code, 200)
-    #     data = response.json()
-    #     self.assertEqual(self.slist.pk, data["pk"])
-    #     self.assertEqual(2, len(data["previous"]))
-    #     previous = data["previous"]
-    #     first = [x for x in previous if x[0] == self.user_one.pk][0]
-    #     second = [x for x in previous if x[0] == self.user_two_nospeaker.pk][0]
-    #     self.assertEqual([self.user_one.pk, [5, 10, 15]], first)
-    #     self.assertEqual([self.user_two_nospeaker.pk, [11]], second)
+    def test_meeting_history(self):
+        url = reverse("speaker-history-list") + f"?meeting={self.meeting.pk}"
+        self.client.force_login(self.user_one)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(
+            sorted(
+                [
+                    {"user": self.user_one.pk, "times_spoken": 3, "seconds_spoken": 30},
+                    {
+                        "user": self.user_two_nospeaker.pk,
+                        "times_spoken": 1,
+                        "seconds_spoken": 11,
+                    },
+                ],
+                key=lambda x: x["user"],
+            ),
+            sorted(data, key=lambda x: x["user"]),
+        )
+
+        # self.assertEqual(2, len(data["previous"]))
+        # previous = data["previous"]
+        # first = [x for x in previous if x[0] == self.user_one.pk][0]
+        # second = [x for x in previous if x[0] == self.user_two_nospeaker.pk][0]
+        # self.assertEqual([self.user_one.pk, [5, 10, 15]], first)
+        # self.assertEqual([self.user_two_nospeaker.pk, [11]], second)

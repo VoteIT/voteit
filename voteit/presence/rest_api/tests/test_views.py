@@ -66,6 +66,12 @@ class PresenceSystemTests(APITestCase):
         url = reverse("presence-systems-list")
         self.client.force_login(self.moderator)
         response = self.client.get(url)
+        self.assertEqual(response.status_code, 400)
+
+    def test_list_w_meeting(self):
+        url = reverse("presence-systems-list")
+        self.client.force_login(self.moderator)
+        response = self.client.get(url, {"meeting": self.meeting.pk})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(0, len(response.json()))
 
@@ -169,8 +175,15 @@ class PresenceCheckTests(APITestCase):
         url = reverse("presence-checks-list")
         self.client.force_login(self.moderator)
         response = self.client.get(url)
+        self.assertEqual(response.status_code, 400)
+
+    def test_list_w_meeting(self):
+        self._mk_one()
+        url = reverse("presence-checks-list")
+        self.client.force_login(self.moderator)
+        response = self.client.get(url, {"meeting": self.meeting.pk})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(0, len(response.json()))
+        self.assertEqual(1, len(response.json()))
 
     def test_get(self):
         presence_check = self._mk_one()
