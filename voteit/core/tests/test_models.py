@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.dispatch import receiver
 from django.test import TestCase
 from voteit.core.testing import mk_usertag, mk_hashtag
@@ -24,15 +25,18 @@ class UserTests(TestCase):
 class RolesTests(TestCase):
     # The roles tests use the MeetingRoles class instead, since it's kind of hard to test abstract db models in django
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import MeetingRoles
         from voteit.meeting.models import Meeting
+        from voteit.organisation.models import Organisation
 
         User = get_user_model()
-        self.user = User.objects.create(username="jane")
-        self.meeting = Meeting.objects.create()
-        self.roles = MeetingRoles.objects.create(user=self.user, context=self.meeting)
-        self.ROLES = MeetingRoles.valid_roles
+        org = Organisation.objects.create()
+        cls.user = User.objects.create(username="jane", organisation=org)
+        cls.meeting = Meeting.objects.create(organisation=org)
+        cls.roles = MeetingRoles.objects.create(user=cls.user, context=cls.meeting)
+        cls.ROLES = MeetingRoles.valid_roles
 
     def test_get_roles(self):
         participant = self.ROLES["participant"]
@@ -147,16 +151,24 @@ class RolesTests(TestCase):
             MeetingRoles.objects.filter(user=self.user, context=self.meeting).exists()
         )
 
+    def test_assign_roles_to_user_within_another_org(self):
+        from voteit.organisation.models import Organisation
+
+        new_org = Organisation.objects.create()
+        with self.assertRaises(IntegrityError):
+            new_org.add_roles(self.user, "org_manager")
+
 
 class BaseContentTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         # Testing abstract model through meeting model
+        from voteit.organisation.models import Organisation
         from voteit.meeting.models import Meeting
 
-        User = get_user_model()
-
-        self.meeting = Meeting.objects.create()
-        self.user = User.objects.create(username="ivan")
+        org: Organisation = Organisation.objects.create()
+        cls.meeting: Meeting = Meeting.objects.create(organisation=org)
+        cls.user = org.users.create(username="ivan")
 
     def test_body_isnt_mangled_by_bleach(self):
         text = f"{mk_hashtag('KörVi')}!"

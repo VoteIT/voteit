@@ -12,12 +12,16 @@ _channel_layers_setting = {
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class RoleChangesPublishedTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
+        from voteit.organisation.models import Organisation
 
-        self.meeting = Meeting.objects.create()
-        self.user = User.objects.create(username="user")
-        self.meeting.add_roles(self.user, "participant")
+        org: Organisation = Organisation.objects.create()
+
+        cls.meeting: Meeting = org.meetings.create()
+        cls.user = cls.meeting.participants.create(username="user", organisation=org)
+        cls.meeting.add_roles(cls.user, "participant")
 
     @patch.object(MeetingChannel, "publish")
     def test_added(self, mock_publish):

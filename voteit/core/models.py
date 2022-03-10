@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from datetime import datetime
+from logging import getLogger
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -9,6 +10,7 @@ from django.contrib.auth.models import UserManager
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
@@ -22,6 +24,7 @@ from typing import TYPE_CHECKING
 from typing import Union
 
 from voteit.core.abcs import ABCModel
+from voteit.core.abcs import OrganisationContext
 from voteit.core.fields import RichTextField
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
@@ -37,6 +40,9 @@ if TYPE_CHECKING:
 
 
 __all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
+
+
+logger = getLogger(__name__)
 
 
 class User(AbstractUser):
@@ -141,13 +147,15 @@ def real_user_only(method):
     return _inner
 
 
-class RoleContextMixin(ABCModel):
+class RoleContextMixin(OrganisationContext):
     """A model where roles can be assigned."""
 
     @property
     @abstractmethod
     def roles_cls(self) -> Roles:
-        """Return the Roles class that this context uses."""
+        """
+        Return the Roles class that this context uses.
+        """
 
     def add_roles(self, user: User, *roles: Role) -> Optional[Set[Role]]:
         assert isinstance(user, User)
@@ -232,7 +240,7 @@ class Roles(ABCModel):
 
     @property
     @abstractmethod
-    def context(self) -> models.Model:
+    def context(self) -> RoleContextMixin:
         """Create a ForeignKey relation to the model that acts as context for this roleset. For instance Meeting"""
 
     class Meta:
@@ -320,6 +328,20 @@ class Roles(ABCModel):
     def related_model_natural_key(cls) -> str:
         related = cls.context.field.related_model
         return f"{related._meta.app_label}.{related._meta.model_name.lower()}"
+
+    def save(self, **kwargs):
+        if self.user.organisation is None:
+            logger.warning(f"User {self.user} has no organisation")
+        elif self.context.organisation is None:
+            logger.warning(
+                f"Context {self.context} has no organisation, assigning user roles blindly"
+            )
+        else:
+            if self.user.organisation != self.context.organisation:
+                raise IntegrityError(
+                    f"User {self.user} is attached to another organisation."
+                )
+        super().save(**kwargs)
 
     # annotations
     objects: models.Manager

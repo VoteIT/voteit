@@ -38,8 +38,8 @@ from voteit.speaker.workflows import SpeakerListWf
 from voteit.speaker.workflows import SpeakerSystemWf
 
 if TYPE_CHECKING:
+    from voteit.organisation.models import Organisation
     from voteit.speaker.abcs import ListMethod
-
 
 __all__ = "SpeakerSystemRoles", "SpeakerListSystem", "Speaker", "SpeakerList"
 
@@ -146,6 +146,10 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         else:  # pragma: no cover
             raise ValueError(f"{value} is not a settings schema or a dict")
         self.settings_data = data.dict()
+
+    @property
+    def organisation(self) -> Organisation:
+        return self.meeting.organisation
 
     @transition(
         field=state,
