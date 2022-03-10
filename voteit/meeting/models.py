@@ -271,6 +271,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     presence_system: Optional[PresenceSystem]
     presence_checks: PresenceCheck.Manager
     reaction_buttons: models.QuerySet
+    polls: models.QuerySet
 
 
 class MeetingGroup(BaseContent, MeetingContext):

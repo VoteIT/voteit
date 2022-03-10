@@ -200,9 +200,10 @@ class CreateModelPermissionsMixin(
 
 class TransitionsMixin(SerializerClassesMixin):
     """
-    Since this is a mixin, it's tested in voteit.agenda.rest_api.tests.test_views
     Note that it only works if the FSM field is called 'state'.
     """
+
+    fsm_field_name: str = "state"
 
     @action(
         methods=["post", "get"],
@@ -211,16 +212,15 @@ class TransitionsMixin(SerializerClassesMixin):
     )
     def transitions(self, request, pk):
         """
-        Generic transitions action for 'state' field.
+        Generic transitions action for field.
         Checks against available transitions for current user before calling.
         """
         instance = self.get_object()
 
         if request.method == "GET":
-            available_transitions = dict(
-                (x.name, x)
-                for x in instance.get_available_user_state_transitions(request.user)
-            )
+            method_name = f"get_available_user_{self.fsm_field_name}_transitions"
+            method = getattr(instance, method_name)
+            available_transitions = dict((x.name, x) for x in method(request.user))
             transition_serializer = FSMTransitionSerializer(
                 list(available_transitions.values()), many=True
             )
@@ -231,9 +231,9 @@ class TransitionsMixin(SerializerClassesMixin):
                 raise exceptions.ValidationError(
                     detail={"transition": [_("Transition not specified")]}
                 )
-            all_transitions = dict(
-                (x.name, x) for x in instance.get_all_state_transitions()
-            )
+            method_name = f"get_all_{self.fsm_field_name}_transitions"
+            method = getattr(instance, method_name)
+            all_transitions = dict((x.name, x) for x in method())
             if transition_name not in all_transitions:
                 raise exceptions.ValidationError(
                     detail={
