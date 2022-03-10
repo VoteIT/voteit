@@ -60,7 +60,7 @@ def load_doctests(tests, package) -> None:
 
 class FakeCommit:
     """
-    A very destructive context manager that will wreck havoc if you use it outside of unittests!
+    A very destructive context manager that will wreak havoc if you use it outside of unittests!
     So don't!
 
     So why does it exist?
