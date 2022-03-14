@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.db.models import QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -81,7 +82,7 @@ class MeetingViewSet(DefaultModelViewSet):
 
 
 @router.register("meeting-roles", basename="meeting-roles")
-class MeetingRolesViewSet(viewsets.ReadOnlyModelViewSet):
+class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     model = MeetingRoles
     queryset = MeetingRoles.objects.all()
     serializer_class = serializers.MeetingRolesSerializer
@@ -97,9 +98,13 @@ class MeetingRolesViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
-        # TODO who can see?
+        # Only superuser can list all on organisation
         if self.request.user.is_superuser:
-            return self.queryset
+            return self.queryset.filter(
+                context__organisation=self.request.user.organisation,
+            )
+        # Filter on meetings where user is participant
+        # UserPkFilter will return empty queryset if context (meeting) is missing in params.
         return self.queryset.filter(
             context__participants=self.request.user,
         )
