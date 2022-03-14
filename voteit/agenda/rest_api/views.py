@@ -1,11 +1,13 @@
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api import serializers
 from voteit.agenda.workflows import AgendaItemWf
+from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 
 
+@router.register("agenda-items")
 class AgendaViewSet(DefaultModelViewSet):
     serializer_class = serializers.AgendaItemSerializer
     serializer_classes = {"create": serializers.CreateAgendaItemSerializer}

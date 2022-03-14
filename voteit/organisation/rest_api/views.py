@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.exceptions import AuthenticationFailed
 
+from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.mixins import SerializerClassesMixin
@@ -15,6 +16,7 @@ from voteit.organisation.models import UserConsent
 from voteit.organisation.rest_api import serializers
 
 
+@router.register("organisations", basename="organisations")
 class OrganisationViewSet(
     AutoPermissionViewSetMixin,
     mixins.RetrieveModelMixin,
@@ -50,6 +52,7 @@ class OrganisationViewSet(
         return Response(serializer.data)
 
 
+@router.register("id-organisations", basename="id-organisations")
 class IDProxyOrganisationViewSet(
     SerializerClassesMixin,
     mixins.CreateModelMixin,
@@ -69,6 +72,7 @@ class IDProxyOrganisationViewSet(
     queryset = Organisation.objects.all()
 
 
+@router.register("tos", basename="tos")
 class TOSViewSet(DefaultModelViewSet):
     serializer_class = serializers.TOSSerializer
     serializer_classes = {"create": serializers.TOSCreateSerializer}
@@ -86,6 +90,7 @@ class TOSViewSet(DefaultModelViewSet):
         return self.model.objects.none()
 
 
+@router.register("user_consents", basename="user_consents")
 class UserConsentViewSet(DefaultModelViewSet):
     serializer_class = serializers.UserConsentSerializer
     serializer_classes = {"create": serializers.UserConsentCreateSerializer}

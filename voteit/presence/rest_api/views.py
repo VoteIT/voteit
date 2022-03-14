@@ -3,9 +3,11 @@ from voteit.meeting.models import Meeting
 from voteit.presence.models import PresenceSystem, PresenceCheck
 
 from . import serializers
+from ...core.rest_api import router
 from ...meeting.permissions import MeetingPermissions
 
 
+@router.register("presence-systems", basename="presence-systems")
 class PresenceSystemViewSet(DefaultModelViewSet):
     serializer_class = serializers.PresenceSystemDetailSerializer
     serializer_classes = {
@@ -26,6 +28,7 @@ class PresenceSystemViewSet(DefaultModelViewSet):
         return self.queryset
 
 
+@router.register("presence-checks", basename="presence-checks")
 class PresenceCheckViewSet(DefaultModelViewSet):
     serializer_class = serializers.PresenceCheckDetailSerializer
     context_queryset = Meeting.objects.all()

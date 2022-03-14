@@ -4,6 +4,7 @@ from rest_framework.response import Response
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
+from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.proposal.models import TextDocument
 from voteit.proposal.models import Proposal
@@ -12,6 +13,7 @@ from voteit.proposal.rest_api import serializers
 __all__ = ["ProposalViewSet"]
 
 
+@router.register("proposals", basename="proposal")
 class ProposalViewSet(DefaultModelViewSet):
     model = Proposal  # And ALL subtypes!
     queryset = Proposal.objects.all().select_subclasses()
@@ -47,6 +49,7 @@ class ProposalViewSet(DefaultModelViewSet):
         return self.queryset
 
 
+@router.register("text-documents", basename="text-document")
 class TextDocumentViewSet(DefaultModelViewSet):
     model = TextDocument
     queryset = TextDocument.objects.all()

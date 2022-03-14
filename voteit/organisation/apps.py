@@ -12,7 +12,7 @@ class OrganisationConfig(AppConfig):
         # Make sure code is imported + registered
         from voteit.organisation import roles
         from voteit.organisation import rules
-        from voteit.organisation import rest_api
+        from .rest_api import views
         from voteit.organisation import providers
 
         assert getattr(

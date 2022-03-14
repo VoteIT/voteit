@@ -7,7 +7,7 @@ class PollConfig(AppConfig):
 
     def ready(self):
         from voteit.poll import rules
-        from voteit.poll import rest_api
+        from .rest_api import views
         from voteit.poll import channels
         from voteit.poll import messages
         from voteit.poll import signals

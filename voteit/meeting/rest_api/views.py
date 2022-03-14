@@ -25,7 +25,10 @@ __all__ = (
     "MeetingGroupViewSet",
 )
 
+from ...core.rest_api import router
 
+
+@router.register("meetings", basename="meeting")
 class MeetingViewSet(DefaultModelViewSet):
     model = Meeting
     serializer_class = serializers.MeetingDetailSerializer
@@ -77,6 +80,7 @@ class MeetingViewSet(DefaultModelViewSet):
         instance.add_roles(self.request.user, roles.ROLE_MODERATOR)
 
 
+@router.register("meeting-roles", basename="meeting-roles")
 class MeetingRolesViewSet(viewsets.ReadOnlyModelViewSet):
     model = MeetingRoles
     queryset = MeetingRoles.objects.all()
@@ -101,6 +105,7 @@ class MeetingRolesViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
+@router.register("meeting-groups", basename="meeting-groups")
 class MeetingGroupViewSet(DefaultModelViewSet):
     model = MeetingGroup
     serializer_class = serializers.MeetingGroupSerializer
@@ -126,4 +131,3 @@ class MeetingGroupViewSet(DefaultModelViewSet):
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         return super().update(request, *args, **kwargs)
-

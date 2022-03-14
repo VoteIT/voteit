@@ -5,7 +5,7 @@ class InvitesConfig(AppConfig):
     name = "voteit.invites"
 
     def ready(self):
-        from voteit.invites import rest_api
+        from .rest_api import views
         from voteit.invites import rules
         from voteit.invites import signals
         from voteit.invites.app.invites import register
