@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
-from voteit.messaging.abcs import BaseOutgoingMessage
+from envelope.core.message import Message
+
 from voteit.messaging.decorators import outgoing
 from voteit.messaging.messages.base import BaseObjectDeleted
 
@@ -12,7 +13,7 @@ class PNSchema(BaseModel):
     pk: int
 
 
-class PNMessage(BaseOutgoingMessage):
+class PNMessage(Message):
     schema = PNSchema
     data: PNSchema
 

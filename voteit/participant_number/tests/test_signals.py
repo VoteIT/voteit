@@ -6,8 +6,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
+from envelope.messages.channels import Subscribe
 from voteit.meeting.channels import ModeratorsChannel
-from voteit.messaging.messages.channels import Subscribe
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -38,7 +38,7 @@ class SignalsTests(TestCase):
 
     def test_app_state_sent_moderators(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user_a.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user_a.pk},
             pk=self.meeting.pk,
             channel_type="moderators",
         )
@@ -46,7 +46,7 @@ class SignalsTests(TestCase):
         pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "pn.added"])
         self.assertEqual({self.one.pk, self.two.pk}, pks)
 
-    @patch.object(ModeratorsChannel, "publish")
+    @patch.object(ModeratorsChannel, "sync_publish")
     def test_added_pn(self, mock_publish):
         from voteit.participant_number.messages import PNAdded
 
@@ -59,7 +59,7 @@ class SignalsTests(TestCase):
         self.assertEqual(pn.number, msg.data.number)
         self.assertEqual(3, pn.number)
 
-    @patch.object(ModeratorsChannel, "publish")
+    @patch.object(ModeratorsChannel, "sync_publish")
     def test_pn_changed(self, mock_publish):
         from voteit.participant_number.messages import PNChanged
 
@@ -71,7 +71,7 @@ class SignalsTests(TestCase):
         self.assertIsInstance(msg, PNChanged)
         self.assertEqual(self.one.number, msg.data.number)
 
-    @patch.object(ModeratorsChannel, "publish")
+    @patch.object(ModeratorsChannel, "sync_publish")
     def test_pn_deleted(self, mock_publish):
         from voteit.participant_number.messages import PNDeleted
 

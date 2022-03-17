@@ -6,6 +6,7 @@ from django.test import override_settings
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.models import LastRead
 from voteit.agenda.messages import LastReadChanged
+from voteit.core.testing import FakeCommit
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -20,7 +21,7 @@ class UpdateLastReadTests(TestCase):
     def _mk_one(self, **kw):
         from voteit.agenda.messages import UpdateLastRead
 
-        return UpdateLastRead({"user_pk": 2, "consumer_name": "abc"}, **kw)
+        return UpdateLastRead(mm={"user_pk": 2, "consumer_name": "abc"}, **kw)
 
     def test_message_job(self):
         msg = self._mk_one(agenda_item=1)
@@ -31,8 +32,12 @@ class UpdateLastReadTests(TestCase):
         last_read = ai.last_read_set.filter(user=user).first()
         self.assertIsInstance(last_read, LastRead)
 
-    @patch.object(LastReadChanged, "send_outgoing")
-    def test_response_sent(self, mock_send):
-        msg = self._mk_one(agenda_item=1)
-        msg.run_job()
-        self.assertTrue(mock_send.called)
+    def test_response_sent(self):
+        from envelope.utils import channel_layer
+
+        with patch.object(channel_layer, "send") as mocked_send:
+            msg = self._mk_one(agenda_item=1)
+            with FakeCommit():
+                msg.run_job()
+                self.assertFalse(mocked_send.called)
+            self.assertTrue(mocked_send.called)

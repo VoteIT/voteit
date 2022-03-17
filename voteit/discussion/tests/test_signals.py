@@ -2,8 +2,10 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+from envelope.messages.channels import Subscribe
+
 from voteit.agenda.channels import AgendaItemChannel
-from voteit.messaging.messages.channels import Subscribe
+
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -27,7 +29,7 @@ class AgendaSubscribedTests(TestCase):
 
     def test_app_state_sent(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.ai.pk,
             channel_type="agenda_item",
         )
@@ -47,7 +49,7 @@ class DiscussionPostChangedTests(TestCase):
         self.ai = self.meeting.agenda_items.create()
         self.disc = self.ai.discussions.create()
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_added(self, mock_publish):
         from voteit.discussion.messages import DiscussionPostAdded
 
@@ -58,7 +60,7 @@ class DiscussionPostChangedTests(TestCase):
         self.assertIsInstance(msg, DiscussionPostAdded)
         self.assertEqual(disc.pk, msg.data.pk)
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_changed(self, mock_publish):
         from voteit.discussion.messages import DiscussionPostChanged
 
@@ -70,7 +72,7 @@ class DiscussionPostChangedTests(TestCase):
         self.assertIsInstance(msg, DiscussionPostChanged)
         self.assertEqual(self.disc.pk, msg.data.pk)
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_deleted(self, mock_publish):
         from voteit.discussion.messages import DiscussionPostDeleted
 

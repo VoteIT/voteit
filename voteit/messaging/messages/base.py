@@ -8,12 +8,12 @@ from typing import Type
 
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
+from envelope.core.message import ContextAction
+from envelope.core.message import Message
+from envelope.messages.common import Status
+from envelope.utils import websocket_send
+
 from voteit.core.models import BaseContent
-from voteit.messaging.abcs import BaseIncomingMessage
-from voteit.messaging.abcs import BaseOutgoingMessage
-from voteit.messaging.abcs import ContextAction
-from voteit.messaging.abcs import DeferredJob
-from voteit.messaging.messages.status import StatusDone
 
 if TYPE_CHECKING:
     from django.db.models import Model
@@ -31,17 +31,17 @@ class DeletedSchema(BaseModel):
     pk: int
 
 
-class BaseObjectAdded(BaseOutgoingMessage):
+class BaseObjectAdded(Message):
     schema = AddedOrUpdatedSchema
     data: AddedOrUpdatedSchema
 
 
-class BaseObjectChanged(BaseOutgoingMessage):
+class BaseObjectChanged(Message):
     schema = AddedOrUpdatedSchema
     data: AddedOrUpdatedSchema
 
 
-class BaseObjectDeleted(BaseOutgoingMessage):
+class BaseObjectDeleted(Message):
     schema = DeletedSchema
     data: DeletedSchema
 
@@ -55,8 +55,8 @@ class GenericDeleteSchema(BaseModel):
     pk: int
 
 
-class BaseObjectAction(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
-    context_pk_attr = "pk"
+class BaseObjectAction(ContextAction, ABC):
+    ...
 
 
 class BaseAddObject(BaseObjectAction, ABC):
@@ -77,18 +77,14 @@ class BaseAddObject(BaseObjectAction, ABC):
         For instance, on agenda items the relation has the name 'proposals'
         """
 
-    def run_job(self) -> StatusDone:
-        self.assert_perm(
-            msg=_("You're not allowed to add %(ctype)s here")
-            % {"ctype": self.add_model}
-        )
-
+    def run_job(self) -> Status:
+        self.assert_perm()
         if issubclass(self.add_model, BaseContent):
             self.data.kwargs.setdefault("author", self.user)
         relation = getattr(self.context, self.relation_queryset_attribute)
         relation.create(**self.data.kwargs)
-        response = StatusDone.from_message(self)
-        response.send_outgoing(self.mm.consumer_name, success=True)
+        response = Status.from_message(self)
+        websocket_send(response, state=response.SUCCESS)
         return response
 
 
@@ -96,29 +92,25 @@ class BaseChangeObject(BaseObjectAction, ABC):
     schema = GenericObjectSchema
     data: GenericObjectSchema
 
-    def run_job(self) -> StatusDone:
-        self.assert_perm(
-            msg=_("You're not allowed to change %(ctype)s here" % {"ctype": self.model})
-        )
+    def run_job(self) -> Status:
+        self.assert_perm()
         # self.context.update(**self.data.kwargs)
         # FIXME This should be validated and saved using a serializer
         for key, value in self.data.kwargs.items():
             setattr(self.context, key, value)
         self.context.save()
-        response = StatusDone.from_message(self)
-        response.send_outgoing(self.mm.consumer_name, success=True)
-        return StatusDone
+        response = Status.from_message(self)
+        websocket_send(response, state=response.SUCCESS)
+        return response
 
 
 class BaseDeleteObject(BaseObjectAction, ABC):
     schema = GenericDeleteSchema
     data: GenericDeleteSchema
 
-    def run_job(self) -> StatusDone:
-        self.assert_perm(
-            msg=_("You're not allowed to delete %(ctype)s here" % {"ctype": self.model})
-        )
+    def run_job(self) -> Status:
+        self.assert_perm()
         self.context.delete()
-        response = StatusDone.from_message(self, msg="Deleted")
-        response.send_outgoing(self.mm.consumer_name, success=True)
+        response = Status.from_message(self, msg="Deleted")
+        websocket_send(response, state=response.SUCCESS)
         return response

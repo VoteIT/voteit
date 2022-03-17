@@ -10,6 +10,7 @@ from django.db.models.signals import post_save
 from django.dispatch import Signal
 from django.dispatch import receiver
 
+from envelope.signals import channel_subscribed
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import disable_on_raw_save
@@ -22,8 +23,7 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.signals import archive_meeting
-from voteit.messaging.messages.app_state import AppState
-from voteit.messaging.signals import channel_subscribed
+
 from voteit.speaker.messages import SpeakerListAdded
 from voteit.speaker.messages import SpeakerListChanged
 from voteit.speaker.messages import SpeakerListDeleted
@@ -43,7 +43,9 @@ from voteit.speaker.utils import publish_list_msg
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
-    from voteit.messaging.abcs import BaseOutgoingMessage
+    from envelope.utils import AppState
+    from envelope.core.message import Message
+
 
 list_updated = Signal(providing_args=["sender", "instance"])
 speaker_started = Signal(providing_args=["sender", "speaker"])
@@ -87,14 +89,14 @@ def _get_list_order_msg(speaker_list: SpeakerList) -> SpeakerListOrder:
     )
 
 
-def publish_active_list_msg(speaker_list: SpeakerList, msg: BaseOutgoingMessage):
+def publish_active_list_msg(speaker_list: SpeakerList, msg: Message):
     """
     Push a message to the currently active list. Just use this if you can assume that this list is active.
     Started/Stopped messages are always sent from the active list for instance.
     """
     if speaker_list.meeting is not None:
         ch = MeetingChannel.from_instance(speaker_list.meeting)
-        ch.publish(msg)
+        ch.sync_publish(msg)
 
 
 @receiver(list_updated)
@@ -166,7 +168,7 @@ def notify_added_or_changed_speaker_system(
         data = SpeakerListSystemSerializer(instance).data
         msg = msg_class(**data)
         ch = MeetingChannel.from_instance(instance.meeting)
-        ch.publish(msg)
+        ch.sync_publish(msg)
         # Also push list and order when speaker system changes since it may have changed active list
         active_list = None
         try:
@@ -177,10 +179,10 @@ def notify_added_or_changed_speaker_system(
             msg_class = SpeakerListChanged
             data = SpeakerListSerializer(instance.active_list).data
             list_msg = msg_class(**data)
-            ch.publish(list_msg)
+            ch.sync_publish(list_msg)
             # And the order
             order_msg = _get_list_order_msg(instance.active_list)
-            ch.publish(order_msg)
+            ch.sync_publish(order_msg)
 
 
 @receiver(pre_delete, sender=SpeakerListSystem)
@@ -189,7 +191,7 @@ def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
     if instance.meeting is not None:
         msg = SpeakerSystemDeleted(pk=instance.pk)
         ch = MeetingChannel.from_instance(instance.meeting)
-        ch.publish(msg)
+        ch.sync_publish(msg)
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)

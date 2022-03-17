@@ -2,8 +2,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from pydantic import ValidationError
-from voteit.messaging.errors import ValidationErrorMsg
 
+from envelope.messages.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
 
 User = get_user_model()
@@ -154,7 +154,7 @@ class AddMajorityVoteTests(TestCase):
     def _mk_one(self, choice, **kw):
         kw.setdefault("vote", {"choice": choice})
         kw.setdefault("poll", self.poll.pk)
-        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_add_msg(self):
         msg = self._mk_one(self.prop1.pk)
@@ -165,7 +165,8 @@ class AddMajorityVoteTests(TestCase):
 
     def test_add_msg_obvious_bad_choice(self):
         # Handled by pydantic
-        self.assertRaises(ValidationError, self._mk_one, 0)
+        msg = self._mk_one(0)
+        self.assertRaises(ValidationError, msg.validate)
 
     def test_add_msg_bad_proposal(self):
         bad_prop_pk = self.prop1.pk - 5

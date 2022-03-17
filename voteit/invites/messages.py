@@ -9,6 +9,9 @@ from pydantic import validator
 from pydantic.main import BaseModel
 from typing import Set
 
+from envelope.core.message import ContextAction
+from envelope.core.message import Message
+from envelope.utils import websocket_send
 from voteit.invites.exceptions import InviteError
 from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.utils import create_invites
@@ -19,17 +22,13 @@ from voteit.invites.workflows import InviteWf
 from voteit.core.validators import root_validate_roles_and_model
 from voteit.core.workflows import SendWf
 from voteit.meeting.models import Meeting
-from voteit.messaging.abcs import BaseIncomingMessage
-from voteit.messaging.abcs import BaseOutgoingMessage
-from voteit.messaging.abcs import ContextAction
-from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.errors import BadRequestError
 from voteit.messaging.messages.base import BaseObjectAdded
 from voteit.messaging.messages.base import BaseObjectChanged
 from voteit.messaging.messages.base import BaseObjectDeleted
 
+from envelope.messages.errors import BadRequestError
 
 logger = getLogger(__name__)
 
@@ -116,13 +115,13 @@ class AddInvitesSchema(BaseModel):
 
 
 @incoming
-class AddInvites(BaseIncomingMessage, ContextAction, DeferredJob):
+class AddInvites(ContextAction):
     name = "invites.add"
     permission = MeetingInvitePermissions.ADD
     schema = AddInvitesSchema
     data: AddInvitesSchema
     model = Meeting
-    context_pk_attr = "meeting"
+    context_schema_attr = "meeting"
 
     def run_job(self) -> InvitesAdded:
         """
@@ -147,7 +146,7 @@ class AddInvites(BaseIncomingMessage, ContextAction, DeferredJob):
             changed=changed,
             skipped_count=skipped_count,
         )
-        response.send_outgoing(self.mm.consumer_name, success=True)
+        websocket_send(response, state=response.SUCCESS)
         return response
 
 
@@ -158,7 +157,7 @@ class InvitesAddedSchema(BaseModel):
 
 
 @outgoing
-class InvitesAdded(BaseOutgoingMessage):
+class InvitesAdded(Message):
     name = "invites.added"
     schema = InvitesAddedSchema
     data: InvitesAddedSchema
@@ -214,13 +213,13 @@ class SendInvitesSchema(BaseModel):
 
 
 @incoming
-class SendInvites(BaseIncomingMessage, ContextAction, DeferredJob):
+class SendInvites(ContextAction):
     name = "invites.send"
     permission = MeetingInvitePermissions.ADD
     schema = SendInvitesSchema
     data: SendInvitesSchema
     model = Meeting
-    context_pk_attr = "meeting"
+    context_schema_attr = "meeting"
     job_atomic = False
 
     def run_job(self):

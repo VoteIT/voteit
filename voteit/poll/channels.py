@@ -4,9 +4,9 @@ from logging import getLogger
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from envelope.core.channels import ContextChannel
 
 from voteit.core.decorators import disable_on_raw_save
-from voteit.messaging.abcs import AbstractObjectChannel
 from voteit.messaging.decorators import channel
 from voteit.poll.messages import PollStatus
 from voteit.poll.models import Vote
@@ -17,7 +17,7 @@ logger = getLogger(__name__)
 
 
 @channel
-class PollChannel(AbstractObjectChannel):
+class PollChannel(ContextChannel):
     """A channel for specific poll updates.
 
     Transport for
@@ -39,10 +39,10 @@ def vote_added(instance=None, created=None, **kw):
     # We don't have to count updated votes!
     if created and isinstance(instance, Vote):
         poll = instance.poll
-        msg = PollStatus.create(
+        msg = PollStatus(
             pk=poll.pk,
             voted=poll.votes.count(),
             total=poll.electoral_register.voters.count(),
         )
         ch = PollChannel.from_instance(poll)
-        ch.publish(msg)
+        ch.sync_publish(msg)

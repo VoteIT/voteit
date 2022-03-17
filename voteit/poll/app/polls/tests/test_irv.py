@@ -1,7 +1,8 @@
 from collections import Counter
 
 from django.test import TestCase
-from voteit.messaging.errors import ValidationErrorMsg
+
+from envelope.messages.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
 
 
@@ -118,7 +119,7 @@ class AddVoteTests(TestCase):
             "vote", {"ranking": [self.prop1.pk, self.prop2.pk, self.prop3.pk]}
         )
         kw.setdefault("poll", self.poll.pk)
-        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_add(self):
         msg = self._mk_one()
@@ -161,7 +162,7 @@ class ChangeVoteTests(TestCase):
     def _mk_one(self, **kw):
         kw.setdefault("vote", {"ranking": [self.prop1.pk, self.prop2.pk]})
         kw.setdefault("pk", self.vote.pk)
-        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_change(self):
         msg = self._mk_one()

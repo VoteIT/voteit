@@ -1,19 +1,25 @@
 """
-Decorators for registries.
+Shorthand decorators for registries.
 """
-def channel(*args, **kwars):
-    from voteit.messaging.registries import channel_registry
+from typing import Type
 
-    return channel_registry(*args, **kwars)
-
-
-def outgoing(*args, **kwars):
-    from voteit.messaging.registries import outgoing_messages
-
-    return outgoing_messages(*args, **kwars)
+from envelope.core.channels import ContextChannel
+from envelope.core.message import Message
+from envelope.registries import context_channel_registry
+from envelope.registries import ws_outgoing_messages
+from envelope.registries import ws_incoming_messages
 
 
-def incoming(*args, **kwars):
-    from voteit.messaging.registries import incoming_messages
+def channel(channel: Type[ContextChannel]):
+    context_channel_registry.add(channel)
+    return channel
 
-    return incoming_messages(*args, **kwars)
+
+def outgoing(message: Type[Message]):
+    ws_outgoing_messages.add(message)
+    return message
+
+
+def incoming(message: Type[Message]):
+    ws_incoming_messages.add(message)
+    return message

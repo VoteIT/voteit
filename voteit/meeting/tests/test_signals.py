@@ -3,6 +3,9 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+
+from envelope.messages.channels import Subscribe
+from envelope.messages.channels import Subscribed
 from voteit.core.testing import FakeCommit
 
 from voteit.meeting.channels import MeetingChannel
@@ -21,7 +24,7 @@ class MeetingChangedTests(TestCase):
         self.meeting = Meeting.objects.create()
 
     # We don't handle added right now
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_changed(self, mock_publish):
         from voteit.meeting.messages import MeetingChanged
 
@@ -30,6 +33,7 @@ class MeetingChangedTests(TestCase):
         self.meeting.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
+        msg.validate()
         self.assertIsInstance(msg, MeetingChanged)
         self.assertEqual(self.meeting.pk, msg.data.pk)
 
@@ -46,14 +50,12 @@ class MeetingChannelSubscribedTests(TestCase):
         self.group.members.add(self.user)
 
     def test_roles_in_app_state(self):
-        from voteit.messaging.messages.channels import Subscribe
-        from voteit.messaging.messages.channels import Subscribed
-
         msg = Subscribe(
             mm={"user_pk": self.user.pk, "consumer_name": "abc"},
             channel_type="meeting",
             pk=self.meeting.pk,
         )
+        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         added_meeting_roles = [
@@ -68,14 +70,12 @@ class MeetingChannelSubscribedTests(TestCase):
         self.assertEqual(payload["model"], "meeting")
 
     def test_meeting_groups_in_app_state(self):
-        from voteit.messaging.messages.channels import Subscribe
-        from voteit.messaging.messages.channels import Subscribed
-
         msg = Subscribe(
             mm={"user_pk": self.user.pk, "consumer_name": "abc"},
             channel_type="meeting",
             pk=self.meeting.pk,
         )
+        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         added = [x for x in response.data.app_state if x.t == "meeting_group.added"]
@@ -95,7 +95,7 @@ class MeetingGroupChangedTests(TestCase):
         self.meeting = Meeting.objects.create()
         self.group = self.meeting.groups.create()
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_added(self, mock_publish):
         from voteit.meeting.messages import MeetingGroupAdded
 
@@ -103,10 +103,11 @@ class MeetingGroupChangedTests(TestCase):
             group = self.meeting.groups.create()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
+        msg.validate()
         self.assertIsInstance(msg, MeetingGroupAdded)
         self.assertEqual(group.pk, msg.data.pk)
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_changed(self, mock_publish):
         from voteit.meeting.messages import MeetingGroupChanged
 
@@ -115,10 +116,11 @@ class MeetingGroupChangedTests(TestCase):
             self.group.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
+        msg.validate()
         self.assertIsInstance(msg, MeetingGroupChanged)
         self.assertEqual(self.group.pk, msg.data.pk)
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_deleted(self, mock_publish):
         from voteit.meeting.messages import MeetingGroupDeleted
 
@@ -126,5 +128,6 @@ class MeetingGroupChangedTests(TestCase):
         self.group.delete()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
+        msg.validate()
         self.assertIsInstance(msg, MeetingGroupDeleted)
         self.assertEqual(group_pk, msg.data.pk)

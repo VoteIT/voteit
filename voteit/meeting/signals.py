@@ -7,6 +7,7 @@ from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
 
+from envelope.signals import channel_subscribed
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.core.messages import RolesAdded
@@ -20,11 +21,12 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.rest_api.serializers import MeetingDetailSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
-from voteit.messaging.signals import channel_subscribed
+
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
-    from voteit.messaging.messages.app_state import AppState
+    from envelope.utils import AppState
+
 
 # Signal providing an atomic transaction to do cleanup when a meeting is archived
 archive_meeting = Signal(providing_args=["meeting"])
@@ -37,8 +39,8 @@ def meeting_change(instance, created=None, **kw):
     if not created:
         data = MeetingDetailSerializer(instance).data
         ch = MeetingChannel.from_instance(instance)
-        msg = MeetingChanged({}, **data)
-        ch.publish(msg)
+        msg = MeetingChanged(data=data)
+        ch.sync_publish(msg)
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
@@ -74,11 +76,11 @@ def meeting_group_updated(instance: MeetingGroup = None, created=None, **kw):
         msg = MeetingGroupAdded(**data)
     else:
         msg = MeetingGroupChanged(**data)
-    meeting_ch.publish(msg)
+    meeting_ch.sync_publish(msg)
 
 
 @receiver(pre_delete, sender=MeetingGroup)
 def meeting_group_delete(instance=None, **kw):
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
     msg = MeetingGroupDeleted(pk=instance.pk)
-    meeting_ch.publish(msg)
+    meeting_ch.sync_publish(msg)

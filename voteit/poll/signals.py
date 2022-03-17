@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from logging import getLogger
+from typing import TYPE_CHECKING
 
 from django.contrib.auth.models import AbstractUser
 from django.db.models.signals import post_save
@@ -8,6 +9,9 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django_fsm import pre_transition
 from django_fsm.signals import post_transition
+
+from envelope.signals import channel_subscribed
+
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.decorators import disable_on_raw_save
@@ -16,8 +20,6 @@ from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
-from voteit.messaging.messages.app_state import AppState
-from voteit.messaging.signals import channel_subscribed
 from voteit.poll.channels import PollChannel
 from voteit.poll.messages import GenericVoteResponse
 from voteit.poll.messages import PollAdded
@@ -30,14 +32,18 @@ from voteit.poll.rest_api.serializers import PollDetailSerializer
 from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.workflows import PollWf
 
+if TYPE_CHECKING:
+    from envelope.utils import AppState
 
 logger = getLogger(__name__)
 
 
 @receiver(channel_subscribed, sender=PollChannel)
 def poll_subscribed(context: Poll, app_state: AppState, **kw):
-    """Populate app_state with current poll status"""
-    msg = PollStatus.create(
+    """
+    Populate app_state with current poll status
+    """
+    msg = PollStatus(
         pk=context.pk,
         voted=context.votes.count(),
         total=context.electoral_register.voters.count(),
@@ -49,7 +55,9 @@ def poll_subscribed(context: Poll, app_state: AppState, **kw):
 def participants_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    """Populate app_state with current meeting polls, except private ones"""
+    """
+    Populate app_state with current meeting polls, except private ones
+    """
     app_state.append_from_queryset(
         context.polls.exclude(state=PollWf.PRIVATE).exclude(
             agenda_item__state=AgendaItemWf.PRIVATE
@@ -87,25 +95,25 @@ def poll_change(instance: Poll = None, created: bool = None, **kw):
     Note: This message won't work properly if django admin is used for instance.
     Proposals won't be attached unless it's during a transaction.
     We have the option to add @ensure_atomic here, but that would break all ability to change polls
-    outside of a transaction.
+    outside a transaction.
     """
     if instance.meeting is not None:
         data = PollDetailSerializer(instance).data
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
         if created:
-            msg = PollAdded({}, **data)
+            msg = PollAdded(data=data)
         else:
-            msg = PollChanged({}, **data)
+            msg = PollChanged(data=data)
         if instance.is_private:
             # Only care about transmitting to participants if it existed previously
             if not created:
                 participants_msg = PollDeleted(pk=instance.pk)
-                participants_ch.publish(participants_msg, on_commit=False)
+                participants_ch.sync_publish(participants_msg, on_commit=False)
         elif instance.agenda_item is None or not instance.agenda_item.is_private:
             # Publish if ai isn't private
-            participants_ch.publish(msg, on_commit=False)
-        moderators_ch.publish(msg, on_commit=False)
+            participants_ch.sync_publish(msg, on_commit=False)
+        moderators_ch.sync_publish(msg, on_commit=False)
 
 
 @receiver(pre_delete, sender=Poll)
@@ -113,13 +121,13 @@ def poll_delete(instance: Poll = None, **kw):
     """Poll deleted is only sent to moderators if the poll's private"""
     if instance.meeting is not None:
         moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
-        msg = PollDeleted({}, pk=instance.pk)
-        moderators_ch.publish(msg)
+        msg = PollDeleted(pk=instance.pk)
+        moderators_ch.sync_publish(msg)
         # Publish to participants if poll isn't private. If agenda item exists, make sure it's not private
         if not instance.is_private:
             if instance.agenda_item is None or not instance.agenda_item.is_private:
                 participants_ch = ParticipantsChannel.from_instance(instance.meeting)
-                participants_ch.publish(msg)
+                participants_ch.sync_publish(msg)
 
 
 @receiver(post_transition, sender=AgendaItem)
@@ -132,8 +140,8 @@ def private_ai_published(instance: AgendaItem, source: str, **kw):
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         for poll in instance.polls.exclude(state=PollWf.PRIVATE):
             data = PollDetailSerializer(poll).data
-            msg = PollAdded({}, **data)
-            participants_ch.publish(msg)
+            msg = PollAdded(data=data)
+            participants_ch.sync_publish(msg)
 
 
 @receiver(pre_transition, sender=Poll)

@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from logging import getLogger
 
+from envelope.core.channels import ContextChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
-from voteit.messaging.abcs import AbstractObjectChannel
 from voteit.messaging.decorators import channel
 
 logger = getLogger(__name__)
 
 
 @channel
-class MeetingInvitesChannel(AbstractObjectChannel):
+class MeetingInvitesChannel(ContextChannel):
     """
     This is a channel that's only for moderators. It handles invites and status updates from them.
     """

@@ -7,10 +7,11 @@ from pydantic import validator
 from pydantic.main import BaseModel
 from typing import List
 
-from voteit.messaging.abcs import BaseIncomingMessage
-from voteit.messaging.abcs import BaseOutgoingMessage
-from voteit.messaging.abcs import ContextAction
-from voteit.messaging.abcs import DeferredJob
+from envelope import WS_INCOMING
+from envelope.core.message import ContextAction
+from envelope.core.message import Message
+from envelope.utils import get_message_type
+from envelope.utils import websocket_send
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.messaging.messages.base import BaseObjectAdded
@@ -47,14 +48,14 @@ class PollStatusSchema(BaseModel):
 
 
 @outgoing
-class PollStatus(BaseOutgoingMessage):
+class PollStatus(Message):
     name = "poll.status"
     schema = PollStatusSchema
     data: PollStatusSchema
 
 
-class VoteBase(BaseIncomingMessage, DeferredJob, ContextAction, ABC):
-    context_pk_attr = "pk"
+class VoteBase(ContextAction, ABC):
+    ...
 
 
 class AddVote(VoteBase, ABC):
@@ -63,7 +64,7 @@ class AddVote(VoteBase, ABC):
     permission = VotePermissions.ADD
     model = Poll
     context: Poll
-    context_pk_attr = "poll"
+    context_schema_attr = "poll"
 
     def run_job(self):
         self.assert_perm()
@@ -75,16 +76,18 @@ class AddVote(VoteBase, ABC):
             # A bit hackish, lets guess the change name
             base_name = self.name.split(".")[0]
             type_name = f"{base_name}.change"
-            msg = ChangeVote.from_message(
-                self, type_name=type_name, vote=self.data.vote, pk=existing_vote.pk
+            change_vote_type = get_message_type(type_name, WS_INCOMING)
+            assert issubclass(change_vote_type, ChangeVote)
+            msg = change_vote_type.from_message(
+                self, vote=self.data.vote, pk=existing_vote.pk
             )
-            msg.send_internal(self.mm.consumer_name)
+            websocket_send(msg, state=msg.SUCCESS)
             return msg
         else:
             vote = poll.votes.create(user=self.user, vote=self.data.vote)
             serializer = VoteSerializer(vote)
             msg = GenericVoteResponse.from_message(self, **serializer.data)
-            msg.send_outgoing(self.mm.consumer_name, success=True)
+            websocket_send(msg, state=msg.SUCCESS)
             return msg
 
 
@@ -102,7 +105,7 @@ class AbstainVote(VoteBase):
     schema = AbstainSchema
     data: AbstainSchema
     context: Poll
-    context_pk_attr = "poll"
+    context_schema_attr = "poll"
 
     def run_job(self):
         self.assert_perm()
@@ -115,7 +118,7 @@ class AbstainVote(VoteBase):
             vote.save()
         serializer = VoteSerializer(vote)
         msg = GenericVoteResponse.from_message(self, **serializer.data)
-        msg.send_outgoing(self.mm.consumer_name, success=True)
+        websocket_send(msg, state=msg.SUCCESS)
         return msg
 
 
@@ -137,12 +140,12 @@ class ChangeVote(VoteBase, ABC):
         self.context.save()
         serializer = VoteSerializer(self.context)
         msg = GenericVoteResponse.from_message(self, **serializer.data)
-        msg.send_outgoing(self.mm.consumer_name, success=True)
+        websocket_send(msg, state=msg.SUCCESS)
         return msg
 
 
 @outgoing
-class GenericVoteResponse(BaseOutgoingMessage):
+class GenericVoteResponse(Message):
     name = "vote.added"
     schema = AddedVoteSchema
     data: AddedVoteSchema
@@ -153,8 +156,8 @@ class GetERVoteCountSchema(BaseModel):
 
 
 @incoming
-class GetERVoteCount(BaseIncomingMessage, DeferredJob, ContextAction):
-    """ Returns vote count for each user in a specific electoral register."""
+class GetERVoteCount(ContextAction):
+    """Returns vote count for each user in a specific electoral register."""
 
     name = "er.vote_count"
     permission = ElectoralRegisterPermissions.VIEW
@@ -162,7 +165,7 @@ class GetERVoteCount(BaseIncomingMessage, DeferredJob, ContextAction):
     context: ElectoralRegister
     schema = GetERVoteCountSchema
     data: GetERVoteCountSchema
-    context_pk_attr = "electoral_register"
+    context_schema_attr = "electoral_register"
 
     def run_job(self) -> ERVoteCount:
         self.assert_perm()
@@ -175,7 +178,7 @@ class GetERVoteCount(BaseIncomingMessage, DeferredJob, ContextAction):
             total=er.get_total_vote_weight(),
             weights=weights,
         )
-        msg.send_outgoing(self.mm.consumer_name, success=True)
+        websocket_send(msg, state=msg.SUCCESS)
         return msg
 
 
@@ -198,7 +201,7 @@ class ERVoteCountSchema(BaseModel):
 
 
 @outgoing
-class ERVoteCount(BaseOutgoingMessage):
+class ERVoteCount(Message):
     name = "er.vote_count"
     schema = ERVoteCountSchema
     data: ERVoteCountSchema

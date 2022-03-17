@@ -7,9 +7,9 @@ from typing import Union
 from django.utils.translation import gettext as _
 from pydantic import BaseModel
 from pydantic import validator
+from envelope.messages.errors import ValidationErrorMsg
 
 from voteit.messaging.decorators import incoming
-from voteit.messaging.errors import ValidationErrorMsg
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote

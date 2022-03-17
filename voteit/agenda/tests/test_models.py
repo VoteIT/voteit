@@ -78,7 +78,7 @@ class AgendaItemTests(TestCase):
         ai.revert_to_last_related_modified()
         self.assertIsNone(ai.related_modified)
 
-    @patch.object(ModeratorsChannel, "publish")
+    @patch.object(ModeratorsChannel, "sync_publish")
     def test_only_one_push_when_several_proposals_changed(self, mock_channel):
         ai = self.meeting.agenda_items.create()
         ai.related_modified = now() - timedelta(minutes=1)

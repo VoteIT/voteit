@@ -3,7 +3,7 @@ from collections import Counter
 from django.test import TestCase
 from django.test import override_settings
 
-from voteit.messaging.errors import ValidationErrorMsg
+from envelope.messages.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
 
 _channel_layers_setting = {
@@ -356,7 +356,7 @@ class AddSchulzeVoteTests(TestCase):
             "vote",
             {"ranking": ((self.prop1.pk, 10), (self.prop2.pk, 5), (self.prop3.pk, 1))},
         )
-        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_add_vote(self):
         from voteit.poll.app.polls.schulze import SchulzePollResult

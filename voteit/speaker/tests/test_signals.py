@@ -1,11 +1,13 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import TestCase
+from django.test import override_settings
+from envelope.messages.channels import Subscribe
+from envelope.messages.channels import Subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
-from voteit.messaging.messages.channels import Subscribed
 
 User = get_user_model()
 
@@ -16,31 +18,30 @@ _channel_layers_setting = {
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalListOrderChangeTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
 
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
 
         from voteit.meeting.models import Meeting
 
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.system = SpeakerListSystem.objects.create(
-            method_name="simple", meeting=self.meeting
+        cls.meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.system = SpeakerListSystem.objects.create(
+            method_name="simple", meeting=cls.meeting
         )
-        self.speaker_list = SpeakerList.objects.create(
-            speaker_system=self.system, agenda_item=self.ai
+        cls.speaker_list = SpeakerList.objects.create(
+            speaker_system=cls.system, agenda_item=cls.ai
         )
-        self.user_one = User.objects.create(username="one")
-        self.user_two = User.objects.create(username="two")
-        self.user_three = User.objects.create(username="three")
-        self.speaker_one = self.speaker_list.speaker_items.create(user=self.user_one)
-        self.speaker_two = self.speaker_list.speaker_items.create(user=self.user_two)
-        self.speaker_three = self.speaker_list.speaker_items.create(
-            user=self.user_three
-        )
+        cls.user_one = User.objects.create(username="one")
+        cls.user_two = User.objects.create(username="two")
+        cls.user_three = User.objects.create(username="three")
+        cls.speaker_one = cls.speaker_list.speaker_items.create(user=cls.user_one)
+        cls.speaker_two = cls.speaker_list.speaker_items.create(user=cls.user_two)
+        cls.speaker_three = cls.speaker_list.speaker_items.create(user=cls.user_three)
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_agenda_gets_list_change(self, mock_publish):
         self.speaker_list.signal_list_updated()
         self.assertTrue(mock_publish.called)
@@ -52,7 +53,7 @@ class SignalListOrderChangeTests(TestCase):
         self.assertEqual(self.speaker_list.pk, data.pk)
         self.assertIsNone(data.current)
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_meeting_gets_active_list(self, mock_publish):
         self.system.active_list = self.speaker_list
         self.system.save()
@@ -67,7 +68,7 @@ class SignalListOrderChangeTests(TestCase):
         self.assertEqual(self.speaker_list.pk, data.pk)
         self.assertIsNone(data.current)
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_agenda_with_active_speaker(self, mock_publish):
         self.speaker_list.start_speaker(self.speaker_three)
         self.speaker_list.signal_list_updated()
@@ -102,7 +103,7 @@ class SignalStartedStoppedTests(TestCase):
         self.user: User = self.meeting.participants.create(username="user")
         self.speaker: Speaker = self.speaker_list.speaker_items.create(user=self.user)
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_start_speaker(self, mock_publish):
         from voteit.speaker.messages import SpeakerStarted
 
@@ -119,7 +120,7 @@ class SignalStartedStoppedTests(TestCase):
         self.assertEqual(self.speaker.started, data.started)
         self.assertIsNone(data.seconds)
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_stop_speaker(self, mock_publish):
         from voteit.speaker.messages import SpeakerStopped
 
@@ -157,7 +158,7 @@ class SignalListChangesTests(TestCase):
             speaker_system=self.system, agenda_item=self.ai, title="Hello"
         )
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_agenda_gets_list_changed(self, mock_publish):
         from voteit.speaker.messages import SpeakerListAdded
 
@@ -171,7 +172,7 @@ class SignalListChangesTests(TestCase):
         self.assertEqual(speaker_list.pk, data.pk)
         self.assertEqual(self.ai.pk, data.agenda_item)
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_meeting_gets_active_list_changed(self, mock_publish):
         from voteit.speaker.messages import SpeakerListChanged
 
@@ -188,7 +189,7 @@ class SignalListChangesTests(TestCase):
         self.assertEqual(self.ai.pk, data.agenda_item)
         self.assertEqual(self.speaker_list.title, data.title)
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_list_deleted(self, mock_publish):
         from voteit.speaker.messages import SpeakerListDeleted
 
@@ -213,7 +214,7 @@ class SignalSystemChangesTests(TestCase):
             method_name="simple", meeting=self.meeting, title="We speak in order"
         )
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_meeting_gets_added(self, mock_publish):
         from voteit.speaker.messages import SpeakerSystemAdded
         from voteit.speaker.models import SpeakerListSystem
@@ -226,7 +227,7 @@ class SignalSystemChangesTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, SpeakerSystemAdded)
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_system_changed(self, mock_publish):
         from voteit.speaker.messages import SpeakerSystemChanged
 
@@ -240,7 +241,7 @@ class SignalSystemChangesTests(TestCase):
         self.assertEqual(self.meeting.pk, data.meeting)
         self.assertEqual(self.system.title, data.title)
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_system_deleted(self, mock_publish):
         from voteit.speaker.messages import SpeakerSystemDeleted
 
@@ -252,7 +253,7 @@ class SignalSystemChangesTests(TestCase):
         data = msg.data
         self.assertEqual(system_pk, data.pk)
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_system_changes_active_list(self, mock_publish):
         from voteit.speaker.messages import SpeakerSystemChanged
         from voteit.speaker.messages import SpeakerListChanged
@@ -311,10 +312,8 @@ class ChannelSubscribedTests(TestCase):
         self.system.add_roles(self.moderator, "list_moderator")
 
     def _mk_one(self, pk, channel_type):
-        from voteit.messaging.messages.channels import Subscribe
-
         return Subscribe(
-            {"user_pk": self.moderator.pk, "consumer_name": "abc"},
+            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"},
             pk=pk,
             channel_type=channel_type,
         )

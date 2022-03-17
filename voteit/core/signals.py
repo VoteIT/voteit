@@ -26,17 +26,17 @@ roles_removed = Signal(providing_args=["sender", "instance", "roles"])
 
 def _publish(instance, msg):
     from voteit.meeting.channels import MeetingChannel
-    from voteit.messaging.channels.user import UserChannel
+    from envelope.app.user_channel.channel import UserChannel
 
     if isinstance(instance, MeetingContext):
         meeting = instance.meeting
         if meeting is not None:
             m_channel = MeetingChannel.from_instance(meeting)
-            m_channel.publish(msg)
+            m_channel.sync_publish(msg)
     # FIXME: Duplicate message to user, but we might not send to meeting later on
     # This is a temporary thing
     user_channel = UserChannel.from_instance(instance.user)
-    user_channel.publish(msg)
+    user_channel.sync_publish(msg)
 
 
 @receiver(roles_added)

@@ -23,7 +23,7 @@ class RoleChangesPublishedTests(TestCase):
         cls.user = cls.meeting.participants.create(username="user", organisation=org)
         cls.meeting.add_roles(cls.user, "participant")
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_added(self, mock_publish):
         from voteit.core.messages import RolesAdded
 
@@ -35,7 +35,7 @@ class RoleChangesPublishedTests(TestCase):
         self.assertEqual(self.meeting.pk, msg.data.pk)
         self.assertEqual({"moderator"}, set(msg.data.roles))
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_removed(self, mock_publish):
         from voteit.core.messages import RolesRemoved
 

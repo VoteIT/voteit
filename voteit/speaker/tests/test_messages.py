@@ -4,11 +4,12 @@ from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.test import TestCase
 
-from voteit.messaging.errors import BadRequestError
-from voteit.messaging.errors import UnauthorizedError
-from voteit.messaging.errors import NotFoundError
-from voteit.messaging.errors import ValidationErrorMsg
-from voteit.messaging.messages.status import StatusDone
+from envelope.messages.common import Status
+from envelope.messages.errors import BadRequestError
+from envelope.messages.errors import NotFoundError
+from envelope.messages.errors import UnauthorizedError
+from envelope.messages.errors import ValidationErrorMsg
+
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -18,16 +19,17 @@ _channel_layers_setting = {
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SpeakerListEnterTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
 
-        self.system = SpeakerListSystem.objects.create(
+        cls.system = SpeakerListSystem.objects.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(speaker_system=self.system)
-        self.user = User.objects.create(username="jane")
-        self.system.add_roles(self.user, "speaker")
+        cls.list = SpeakerList.objects.create(speaker_system=cls.system)
+        cls.user = User.objects.create(username="jane")
+        cls.system.add_roles(cls.user, "speaker")
 
     @property
     def _cut(self):
@@ -37,7 +39,7 @@ class SpeakerListEnterTests(TestCase):
 
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
-        return self._cut({"user_pk": self.user.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(mm={"user_pk": self.user.pk, "consumer_name": "abc"}, **kw)
 
     def test_enter(self):
         self.assertFalse(self.list.speakers.filter(pk=self.user.pk).exists())
@@ -80,7 +82,7 @@ class SpeakerListLeaveTests(TestCase):
 
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
-        return self._cut({"user_pk": self.user.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(mm={"user_pk": self.user.pk, "consumer_name": "abc"}, **kw)
 
     def test_leave(self):
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
@@ -104,17 +106,18 @@ class SpeakerListLeaveTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SpeakerListSetActiveTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.speaker.models import SpeakerList
         from voteit.meeting.models import Meeting
 
         meeting = Meeting.objects.create()
-        self.system = meeting.speaker_systems.create(
+        cls.system = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(speaker_system=self.system)
-        self.user = User.objects.create(username="jane")
-        self.system.add_roles(self.user, "list_moderator")
+        cls.list = SpeakerList.objects.create(speaker_system=cls.system)
+        cls.user = User.objects.create(username="jane")
+        cls.system.add_roles(cls.user, "list_moderator")
 
     @property
     def _cut(self):
@@ -124,13 +127,13 @@ class SpeakerListSetActiveTests(TestCase):
 
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
-        return self._cut({"user_pk": self.user.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(mm={"user_pk": self.user.pk, "consumer_name": "abc"}, **kw)
 
     def test_set_active(self):
 
         msg = self._mk_one()
         response = msg.run_job()
-        self.assertIsInstance(response, StatusDone)
+        self.assertIsInstance(response, Status)
         self.system.refresh_from_db()
         self.assertEqual(self.system.active_list, self.list)
 
@@ -153,22 +156,23 @@ class SpeakerListSetActiveTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class StartSpeakerInListTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.speaker.models import SpeakerList
         from voteit.meeting.models import Meeting
 
         meeting = Meeting.objects.create()
-        self.system = meeting.speaker_systems.create(
+        cls.system = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(speaker_system=self.system)
-        self.system.active_list = self.list
-        self.system.save()
-        self.user = User.objects.create(username="jane")
-        self.speaker = self.list.speaker_items.create(user=self.user)
-        self.moderator = User.objects.create(username="moderator")
-        self.system.add_roles(self.user, "speaker")
-        self.system.add_roles(self.moderator, "list_moderator")
+        cls.list = SpeakerList.objects.create(speaker_system=cls.system)
+        cls.system.active_list = cls.list
+        cls.system.save()
+        cls.user = User.objects.create(username="jane")
+        cls.speaker = cls.list.speaker_items.create(user=cls.user)
+        cls.moderator = User.objects.create(username="moderator")
+        cls.system.add_roles(cls.user, "speaker")
+        cls.system.add_roles(cls.moderator, "list_moderator")
 
     @property
     def _cut(self):
@@ -179,7 +183,9 @@ class StartSpeakerInListTests(TestCase):
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
         kw.setdefault("user", self.user.pk)
-        return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(
+            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw
+        )
 
     def test_start_speaker(self):
         self.assertIsNone(self.list.current)
@@ -244,7 +250,9 @@ class StopSpeakerInListTests(TestCase):
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
         kw.setdefault("user", self.user.pk)
-        return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(
+            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw
+        )
 
     def test_stop_speaker(self):
         msg = self._mk_one()
@@ -295,7 +303,9 @@ class ModeratorSpeakerListEnterTests(TestCase):
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
         kw.setdefault("user", self.user.pk)
-        return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(
+            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw
+        )
 
     def test_enter(self):
         self.assertFalse(self.list.speakers.filter(pk=self.user.pk).exists())
@@ -358,7 +368,9 @@ class ModeratorSpeakerListLeaveTests(TestCase):
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
         kw.setdefault("user", self.user.pk)
-        return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(
+            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw
+        )
 
     def test_leave(self):
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
@@ -405,7 +417,9 @@ class ModeratorSpeakerListUndoTests(TestCase):
 
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
-        return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(
+            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw
+        )
 
     def test_undo(self):
         self.assertEqual(self.list.current, self.speaker)
@@ -446,7 +460,9 @@ class SpeakerListShuffleTests(TestCase):
 
     def _mk_one(self, **kw):
         kw.setdefault("pk", self.list.pk)
-        return self._cut({"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(
+            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"}, **kw
+        )
 
     def test_shuffle_causes_new_order(self):
         current_order = self.list.current_order()

@@ -1,14 +1,16 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
-from voteit.agenda.channels import AgendaItemChannel
+from django.test import TestCase
+from django.test import override_settings
+from envelope.messages.channels import Subscribe
 
+from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
-from voteit.messaging.messages.channels import Subscribe
 
 if TYPE_CHECKING:
     from voteit.proposal.models import DiffProposal
@@ -40,7 +42,7 @@ class MeetingSubscribedTests(TestCase):
 
     def test_app_state_sent_moderators(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
             channel_type="moderators",
         )
@@ -52,7 +54,7 @@ class MeetingSubscribedTests(TestCase):
         self.ai.unpublish()
         self.ai.save()
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
             channel_type="moderators",
         )
@@ -62,7 +64,7 @@ class MeetingSubscribedTests(TestCase):
 
     def test_app_state_sent_participants(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
             channel_type="participants",
         )
@@ -74,7 +76,7 @@ class MeetingSubscribedTests(TestCase):
         self.ai.unpublish()
         self.ai.save()
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
             channel_type="participants",
         )
@@ -116,7 +118,7 @@ class AnyProposalChangedTests(TestCase):
             agenda_item=self.ai,  # paragraph=cls.para
         )
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_added_participant(self, mock_publish):
         from voteit.proposal.messages import ProposalAdded
 
@@ -127,7 +129,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertIsInstance(msg, ProposalAdded)
         self.assertEqual(prop.pk, msg.data.pk)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_added_in_private_ai_participant(self, mock_publish):
         self.assertFalse(mock_publish.called)
         self.ai.unpublish()
@@ -136,7 +138,7 @@ class AnyProposalChangedTests(TestCase):
         self.ai.proposals.create()
         self.assertFalse(mock_publish.called)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_diff_proposal_added(self, mock_publish):
         from voteit.proposal.messages import ProposalAdded
 
@@ -148,7 +150,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertEqual(diff_prop.pk, msg.data.pk)
         self.assertEqual(msg.data.paragraph, diff_prop.paragraph.pk)
 
-    @patch.object(ModeratorsChannel, "publish")
+    @patch.object(ModeratorsChannel, "sync_publish")
     def test_added_moderator(self, mock_publish):
         from voteit.proposal.messages import ProposalAdded
 
@@ -166,7 +168,7 @@ class AnyProposalChangedTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalAdded)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed_participant(self, mock_publish):
         from voteit.proposal.messages import ProposalChanged
 
@@ -178,7 +180,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertIsInstance(msg, ProposalChanged)
         self.assertEqual(self.prop.pk, msg.data.pk)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_diff_changed_participant(self, mock_publish):
         from voteit.proposal.messages import ProposalChanged
 
@@ -191,7 +193,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertEqual(self.diff_prop.pk, msg.data.pk)
         self.assertEqual(self.diff_prop.paragraph.pk, msg.data.paragraph)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed_private_ai_participant(self, mock_publish):
         self.ai.unpublish()
         self.ai.save()
@@ -201,7 +203,7 @@ class AnyProposalChangedTests(TestCase):
         self.prop.save()
         self.assertFalse(mock_publish.called)
 
-    @patch.object(ModeratorsChannel, "publish")
+    @patch.object(ModeratorsChannel, "sync_publish")
     def test_changed_moderator(self, mock_publish):
         from voteit.proposal.messages import ProposalChanged
 
@@ -219,7 +221,7 @@ class AnyProposalChangedTests(TestCase):
         self.prop.save()
         self.assertTrue(mock_publish.called)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted_participants(self, mock_publish):
         from voteit.proposal.messages import ProposalDeleted
 
@@ -231,7 +233,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertIsInstance(msg, ProposalDeleted)
         self.assertEqual(prop_pk, msg.data.pk)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted_diff_participants(self, mock_publish):
         from voteit.proposal.messages import ProposalDeleted
 
@@ -243,7 +245,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertIsInstance(msg, ProposalDeleted)
         self.assertEqual(diff_prop_pk, msg.data.pk)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted_participants_private_ai(self, mock_publish):
         self.ai.unpublish()
         self.ai.save()
@@ -252,7 +254,7 @@ class AnyProposalChangedTests(TestCase):
         self.prop.delete()
         self.assertFalse(mock_publish.called)
 
-    @patch.object(ModeratorsChannel, "publish")
+    @patch.object(ModeratorsChannel, "sync_publish")
     def test_deleted_moderators(self, mock_publish):
         from voteit.proposal.messages import ProposalDeleted
 
@@ -286,7 +288,7 @@ class PrivateAIPublishedTests(TestCase):
         self.user = User.objects.create(username="user")
         self.meeting.add_roles(self.user, "participant")
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_ai_made_public(self, mock_publish):
         from voteit.agenda.messages import AgendaChanged
         from voteit.proposal.messages import ProposalAdded
@@ -317,7 +319,7 @@ class AgendaItemChannelTests(TestCase):
         cls.user = cls.meeting.participants.create(username="participant")
         cls.meeting.add_roles(cls.user, "participant")
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_create(self, mock_publish):
         from voteit.proposal.messages import TextDocumentAdded
 
@@ -335,7 +337,7 @@ class AgendaItemChannelTests(TestCase):
             ["Hello again", "World"], [x["body"] for x in msg.data.paragraphs]
         )
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_delete(self, mock_publish):
         from voteit.proposal.messages import TextDocumentDeleted
 
@@ -349,7 +351,7 @@ class AgendaItemChannelTests(TestCase):
         msg = messages[0]
         self.assertEqual(deleted_pk, msg.data.pk)
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_update(self, mock_publish):
         from voteit.proposal.messages import TextDocumentChanged
 
@@ -366,7 +368,7 @@ class AgendaItemChannelTests(TestCase):
 
     def test_subscribe_fetches_text_doc(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.ai.pk,
             channel_type="agenda_item",
         )

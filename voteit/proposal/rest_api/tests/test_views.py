@@ -231,7 +231,7 @@ class ProposalsAPITests(APITestCase):
             data["body_diff"],
         )
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_transition_on_diff_triggers_correct_push(self, mock_publish):
         from voteit.proposal.messages import ProposalChanged
 

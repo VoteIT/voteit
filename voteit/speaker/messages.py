@@ -11,18 +11,18 @@ from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
 
+from envelope.core.message import ContextAction
+from envelope.core.message import Message
+from envelope.messages.common import Status
+from envelope.messages.errors import BadRequestError
+from envelope.messages.errors import NotFoundError
+from envelope.messages.errors import ValidationErrorMsg
+from envelope.utils import websocket_send
 from voteit.meeting.roles import ROLE_PARTICIPANT
-from voteit.messaging.abcs import BaseIncomingMessage
-from voteit.messaging.abcs import BaseOutgoingMessage
-from voteit.messaging.abcs import ContextAction
-from voteit.messaging.abcs import DeferredJob
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.errors import BadRequestError
-from voteit.messaging.errors import NotFoundError
-from voteit.messaging.errors import ValidationErrorMsg
+
 from voteit.messaging.messages.base import BaseObjectDeleted
-from voteit.messaging.messages.status import StatusDone
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.rules import not_currently_speaking
@@ -36,20 +36,16 @@ class SpeakerListUserSchema(SpeakerListActionSchema):
     user: int  # Moderators may also enter someone else.
 
 
-class ListMessage(BaseIncomingMessage, DeferredJob, ContextAction[SpeakerList], ABC):
+class ListMessage(ContextAction, ABC):
     model = SpeakerList
     schema = SpeakerListActionSchema
     data: SpeakerListActionSchema
-    context_pk_attr = "pk"
 
 
-class ModeratorListMessage(
-    BaseIncomingMessage, DeferredJob, ContextAction[SpeakerList], ABC
-):
+class ModeratorListMessage(ContextAction, ABC):
     model = SpeakerList
     schema = SpeakerListUserSchema
     data: SpeakerListUserSchema
-    context_pk_attr = "pk"
 
     def get_user(self) -> AbstractUser:
         User = get_user_model()
@@ -57,7 +53,10 @@ class ModeratorListMessage(
             return User.objects.get(pk=self.data.user)
         except User.DoesNotExist:
             raise NotFoundError.from_message(
-                self, msg=_("No user with pk %(pk)s") % {"pk": self.data.pk}
+                self,
+                msg=_("No user with pk %(pk)s") % {"pk": self.data.pk},
+                model=self.model,
+                value=self.data.user,
             )
 
 
@@ -66,7 +65,7 @@ class SpeakerListEnter(ListMessage):
     name = "speaker_list.enter"
     permission = SpeakerListPermissions.ENTER
 
-    def run_job(self) -> StatusDone:
+    def run_job(self) -> Status:
         self.assert_perm()
         existing_obj = self.context.speaker_items.filter(
             user=self.user, order__isnull=False
@@ -74,8 +73,8 @@ class SpeakerListEnter(ListMessage):
         if existing_obj is not None:
             raise BadRequestError.from_message(self, msg=_("Already in list"))
         self.context.speaker_items.create(user=self.user)
-        msg = StatusDone.from_message(self)
-        msg.send_outgoing(self.mm.consumer_name, success=True)
+        msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
         return msg
 
 
@@ -84,7 +83,7 @@ class SpeakerListLeave(ListMessage):
     name = "speaker_list.leave"
     permission = SpeakerListPermissions.LEAVE
 
-    def run_job(self) -> StatusDone:
+    def run_job(self) -> Status:
         self.assert_perm()
         existing_obj = self.context.speaker_items.filter(
             user=self.user, order__isnull=False
@@ -92,8 +91,8 @@ class SpeakerListLeave(ListMessage):
         if existing_obj is None:
             raise BadRequestError.from_message(self, msg=_("Not in list"))
         existing_obj.delete()
-        msg = StatusDone.from_message(self)
-        msg.send_outgoing(self.mm.consumer_name, success=True)
+        msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
         return msg
 
 
@@ -102,7 +101,7 @@ class SetActiveList(ListMessage):
     name = "speaker_list.set_active"
     permission = SpeakerListPermissions.CHANGE
 
-    def run_job(self) -> StatusDone:
+    def run_job(self) -> Status:
         self.assert_perm()
         system = self.context.speaker_system
         if not self.context.is_active_list:
@@ -126,19 +125,21 @@ class SetActiveList(ListMessage):
                 )
             system.active_list = self.context
             system.save()
-            msg = StatusDone.from_message(self)
-            msg.send_outgoing(self.mm.consumer_name, success=True)
+            msg = Status.from_message(self)
+            websocket_send(msg, state=msg.SUCCESS)
             return msg
 
 
 @incoming
 class StartSpeakerInList(ModeratorListMessage):
-    """Start user. Ignore if not found or already speaking."""
+    """
+    Start user. Ignore if not found or already speaking.
+    """
 
     name = "speaker_list.start_user"
     permission = SpeakerListPermissions.START
 
-    def run_job(self) -> StatusDone:
+    def run_job(self) -> Status:
         self.assert_perm()
         user = self.get_user()
         speaker = self.context.speaker_items.filter(
@@ -158,19 +159,21 @@ class StartSpeakerInList(ModeratorListMessage):
             )
         self.context.start_speaker(speaker)
         self.context.signal_list_updated()
-        msg = StatusDone.from_message(self)
-        msg.send_outgoing(self.mm.consumer_name, success=True)
+        msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
         return msg
 
 
 @incoming
 class StopSpeakerInList(ModeratorListMessage):
-    """Stop user. Ignore if not speaking."""
+    """
+    Stop user. Ignore if not speaking.
+    """
 
     name = "speaker_list.stop_user"
     permission = SpeakerListPermissions.STOP
 
-    def run_job(self) -> StatusDone:
+    def run_job(self) -> Status:
         self.assert_perm()
         user = self.get_user()
         speaker = self.context.current
@@ -200,8 +203,8 @@ class StopSpeakerInList(ModeratorListMessage):
             )
         self.context.stop_speaker()
         self.context.signal_list_updated()
-        msg = StatusDone.from_message(self)
-        msg.send_outgoing(self.mm.consumer_name, success=True)
+        msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
         return msg
 
 
@@ -214,14 +217,14 @@ class SpeakerStatsSchema(BaseModel):
 
 
 @outgoing
-class SpeakerStarted(BaseOutgoingMessage):
+class SpeakerStarted(Message):
     name = "speaker.started"
     schema = SpeakerStatsSchema
     data: SpeakerStatsSchema
 
 
 @outgoing
-class SpeakerStopped(BaseOutgoingMessage):
+class SpeakerStopped(Message):
     name = "speaker.stopped"
     schema = SpeakerStatsSchema
     data: SpeakerStatsSchema
@@ -233,7 +236,7 @@ class ModeratorSpeakerListEnter(ModeratorListMessage):
     # Note permission diff: Perms will be checked against moderator
     permission = SpeakerListPermissions.CHANGE
 
-    def run_job(self) -> StatusDone:
+    def run_job(self) -> Status:
         self.assert_perm()
         user = self.get_user()
         # Negating rules has unwanted side-effects, hence this silly thing :)
@@ -251,8 +254,8 @@ class ModeratorSpeakerListEnter(ModeratorListMessage):
         if existing_obj is not None:
             raise BadRequestError.from_message(self, msg=_("Already in list"))
         self.context.speaker_items.create(user=user)
-        msg = StatusDone.from_message(self)
-        msg.send_outgoing(self.mm.consumer_name, success=True)
+        msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
         return msg
 
 
@@ -262,7 +265,7 @@ class ModeratorSpeakerListLeave(ModeratorListMessage):
     # Note permission diff: Perms will be checked against moderator
     permission = SpeakerListPermissions.CHANGE
 
-    def run_job(self) -> StatusDone:
+    def run_job(self) -> Status:
         self.assert_perm()
         user = self.get_user()
         existing_obj = self.context.speaker_items.filter(
@@ -271,8 +274,8 @@ class ModeratorSpeakerListLeave(ModeratorListMessage):
         if existing_obj is None:
             raise BadRequestError.from_message(self, msg=_("Not in list"))
         existing_obj.delete()
-        msg = StatusDone.from_message(self)
-        msg.send_outgoing(self.mm.consumer_name, success=True)
+        msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
         return msg
 
 
@@ -281,12 +284,12 @@ class ModeratorSpeakerListUndo(ListMessage):
     name = "speaker_list.mod_undo"
     permission = SpeakerListPermissions.STOP
 
-    def run_job(self) -> StatusDone:
+    def run_job(self) -> Status:
         self.assert_perm()
         if not self.context.undo_speaker():
             raise BadRequestError.from_message(self, msg=_("No active speaker"))
-        msg = StatusDone.from_message(self)
-        msg.send_outgoing(self.mm.consumer_name, success=True)
+        msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
         return msg
 
 
@@ -295,11 +298,11 @@ class ModeratorSpeakerListShuffle(ListMessage):
     name = "speaker_list.mod_shuffle"
     permission = SpeakerListPermissions.CHANGE
 
-    def run_job(self) -> StatusDone:
+    def run_job(self) -> Status:
         self.assert_perm()
         self.context.shuffle()
-        msg = StatusDone.from_message(self)
-        msg.send_outgoing(self.mm.consumer_name, success=True)
+        msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
         return msg
 
 
@@ -311,7 +314,7 @@ class OrderSchema(BaseModel):
 
 
 @outgoing
-class SpeakerListOrder(BaseOutgoingMessage):
+class SpeakerListOrder(Message):
     name = "speaker_list.order"
     schema = OrderSchema
     data: OrderSchema
@@ -326,14 +329,14 @@ class SpeakerListSchema(BaseModel):
 
 
 @outgoing
-class SpeakerListAdded(BaseOutgoingMessage):
+class SpeakerListAdded(Message):
     name = "speaker_list.added"
     schema = SpeakerListSchema
     data: SpeakerListSchema
 
 
 @outgoing
-class SpeakerListChanged(BaseOutgoingMessage):
+class SpeakerListChanged(Message):
     name = "speaker_list.changed"
     schema = SpeakerListSchema
     data: SpeakerListSchema
@@ -357,14 +360,14 @@ class SpeakerSystemSchema(BaseModel):
 
 
 @outgoing
-class SpeakerSystemAdded(BaseOutgoingMessage):
+class SpeakerSystemAdded(Message):
     name = "speaker_system.added"
     schema = SpeakerSystemSchema
     data: SpeakerSystemSchema
 
 
 @outgoing
-class SpeakerSystemChanged(BaseOutgoingMessage):
+class SpeakerSystemChanged(Message):
     name = "speaker_system.changed"
     schema = SpeakerSystemSchema
     data: SpeakerSystemSchema

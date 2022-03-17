@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from voteit.messaging.errors import UnauthorizedError, ValidationErrorMsg
+from envelope.messages.errors import UnauthorizedError
+from envelope.messages.errors import ValidationErrorMsg
 
 
 User = get_user_model()
@@ -33,7 +34,7 @@ class AddPresenceTests(TestCase, _PresenceFixture):
 
     def _mk_one(self):
         return self._cut(
-            {"user_pk": self.user.pk, "consumer_name": "abc"},
+            mm={"user_pk": self.user.pk, "consumer_name": "abc"},
             presence_check=self.check.pk,
         )
 
@@ -73,7 +74,7 @@ class RemovePresenceTests(TestCase, _PresenceFixture):
 
     def _mk_one(self):
         return self._cut(
-            {"user_pk": self.user.pk, "consumer_name": "abc"}, pk=self.presence.pk
+            mm={"user_pk": self.user.pk, "consumer_name": "abc"}, pk=self.presence.pk
         )
 
     def test_delete(self):
@@ -111,7 +112,7 @@ class AddUserPresenceTests(TestCase, _PresenceFixture):
 
     def _mk_one(self):
         return self._cut(
-            {"user_pk": self.moderator.pk, "consumer_name": "abc"},
+            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"},
             presence_check=self.check.pk,
             userid=self.user.pk,
         )
@@ -162,7 +163,7 @@ class RemoveUserPresenceTests(TestCase, _PresenceFixture):
 
     def _mk_one(self):
         return self._cut(
-            {"user_pk": self.moderator.pk, "consumer_name": "abc"},
+            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"},
             pk=self.presence.pk,
             userid=self.user.pk,
         )

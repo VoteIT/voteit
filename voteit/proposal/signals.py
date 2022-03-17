@@ -7,6 +7,8 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django_fsm import post_transition
 
+from envelope.signals import channel_subscribed
+from envelope.utils import AppState
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
@@ -14,8 +16,6 @@ from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import receiver_all_subclasses
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
-from voteit.messaging.messages.app_state import AppState
-from voteit.messaging.signals import channel_subscribed
 from voteit.proposal.messages import ProposalAdded
 from voteit.proposal.messages import ProposalChanged
 from voteit.proposal.messages import ProposalDeleted
@@ -61,13 +61,13 @@ def proposal_updated(instance: Proposal = None, created=None, **kw):
     moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
     data = GenericProposalSerializer(instance).data
     if created:
-        msg = ProposalAdded({}, **data)
+        msg = ProposalAdded(data=data)
     else:
-        msg = ProposalChanged({}, **data)
-    moderators_ch.publish(msg)
+        msg = ProposalChanged(data=data)
+    moderators_ch.sync_publish(msg)
     if instance.agenda_item and not instance.agenda_item.is_private:
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
-        participants_ch.publish(msg)
+        participants_ch.sync_publish(msg)
 
 
 @receiver_all_subclasses(pre_delete, sender=Proposal)
@@ -75,11 +75,11 @@ def proposal_delete(instance=None, **kw):
     if instance.meeting is None:
         return
     moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
-    msg = ProposalDeleted({}, pk=instance.pk)
-    moderators_ch.publish(msg)
+    msg = ProposalDeleted(pk=instance.pk)
+    moderators_ch.sync_publish(msg)
     if instance.agenda_item and not instance.agenda_item.is_private:
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
-        participants_ch.publish(msg)
+        participants_ch.sync_publish(msg)
 
 
 @receiver(post_transition, sender=AgendaItem)
@@ -90,8 +90,8 @@ def private_ai_published(instance: AgendaItem, source: str, **kw):
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         for proposal in instance.proposals.all():
             data = GenericProposalSerializer(proposal).data
-            msg = ProposalAdded({}, **data)
-            participants_ch.publish(msg)
+            msg = ProposalAdded(data=data)
+            participants_ch.sync_publish(msg)
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)
@@ -122,10 +122,10 @@ def text_document_updated(instance: TextDocument = None, created=None, **kw):
     ch = AgendaItemChannel.from_instance(instance.agenda_item)
     data = TextDocumentSerializer(instance).data
     if created:
-        msg = TextDocumentAdded({}, **data)
+        msg = TextDocumentAdded(data=data)
     else:
-        msg = TextDocumentChanged({}, **data)
-    ch.publish(msg)
+        msg = TextDocumentChanged(data=data)
+    ch.sync_publish(msg)
 
 
 @receiver(pre_delete, sender=TextDocument)
@@ -133,5 +133,5 @@ def text_paragraph_delete(instance: TextDocument = None, **kw):
     if instance.agenda_item is None:
         return
     ch = AgendaItemChannel.from_instance(instance.agenda_item)
-    msg = TextDocumentDeleted({}, pk=instance.pk)
-    ch.publish(msg)
+    msg = TextDocumentDeleted(pk=instance.pk)
+    ch.sync_publish(msg)

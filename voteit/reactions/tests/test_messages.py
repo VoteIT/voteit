@@ -1,9 +1,11 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import TestCase
+from django.test import override_settings
+from envelope.messages.common import Status
+from envelope.messages.errors import UnauthorizedError
+from envelope.messages.errors import ValidationErrorMsg
+
 from voteit.core.utils import get_model_shortname
-from voteit.messaging.errors import UnauthorizedError
-from voteit.messaging.errors import ValidationErrorMsg
-from voteit.messaging.messages.status import StatusDone
 
 User = get_user_model()
 
@@ -40,7 +42,7 @@ class AddReactionTests(TestCase):
 
     def _mk_one(self, context, **kw):
         return self._cut(
-            {"consumer_name": "abc", "user_pk": self.voter.pk},
+            mm={"consumer_name": "abc", "user_pk": self.voter.pk},
             button=self.button.pk,
             content_type=get_model_shortname(context),
             object_id=context.pk,
@@ -51,14 +53,14 @@ class AddReactionTests(TestCase):
         self.assertFalse(self.prop.reaction_set.count())
         msg = self._mk_one(self.prop)
         response = msg.run_job()
-        self.assertIsInstance(response, StatusDone)
+        self.assertIsInstance(response, Status)
         self.assertTrue(self.prop.reaction_set.count())
 
     def test_add_on_discussion(self):
         self.assertFalse(self.prop.reaction_set.count())
         msg = self._mk_one(self.disc)
         response = msg.run_job()
-        self.assertIsInstance(response, StatusDone)
+        self.assertIsInstance(response, Status)
         self.assertTrue(self.disc.reaction_set.count())
 
     def test_add_wrong_type(self):
@@ -113,9 +115,8 @@ class DeleteReactionTests(TestCase):
 
     def _mk_one(self):
         return self._cut(
-            {"consumer_name": "abc", "user_pk": self.voter.pk},
+            mm={"consumer_name": "abc", "user_pk": self.voter.pk},
             pk=self.reaction.pk,
-            # reaction_pk=self.reaction.pk,
         )
 
     def test_delete(self):
@@ -161,7 +162,7 @@ class ListReactionUsersTests(TestCase):
 
     def _mk_one(self, user, context):
         return self._cut(
-            {"consumer_name": "abc", "user_pk": user.pk},
+            mm={"consumer_name": "abc", "user_pk": user.pk},
             button=self.button.pk,
             content_type=context.name,
             object_id=context.pk,
@@ -179,6 +180,4 @@ class ListReactionUsersTests(TestCase):
         msg = self._mk_one(self.voter, self.prop)
         response = msg.run_job()
         self.assertEqual("reaction.list", response.name)
-        self.assertEqual(
-            {self.voter.pk, self.participant.pk}, set(response.data.users)
-        )
+        self.assertEqual({self.voter.pk, self.participant.pk}, set(response.data.users))

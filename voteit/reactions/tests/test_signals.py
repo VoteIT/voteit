@@ -2,10 +2,11 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+
+from envelope.app.user_channel.channel import UserChannel
+from envelope.messages.channels import Subscribe
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
-from voteit.messaging.channels.user import UserChannel
-from voteit.messaging.messages.channels import Subscribed, Subscribe
 
 User = get_user_model()
 
@@ -28,7 +29,7 @@ class SignalButtonTests(TestCase):
         self.moderator = User.objects.create(username="moderator")
         self.meeting.add_roles(self.moderator, "moderator")
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_button_added(self, mock_publish):
         from voteit.reactions.messages import ButtonAdded
 
@@ -39,7 +40,7 @@ class SignalButtonTests(TestCase):
         self.assertIsInstance(msg, ButtonAdded)
         self.assertEqual(button.pk, msg.data.pk)
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_button_changed(self, mock_publish):
         from voteit.reactions.messages import ButtonChanged
 
@@ -51,7 +52,7 @@ class SignalButtonTests(TestCase):
         self.assertEqual(self.button.pk, msg.data.pk)
         self.assertEqual(self.button.title, "I'm new")
 
-    @patch.object(MeetingChannel, "publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_button_deleted(self, mock_publish):
         from voteit.reactions.messages import ButtonDeleted
 
@@ -65,7 +66,7 @@ class SignalButtonTests(TestCase):
 
     def test_meeting_channel_subscribed(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.moderator.pk},
+            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
             pk=self.meeting.pk,
             channel_type="meeting",
         )
@@ -86,7 +87,7 @@ class SignalButtonTests(TestCase):
             user=self.moderator, button=self.button, agenda_item=self.ai
         )
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.moderator.pk},
+            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
             pk=self.ai.pk,
             channel_type="agenda_item",
         )
@@ -118,7 +119,7 @@ class SignalReactionTests(TestCase):
         kw.setdefault("agenda_item", self.ai)
         return Reaction.objects.create(**kw)
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_reaction_added_ai(self, mock_publish):
         from voteit.reactions.messages import ReactionCount
 
@@ -131,7 +132,7 @@ class SignalReactionTests(TestCase):
         self.assertEqual(self.prop.pk, msg.data.object_id)
         self.assertEqual("proposal", msg.data.content_type)
 
-    @patch.object(AgendaItemChannel, "publish")
+    @patch.object(AgendaItemChannel, "sync_publish")
     def test_reaction_deleted_ai(self, mock_publish):
         from voteit.reactions.messages import ReactionCount
 
@@ -145,7 +146,7 @@ class SignalReactionTests(TestCase):
         self.assertEqual(self.prop.pk, msg.data.object_id)
         self.assertEqual("proposal", msg.data.content_type)
 
-    @patch.object(UserChannel, "publish")
+    @patch.object(UserChannel, "sync_publish")
     def test_reaction_added_user(self, mock_publish):
         from voteit.reactions.messages import UserReactionAdded
 
@@ -158,7 +159,7 @@ class SignalReactionTests(TestCase):
         self.assertEqual(self.prop.pk, msg.data.object_id)
         self.assertEqual("proposal", msg.data.content_type)
 
-    @patch.object(UserChannel, "publish")
+    @patch.object(UserChannel, "sync_publish")
     def test_reaction_deleted_user(self, mock_publish):
         from voteit.reactions.messages import UserReactionDeleted
 

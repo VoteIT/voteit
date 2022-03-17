@@ -2,16 +2,17 @@ from __future__ import annotations
 
 from logging import getLogger
 
+from envelope.core.channels import ContextChannel
+
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
-from voteit.messaging.abcs import AbstractObjectChannel
 from voteit.messaging.decorators import channel
 
 logger = getLogger(__name__)
 
 
 @channel
-class MeetingChannel(AbstractObjectChannel):
+class MeetingChannel(ContextChannel):
     """This is the generic meeting channel, everyone should subscribe to this.
     Anything meant to reach anyone interacting with the meeting should be published here.
     """
@@ -23,7 +24,7 @@ class MeetingChannel(AbstractObjectChannel):
 
 
 @channel
-class ParticipantsChannel(AbstractObjectChannel):
+class ParticipantsChannel(ContextChannel):
     """This transmits messages for regular participants that aren't moderators.
         Moderators should NOT subscribe to this channel,
         since the messages there will conflict the moderator channel.
@@ -39,7 +40,7 @@ class ParticipantsChannel(AbstractObjectChannel):
 
 
 @channel
-class ModeratorsChannel(AbstractObjectChannel):
+class ModeratorsChannel(ContextChannel):
     """Moderator messages, moderators should subscribe to this channel instead of the participants channel.
 
     - All polls

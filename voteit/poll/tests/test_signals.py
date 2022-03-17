@@ -1,12 +1,14 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
-from django.test import TestCase, override_settings
+from django.test import TestCase
+from django.test import override_settings
+
+from envelope.messages.channels import Subscribe
 from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
-from voteit.meeting.channels import ParticipantsChannel, ModeratorsChannel
-from voteit.messaging.messages.channels import Subscribe
+from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 
 User = get_user_model()
 
@@ -34,7 +36,7 @@ class PollSubscribedTests(TestCase):
 
     def test_app_state_sent(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.poll.pk,
             channel_type="poll",
         )
@@ -68,7 +70,7 @@ class MeetingSubscribedTests(TestCase):
 
     def test_app_state_sent_participants_poll_added(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
             channel_type=ParticipantsChannel.name,
         )
@@ -78,7 +80,7 @@ class MeetingSubscribedTests(TestCase):
 
     def test_app_state_sent_moderators(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
             channel_type=ModeratorsChannel.name,
         )
@@ -88,7 +90,7 @@ class MeetingSubscribedTests(TestCase):
 
     def test_app_state_sent_votes(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
             channel_type=MeetingChannel.name,
         )
@@ -120,12 +122,12 @@ class PollChangedTests(TestCase):
     def setUp(self):
         self.poll = self.meeting.polls.get(pk=self.poll_pk)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_added_participants(self, mock_publish):
         self.meeting.polls.create(method_name="simple", electoral_register=self.er)
         self.assertFalse(mock_publish.called)
 
-    @patch.object(ModeratorsChannel, "publish")
+    @patch.object(ModeratorsChannel, "sync_publish")
     def test_added_moderators(self, mock_publish):
         from voteit.poll.messages import PollAdded
 
@@ -141,7 +143,7 @@ class PollChangedTests(TestCase):
         self.assertEqual(poll.pk, msg.data.pk)
         self.assertEqual([self.prop.pk], msg.data.proposals)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed_participants(self, mock_publish):
         from voteit.poll.messages import PollChanged
         from voteit.poll.messages import PollDeleted
@@ -163,7 +165,7 @@ class PollChangedTests(TestCase):
         self.assertIsInstance(msg, PollDeleted)
         self.assertEqual(self.poll.pk, msg.data.pk)
 
-    @patch.object(ModeratorsChannel, "publish")
+    @patch.object(ModeratorsChannel, "sync_publish")
     def test_deleted_moderators(self, mock_publish):
         from voteit.poll.messages import PollDeleted
 
@@ -175,7 +177,7 @@ class PollChangedTests(TestCase):
         self.assertIsInstance(msg, PollDeleted)
         self.assertEqual(poll_pk, msg.data.pk)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted(self, mock_publish):
         from voteit.poll.messages import PollDeleted
 
@@ -211,7 +213,7 @@ class PrivateAIPublishedTests(TestCase):
         self.user = User.objects.create(username="user")
         self.meeting.add_roles(self.user, "participant")
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_ai_made_public_private_poll(self, mock_publish):
         from voteit.agenda.messages import AgendaChanged
 
@@ -223,7 +225,7 @@ class PrivateAIPublishedTests(TestCase):
         self.assertIsInstance(msg, AgendaChanged)
         self.assertEqual(1, len(mock_publish.mock_calls))
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_ai_made_public_visible_poll(self, mock_publish):
         from voteit.agenda.messages import AgendaChanged
         from voteit.poll.messages import PollAdded

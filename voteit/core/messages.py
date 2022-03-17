@@ -1,21 +1,21 @@
 from __future__ import annotations
+
+from typing import Dict
+from typing import List
 from typing import OrderedDict
 from typing import TYPE_CHECKING
 
 from pydantic.main import BaseModel
-from typing import List
 
-from typing import Dict
-
+from envelope.core.message import AsyncRunnable
+from envelope.core.message import Message
 from voteit.core.utils import get_available_transitions
-from voteit.messaging.abcs import AsyncRunnable
-from voteit.messaging.abcs import BaseIncomingMessage
-from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 
+
 if TYPE_CHECKING:
-    from voteit.messaging.consumers import WebsocketDemuxConsumer
+    from envelope.consumers.websocket import WebsocketConsumer
 
 
 class RolesChangeSchema(BaseModel):
@@ -32,32 +32,30 @@ class RolesChangeSchema(BaseModel):
 
 
 @outgoing
-class RolesAdded(BaseOutgoingMessage):
+class RolesAdded(Message):
     name = "roles.added"
     schema = RolesChangeSchema
     data: RolesChangeSchema
 
 
 @outgoing
-class RolesRemoved(BaseOutgoingMessage):
+class RolesRemoved(Message):
     name = "roles.removed"
     schema = RolesChangeSchema
     data: RolesChangeSchema
 
 
 @incoming
-class GetAllTransitions(BaseIncomingMessage, AsyncRunnable):
-    """ All transitions in VoteIT regardless of conditions or permissions."""
+class GetAllTransitions(AsyncRunnable):
+    """All transitions in VoteIT regardless of conditions or permissions."""
 
     name = "transitions.get"
 
-    async def run(self, consumer: WebsocketDemuxConsumer) -> AllTransitions:
+    async def run(self, *, consumer: WebsocketConsumer, **kwargs) -> AllTransitions:
         response = AllTransitions.from_message(
             self, transitions=get_available_transitions()
         )
-        await response.async_send_outgoing(
-            channel_name=self.mm.consumer_name, success=True
-        )
+        await consumer.send_ws_message(response, state=response.SUCCESS)
         return response
 
 
@@ -66,7 +64,7 @@ class TransitionsSchema(BaseModel):
 
 
 @outgoing
-class AllTransitions(BaseOutgoingMessage):
+class AllTransitions(Message):
     name = "transitions.all"
     schema = TransitionsSchema
     data: TransitionsSchema

@@ -1,6 +1,8 @@
 from django.test import TestCase
 from django.test import override_settings
-from voteit.messaging.errors import UnauthorizedError
+
+from envelope.messages.errors import UnauthorizedError
+
 
 _channel_layers_setting = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
@@ -9,7 +11,7 @@ _channel_layers_setting = {
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AddVoteTests(TestCase):
-    """ Since this is an abstract class, we'll use simple vote to test it"""
+    """Since this is an abstract class, we'll use simple vote to test it"""
 
     @classmethod
     def setUpTestData(cls):
@@ -35,7 +37,7 @@ class AddVoteTests(TestCase):
     def _mk_one(self, **kw):
         kw.setdefault("vote", {"choice": "yes"})
         kw.setdefault("poll", self.poll.pk)
-        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_add(self):
         self.poll.ongoing()
@@ -59,6 +61,8 @@ class AddVoteTests(TestCase):
 
     def test_add_vote_exists(self):
         from voteit.poll.messages import ChangeVote
+
+        # from voteit.poll.app.polls import simple
 
         self.poll.ongoing()
         self.poll.save()
@@ -97,7 +101,7 @@ class AbstainTests(TestCase):
 
     def _mk_one(self, **kw):
         kw.setdefault("poll", self.poll.pk)
-        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_abstain(self):
         msg = self._mk_one()
@@ -111,7 +115,7 @@ class AbstainTests(TestCase):
         from voteit.poll.app.polls.simple import AddSimpleVote
 
         AddSimpleVote(
-            {"user_pk": self.voter.pk, "consumer_name": "abc"},
+            mm={"user_pk": self.voter.pk, "consumer_name": "abc"},
             vote={"choice": "yes"},
             poll=self.poll.pk,
         ).run_job()
@@ -120,7 +124,7 @@ class AbstainTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ChangeVoteTests(TestCase):
-    """ Since this is an abstract class, we'll use simple vote to test it"""
+    """Since this is an abstract class, we'll use simple vote to test it"""
 
     def setUp(self):
         from voteit.poll.models import Poll
@@ -146,7 +150,7 @@ class ChangeVoteTests(TestCase):
     def _mk_one(self, **kw):
         kw.setdefault("vote", {"choice": "no"})
         kw.setdefault("pk", self.vote.pk)
-        return self._cut({"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_change(self):
         msg = self._mk_one()
@@ -237,7 +241,7 @@ class GetERVoteCountTests(TestCase):
 
     def _mk_one(self, user, **kw):
         kw.setdefault("electoral_register", self.er.pk)
-        return self._cut({"user_pk": user.pk, "consumer_name": "abc"}, **kw)
+        return self._cut(mm={"user_pk": user.pk, "consumer_name": "abc"}, **kw)
 
     def test_get(self):
         from voteit.poll.messages import ERVoteCount

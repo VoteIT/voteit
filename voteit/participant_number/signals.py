@@ -7,19 +7,20 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-from voteit.core.decorators import disable_on_raw_save
+from envelope.signals import channel_subscribed
 
+from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import receiver_all_subclasses
 from voteit.meeting.channels import ModeratorsChannel
-from voteit.messaging.messages.app_state import AppState
-from voteit.messaging.signals import channel_subscribed
 from voteit.participant_number.messages import PNAdded
 from voteit.participant_number.messages import PNChanged
 from voteit.participant_number.messages import PNDeleted
 from voteit.participant_number.models import ParticipantNumber
 
 if TYPE_CHECKING:
+    from envelope.utils import AppState
     from voteit.meeting.models import Meeting
+
 
 logger = getLogger(__name__)
 
@@ -54,7 +55,7 @@ def pn_updated(instance: ParticipantNumber = None, created=None, **kw):
         user=instance.user.pk,
         pk=instance.pk,
     )
-    moderators_ch.publish(msg)
+    moderators_ch.sync_publish(msg)
 
 
 @receiver_all_subclasses(pre_delete, sender=ParticipantNumber)
@@ -65,4 +66,4 @@ def pn_deleted(instance: ParticipantNumber = None, **kw):
     msg = PNDeleted(
         pk=instance.pk,
     )
-    moderators_ch.publish(msg)
+    moderators_ch.sync_publish(msg)

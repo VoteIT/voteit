@@ -4,10 +4,12 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from pytz import UTC
+
+from envelope.messages.channels import Subscribe
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
-from voteit.messaging.messages.channels import Subscribe
+
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -33,7 +35,7 @@ class SubscribedTests(TestCase):
 
     def test_app_state_sent_participants(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
             channel_type=ParticipantsChannel.name,
         )
@@ -43,7 +45,7 @@ class SubscribedTests(TestCase):
 
     def test_app_state_sent_moderators(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
             channel_type=ModeratorsChannel.name,
         )
@@ -53,7 +55,7 @@ class SubscribedTests(TestCase):
 
     def test_app_state_last_read_sent(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
             channel_type=MeetingChannel.name,
         )
@@ -81,14 +83,14 @@ class AgendaChangedTests(TestCase):
     def setUp(self):
         self.ai = self.meeting.agenda_items.get(pk=self.ai_pk)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_added_participants(self, mock_publish):
         # This should have no effect at all
         self.assertFalse(mock_publish.called)
         self.meeting.agenda_items.create()
         self.assertFalse(mock_publish.called)
 
-    @patch.object(ModeratorsChannel, "publish")
+    @patch.object(ModeratorsChannel, "sync_publish")
     def test_added_moderators(self, mock_publish):
         from voteit.agenda.messages import AgendaAdded
 
@@ -99,10 +101,9 @@ class AgendaChangedTests(TestCase):
         self.assertIsInstance(msg, AgendaAdded)
         self.assertEqual(ai.pk, msg.data.pk)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed_participants(self, mock_publish):
         from voteit.agenda.messages import AgendaChanged
-        from voteit.agenda.messages import AgendaDeleted
 
         self.assertFalse(mock_publish.called)
         self.ai.title = "Hello"
@@ -116,7 +117,7 @@ class AgendaChangedTests(TestCase):
         self.assertIsInstance(msg, AgendaChanged)
         self.assertEqual(self.ai.pk, msg.data.pk)
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted_participants(self, mock_publish):
         from voteit.agenda.messages import AgendaDeleted
 
@@ -134,7 +135,7 @@ class AgendaChangedTests(TestCase):
         self.assertIsInstance(msg, AgendaDeleted)
         self.assertEqual(ai_pk, msg.data.pk)
 
-    @patch.object(ModeratorsChannel, "publish")
+    @patch.object(ModeratorsChannel, "sync_publish")
     def test_deleted_moderators(self, mock_publish):
         from voteit.agenda.messages import AgendaDeleted
 
@@ -186,7 +187,7 @@ class RelatedItemsTests(TestCase):
         self.disc = self.ai.discussions.get(pk=self.disc_pk)
         self.ai.refresh_from_db()
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_proposal_deleted(self, mock_publish):
         self.prop.delete()
         self.assertEqual(
@@ -200,7 +201,7 @@ class RelatedItemsTests(TestCase):
             ),
         )
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_discussion_deleted(self, mock_publish):
         self.disc.delete()
         self.assertEqual(
@@ -214,7 +215,7 @@ class RelatedItemsTests(TestCase):
             ),
         )
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_proposal_created(self, mock_publish):
         self.ai.proposals.create(body="Hello")
         self.assertTrue(
@@ -225,7 +226,7 @@ class RelatedItemsTests(TestCase):
             ]
         )
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_proposal_changed(self, mock_publish):
         self.prop.body = "Hello"
         self.prop.save()
@@ -237,7 +238,7 @@ class RelatedItemsTests(TestCase):
             ]
         )
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_discussion_created(self, mock_publish):
         self.ai.discussions.create(body="Hello")
         self.assertTrue(
@@ -248,7 +249,7 @@ class RelatedItemsTests(TestCase):
             ]
         )
 
-    @patch.object(ParticipantsChannel, "publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_discussion_changed(self, mock_publish):
         self.disc.body = "Hello"
         self.disc.save()

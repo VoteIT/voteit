@@ -6,12 +6,12 @@ from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+from envelope.app.user_channel.channel import UserChannel
+from envelope.signals import channel_subscribed
+from envelope.utils import AppState
 from voteit.core.decorators import disable_on_raw_save
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
-from voteit.messaging.channels.user import UserChannel
-from voteit.messaging.messages.app_state import AppState
-from voteit.messaging.signals import channel_subscribed
 from voteit.presence.channels import PresenceCheckChannel
 from voteit.presence.messages import PresenceAdded
 from voteit.presence.messages import PresenceCheckAdded
@@ -38,10 +38,10 @@ def presence_added(instance=None, created: bool = None, **kw):
             present=instance.presence_check.presences.count(),
         )
         ch = PresenceCheckChannel.from_instance(instance.presence_check)
-        ch.publish(msg)
+        ch.sync_publish(msg)
         # And the users message
         presence_msg = PresenceAdded(**data)
-        user_ch.publish(presence_msg)
+        user_ch.sync_publish(presence_msg)
 
 
 @receiver(post_delete, sender=Presence)
@@ -51,10 +51,10 @@ def presence_deleted(instance: Presence = None, **kw):
         pk=instance.presence_check.pk, present=instance.presence_check.presences.count()
     )
     ch = PresenceCheckChannel.from_instance(instance.presence_check)
-    ch.publish(msg)
+    ch.sync_publish(msg)
     presence_msg = PresenceDeleted(pk=instance.pk)
     user_ch = UserChannel.from_instance(instance.user)
-    user_ch.publish(presence_msg)
+    user_ch.sync_publish(presence_msg)
 
 
 @receiver(post_save, sender=PresenceCheck)
@@ -69,7 +69,7 @@ def presence_check_changed(instance: PresenceCheck = None, created: bool = None,
         else:
             msg = PresenceCheckChanged(**data)
         ch = MeetingChannel.from_instance(meeting)
-        ch.publish(msg)
+        ch.sync_publish(msg)
 
 
 @receiver(post_delete, sender=PresenceCheck)
@@ -79,7 +79,7 @@ def presence_check_deleted(instance=None, **kw):
     if meeting is not None:
         msg = PresenceCheckDeleted(pk=instance.pk)
         ch = MeetingChannel.from_instance(meeting)
-        ch.publish(msg)
+        ch.sync_publish(msg)
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)

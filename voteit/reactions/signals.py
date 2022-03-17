@@ -8,13 +8,13 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
+from envelope.app.user_channel.channel import UserChannel
+from envelope.signals import channel_subscribed
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.signals import archive_meeting
-from voteit.messaging.channels.user import UserChannel
-from voteit.messaging.signals import channel_subscribed
 from voteit.reactions.messages import ButtonAdded
 from voteit.reactions.messages import ButtonChanged
 from voteit.reactions.messages import ButtonDeleted
@@ -26,10 +26,11 @@ from voteit.reactions.models import ReactionButton
 from voteit.reactions.rest_api.serializers import ButtonDetailSerializer
 from voteit.reactions.rest_api.serializers import ReactionSerializer
 
+
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
+    from envelope.utils import AppState
     from voteit.meeting.models import Meeting
-    from voteit.messaging.messages.app_state import AppState
     from voteit.agenda.models import AgendaItem
 
 
@@ -72,17 +73,17 @@ def reaction_button_updated(
     ch = MeetingChannel.from_instance(instance.meeting)
     data = ButtonDetailSerializer(instance).data
     if created:
-        msg = ButtonAdded({}, **data)
+        msg = ButtonAdded(data=data)
     else:
-        msg = ButtonChanged({}, **data)
-    ch.publish(msg)
+        msg = ButtonChanged(data=data)
+    ch.sync_publish(msg)
 
 
 @receiver(pre_delete, sender=ReactionButton)
 def reaction_button_delete(instance: ReactionButton = None, **kw):
     ch = MeetingChannel.from_instance(instance.meeting)
-    msg = ButtonDeleted({}, pk=instance.pk)
-    ch.publish(msg)
+    msg = ButtonDeleted(pk=instance.pk)
+    ch.sync_publish(msg)
 
 
 def _send_count(instance: Reaction, pre_delete=False):
@@ -99,14 +100,13 @@ def _send_count(instance: Reaction, pre_delete=False):
     if pre_delete:
         count -= 1
     msg = ReactionCount(
-        {},
         content_type=get_model_shortname(instance.content_type.model_class()),
         object_id=instance.object_id,
         button=instance.button.pk,
         count=count,
     )
     ch = AgendaItemChannel.from_instance(ai)
-    ch.publish(msg)
+    ch.sync_publish(msg)
 
 
 @receiver(post_save, sender=Reaction)
@@ -128,9 +128,9 @@ def send_added_to_user(instance: Reaction = None, created: bool = None, **kw):
     if created:
         # Update shouldn't exist
         data = ReactionSerializer(instance).data
-        msg = UserReactionAdded({}, **data)
+        msg = UserReactionAdded(data=data)
         user_ch = UserChannel.from_instance(instance.user)
-        user_ch.publish(msg)
+        user_ch.sync_publish(msg)
 
 
 @receiver(pre_delete, sender=Reaction)
@@ -141,9 +141,9 @@ def send_count_deleted(instance: Reaction = None, **kw):
 @receiver(pre_delete, sender=Reaction)
 def send_deleted_to_user(instance: Reaction = None, **kw):
     """Same as send_added_to_user, sent to userchannel instead of a response."""
-    msg = UserReactionDeleted({}, pk=instance.pk)
+    msg = UserReactionDeleted(pk=instance.pk)
     user_ch = UserChannel.from_instance(instance.user)
-    user_ch.publish(msg)
+    user_ch.sync_publish(msg)
 
 
 @receiver(archive_meeting)

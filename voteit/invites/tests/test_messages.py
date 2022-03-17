@@ -36,9 +36,9 @@ class AddInvitesTests(TestCase):
         if user_pk is None:
             user_pk = 1  # Moderator from fixture
         kw.setdefault("meeting", 1)  # from fixture
-        return self._cut({"consumer_name": "abc", "user_pk": user_pk}, **kw)
+        return self._cut(mm={"consumer_name": "abc", "user_pk": user_pk}, **kw)
 
-    @patch.object(MeetingInvitesChannel, "publish")
+    @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_add(self, mock_publish):
         from voteit.invites.messages import MeetingInviteAdded
 
@@ -58,7 +58,7 @@ class AddInvitesTests(TestCase):
         self.assertIsInstance(msg, MeetingInviteAdded)
         self.assertEqual("one@betahaus.net", msg.data.invite_data)
 
-    @patch.object(MeetingInvitesChannel, "publish")
+    @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_add_modifies_already_existing_invites(self, mock_publish):
         from voteit.meeting.models import Meeting
         from voteit.invites.messages import MeetingInviteAdded
@@ -139,9 +139,9 @@ class SendInvitesTests(TestCase):
         kw.setdefault("meeting", 1)  # from fixture
         kw.setdefault("body", "hello world")
         kw.setdefault("subject", "About this meeting")
-        return self._cut({"consumer_name": "abc", "user_pk": user_pk}, **kw)
+        return self._cut(mm={"consumer_name": "abc", "user_pk": user_pk}, **kw)
 
-    @patch.object(MeetingInvitesChannel, "publish")
+    @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_send(self, mock_publish):
         from voteit.invites.messages import MeetingInviteChanged
 
@@ -159,7 +159,7 @@ class SendInvitesTests(TestCase):
         self.assertEqual(2, self.meeting.invites.filter(send_state=SendWf.SENT).count())
         self.assertEqual(2, len(mail.outbox))
 
-    @patch.object(MeetingInvitesChannel, "publish")
+    @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_send_invites_already_sent(self, mock_publish):
         self.meeting.invites.all().update(last_sent=now())
         msg = self._mk_one()
@@ -167,7 +167,7 @@ class SendInvitesTests(TestCase):
         self.assertFalse(mock_publish.called)
         self.assertEqual(0, self.meeting.invites.filter(send_state=SendWf.SENT).count())
 
-    @patch.object(MeetingInvitesChannel, "publish")
+    @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_bad_data_in_invite(self, mock_publish):
         from voteit.invites.messages import MeetingInviteChanged
 

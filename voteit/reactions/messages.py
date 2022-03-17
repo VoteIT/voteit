@@ -7,19 +7,20 @@ from pydantic import validator
 from pydantic.main import BaseModel
 from typing import List
 
+from envelope.core.message import Message
+from envelope.messages.common import Status
+from envelope.messages.errors import ValidationErrorMsg
+from envelope.utils import websocket_send
 from voteit.core.utils import get_model_by_shortname
 from voteit.core.validators import validate_model_shortname
-from voteit.messaging.abcs import BaseOutgoingMessage
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.errors import ValidationErrorMsg
 from voteit.messaging.messages.base import BaseAddObject
 from voteit.messaging.messages.base import BaseDeleteObject
 from voteit.messaging.messages.base import BaseObjectAction
 from voteit.messaging.messages.base import BaseObjectAdded
 from voteit.messaging.messages.base import BaseObjectChanged
 from voteit.messaging.messages.base import BaseObjectDeleted
-from voteit.messaging.messages.status import StatusDone
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
 from voteit.reactions.permissions import ReactionButtonPermissions
@@ -66,15 +67,17 @@ class UserReactionResponseSchema(ReactionSchema):
 
 
 @outgoing
-class ReactionCount(BaseOutgoingMessage):
+class ReactionCount(Message):
     name = "reaction.count"
     schema = ReactionCountSchema
     data: ReactionCountSchema
 
 
 @outgoing
-class UserReactionAdded(BaseOutgoingMessage):
-    """ Normally only sent to the user who added it!"""
+class UserReactionAdded(Message):
+    """
+    Normally only sent to the user who added it!
+    """
 
     name = "reaction.added"
     schema = UserReactionResponseSchema
@@ -96,9 +99,9 @@ class AddReaction(BaseAddObject):
     schema = ReactionSchema
     data: ReactionSchema
     context: ReactionButton
-    context_pk_attr = "button"
+    context_schema_attr = "button"
 
-    def run_job(self) -> StatusDone:
+    def run_job(self) -> Status:
         self.assert_perm()
         model_shortname = self.data.content_type
         if model_shortname not in self.context.allowed_models:
@@ -122,8 +125,8 @@ class AddReaction(BaseAddObject):
             agenda_item=ai,
             content_type=ct,
         )
-        response = StatusDone.from_message(self)
-        response.send_outgoing(self.mm.consumer_name, success=True)
+        response = Status.from_message(self)
+        websocket_send(response, state=response.SUCCESS)
         return response
 
 
@@ -133,11 +136,11 @@ class DeleteReaction(BaseDeleteObject):
     permission = ReactionPermissions.DELETE
     model = Reaction
 
-    def run_job(self) -> StatusDone:
-        self.assert_perm(msg=_("You're not allowed to change this now"))
+    def run_job(self) -> Status:
+        self.assert_perm()
         self.context.delete()
-        response = StatusDone.from_message(self)
-        response.send_outgoing(self.mm.consumer_name, success=True)
+        response = Status.from_message(self)
+        websocket_send(response, state=response.SUCCESS)
         return response
 
 
@@ -149,7 +152,7 @@ class ListReactionUsers(BaseObjectAction):
     schema = ReactionSchema
     data: ReactionSchema
     context: ReactionButton
-    context_pk_attr = "button"
+    context_schema_attr = "button"
 
     def run_job(self) -> ReactionUserListResponse:
         self.assert_perm()
@@ -163,12 +166,12 @@ class ListReactionUsers(BaseObjectAction):
         response = ReactionUserListResponse.from_message(
             self, users=list(user_pks), **self.data.dict()
         )
-        response.send_outgoing(self.mm.consumer_name, success=True)
+        websocket_send(response, state=response.SUCCESS)
         return response
 
 
 @outgoing
-class ReactionUserListResponse(BaseOutgoingMessage):
+class ReactionUserListResponse(Message):
 
     name = "reaction.list"
     schema = ReactionUserListSchema

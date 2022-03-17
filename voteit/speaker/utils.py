@@ -19,7 +19,7 @@ def get_list_method_registry():
 def publish_list_msg(speaker_list: SpeakerList, msg: BaseOutgoingMessage):
     if speaker_list.is_active_list and speaker_list.meeting:
         ch = MeetingChannel.from_instance(speaker_list.meeting)
-        ch.publish(msg)
+        ch.sync_publish(msg)
     elif speaker_list.agenda_item is not None:
         ai_ch = AgendaItemChannel.from_instance(speaker_list.agenda_item)
-        ai_ch.publish(msg)
+        ai_ch.sync_publish(msg)

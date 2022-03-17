@@ -2,10 +2,12 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
+
+from envelope.messages.channels import Subscribe
 from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.meeting.models import Meeting
-from voteit.messaging.messages.channels import Subscribe
+
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -51,7 +53,7 @@ class InvitesSubscribedTests(TestCase):
 
     def test_app_state_sent(self):
         command = Subscribe(
-            {"consumer_name": "abc", "user_pk": self.moderator.pk},
+            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
             pk=self.meeting.pk,
             channel_type="invites",
         )
@@ -80,7 +82,7 @@ class MeetingInviteSignalTests(TestCase):
     def setUp(self):
         self.invite.refresh_from_db()
 
-    @patch.object(MeetingInvitesChannel, "publish")
+    @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_added(self, mock_publish):
         from voteit.invites.messages import MeetingInviteAdded
 
@@ -94,7 +96,7 @@ class MeetingInviteSignalTests(TestCase):
         self.assertIsInstance(msg, MeetingInviteAdded)
         self.assertEqual(invite.pk, msg.data.pk)
 
-    @patch.object(MeetingInvitesChannel, "publish")
+    @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_changed(self, mock_publish):
         from voteit.invites.messages import MeetingInviteChanged
 
@@ -108,7 +110,7 @@ class MeetingInviteSignalTests(TestCase):
         self.assertEqual(self.invite.pk, msg.data.pk)
         self.assertEqual(self.invite.roles, msg.data.roles)
 
-    @patch.object(MeetingInvitesChannel, "publish")
+    @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_deleted_diff_participants(self, mock_publish):
         from voteit.invites.messages import MeetingInviteDeleted
 
