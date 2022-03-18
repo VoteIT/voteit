@@ -11,9 +11,9 @@ from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.messages.base import BaseObjectAdded
-from voteit.messaging.messages.base import BaseObjectChanged
-from voteit.messaging.messages.base import BaseObjectDeleted
+from voteit.messaging.base import BaseObjectAdded
+from voteit.messaging.base import BaseObjectChanged
+from voteit.messaging.base import BaseObjectDeleted
 
 
 # This should probably not exist since we use the rest interface.

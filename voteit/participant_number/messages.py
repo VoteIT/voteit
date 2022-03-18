@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from envelope.core.message import Message
 
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.messages.base import BaseObjectDeleted
+from voteit.messaging.base import BaseObjectDeleted
 
 
 class PNSchema(BaseModel):

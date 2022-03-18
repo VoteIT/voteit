@@ -22,7 +22,7 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 
-from voteit.messaging.messages.base import BaseObjectDeleted
+from voteit.messaging.base import BaseObjectDeleted
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.rules import not_currently_speaking

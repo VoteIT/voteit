@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING
 # from django.contrib.auth import get_user_model
 
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.messages.base import BaseObjectAdded
-from voteit.messaging.messages.base import BaseObjectChanged
-from voteit.messaging.messages.base import BaseObjectDeleted
+from voteit.messaging.base import BaseObjectAdded
+from voteit.messaging.base import BaseObjectChanged
+from voteit.messaging.base import BaseObjectDeleted
 
 
 if TYPE_CHECKING:

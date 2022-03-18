@@ -14,9 +14,9 @@ from envelope.utils import get_message_type
 from envelope.utils import websocket_send
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.messages.base import BaseObjectAdded
-from voteit.messaging.messages.base import BaseObjectChanged
-from voteit.messaging.messages.base import BaseObjectDeleted
+from voteit.messaging.base import BaseObjectAdded
+from voteit.messaging.base import BaseObjectChanged
+from voteit.messaging.base import BaseObjectDeleted
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote

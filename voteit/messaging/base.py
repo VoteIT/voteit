@@ -6,7 +6,6 @@ from typing import Dict
 from typing import TYPE_CHECKING
 from typing import Type
 
-from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
 from envelope.core.message import ContextAction
 from envelope.core.message import Message

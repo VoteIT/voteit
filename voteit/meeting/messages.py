@@ -1,7 +1,7 @@
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.messages.base import BaseObjectAdded
-from voteit.messaging.messages.base import BaseObjectChanged
-from voteit.messaging.messages.base import BaseObjectDeleted
+from voteit.messaging.base import BaseObjectAdded
+from voteit.messaging.base import BaseObjectChanged
+from voteit.messaging.base import BaseObjectDeleted
 
 
 @outgoing
