@@ -10,7 +10,7 @@ from django.dispatch import receiver
 from envelope.signals import channel_subscribed
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
-from voteit.core.messages import RolesAdded
+from voteit.core.messages.role_updates import RolesAdded
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.messages import MeetingChanged

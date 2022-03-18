@@ -14,7 +14,7 @@ from envelope.signals import channel_subscribed
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import disable_on_raw_save
-from voteit.core.messages import RolesAdded
+from voteit.core.messages.role_updates import RolesAdded
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname

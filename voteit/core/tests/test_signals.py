@@ -25,7 +25,7 @@ class RoleChangesPublishedTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added(self, mock_publish):
-        from voteit.core.messages import RolesAdded
+        from voteit.core.messages.role_updates import RolesAdded
 
         self.assertFalse(mock_publish.called)
         self.meeting.add_roles(self.user, "moderator")
@@ -37,7 +37,7 @@ class RoleChangesPublishedTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_removed(self, mock_publish):
-        from voteit.core.messages import RolesRemoved
+        from voteit.core.messages.role_updates import RolesRemoved
 
         self.assertFalse(mock_publish.called)
         self.meeting.remove_roles(self.user, "participant")

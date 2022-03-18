@@ -13,12 +13,12 @@ _channel_layers_setting = {
 class GetAllTransitionsTests(TestCase):
     @property
     def _cut(self):
-        from voteit.core.messages import GetAllTransitions
+        from voteit.core.messages.transitions import GetAllTransitions
 
         return GetAllTransitions
 
     async def test_get_transitions(self):
-        from voteit.core.messages import AllTransitions
+        from voteit.core.messages.transitions import AllTransitions
 
         msg = self._cut(mm={"consumer_name": "abc"})
         consumer = WebsocketConsumer()

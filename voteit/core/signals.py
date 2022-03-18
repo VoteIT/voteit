@@ -9,8 +9,8 @@ from django.dispatch import receiver
 
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import disable_on_raw_save
-from voteit.core.messages import RolesAdded
-from voteit.core.messages import RolesRemoved
+from voteit.core.messages.role_updates import RolesAdded
+from voteit.core.messages.role_updates import RolesRemoved
 from voteit.core.utils import get_model_shortname
 from voteit.core import models_to_register
 

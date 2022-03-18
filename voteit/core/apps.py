@@ -21,6 +21,11 @@ class CoreConfig(AppConfig):
         # Cache all workflow transitions
         prepare_available_transitions()
 
+        # Register messages
+        from voteit.core.messages import register
+
+        register()
+
 
 def register_model(model, registry):
     """
