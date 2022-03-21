@@ -12,6 +12,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.utils import get_identity_data
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+@router.register("meeting-invites", basename="meeting-invites")
 class MeetingInviteViewSet(DefaultModelViewSet):
     serializer_class = serializers.MeetingInviteSerializer
     serializer_classes = {
@@ -50,6 +52,7 @@ class MeetingInviteViewSet(DefaultModelViewSet):
             return context.invites
 
 
+@router.register("match-invites", basename="match-invites")
 class MatchInvitesViewSet(viewsets.GenericViewSet):
     """
     This view is meant as a service endpoint for matching identity data.
@@ -101,6 +104,7 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
         return Response(status=200, data=self.serializer_class(instance).data)
 
 
+@router.register("used-invites", basename="users-used-invites")
 class UsedInvitesViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = serializers.MeetingInviteSerializer
     permission_classes = (IsAuthenticated,)
@@ -112,6 +116,7 @@ class UsedInvitesViewSet(viewsets.ReadOnlyModelViewSet):
 _marker = object()
 
 
+@router.register("handle-matched-invites", basename="handle-matched-invites")
 class HandleMatchedInvitesViewSet(
     mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet
 ):
@@ -132,7 +137,7 @@ class HandleMatchedInvitesViewSet(
         # bad request if no user org
         organisation = self.request.user.organisation
         if organisation is None:
-            raise ValidationError('Organisation required')
+            raise ValidationError("Organisation required")
         sdata = {}
         for item in self.identity_data["user_data"]:
             values = sdata.setdefault(item["scope"], set())

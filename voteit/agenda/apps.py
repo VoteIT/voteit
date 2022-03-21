@@ -7,7 +7,7 @@ class AgendaConfig(AppConfig):
 
     def ready(self):
         from voteit.agenda import rules
-        from voteit.agenda import rest_api
+        from .rest_api import views
         from voteit.agenda import channels
         from voteit.agenda import messages
         from voteit.agenda import signals

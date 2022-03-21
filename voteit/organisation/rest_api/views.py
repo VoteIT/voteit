@@ -1,20 +1,28 @@
 from django.utils.translation import gettext as _
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework import permissions
+from rest_framework import viewsets
+from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.exceptions import AuthenticationFailed
 
+from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.mixins import SerializerClassesMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.organisation.models import Organisation
+from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserConsent
 from voteit.organisation.rest_api import serializers
+from .filters import UserPkFilter
+from ..permissions import OrgPermissions
 
 
+@router.register("organisations", basename="organisations")
 class OrganisationViewSet(
     AutoPermissionViewSetMixin,
     mixins.RetrieveModelMixin,
@@ -50,6 +58,7 @@ class OrganisationViewSet(
         return Response(serializer.data)
 
 
+@router.register("id-organisations", basename="id-organisations")
 class IDProxyOrganisationViewSet(
     SerializerClassesMixin,
     mixins.CreateModelMixin,
@@ -69,6 +78,7 @@ class IDProxyOrganisationViewSet(
     queryset = Organisation.objects.all()
 
 
+@router.register("tos", basename="tos")
 class TOSViewSet(DefaultModelViewSet):
     serializer_class = serializers.TOSSerializer
     serializer_classes = {"create": serializers.TOSCreateSerializer}
@@ -86,6 +96,7 @@ class TOSViewSet(DefaultModelViewSet):
         return self.model.objects.none()
 
 
+@router.register("user_consents", basename="user_consents")
 class UserConsentViewSet(DefaultModelViewSet):
     serializer_class = serializers.UserConsentSerializer
     serializer_classes = {"create": serializers.UserConsentCreateSerializer}
@@ -101,3 +112,26 @@ class UserConsentViewSet(DefaultModelViewSet):
                 tos__organisation=self.request.user.organisation
             )
         return self.model.objects.none()
+
+
+@router.register("organisation-roles")
+class OrganisationRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    model = OrganisationRoles
+    queryset = OrganisationRoles.objects.all()
+    serializer_class = serializers.OrganisationRolesSerializer
+    filter_backends = (
+        DjangoFilterBackend,
+        SearchFilter,
+    )
+    filter_class = UserPkFilter
+    search_fields = (
+        "^user__first_name",
+        "^user__last_name",
+    )
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.has_perm(OrgPermissions.VIEW_ROLES, user.organisation):
+            return self.queryset.filter(context=user.organisation)
+        return self.queryset.none()

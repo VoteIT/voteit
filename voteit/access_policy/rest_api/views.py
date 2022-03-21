@@ -10,11 +10,13 @@ from rest_framework.response import Response
 
 from voteit.access_policy.app.policies import AutomaticAccess
 from voteit.access_policy.rest_api import serializers
+from voteit.core.rest_api import router
 from voteit.meeting.models import Meeting
 
 logger = getLogger(__name__)
 
 
+@router.register("access-policies", basename="access-policies")
 class AccessPoliciesViewSet(viewsets.ReadOnlyModelViewSet):
     model = Meeting
     serializer_class = serializers.MeetingAccessPoliciesSerializer

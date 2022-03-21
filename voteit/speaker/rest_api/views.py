@@ -6,6 +6,8 @@ from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 from rest_framework import exceptions
 from rest_framework.permissions import IsAuthenticated
+
+from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.meeting.models import Meeting
@@ -22,6 +24,7 @@ from voteit.speaker.roles import ROLE_LIST_MODERATOR
 logger = getLogger(__name__)
 
 
+@router.register("speaker-lists", basename="speaker-lists")
 class SpeakerListViewSet(DefaultModelViewSet):
     model = SpeakerList
     queryset = SpeakerList.objects.all()
@@ -45,6 +48,7 @@ class SpeakerListViewSet(DefaultModelViewSet):
             return self.queryset
 
 
+@router.register("speaker-history", basename="speaker-history")
 class HistoricSpeakerViewSet(
     ModelContextMixin,
     ListModelMixin,
@@ -83,6 +87,7 @@ class HistoricSpeakerViewSet(
             return self.queryset
 
 
+@router.register("speaker-list-systems")
 class SpeakerListSystemViewSet(DefaultModelViewSet):
     model = SpeakerListSystem
     queryset = SpeakerListSystem.objects.all()

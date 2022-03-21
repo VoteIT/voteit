@@ -15,8 +15,10 @@ __all__ = [
 ]
 
 from ...agenda.permissions import AgendaPermissions
+from ...core.rest_api import router
 
 
+@router.register("polls")
 class PollViewSet(DefaultModelViewSet):
     serializer_class = serializers.PollDetailSerializer
     serializer_classes = {
@@ -43,6 +45,7 @@ class PollViewSet(DefaultModelViewSet):
         return self.queryset
 
 
+@router.register("electoral-registers")
 class ElectoralRegisterViewSet(ReadonlyModelViewSet):
     model = ElectoralRegister
     queryset = ElectoralRegister.objects.all()

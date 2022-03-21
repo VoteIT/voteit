@@ -6,4 +6,4 @@ class AccessPolicyConfig(AppConfig):
 
     def ready(self):
         from voteit.access_policy.app import policies
-        from voteit.access_policy import rest_api
+        from .rest_api import views

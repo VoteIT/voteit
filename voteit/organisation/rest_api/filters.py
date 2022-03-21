@@ -1,5 +1,5 @@
 from django_filters import rest_framework as filters
-from voteit.meeting.models import MeetingRoles
+from voteit.organisation.models import OrganisationRoles
 
 
 class NumberInFilter(filters.BaseInFilter, filters.NumberFilter):
@@ -12,13 +12,6 @@ class UserPkFilter(filters.FilterSet):
 
     user_id_in = NumberInFilter(field_name="user_id", lookup_expr="in")
 
-    def filter_queryset(self, queryset):
-        """Return empty queryset if no context (meeting)."""
-        if not self.data.get("context"):
-            return queryset.none()
-
-        return super().filter_queryset(queryset)
-
     class Meta:
-        model = MeetingRoles
-        fields = "user_id_in", "context"
+        model = OrganisationRoles
+        fields = ("user_id_in",)

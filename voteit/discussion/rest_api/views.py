@@ -2,6 +2,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
+from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.discussion.models import DiscussionPost
 from voteit.discussion.rest_api import serializers
@@ -10,6 +11,7 @@ from voteit.discussion.rest_api import serializers
 __all__ = ["DiscussionPostViewSet"]
 
 
+@router.register("discussion-posts")
 class DiscussionPostViewSet(DefaultModelViewSet):
     model = DiscussionPost
     queryset = DiscussionPost.objects.all()

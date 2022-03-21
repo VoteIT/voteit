@@ -10,6 +10,7 @@ class CoreConfig(AppConfig):
         from voteit.core.registries import permissions
         from voteit.core import models_to_register
         from voteit.core.utils import prepare_available_transitions
+        from .rest_api import views
 
         while models_to_register:
             model = models_to_register.pop()

@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.db.models import QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -25,7 +26,10 @@ __all__ = (
     "MeetingGroupViewSet",
 )
 
+from ...core.rest_api import router
 
+
+@router.register("meetings", basename="meeting")
 class MeetingViewSet(DefaultModelViewSet):
     model = Meeting
     serializer_class = serializers.MeetingDetailSerializer
@@ -77,7 +81,8 @@ class MeetingViewSet(DefaultModelViewSet):
         instance.add_roles(self.request.user, roles.ROLE_MODERATOR)
 
 
-class MeetingRolesViewSet(viewsets.ReadOnlyModelViewSet):
+@router.register("meeting-roles", basename="meeting-roles")
+class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     model = MeetingRoles
     queryset = MeetingRoles.objects.all()
     serializer_class = serializers.MeetingRolesSerializer
@@ -93,14 +98,19 @@ class MeetingRolesViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
-        # TODO who can see?
+        # Only superuser can list all on organisation
         if self.request.user.is_superuser:
-            return self.queryset
+            return self.queryset.filter(
+                context__organisation=self.request.user.organisation,
+            )
+        # Filter on meetings where user is participant
+        # UserPkFilter will return empty queryset if context (meeting) is missing in params.
         return self.queryset.filter(
             context__participants=self.request.user,
         )
 
 
+@router.register("meeting-groups", basename="meeting-groups")
 class MeetingGroupViewSet(DefaultModelViewSet):
     model = MeetingGroup
     serializer_class = serializers.MeetingGroupSerializer
@@ -126,4 +136,3 @@ class MeetingGroupViewSet(DefaultModelViewSet):
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         return super().update(request, *args, **kwargs)
-

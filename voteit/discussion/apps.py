@@ -7,6 +7,6 @@ class DiscussionConfig(AppConfig):
 
     def ready(self):
         from voteit.discussion import rules
-        from voteit.discussion import rest_api
+        from .rest_api import views
         from voteit.discussion import messages
         from voteit.discussion import signals

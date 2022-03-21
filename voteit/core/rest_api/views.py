@@ -9,6 +9,8 @@ from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import ModelContextMixin
 
 from voteit.core.rest_api.mixins import TransitionsMixin
@@ -21,6 +23,7 @@ from voteit.organisation.permissions import OrgPermissions
 UserModel = get_user_model()
 
 
+@router.register("users", "users")
 class UserSearchViewSet(ModelContextMixin, viewsets.ReadOnlyModelViewSet):
     model = UserModel
     permission_classes = (
@@ -53,6 +56,7 @@ class UserSearchViewSet(ModelContextMixin, viewsets.ReadOnlyModelViewSet):
         return UserModel.objects.none()
 
 
+@router.register("user", basename="user")
 class UserView(
     TransitionsMixin,
     mixins.RetrieveModelMixin,
@@ -62,6 +66,7 @@ class UserView(
     """
     A single view to get data for currently logged in user.
     """
+
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = UserSerializer
     serializer_classes = {

@@ -8,9 +8,10 @@ from rest_framework import serializers
 from rest_framework.reverse import reverse
 from rest_framework.exceptions import ValidationError
 from typing import List
-from voteit.core.rest_api.serializers import BaseModelSerializer
+from voteit.core.rest_api.serializers import BaseModelSerializer, UserSerializer
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
+from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserConsent
 from voteit.organisation.utils import get_provider_response_adapters
@@ -144,3 +145,11 @@ class UserConsentCreateSerializer(BaseModelSerializer):
     class Meta:
         model = UserConsent
         fields = ["tos"]
+
+
+class OrganisationRolesSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = OrganisationRoles
+        fields = read_only_fields = "pk", "user", "assigned"
