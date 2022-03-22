@@ -28,9 +28,11 @@ class TransitionsMixinTests(APITestCase):
             username="moderator", organisation=org
         )
         cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.ai = cls.meeting.agenda_items.create()
 
     def setUp(self):
         self.meeting.refresh_from_db()
+        self.ai.refresh_from_db()
 
     @property
     def _cut(self):
@@ -91,6 +93,31 @@ class TransitionsMixinTests(APITestCase):
         self.assertEqual(201, response.status_code)
         self.meeting.refresh_from_db()
         self.assertEqual("ongoing", self.meeting.state)
+
+    def test_transition_to_same_state(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(self._url, data={"transition": "upcoming"})
+        self.assertEqual(400, response.status_code)
+
+    def test_transition_permission(self):
+        self.meeting.ongoing()
+        self.meeting.save()
+        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data={"transition": "archive"})
+        self.assertEqual(403, response.status_code)
+
+    def test_transition_guard(self):
+        self.meeting.ongoing()
+        self.meeting.save()
+        self.ai.ongoing()
+        self.ai.save()
+        self.ai.polls.create(state="ongoing", method_name="simple")
+        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data={"transition": "upcoming"})
+        self.assertEqual(400, response.status_code)
+        self.assertIn("transition", response.json())
 
 
 class TransitionMixinAgendaTest(APITestCase):

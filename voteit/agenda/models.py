@@ -150,12 +150,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
 
     @transition(
         field=state,
-        source=[
-            AgendaItemWf.PRIVATE,
-            AgendaItemWf.UPCOMING,
-            AgendaItemWf.CLOSED,
-            AgendaItemWf.ONGOING,
-        ],
+        source=[AgendaItemWf.UPCOMING, AgendaItemWf.CLOSED, AgendaItemWf.ONGOING],
         target=AgendaItemWf.PRIVATE,
         permission=AgendaPermissions.CHANGE,
         custom={"title": _("Unpublish")},

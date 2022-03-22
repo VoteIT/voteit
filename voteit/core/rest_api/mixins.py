@@ -244,6 +244,22 @@ class TransitionsMixin(SerializerClassesMixin):
                     }
                 )
             transition = all_transitions[transition_name]
+            meta = transition.method._django_fsm
+            current_state = getattr(instance, self.fsm_field_name)
+            if not meta.has_transition(current_state):
+                raise exceptions.ValidationError(
+                    detail={
+                        "transition": [
+                            _(
+                                "Can't switch from state '%(state)s' using method '%(method)s'"
+                            )
+                            % {
+                                "state": current_state,
+                                "method": transition.method.__name__,
+                            }
+                        ]
+                    }
+                )
             for condition in transition.conditions:
                 if not condition(instance):
                     raise exceptions.ValidationError(
