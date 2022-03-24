@@ -10,11 +10,13 @@ from django.db.models.signals import post_save
 from django.dispatch import Signal
 from django.dispatch import receiver
 
+from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import disable_on_raw_save
-from voteit.core.messages.role_updates import RolesAdded
+from voteit.core.messages.role_updates import RolesAdded, RolesRemoved
+from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
@@ -281,3 +283,42 @@ def remove_list_roles_when_participant_removed(instance: MeetingRoles, roles, **
         to_remove = list(SpeakerListSystem.roles_cls.valid_roles.keys())
         for system in instance.meeting.speaker_systems.all():
             system.remove_roles(instance.user, *to_remove)
+
+
+def _role_msg_publish(instance: SpeakerSystemRoles, msg):
+    if isinstance(instance.meeting, Meeting):
+        meeting_ch = MeetingChannel.from_instance(instance.meeting)
+        meeting_ch.sync_publish(msg)
+    # FIXME: Duplicate message to user, but we might not send to meeting later on
+    # This is a temporary thing
+    user_ch = UserChannel.from_instance(instance.user)
+    user_ch.sync_publish(msg)
+
+
+@receiver(roles_added, sender=SpeakerSystemRoles)
+@disable_on_raw_save
+def push_roles_added(instance: SpeakerSystemRoles, roles: list[Role], **kwargs):
+    _role_msg_publish(
+        instance,
+        RolesAdded(
+            mm=dict(),
+            roles=instance.context.roles_to_strings(*roles),
+            pk=instance.context.pk,
+            model=get_model_shortname(instance.context),
+            user_pk=instance.user.pk,
+        ),
+    )
+
+
+@receiver(roles_removed, sender=SpeakerSystemRoles)
+def push_roles_removed(instance: SpeakerSystemRoles, roles: list[Role], **kwargs):
+    _role_msg_publish(
+        instance,
+        RolesRemoved(
+            mm=dict(),
+            roles=instance.context.roles_to_strings(*roles),
+            pk=instance.context.pk,
+            model=get_model_shortname(instance.context),
+            user_pk=instance.user.pk,
+        ),
+    )

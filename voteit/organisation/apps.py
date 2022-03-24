@@ -13,6 +13,9 @@ class OrganisationConfig(AppConfig):
         from voteit.organisation import roles
         from voteit.organisation import rules
         from .rest_api import views
+        from . import channels
+        from . import messages
+        from . import signals
         from voteit.organisation import providers
 
         assert getattr(

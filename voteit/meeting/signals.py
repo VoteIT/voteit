@@ -7,10 +7,15 @@ from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
 
+from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.core.messages.role_updates import RolesAdded
+from voteit.core.messages.role_updates import RolesRemoved
+from voteit.core.role import Role
+from voteit.core.signals import roles_added
+from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.messages import MeetingChanged
@@ -18,6 +23,7 @@ from voteit.meeting.messages import MeetingGroupAdded
 from voteit.meeting.messages import MeetingGroupChanged
 from voteit.meeting.messages import MeetingGroupDeleted
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingRoles
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.rest_api.serializers import MeetingDetailSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
@@ -84,3 +90,41 @@ def meeting_group_delete(instance=None, **kw):
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
     msg = MeetingGroupDeleted(pk=instance.pk)
     meeting_ch.sync_publish(msg)
+
+
+def _role_msg_publish(instance: MeetingRoles, msg):
+    meeting_ch = MeetingChannel.from_instance(instance.meeting)
+    meeting_ch.sync_publish(msg)
+    # FIXME: Duplicate message to user, but we might not send to meeting later on
+    # This is a temporary thing
+    user_ch = UserChannel.from_instance(instance.user)
+    user_ch.sync_publish(msg)
+
+
+@receiver(roles_added, sender=MeetingRoles)
+@disable_on_raw_save
+def push_roles_added(instance: MeetingRoles, roles: list[Role], **kwargs):
+    _role_msg_publish(
+        instance,
+        RolesAdded(
+            mm=dict(),
+            roles=instance.context.roles_to_strings(*roles),
+            pk=instance.context.pk,
+            model=get_model_shortname(instance.context),
+            user_pk=instance.user.pk,
+        ),
+    )
+
+
+@receiver(roles_removed, sender=MeetingRoles)
+def push_roles_removed(instance: MeetingRoles, roles: list[Role], **kwargs):
+    _role_msg_publish(
+        instance,
+        RolesRemoved(
+            mm=dict(),
+            roles=instance.context.roles_to_strings(*roles),
+            pk=instance.context.pk,
+            model=get_model_shortname(instance.context),
+            user_pk=instance.user.pk,
+        ),
+    )
