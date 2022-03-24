@@ -13,8 +13,8 @@ logger = getLogger(__name__)
 
 @channel
 class OrganisationChannel(ContextChannel):
-    """This is the generic meeting channel, everyone should subscribe to this.
-    Anything meant to reach anyone interacting with the meeting should be published here.
+    """This is the generic organisation channel. Should be subscribed to for live updates of org roles.
+    It also sends organisation object changes.
     """
 
     name = "organisation"

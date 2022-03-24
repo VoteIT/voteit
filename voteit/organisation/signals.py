@@ -35,11 +35,11 @@ def organisation_change(instance, created=None, **kw):
 
 
 @receiver(channel_subscribed, sender=OrganisationChannel)
-def meeting_channel_subscribed(
+def organisation_channel_subscribed(
     context: Organisation, app_state: AppState, user: AbstractUser, **kw
 ):
     """
-    Send users meeting roles as response
+    Send users organisation roles as response
     """
     roles = context.get_roles(user)
     if roles:
@@ -56,7 +56,6 @@ def meeting_channel_subscribed(
 def _role_msg_publish(instance: OrganisationRoles, msg):
     organisation_ch = OrganisationChannel.from_instance(instance.context)
     organisation_ch.sync_publish(msg)
-    # FIXME: Duplicate message to user, but we might not send to meeting later on
     # This is a temporary thing
     user_ch = UserChannel.from_instance(instance.user)
     user_ch.sync_publish(msg)
