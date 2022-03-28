@@ -31,6 +31,7 @@ from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.utils import relaxed_clean_html
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
+from voteit.organisation.permissions import OrgPermissions
 from voteit.poll.utils import get_electoral_policy_registry
 from voteit.proposal import DEFAULT_PROPOSAL_ID_POLICY
 from voteit.proposal.utils import get_proposal_id_registry
@@ -249,9 +250,12 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
                 return user.organisation.meetings.all()
             if user.organisation is None:
                 return self.none()
-            return user.organisation.meetings.filter(
-                models.Q(public=True) | models.Q(participants=user)
-            ).distinct()
+            if user.has_perm(OrgPermissions.MANAGE, user.organisation):
+                return user.organisation.meetings.all()
+            else:
+                return user.organisation.meetings.filter(
+                    models.Q(public=True) | models.Q(participants=user)
+                ).distinct()
 
     class Manager(models.Manager):
         def get_queryset(self):
