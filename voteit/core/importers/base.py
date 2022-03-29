@@ -15,12 +15,21 @@ from django.db import DatabaseError
 from django.db import IntegrityError
 from django.db import models
 from django.db import router
+from typing import TYPE_CHECKING
 
 from voteit.core.utils import get_content_registry
 from voteit.core.utils import get_model_shortname
 
 # These are remaps that target attributes with the same name as the content type, so we don't need to specify them.
 # For instance proposal objects always have agenda_item linking to one agenda_item.
+if TYPE_CHECKING:
+    from voteit.poll.app.polls.combined_simple import CombinedSimplePollResult
+    from voteit.poll.app.polls.dutt import DuttResultSchema
+    from voteit.poll.app.polls.majority import MajorityPollResult
+    from voteit.poll.app.polls.schulze import RepeatedSchulzeResult
+    from voteit.poll.app.polls.schulze import SchulzePollResult
+    from voteit.poll.app.polls.scottish_stv import STVResultSchema
+
 
 DEFAULT_REMAPS = {
     "meeting",
@@ -123,6 +132,17 @@ class BaseImporter(ABC):
     def run(self, **kwargs):
         ...
 
+    def get_remap_obj(self, shortname: str, curr_val: int) -> models.Model:
+        assert isinstance(
+            curr_val, int
+        ), "field_name must point to the *_id field of the FK relation"
+        remap_to = self.objects_to_handle[shortname][curr_val]
+        if isinstance(remap_to, DeserializedObject):
+            remap_to = remap_to.object
+        assert isinstance(remap_to, models.Model)
+        assert isinstance(remap_to.pk, int)
+        return remap_to
+
     def add_obj_to_handle(self, obj: Union[models.Model, DeserializedObject]):
         if isinstance(obj, DeserializedObject):
             name = get_model_shortname(obj.object)
@@ -169,18 +189,96 @@ class BaseImporter(ABC):
                 curr_val = obj.pk
         # In case curr_val was actually changed
         if curr_val is not None:
-            assert isinstance(
-                curr_val, int
-            ), "field_name must point to the *_id field of the FK relation"
-            remap_to = self.objects_to_handle[relation_model_name][curr_val]
-            if isinstance(remap_to, DeserializedObject):
-                remap_to = remap_to.object
-            assert isinstance(remap_to, models.Model)
-            assert isinstance(remap_to.pk, int)
-            # We can't remap the key to an int since Django 2 it seems :(
+            remap_to = self.get_remap_obj(relation_model_name, curr_val)
             setattr(obj, field_name, remap_to)
             if is_pointer:
                 return remap_to.pk
+
+    def remap_schule_round(self, result: dict):
+        new_pairs = []
+        for pair in result.pairs:
+            # [ [1,2], v]
+            remapped = []
+            for x in pair[0]:
+                remapped.append(self.get_remap_obj("proposal", x).pk)
+            new_pairs.append([remapped, pair[1]])
+        result.pairs = new_pairs
+        result.candidates = [
+            self.get_remap_obj("proposal", x).pk for x in result.candidates
+        ]
+        result.winner = self.get_remap_obj("proposal", result.winner).pk
+        strong_new_pairs = []
+        for pair in result.strong_pairs:
+            # [ [1,2], v]
+            remapped = []
+            for x in pair[0]:
+                remapped.append(self.get_remap_obj("proposal", x).pk)
+            strong_new_pairs.append([remapped, pair[1]])
+        result.strong_pairs = strong_new_pairs
+        if result.tied_winners:
+            result.tied_winners = [
+                self.get_remap_obj("proposal", x).pk for x in result.tied_winners
+            ]
+
+    def update_poll_results(self, deserialized: DeserializedObject):
+        if not deserialized.object.result_data:
+            return
+        method_name = deserialized.object.method_name
+        try:
+            result = deserialized.object.result
+        except Exception as exc:
+            breakpoint()
+            raise exc
+        result.denied = [self.get_remap_obj("proposal", x).pk for x in result.denied]
+        result.approved = [
+            self.get_remap_obj("proposal", x).pk for x in result.approved
+        ]
+        if method_name == "combined_simple":
+            result: CombinedSimplePollResult
+            reformatted = {}
+            for (k, v) in result.results.items():
+                reformatted[self.get_remap_obj("proposal", k).pk] = v
+            result.results = reformatted
+        elif method_name == "majority":
+            result: MajorityPollResult
+            for prop_result in result.results:
+                prop_result.proposal = self.get_remap_obj(
+                    "proposal", prop_result.proposal
+                ).pk
+        elif method_name == "dutt":
+            result: DuttResultSchema
+            for prop_result in result.results:
+                prop_result.proposal = self.get_remap_obj(
+                    "proposal", prop_result.proposal
+                ).pk
+        elif method_name == "schulze":
+            result: SchulzePollResult
+            self.remap_schule_round(result)
+
+        elif method_name == "repeated_schulze":
+            result: RepeatedSchulzeResult
+            result.candidates = [
+                self.get_remap_obj("proposal", x).pk for x in result.candidates
+            ]
+            for res_round in result.rounds:
+                self.remap_schule_round(res_round)
+        elif method_name == "scottish_stv":
+            result: STVResultSchema
+            for stv_round in result.rounds:
+                stv_round.selected = [
+                    self.get_remap_obj("proposal", x).pk for x in stv_round.selected
+                ]
+                stv_round.vote_count = [
+                    (self.get_remap_obj("proposal", k).pk, v)
+                    for k, v in stv_round.vote_count
+                ]
+        else:
+            breakpoint()
+            raise ValueError(
+                f"Need to handle remapping of results for method {method_name}"
+            )
+        # Just to make sure we don't use the wrong type!
+        deserialized.object.result = result.dict()
 
     def update_special_fields(self, deserialized: DeserializedObject):
         field_names = [x.name for x in deserialized.object._meta.get_fields()]
@@ -209,12 +307,7 @@ class BaseImporter(ABC):
                         # remapping m2m data
                         new_val = []
                         for pk in deserialized.m2m_data[relation_attr_name]:
-                            remap_to = self.objects_to_handle[model_name][pk]
-
-                            if isinstance(remap_to, DeserializedObject):
-                                remap_to = remap_to.object
-                            assert isinstance(remap_to, models.Model)
-                            assert isinstance(remap_to.pk, int)
+                            remap_to = self.get_remap_obj(model_name, pk)
                             new_val.append(remap_to.pk)
                         deserialized.m2m_data[relation_attr_name] = new_val
         unhandled_m2m = (
@@ -230,6 +323,8 @@ class BaseImporter(ABC):
         else:
             # Set on save, any will do
             deserialized.object.pk = None
+        if name == "poll":
+            self.update_poll_results(deserialized)
 
     def save_obj(self, obj):
         saved = False
