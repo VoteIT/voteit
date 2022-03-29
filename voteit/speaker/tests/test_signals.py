@@ -142,21 +142,26 @@ class SignalStartedStoppedTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalListChangesTests(TestCase):
-    def setUp(self):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
 
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
 
         from voteit.meeting.models import Meeting
 
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.system = SpeakerListSystem.objects.create(
-            method_name="simple", meeting=self.meeting
+        cls.participant = User.objects.get(username="participant")
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.system = SpeakerListSystem.objects.create(
+            method_name="simple", meeting=cls.meeting
         )
-        self.speaker_list = SpeakerList.objects.create(
-            speaker_system=self.system, agenda_item=self.ai, title="Hello"
+        cls.speaker_list = SpeakerList.objects.create(
+            speaker_system=cls.system, agenda_item=cls.ai, title="Hello"
         )
+        cls.speaker = cls.speaker_list.speaker_items.create(user=cls.participant)
 
     @patch.object(AgendaItemChannel, "sync_publish")
     def test_agenda_gets_list_changed(self, mock_publish):
