@@ -9,14 +9,12 @@ from typing import Type
 from typing import Union
 
 from django.core import serializers
-from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.base import DeserializedObject
 from django.db import DEFAULT_DB_ALIAS
 from django.db import DatabaseError
 from django.db import IntegrityError
 from django.db import models
 from django.db import router
-from django.utils.timezone import now
 
 from voteit.core.utils import get_content_registry
 from voteit.core.utils import get_model_shortname
@@ -189,14 +187,6 @@ class BaseImporter(ABC):
         name = get_model_shortname(deserialized.object)
         importer = self.importers[name]
         pointer_val = None
-        # for field_name in importer.ignore:
-        #     # FIXME: Maybe check relation type
-        #     breakpoint()
-        #     print(f"Clearing {field_name} for {name}")
-        #     field = getattr(obj, field_name)
-        #     field.clear()
-        # if name == "poll":
-        #     print(obj.proposals.count())
         m2ms_handled = set()
         for model_name, attrs in importer.remap_relations.items():
             for relation_attr_name in attrs:
@@ -234,11 +224,6 @@ class BaseImporter(ABC):
             raise Exception(
                 f"{deserialized.object} has undhandled m2ms: {unhandled_m2m}"
             )
-        # FIXME: This might not be a good idea all of the time?
-        if "created" in field_names:
-            deserialized.object.created = now()
-        if "modified" in field_names:
-            deserialized.object.modified = now()
         # We need to force the pointer value for pk in case this model is a subclass of something
         if pointer_val:
             assert deserialized.object.pk == pointer_val
