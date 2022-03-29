@@ -37,7 +37,7 @@ class DiscussionPost(
     )
     meeting_group: MeetingGroup = models.ForeignKey(
         "meeting.MeetingGroup",
-        on_delete=models.PROTECT,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
         related_name="discussions",

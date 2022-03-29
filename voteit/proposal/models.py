@@ -332,7 +332,7 @@ class TextParagraph(AgendaItemContext, MeetingContext):
 class DiffProposal(Proposal):
     name = "diff_proposal"
     paragraph: TextParagraph = models.ForeignKey(
-        TextParagraph, on_delete=models.PROTECT, related_name="proposals"
+        TextParagraph, on_delete=models.RESTRICT, related_name="proposals"
     )
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
