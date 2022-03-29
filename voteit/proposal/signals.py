@@ -35,9 +35,9 @@ if TYPE_CHECKING:
 def participants_channel_subscribed(context: Meeting, app_state: AppState, **kw):
     """Populate app_state with current proposals"""
     app_state.append_from_queryset(
-        Proposal.objects.filter(agenda_item__meeting=context).exclude(
-            agenda_item__state=AgendaItemWf.PRIVATE
-        ),
+        Proposal.objects.filter(agenda_item__meeting=context)
+        .exclude(agenda_item__state=AgendaItemWf.PRIVATE)
+        .select_subclasses(),
         GenericProposalSerializer,
         ProposalAdded,
     )
@@ -47,7 +47,7 @@ def participants_channel_subscribed(context: Meeting, app_state: AppState, **kw)
 def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
     """Populate app_state with current proposals"""
     app_state.append_from_queryset(
-        Proposal.objects.filter(agenda_item__meeting=context),
+        Proposal.objects.filter(agenda_item__meeting=context).select_subclasses(),
         GenericProposalSerializer,
         ProposalAdded,
     )

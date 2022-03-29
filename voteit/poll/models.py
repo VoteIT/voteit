@@ -285,7 +285,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         custom={"title": _("Make upcoming")},
     )
     def upcoming(self):
-        for proposal in self.proposals.all():
+        for proposal in self.proposals.all().select_subclasses():
             with suppress(TransitionNotAllowed):
                 proposal.lock_for_vote()
                 proposal.save()
@@ -338,11 +338,15 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         # Abstains aren't included here
         result.vote_count = sum(counter.values())
         self.result = result
-        for proposal in self.proposals.filter(pk__in=self.result.approved):
+        for proposal in self.proposals.filter(
+            pk__in=self.result.approved
+        ).select_subclasses():
             with suppress(TransitionNotAllowed):
                 proposal.approved()
                 proposal.save()
-        for proposal in self.proposals.filter(pk__in=self.result.denied):
+        for proposal in self.proposals.filter(
+            pk__in=self.result.denied
+        ).select_subclasses():
             with suppress(TransitionNotAllowed):
                 proposal.denied()
                 proposal.save()
@@ -356,7 +360,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     )
     def cancel(self):
         self._mark_closed()
-        for proposal in self.proposals.all():
+        for proposal in self.proposals.all().select_subclasses():
             proposal.publish()
             proposal.save()
 
@@ -368,7 +372,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         custom={"title": _("Revert to private")},
     )
     def unpublish(self):
-        for proposal in self.proposals.all():
+        for proposal in self.proposals.all().select_subclasses():
             proposal.publish()
             proposal.save()
 
