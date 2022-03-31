@@ -37,13 +37,25 @@ class Command(BaseCommand):
             "-o",
             help="Output filemap",
         )
+        parser.add_argument(
+            "--reuse-userid",
+            help="Reuse organisation users with the same userid. "
+            "This is not a good idea for live imports!",
+            default=False,
+            action="store_true",
+        )
 
     def handle(self, *args, **options):
         filemap_name = options["o"]
+        reuse_userid = options["reuse_userid"]
         importer = OrganisationImporter(
             using=options["database"], filename=options["filename"]
         )
-        importer.run(dry=options["dry_run"], existing_organisation_pk=options["org"])
+        importer.run(
+            dry=options["dry_run"],
+            existing_organisation_pk=options["org"],
+            reuse_userid=reuse_userid,
+        )
         if filemap_name:
             print(f"Writing filemap as {filemap_name}")
             data = {}

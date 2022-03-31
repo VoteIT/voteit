@@ -317,6 +317,16 @@ class BaseImporter(ABC):
             raise Exception(
                 f"{deserialized.object} has undhandled m2ms: {unhandled_m2m}"
             )
+        # Some models contain json fields. We'll load them in corresponding schema to check contents.
+        # Note that PK isn't remapped yet!
+        if name == "poll":
+            for attr in ["settings", "result"]:
+                self.verify_schema_attr(deserialized.object, attr)
+        elif name == "vote":
+            self.verify_schema_attr(deserialized.object, "vote")
+        elif name == "speaker_system":
+            self.verify_schema_attr(deserialized.object, "settings")
+
         # We need to force the pointer value for pk in case this model is a subclass of something
         if pointer_val:
             assert deserialized.object.pk == pointer_val
@@ -325,6 +335,16 @@ class BaseImporter(ABC):
             deserialized.object.pk = None
         if name == "poll":
             self.update_poll_results(deserialized)
+
+    def verify_schema_attr(self, obj, attr):
+        """
+        Touch attributes that will validate stored json data.
+        """
+        try:
+            getattr(obj, attr)
+        except ValueError as exc:
+            print(f"{obj} caused import error. Import PK: {obj.pk} - attr: {attr}")
+            raise exc
 
     def save_obj(self, obj):
         saved = False

@@ -20,7 +20,7 @@ class OrganisationImport(BaseImport):
 class OrganisationImporter(BaseImporter):
     import_class = OrganisationImport
 
-    def run(self, dry=False, existing_organisation_pk=None):
+    def run(self, dry=False, existing_organisation_pk=None, reuse_userid=False):
         # We need to muck about with all objects so keeping them in memory (or later in a temp file) is required :/
         # Create new organisation if existing_organisation_pk isn't specified
         if existing_organisation_pk:
@@ -30,6 +30,7 @@ class OrganisationImporter(BaseImporter):
         deserialized_organisation = None
         email_to_import_pk = {}
         username_to_import_pk = {}  # In case of duplicate run!
+        userid_to_import_pk = {}
 
         for deserialized in self.load_objects():
             shortname = get_model_shortname(deserialized.object)
@@ -54,6 +55,7 @@ class OrganisationImporter(BaseImporter):
                     email_to_import_pk[
                         deserialized.object.email
                     ] = deserialized.object.pk
+                # username
                 if deserialized.object.username in username_to_import_pk:
                     raise ValueError(
                         f"Duplicate username in import: {deserialized.object.username}"
@@ -61,6 +63,13 @@ class OrganisationImporter(BaseImporter):
                 username_to_import_pk[
                     deserialized.object.username
                 ] = deserialized.object.pk
+                # userid
+                if deserialized.object.userid in userid_to_import_pk:
+                    raise ValueError(
+                        f"Duplicate userid in import: {deserialized.object.userid}"
+                    )
+                userid_to_import_pk[deserialized.object.userid] = deserialized.object.pk
+                # Thumbs up
                 self.add_obj_to_handle(deserialized)
             else:
                 # All other objects
@@ -103,8 +112,25 @@ class OrganisationImporter(BaseImporter):
                 self.objects_to_handle["user"][
                     username_to_import_pk[user.username]
                 ] = user
+            matched_existing_userid = 0
+            if reuse_userid:
+                existing_qs_userid = User.objects.filter(
+                    userid__in=userid_to_import_pk.keys(), organisation=organisation
+                ).exclude(pk__in=existing_qs_username)
+                for user in existing_qs_userid:
+                    self.objects_to_handle["user"][
+                        userid_to_import_pk[user.userid]
+                    ] = user
+                matched_existing_userid = existing_qs_userid.count()
             print(
                 f"Found {matched_existing_emails} users via email and {matched_existing_username} via username. "
+            )
+            if reuse_userid:
+                print(
+                    f"Warning: Reusing {matched_existing_userid} form userid. "
+                    f"This is not a good idea if you have existing data!"
+                )
+            print(
                 f"Will remap to those users instead of creating new ones. "
                 f"Total users to handle: {len(self.objects_to_handle['user'])}"
             )
