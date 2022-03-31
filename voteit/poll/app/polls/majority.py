@@ -135,8 +135,8 @@ class Majority(PollMethod):
         return majority_result
 
     def start_check(self):
-        if self.poll.proposals.count() != 2:
-            raise InvalidProposalCount(_("Must be exactly two proposals"))
+        if self.poll.proposals.count() < 2:
+            raise InvalidProposalCount(_("Must ge at least 2 proposals"))
 
     def validate_vote(self, msg: Union[AddMajorityVote, ChangeMajorityVote]) -> None:
         if not self.poll.proposals.filter(pk=msg.data.vote.choice).exists():
