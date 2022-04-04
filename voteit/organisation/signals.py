@@ -4,20 +4,21 @@ from typing import TYPE_CHECKING
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
 
 from voteit.core.decorators import disable_on_raw_save
-from voteit.core.messages.role_updates import RolesAdded, RolesRemoved
+from voteit.core.messages.role_updates import RolesAdded
+from voteit.core.messages.role_updates import RolesRemoved
+from voteit.core.role import Role
+from voteit.core.signals import roles_added
+from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
-
-from .channels import OrganisationChannel
-from .messages import OrganisationChanged
-from .models import Organisation, OrganisationRoles
-from .rest_api.serializers import OrganisationSerializer
-from ..core.role import Role
-from ..core.signals import roles_added, roles_removed
+from voteit.organisation.channels import OrganisationChannel
+from voteit.organisation.messages import OrganisationChanged
+from voteit.organisation.models import Organisation
+from voteit.organisation.models import OrganisationRoles
+from voteit.organisation.rest_api.serializers import OrganisationSerializer
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
