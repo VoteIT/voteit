@@ -18,6 +18,7 @@ from rest_framework.serializers import Serializer
 
 from voteit.core.rest_api.serializers import FSMTransitionSerializer
 from voteit.core.rest_api.serializers import TransitionSerializer
+from voteit.core.rest_api.utils import get_valid_transitions
 from voteit.core.utils import get_permission_registry
 
 logger = getLogger(__name__)
@@ -216,13 +217,15 @@ class TransitionsMixin(SerializerClassesMixin):
         Checks against available transitions for current user before calling.
         """
         instance = self.get_object()
-
         if request.method == "GET":
-            method_name = f"get_available_user_{self.fsm_field_name}_transitions"
-            method = getattr(instance, method_name)
-            available_transitions = dict((x.name, x) for x in method(request.user))
+            transitions = sorted(
+                get_valid_transitions(instance, attr=self.fsm_field_name),
+                key=lambda x: x.name,
+            )
             transition_serializer = FSMTransitionSerializer(
-                list(available_transitions.values()), many=True
+                transitions,
+                many=True,
+                context={"request": request, "instance": instance},
             )
             return Response(transition_serializer.data)
         else:
@@ -231,10 +234,13 @@ class TransitionsMixin(SerializerClassesMixin):
                 raise exceptions.ValidationError(
                     detail={"transition": [_("Transition not specified")]}
                 )
-            method_name = f"get_all_{self.fsm_field_name}_transitions"
-            method = getattr(instance, method_name)
-            all_transitions = dict((x.name, x) for x in method())
-            if transition_name not in all_transitions:
+            transitions = dict(
+                [
+                    (x.name, x)
+                    for x in get_valid_transitions(instance, attr=self.fsm_field_name)
+                ]
+            )
+            if transition_name not in transitions:
                 raise exceptions.ValidationError(
                     detail={
                         "transition": [
@@ -243,7 +249,7 @@ class TransitionsMixin(SerializerClassesMixin):
                         ]
                     }
                 )
-            transition = all_transitions[transition_name]
+            transition = transitions[transition_name]
             meta = transition.method._django_fsm
             current_state = getattr(instance, self.fsm_field_name)
             if not meta.has_transition(current_state):

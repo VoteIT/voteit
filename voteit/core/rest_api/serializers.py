@@ -177,16 +177,54 @@ class PydanticFieldSerializer(JSONField):
         return super().to_representation(value)
 
 
-class FSMTransitionSerializer(serializers.Serializer):
-    name = serializers.CharField()
-    permission = serializers.CharField(required=False)
-    source = serializers.CharField(required=False)
-    target = serializers.CharField()
-    title = serializers.SerializerMethodField()
+class BaseFSMTransitonSerializer(serializers.Serializer):
+    """Basic details with no checks"""
 
-    def get_title(self, field: Transition):
+    name: str = serializers.CharField()
+    permission: Optional[str] = serializers.CharField(required=False)
+    source: str = serializers.CharField(required=False)
+    target: str = serializers.CharField()
+    title: str = serializers.SerializerMethodField()
+
+    def get_title(self, transition: Transition) -> str:
         # Title might be a lazy gettext, which doesn't work
-        return translation.gettext(field.custom.get("title", field.name.title()))
+        return translation.gettext(
+            transition.custom.get("title", transition.name.title())
+        )
+
+
+class FSMTransitionSerializer(BaseFSMTransitonSerializer):
+    has_perm: Optional[bool] = serializers.SerializerMethodField()
+    conditions: list[dict] = serializers.SerializerMethodField()
+    allowed: bool = serializers.BooleanField(required=False)
+
+    def to_representation(self, transition: Transition):
+        res = super().to_representation(transition)
+        res["allowed"] = res["has_perm"] and all(
+            x["allowed"] for x in res["conditions"]
+        )
+        return res
+
+    def get_has_perm(self, transition: Transition) -> Optional[bool]:
+        return transition.has_perm(
+            self.context["instance"], self.context["request"].user
+        )
+
+    def get_conditions(self, transition: Transition):
+        result = []
+        for condition in transition.conditions:
+            if hasattr(condition, "title"):
+                title = condition.title
+            else:
+                title = condition.__name__
+            result.append(
+                {
+                    "allowed": condition(self.context["instance"]),
+                    "title": title,
+                    "name": condition.__name__,
+                }
+            )
+        return result
 
 
 class RichTextSerializerMixin:

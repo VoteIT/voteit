@@ -250,6 +250,9 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             return False
         return pset is None or isinstance(pset, BaseModel)
 
+    validate_settings_guard.title = "Invalid settings"
+
+    # FIXME: Split this to get saner errors
     def start_check(self, exceptions=False) -> bool:
         """Check that this poll could be started. A very basic check for the most obvious things.
         Note that it's used as a transition condition, so it must return True if everything is ok!

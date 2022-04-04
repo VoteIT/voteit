@@ -15,19 +15,15 @@ class TransitionsMixinTests(APITestCase):
     We'll test this view against the regular meeting endpoint
     """
 
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
         from voteit.meeting.models import Meeting
-        from voteit.organisation.models import Organisation
 
-        org = Organisation.objects.create()
-        cls.meeting = Meeting.objects.create(
-            er_policy_name="auto_before_poll", organisation=org
-        )
-        cls.moderator = cls.meeting.participants.create(
-            username="moderator", organisation=org
-        )
-        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.moderator = cls.meeting.participants.get(username="moderator")
+        cls.participant = cls.meeting.participants.get(username="participant")
         cls.ai = cls.meeting.agenda_items.create()
 
     def setUp(self):
@@ -56,7 +52,16 @@ class TransitionsMixinTests(APITestCase):
                     "source": "upcoming",
                     "target": "ongoing",
                     "title": "Make ongoing",
-                }
+                    "has_perm": True,
+                    "allowed": True,
+                    "conditions": [
+                        {
+                            "allowed": True,
+                            "title": "Must have valid ER policy name",
+                            "name": "valid_er_policy_guard",
+                        }
+                    ],
+                },
             ],
             response.json(),
         )
@@ -75,6 +80,9 @@ class TransitionsMixinTests(APITestCase):
                     "source": "ongoing",
                     "target": "closed",
                     "title": "Close",
+                    "conditions": [],
+                    "has_perm": True,
+                    "allowed": True,
                 },
                 {
                     "name": "upcoming",
@@ -82,6 +90,9 @@ class TransitionsMixinTests(APITestCase):
                     "source": "ongoing",
                     "target": "upcoming",
                     "title": "Back to upcoming",
+                    "conditions": [],
+                    "has_perm": True,
+                    "allowed": True,
                 },
             ],
             response.json(),
@@ -100,11 +111,9 @@ class TransitionsMixinTests(APITestCase):
         self.assertEqual(400, response.status_code)
 
     def test_transition_permission(self):
-        self.meeting.ongoing()
-        self.meeting.save()
-        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
-        self.client.force_login(self.moderator)
-        response = self.client.post(url, data={"transition": "archive"})
+        url = reverse("meeting-transitions", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.participant)
+        response = self.client.post(url, data={"transition": "ongoing"})
         self.assertEqual(403, response.status_code)
 
     def test_transition_guard(self):
