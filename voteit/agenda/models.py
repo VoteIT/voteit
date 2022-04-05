@@ -131,12 +131,12 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     def guard_no_ongoing_polls(self) -> bool:
         return not self.polls.filter(state=PollWf.ONGOING).exists()
 
-    guard_no_ongoing_polls.title = "No ongoing polls"
+    guard_no_ongoing_polls.title = "There are ongoing polls"
 
     def guard_meeting_ongoing(self) -> bool:
         return self.meeting.state == MeetingWf.ONGOING
 
-    guard_no_ongoing_polls.title = "Meeting must be ongoing"
+    guard_meeting_ongoing.title = "Meeting must be ongoing"
 
     @transition(
         field=state,
