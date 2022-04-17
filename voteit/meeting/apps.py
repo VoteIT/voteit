@@ -4,6 +4,7 @@ from django.apps import AppConfig
 class MeetingConfig(AppConfig):
     name = "voteit.meeting"
     verbose_name = "Meeting"
+    default_auto_field = 'django.db.models.BigAutoField'
 
     def ready(self):
         from voteit.meeting import roles

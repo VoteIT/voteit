@@ -4,6 +4,7 @@ from django.apps import AppConfig
 class CoreConfig(AppConfig):
     name = "voteit.core"
     verbose_name = "VoteIT Core"
+    default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
         from voteit.core.registries import content_types

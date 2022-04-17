@@ -4,6 +4,7 @@ from django.apps import AppConfig
 class ProposalConfig(AppConfig):
     name = "voteit.proposal"
     verbose_name = "Proposals"
+    default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
         from voteit.proposal import rules

@@ -4,6 +4,7 @@ from django.apps import AppConfig
 class PollConfig(AppConfig):
     name = "voteit.poll"
     verbose_name = "Polls"
+    default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
         from voteit.poll import rules

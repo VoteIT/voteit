@@ -7,6 +7,7 @@ from django.conf import settings
 class OrganisationConfig(AppConfig):
     name = "voteit.organisation"
     verbose_name = "Organisation"
+    default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
         # Make sure code is imported + registered

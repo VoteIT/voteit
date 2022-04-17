@@ -4,6 +4,7 @@ from django.apps import AppConfig
 class DiscussionConfig(AppConfig):
     name = "voteit.discussion"
     verbose_name = "Discussion"
+    default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
         from voteit.discussion import rules
