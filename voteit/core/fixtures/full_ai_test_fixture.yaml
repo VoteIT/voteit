@@ -1,0 +1,187 @@
+- fields:
+    created: '2020-05-20T07:56:01.739622Z'
+    meeting: 1
+  model: poll.electoralregister
+  pk: 1
+- fields:
+    register: 1
+    user: 1
+    weight: 1
+  model: poll.voterweight
+  pk: 1
+- fields:
+    register: 1
+    user: 2
+    weight: 1
+  model: poll.voterweight
+  pk: 2
+
+# Discussion post
+- fields:
+    agenda_item: 1
+    author: 2
+    body: "\n<span class=\"mention\" data-index=\"0\" data-denotation-char=\"#\" data-id=\"\
+      styrelse-1\" data-value=\"styrelse-1\">\n<span contenteditable=\"false\"><span\
+      \ class=\"ql-mention-denotation-char\">#</span>styrelse-1</span></span> \n\r\
+      \nJag h\xE5ller med"
+    created: '2020-05-18T13:53:14.961055Z'
+    mentions: []
+    modified: '2020-05-18T13:53:14.961055Z'
+    tags:
+    - styrelse-1
+  model: discussion.discussionpost
+  pk: 1
+- fields:
+    agenda_item: 1
+    author: 2
+    body: "Hej och hå"
+    created: '2020-05-19T16:08:33.447094Z'
+    mentions:
+    - 1
+    modified: '2020-05-19T16:08:33.447094Z'
+    tags:
+    - styrelse-2
+  model: discussion.discussionpost
+  pk: 2
+
+# Proposals
+- model: proposal.proposal
+  pk: 1
+  fields:
+    body: Löksås är gott och ska med fördel serveras med färsk potatis. ipsum bland
+      strand söka kunde både dunge gamla, där år ska annan faktor när dimma samtidigt,
+      miljoner gör nu oss när hwila räv. Sjö miljoner när samtidigt dimmhöljd hav
+      nu erfarenheter samma rännil sjö, av rot ska dimma färdväg som genom dimmhöljd
+      faktor rot fram, verkligen hwila dag inom sorgliga oss är hela ta. Så helt och
+      det år vad helt tid, erfarenheter smultron på sin upprätthållande del, sin samtidigt
+      tiden regn stig ta.
+    created: 2022-03-29 09:30:58.356396+00:00
+    modified: 2022-03-29 09:30:58.356404+00:00
+    last_modified_by: null
+    tags: '["stycke-1"]'
+    state: published
+    author: 2
+    prop_id: loeksas-1
+    agenda_item: 1
+
+#Related to the one above
+- model: proposal.diffproposal
+  pk: 1
+  fields:
+    paragraph: 1
+
+- model: proposal.proposal
+  pk: 2
+  fields:
+    body: Viktiga saker hända här
+    created: 2022-03-29 09:30:58.356396+00:00
+    modified: 2022-03-29 09:30:58.356404+00:00
+    last_modified_by: null
+    tags: '["stycke-1"]'
+    state: published
+    author: 2
+    prop_id: loeksas-2
+    agenda_item: 1
+
+- model: proposal.proposal
+  pk: 2
+  fields:
+    body: För övrigt anser jag att Karthago ska förströras
+    created: 2022-03-29 09:30:58.356396+00:00
+    modified: 2022-03-29 09:30:58.356404+00:00
+    last_modified_by: null
+    tags: '["loeksas-3"]'
+    state: published
+    author: 2
+    prop_id: loeksas-3
+    agenda_item: 1
+
+- model: proposal.proposal
+  pk: 3
+  fields:
+    body: I don't even want to be here
+    created: 2022-03-29 09:30:58.356396+00:00
+    modified: 2022-03-29 09:30:58.356404+00:00
+    last_modified_by: null
+    tags: '["loeksas-4"]'
+    state: published
+    author: 2
+    prop_id: loeksas-4
+    agenda_item: 1
+
+# Poll
+- fields:
+    abstains: 0
+    agenda_item: 1
+    body: ''
+    closed: null
+    created: '2020-05-20T07:59:04.772867Z'
+    electoral_register: 1
+    meeting: 1
+    method_name: repeated_schulze
+    modified: '2020-05-20T08:01:53.035708Z'
+    proposals:
+    - 1
+    - 2
+    - 3
+    settings_data:
+      max_stars: 5
+      min_stars: 5
+      winners: null
+    started: '2020-05-20T08:01:53.035689Z'
+    state: ongoing
+    title: "Vilken frukt \xE4r OTS medlemmar mest lika?"
+  model: poll.poll
+  pk: 1
+
+# Votes
+- fields:
+    changed: '2020-05-22T11:14:45.671150Z'
+    created: '2020-05-22T11:14:45.671150Z'
+    poll: 1
+    user: 1
+    vote_data: '[[1, 5], [2, 4], [3, 0]]'
+  model: poll.vote
+  pk: 1
+- fields:
+    changed: '2020-05-22T11:14:45.671150Z'
+    created: '2020-05-22T11:14:45.671150Z'
+    poll: 1
+    user: 2
+    vote_data: '[[1, 5], [2, 5], [3, 0]]'
+  model: poll.vote
+  pk: 2
+
+
+# Diff-related
+- model: proposal.textdocument
+  pk: 1
+  fields:
+    title: Verksamhetsplan 2019 – 2020
+    body: "Löksås ipsum bland strand söka kunde både dunge gamla, där år ska annan
+      faktor när dimma samtidigt, miljoner gör nu oss när hwila räv. Sjö miljoner
+      när samtidigt dimmhöljd hav nu erfarenheter samma rännil sjö, av rot ska dimma
+      färdväg som genom dimmhöljd faktor rot fram, verkligen hwila dag inom sorgliga
+      oss är hela ta. Så helt och det år vad helt tid, erfarenheter smultron på sin
+      upprätthållande del, sin samtidigt tiden regn stig ta."
+    base_tag: stycke
+    created: 2022-03-29 09:31:51.413988+00:00
+    modified: 2022-03-29 09:31:51.413994+00:00
+    author: null
+    last_modified_by: null
+    agenda_item: 1
+
+- model: proposal.textparagraph
+  pk: 1
+  fields:
+    body: Löksås ipsum bland strand söka kunde både dunge gamla, där år ska annan
+      faktor när dimma samtidigt, miljoner gör nu oss när hwila räv. Sjö miljoner
+      när samtidigt dimmhöljd hav nu erfarenheter samma rännil sjö, av rot ska dimma
+      färdväg som genom dimmhöljd faktor rot fram, verkligen hwila dag inom sorgliga
+      oss är hela ta. Så helt och det år vad helt tid, erfarenheter smultron på sin
+      upprätthållande del, sin samtidigt tiden regn stig ta.
+    created: 2022-03-29 09:31:51.432414+00:00
+    modified: 2022-03-29 09:31:51.432424+00:00
+    paragraph_id: 1
+    text_document: 1
+    agenda_item: 1
