@@ -35,6 +35,8 @@ _marker = object()
 class OrganisationRoles(Roles):
     """Contains assigned meeting roles for a specific meeting and user"""
 
+    name = "organisation_roles"
+
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
