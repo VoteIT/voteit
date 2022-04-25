@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import Collection
+from collections.abc import Collection
 from datetime import datetime
 from logging import getLogger
 from typing import List
