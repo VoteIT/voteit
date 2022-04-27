@@ -473,6 +473,10 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     def is_private(self) -> bool:
         return self.state == PollWf.PRIVATE
 
+    @property
+    def is_finished(self) -> bool:
+        return self.state == PollWf.FINISHED
+
     # Annotations
     objects: models.Manager
     votes: models.QuerySet

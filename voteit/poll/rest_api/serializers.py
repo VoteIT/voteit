@@ -1,3 +1,4 @@
+from typing import Optional
 from typing import Type
 
 from django.db import transaction
@@ -22,10 +23,12 @@ class PollDetailSerializer(serializers.ModelSerializer):
     serializer_url_field = OptionalHyperlinkedIdentityField
     settings = PydanticFieldSerializer(allow_null=True, required=False)
     result = PydanticFieldSerializer(allow_null=True, required=False)
+    abstain_count = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Poll
         read_only_fields = (
+            "abstain_count",
             "agenda_item",
             "body",
             "closed",
@@ -43,6 +46,10 @@ class PollDetailSerializer(serializers.ModelSerializer):
             "url",
         )
         fields = read_only_fields
+
+    def get_abstain_count(self, instance: models.Poll) -> Optional[int]:
+        if instance.is_finished:
+            return instance.abstains
 
 
 class PollListSerializer(PollDetailSerializer):

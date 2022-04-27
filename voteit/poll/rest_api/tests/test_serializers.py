@@ -64,9 +64,37 @@ class PollDetailSerializerTests(TestCase):
                 "settings": None,
                 "state": "private",
                 "url": None,
+                "abstain_count": None,
             },
             data,
         )
+
+        def test_serializer_simple_finished(self):
+            self.poll.abstains = 5
+            self.poll.save()
+            serializer = self._cut(self.poll)
+            data = serializer.data
+            data.pop("started")
+            data.pop("closed")
+            self.assertEqual(
+                {
+                    "pk": self.poll.pk,
+                    "body": "<b>Hello</b>",
+                    "title": "world",
+                    "agenda_item": self.ai.pk,
+                    "electoral_register": None,
+                    "initial_electoral_register": None,
+                    "meeting": self.meeting.pk,
+                    "method_name": "simple",
+                    "proposals": [self.prop1.pk, self.prop2.pk],
+                    "result": None,
+                    "settings": None,
+                    "state": "private",
+                    "url": None,
+                    "abstain_count": 5,
+                },
+                data,
+            )
 
     def test_serializer_repeated_schulze(self):
         self.poll.method_name = "repeated_schulze"
