@@ -1,11 +1,12 @@
+from abc import ABC
+
 from rest_framework import viewsets
-from voteit.core.rest_api.mixins import (
-    DefaultQS,
-    CreateModelPermissionsMixin,
-    TransitionsMixin,
-    AutoPermissionViewSetMixin,
-)
+
+from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
+from voteit.core.rest_api.mixins import CreateModelPermissionsMixin
+from voteit.core.rest_api.mixins import DefaultQS
 from voteit.core.rest_api.mixins import ModelContextMixin
+from voteit.core.rest_api.mixins import TransitionsMixin
 
 
 class DefaultModelViewSet(
@@ -13,8 +14,11 @@ class DefaultModelViewSet(
     CreateModelPermissionsMixin,
     TransitionsMixin,
     viewsets.ModelViewSet,
+    ABC,
 ):
-    """Checks permissions properly where applicable and enables all actions"""
+    """
+    Checks permissions properly where applicable and enables all actions
+    """
 
 
 class ReadonlyModelViewSet(
@@ -22,5 +26,13 @@ class ReadonlyModelViewSet(
     AutoPermissionViewSetMixin,
     ModelContextMixin,
     viewsets.ReadOnlyModelViewSet,
+    ABC,
 ):
-    """Read-only version"""
+    """
+    Read-only version
+    """
+
+    @property
+    def context_queryset(self):
+        # This is since ModelContextMixin wasn't part of ReadonlyModelViewSet
+        raise NotImplementedError("Implement in subclass if used")
