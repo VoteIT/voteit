@@ -1,26 +1,21 @@
 from rest_framework import serializers
 
-from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
 from voteit.presence import models
 
 
 class PresenceDetailSerializer(serializers.ModelSerializer):
-    serializer_url_field = OptionalHyperlinkedIdentityField
-
     class Meta:
         model = models.Presence
         read_only_fields = [
             "created",
             "pk",
             "presence_check",
-            "pk",
             "user",
-            "url",
         ]
-        fields = list(read_only_fields)
+        fields = read_only_fields
 
 
-class PresenceCheckDetailSerializer(serializers.ModelSerializer):
+class PresenceCheckCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.PresenceCheck
         read_only_fields = [
@@ -30,6 +25,13 @@ class PresenceCheckDetailSerializer(serializers.ModelSerializer):
             "closed",
         ]
         fields = read_only_fields + ["meeting"]
+
+
+class PresenceCheckDetailSerializer(PresenceCheckCreateSerializer):
+    class Meta(PresenceCheckCreateSerializer.Meta):
+        read_only_fields = PresenceCheckCreateSerializer.Meta.read_only_fields + [
+            "meeting"
+        ]
 
 
 class PresenceSystemDetailSerializer(serializers.ModelSerializer):

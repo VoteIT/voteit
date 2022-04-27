@@ -66,7 +66,8 @@ class PresenceSystemTests(APITestCase):
         url = reverse("presence-systems-list")
         self.client.force_login(self.moderator)
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([], response.json())
 
     def test_list_w_meeting(self):
         url = reverse("presence-systems-list")
@@ -175,7 +176,8 @@ class PresenceCheckTests(APITestCase):
         url = reverse("presence-checks-list")
         self.client.force_login(self.moderator)
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([], response.json())
 
     def test_list_w_meeting(self):
         self._mk_one()
@@ -205,3 +207,71 @@ class PresenceCheckTests(APITestCase):
             204,
         )
         self.assertRaises(ObjectDoesNotExist, presence_check.refresh_from_db)
+
+
+class PresenceTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
+        from voteit.presence.models import PresenceSystem, PresenceCheck
+
+        cls.meeting: Meeting = Meeting.objects.create(
+            title="Test meeting", state="ongoing"
+        )
+        cls.participant: User = User.objects.create_user("participant")
+        cls.moderator: User = User.objects.create_user("moderator")
+        cls.outsider: User = User.objects.create_user("outsider")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        # cls.system: PresenceSystem = PresenceSystem.objects.create(meeting=cls.meeting)
+        cls.check: PresenceCheck = cls.meeting.presence_checks.create()
+        cls.present_moderator = cls.check.presences.create(user=cls.moderator)
+        cls.present_participant = cls.check.presences.create(user=cls.participant)
+
+    def test_create(self):
+        url = reverse("presences-list")
+        data = {"presence_check": self.check.pk}
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual(
+            response.status_code,
+            405,
+        )
+
+    def test_list_wo_context(self):
+        url = reverse("presences-list")
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([], response.json())
+
+    def test_list(self):
+        url = reverse("presences-list")
+        self.client.force_login(self.moderator)
+        response = self.client.get(url, {"presence_check": self.check.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [self.present_moderator.pk, self.present_participant.pk],
+            sorted(x["pk"] for x in response.json()),
+        )
+
+    def test_get(self):
+        self.client.force_login(self.moderator)
+        url = reverse("presences-detail", kwargs={"pk": self.present_moderator.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(self.present_moderator.pk, data["pk"])
+
+    def test_delete(self):
+        self.client.force_login(self.moderator)
+        url = reverse("presences-detail", kwargs={"pk": self.present_moderator.pk})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, 405)
+
+    def test_put(self):
+        self.client.force_login(self.moderator)
+        url = reverse("presences-detail", kwargs={"pk": self.present_moderator.pk})
+        response = self.client.put(url, {})
+        self.assertEqual(response.status_code, 405)

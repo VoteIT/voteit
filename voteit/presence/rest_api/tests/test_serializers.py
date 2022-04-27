@@ -55,9 +55,9 @@ class PresenceCheckCreateSerializerTests(TestCase):
 
     @property
     def _cut(self):
-        from voteit.presence.rest_api.serializers import PresenceCheckDetailSerializer
+        from voteit.presence.rest_api.serializers import PresenceCheckCreateSerializer
 
-        return PresenceCheckDetailSerializer
+        return PresenceCheckCreateSerializer
 
     def test_create(self):
         from voteit.presence.models import PresenceCheck
