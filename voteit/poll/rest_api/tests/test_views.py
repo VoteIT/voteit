@@ -7,22 +7,23 @@ User = get_user_model()
 
 
 class PollViewSetTests(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
 
-        self.meeting: Meeting = Meeting.objects.create(
+        cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting",
         )
-        self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
-        self.ai_private = self.meeting.agenda_items.create(title="Private")
-        self.prop = self.ai.proposals.create()
-        self.participant: User = User.objects.create_user("participant")
-        self.moderator: User = User.objects.create_user("moderator")
-        self.outsider: User = User.objects.create_user("outsider")
-        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
-        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
+        cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
+        cls.ai_private = cls.meeting.agenda_items.create(title="Private")
+        cls.prop = cls.ai.proposals.create()
+        cls.participant: User = User.objects.create_user("participant")
+        cls.moderator: User = User.objects.create_user("moderator")
+        cls.outsider: User = User.objects.create_user("outsider")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
 
     def test_create(self):
         url = reverse("poll-list")
@@ -174,3 +175,37 @@ class PollViewSetTests(APITestCase):
         self.assertEqual(200, response.status_code)
         poll.refresh_from_db(fields=("title",))
         self.assertEqual("First", poll.title)
+
+
+class ElectoralRegisterViewSetTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+
+        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
+
+        cls.meeting: Meeting = Meeting.objects.create(
+            title="Test meeting",
+        )
+        cls.participant: User = User.objects.create_user("participant")
+        cls.moderator: User = User.objects.create_user("moderator")
+        cls.outsider: User = User.objects.create_user("outsider")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.er = cls.meeting.electoral_registers.create()
+
+    def test_list(self):
+        url = reverse("electoral-registers-list")
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(1, len(data))
+
+    def test_get(self):
+        url = reverse("electoral-registers-detail", kwargs={"pk": self.er.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(self.er.pk, data["pk"])

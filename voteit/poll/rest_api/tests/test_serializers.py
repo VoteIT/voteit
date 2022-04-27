@@ -300,16 +300,6 @@ class ElectoralRegisterSerializerTests(TestCase):
         serializer = self._cut(self.er)
         self.assertEqual(self.er.pk, serializer.data["pk"])
         self.assertEqual(self.voter_pks, set(serializer.data["voters"]))
-        self.assertEqual(None, serializer.data["url"])
-
-    def test_er_with_url(self):
-        rf = RequestFactory()
-        request = rf.request()
-        serializer = self._cut(self.er, context={"request": request})
-        self.assertEqual(
-            f"http://testserver/api/electoral-registers/{self.er.pk}/",
-            serializer.data["url"],
-        )
 
 
 class VoteSerializerTests(TestCase):

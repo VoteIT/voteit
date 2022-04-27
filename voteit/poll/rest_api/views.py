@@ -45,7 +45,7 @@ class PollViewSet(DefaultModelViewSet):
         return self.queryset
 
 
-@router.register("electoral-registers")
+@router.register("electoral-registers", basename="electoral-registers")
 class ElectoralRegisterViewSet(ReadonlyModelViewSet):
     model = ElectoralRegister
     queryset = ElectoralRegister.objects.all()

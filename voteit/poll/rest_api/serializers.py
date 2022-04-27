@@ -155,8 +155,6 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
 
 class ElectoralRegisterSerializer(serializers.ModelSerializer):
-    serializer_url_field = OptionalHyperlinkedIdentityField
-
     class Meta:
         model = models.ElectoralRegister
 
@@ -164,7 +162,6 @@ class ElectoralRegisterSerializer(serializers.ModelSerializer):
             "created",
             "pk",
             "voters",
-            "url",
         )
 
 
