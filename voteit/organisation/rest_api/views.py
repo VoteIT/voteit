@@ -3,10 +3,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.exceptions import AuthenticationFailed
 
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
@@ -17,9 +17,9 @@ from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserConsent
+from voteit.organisation.permissions import OrgPermissions
 from voteit.organisation.rest_api import serializers
-from .filters import UserPkFilter
-from ..permissions import OrgPermissions
+from voteit.organisation.rest_api.filters import UserPkFilter
 
 
 @router.register("organisations", basename="organisations")
@@ -34,7 +34,7 @@ class OrganisationViewSet(
     model = Organisation
     queryset = Organisation.objects.all()
     serializer_class = serializers.OrganisationSerializer
-
+    expected_default_http_status = 401
     # TODO: Not decided how to host multiple organisations. For now, always return a list of one.
     def get_queryset(self):
         # Host is forced for authenticated too
@@ -76,6 +76,7 @@ class IDProxyOrganisationViewSet(
     permission_classes = (HasIDProxyAPIKey,)
     model = Organisation
     queryset = Organisation.objects.all()
+    expected_default_http_status = 401
 
 
 @router.register("tos", basename="tos")

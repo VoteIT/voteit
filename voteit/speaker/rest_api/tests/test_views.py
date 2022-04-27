@@ -366,7 +366,8 @@ class HistoricSpeakerViewTests(APITestCase):
         url = reverse("speaker-history-list")
         self.client.force_login(self.user_one)
         response = self.client.get(url)
-        self.assertEqual(400, response.status_code)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([], response.json())
 
     def test_meeting_history(self):
         url = reverse("speaker-history-list") + f"?meeting={self.meeting.pk}"

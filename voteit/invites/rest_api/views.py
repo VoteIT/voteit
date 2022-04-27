@@ -44,12 +44,16 @@ class MeetingInviteViewSet(DefaultModelViewSet):
         if self.detail:
             # Permission checked against obj
             return MeetingInvite.objects.all()
-        else:
-            context: Meeting = self.get_context(self.request)
-            # This permission can be checked against meetings too
-            if not self.request.user.has_perm(MeetingInvitePermissions.VIEW, context):
-                return HttpResponseForbidden("You lack the required moderator role")
-            return context.invites
+        try:
+            meeting: Meeting = self.get_context(self.request)
+        except ValidationError:
+            meeting = None
+        # This permission can be checked against meetings too
+        if meeting and self.request.user.has_perm(
+            MeetingInvitePermissions.VIEW, meeting
+        ):
+            return meeting.invites
+        return MeetingInvite.objects.none()
 
 
 @router.register("match-invites", basename="match-invites")
@@ -126,6 +130,7 @@ class HandleMatchedInvitesViewSet(
     Note that the data must match returned data from their identity_url
     """
 
+    expected_default_http_status = 403
     serializer_class = serializers.MeetingInviteSerializer
     permission_classes = [IsAuthenticated]
 

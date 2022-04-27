@@ -35,17 +35,17 @@ class SpeakerListViewSet(DefaultModelViewSet):
     context_queryset = SpeakerListSystem.objects.all()
 
     def get_queryset(self):
-        if self.action == "list":
-            speaker_system = self.get_context(self.request)
-            if self.request.user.has_perm(
-                SpeakerSystemPermissions.VIEW, speaker_system
-            ):
-                return self.queryset.filter(speaker_system=speaker_system)
-            raise exceptions.PermissionDenied(
-                "You're not allowed to view this speaker system"
-            )
-        else:
+        if self.detail:
             return self.queryset
+        try:
+            speaker_system = self.get_context(self.request)
+        except exceptions.ValidationError:
+            speaker_system = None
+        if speaker_system and self.request.user.has_perm(
+            SpeakerSystemPermissions.VIEW, speaker_system
+        ):
+            return self.queryset.filter(speaker_system=speaker_system)
+        return self.queryset.none()
 
 
 @router.register("speaker-history", basename="speaker-history")
@@ -75,16 +75,15 @@ class HistoricSpeakerViewSet(
     context_queryset = Meeting.objects.all()
 
     def get_queryset(self):
-        # breakpoint()
-        if self.action == "list":
-            meeting = self.get_context(self.request)
-            if self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
-                return self.queryset.filter(
-                    speaker_list__speaker_system__meeting=meeting
-                )
-            return self.queryset.none()
-        else:
+        if self.detail:
             return self.queryset
+        try:
+            meeting = self.get_context(self.request)
+        except exceptions.ValidationError:
+            meeting = None
+        if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
+            return self.queryset.filter(speaker_list__speaker_system__meeting=meeting)
+        return self.queryset.none()
 
 
 @router.register("speaker-list-systems")
@@ -102,10 +101,12 @@ class SpeakerListSystemViewSet(DefaultModelViewSet):
         instance.add_roles(self.request.user, ROLE_LIST_MODERATOR)
 
     def get_queryset(self):
-        if self.action == "list":
-            meeting = self.get_context(self.request)
-            if self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
-                return self.queryset.filter(meeting=meeting)
-            self.queryset.none()
-        else:
+        if self.detail:
             return self.queryset
+        try:
+            meeting = self.get_context(self.request)
+        except exceptions.ValidationError:
+            meeting = None
+        if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
+            return self.queryset.filter(meeting=meeting)
+        self.queryset.none()

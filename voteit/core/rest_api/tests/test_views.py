@@ -44,7 +44,8 @@ class UserSearchViewSetTests(APITestCase):
         url = reverse("users-list")
         self.client.force_login(self.moderator)
         response = self.client.get(url)
-        self.assertEqual(400, response.status_code)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([], response.json())
 
     def test_list_moderator_own_meeting(self):
         url = reverse("users-list")

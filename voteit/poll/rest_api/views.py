@@ -1,5 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from voteit.agenda.models import AgendaItem
 from voteit.core.rest_api.base import DefaultModelViewSet, ReadonlyModelViewSet
@@ -36,13 +37,16 @@ class PollViewSet(DefaultModelViewSet):
     )
 
     def get_queryset(self):
-        if self.action == "list":
-            # This isn't really necessary for QS since we use websockets
+        if self.detail:
+            return self.queryset
+        # This isn't really necessary for QS since we use websockets
+        try:
             ai = self.get_context(self.request)
-            if self.request.user.has_perm(AgendaPermissions.VIEW, ai):
-                return self.queryset.filter(agenda_item=ai)
-            return self.queryset.none()
-        return self.queryset
+        except ValidationError:
+            ai = None
+        if ai and self.request.user.has_perm(AgendaPermissions.VIEW, ai):
+            return self.queryset.filter(agenda_item=ai)
+        return self.queryset.none()
 
 
 @router.register("electoral-registers", basename="electoral-registers")

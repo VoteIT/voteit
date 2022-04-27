@@ -93,7 +93,8 @@ class ReactionButtonViewSetTests(APITestCase):
         url = reverse("reaction-buttons-list")
         self.client.force_login(self.moderator)
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([], response.json())
 
     def test_get(self):
         button = self._mk_one()

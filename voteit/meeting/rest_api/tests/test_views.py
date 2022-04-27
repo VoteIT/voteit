@@ -221,7 +221,8 @@ class MeetingGroupViewSetTests(APITestCase):
         url = reverse("meeting-groups-list")
         self.client.force_login(self.moderator)
         response = self.client.get(url)
-        self.assertEqual(400, response.status_code)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([], response.json())
 
     def test_list(self):
         url = reverse("meeting-groups-list")

@@ -1,4 +1,5 @@
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.exceptions import ValidationError
 
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
@@ -22,9 +23,12 @@ class ReactionButtonViewSet(DefaultModelViewSet):
     filterset_fields = ("meeting",)
 
     def get_queryset(self):
-        if self.action == "list":
+        if self.detail:
+            return self.queryset
+        try:
             meeting = self.get_context(self.request)
-            if self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
-                return self.queryset.filter(meeting=meeting)
-            return self.queryset.none()
-        return self.queryset
+        except ValidationError:
+            meeting = None
+        if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
+            return self.queryset.filter(meeting=meeting)
+        return self.queryset.none()

@@ -3,16 +3,16 @@ from django.contrib.auth import login
 from django.contrib.auth import logout
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
-from rest_framework import serializers
-from rest_framework import viewsets
 from rest_framework import mixins
 from rest_framework import permissions
+from rest_framework import serializers
+from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import ModelContextMixin
-
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.serializers import UpdateUserSerializer
 from voteit.core.rest_api.serializers import UserSerializer
@@ -50,8 +50,11 @@ class UserSearchViewSet(ModelContextMixin, viewsets.ReadOnlyModelViewSet):
         if user.is_superuser or user.has_perm(OrgPermissions.MANAGE, user.organisation):
             return user.organisation.users.all()
         # Method will raise 404 if meeting doesn't exist
-        meeting = self.get_context(self.request)
-        if user.has_perm(MeetingPermissions.MODERATE, meeting):
+        try:
+            meeting = self.get_context(self.request)
+        except ValidationError:
+            meeting = None
+        if meeting and user.has_perm(MeetingPermissions.MODERATE, meeting):
             return meeting.participants.all()
         return UserModel.objects.none()
 

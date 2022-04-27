@@ -124,8 +124,11 @@ class MeetingGroupViewSet(DefaultModelViewSet):
         if self.detail:
             # Permission checked against object
             return MeetingGroup.objects.all()
-        meeting = self.get_context(self.request)
-        if self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
+        try:
+            meeting = self.get_context(self.request)
+        except ValidationError:
+            meeting = None
+        if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
             return MeetingGroup.objects.filter(meeting=meeting)
         return MeetingGroup.objects.none()
 
