@@ -5,15 +5,22 @@ from voteit.core.rest_api.mixins import (
     TransitionsMixin,
     AutoPermissionViewSetMixin,
 )
+from voteit.core.rest_api.mixins import ModelContextMixin
 
 
 class DefaultModelViewSet(
-    DefaultQS, CreateModelPermissionsMixin, TransitionsMixin, viewsets.ModelViewSet
+    DefaultQS,
+    CreateModelPermissionsMixin,
+    TransitionsMixin,
+    viewsets.ModelViewSet,
 ):
-    """ Checks permissions properly where applicable and enables all actions"""
+    """Checks permissions properly where applicable and enables all actions"""
 
 
 class ReadonlyModelViewSet(
-    DefaultQS, AutoPermissionViewSetMixin, viewsets.ReadOnlyModelViewSet
+    DefaultQS,
+    AutoPermissionViewSetMixin,
+    ModelContextMixin,
+    viewsets.ReadOnlyModelViewSet,
 ):
-    """ Read-only version"""
+    """Read-only version"""
