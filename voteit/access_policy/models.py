@@ -5,6 +5,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from django.db import models
+
 from voteit.core.abcs import MeetingContext
 
 if TYPE_CHECKING:
@@ -35,12 +36,16 @@ class AccessPolicy(MeetingContext):
     @property
     @abstractmethod
     def name(self) -> str:
-        """Name of access policy, used as ID."""
+        """
+        Name of access policy, used as ID.
+        """
 
     @property
     @abstractmethod
     def title(self) -> str:
-        """Human readable name"""
+        """
+        Human-readable name
+        """
 
     def __str__(self):
         return f"{self.__class__.__name__} for meeting {self.meeting.pk}"
