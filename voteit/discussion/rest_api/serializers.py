@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from typing import OrderedDict
+
 from rest_framework import serializers
 
 from voteit.core.rest_api.serializers import BaseModelSerializer
@@ -18,13 +21,13 @@ class DiscussionPostDetailSerializer(
         model = models.DiscussionPost
         read_only_fields = [
             "agenda_item",
-            "author",
             "created",
-            "meeting_group",
             "pk",
         ]
         fields = read_only_fields + [
+            "author",
             "body",
+            "meeting_group",
             "tags",
         ]
 

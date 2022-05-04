@@ -105,20 +105,20 @@ class ProposalDetailSerializer(RichTextSerializerMixin, serializers.ModelSeriali
     class Meta:
         model = Proposal
         read_only_fields = [
-            "author",
             "created",
             "state",
             "prop_id",
             "state",
             "pk",
             "agenda_item",
-            "meeting_group",
             "shortname",
         ]
         fields = read_only_fields + [
+            "author",
             "body",
-            "tags",
+            "meeting_group",
             "mentions",
+            "tags",
         ]
 
     def get_shortname(self, instance):

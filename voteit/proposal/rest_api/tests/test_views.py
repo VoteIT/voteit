@@ -43,6 +43,7 @@ class ProposalsAPITests(APITestCase):
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.proposer, ROLE_PROPOSER)
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.meeting_group = cls.meeting.groups.create()
 
     def test_create(self):
         url = reverse("proposal-list")
@@ -249,6 +250,56 @@ class ProposalsAPITests(APITestCase):
         self.assertEqual(diff_prop.pk, msg.data.pk)
         self.assertEqual("diff_proposal", msg.data.shortname)
         self.assertEqual(self.para.pk, msg.data.paragraph)
+
+    def test_patch_author_normal_user(self):
+        prop = self.ai.proposals.create(body="hello", author=self.proposer)
+        url = reverse("proposal-detail", kwargs={"pk": prop.pk})
+        self.client.force_login(self.proposer)
+        response = self.client.patch(url, data={"author": self.moderator.pk})
+        self.assertEqual(
+            response.status_code,
+            403,
+        )
+        self.assertIn(
+            "permission 'proposal.change_proposal'", response.json()["detail"]
+        )
+
+    def test_patch_author_moderator(self):
+        prop = self.ai.proposals.create(body="hello", author=self.proposer)
+        url = reverse("proposal-detail", kwargs={"pk": prop.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"author": self.moderator.pk})
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+        prop.refresh_from_db()
+        self.assertEqual(prop.author, self.moderator)
+
+    def test_patch_meeting_group_normal_user(self):
+        prop = self.ai.proposals.create(body="hello", author=self.proposer)
+        url = reverse("proposal-detail", kwargs={"pk": prop.pk})
+        self.client.force_login(self.proposer)
+        response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})
+        self.assertEqual(
+            response.status_code,
+            403,
+        )
+        self.assertIn(
+            "permission 'proposal.change_proposal'", response.json()["detail"]
+        )
+
+    def test_patch_meeting_group_moderator(self):
+        prop = self.ai.proposals.create(body="hello", author=self.proposer)
+        url = reverse("proposal-detail", kwargs={"pk": prop.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+        prop.refresh_from_db()
+        self.assertEqual(prop.meeting_group, self.meeting_group)
 
 
 class TextDocumentAPITests(APITestCase):

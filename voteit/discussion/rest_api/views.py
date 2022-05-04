@@ -11,7 +11,7 @@ from voteit.discussion.rest_api import serializers
 __all__ = ["DiscussionPostViewSet"]
 
 
-@router.register("discussion-posts")
+@router.register("discussion-posts", basename="discussion-posts")
 class DiscussionPostViewSet(DefaultModelViewSet):
     model = DiscussionPost
     queryset = DiscussionPost.objects.all()

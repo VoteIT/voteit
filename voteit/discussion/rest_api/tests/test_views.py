@@ -9,7 +9,8 @@ User = get_user_model()
 
 
 class DiscussionPostAPITests(APITestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
         from voteit.meeting.roles import (
@@ -18,20 +19,21 @@ class DiscussionPostAPITests(APITestCase):
             ROLE_DISCUSSER,
         )
 
-        self.meeting: Meeting = Meeting.objects.create(
+        cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
-        self.participant: User = User.objects.create_user("participant")
-        self.discusser: User = User.objects.create_user("discusser")
-        self.moderator: User = User.objects.create_user("moderator")
-        self.outsider: User = User.objects.create_user("outsider")
-        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
-        self.meeting.add_roles(self.discusser, ROLE_DISCUSSER)
-        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
+        cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
+        cls.participant: User = User.objects.create_user("participant")
+        cls.discusser: User = User.objects.create_user("discusser")
+        cls.moderator: User = User.objects.create_user("moderator")
+        cls.outsider: User = User.objects.create_user("outsider")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.discusser, ROLE_DISCUSSER)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.meeting_group = cls.meeting.groups.create()
 
     def test_create(self):
-        url = f"/api/discussion-posts/"
+        url = reverse("discussion-posts-list")
         data = {
             "agenda_item": self.ai.pk,
             "body": "Hello " + mk_hashtag("world"),
@@ -52,7 +54,7 @@ class DiscussionPostAPITests(APITestCase):
             )
 
     def test_create_ai_ne(self):
-        url = f"/api/discussion-posts/"
+        url = reverse("discussion-posts-list")
         data = {
             "body": "bla",
             "agenda_item": -1,
@@ -63,7 +65,7 @@ class DiscussionPostAPITests(APITestCase):
         self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
 
     def test_list(self):
-        url = f"/api/discussion-posts/"
+        url = reverse("discussion-posts-list")
         self.client.force_login(self.discusser)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
@@ -71,7 +73,7 @@ class DiscussionPostAPITests(APITestCase):
 
     def test_put_author_discusser(self):
         disc = self.ai.discussions.create(body="hello", author=self.discusser)
-        url = f"/api/discussion-posts/{disc.pk}/"
+        url = reverse("discussion-posts-detail", kwargs={"pk": disc.pk})
         data = {
             "body": "Sup?",
             "agenda_item": self.ai.pk,
@@ -85,7 +87,7 @@ class DiscussionPostAPITests(APITestCase):
 
     def test_patch_author_discusser(self):
         disc = self.ai.discussions.create(body="hello", author=self.discusser)
-        url = f"/api/discussion-posts/{disc.pk}/"
+        url = reverse("discussion-posts-detail", kwargs={"pk": disc.pk})
         data = {
             "body": "Sup?",
         }
@@ -98,7 +100,7 @@ class DiscussionPostAPITests(APITestCase):
 
     def test_patch_author_discusser_moderator_user(self):
         disc = self.ai.discussions.create(body="hello", author=self.discusser)
-        url = f"/api/discussion-posts/{disc.pk}/"
+        url = reverse("discussion-posts-detail", kwargs={"pk": disc.pk})
         data = {
             "body": "Sup?",
         }
@@ -113,7 +115,7 @@ class DiscussionPostAPITests(APITestCase):
 
     def test_delete(self):
         disc = self.ai.discussions.create(body="hello", author=self.discusser)
-        url = f"/api/discussion-posts/{disc.pk}/"
+        url = reverse("discussion-posts-detail", kwargs={"pk": disc.pk})
         self.client.force_login(self.moderator)
         response = self.client.delete(url)
         self.assertEqual(
@@ -121,3 +123,53 @@ class DiscussionPostAPITests(APITestCase):
             204,
         )
         self.assertRaises(ObjectDoesNotExist, disc.refresh_from_db)
+
+    def test_patch_author_normal_user(self):
+        disc = self.ai.discussions.create(body="hello", author=self.discusser)
+        url = reverse("discussion-posts-detail", kwargs={"pk": disc.pk})
+        self.client.force_login(self.discusser)
+        response = self.client.patch(url, data={"author": self.moderator.pk})
+        self.assertEqual(
+            response.status_code,
+            403,
+        )
+        self.assertIn(
+            "permission 'discussion.change_discussionpost'", response.json()["detail"]
+        )
+
+    def test_patch_author_moderator(self):
+        disc = self.ai.discussions.create(body="hello", author=self.discusser)
+        url = reverse("discussion-posts-detail", kwargs={"pk": disc.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"author": self.moderator.pk})
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+        disc.refresh_from_db()
+        self.assertEqual(disc.author, self.moderator)
+
+    def test_patch_meeting_group_normal_user(self):
+        disc = self.ai.discussions.create(body="hello", author=self.discusser)
+        url = reverse("discussion-posts-detail", kwargs={"pk": disc.pk})
+        self.client.force_login(self.discusser)
+        response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})
+        self.assertEqual(
+            response.status_code,
+            403,
+        )
+        self.assertIn(
+            "permission 'discussion.change_discussionpost'", response.json()["detail"]
+        )
+
+    def test_patch_meeting_group_moderator(self):
+        disc = self.ai.discussions.create(body="hello", author=self.discusser)
+        url = reverse("discussion-posts-detail", kwargs={"pk": disc.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+        disc.refresh_from_db()
+        self.assertEqual(disc.meeting_group, self.meeting_group)
