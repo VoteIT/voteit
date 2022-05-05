@@ -1,24 +1,16 @@
 from __future__ import annotations
+
 from logging import getLogger
-from typing import TYPE_CHECKING
 
 from django.dispatch import receiver
 from django.utils.translation import gettext as _
 from django_fsm import post_transition
-from django_fsm import pre_transition
-from typing import Set
 
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.abcs import ElectoralRegisterPolicy
-from voteit.poll.models import Poll
 from voteit.poll.registries import er_policy
-from voteit.poll.workflows import PollWf
-from voteit.meeting.models import Meeting
 from voteit.presence.models import PresenceCheck
 from voteit.presence.workflows import PresenceCheckWf
-
-if TYPE_CHECKING:
-    from voteit.poll.models import ElectoralRegister
 
 __all__ = ("PresenceCheckPolicy",)
 
@@ -35,7 +27,7 @@ class PresenceCheckPolicy(ElectoralRegisterPolicy):
     title = _("Closing a presence check will set a new electoral register.")
     logger = logger
 
-    def get_voters(self, presence_check=None, **kwargs) -> Set[int]:
+    def get_voters(self, presence_check=None, **kwargs) -> set[int]:
         if presence_check is None:
             # FIXME: What kind of exception here?
             raise Exception("No presence check exists")

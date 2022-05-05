@@ -1,7 +1,6 @@
 from logging import getLogger
 
 from django.utils.translation import gettext as _
-from typing import Set
 
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.abcs import ElectoralRegisterPolicy
@@ -27,7 +26,7 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
     title = _("Automatic before poll")
     logger = logger
 
-    def get_voters(self, **kwargs) -> Set[int]:
+    def get_voters(self, **kwargs) -> set[int]:
         return set(self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER))
 
     def pre_apply(self, poll: Poll, target: str):

@@ -4,7 +4,6 @@ from abc import ABC
 from abc import abstractmethod
 from logging import getLogger
 from typing import Optional
-from typing import Set
 from typing import TYPE_CHECKING
 from typing import Type
 
@@ -96,7 +95,7 @@ class ElectoralRegisterPolicy(ABC):
         ...
 
     @abstractmethod
-    def get_voters(self, **kwargs) -> Set[int]:
+    def get_voters(self, **kwargs) -> set[int]:
         """
         Return a Set with users that should (currently!) be voters according to this method.
         It doesn't mean that they are voters right now.
