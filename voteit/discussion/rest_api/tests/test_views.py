@@ -12,6 +12,7 @@ class DiscussionPostAPITests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         from voteit.meeting.models import Meeting
+        from voteit.agenda.models import AgendaItem
 
         from voteit.meeting.roles import (
             ROLE_MODERATOR,
@@ -22,7 +23,12 @@ class DiscussionPostAPITests(APITestCase):
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(
+            state="ongoing", title="Ongoing"
+        )
+        cls.post_one = cls.ai.discussions.create(body="One for open")
+        cls.ai_private: AgendaItem = cls.meeting.agenda_items.create(title="Private")
+        cls.post_two = cls.ai_private.discussions.create(body="Two for private")
         cls.participant: User = User.objects.create_user("participant")
         cls.discusser: User = User.objects.create_user("discusser")
         cls.moderator: User = User.objects.create_user("moderator")
@@ -70,6 +76,62 @@ class DiscussionPostAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json())
+
+    def test_list_with_ai(self):
+        url = reverse("discussion-posts-list")
+        self.client.force_login(self.discusser)
+        response = self.client.get(url, {"agenda_item": self.ai.pk})
+        self.assertEqual(response.status_code, 200)
+        items = response.json()
+        self.assertEqual(1, len(items))
+        data = items[0]
+        self.assertTrue(data.pop("created"))
+        self.assertEqual(
+            {
+                "agenda_item": self.ai.pk,
+                "pk": self.post_one.pk,
+                "author": None,
+                "body": "One for open",
+                "meeting_group": None,
+                "tags": [],
+            },
+            data,
+        )
+
+    def test_list_with_ai_outsider(self):
+        url = reverse("discussion-posts-list")
+        self.client.force_login(self.outsider)
+        response = self.client.get(url, {"agenda_item": self.ai.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([], response.json())
+
+    def test_list_with_private_ai(self):
+        url = reverse("discussion-posts-list")
+        self.client.force_login(self.discusser)
+        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([], response.json())
+
+    def test_list_with_private_ai_moderator(self):
+        url = reverse("discussion-posts-list")
+        self.client.force_login(self.moderator)
+        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
+        self.assertEqual(response.status_code, 200)
+        items = response.json()
+        self.assertEqual(1, len(items))
+        data = items[0]
+        self.assertTrue(data.pop("created"))
+        self.assertEqual(
+            {
+                "agenda_item": self.ai_private.pk,
+                "pk": self.post_two.pk,
+                "author": None,
+                "body": "Two for private",
+                "meeting_group": None,
+                "tags": [],
+            },
+            data,
+        )
 
     def test_put_author_discusser(self):
         disc = self.ai.discussions.create(body="hello", author=self.discusser)

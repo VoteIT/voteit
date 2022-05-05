@@ -74,6 +74,28 @@ class AgendaItemViewTestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(2, len(response.json()))
 
+    def test_list_participant(self):
+        url = reverse("agendaitem-list")
+        data = {
+            "meeting": self.meeting.pk,
+        }
+        self.client.force_login(self.participant)
+        response = self.client.get(url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(1, len(response.json()))
+
+    def test_list_anon(self):
+        url = reverse("agendaitem-list")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 401)
+
+    def test_list_outsider(self):
+        url = reverse("agendaitem-list")
+        self.client.force_login(self.outsider)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([], response.json())
+
     def test_patch_change_meeting(self):
         url = reverse("agendaitem-detail", kwargs={"pk": self.ai.pk})
         data = {

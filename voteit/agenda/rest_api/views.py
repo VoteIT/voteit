@@ -1,3 +1,5 @@
+from rest_framework.exceptions import ValidationError
+
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api import serializers
 from voteit.agenda.workflows import AgendaItemWf
@@ -17,13 +19,16 @@ class AgendaViewSet(DefaultModelViewSet):
     model = AgendaItem
 
     def get_queryset(self):
-        if self.detail == "list":
-            meeting = self.get_context(self.request)
-            if self.request.user.has_perm(meeting, MeetingPermissions.VIEW):
+        if self.action == "list":
+            try:
+                meeting = self.get_context(self.request)
+            except ValidationError:
+                meeting = None
+            if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
                 queryset = self.queryset.filter(meeting=meeting)
-                if not self.request.user.has_perm(meeting, MeetingPermissions.MODERATE):
-                    return queryset.exclude(state=AgendaItemWf.PRIVATE)
-                return queryset
+                if self.request.user.has_perm(MeetingPermissions.MODERATE, meeting):
+                    return queryset
+                return queryset.exclude(state=AgendaItemWf.PRIVATE)
             else:
                 return self.queryset.none()
         return self.queryset

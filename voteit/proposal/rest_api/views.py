@@ -1,5 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from voteit.agenda.models import AgendaItem
@@ -40,10 +41,13 @@ class ProposalViewSet(DefaultModelViewSet):
         return Response(data=data)
 
     def get_queryset(self):
-        if self.detail == "list":
+        if self.action == "list":
             # This isn't really necessary for QS since we use websockets
-            ai = self.get_context(self.request)
-            if self.request.user.has_perm(ai, AgendaPermissions.VIEW):
+            try:
+                ai = self.get_context(self.request)
+            except ValidationError:
+                ai = None
+            if ai and self.request.user.has_perm(AgendaPermissions.VIEW, ai):
                 return self.queryset.filter(agenda_item=ai)
             return self.queryset.none()
         return self.queryset
@@ -64,10 +68,13 @@ class TextDocumentViewSet(DefaultModelViewSet):
     context_lookup_kwarg = "agenda_item"
 
     def get_queryset(self):
-        if self.detail == "list":
+        if self.action == "list":
             # This isn't really necessary for QS since we use websockets
-            ai = self.get_context(self.request)
-            if self.request.user.has_perm(ai, AgendaPermissions.VIEW):
+            try:
+                ai = self.get_context(self.request)
+            except ValidationError:
+                ai = None
+            if ai and self.request.user.has_perm(AgendaPermissions.VIEW, ai):
                 return self.queryset.filter(agenda_item=ai)
             return self.queryset.none()
         return self.queryset

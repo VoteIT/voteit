@@ -32,6 +32,9 @@ class ProposalsAPITests(APITestCase):
         cls.ai: AgendaItem = cls.meeting.agenda_items.create(
             state="ongoing", title="Ongoing"
         )
+        cls.prop = cls.ai.proposals.create(body="Open")
+        cls.ai_private: AgendaItem = cls.meeting.agenda_items.create(title="Private")
+        cls.prop_private = cls.ai_private.proposals.create(body="Private")
         cls.text_doc: TextDocument = cls.ai.text_documents.create(
             body="I am the eggman\nI am the walrus"
         )
@@ -124,12 +127,33 @@ class ProposalsAPITests(APITestCase):
                 f"{user} action returned wrong response code",
             )
 
-    def test_list(self):
+    def test_list_without_ai(self):
         url = reverse("proposal-list")
-        self.client.force_login(self.proposer)
+        self.client.force_login(self.participant)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.json())
+        self.assertEqual([], response.json())
+
+    def test_list(self):
+        url = reverse("proposal-list")
+        self.client.force_login(self.participant)
+        response = self.client.get(url, {"agenda_item": self.ai.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(1, len(response.json()))
+
+    def test_list_private_ai(self):
+        url = reverse("proposal-list")
+        self.client.force_login(self.participant)
+        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([], response.json())
+
+    def test_list_private_ai_moderator(self):
+        url = reverse("proposal-list")
+        self.client.force_login(self.moderator)
+        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(1, len(response.json()))
 
     def test_put_author_proposer(self):
         prop = self.ai.proposals.create(body="hello", author=self.proposer)
@@ -315,11 +339,15 @@ class TextDocumentAPITests(APITestCase):
 
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="ongoing")
+        cls.ai_private: AgendaItem = cls.meeting.agenda_items.create()
         User = get_user_model()
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
         cls.outsider = User.objects.create(username="outsider")
         cls.text_doc: TextDocument = cls.ai.text_documents.create(body="Hello")
+        cls.private_text_doc: TextDocument = cls.ai_private.text_documents.create(
+            body="Private text"
+        )
 
     def test_create(self):
         url = reverse("text-document-list")
@@ -354,12 +382,32 @@ class TextDocumentAPITests(APITestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
 
-    def test_list(self):
+    def test_list_without_ai(self):
         url = reverse("text-document-list")
         self.client.force_login(self.participant)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        # We don't want to fetch items this way, but it's possible
+        self.assertEqual([], response.json())
+
+    def test_list(self):
+        url = reverse("text-document-list")
+        self.client.force_login(self.participant)
+        response = self.client.get(url, {"agenda_item": self.ai.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(1, len(response.json()))
+
+    def test_list_private_ai(self):
+        url = reverse("text-document-list")
+        self.client.force_login(self.participant)
+        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([], response.json())
+
+    def test_list_private_ai_moderator(self):
+        url = reverse("text-document-list")
+        self.client.force_login(self.moderator)
+        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(1, len(response.json()))
 
     def test_delete(self):

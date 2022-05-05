@@ -1,4 +1,5 @@
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.exceptions import ValidationError
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
@@ -28,9 +29,12 @@ class DiscussionPostViewSet(DefaultModelViewSet):
     context_lookup_kwarg = "agenda_item"
 
     def get_queryset(self):
-        if self.detail == "list":
-            ai = self.get_context(self.request)
-            if self.request.user.has_perm(ai, AgendaPermissions.VIEW):
+        if self.action == "list":
+            try:
+                ai = self.get_context(self.request)
+            except ValidationError:
+                ai = None
+            if ai and self.request.user.has_perm(AgendaPermissions.VIEW, ai):
                 return self.queryset.filter(agenda_item=ai)
             return self.queryset.none()
         return self.queryset
