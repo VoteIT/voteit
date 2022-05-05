@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC
+from typing import Optional
+from typing import Type
 
 from django.contrib.auth.models import AbstractUser
 from pydantic import validator
@@ -9,14 +11,18 @@ from typing import List
 
 from envelope import WS_INCOMING
 from envelope.core.message import ContextAction
+from envelope.core.message import M
 from envelope.core.message import Message
+from envelope.messages.common import Status
 from envelope.utils import get_message_type
 from envelope.utils import websocket_send
+from voteit.meeting.models import Meeting
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
+from voteit.poll.app.er_policies.manual import Manual
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
@@ -205,3 +211,25 @@ class ERVoteCount(Message):
     name = "er.vote_count"
     schema = ERVoteCountSchema
     data: ERVoteCountSchema
+
+
+class ManualCreateERSchema(BaseModel):
+    meeting: int
+
+
+@incoming
+class ManualCreateER(ContextAction):
+    name = "er.manual_create"
+    schema = ManualCreateERSchema
+    data: ManualCreateERSchema
+    model = Meeting
+    context_schema_attr = "meeting"
+    permission = ElectoralRegisterPermissions.ADD
+
+    def run_job(self) -> Status:
+        self.assert_perm()
+        manual_er = Manual(self.context)
+        manual_er.create_er()  # Only creates if needed
+        msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
+        return msg

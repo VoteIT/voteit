@@ -1,7 +1,7 @@
 from logging import getLogger
 
 from django.dispatch import receiver
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed

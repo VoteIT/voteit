@@ -311,7 +311,7 @@ class ElectoralRegisterTests(TestCase):
     def _mk_meeting_user(self, _id: int):
         from voteit.meeting.models import Meeting
         from voteit.meeting import roles
-        from voteit.poll.app.er_policies import AutoBeforePoll
+        from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
         from voteit.poll.app.polls.simple import Simple
 
         meeting = Meeting.objects.create(

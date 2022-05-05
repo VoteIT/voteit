@@ -3,7 +3,7 @@ from __future__ import annotations
 from logging import getLogger
 
 from django.dispatch import receiver
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from django_fsm import post_transition
 
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER

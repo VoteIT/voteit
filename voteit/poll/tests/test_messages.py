@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
@@ -7,6 +8,9 @@ from envelope.messages.errors import UnauthorizedError
 _channel_layers_setting = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
 }
+
+
+User = get_user_model()
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -258,3 +262,62 @@ class GetERVoteCountTests(TestCase):
     def test_get_unauthorized_user(self):
         msg = self._mk_one(self.voter_unknown)
         self.assertRaises(UnauthorizedError, msg.run_job)
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class ManualCreateERTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+
+        # from voteit.poll.models import Poll
+        # from voteit.poll.models import ElectoralRegister
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.meeting.er_policy_name = "manual"
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.meeting.add_roles(cls.participant, "potential_voter")
+        # cls.er = ElectoralRegister.objects.create()
+        # cls.voter = cls.er.voters.create(username="voter")
+        # cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="simple")
+        # cls.poll.proposals.create()
+        # cls.poll.upcoming()
+        # cls.poll.save()
+
+    def setUp(self):
+        self.meeting.refresh_from_db()
+
+    @property
+    def _cut(self):
+        from voteit.poll.messages import ManualCreateER
+
+        return ManualCreateER
+
+    def _mk_one(self, user, **kw):
+        kw.setdefault("meeting", self.meeting.pk)
+        return self._cut(
+            mm={"user_pk": user.pk, "consumer_name": "abc", "id": "1"}, **kw
+        )
+
+    def test_add_moderator(self):
+        msg = self._mk_one(self.moderator)
+        response = msg.run_job()
+        self.assertEqual(1, self.meeting.electoral_registers.count())
+        self.assertEqual(
+            ["participant"],
+            list(self.meeting.latest_er.voters.values_list("username", flat=True)),
+        )
+        self.assertEqual("1", response.mm.id)
+
+    def test_add_participant(self):
+        msg = self._mk_one(self.participant)
+        self.assertRaises(UnauthorizedError, msg.run_job)
+
+    def test_add_not_needed(self):
+        msg = self._mk_one(self.moderator)
+        msg.run_job()
+        self.assertEqual(1, self.meeting.electoral_registers.count())
+        msg.run_job()
+        self.assertEqual(1, self.meeting.electoral_registers.count())

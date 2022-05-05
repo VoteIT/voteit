@@ -21,4 +21,5 @@ class VotePermissions(ModelPermissions):
 
 class ElectoralRegisterPermissions(ModelPermissions):
     model = "electoral_register"
+    ADD = P("poll.add_electoralregister", context="meeting")
     VIEW = P("poll.view_electoralregister")

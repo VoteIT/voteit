@@ -372,17 +372,21 @@ class VoteRulesTests(TestCase):
 
 
 class ElectoralRegisterTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.poll.permissions import ElectoralRegisterPermissions
 
-        self.meeting = Meeting.objects.create()
-        self.er = self.meeting.electoral_registers.create()
-        self.participant = User.objects.create(username="participant")
-        self.outsider = User.objects.create(username="outsider")
-        self.anon = AnonymousUser()
-        self.meeting.add_roles(self.participant, "participant")
-        self.VIEW_PERM = ElectoralRegisterPermissions.VIEW
+        cls.meeting = Meeting.objects.create()
+        cls.er = cls.meeting.electoral_registers.create()
+        cls.participant = User.objects.create(username="participant")
+        cls.outsider = User.objects.create(username="outsider")
+        cls.moderator = User.objects.create(username="moderator")
+        cls.anon = AnonymousUser()
+        cls.meeting.add_roles(cls.participant, "participant")
+        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.VIEW_PERM = ElectoralRegisterPermissions.VIEW
+        cls.ADD_PERM = ElectoralRegisterPermissions.ADD
 
     def test_view_normal_meeting(self):
         self.assertTrue(self.participant.has_perm(self.VIEW_PERM, self.er))
@@ -402,3 +406,17 @@ class ElectoralRegisterTests(TestCase):
         self.assertFalse(self.participant.has_perm(self.VIEW_PERM, self.er))
         self.assertFalse(self.outsider.has_perm(self.VIEW_PERM, self.er))
         self.assertFalse(self.anon.has_perm(self.VIEW_PERM, self.er))
+
+    def test_add(self):
+        self.assertFalse(self.participant.has_perm(self.ADD_PERM, self.meeting))
+        self.assertFalse(self.outsider.has_perm(self.ADD_PERM, self.meeting))
+        self.assertFalse(self.anon.has_perm(self.ADD_PERM, self.meeting))
+        self.assertTrue(self.moderator.has_perm(self.ADD_PERM, self.meeting))
+
+    def test_add_archived_meeting(self):
+        self.meeting.archive()
+        self.meeting.save()
+        self.assertFalse(self.participant.has_perm(self.ADD_PERM, self.meeting))
+        self.assertFalse(self.outsider.has_perm(self.ADD_PERM, self.meeting))
+        self.assertFalse(self.anon.has_perm(self.ADD_PERM, self.meeting))
+        self.assertFalse(self.moderator.has_perm(self.ADD_PERM, self.meeting))

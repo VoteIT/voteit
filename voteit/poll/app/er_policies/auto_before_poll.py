@@ -1,6 +1,6 @@
 from logging import getLogger
 
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.abcs import ElectoralRegisterPolicy
