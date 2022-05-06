@@ -16,8 +16,10 @@ from pydantic.main import BaseModel
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.fields import JSONField
-from voteit.core.rest_api.utils import get_identity_data
 
+from voteit.core.abcs import MeetingContext
+from voteit.core.rest_api.utils import get_identity_data
+from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
 from voteit.core.validators import valid_userid
@@ -43,6 +45,43 @@ class BaseModelSerializer(serializers.ModelSerializer):
     def get_request_user(self) -> Optional[AbstractUser]:
         # Validate user?
         return self.context["request"].user
+
+    def validate_author(self, value):
+        """
+        Validation caveats here:
+
+        - Create will throw away user since we _force_ current user. So we don't need to validate in that case.
+        - Validation won't work outside of meeting context.
+        """
+        if value is None:
+            return value
+        if self.instance:
+            if isinstance(self.instance, MeetingContext):
+                User = get_user_model()
+                if not isinstance(value, User):
+                    raise ValidationError("Wrong type")
+                if value not in self.instance.meeting.participants.all():
+                    raise ValidationError("User doesn't exist")
+                return value
+            raise ValidationError("Object is not a meeting context")
+
+    def validate_meeting_group(self, value):
+        from voteit.meeting.models import MeetingGroup
+
+        # if value is None:
+        #    return value
+        if self.instance:
+            # An operation on an existing object
+            assert isinstance(self.instance, MeetingContext)
+            assert isinstance(value, MeetingGroup)
+            if value in self.instance.meeting.groups.all():
+                return value
+        else:
+            # Tricky part, validate add
+            meeting = meeting_from_unsafe_data(self)
+            if value in meeting.groups.all():
+                return value
+        raise ValidationError("Meeting group doesn't exist")
 
 
 class OptionalHyperlinkedIdentityField(serializers.HyperlinkedIdentityField):

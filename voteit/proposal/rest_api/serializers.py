@@ -99,7 +99,7 @@ class GenericProposalSerializer(serializers.Serializer):
         return serializer(instance, *args, **kwargs)
 
 
-class ProposalDetailSerializer(RichTextSerializerMixin, serializers.ModelSerializer):
+class ProposalDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
     shortname = serializers.SerializerMethodField()
 
     class Meta:

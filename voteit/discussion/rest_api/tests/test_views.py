@@ -175,6 +175,21 @@ class DiscussionPostAPITests(APITestCase):
         disc.refresh_from_db(fields=("body",))
         self.assertEqual("Sup?", disc.body)
 
+    def test_create_meeting_group_not_in_meeting(self):
+        from voteit.meeting.models import Meeting
+
+        meeting = Meeting.objects.create()
+        ai = meeting.agenda_items.create()
+        disc = ai.discussions.create(body="I'm from another meeting")
+        meeting.add_roles(self.moderator, "moderator")
+        url = reverse("discussion-posts-detail", kwargs={"pk": disc.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})
+        self.assertEqual(
+            response.status_code,
+            400,
+        )
+
     def test_delete(self):
         disc = self.ai.discussions.create(body="hello", author=self.discusser)
         url = reverse("discussion-posts-detail", kwargs={"pk": disc.pk})

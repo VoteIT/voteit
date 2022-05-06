@@ -6,6 +6,7 @@ from typing import Dict
 from typing import Generator
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.exceptions import ValidationError
 
 from voteit.core.permissions import NOT_ALLOWED
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from voteit.core.models import User
     from voteit.organisation.models import OAuth2Provider
     from voteit.organisation.models import Organisation
+    from voteit.meeting.models import Meeting
     from django_fsm import Transition
 
 
@@ -69,3 +71,59 @@ def get_valid_transitions(
             # Is this a hidden transition?
             if valid_transition.permission != NOT_ALLOWED:
                 yield valid_transition
+
+
+def _pos_int_or_validation_error(value) -> int:
+    """
+    >>> _pos_int_or_validation_error("1")
+    1
+    >>> _pos_int_or_validation_error("0")
+    Traceback (most recent call last):
+    ...
+    rest_framework.exceptions.ValidationError:
+    >>> _pos_int_or_validation_error("-1")
+    Traceback (most recent call last):
+    ...
+    rest_framework.exceptions.ValidationError:
+    >>> _pos_int_or_validation_error("a")
+    Traceback (most recent call last):
+    ...
+    rest_framework.exceptions.ValidationError:
+    """
+    try:
+        value = int(value)
+    except (ValueError, TypeError):
+        raise ValidationError("Invalid")
+    if value > 0:
+        return value
+    raise ValidationError("Invalid")
+
+
+def meeting_from_unsafe_data(serializer) -> Meeting:
+    """
+    This method should only be used directly by a serializer validation method
+    """
+    # Via agenda_item
+    ai_query_val = serializer.initial_data.get("agenda_item", None)
+    if ai_query_val:
+        ai_query_val = _pos_int_or_validation_error(ai_query_val)
+        from voteit.agenda.models import AgendaItem
+
+        try:
+            ai = AgendaItem.objects.get(pk=ai_query_val)
+            if ai.meeting:
+                return ai.meeting
+        except ObjectDoesNotExist:
+            pass
+    # Via meeting
+    meeting_query_val = serializer.initial_data.get("meeting", None)
+    if meeting_query_val:
+        meeting_query_val = _pos_int_or_validation_error(meeting_query_val)
+        from voteit.meeting.models import Meeting
+
+        try:
+            return Meeting.objects.get(pk=meeting_query_val)
+        except ObjectDoesNotExist:
+            pass
+    # Fail
+    raise ValidationError("Can't find meeting")

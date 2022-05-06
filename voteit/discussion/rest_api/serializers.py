@@ -13,9 +13,7 @@ from voteit.discussion import models
 __all__ = ("DiscussionPostDetailSerializer", "DiscussionPostCreateSerializer")
 
 
-class DiscussionPostDetailSerializer(
-    RichTextSerializerMixin, serializers.ModelSerializer
-):
+class DiscussionPostDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
     # Note: This won't have access to the request, so no url thingies here!
     class Meta:
         model = models.DiscussionPost

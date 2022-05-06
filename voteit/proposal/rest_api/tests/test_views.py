@@ -300,6 +300,51 @@ class ProposalsAPITests(APITestCase):
         prop.refresh_from_db()
         self.assertEqual(prop.author, self.moderator)
 
+    def test_patch_author_not_in_meeting(self):
+        from voteit.meeting.models import Meeting
+
+        meeting = Meeting.objects.create()
+        ai = meeting.agenda_items.create()
+        prop = ai.proposals.create(body="I'm from another meeting")
+        meeting.add_roles(self.moderator, "moderator")
+        url = reverse("proposal-detail", kwargs={"pk": prop.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"author": self.proposer.pk})
+        self.assertEqual(
+            response.status_code,
+            400,
+        )
+
+    def test_patch_meeting_group_not_in_meeting(self):
+        from voteit.meeting.models import Meeting
+
+        meeting = Meeting.objects.create()
+        ai = meeting.agenda_items.create()
+        prop = ai.proposals.create(body="I'm from another meeting")
+        meeting.add_roles(self.moderator, "moderator")
+        url = reverse("proposal-detail", kwargs={"pk": prop.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})
+        self.assertEqual(
+            response.status_code,
+            400,
+        )
+
+    def test_create_meeting_group_not_in_meeting(self):
+        from voteit.meeting.models import Meeting
+
+        meeting = Meeting.objects.create()
+        ai = meeting.agenda_items.create()
+        prop = ai.proposals.create(body="I'm from another meeting")
+        meeting.add_roles(self.moderator, "moderator")
+        url = reverse("proposal-detail", kwargs={"pk": prop.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})
+        self.assertEqual(
+            response.status_code,
+            400,
+        )
+
     def test_patch_meeting_group_normal_user(self):
         prop = self.ai.proposals.create(body="hello", author=self.proposer)
         url = reverse("proposal-detail", kwargs={"pk": prop.pk})
