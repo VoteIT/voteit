@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.test import override_settings
 
 from envelope.messages.errors import UnauthorizedError
-
+from envelope.messages.errors import ValidationErrorMsg
 
 _channel_layers_setting = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
@@ -272,19 +272,11 @@ class ManualCreateERTests(TestCase):
     def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
-        # from voteit.poll.models import Poll
-        # from voteit.poll.models import ElectoralRegister
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.meeting.er_policy_name = "manual"
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
         cls.meeting.add_roles(cls.participant, "potential_voter")
-        # cls.er = ElectoralRegister.objects.create()
-        # cls.voter = cls.er.voters.create(username="voter")
-        # cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="simple")
-        # cls.poll.proposals.create()
-        # cls.poll.upcoming()
-        # cls.poll.save()
 
     def setUp(self):
         self.meeting.refresh_from_db()
@@ -321,3 +313,19 @@ class ManualCreateERTests(TestCase):
         self.assertEqual(1, self.meeting.electoral_registers.count())
         msg.run_job()
         self.assertEqual(1, self.meeting.electoral_registers.count())
+
+    def test_add_with_weight(self):
+        msg = self._mk_one(
+            self.moderator, weights=[{"user": self.participant.pk, "weight": 5}]
+        )
+        msg.run_job()
+        self.assertEqual({2: 5}, self.meeting.latest_er.weight_dict)
+
+    def test_add_with_weight_bad_user(self):
+        msg = self._mk_one(self.moderator, weights=[{"user": 0, "weight": 1}])
+        self.assertRaises(ValidationErrorMsg, msg.run_job)
+
+    def test_add_without_specification(self):
+        msg = self._mk_one(self.moderator)
+        msg.run_job()
+        self.assertEqual({2: 1}, self.meeting.latest_er.weight_dict)

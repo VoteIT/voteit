@@ -101,12 +101,18 @@ class ElectoralRegister(MeetingContext):
         # FIXME: Is this the correct method? :)
         return self.voterweight_set.aggregate(Sum("weight"))["weight__sum"]
 
+    def get_weight_dict(self) -> dict[int, int]:
+        """
+        Uncached version
+        """
+        return dict(self.voterweight_set.values_list("user_id", "weight"))
+
     @cached_property
     def weight_dict(self) -> dict[int, int]:
         """
         Return a dict with user PK as key and weight as value.
         """
-        return dict(self.voterweight_set.values_list("user_id", "weight"))
+        return self.get_weight_dict()
 
     def set_voters_from_dict(self, values: dict[int, int]):
         """

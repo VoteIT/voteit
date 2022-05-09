@@ -20,9 +20,13 @@ class Manual(ElectoralRegisterPolicy):
     name = "manual"
     title = _("Manual only")
     logger = logger
-    handles_vote_weight = False
+    handles_vote_weight = True
 
-    def get_voters(self, **kwargs) -> dict[int, int]:
+    def get_voters(self, *, weight_dict: dict[int, int], **kwargs) -> dict[int, int]:
+        """
+        :param weight_dict: user_pk as key and weight as value, or simply skip it for 1
+        """
         return dict(
-            (x, 1) for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
+            (x, weight_dict.get(x, 1))
+            for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
         )

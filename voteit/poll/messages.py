@@ -8,15 +8,17 @@ from django.contrib.auth.models import AbstractUser
 from pydantic import validator
 from pydantic.main import BaseModel
 from typing import List
-
+from django.utils.translation import gettext as _
 from envelope import WS_INCOMING
 from envelope.core.message import ContextAction
 from envelope.core.message import M
 from envelope.core.message import Message
 from envelope.messages.common import Status
+from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import get_message_type
 from envelope.utils import websocket_send
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.messaging.base import BaseObjectAdded
@@ -176,9 +178,7 @@ class GetERVoteCount(ContextAction):
     def run_job(self) -> ERVoteCount:
         self.assert_perm()
         er = self.context
-        weights = [
-            {"user": x.user, "weight": x.weight} for x in er.voterweight_set.all()
-        ]
+        weights = [{"user": k, "weight": v} for k, v in er.weight_dict.items()]
         msg = ERVoteCount.from_message(
             self,
             total=er.get_total_vote_weight(),
@@ -213,12 +213,44 @@ class ERVoteCount(Message):
     data: ERVoteCountSchema
 
 
+class VoterWeightSchema(BaseModel):
+    user: int
+    weight: int
+
+    @validator("weight")
+    def validate_weight(cls, v):
+        """
+        Always a positive int
+
+        >>> VoterWeightSchema.validate_weight(2)
+        2
+        >>> VoterWeightSchema.validate_weight(1)
+        1
+        >>> VoterWeightSchema.validate_weight(0)
+        Traceback (most recent call last):
+        ...
+        ValueError: Must be positive int
+        """
+        if v > 0:
+            return v
+        raise ValueError("Must be positive int")
+
+
 class ManualCreateERSchema(BaseModel):
     meeting: int
+    weights: list[VoterWeightSchema] = ()
 
 
 @incoming
 class ManualCreateER(ContextAction):
+    """
+    Manually create an electoral register based on voter weight.
+    This can be used regardless of the meetings electoral register setting, but with a stern warning
+    that another policy may overwrite this at any moment.
+
+    Only users with potential_voter role will be considered.
+    """
+
     name = "er.manual_create"
     schema = ManualCreateERSchema
     data: ManualCreateERSchema
@@ -228,8 +260,23 @@ class ManualCreateER(ContextAction):
 
     def run_job(self) -> Status:
         self.assert_perm()
+        # Check that each of the users is a potential voter
+        potential_voters = set(
+            self.context.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
+        )
+        missing_potential_voters = set(
+            x.user for x in self.data.weights if x.user not in potential_voters
+        )
+        if missing_potential_voters:
+            # FIXME: Error dict with pos as int
+            raise ValidationErrorMsg.from_message(
+                self,
+                msg=f"Got the following invalid potential voters (User PKs): {', '.join([str(x) for x in sorted(missing_potential_voters)])}",
+                errors=[],
+            )
+        weight_dict = dict((wv.user, wv.weight) for wv in self.data.weights)
         manual_er = Manual(self.context)
-        manual_er.create_er()  # Only creates if needed
+        manual_er.create_er(weight_dict=weight_dict)  # Only creates if needed
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
         return msg
