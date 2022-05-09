@@ -306,32 +306,6 @@ class VoteRulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(ADD, self.poll))
         self.assertFalse(self.anon.has_perm(ADD, self.poll))
 
-    # We don't need to test change for upcoming, no votes should exist :)
-    def test_change_ongoing(self):
-        self.poll.state = self.PollWf.ONGOING
-        self.poll.save()
-        self.assertEqual("ongoing", self.poll.state)
-        CHANGE = self.p("CHANGE")
-        self.assertFalse(self.anon_user.has_perm(CHANGE, self.vote))
-        self.assertFalse(self.participant_user.has_perm(CHANGE, self.vote))
-        self.assertFalse(self.voter_user.has_perm(CHANGE, self.vote))
-        self.assertTrue(self.voted_user.has_perm(CHANGE, self.vote))
-        self.assertFalse(self.moderator.has_perm(CHANGE, self.vote))
-        self.assertFalse(self.anon.has_perm(CHANGE, self.vote))
-
-    def test_change_closed(self):
-        self.poll.state = self.PollWf.ONGOING
-        self.poll.close()
-        self.poll.save()
-        self.assertEqual("finished", self.poll.state)
-        CHANGE = self.p("CHANGE")
-        self.assertFalse(self.anon_user.has_perm(CHANGE, self.vote))
-        self.assertFalse(self.participant_user.has_perm(CHANGE, self.vote))
-        self.assertFalse(self.voter_user.has_perm(CHANGE, self.vote))
-        self.assertFalse(self.voted_user.has_perm(CHANGE, self.vote))
-        self.assertFalse(self.moderator.has_perm(CHANGE, self.vote))
-        self.assertFalse(self.anon.has_perm(CHANGE, self.vote))
-
     def test_delete_ongoing(self):
         self.poll.state = self.PollWf.ONGOING
         self.poll.save()

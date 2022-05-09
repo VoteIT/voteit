@@ -12,10 +12,8 @@ from voteit.poll.app.polls.scottish_stv import ScottishSTV
 from voteit.poll.app.polls.scottish_stv import STVResultSchema
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote
-from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import AddRankedVoteSchema
-from voteit.poll.schemas import ExistingRankedVoteSchema
 
 __all__ = ("IRV",)
 
@@ -55,13 +53,6 @@ class AddIRVVote(AddVote):
     name = "irv_vote.add"
     schema = AddRankedVoteSchema
     data: AddRankedVoteSchema
-
-
-@incoming
-class ChangeIRVVote(ChangeVote):
-    name = "irv_vote.change"
-    schema = ExistingRankedVoteSchema
-    data: ExistingRankedVoteSchema
 
 
 class IRVSettings(BaseModel):

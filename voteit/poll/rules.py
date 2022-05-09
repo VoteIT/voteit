@@ -105,7 +105,6 @@ def vote_is_poll_ongoing(user: AbstractUser, vote: Vote):
 
 # Vote
 rules.add_perm(VotePermissions.ADD, is_poll_ongoing & is_voter)  # Checked against poll.
-rules.add_perm(VotePermissions.CHANGE, is_vote_owner & vote_is_poll_ongoing)
 rules.add_perm(VotePermissions.DELETE, is_vote_owner & vote_is_poll_ongoing)
 rules.add_perm(VotePermissions.VIEW, is_vote_owner)
 

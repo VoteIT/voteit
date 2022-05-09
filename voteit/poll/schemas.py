@@ -12,10 +12,6 @@ class GenericAddVoteSchema(_GenericVoteSchema):
     poll: int  # Poll pk for votes
 
 
-class GenericExistingVoteSchema(_GenericVoteSchema):
-    pk: int  # Vote pk
-
-
 class AddedVoteSchema(_GenericVoteSchema):
     pk: int
     poll: int
@@ -24,7 +20,9 @@ class AddedVoteSchema(_GenericVoteSchema):
 class PollResult(BaseModel):
     approved: List[int] = []
     denied: List[int] = []
-    vote_count: Optional[int]   # Optional, so that it can be populated after method calculation
+    vote_count: Optional[
+        int
+    ]  # Optional, so that it can be populated after method calculation
 
 
 class RankingSchema(BaseModel):
@@ -32,8 +30,4 @@ class RankingSchema(BaseModel):
 
 
 class AddRankedVoteSchema(GenericAddVoteSchema):
-    vote: RankingSchema
-
-
-class ExistingRankedVoteSchema(GenericExistingVoteSchema):
     vote: RankingSchema

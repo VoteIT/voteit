@@ -14,10 +14,8 @@ from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote
-from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import AddRankedVoteSchema
-from voteit.poll.schemas import ExistingRankedVoteSchema
 from voteit.poll.schemas import PollResult
 from voteit.poll.schemas import RankingSchema
 
@@ -44,13 +42,6 @@ class AddSTVVote(AddVote):
     name = "scottish_stv_vote.add"
     schema = AddRankedVoteSchema
     data: AddRankedVoteSchema
-
-
-@incoming
-class ChangeSTVVote(ChangeVote):
-    name = "scottish_stv_vote.change"
-    schema = ExistingRankedVoteSchema
-    data: ExistingRankedVoteSchema
 
 
 class STVResultRoundSchema(BaseModel):
@@ -149,7 +140,7 @@ class ScottishSTV(PollMethod):
             )
         return self.result_schema(**result_dict)
 
-    def validate_vote(self, msg: Union[AddSTVVote, ChangeSTVVote]) -> None:
+    def validate_vote(self, msg: AddSTVVote) -> None:
         matched_pks = set(
             self.poll.proposals.filter(pk__in=msg.data.vote.ranking).values_list(
                 "pk", flat=True

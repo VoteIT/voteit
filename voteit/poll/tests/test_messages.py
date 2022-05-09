@@ -65,17 +65,11 @@ class AddVoteTests(TestCase):
         self.assertRaises(UnauthorizedError, msg.run_job)
 
     def test_add_vote_exists(self):
-        from voteit.poll.messages import ChangeVote
-
-        # from voteit.poll.app.polls import simple
-
         self.poll.ongoing()
         self.poll.save()
         self.vote = self.poll.votes.create(user=self.voter, vote_data="no")
         msg = self._mk_one()
         response = msg.run_job()
-        self.assertIsInstance(response, ChangeVote)
-        response.run_job()
         vote = self.poll.votes.filter(user=self.voter).first()
         self.assertEqual("yes", vote.vote_data)
 
@@ -148,13 +142,13 @@ class ChangeVoteTests(TestCase):
 
     @property
     def _cut(self):
-        from voteit.poll.app.polls.simple import ChangeSimpleVote
+        from voteit.poll.app.polls.simple import AddSimpleVote
 
-        return ChangeSimpleVote
+        return AddSimpleVote
 
     def _mk_one(self, **kw):
         kw.setdefault("vote", {"choice": "no"})
-        kw.setdefault("pk", self.vote.pk)
+        kw.setdefault("poll", self.poll.pk)
         return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_change(self):
@@ -168,8 +162,6 @@ class ChangeVoteTests(TestCase):
         self.poll.save()
         msg = self._mk_one()
         self.assertRaises(UnauthorizedError, msg.run_job)
-
-    # FIXME: Write a change test where we actually listen to the websocket
 
 
 #

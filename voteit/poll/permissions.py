@@ -14,7 +14,6 @@ class PollPermissions(ModelPermissions):
 class VotePermissions(ModelPermissions):
     model = "vote"
     ADD = P("poll.add_vote", context="poll")
-    CHANGE = P("poll.change_vote")
     DELETE = P("poll.delete_vote")
     VIEW = P("poll.view_vote")
 

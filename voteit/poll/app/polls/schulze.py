@@ -18,10 +18,8 @@ from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote
-from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import GenericAddVoteSchema
-from voteit.poll.schemas import GenericExistingVoteSchema
 from voteit.poll.schemas import PollResult
 
 __all__ = ("Schulze", "RepeatedSchulze")
@@ -43,29 +41,11 @@ class AddSchulzeVote(AddVote):
     data: AddVoteSchema
 
 
-class ExistingVoteSchema(GenericExistingVoteSchema):
-    vote: SchulzeVoteSchema
-
-
-@incoming
-class ChangeSchulzeVote(ChangeVote):
-    name = "schulze_vote.change"
-    schema = ExistingVoteSchema
-    data: ExistingVoteSchema
-
-
 @incoming
 class AddRepeatedSchulzeVote(AddVote):
     name = "repeated_schulze_vote.add"
     schema = AddVoteSchema
     data: AddVoteSchema
-
-
-@incoming
-class ChangeRepeatedSchulzeVote(ChangeVote):
-    name = "repeated_schulze_vote.change"
-    schema = ExistingVoteSchema
-    data: ExistingVoteSchema
 
 
 class SchulzePollResult(PollResult):
@@ -183,7 +163,7 @@ class Schulze(PollMethod):
             res.denied.extend([x for x in res.candidates if x and x != res.winner])
         return res
 
-    def validate_vote(self, msg: Union[AddSchulzeVote, ChangeSchulzeVote]) -> None:
+    def validate_vote(self, msg: AddSchulzeVote) -> None:
         ranked_pks = [x[0] for x in msg.data.vote.ranking]
         matched_pks = set(
             self.poll.proposals.filter(pk__in=ranked_pks).values_list("pk", flat=True)

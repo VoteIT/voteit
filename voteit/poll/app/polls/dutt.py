@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from collections import Counter
 from typing import List
-from typing import Union
 
 from pydantic import BaseModel
 from django.utils.translation import gettext as _
@@ -15,10 +14,8 @@ from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote
-from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import GenericAddVoteSchema
-from voteit.poll.schemas import GenericExistingVoteSchema
 from voteit.poll.schemas import PollResult
 
 
@@ -82,17 +79,6 @@ class AddDuttVote(AddVote):
     data: AddVoteSchema
 
 
-class ExistingVoteSchema(GenericExistingVoteSchema):
-    vote: DuttVoteSchema
-
-
-@incoming
-class ChangeDuttVote(ChangeVote):
-    name = "dutt_vote.change"
-    schema = ExistingVoteSchema
-    data: ExistingVoteSchema
-
-
 @poll_methods
 class Dutt(PollMethod):
     title = "Dutt"
@@ -153,7 +139,7 @@ class Dutt(PollMethod):
             results.append(DuttScore(proposal=prop, votes=votes))
         return self.result_schema(results=results)
 
-    def validate_vote(self, msg: Union[AddDuttVote, ChangeDuttVote]) -> None:
+    def validate_vote(self, msg: AddDuttVote) -> None:
         picked_count = len(msg.data.vote.choices)
         settings: DuttSettingsSchema = self.poll.settings
         if settings.min and settings.min > picked_count:

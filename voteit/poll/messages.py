@@ -1,30 +1,24 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import Optional
-from typing import Type
+from typing import List
 
 from django.contrib.auth.models import AbstractUser
 from pydantic import validator
 from pydantic.main import BaseModel
-from typing import List
-from django.utils.translation import gettext as _
-from envelope import WS_INCOMING
 from envelope.core.message import ContextAction
-from envelope.core.message import M
 from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.messages.errors import ValidationErrorMsg
-from envelope.utils import get_message_type
-from envelope.utils import internal_send
 from envelope.utils import websocket_send
+
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-from voteit.messaging.decorators import incoming
-from voteit.messaging.decorators import outgoing
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
+from voteit.messaging.decorators import incoming
+from voteit.messaging.decorators import outgoing
 from voteit.poll.app.er_policies.manual import Manual
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
@@ -68,7 +62,10 @@ class VoteBase(ContextAction, ABC):
 
 
 class AddVote(VoteBase, ABC):
-    """The base class for adding votes."""
+    """
+    The base class for adding votes.
+    There's no change vote, so this updates an existing vote if it exists.
+    """
 
     permission = VotePermissions.ADD
     model = Poll
@@ -79,25 +76,19 @@ class AddVote(VoteBase, ABC):
         self.assert_perm()
         poll = self.context
         poll.method.validate_vote(self)
-        existing_vote = poll.votes.filter(user=self.user).first()
-        if existing_vote is not None:
-            # Vote already exists - no need to error we can simply change it instead?
-            # A bit hackish, lets guess the change name
-            base_name = self.name.split(".")[0]
-            type_name = f"{base_name}.change"
-            change_vote_type = get_message_type(type_name, WS_INCOMING)
-            assert issubclass(change_vote_type, ChangeVote)
-            msg = change_vote_type.from_message(
-                self, vote=self.data.vote, pk=existing_vote.pk
-            )
-            internal_send(msg)
-            return msg
-        else:
+        vote = poll.votes.filter(user=self.user).first()
+        if vote is None:
             vote = poll.votes.create(user=self.user, vote=self.data.vote)
-            serializer = VoteSerializer(vote)
-            msg = GenericVoteResponse.from_message(self, **serializer.data)
-            websocket_send(msg, state=msg.SUCCESS)
-            return msg
+        else:
+            # Vote already exists - we'll change the existing one instead
+            vote.vote = self.data.vote
+            vote.abstain = False
+            vote.save()
+
+        serializer = VoteSerializer(vote)
+        msg = GenericVoteResponse.from_message(self, **serializer.data)
+        websocket_send(msg, state=msg.SUCCESS)
+        return msg
 
 
 class AbstainSchema(BaseModel):
@@ -126,28 +117,6 @@ class AbstainVote(VoteBase):
             vote.abstain = True
             vote.save()
         serializer = VoteSerializer(vote)
-        msg = GenericVoteResponse.from_message(self, **serializer.data)
-        websocket_send(msg, state=msg.SUCCESS)
-        return msg
-
-
-class ChangeVote(VoteBase, ABC):
-    """Update a users vote. Subclass this and register as an incoming
-    message for each poll method, with a proper vote schema.
-    """
-
-    context: Vote
-    permission = VotePermissions.CHANGE
-    model = Vote
-
-    def run_job(self):
-        self.assert_perm()
-        poll: Poll = self.context.poll
-        poll.method.validate_vote(self)
-        self.context.vote = self.data.vote
-        self.context.abstain = False
-        self.context.save()
-        serializer = VoteSerializer(self.context)
         msg = GenericVoteResponse.from_message(self, **serializer.data)
         websocket_send(msg, state=msg.SUCCESS)
         return msg

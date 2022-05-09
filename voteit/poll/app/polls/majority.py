@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections import Counter
 from typing import List
-from typing import Union
 
 from django.utils.translation import gettext as _
 from pydantic import BaseModel
@@ -13,10 +12,8 @@ from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote
-from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import GenericAddVoteSchema
-from voteit.poll.schemas import GenericExistingVoteSchema
 from voteit.poll.schemas import PollResult
 
 __all__ = ("Majority",)
@@ -45,22 +42,11 @@ class AddVoteSchema(GenericAddVoteSchema):
     vote: MajorityVoteSchema
 
 
-class ExistingVoteSchema(GenericExistingVoteSchema):
-    vote: MajorityVoteSchema
-
-
 @incoming
 class AddMajorityVote(AddVote):
     name = "majority_vote.add"
     schema = AddVoteSchema
     data: AddVoteSchema
-
-
-@incoming
-class ChangeMajorityVote(ChangeVote):
-    name = "majority_vote.change"
-    schema = ExistingVoteSchema
-    data: ExistingVoteSchema
 
 
 class ProposalResult(BaseModel):
@@ -138,7 +124,7 @@ class Majority(PollMethod):
         if self.poll.proposals.count() < 2:
             raise InvalidProposalCount(_("Must ge at least 2 proposals"))
 
-    def validate_vote(self, msg: Union[AddMajorityVote, ChangeMajorityVote]) -> None:
+    def validate_vote(self, msg: AddMajorityVote) -> None:
         if not self.poll.proposals.filter(pk=msg.data.vote.choice).exists():
             raise ValidationErrorMsg.from_message(
                 msg,

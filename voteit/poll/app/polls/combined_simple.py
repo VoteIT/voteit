@@ -13,10 +13,8 @@ from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote
-from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import GenericAddVoteSchema
-from voteit.poll.schemas import GenericExistingVoteSchema
 from voteit.poll.schemas import PollResult
 
 __all__ = ("CombinedSimple",)
@@ -42,22 +40,11 @@ class AddVoteSchema(GenericAddVoteSchema):
     vote: CombinedSimpleVoteSchema
 
 
-class ExistingVoteSchema(GenericExistingVoteSchema):
-    vote: CombinedSimpleVoteSchema
-
-
 @incoming
 class AddSimpleVote(AddVote):
     name = "combined_simple_vote.add"
     schema = AddVoteSchema
     data: AddVoteSchema
-
-
-@incoming
-class ChangeSimpleVote(ChangeVote):
-    name = "combined_simple_vote.change"
-    schema = ExistingVoteSchema
-    data: ExistingVoteSchema
 
 
 class ProposalResult(BaseModel):

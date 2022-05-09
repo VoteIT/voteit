@@ -10,10 +10,8 @@ from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote
-from voteit.poll.messages import ChangeVote
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import GenericAddVoteSchema
-from voteit.poll.schemas import GenericExistingVoteSchema
 from voteit.poll.schemas import PollResult
 
 __all__ = ("Simple",)
@@ -38,22 +36,11 @@ class AddVoteSchema(GenericAddVoteSchema):
     vote: SimpleVoteSchema
 
 
-class ExistingVoteSchema(GenericExistingVoteSchema):
-    vote: SimpleVoteSchema
-
-
 @incoming
 class AddSimpleVote(AddVote):
     name = "simple_vote.add"
     schema = AddVoteSchema
     data: AddVoteSchema
-
-
-@incoming
-class ChangeSimpleVote(ChangeVote):
-    name = "simple_vote.change"
-    schema = ExistingVoteSchema
-    data: ExistingVoteSchema
 
 
 class SimplePollResult(PollResult):
