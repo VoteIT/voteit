@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+from pydantic import ValidationError
 
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
@@ -329,3 +330,13 @@ class ManualCreateERTests(TestCase):
         msg = self._mk_one(self.moderator)
         msg.run_job()
         self.assertEqual({2: 1}, self.meeting.latest_er.weight_dict)
+
+    def test_add_with_duplicate(self):
+        msg = self._mk_one(
+            self.moderator,
+            weights=[
+                {"user": self.participant.pk, "weight": 5},
+                {"user": self.participant.pk, "weight": 3},
+            ],
+        )
+        self.assertRaises(ValidationError, msg.run_job)

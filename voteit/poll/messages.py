@@ -240,6 +240,23 @@ class ManualCreateERSchema(BaseModel):
     meeting: int
     weights: list[VoterWeightSchema] = ()
 
+    @validator("weights")
+    def validate_weights(cls, v):
+        """
+        >>> ManualCreateERSchema(meeting=1, weights=[{'user': 1, 'weight': 1}])
+        ManualCreateERSchema(meeting=1, weights=[VoterWeightSchema(user=1, weight=1)])
+        >>> ManualCreateERSchema(meeting=1, weights=[{'user': 1, 'weight': 1}, {'user': 1, 'weight': 1}])
+        Traceback (most recent call last):
+        ...
+        pydantic.error_wrappers.ValidationError: 1 validation error for ManualCreateERSchema
+        """
+        found = set()
+        for vw in v:
+            if vw.user in found:
+                raise ValueError(f"Duplicate user entry: {vw.user}")
+            found.add(vw.user)
+        return v
+
 
 @incoming
 class ManualCreateER(ContextAction):
