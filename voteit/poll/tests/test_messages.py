@@ -169,6 +169,8 @@ class ChangeVoteTests(TestCase):
         msg = self._mk_one()
         self.assertRaises(UnauthorizedError, msg.run_job)
 
+    # FIXME: Write a change test where we actually listen to the websocket
+
 
 #
 # @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

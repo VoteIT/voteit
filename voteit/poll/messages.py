@@ -16,6 +16,7 @@ from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import get_message_type
+from envelope.utils import internal_send
 from envelope.utils import websocket_send
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
@@ -89,7 +90,7 @@ class AddVote(VoteBase, ABC):
             msg = change_vote_type.from_message(
                 self, vote=self.data.vote, pk=existing_vote.pk
             )
-            websocket_send(msg, state=msg.SUCCESS)
+            internal_send(msg)
             return msg
         else:
             vote = poll.votes.create(user=self.user, vote=self.data.vote)
