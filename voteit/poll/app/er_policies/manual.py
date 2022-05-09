@@ -20,6 +20,9 @@ class Manual(ElectoralRegisterPolicy):
     name = "manual"
     title = _("Manual only")
     logger = logger
+    handles_vote_weight = False
 
-    def get_voters(self, **kwargs) -> set[int]:
-        return set(self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER))
+    def get_voters(self, **kwargs) -> dict[int, int]:
+        return dict(
+            (x, 1) for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
+        )

@@ -26,19 +26,22 @@ class PresenceCheckPolicy(ElectoralRegisterPolicy):
     name = "presence_check"
     title = _("Closing a presence check will set a new electoral register.")
     logger = logger
+    handles_vote_weight = False
 
-    def get_voters(self, presence_check=None, **kwargs) -> set[int]:
+    def get_voters(self, presence_check=None, **kwargs) -> dict[int, int]:
         if presence_check is None:
             # FIXME: What kind of exception here?
             raise Exception("No presence check exists")
         potential_voters = self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
         if potential_voters is None:
-            # FIXME: What kind of exception here?
-            raise Exception("Not a single elegible voter")
+            # FIXME: What kind of exception should we use here?
+            raise Exception("Not a single eligible voter")
         present_potential_voters = presence_check.present_users.filter(
             pk__in=potential_voters
         )
-        return set(present_potential_voters.values_list("pk", flat=True))
+        return dict(
+            (x, 1) for x in present_potential_voters.values_list("pk", flat=True)
+        )
 
 
 @receiver(post_transition, sender=PresenceCheck)

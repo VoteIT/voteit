@@ -25,9 +25,12 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
     name = "auto_before_poll"
     title = _("Automatic before poll")
     logger = logger
+    handles_vote_weight = False
 
-    def get_voters(self, **kwargs) -> set[int]:
-        return set(self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER))
+    def get_voters(self, **kwargs) -> dict[int, int]:
+        return dict(
+            (x, 1) for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
+        )
 
     def pre_apply(self, poll: Poll, target: str):
         self.create_er()  # Won't trigger unless needed

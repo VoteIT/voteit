@@ -101,6 +101,25 @@ class ElectoralRegister(MeetingContext):
         # FIXME: Is this the correct method? :)
         return self.voterweight_set.aggregate(Sum("weight"))["weight__sum"]
 
+    @cached_property
+    def weight_dict(self) -> dict[int, int]:
+        """
+        Return a dict with user PK as key and weight as value.
+        """
+        return dict(self.voterweight_set.values_list("user_id", "weight"))
+
+    def set_voters_from_dict(self, values: dict[int, int]):
+        """
+        Adjust and set voters exactly according to {user PK: weight}
+        Note that this is a low-lever function that does very little validation. It won't check that set users
+        even have permission to view the meeting!
+        """
+        self.voters.set(values.keys())
+        user_weights_to_adjust = set(k for (k, v) in values.items() if v > 1)
+        for vw in self.voterweight_set.filter(user__in=user_weights_to_adjust):
+            vw.weight = values[vw.user_id]
+            vw.save()
+
     class QuerySet(models.QuerySet):
         def for_user(self, user: AbstractUser):
             return self.filter(meeting__participants=user).distinct()
@@ -113,6 +132,7 @@ class ElectoralRegister(MeetingContext):
             return self.get_queryset().for_user(user)
 
     objects = Manager()
+    voterweight_set: models.QuerySet
 
     def __str__(self):
         return (

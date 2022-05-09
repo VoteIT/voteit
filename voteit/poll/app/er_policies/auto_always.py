@@ -25,10 +25,13 @@ class AutoAlways(ElectoralRegisterPolicy):
 
     name = "auto_always"
     title = _("Demo meeting: Always update electoral register")
+    handles_vote_weight = False
     logger = logger
 
-    def get_voters(self, **kwargs):
-        return set(self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER))
+    def get_voters(self, **kwargs) -> dict[int, int]:
+        return dict(
+            (x, 1) for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
+        )
 
 
 def _maybe_create_and_update(instance: MeetingRoles, roles=()):

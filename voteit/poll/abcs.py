@@ -77,7 +77,9 @@ class PollMethod(ABC):
 
 
 class ElectoralRegisterPolicy(ABC):
-    """Responsible for handling electoral registers."""
+    """
+    Responsible for handling electoral registers.
+    """
 
     logger = logger
 
@@ -94,10 +96,19 @@ class ElectoralRegisterPolicy(ABC):
     def title(self) -> str:
         ...
 
+    @property
     @abstractmethod
-    def get_voters(self, **kwargs) -> set[int]:
+    def handles_vote_weight(self) -> bool:
         """
-        Return a Set with users that should (currently!) be voters according to this method.
+        Does this method handle vote weight (voters with multiple votes) in any way?
+        """
+
+    @abstractmethod
+    def get_voters(self, **kwargs) -> dict[int, int]:
+        """
+        Return a dict with user PKs and vote weright as value
+
+        This returns users that should (currently!) be voters according to this method.
         It doesn't mean that they are voters right now.
 
         It could simply be the users from potential voters for instance:
@@ -110,9 +121,7 @@ class ElectoralRegisterPolicy(ABC):
         """
         if self.meeting.latest_er is None:
             return True
-        return self.get_voters(**kwargs) != set(
-            self.meeting.latest_er.voters.all().values_list("pk", flat=True)
-        )
+        return self.get_voters(**kwargs) != self.meeting.latest_er.weight_dict
 
     def pre_apply(self, poll: Poll, target: str):
         """
@@ -158,7 +167,7 @@ class ElectoralRegisterPolicy(ABC):
         """
         if force or self.new_er_needed(**kwargs):
             er = self.meeting.electoral_registers.create()
-            er.voters.set(self.get_voters(**kwargs))
+            er.set_voters_from_dict(self.get_voters(**kwargs))
             self.meeting.latest_er = er  # Clear cached
             return er
         return self.meeting.latest_er

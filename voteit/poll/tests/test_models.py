@@ -1,20 +1,15 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from typing import Type
 
-from django_fsm import TransitionNotAllowed
 from voteit.poll.exceptions import ElectoralRegisterEmpty
 from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidPollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.exceptions import NotAllowedToVote
+from voteit.poll.models import ElectoralRegister
 from voteit.proposal.workflows import ProposalWf
-
-if TYPE_CHECKING:
-    from voteit.proposal.models import Proposal
 
 
 User = get_user_model()
@@ -308,6 +303,48 @@ class VoteWeightTests(TestCase):
 
 
 class ElectoralRegisterTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+
+        cls.meeting = Meeting.objects.get(pk=1)
+        # cls.meeting.save()
+        cls.participant = User.objects.get(username="participant")
+        cls.moderator = User.objects.get(username="moderator")
+        cls.meeting.add_roles(cls.participant, "potential_voter")
+        cls.meeting.add_roles(cls.moderator, "potential_voter")
+        cls.er: ElectoralRegister = cls.meeting.er_policy.create_er()
+        wv_participant = cls.er.voterweight_set.get(user=cls.participant)
+        wv_participant.weight = 4
+        wv_participant.save()
+        wv_moderator = cls.er.voterweight_set.get(user=cls.moderator)
+        wv_moderator.weight = 2
+        wv_moderator.save()
+
+    def setUp(self):
+        # Clear cached things
+        self.er: ElectoralRegister = ElectoralRegister.objects.get(pk=self.er.pk)
+
+    def test_get_voter_weight(self):
+        self.assertEqual(2, self.er.get_voter_weight(self.moderator))
+
+    def test_get_total_vote_weight(self):
+        self.assertEqual(6, self.er.get_total_vote_weight())
+
+    def test_weight_dict(self):
+        self.assertEqual(
+            {self.moderator.pk: 2, self.participant.pk: 4},
+            self.er.weight_dict,
+        )
+
+    def test_set_voters_from_dict(self):
+        self.er.set_voters_from_dict({self.moderator.pk: 3})
+        self.assertEqual({self.moderator.pk: 3}, self.er.weight_dict)
+
+
+class ElectoralRegisterManagerTests(TestCase):
     def _mk_meeting_user(self, _id: int):
         from voteit.meeting.models import Meeting
         from voteit.meeting import roles
