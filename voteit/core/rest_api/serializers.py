@@ -68,8 +68,8 @@ class BaseModelSerializer(serializers.ModelSerializer):
     def validate_meeting_group(self, value):
         from voteit.meeting.models import MeetingGroup
 
-        # if value is None:
-        #    return value
+        if value is None:
+            return value
         if self.instance:
             # An operation on an existing object
             assert isinstance(self.instance, MeetingContext)

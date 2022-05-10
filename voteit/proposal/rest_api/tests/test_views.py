@@ -315,6 +315,16 @@ class ProposalsAPITests(APITestCase):
             400,
         )
 
+    def test_patch_meeting_group_null(self):
+        url = reverse("proposal-detail", kwargs={"pk": self.prop.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"meeting_group": None})
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+        self.assertIsNone(self.prop.meeting_group)
+
     def test_patch_meeting_group_not_in_meeting(self):
         from voteit.meeting.models import Meeting
 
