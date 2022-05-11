@@ -106,3 +106,25 @@ class AgendaItemViewTestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(self.meeting.pk, data["meeting"])
+
+    def test_patch_change_tags(self):
+        url = reverse("agendaitem-detail", kwargs={"pk": self.ai.pk})
+        data = {
+            "tags": ["a", "b"],
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(["a", "b"], data["tags"])
+
+    def test_patch_remove_tags(self):
+        url = reverse("agendaitem-detail", kwargs={"pk": self.ai.pk})
+        data = {
+            "tags": [],
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual([], data["tags"])
