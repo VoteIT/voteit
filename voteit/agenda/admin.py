@@ -16,7 +16,10 @@ class AgendaAdmin(FSMTransitionMixin, admin.ModelAdmin):
         "state",
         "meeting",
     )
-    autocomplete_fields = ("meeting",)
+    autocomplete_fields = (
+        "meeting",
+        "mentions",
+    )
     search_fields = (
         "title",
         "body",

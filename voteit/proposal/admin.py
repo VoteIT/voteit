@@ -1,7 +1,7 @@
 from django.contrib import admin
 from fsm_admin.mixins import FSMTransitionMixin
-from voteit.proposal.models import DiffProposal
 
+from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
 
@@ -29,6 +29,12 @@ class ProposalAdmin(FSMTransitionMixin, admin.ModelAdmin):
         "agenda_item__title",
         "agenda_item__meeting__title",
     )
+    autocomplete_fields = (
+        "agenda_item",
+        "author",
+        "meeting_group",
+        "mentions",
+    )
     exclude = ("state",)
 
 
@@ -55,6 +61,11 @@ class DiffProposalAdmin(FSMTransitionMixin, admin.ModelAdmin):
         "agenda_item__title",
         "agenda_item__meeting__title",
     )
+    autocomplete_fields = (
+        "agenda_item",
+        "author",
+        "meeting_group",
+    )
     exclude = ("state",)
 
 
@@ -76,3 +87,4 @@ class TextDocumentAdmin(admin.ModelAdmin):
         "agenda_item__title",
         "agenda_item__meeting__title",
     )
+    autocomplete_fields = ("agenda_item",)
