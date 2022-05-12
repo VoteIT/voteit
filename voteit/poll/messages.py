@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import List
 
-from django.contrib.auth.models import AbstractUser
 from pydantic import validator
 from pydantic.main import BaseModel
 from envelope.core.message import ContextAction
@@ -20,7 +18,6 @@ from voteit.messaging.base import BaseObjectDeleted
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.poll.app.er_policies.manual import Manual
-from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
 from voteit.poll.permissions import ElectoralRegisterPermissions
@@ -128,60 +125,6 @@ class GenericVoteResponse(Message):
     name = "vote.added"
     schema = AddedVoteSchema
     data: AddedVoteSchema
-
-
-class GetERVoteCountSchema(BaseModel):
-    electoral_register: int
-
-
-@incoming
-class GetERVoteCount(ContextAction):
-    """Returns vote count for each user in a specific electoral register."""
-
-    name = "er.vote_count"
-    permission = ElectoralRegisterPermissions.VIEW
-    model = ElectoralRegister
-    context: ElectoralRegister
-    schema = GetERVoteCountSchema
-    data: GetERVoteCountSchema
-    context_schema_attr = "electoral_register"
-
-    def run_job(self) -> ERVoteCount:
-        self.assert_perm()
-        er = self.context
-        weights = [{"user": k, "weight": v} for k, v in er.weight_dict.items()]
-        msg = ERVoteCount.from_message(
-            self,
-            total=er.get_total_vote_weight(),
-            weights=weights,
-        )
-        websocket_send(msg, state=msg.SUCCESS)
-        return msg
-
-
-class VoteWeight(BaseModel):
-    user: int
-    weight: int
-
-    @validator("user", pre=True)
-    def transform_user(cls, value):
-        if isinstance(value, int):
-            return value
-        elif isinstance(value, AbstractUser):
-            return value.pk
-        raise ValueError("Wrong user type")
-
-
-class ERVoteCountSchema(BaseModel):
-    weights: List[VoteWeight]
-    total: int
-
-
-@outgoing
-class ERVoteCount(Message):
-    name = "er.vote_count"
-    schema = ERVoteCountSchema
-    data: ERVoteCountSchema
 
 
 class ManualCreateERSchema(BaseModel):
