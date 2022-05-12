@@ -1,3 +1,4 @@
+from typing import Generator
 from typing import Optional
 from typing import Type
 
@@ -155,14 +156,23 @@ class PollCreateSerializer(serializers.ModelSerializer):
 
 
 class ElectoralRegisterSerializer(serializers.ModelSerializer):
+    weights = serializers.SerializerMethodField()
+
     class Meta:
         model = models.ElectoralRegister
 
         fields = read_only_fields = (
             "created",
             "pk",
-            "voters",
+            "meeting",
+            "weights",
         )
+
+    def get_weights(
+        self, er: models.ElectoralRegister
+    ) -> Generator[dict[str, int], None, None]:
+        for user_pk, weight in er.weight_dict.items():
+            yield {"user": user_pk, "weight": weight}
 
 
 class VoteSerializer(serializers.ModelSerializer):

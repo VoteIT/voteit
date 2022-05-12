@@ -181,8 +181,8 @@ class ElectoralRegisterViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         from voteit.meeting.models import Meeting
-
         from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
+        from voteit.poll.models import ElectoralRegister
 
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting",
@@ -192,7 +192,8 @@ class ElectoralRegisterViewSetTests(APITestCase):
         cls.outsider: User = User.objects.create_user("outsider")
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
-        cls.er = cls.meeting.electoral_registers.create()
+        cls.er: ElectoralRegister = cls.meeting.electoral_registers.create()
+        cls.er.set_voters_from_dict({cls.moderator.pk: 1, cls.participant.pk: 2})
 
     def test_list(self):
         url = reverse("electoral-registers-list")
@@ -209,3 +210,12 @@ class ElectoralRegisterViewSetTests(APITestCase):
         self.assertEqual(200, response.status_code)
         data = response.json()
         self.assertEqual(self.er.pk, data["pk"])
+        self.assertIsInstance(data["weights"], list)
+        self.assertEqual(2, len(data["weights"]))
+        self.assertEqual(
+            [
+                {"user": self.participant.pk, "weight": 2},
+                {"user": self.moderator.pk, "weight": 1},
+            ],
+            sorted(data["weights"], key=lambda x: x["user"]),
+        )

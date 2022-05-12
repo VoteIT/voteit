@@ -27,6 +27,7 @@ from voteit.poll.permissions import ElectoralRegisterPermissions
 from voteit.poll.permissions import VotePermissions
 from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.schemas import AddedVoteSchema
+from voteit.poll.schemas import VoterWeightSchema
 
 
 @outgoing
@@ -181,29 +182,6 @@ class ERVoteCount(Message):
     name = "er.vote_count"
     schema = ERVoteCountSchema
     data: ERVoteCountSchema
-
-
-class VoterWeightSchema(BaseModel):
-    user: int
-    weight: int
-
-    @validator("weight")
-    def validate_weight(cls, v):
-        """
-        Always a positive int
-
-        >>> VoterWeightSchema.validate_weight(2)
-        2
-        >>> VoterWeightSchema.validate_weight(1)
-        1
-        >>> VoterWeightSchema.validate_weight(0)
-        Traceback (most recent call last):
-        ...
-        ValueError: Must be positive int
-        """
-        if v > 0:
-            return v
-        raise ValueError("Must be positive int")
 
 
 class ManualCreateERSchema(BaseModel):

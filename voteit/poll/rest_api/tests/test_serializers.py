@@ -286,9 +286,8 @@ class ElectoralRegisterSerializerTests(TestCase):
 
         self.meeting = Meeting.objects.create()
         self.er = self.meeting.electoral_registers.create()
-        one = self.er.voters.create(username="one")
-        two = self.er.voters.create(username="two")
-        self.voter_pks = {one.pk, two.pk}
+        self.one = self.er.voters.create(username="one")
+        self.two = self.er.voters.create(username="two")
 
     @property
     def _cut(self):
@@ -298,8 +297,15 @@ class ElectoralRegisterSerializerTests(TestCase):
 
     def test_er(self):
         serializer = self._cut(self.er)
-        self.assertEqual(self.er.pk, serializer.data["pk"])
-        self.assertEqual(self.voter_pks, set(serializer.data["voters"]))
+        data = serializer.data
+        self.assertEqual(self.er.pk, data.pop("pk"))
+        self.assertEqual(
+            [{"user": self.one.pk, "weight": 1}, {"user": self.two.pk, "weight": 1}],
+            sorted(data.pop("weights"), key=lambda x: x["user"]),
+        )
+        self.assertIsNotNone(data.pop("created"))
+        self.assertEqual(self.meeting.pk, data.pop("meeting"))
+        self.assertFalse(data)
 
 
 class VoteSerializerTests(TestCase):

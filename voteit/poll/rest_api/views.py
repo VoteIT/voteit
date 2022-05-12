@@ -52,7 +52,6 @@ class PollViewSet(DefaultModelViewSet):
 @router.register("electoral-registers", basename="electoral-registers")
 class ElectoralRegisterViewSet(ReadonlyModelViewSet):
     model = ElectoralRegister
-    queryset = ElectoralRegister.objects.all()
     serializer_class = serializers.ElectoralRegisterSerializer
     permission_type_map = {
         **ReadonlyModelViewSet.permission_type_map,
