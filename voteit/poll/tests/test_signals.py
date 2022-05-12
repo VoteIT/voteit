@@ -48,25 +48,37 @@ class PollSubscribedTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class MeetingSubscribedTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.poll.models import ElectoralRegister
 
-        er = ElectoralRegister.objects.create()
-        cls.meeting = Meeting.objects.create()
-        cls.poll = cls.meeting.polls.create(method_name="simple", electoral_register=er)
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.meeting.er_policy_name = None
+        cls.er = ElectoralRegister.objects.create(meeting=cls.meeting)
+        cls.poll = cls.meeting.polls.create(
+            method_name="simple", electoral_register=cls.er
+        )
         cls.poll.upcoming()
         cls.poll.save()
         cls.poll_private = cls.meeting.polls.create(
-            method_name="simple", electoral_register=er
+            method_name="simple", electoral_register=cls.er
         )
-        # cls.user = User.objects.create(username="user")
-        cls.user = er.voters.create(username="user")
+        cls.user = cls.er.voters.create(username="user")
         cls.meeting.add_roles(cls.user, "moderator")
         # Create a vote
         cls.poll.proposals.create()
         cls.vote = cls.poll.votes.create(user=cls.user, vote="yes")
+
+    def setUp(self):
+        from voteit.meeting.models import Meeting
+
+        # Clear cached stuff
+        self.meeting = Meeting.objects.get(pk=1)
+        self.er.refresh_from_db()
+        self.poll.refresh_from_db()
 
     def test_app_state_sent_participants_poll_added(self):
         command = Subscribe(
@@ -97,6 +109,26 @@ class MeetingSubscribedTests(TestCase):
         msg = command.run_job()
         pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "vote.added"])
         self.assertEqual({self.vote.pk}, pks)
+
+    def test_app_state_sent_latest_er(self):
+        command = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.meeting.pk,
+            channel_type=MeetingChannel.name,
+        )
+        msg = command.run_job()
+        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "er.added"])
+        self.assertEqual({self.er.pk}, pks)
+
+    def test_app_state_doesnt_break_without_er(self):
+        self.er.delete()
+        command = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.meeting.pk,
+            channel_type=MeetingChannel.name,
+        )
+        msg = command.run_job()
+        self.assertFalse([x for x in msg.data.app_state if x.t == "er.added"])
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -240,3 +272,30 @@ class PrivateAIPublishedTests(TestCase):
         messages = [x.args[0] for x in mock_publish.mock_calls]
         self.assertEqual(1, len([x for x in messages if isinstance(x, AgendaChanged)]))
         self.assertEqual(1, len([x for x in messages if isinstance(x, PollAdded)]))
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class NewERSentToMeetingTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+
+        cls.meeting = Meeting.objects.create(er_policy_name="manual")
+        cls.user = User.objects.create(username="user")
+        cls.meeting.add_roles(cls.user, "participant", "potential_voter")
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_added(self, mock_publish):
+        from voteit.poll.messages import ElectoralRegisterAdded
+
+        er = self.meeting.er_policy.create_er(weight_dict={self.user.pk: 5})
+        self.assertTrue(mock_publish.called)
+        messages = [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if isinstance(x.args[0], ElectoralRegisterAdded)
+        ]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertEqual(er.pk, msg.data.pk)
+        self.assertEqual([{"user": self.user.pk, "weight": 5}], msg.data.weights)

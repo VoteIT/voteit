@@ -42,6 +42,16 @@ class PollDeleted(BaseObjectDeleted):
     name = "poll.deleted"
 
 
+@outgoing
+class ElectoralRegisterAdded(BaseObjectAdded):
+    name = "er.added"
+
+
+@outgoing
+class ElectoralRegisterDeleted(BaseObjectDeleted):
+    name = "er.deleted"
+
+
 class PollStatusSchema(BaseModel):
     pk: int
     voted: int

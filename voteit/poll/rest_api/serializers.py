@@ -166,13 +166,14 @@ class ElectoralRegisterSerializer(serializers.ModelSerializer):
             "pk",
             "meeting",
             "weights",
+            "source",
         )
 
-    def get_weights(
-        self, er: models.ElectoralRegister
-    ) -> Generator[dict[str, int], None, None]:
+    def get_weights(self, er: models.ElectoralRegister) -> list[dict[str, int]]:
+        results = []
         for user_pk, weight in er.weight_dict.items():
-            yield {"user": user_pk, "weight": weight}
+            results.append({"user": user_pk, "weight": weight})
+        return results
 
 
 class VoteSerializer(serializers.ModelSerializer):

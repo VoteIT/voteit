@@ -305,6 +305,7 @@ class ElectoralRegisterSerializerTests(TestCase):
         )
         self.assertIsNotNone(data.pop("created"))
         self.assertEqual(self.meeting.pk, data.pop("meeting"))
+        self.assertIsNone(data.pop("source"))
         self.assertFalse(data)
 
 

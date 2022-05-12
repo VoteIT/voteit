@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 from django.contrib.auth.models import AbstractUser
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
+from django.dispatch import Signal
 from django.dispatch import receiver
 from django_fsm import pre_transition
 from django_fsm.signals import post_transition
-
 from envelope.signals import channel_subscribed
 
 from voteit.agenda.models import AgendaItem
@@ -21,13 +21,17 @@ from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.poll.channels import PollChannel
+from voteit.poll.messages import ElectoralRegisterAdded
+from voteit.poll.messages import ElectoralRegisterDeleted
 from voteit.poll.messages import GenericVoteResponse
 from voteit.poll.messages import PollAdded
 from voteit.poll.messages import PollChanged
 from voteit.poll.messages import PollDeleted
 from voteit.poll.messages import PollStatus
+from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
+from voteit.poll.rest_api.serializers import ElectoralRegisterSerializer
 from voteit.poll.rest_api.serializers import PollDetailSerializer
 from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.workflows import PollWf
@@ -36,6 +40,12 @@ if TYPE_CHECKING:
     from envelope.utils import AppState
 
 logger = getLogger(__name__)
+
+
+# Sent after voter weight has been updated!
+# arguments:
+#   instance: The electoral register
+new_er_created = Signal()
 
 
 @receiver(channel_subscribed, sender=PollChannel)
@@ -77,13 +87,19 @@ def meeting_subscribed(context: Meeting, app_state: AppState, user: AbstractUser
         VoteSerializer,
         GenericVoteResponse,
     )
+    if context.latest_er:
+        app_state.append_from(
+            context.latest_er, ElectoralRegisterSerializer, ElectoralRegisterAdded
+        )
 
 
 @receiver(channel_subscribed, sender=ModeratorsChannel)
 def moderators_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    """Populate app_state with current meeting polls"""
+    """
+    Populate app_state with current meeting polls
+    """
     app_state.append_from_queryset(context.polls.all(), PollDetailSerializer, PollAdded)
 
 
@@ -157,3 +173,27 @@ def maybe_apply_er_when_poll_changes_state(
         # No need to die here
         return
     er_policy.apply(instance, target)
+
+
+@receiver(new_er_created)
+def push_new_er(instance: ElectoralRegister, **kwargs):
+    """
+    Special signals for ER since they have M2M relations that are updated after post_save signal is sent.
+    """
+    meeting_ch = MeetingChannel.from_instance(instance.meeting)
+    data = ElectoralRegisterSerializer(instance).data
+    msg = ElectoralRegisterAdded(data=data)
+    meeting_ch.sync_publish(msg)
+
+
+@receiver(pre_delete, sender=ElectoralRegister)
+@disable_on_raw_save
+def er_deleted(instance: ElectoralRegister = None, **kw):
+    """
+    Electoral registers usually aren't deleted, but there are some special cases mostly for demo meetings.
+    """
+    if instance.meeting is not None:
+        # We can't really do anything if it is!
+        meeting_ch = MeetingChannel.from_instance(instance.meeting)
+        msg = ElectoralRegisterDeleted(pk=instance.pk)
+        meeting_ch.sync_publish(msg)

@@ -76,7 +76,8 @@ class VoterWeight(models.Model):
 
 class ElectoralRegister(MeetingContext):
     name = "electoral_register"
-    created = models.DateTimeField(editable=False, default=now)
+    created: datetime = models.DateTimeField(editable=False, default=now)
+    source: Optional[str] = models.CharField(max_length=20, null=True, blank=True)
     voters = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         through=VoterWeight,

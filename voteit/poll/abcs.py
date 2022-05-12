@@ -166,8 +166,13 @@ class ElectoralRegisterPolicy(ABC):
         Note that new electoral registers shouldn't be created unless needed or forced.
         """
         if force or self.new_er_needed(**kwargs):
-            er = self.meeting.electoral_registers.create()
+            # Avoid circular import
+            from voteit.poll.signals import new_er_created
+
+            # FIXME: Atomics?
+            er = self.meeting.electoral_registers.create(source=self.name)
             er.set_voters_from_dict(self.get_voters(**kwargs))
             self.meeting.latest_er = er  # Clear cached
+            new_er_created.send(instance=er, sender=er.__class__)
             return er
         return self.meeting.latest_er
