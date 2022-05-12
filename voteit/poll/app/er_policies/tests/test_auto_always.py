@@ -75,3 +75,23 @@ class AutoAlwaysTests(TestCase):
             fields=("initial_electoral_register", "electoral_register")
         )
         self.assertEqual(third_er, self.poll.electoral_register)
+
+    def test_cleanup_unused_ers(self):
+        one = self.meeting.electoral_registers.create(source=self.AutoAlways.name)
+        self.assertEqual(2, self.meeting.electoral_registers.count())
+        self.meeting.remove_roles(self.user2, ROLE_POTENTIAL_VOTER)
+        # First one deleted
+        self.assertEqual(1, self.meeting.electoral_registers.count())
+        self.assertNotIn(one, self.meeting.electoral_registers.all())
+        # We'll keep this er though
+        two = self.meeting.get_latest_er()
+        self.poll.upcoming()
+        self.poll.save()
+        self.assertEqual(two, self.poll.electoral_register)
+        self.poll.state = "closed"
+        self.poll.save()
+        self.meeting.add_roles(self.user2, ROLE_POTENTIAL_VOTER)
+        self.assertNotEqual(two, self.meeting.get_latest_er())
+        self.assertEqual(two, self.poll.electoral_register)
+        # So one more kept
+        self.assertEqual(2, self.meeting.electoral_registers.count())

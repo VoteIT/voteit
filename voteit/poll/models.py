@@ -140,6 +140,8 @@ class ElectoralRegister(MeetingContext):
 
     objects = Manager()
     voterweight_set: models.QuerySet
+    polls: models.QuerySet
+    polls_initial: models.QuerySet
 
     def __str__(self):
         return (

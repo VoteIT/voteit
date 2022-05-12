@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from logging import getLogger
 
 from django.dispatch import receiver
@@ -7,10 +9,13 @@ from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.abcs import ElectoralRegisterPolicy
+from voteit.poll.models import ElectoralRegister
 from voteit.poll.registries import er_policy
+from voteit.poll.signals import new_er_created
 from voteit.poll.workflows import PollWf
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
+
 
 __all__ = ("AutoAlways",)
 logger = getLogger(__name__)
@@ -55,3 +60,20 @@ def new_er_voter_added(instance: MeetingRoles, roles=(), **kw):
 @receiver(roles_removed, sender=MeetingRoles)
 def new_er_voter_removed(instance: MeetingRoles, roles=(), **kw):
     _maybe_create_and_update(instance, roles=roles)
+
+
+@receiver(new_er_created)
+def cleanup_unused_ers(instance: ElectoralRegister, **kwargs):
+    """
+    Auto always creates a lot of clutter. Remove unused ERs
+    """
+    if instance.source == AutoAlways.name:
+        er_qs = ElectoralRegister.objects.filter(
+            meeting=instance.meeting,
+            source=instance.source,
+            polls__isnull=True,
+            polls_initial__isnull=True,
+        ).exclude(pk=instance.pk)
+        for er in er_qs:
+            # Delete this way to trigger push
+            er.delete()
