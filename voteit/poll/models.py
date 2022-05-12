@@ -429,7 +429,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         """
         counter = Counter()
         abstains = 0
-        for v in self.votes.all():
+        for v in self.votes.all().order_by("pk"):
             if v.abstain:
                 abstains += v.weight
             else:
