@@ -36,7 +36,7 @@ class MeetingAccessPoliciesSerializer(serializers.ModelSerializer):
 
     def get_enabled_policies(self, meeting) -> List:
         result = []
-        for ap in get_policies(meeting):
+        for ap in get_policies(meeting, only_active=False):
             serializer = ap_to_serializer[ap.name]
             result.append(serializer(ap).data)
         return result
