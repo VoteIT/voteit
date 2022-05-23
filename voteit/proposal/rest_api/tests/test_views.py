@@ -8,7 +8,6 @@ from voteit.core.testing import mk_hashtag
 from voteit.core.testing import mk_usertag
 from voteit.meeting.channels import ParticipantsChannel
 
-
 User = get_user_model()
 
 
@@ -157,7 +156,7 @@ class ProposalsAPITests(APITestCase):
 
     def test_put_author_proposer(self):
         prop = self.ai.proposals.create(body="hello", author=self.proposer)
-        url = f"/api/proposals/{prop.pk}/"
+        url = reverse("proposal-detail", kwargs={"pk": prop.pk})
         data = {
             "body": "Sup?",
             "agenda_item": self.ai.pk,
@@ -171,7 +170,7 @@ class ProposalsAPITests(APITestCase):
 
     def test_patch_author_proposer(self):
         prop = self.ai.proposals.create(body="hello", author=self.proposer)
-        url = f"/api/proposals/{prop.pk}/"
+        url = reverse("proposal-detail", kwargs={"pk": prop.pk})
         data = {
             "body": "Sup?",
         }
@@ -184,7 +183,7 @@ class ProposalsAPITests(APITestCase):
 
     def test_patch_author_proposer_moderator_user(self):
         prop = self.ai.proposals.create(body="hello", author=self.proposer)
-        url = f"/api/proposals/{prop.pk}/"
+        url = reverse("proposal-detail", kwargs={"pk": prop.pk})
         data = {
             "body": "Sup?",
         }
@@ -199,7 +198,7 @@ class ProposalsAPITests(APITestCase):
 
     def test_delete(self):
         prop = self.ai.proposals.create(body="hello", author=self.proposer)
-        url = f"/api/proposals/{prop.pk}/"
+        url = reverse("proposal-detail", kwargs={"pk": prop.pk})
         self.client.force_login(self.moderator)
         response = self.client.delete(url)
         self.assertEqual(
@@ -207,6 +206,17 @@ class ProposalsAPITests(APITestCase):
             204,
         )
         self.assertRaises(ObjectDoesNotExist, prop.refresh_from_db)
+
+    def test_delete_diff(self):
+        diff_prop = self.para.proposals.create(agenda_item=self.ai)
+        url = reverse("proposal-detail", kwargs={"pk": diff_prop.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.delete(url)
+        self.assertEqual(
+            response.status_code,
+            204,
+        )
+        self.assertRaises(ObjectDoesNotExist, diff_prop.refresh_from_db)
 
     def test_preview_proposal(self):
         url = reverse("proposal-preview")

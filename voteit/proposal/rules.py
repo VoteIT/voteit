@@ -13,6 +13,7 @@ from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import is_proposer
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
+from voteit.proposal.permissions import DiffProposalPermissions
 from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.permissions import TextDocumentPermissions
 from voteit.proposal.workflows import ProposalWf
@@ -42,24 +43,30 @@ def has_no_proposals(user: AbstractUser, text_document: TextDocument):
 
 
 # Proposal and variants
-rules.add_perm(
-    ProposalPermissions.ADD,
-    (is_moderator & upcoming_ongoing_or_private_ai)
-    | (upcoming_or_ongoing_ai & ai_proposals_not_blocked & is_proposer),
-)
-rules.add_perm(ProposalPermissions.VIEW, can_view_ai)
-rules.add_perm(
-    ProposalPermissions.CHANGE, upcoming_ongoing_or_private_ai & is_moderator
-)
-rules.add_perm(
-    ProposalPermissions.DELETE,
-    is_not_used_in_poll & is_moderator & upcoming_ongoing_or_private_ai,
-)
-rules.add_perm(
-    ProposalPermissions.RETRACT,
-    (is_moderator & upcoming_ongoing_or_private_ai)
-    | (upcoming_or_ongoing_ai & is_published & is_author & ai_proposals_not_blocked),
-)
+# make sure diff and regular proposals work exactly the same!
+for perm in (ProposalPermissions.ADD, DiffProposalPermissions.ADD):
+    rules.add_perm(
+        perm,
+        (is_moderator & upcoming_ongoing_or_private_ai)
+        | (upcoming_or_ongoing_ai & ai_proposals_not_blocked & is_proposer),
+    )
+for perm in (ProposalPermissions.VIEW, DiffProposalPermissions.VIEW):
+    rules.add_perm(perm, can_view_ai)
+for perm in (ProposalPermissions.CHANGE, DiffProposalPermissions.CHANGE):
+    rules.add_perm(perm, upcoming_ongoing_or_private_ai & is_moderator)
+for perm in (ProposalPermissions.DELETE, DiffProposalPermissions.DELETE):
+    rules.add_perm(
+        perm,
+        is_not_used_in_poll & is_moderator & upcoming_ongoing_or_private_ai,
+    )
+for perm in (ProposalPermissions.RETRACT, DiffProposalPermissions.RETRACT):
+    rules.add_perm(
+        perm,
+        (is_moderator & upcoming_ongoing_or_private_ai)
+        | (
+            upcoming_or_ongoing_ai & is_published & is_author & ai_proposals_not_blocked
+        ),
+    )
 
 
 # TextDocument
