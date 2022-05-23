@@ -14,6 +14,7 @@ from django.utils import translation
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework.fields import JSONField
 
@@ -23,6 +24,7 @@ from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
 from voteit.core.validators import valid_userid
+from voteit.meeting.permissions import MeetingPermissions
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -30,7 +32,7 @@ if TYPE_CHECKING:
     from voteit.core.models import BaseContent
     from voteit.meeting.models import Meeting
     from voteit.agenda.models import AgendaItem
-
+    from voteit.meeting.models import MeetingGroup
 
 logger = getLogger(__name__)
 
@@ -38,49 +40,98 @@ logger = getLogger(__name__)
 class BaseModelSerializer(serializers.ModelSerializer):
     author_kw = "author"
 
-    def create(self, validated_data):
-        validated_data[self.author_kw] = self.get_request_user()
-        return super().create(validated_data)
-
     def get_request_user(self) -> Optional[AbstractUser]:
         # Validate user?
-        return self.context["request"].user
+        request = self.context.get("request")
+        if request is not None:
+            return request.user
 
-    def validate_author(self, value):
+    def validate(self, attrs):
         """
         Validation caveats here:
 
-        - Create will throw away user since we _force_ current user. So we don't need to validate in that case.
         - Validation won't work outside of meeting context.
+        - Only moderators can specify other authors.
         """
-        if value is None:
-            return value
-        if self.instance:
-            if isinstance(self.instance, MeetingContext):
-                User = get_user_model()
-                if not isinstance(value, User):
-                    raise ValidationError("Wrong type")
-                if value not in self.instance.meeting.participants.all():
-                    raise ValidationError("User doesn't exist")
-                return value
-            raise ValidationError("Object is not a meeting context")
+        attrs = super().validate(attrs)
+        author = attrs.get(self.author_kw)
+        User = get_user_model()
+        do_validation = True
+        if author is None:
+            author = self.get_request_user()
+            do_validation = False
+        if not isinstance(author, User) and author is not None:
+            raise ValidationError(detail={self.author_kw: "Wrong type"})
+        if do_validation:
+            # First, find meeting
+            meeting = None
+            if self.instance:
+                if isinstance(self.instance, MeetingContext):
+                    meeting = self.instance.meeting
+            else:
+                try:
+                    meeting = meeting_from_unsafe_data(self)
+                except ValidationError:
+                    # Don't die here, there might be contexts outside meeting
+                    meeting = None
+            if meeting:
+                user = self.get_request_user()
+                if (
+                    user is None
+                    or user != author
+                    and not user.has_perm(MeetingPermissions.MODERATE, meeting)
+                ):
+                    raise PermissionDenied(
+                        detail={
+                            self.author_kw: "You're not a moderator and may not specify author"
+                        }
+                    )
+                if author not in self.instance.meeting.participants.all():
+                    raise ValidationError(
+                        detail={self.author_kw: "Not an existing meeting participant"}
+                    )
+            else:
+                raise ValidationError(
+                    detail={
+                        self.author_kw: "You've specified author outside of a meeting context"
+                    }
+                )
+        attrs[self.author_kw] = author
+        return attrs
 
-    def validate_meeting_group(self, value):
+    def validate_meeting_group(self, value: Optional[MeetingGroup]):
+        """
+        - None is always allowed.
+        - Moderators can post as any group.
+        - Participants can post if they're members of that group.
+        """
+        from voteit.meeting.models import Meeting
         from voteit.meeting.models import MeetingGroup
 
         if value is None:
             return value
+
+        user = self.get_request_user()
+        if user is None:
+            raise ValidationError(detail="Can't find posting user")
+        assert isinstance(value, MeetingGroup)  # A weird bug we won't catch
+        meeting = None
         if self.instance:
             # An operation on an existing object
-            assert isinstance(self.instance, MeetingContext)
-            assert isinstance(value, MeetingGroup)
-            if value in self.instance.meeting.groups.all():
-                return value
+            if not isinstance(self.instance, MeetingContext):
+                raise ValidationError(detail="Not within a meeting")
+            meeting = self.instance.meeting
         else:
-            # Tricky part, validate add
+            # Tricky part, validate add. Die here if no meeting is found
             meeting = meeting_from_unsafe_data(self)
-            if value in meeting.groups.all():
-                return value
+        assert isinstance(meeting, Meeting)  # Programming bug,not a user error
+        if value not in meeting.groups.all():
+            raise ValidationError("Meeting group doesn't exist")
+        if user in value.members.all() or user.has_perm(
+            MeetingPermissions.MODERATE, meeting
+        ):
+            return value
+        # Fail for anything else
         raise ValidationError("Meeting group doesn't exist")
 
 
