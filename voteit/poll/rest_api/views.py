@@ -1,22 +1,19 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.response import Response
+
 from voteit.agenda.models import AgendaItem
-from voteit.core.rest_api.base import DefaultModelViewSet, ReadonlyModelViewSet
-from voteit.poll.models import *
-from voteit.poll.registries import er_policy
-
-from . import serializers
-
+from voteit.agenda.permissions import AgendaPermissions
+from voteit.core.rest_api import router
+from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.base import ReadonlyModelViewSet
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.poll.rest_api import serializers
 
 __all__ = [
     "PollViewSet",
     "ElectoralRegisterViewSet",
 ]
-
-from ...agenda.permissions import AgendaPermissions
-from ...core.rest_api import router
 
 
 @router.register("polls")
@@ -53,21 +50,8 @@ class PollViewSet(DefaultModelViewSet):
 class ElectoralRegisterViewSet(ReadonlyModelViewSet):
     model = ElectoralRegister
     serializer_class = serializers.ElectoralRegisterSerializer
-    permission_type_map = {
-        **ReadonlyModelViewSet.permission_type_map,
-        "methods": None,
-    }
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ("meeting",)
 
     def get_queryset(self):
         return ElectoralRegister.objects.for_user(self.request.user)
-
-    @action(detail=False, methods=["GET"])
-    def methods(self, request):
-        return Response(
-            [
-                {"name": p.title, "value": p.name}  # TODO Translate
-                for p in er_policy.values()
-            ]
-        )
