@@ -20,7 +20,5 @@ class PresenceCheckPermissions(ModelPermissions):
 
 class PresencePermissions(ModelPermissions):
     model = "presence"
-    # Change doesn't exist
-    ADD = P("presence.add_presence", context="presence_check")
-    DELETE = P("presence.delete_presence")
+    CHANGE = P("presence.change_presence", context="presence_check")
     VIEW = P("presence.view_presence")

@@ -144,33 +144,18 @@ class PresenceTests(TestCase):
 
         return PresencePermissions
 
-    def test_add(self):
-        ADD = self.P.ADD
-        self.assertTrue(self.moderator.has_perm(ADD, self.presence_check))
-        self.assertTrue(self.participant.has_perm(ADD, self.presence_check))
-        self.assertFalse(self.anon_user.has_perm(ADD, self.presence_check))
+    def test_change(self):
+        CHANGE = self.P.CHANGE
+        self.assertTrue(self.moderator.has_perm(CHANGE, self.presence_check))
+        self.assertTrue(self.participant.has_perm(CHANGE, self.presence_check))
+        self.assertFalse(self.anon_user.has_perm(CHANGE, self.presence_check))
 
-    def test_add_closed(self):
-        ADD = self.P.ADD
+    def test_change_closed(self):
+        CHANGE = self.P.CHANGE
         self.presence_check.close()
-        self.assertFalse(self.moderator.has_perm(ADD, self.presence_check))
-        self.assertFalse(self.participant.has_perm(ADD, self.presence_check))
-        self.assertFalse(self.anon_user.has_perm(ADD, self.presence_check))
-
-    def test_delete(self):
-        DELETE = self.P.DELETE
-        self.assertTrue(self.moderator.has_perm(DELETE, self.presence))
-        self.assertFalse(self.participant.has_perm(DELETE, self.presence))
-        self.assertTrue(self.present_participant.has_perm(DELETE, self.presence))
-        self.assertFalse(self.anon_user.has_perm(DELETE, self.presence))
-
-    def test_delete_closed(self):
-        DELETE = self.P.DELETE
-        self.presence_check.close()
-        self.assertFalse(self.moderator.has_perm(DELETE, self.presence))
-        self.assertFalse(self.participant.has_perm(DELETE, self.presence))
-        self.assertFalse(self.present_participant.has_perm(DELETE, self.presence))
-        self.assertFalse(self.anon_user.has_perm(DELETE, self.presence))
+        self.assertFalse(self.moderator.has_perm(CHANGE, self.presence_check))
+        self.assertFalse(self.participant.has_perm(CHANGE, self.presence_check))
+        self.assertFalse(self.anon_user.has_perm(CHANGE, self.presence_check))
 
     def test_view(self):
         VIEW = self.P.VIEW

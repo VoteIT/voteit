@@ -98,6 +98,9 @@ class PresenceCheck(MeetingContext):
     def presence_system(self):
         return PresenceSystem.objects.get_or_create(meeting=self.meeting)
 
+    def present_user_pks(self) -> list[int]:
+        return list(self.presences.values_list("user_id"))
+
     def __str__(self):
         return f"Presence check ({self.pk})"
 

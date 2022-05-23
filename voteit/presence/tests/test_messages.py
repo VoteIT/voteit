@@ -7,40 +7,39 @@ from envelope.messages.errors import ValidationErrorMsg
 User = get_user_model()
 
 
-class _PresenceFixture:
+class ChangePresenceTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
-    def fixture(cls):
+    def setUpTestData(cls):
         from voteit.presence.models import PresenceSystem
         from voteit.presence.models import PresenceCheck
         from voteit.meeting.models import Meeting
 
-        cls.user = User.objects.create(username="creeper")
-        cls.meeting = Meeting.objects.create()
-        cls.meeting.add_roles(cls.user, "participant")
+        cls.outsider = User.objects.create(username="outsider")
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.participant = User.objects.get(username="participant")
+        cls.moderator = User.objects.get(username="moderator")
         cls.system = PresenceSystem.objects.create(meeting=cls.meeting)
         cls.check = PresenceCheck.objects.create(meeting=cls.meeting)
 
-
-class AddPresenceTests(TestCase, _PresenceFixture):
-    @classmethod
-    def setUpTestData(cls):
-        cls.fixture()
-
     @property
     def _cut(self):
-        from voteit.presence.messages import AddPresence
+        from voteit.presence.messages import ChangePresence
 
-        return AddPresence
+        return ChangePresence
 
-    def _mk_one(self):
+    def _mk_one(self, *, user, check, present, presence_user=None):
         return self._cut(
-            mm={"user_pk": self.user.pk, "consumer_name": "abc"},
-            presence_check=self.check.pk,
+            mm={"user_pk": user.pk, "consumer_name": "abc"},
+            presence_check=check.pk,
+            present=present,
+            user=presence_user,
         )
 
     def test_add(self):
         self.assertFalse(self.check.present_users.count())
-        msg = self._mk_one()
+        msg = self._mk_one(user=self.participant, check=self.check, present=True)
         msg.run_job()
         self.assertTrue(self.check.present_users.count())
         # Make sure duplicate doesn't kill it
@@ -49,138 +48,117 @@ class AddPresenceTests(TestCase, _PresenceFixture):
     def test_add_closed_check(self):
         self.check.close()
         self.check.save()
-        msg = self._mk_one()
+        msg = self._mk_one(user=self.participant, check=self.check, present=True)
         self.assertRaises(UnauthorizedError, msg.run_job)
 
     def test_add_not_participant(self):
-        self.meeting.remove_roles(self.user, "participant")
-        msg = self._mk_one()
+        msg = self._mk_one(user=self.outsider, check=self.check, present=True)
         self.assertRaises(UnauthorizedError, msg.run_job)
 
-
-class RemovePresenceTests(TestCase, _PresenceFixture):
-    @classmethod
-    def setUpTestData(cls):
-        from voteit.presence.models import Presence
-
-        cls.fixture()
-        cls.presence = Presence.objects.create(user=cls.user, presence_check=cls.check)
-
-    @property
-    def _cut(self):
-        from voteit.presence.messages import DeletePresence
-
-        return DeletePresence
-
-    def _mk_one(self):
-        return self._cut(
-            mm={"user_pk": self.user.pk, "consumer_name": "abc"}, pk=self.presence.pk
+    def test_user_add_other_user(self):
+        msg = self._mk_one(
+            user=self.participant,
+            check=self.check,
+            present=True,
+            presence_user=self.moderator,
         )
+        self.assertRaises(UnauthorizedError, msg.run_job)
+
+    def test_moderator_add_other_user(self):
+        msg = self._mk_one(
+            user=self.moderator,
+            check=self.check,
+            present=True,
+            presence_user=self.participant,
+        )
+        msg.run_job()
+        self.assertIn(self.participant, self.check.present_users.all())
+        self.assertNotIn(self.moderator, self.check.present_users.all())
+
+    def test_moderator_add_outsider(self):
+        msg = self._mk_one(
+            user=self.moderator,
+            check=self.check,
+            present=True,
+            presence_user=self.outsider,
+        )
+        self.assertRaises(ValidationErrorMsg, msg.run_job)
+
+    def test_moderator_add_user_that_doest_exist(self):
+        msg = self._mk_one(
+            user=self.moderator,
+            check=self.check,
+            present=True,
+            presence_user=-1,
+        )
+        self.assertRaises(ValidationErrorMsg, msg.run_job)
+
+    def test_moderator_add_closed(self):
+        self.check.close()
+        self.check.save()
+        msg = self._mk_one(user=self.moderator, check=self.check, present=True)
+        self.assertRaises(UnauthorizedError, msg.run_job)
 
     def test_delete(self):
-        self.assertTrue(self.check.present_users.count())
-        msg = self._mk_one()
+        self.check.presences.create(user=self.participant)
+        # self.assertTrue(self.check.present_users.count())
+        msg = self._mk_one(user=self.participant, check=self.check, present=False)
         msg.run_job()
-        self.assertFalse(self.check.present_users.count())
+        self.assertFalse(self.check.presences.count())
+
+    def test_delete_doest_exist(self):
+        # No errors here
+        msg = self._mk_one(user=self.participant, check=self.check, present=False)
+        msg.run_job()
+        self.assertFalse(self.check.presences.count())
 
     def test_delete_closed_check(self):
         self.check.close()
         self.check.save()
-        msg = self._mk_one()
+        msg = self._mk_one(user=self.participant, check=self.check, present=False)
         self.assertRaises(UnauthorizedError, msg.run_job)
 
-    def test_delete_other_user(self):
-        other = User.objects.create(username="another")
-        self.meeting.add_roles(other, "participant")
-        msg = self._mk_one()
-        msg.mm.user_pk = other.pk
-        self.assertRaises(UnauthorizedError, msg.run_job)
-
-
-class AddUserPresenceTests(TestCase, _PresenceFixture):
-    @classmethod
-    def setUpTestData(cls):
-        cls.fixture()
-        cls.moderator = User.objects.create(username="moderator")
-        cls.meeting.add_roles(cls.moderator, "moderator")
-
-    @property
-    def _cut(self):
-        from voteit.presence.messages import AddUserPresence
-
-        return AddUserPresence
-
-    def _mk_one(self):
-        return self._cut(
-            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"},
-            presence_check=self.check.pk,
-            userid=self.user.pk,
-        )
-
-    def test_add(self):
-        self.assertFalse(self.check.present_users.count())
-        msg = self._mk_one()
-        msg.run_job()
-        self.assertTrue(self.check.present_users.count())
-
-    def test_add_closed_check(self):
+    def test_delete_moderator_closed_check(self):
+        self.check.presences.create(user=self.participant)
         self.check.close()
         self.check.save()
-        msg = self._mk_one()
-        self.assertRaises(UnauthorizedError, msg.run_job)
-
-    def test_add_not_participant(self):
-        self.meeting.remove_roles(self.user, "participant")
-        msg = self._mk_one()
-        self.assertRaises(ValidationErrorMsg, msg.run_job)
-
-    def test_add_regular_user(self):
-        self.meeting.remove_roles(self.moderator, "moderator")
-        msg = self._mk_one()
-        self.assertRaises(UnauthorizedError, msg.run_job)
-
-    def test_add_non_existing_userid(self):
-        msg = self._mk_one()
-        msg.data.userid = -1
-        self.assertRaises(ValidationErrorMsg, msg.run_job)
-
-
-class RemoveUserPresenceTests(TestCase, _PresenceFixture):
-    @classmethod
-    def setUpTestData(cls):
-        from voteit.presence.models import Presence
-
-        cls.fixture()
-        cls.presence = Presence.objects.create(user=cls.user, presence_check=cls.check)
-        cls.moderator = User.objects.create(username="moderator")
-        cls.meeting.add_roles(cls.moderator, "moderator")
-
-    @property
-    def _cut(self):
-        from voteit.presence.messages import DeleteUserPresence
-
-        return DeleteUserPresence
-
-    def _mk_one(self):
-        return self._cut(
-            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"},
-            pk=self.presence.pk,
-            userid=self.user.pk,
+        msg = self._mk_one(
+            user=self.moderator,
+            check=self.check,
+            present=False,
+            presence_user=self.participant,
         )
+        self.assertRaises(UnauthorizedError, msg.run_job)
 
-    def test_delete(self):
-        self.assertTrue(self.check.present_users.count())
-        msg = self._mk_one()
+    def test_delete_moderator(self):
+        self.check.presences.create(user=self.participant)
+        msg = self._mk_one(
+            user=self.moderator,
+            check=self.check,
+            present=False,
+            presence_user=self.participant,
+        )
         msg.run_job()
-        self.assertFalse(self.check.present_users.count())
+        self.assertFalse(self.check.presences.count())
 
-    def test_delete_closed_check(self):
-        self.check.close()
-        self.check.save()
-        msg = self._mk_one()
-        self.assertRaises(UnauthorizedError, msg.run_job)
+    def test_delete_moderator_nonexisting_outsider(self):
+        self.check.presences.create(user=self.outsider)
+        msg = self._mk_one(
+            user=self.moderator,
+            check=self.check,
+            present=False,
+            presence_user=self.outsider,
+        )
+        msg.run_job()
+        self.assertFalse(self.check.presences.count())
 
-    def test_delete_regular_user(self):
-        self.meeting.remove_roles(self.moderator, "moderator")
-        msg = self._mk_one()
-        self.assertRaises(UnauthorizedError, msg.run_job)
+    def test_delete_moderator_existing_outsider(self):
+        self.check.presences.create(user=self.outsider)
+        msg = self._mk_one(
+            user=self.moderator,
+            check=self.check,
+            present=False,
+            presence_user=self.outsider,
+        )
+        msg.run_job()
+        self.assertFalse(self.check.presences.count())

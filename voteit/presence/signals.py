@@ -4,11 +4,12 @@ from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
+from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
 from envelope.utils import AppState
+
 from voteit.core.decorators import disable_on_raw_save
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
@@ -17,7 +18,6 @@ from voteit.presence.messages import PresenceAdded
 from voteit.presence.messages import PresenceCheckAdded
 from voteit.presence.messages import PresenceCheckChanged
 from voteit.presence.messages import PresenceCheckDeleted
-from voteit.presence.messages import PresenceCheckStatus
 from voteit.presence.messages import PresenceDeleted
 from voteit.presence.models import Presence
 from voteit.presence.models import PresenceCheck
@@ -27,34 +27,32 @@ from voteit.presence.rest_api.serializers import PresenceDetailSerializer
 
 @receiver(post_save, sender=Presence)
 @disable_on_raw_save
-def presence_added(instance=None, created: bool = None, **kw):
-    """Send presence item to user channel and a count to the specific presence check channel."""
+def presence_added(instance: Presence, created: bool = None, **kw):
+    """
+    Send presence item to user channel and a count to the specific presence check channel.
+    """
     if created:
-        # There is no change for presence that's relevant
-        user_ch = UserChannel.from_instance(instance.user)
-        data = PresenceDetailSerializer(instance).data
-        msg = PresenceCheckStatus(
-            pk=instance.presence_check.pk,
-            present=instance.presence_check.presences.count(),
-        )
-        ch = PresenceCheckChannel.from_instance(instance.presence_check)
-        ch.sync_publish(msg)
-        # And the users message
-        presence_msg = PresenceAdded(**data)
-        user_ch.sync_publish(presence_msg)
+        _publish_presence_changed(presence=instance, present=True)
 
 
-@receiver(post_delete, sender=Presence)
-def presence_deleted(instance: Presence = None, **kw):
-    """Notify of removed presence item to user channel and a count to the specific presence check channel."""
-    msg = PresenceCheckStatus(
-        pk=instance.presence_check.pk, present=instance.presence_check.presences.count()
-    )
-    ch = PresenceCheckChannel.from_instance(instance.presence_check)
+@receiver(pre_delete, sender=Presence)
+def presence_deleted(instance: Presence, **kw):
+    """
+    Notify of removed presence item to user channel and a count to the specific presence check channel.
+    """
+    _publish_presence_changed(presence=instance, present=False)
+
+
+def _publish_presence_changed(*, presence: Presence, present: bool):
+    data = PresenceDetailSerializer(presence).data
+    if present:
+        msg = PresenceAdded(**data)
+    else:
+        msg = PresenceDeleted(**data)
+    ch = PresenceCheckChannel.from_instance(presence.presence_check)
     ch.sync_publish(msg)
-    presence_msg = PresenceDeleted(pk=instance.pk)
-    user_ch = UserChannel.from_instance(instance.user)
-    user_ch.sync_publish(presence_msg)
+    user_ch = UserChannel.from_instance(presence.user)
+    user_ch.sync_publish(msg)
 
 
 @receiver(post_save, sender=PresenceCheck)
@@ -74,7 +72,9 @@ def presence_check_changed(instance: PresenceCheck = None, created: bool = None,
 
 @receiver(post_delete, sender=PresenceCheck)
 def presence_check_deleted(instance=None, **kw):
-    """Transmit that presence check has been deleted to meeting channel."""
+    """
+    Transmit that presence check has been deleted to meeting channel.
+    """
     meeting = instance.meeting
     if meeting is not None:
         msg = PresenceCheckDeleted(pk=instance.pk)
@@ -86,7 +86,9 @@ def presence_check_deleted(instance=None, **kw):
 def _channel_subscribed(
     context: Meeting, user: AbstractUser, app_state: AppState, **kw
 ):
-    """Populate app_state with current, if any, presence check objects."""
+    """
+    Populate app_state with current, if any, presence check objects.
+    """
     with suppress(ObjectDoesNotExist):
         if presence_check := context.presence_checks.latest_open():
             app_state.append_from(
@@ -102,6 +104,9 @@ def _channel_subscribed(
 def _check_channel_subscribed(
     context: PresenceCheck, user: AbstractUser, app_state: AppState, **kw
 ):
-    app_state.append(
-        PresenceCheckStatus(pk=context.pk, present=context.presences.count())
+    """
+    Since this sends out who's present, it has restricted access.
+    """
+    app_state.append_from_queryset(
+        context.presences.all(), PresenceDetailSerializer, PresenceAdded
     )
