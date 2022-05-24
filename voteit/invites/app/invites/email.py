@@ -18,6 +18,24 @@ if TYPE_CHECKING:
 
 @invite_data
 class Email(BaseModel):
+    """
+    Email handles quite differently now...
+
+    >>> Email(email="  bjÖRn@hej.se")
+    Email(email='björn@hej.se')
+
+    >>> Email(email="  bjÖRn@åhlens.nu")
+    Email(email='björn@åhlens.nu')
+
+    >>> Email(email=" Björn <bjÖRn@åhlens.nu>")
+    Email(email='björn@åhlens.nu')
+
+    >>> Email(email="  bjÖRn@hej£.nu")
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError:
+    """
+
     email: EmailStr
 
     @validator("email")
