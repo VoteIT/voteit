@@ -24,6 +24,7 @@ from envelope.messages.channels import RecheckChannelSubscriptions
 from envelope.messages.common import Status
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import websocket_send
+from voteit.core.loggers import log_roles_change
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.schemas import RoleOutput
 from voteit.core.utils import get_model_by_shortname
@@ -102,7 +103,14 @@ class AddRoles(BaseRoles):
     def run_job(self) -> Status:
         users_qs = self.validate_and_fetch()
         for user in users_qs:
-            self.context.add_roles(user, *self.data.roles)
+            if roles_objs := self.context.add_roles(user, *self.data.roles):
+                log_roles_change(
+                    "Added",
+                    actor=self.user,
+                    for_user=user,
+                    context=self.context,
+                    roles=roles_objs,
+                )
         if self.mm.consumer_name:  # If this is a script, consumer_name will be None
             response = Status.from_message(self)
             websocket_send(response, state=response.SUCCESS)
@@ -122,7 +130,14 @@ class RemoveRoles(BaseRoles):
         users_qs = self.validate_and_fetch()
         notify_users = set()
         for user in users_qs:
-            if self.context.remove_roles(user, *self.data.roles):
+            if roles_objs := self.context.remove_roles(user, *self.data.roles):
+                log_roles_change(
+                    "Removed",
+                    actor=self.user,
+                    for_user=user,
+                    context=self.context,
+                    roles=roles_objs,
+                )
                 notify_users.add(user)
         response = None
         if self.mm.consumer_name:  # If this is a script, consumer_name will be None
