@@ -129,7 +129,9 @@ class AddRolesTests(TestCase):
             {
                 "message": "Added",
                 "context_name": "meeting",
-                "context_pk": 1,
+                "context": 1,
+                "org": 1,
+                "meeting": 1,
                 "actor": 1,
                 "for_user": 2,
                 "roles": [str(ROLE_DISCUSSER)],
@@ -187,7 +189,9 @@ class RemoveRolesTests(TestCase):
             {
                 "message": "Removed",
                 "context_name": "meeting",
-                "context_pk": 1,
+                "context": 1,
+                "meeting": 1,
+                "org": 1,
                 "actor": 1,
                 "for_user": 2,
                 "roles": [str(ROLE_PARTICIPANT)],

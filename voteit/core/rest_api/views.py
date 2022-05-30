@@ -11,6 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from voteit.core.loggers import log_auth
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.mixins import TransitionsMixin
@@ -98,12 +99,14 @@ class UserView(
 
     @action(methods=["POST"], detail=False)
     def logout(self, request):
+        log_auth("Logout", request=request)
         logout(request)
         return Response()
 
     @action(methods=["POST"], detail=True)
     def switch(self, request, pk):
         user = self.get_object()
+        log_auth("Switch user", for_user=user, request=request)
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         serializer = self.serializer_class(user)
         return Response(serializer.data)

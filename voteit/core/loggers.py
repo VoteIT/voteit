@@ -3,18 +3,23 @@ from logging import LoggerAdapter
 from logging import getLogger
 from typing import Optional
 from typing import TYPE_CHECKING
+from typing import Union
 
+from django.core.handlers.wsgi import WSGIRequest
 from django.db.transaction import on_commit
+from django.db.models import Model
+from rest_framework.request import Request
 
+from voteit.core.abcs import MeetingContext
+from voteit.core.abcs import OrganisationContext
 from voteit.core.utils import get_model_shortname
 
 if TYPE_CHECKING:
-    from django.db.models import Model
     from voteit.core.models import User as UserType
     from voteit.core.role import Role
 
 
-class OnCommitLoggerAdapter(LoggerAdapter):
+class OnCommitAdapterMixin:
     """
     If there's an active transaction, delay the logging until after commit.
     Any exception will cause the log to be thrown away, but this is the point!
@@ -31,23 +36,48 @@ class OnCommitLoggerAdapter(LoggerAdapter):
             on_commit(lambda: self.logger.log(level, msg, *args, **kwargs))
 
 
-class EventLoggerAdapter(OnCommitLoggerAdapter):
+class EventAdapterMixin:
     def process(self, msg, kwargs):
         msg, kwargs = super().process(msg, kwargs)
-        if context := kwargs.pop("context"):
+        if request := kwargs.pop("request", None):
+            request: Union[Request, WSGIRequest]
+            kwargs["extra"]["actor"] = getattr(request, "user", None)
+            kwargs["extra"]["path"] = request.path
+            kwargs["extra"]["method"] = request.method
+        if context := kwargs.pop("context", None):
             context: Model
             kwargs["extra"]["context_name"] = get_model_shortname(context)
-            kwargs["extra"]["context_pk"] = context.pk
-        if actor := kwargs.pop("actor"):
-            actor: UserType
-            kwargs["extra"]["actor"] = actor.pk
-        if for_user := kwargs.pop("for_user"):
-            for_user: UserType
-            kwargs["extra"]["for_user"] = for_user.pk
+            kwargs["extra"]["context"] = context.pk
+            organisation = None
+            if isinstance(context, OrganisationContext):
+                organisation = getattr(context.organisation, "pk", None)
+            if isinstance(context, MeetingContext):
+                kwargs["extra"]["meeting"] = context.meeting.pk
+                if organisation is None:
+                    organisation = getattr(context.meeting.organisation, "pk", None)
+            if organisation:
+                kwargs["extra"]["org"] = organisation
         for k in set(kwargs) - {"extra"}:
             # Move other things to extra domain
-            kwargs["extra"][k] = kwargs.pop(k)
+            val = kwargs.pop(k)
+            if isinstance(val, Model):
+                val = val.pk
+            kwargs["extra"][k] = val
         return msg, kwargs
+
+
+class OnCommitLoggerAdapter(OnCommitAdapterMixin, LoggerAdapter):
+    ...
+
+
+class OnCommitEventLoggerAdapter(
+    OnCommitAdapterMixin, EventAdapterMixin, LoggerAdapter
+):
+    ...
+
+
+class EventLoggerAdapter(EventAdapterMixin, LoggerAdapter):
+    ...
 
 
 def getOnCommitLogger(name=None, extra=None):
@@ -63,7 +93,7 @@ def getOnCommitLogger(name=None, extra=None):
     return logger
 
 
-def getEventLogger(name=None, extra=None):
+def getEventLogger(name=None, extra=None, on_commit=True):
     """
     Logger with on_commit behaviour and some extra methods to extract user and context from kwargs.
     """
@@ -71,7 +101,10 @@ def getEventLogger(name=None, extra=None):
     if extra is None:
         # We need a dict here
         extra = {}
-    logger = EventLoggerAdapter(logger, extra)
+    if on_commit:
+        logger = OnCommitEventLoggerAdapter(logger, extra)
+    else:
+        logger = EventLoggerAdapter(logger, extra)
     return logger
 
 
@@ -82,6 +115,8 @@ notification_logger = getLogger("voteit.notification")
 events_logger = getEventLogger("voteit.event")
 # A permission is changed by someone
 roles_logger = getEventLogger("voteit.event.roles")
+# Authentication logger
+auth_logger = getEventLogger("voteit.event.auth", on_commit=False)
 
 
 def log_roles_change(
@@ -91,7 +126,7 @@ def log_roles_change(
     context: Model,
     for_user: UserType,
     roles: list[Role, str],
-    extra: Optional[dict] = None,
+    **kwargs,
 ) -> None:
     """
     Shorthand to log changes to roles
@@ -101,7 +136,6 @@ def log_roles_change(
     :param context: Where
     :param for_user: Who was changed
     :param roles: List of roles
-    :param extra: extra log param
     """
     roles_logger.info(
         msg,
@@ -109,4 +143,41 @@ def log_roles_change(
         context=context,
         for_user=for_user,
         roles=list(str(x) for x in roles),
+        **kwargs,
+    )
+
+
+def log_auth(
+    msg: str,
+    *,
+    request: Union[Request, WSGIRequest],
+    actor: Optional[UserType] = None,
+    context: Model = None,
+    for_user: UserType = None,
+    **kwargs,
+):
+    """
+    Shorthand auth log
+
+    :param msg: Describe action
+    :param request:
+    :param actor: Who did this, usually fetched from request
+    :param context: Where the auth-event was. (Usually org)
+    :param for_user: Is this for someone else than the actor?
+    """
+    if actor:
+        kwargs["actor"] = actor
+    if context:
+        kwargs["context"] = context
+    if for_user:
+        kwargs["for_user"] = for_user
+    ip = request.META.get("HTTP_X_FORWARDED_FOR", None)
+    if not ip:
+        ip = request.META.get("REMOTE_ADDR", None)
+    if ip:
+        kwargs["ip"] = ip
+    auth_logger.info(
+        msg,
+        request=request,
+        **kwargs,
     )
