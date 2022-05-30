@@ -50,7 +50,6 @@ class CloneMeetingTests(TestCase):
 
     def test_copy_org_manager(self):
         msg = self._mk_one(self.org_manager)
-
         with patch.object(channel_layer, "send") as mocked_send:
             with FakeCommit():
                 msg.run_job()
@@ -59,6 +58,9 @@ class CloneMeetingTests(TestCase):
                     {
                         "text_data": '{"t": "s.stat", "p": null, "i": "copy", "s": "r"}',
                         "type": "websocket.send",
+                        "i": "copy",
+                        "t": "s.stat",
+                        "s": "r",
                     },
                     mocked_send.mock_calls[0].args[1],
                 )
@@ -68,6 +70,9 @@ class CloneMeetingTests(TestCase):
                 {
                     "text_data": '{"t": "s.stat", "p": null, "i": "copy", "s": "s"}',
                     "type": "websocket.send",
+                    "i": "copy",
+                    "t": "s.stat",
+                    "s": "s",
                 },
                 mocked_send.mock_calls[1].args[1],
             )
