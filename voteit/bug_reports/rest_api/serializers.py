@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from voteit.bug_reports.models import BugReport
-from voteit.core.loggers import slack_logger
+from voteit.core.loggers import notification_logger
 from voteit.meeting.models import Meeting
 
 
@@ -17,13 +17,17 @@ class BugReportSerializer(serializers.ModelSerializer):
         )
 
     def create(self, validated_data):
-        user = self.context['request'].user
-        meeting: Meeting = validated_data['meeting']
-        slack_logger.info(
+        user = self.context["request"].user
+        meeting: Meeting = validated_data["meeting"]
+        notification_logger.warning(
             f"Bug report in {meeting.organisation.title}/{meeting.title}:\n{validated_data['description']}"
         )
-        return super().create({
-            **validated_data,
-            'user': user,
-            'user_roles': tuple(meeting.get_roles(user))          # Roles at time of bug report
-        })
+        return super().create(
+            {
+                **validated_data,
+                "user": user,
+                "user_roles": tuple(
+                    meeting.get_roles(user)
+                ),  # Roles at time of bug report
+            }
+        )
