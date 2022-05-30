@@ -14,7 +14,6 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
 
-User = get_user_model()
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
@@ -44,6 +43,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        User: UserType = get_user_model()
         created_by: UserType = User.objects.get(pk=options.get("u"))
         meeting: Meeting = Meeting.objects.get(pk=options.get("m"))
         roles = {str(ROLE_PARTICIPANT)}

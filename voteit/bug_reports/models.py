@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -12,13 +13,18 @@ from voteit.bug_reports.workflows import BugReportWf
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
 
+if TYPE_CHECKING:
+    from voteit.core.models import User as UserType
 
-User = get_user_model()
+
+__all__ = ("BugReport",)
 
 
 class BugReport(MeetingContext):
-    meeting = models.ForeignKey(Meeting, models.CASCADE)
-    user = models.ForeignKey(User, models.CASCADE)
+    meeting: Meeting = models.ForeignKey(Meeting, models.CASCADE)
+    user: UserType = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE
+    )
     user_roles: list[str] = ArrayField(models.CharField(max_length=20, default=tuple))
     user_platform: dict = models.JSONField(
         encoder=DjangoJSONEncoder

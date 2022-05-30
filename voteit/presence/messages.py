@@ -22,8 +22,6 @@ from voteit.presence.models import PresenceCheck
 from voteit.presence.permissions import PresenceCheckPermissions
 from voteit.presence.permissions import PresencePermissions
 
-User: AbstractUser = get_user_model()
-
 
 class ChangePresenceSchema(BaseModel):
     presence_check: int
