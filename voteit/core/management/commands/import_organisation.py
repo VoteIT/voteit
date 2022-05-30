@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import yaml
-from django.core.management import BaseCommand
-from django.core.serializers.base import DeserializedObject
-from django.db import DEFAULT_DB_ALIAS
+import os
+import traceback
 
-from voteit.core.importers.organisation import OrganisationImporter
+from django.contrib.auth import get_user_model
+from django.core.management import BaseCommand
+from django.db import DEFAULT_DB_ALIAS
+from django.db import transaction
+from dolly.core import Importer
 
 
 class Command(BaseCommand):
-    help = (
-        "Import all organisation related things. Merge with an existing organisation."
-    )
+    help = "Import all organisation related things. Create a new organisation or merge with an existing."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -30,40 +30,71 @@ class Command(BaseCommand):
             help="Do nothing, just report",
         )
         parser.add_argument(
-            "--org",
-            help="Organisation pk to append content to",
+            "--merge",
+            help="Merge with this organisation pk. The organisation object itself won't be imported.",
         )
-        parser.add_argument(
-            "-o",
-            help="Output filemap",
-        )
+        # parser.add_argument(
+        #     "-o",
+        #     help="Output filemap",
+        # )
         parser.add_argument(
             "--reuse-userid",
             help="Reuse organisation users with the same userid. "
-            "This is not a good idea for live imports!",
+            "It only works on existing organisations with --merge.",
             default=False,
             action="store_true",
         )
 
     def handle(self, *args, **options):
-        filemap_name = options["o"]
+        rel_fn = options["filename"]
         reuse_userid = options["reuse_userid"]
-        importer = OrganisationImporter(
-            using=options["database"], filename=options["filename"]
-        )
-        importer.run(
-            dry=options["dry_run"],
-            existing_organisation_pk=options["org"],
-            reuse_userid=reuse_userid,
-        )
-        if filemap_name:
-            print(f"Writing filemap as {filemap_name}")
-            data = {}
-            for k, v in importer.objects_to_handle.items():
-                data[k] = []
-                for obj in v.values():
-                    # Only deserialized objects, other instances were loaded from the db
-                    if isinstance(obj, DeserializedObject):
-                        data[k].append(obj.object.pk)
-            with open(filemap_name, "w") as filemap:
-                yaml.dump(data, filemap)
+        merge_org = options["merge"]
+        if not merge_org and reuse_userid:
+            raise ValueError("reuse userid can only be specified together with merge.")
+        dry_run = options["dry_run"]
+        # quiet = options["quiet"]
+        if dry_run:  # and not quiet:
+            print("!! Dry run - nothing will be saved !!")
+        filename = os.path.join(os.getcwd(), rel_fn)
+        importer = Importer.from_filename(filename)
+        importer.print_log = True
+        # There are some reverse dependencies here, but they're for attributes we don't really need to care about
+        # so we'll simply ignore them to solve the conflict.
+        # This will destroy data, but active list or speaker should never be imported anyway.
+        from voteit.speaker.models import SpeakerListSystem
+        from voteit.speaker.models import SpeakerList
+
+        importer.add_clear_attrs(SpeakerListSystem, "active_list")
+        importer.add_clear_attrs(SpeakerList, "current")
+        if merge_org:
+            from voteit.organisation.models import Organisation
+
+            assert len(importer.data[Organisation]) == 1
+            deserialized_org = next(iter(importer.data[Organisation]))
+            org = Organisation.objects.get(pk=merge_org)
+            importer.replace_deserialized_object(deserialized_org, org)
+            importer.add_log(
+                mod=Organisation,
+                act="merge",
+                msg=f"Replacing organisation from import with organisation we want to merge with",
+            )
+            User = get_user_model()
+            # Since the exclude operation is a bit more complex than just keywords we'll do it semi-manual here.
+            # Even if this is slower, we make sure that we'll never match users outside of this org.
+            exclude_qs = User.objects.all().exclude(organisation=org).distinct()
+            attrs = ["username", "email"]
+            if reuse_userid:
+                attrs.append("userid")
+            for attr in attrs:
+                round_qs = importer.match_and_update(User, attr, exclude_qs=exclude_qs)
+                exclude_qs = round_qs | exclude_qs
+        try:
+            with transaction.atomic(durable=True):
+                importer()
+                if dry_run:
+                    print("!! DRY-RUN - nothing saved !!")
+                    transaction.set_rollback(True)
+        except Exception as exc:
+            traceback.print_exc()
+        else:
+            print("DONE!")
