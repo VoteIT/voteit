@@ -24,9 +24,11 @@ class Manual(ElectoralRegisterPolicy):
 
     def get_voters(self, *, weight_dict: dict[int, int], **kwargs) -> dict[int, int]:
         """
-        :param weight_dict: user_pk as key and weight as value, or simply skip it for 1
+        :param weight_dict: user_pk as key and weight as value. Require user to be potential voter.
+            Anything not in weight_dict will be skipped.
         """
         return dict(
-            (x, weight_dict.get(x, 1))
+            (x, weight_dict[x])
             for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
+            if x in weight_dict
         )

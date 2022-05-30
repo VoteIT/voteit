@@ -188,6 +188,7 @@ class ManualCreateERTests(TestCase):
 
     def _mk_one(self, user, **kw):
         kw.setdefault("meeting", self.meeting.pk)
+        kw.setdefault("weights", [{"user": self.participant.pk, "weight": 1}])
         return self._cut(
             mm={"user_pk": user.pk, "consumer_name": "abc", "id": "1"}, **kw
         )
