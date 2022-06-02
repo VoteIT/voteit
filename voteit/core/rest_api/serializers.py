@@ -86,7 +86,7 @@ class BaseModelSerializer(serializers.ModelSerializer):
                             self.author_kw: "You're not a moderator and may not specify author"
                         }
                     )
-                if author not in self.instance.meeting.participants.all():
+                if author not in meeting.participants.all():
                     raise ValidationError(
                         detail={self.author_kw: "Not an existing meeting participant"}
                     )
