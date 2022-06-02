@@ -48,7 +48,7 @@ class OrganisationRoles(Roles):
     importers = {"organisation": {"remap_relations": {"organisation": "context"}}}
 
     class Meta:
-        verbose_name = verbose_name_plural = _("Organisation roles")
+        verbose_name = verbose_name_plural = "Organisation roles"
 
 
 class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
@@ -65,8 +65,8 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     )
 
     class Meta:
-        verbose_name = _("Organisation")
-        verbose_name_plural = _("Organisations")
+        verbose_name = "Organisation"
+        verbose_name_plural = "Organisations"
         ordering = ("title",)
 
     @property
@@ -289,7 +289,7 @@ class TermsOfService(BaseContent, OrganisationContext):
     organisation: Organisation = models.ForeignKey(
         Organisation,
         on_delete=models.CASCADE,
-        verbose_name=_("Organisation"),
+        verbose_name="Organisation",
         related_name="tos",
     )
 

@@ -68,7 +68,7 @@ class MeetingRoles(Roles, MeetingContext):
         return self.context
 
     class Meta:
-        verbose_name = verbose_name_plural = _("Meeting roles")
+        verbose_name = verbose_name_plural = "Meeting roles"
 
     exporters = {"meeting": {"meeting_kw": "context"}}
     importers = {
@@ -89,22 +89,22 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False
     )
     start_time: Optional[datetime] = models.DateTimeField(
-        verbose_name=_("When the meeting starts/started."), null=True, blank=True
+        verbose_name="When the meeting starts/started.", null=True, blank=True
     )
     end_time: Optional[datetime] = models.DateTimeField(
-        verbose_name=_("When the meeting ends/ended."), null=True, blank=True
+        verbose_name="When the meeting ends/ended.", null=True, blank=True
     )
     public: bool = models.BooleanField(
-        verbose_name=_("Is this meeting viewable by anyone?"), default=False
+        verbose_name="Is this meeting viewable by anyone?", default=False
     )
     er_policy_name: Optional[str] = models.CharField(
-        verbose_name=_("ID of used electoral policy"),
+        verbose_name="ID of used electoral policy",
         max_length=30,
         null=True,
         blank=True,
     )
     proposal_id_policy_name: Optional[str] = models.CharField(
-        verbose_name=_("Proposal ID policy name, defaults to system standard"),
+        verbose_name="Proposal ID policy name, defaults to system standard",
         max_length=30,
         null=True,
         blank=True,
@@ -225,7 +225,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         source=MeetingWf.ARCHIVING,
         target=MeetingWf.CLOSED,
         permission=MeetingPermissions.ARCHIVE,
-        custom={"title": _("Undo archiving request")},
+        custom={"title": _("Abort archiving")},
     )
     def abort_archiving(self):
         self.archive_after = None

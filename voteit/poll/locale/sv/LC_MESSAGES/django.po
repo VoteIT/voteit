@@ -3,159 +3,163 @@
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
-#, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
+"Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-09-10 14:53+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: \n"
+"POT-Creation-Date: 2022-06-02 08:06+0000\n"
+"PO-Revision-Date: 2022-06-02 10:07+0200\n"
+"Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
+"Language-Team: \n"
+"Language: sv\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 2.3\n"
 
-#: voteit/poll/app/er_policys/auto_always.py:27
+#: app/er_policies/auto_always.py:32
 msgid "Demo meeting: Always update electoral register"
-msgstr ""
+msgstr "Demomöte: Uppdatera alltid röstlängden"
 
-#: voteit/poll/app/er_policys/auto_before_poll.py:28
+#: app/er_policies/auto_before_poll.py:26
 msgid "Automatic before poll"
-msgstr ""
+msgstr "Automatiskt före omröstning"
 
-#: voteit/poll/app/polls/combined_simple.py:28
-#: voteit/poll/app/polls/simple.py:24
+#: app/er_policies/manual.py:21
+msgid "Manual only"
+msgstr "Bara manuellt"
+
+#: app/er_policies/presence_check.py:27
+msgid "Closing a presence check will set a new electoral register."
+msgstr "En ny röstlängd skapas när en närvarokontroll avslutas."
+
+#: app/polls/combined_simple.py:26 app/polls/simple.py:22
 msgid "Yes"
-msgstr ""
+msgstr "Ja"
 
-#: voteit/poll/app/polls/combined_simple.py:28
-#: voteit/poll/app/polls/simple.py:24
+#: app/polls/combined_simple.py:26 app/polls/simple.py:22
 msgid "No"
-msgstr ""
+msgstr "Nej"
 
-#: voteit/poll/app/polls/combined_simple.py:28
+#: app/polls/combined_simple.py:26
 msgid "Abstain"
-msgstr ""
+msgstr "Avstå"
 
-#: voteit/poll/app/polls/combined_simple.py:80
+#: app/polls/combined_simple.py:67
 msgid "Combined Simple"
-msgstr ""
+msgstr "Kombinerad enkel"
 
-#: voteit/poll/app/polls/irv.py:77
-msgid "Instant-Runoff Voting"
-msgstr ""
-
-#: voteit/poll/app/polls/irv.py:103
-#, python-format
-msgid "The method %(method)s require at least 3 proposals"
-msgstr ""
-
-#: voteit/poll/app/polls/schulze.py:82
-msgid "Schulze"
-msgstr ""
-
-#: voteit/poll/app/polls/schulze.py:171
-#: voteit/poll/app/polls/scottish_stv.py:161
+#: app/polls/dutt.py:148 app/polls/dutt.py:160 app/polls/dutt.py:178
+#: app/polls/majority.py:131 app/polls/schulze.py:177
+#: app/polls/scottish_stv.py:153
 msgid "Invalid vote"
-msgstr ""
+msgstr "Ogiltig röst"
 
-#: voteit/poll/app/polls/schulze.py:176
-#: voteit/poll/app/polls/scottish_stv.py:166
+#: app/polls/dutt.py:152
+msgid "Too few proposals picked"
+msgstr "För få förslag valda"
+
+#: app/polls/dutt.py:164
+msgid "Too many proposals picked"
+msgstr "För många förslag valda"
+
+#: app/polls/dutt.py:183 app/polls/schulze.py:182 app/polls/scottish_stv.py:158
 #, python-format
 msgid "Invalid choice, the following proposals don't exist: %s"
-msgstr ""
+msgstr "Ogiltigt val, följande förslag existerar inte: %s"
 
-#: voteit/poll/app/polls/schulze.py:211
+#: app/polls/irv.py:68
+msgid "Instant-Runoff Voting"
+msgstr "Instant-Runoff Voting"
+
+#: app/polls/irv.py:94
+#, python-format
+msgid "The method %(method)s require at least 3 proposals"
+msgstr "Metoden %(method)s kräver minst 3 förslag"
+
+#: app/polls/majority.py:68
+msgid "Majority"
+msgstr "Majoritet"
+
+#: app/polls/majority.py:125
+msgid "Must have at least 2 proposals"
+msgstr "Metoden %(method)s kräver minst 2 förslag"
+
+#: app/polls/schulze.py:78
+msgid "Schulze"
+msgstr "Schulze"
+
+#: app/polls/schulze.py:223
 msgid "Repeated Schulze"
-msgstr ""
+msgstr "Repeterad Schulze"
 
-#: voteit/poll/app/polls/scottish_stv.py:107
+#: app/polls/scottish_stv.py:97
 msgid "Scottish STV"
-msgstr ""
+msgstr "Skotsk STV"
 
-#: voteit/poll/app/polls/scottish_stv.py:179
+#: app/polls/scottish_stv.py:170
 #, python-format
-msgid ""
-"The method %(method)s require at least %(min_losers)d more proposals than "
-"winners"
-msgstr ""
+msgid "The method %(method)s can't have as many winners as proposals"
+msgstr "Metoden %(method)s kan inte ha lika många vinnare som förslag"
 
-#: voteit/poll/app/polls/scottish_stv.py:185
+#: app/polls/scottish_stv.py:175
 #, python-format
-msgid "The method %(method)s require at least %(min_winners)d winner(s)"
-msgstr ""
+msgid "The method %(method)s require at least %(min_winners)d winners"
+msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
 
-#: voteit/poll/app/polls/simple.py:71
+#: app/polls/simple.py:58
 msgid "Simple"
-msgstr ""
+msgstr "Enkel"
 
-#: voteit/poll/models.py:139
-msgid "JSON-serialized ballot data"
-msgstr ""
-
-#: voteit/poll/models.py:142
-msgid "SHA512 checksum of ballot data"
-msgstr ""
-
-#: voteit/poll/models.py:148
-msgid "Abstentions"
-msgstr ""
-
-#: voteit/poll/models.py:151
-msgid "JSON-serialized result data"
-msgstr ""
-
-#: voteit/poll/models.py:243
+#: models.py:317
 msgid "Make upcoming"
-msgstr ""
+msgstr "Gör kommande"
 
-#: voteit/poll/models.py:257
+#: models.py:331
 msgid "Start"
-msgstr ""
+msgstr "Starta"
 
-#: voteit/poll/models.py:270
+#: models.py:344
 msgid "Close"
-msgstr ""
+msgstr "Stäng"
 
-#: voteit/poll/models.py:284
+#: models.py:359
 msgid "Finish"
-msgstr ""
+msgstr "Avsluta"
 
-#: voteit/poll/models.py:311
+#: models.py:391
 msgid "Cancel"
-msgstr ""
+msgstr "Avbryt"
 
-#: voteit/poll/models.py:323
+#: models.py:404
 msgid "Revert to private"
-msgstr ""
+msgstr "Återgå till privat"
 
-#: voteit/poll/workflows.py:13
-msgid "Private"
-msgstr ""
-
-#: voteit/poll/workflows.py:14
-msgid "Upcoming"
-msgstr ""
-
-#: voteit/poll/workflows.py:15
-msgid "Ongoing"
-msgstr ""
-
-#: voteit/poll/workflows.py:16
-msgid "Closed"
-msgstr ""
-
-#: voteit/poll/workflows.py:17
-msgid "Finished"
-msgstr ""
-
-#: voteit/poll/workflows.py:18
-msgid "Canceled"
-msgstr ""
-
-#: voteit/poll/workflows.py:19
+#: models.py:416 workflows.py:19
 msgid "Failed"
-msgstr ""
+msgstr "Misslyckades"
+
+#: workflows.py:13
+msgid "Private"
+msgstr "Privat"
+
+#: workflows.py:14
+msgid "Upcoming"
+msgstr "Kommande"
+
+#: workflows.py:15
+msgid "Ongoing"
+msgstr "Pågående"
+
+#: workflows.py:16
+msgid "Closed"
+msgstr "Stängd"
+
+#: workflows.py:17
+msgid "Finished"
+msgstr "Avslutad"
+
+#: workflows.py:18
+msgid "Canceled"
+msgstr "Avbruten"

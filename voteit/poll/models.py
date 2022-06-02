@@ -183,19 +183,19 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         related_name="polls",
     )
     ballot_data: Optional[str] = models.TextField(
-        verbose_name=_("JSON-serialized ballot data"), editable=False, null=True
+        verbose_name="JSON-serialized ballot data", editable=False, null=True
     )
     ballot_checksum: Optional[str] = models.CharField(
-        verbose_name=_("SHA512 checksum of ballot data"),
+        verbose_name="SHA512 checksum of ballot data",
         max_length=128,
         editable=False,
         null=True,
     )
     abstains: int = models.PositiveIntegerField(
-        verbose_name=_("Abstentions"), default=0, editable=False
+        verbose_name="Abstentions", default=0, editable=False
     )
     result_data: Optional[Dict] = models.JSONField(
-        verbose_name=_("JSON-serialized result data"),
+        verbose_name="JSON-serialized result data",
         editable=False,
         null=True,
         encoder=DjangoJSONEncoder,

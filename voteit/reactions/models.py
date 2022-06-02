@@ -53,16 +53,20 @@ class ReactionButton(MeetingContext):
         ("warning", _("Warning")),
     )
 
-    title: str = models.CharField(_("Display name"), max_length=80)
-    icon: str = models.CharField(_("Icon name"), max_length=80, choices=ICON_CHOICES)
-    color: str = models.CharField(_("Color"), max_length=80, choices=COLOR_CHOICES)
+    title: str = models.CharField(verbose_name="Display name", max_length=80)
+    icon: str = models.CharField(
+        verbose_name="Icon name", max_length=80, choices=ICON_CHOICES
+    )
+    color: str = models.CharField(
+        verbose_name="Color", max_length=80, choices=COLOR_CHOICES
+    )
     meeting: Meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="reaction_buttons"
     )
     order: int = models.PositiveSmallIntegerField(default=0)
     change_roles: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
     list_roles: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
-    active: bool = models.BooleanField(_("Is this activated?"), default=True)
+    active: bool = models.BooleanField(verbose_name="Is this activated?", default=True)
     allowed_models: List[str] = ArrayField(
         models.CharField(max_length=20),
         default=_default_allowed_models,
@@ -73,8 +77,8 @@ class ReactionButton(MeetingContext):
     importers = {"meeting": {}, "organisation": {}}
 
     class Meta:
-        verbose_name = _("Reaction button")
-        verbose_name_plural = _("Reaction buttons")
+        verbose_name = "Reaction button"
+        verbose_name_plural = "Reaction buttons"
         ordering = ["order"]
 
     def save(self, **kw):
@@ -140,8 +144,8 @@ class Reaction(AgendaItemContext):
     )
 
     class Meta:
-        verbose_name = _("Reaction")
-        verbose_name_plural = _("Reactions")
+        verbose_name = "Reaction"
+        verbose_name_plural = "Reactions"
         unique_together = [["content_type", "object_id", "button", "user"]]
 
     # class Manager(models.Manager):

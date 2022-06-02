@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-09-10 14:53+0000\n"
+"POT-Creation-Date: 2022-06-02 07:50+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,38 +18,38 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: voteit/motion/models.py:50
+#: models.py:50
 msgid "Is anyone allowed to view motions except drafts and retracted?"
 msgstr ""
 
-#: voteit/motion/workflows.py:9
+#: workflows.py:9
 msgid "Open"
 msgstr ""
 
-#: voteit/motion/workflows.py:10
+#: workflows.py:10
 msgid "Closed"
 msgstr ""
 
-#: voteit/motion/workflows.py:28
+#: workflows.py:28
 msgid "Draft"
 msgstr ""
 
-#: voteit/motion/workflows.py:29
+#: workflows.py:29
 msgid "Published"
 msgstr ""
 
-#: voteit/motion/workflows.py:30
+#: workflows.py:30
 msgid "Retracted"
 msgstr ""
 
-#: voteit/motion/workflows.py:31
+#: workflows.py:31
 msgid "Accepted"
 msgstr ""
 
-#: voteit/motion/workflows.py:32
+#: workflows.py:32
 msgid "Rejected"
 msgstr ""
 
-#: voteit/motion/workflows.py:33
+#: workflows.py:33
 msgid "Unhandled"
 msgstr ""

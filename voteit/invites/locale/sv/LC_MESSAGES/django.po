@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-06-02 07:50+0000\n"
-"PO-Revision-Date: 2022-06-02 10:08+0200\n"
+"PO-Revision-Date: 2022-06-02 10:29+0200\n"
 "Language: sv\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -18,18 +18,35 @@ msgstr ""
 "Language-Team: \n"
 "X-Generator: Poedit 2.3\n"
 
-#: messages.py:61
-msgid "User doesn't exist"
-msgstr "Användaren finns inte"
+#: app/invites/email.py:48
+msgid "Send email"
+msgstr "Skicka epost"
 
-#: messages.py:83
-msgid "User can't be present here - maybe they're not a participant?"
-msgstr "Användaren kan inte sättas som närvarande här - de kanske inte är deltagare?"
+#: app/invites/email.py:55
+#, python-format
+msgid "Meeting invitation to %(title)s"
+msgstr "Mötesinbjudan till %(title)s"
 
-#: workflows.py:7
+#: exceptions.py:5
+msgid "Invites caused an error"
+msgstr "Inbjudningarna orsakade ett fel"
+
+#: workflows.py:12
 msgid "Open"
 msgstr "Öppen"
 
-#: workflows.py:7
-msgid "Closed"
-msgstr "Stängd"
+#: workflows.py:13
+msgid "Expired"
+msgstr "Utgången"
+
+#: workflows.py:14
+msgid "Revoked"
+msgstr "Tillbakadragen"
+
+#: workflows.py:15
+msgid "Accepted"
+msgstr "Accepterad"
+
+#: workflows.py:16
+msgid "Rejected"
+msgstr "Nekad"

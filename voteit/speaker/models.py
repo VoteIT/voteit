@@ -14,7 +14,6 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
-from django.db import transaction
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
@@ -54,7 +53,7 @@ class SpeakerSystemRoles(Roles, MeetingContext):
         return self.context.meeting
 
     class Meta:
-        verbose_name = verbose_name_plural = _("Speaker system roles")
+        verbose_name = verbose_name_plural = "Speaker system roles"
 
     exporters = {"meeting": {"meeting_kw": "context__meeting"}}
     importers = {
@@ -77,20 +76,20 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     title: Optional[str] = models.CharField(max_length=200, null=True)
     meeting: Optional[Meeting] = models.ForeignKey(
         Meeting,
-        verbose_name=_("Related meeting"),
+        verbose_name="Related meeting",
         on_delete=models.CASCADE,
         null=True,
         related_name="speaker_systems",
     )
     method_name: str = models.CharField(max_length=20)
     settings_data: dict = models.JSONField(
-        verbose_name=_("JSON-serialized settings data"),
+        verbose_name="JSON-serialized settings data",
         editable=False,
         null=True,
         encoder=DjangoJSONEncoder,
     )
     safe_positions: Optional[int] = models.PositiveSmallIntegerField(
-        verbose_name=_(
+        verbose_name=(
             "When a list is active, mark the top X positions as safe automatically. "
             "Safe speakers will never be moved down."
         ),
@@ -100,7 +99,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
     )
     active_list: Optional[SpeakerList] = models.OneToOneField(
         "SpeakerList",
-        verbose_name=_("Currently active speaker list"),
+        verbose_name="Currently active speaker list",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
@@ -156,6 +155,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         source=SpeakerSystemWf.INACTIVE,
         target=SpeakerSystemWf.ACTIVE,
         permission=SpeakerSystemPermissions.CHANGE,
+        custom={"title": _("Make active")},
     )
     def activate(self):
         """
@@ -167,6 +167,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         source=SpeakerSystemWf.ACTIVE,
         target=SpeakerSystemWf.INACTIVE,
         permission=SpeakerSystemPermissions.CHANGE,
+        custom={"title": _("Inactivate")},
     )
     def inactivate(self):
         """
@@ -178,6 +179,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         field=state,
         target=SpeakerSystemWf.ARCHIVED,
         permission=NOT_ALLOWED,
+        custom={"title": _("Archive")},
     )
     def archive(self):
         self.active_list = None
@@ -288,7 +290,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
     )
     current: Optional[Speaker] = models.OneToOneField(
         Speaker,
-        verbose_name=_("Current speaker, if any"),
+        verbose_name="Current speaker, if any",
         null=True,
         blank=True,
         on_delete=models.CASCADE,
@@ -333,6 +335,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
         source=SpeakerListWf.CLOSED,
         target=SpeakerListWf.OPEN,
         permission=SpeakerListPermissions.CHANGE,
+        custom={"title": _("Open")},
     )
     def open(self):
         pass
@@ -342,6 +345,7 @@ class SpeakerList(AgendaItemContext, MeetingContext):
         source=SpeakerListWf.OPEN,
         target=SpeakerListWf.CLOSED,
         permission=SpeakerListPermissions.CHANGE,
+        custom={"title": _("Close")},
     )
     def close(self):
         pass

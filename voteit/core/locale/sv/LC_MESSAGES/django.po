@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-11-09 14:56+0000\n"
-"PO-Revision-Date: 2021-11-09 15:58+0100\n"
+"POT-Creation-Date: 2022-06-02 07:50+0000\n"
+"PO-Revision-Date: 2022-06-02 09:49+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -18,90 +18,98 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 2.3\n"
 
-#: voteit/core/models.py:93
+#: messages/roles.py:91
+msgid "Some users don't exist, aborting"
+msgstr "Några av användarna existerar inte, avbryter"
+
+#: models.py:107
 msgid "Make user active"
 msgstr "Gör användaren aktiv"
 
-#: voteit/core/models.py:102
+#: models.py:117
 msgid "Mark user as incomplete"
 msgstr "Markera användaren som ofullständig"
 
-#: voteit/core/rest_api/mixins.py:23
+#: rest_api/mixins.py:28
 #, python-format
 msgid "You're missing the permission '%(perm)s' on %(obj)s."
 msgstr "Du saknar behörigheten ’%(perm)s’ på %(obj)s."
 
-#: voteit/core/rest_api/mixins.py:147
-#, python-format
-msgid "%(lookup_kw)s not specified"
-msgstr "%(lookup_kw)s har inte angetts"
-
-#: voteit/core/rest_api/mixins.py:154
-#, python-format
-msgid "No item found where %(lookup_field)s==%(lookup_val)s"
-msgstr "Inget objekt hittades där %(lookup_field)s==%(lookup_val)s"
-
-#: voteit/core/rest_api/mixins.py:213
+#: rest_api/mixins.py:235
 msgid "Transition not specified"
 msgstr "Handling måste anges"
 
-#: voteit/core/rest_api/mixins.py:222
+#: rest_api/mixins.py:247
 #, python-format
 msgid "Invalid transition: %(name)s"
 msgstr "Ogiltig handling: %(name)s"
 
-#: voteit/core/rest_api/mixins.py:233
+#: rest_api/mixins.py:260
+#, python-format
+msgid "Can't switch from state '%(state)s' using method '%(method)s'"
+msgstr "Kan inte byta från tillståndet ’%(state)s’ med metoden ’%(method)s’"
+
+#: rest_api/mixins.py:274
 #, python-format
 msgid "Guard %(guard)s blocks transition %(name)s"
 msgstr "Regeln %(guard)s blockerar handlingen %(name)s"
 
-#: voteit/core/rest_api/serializers.py:102
+#: rest_api/serializers.py:202
 msgid "Email you specified isn't validated. It must exist on your profile."
 msgstr ""
+"Eposten du specificerade är inte validerad. Den måste finnas i din profil."
 
-#: voteit/core/rest_api/serializers.py:226
-msgid "You can only pick existing users"
-msgstr "Du kan bara välja existerande användare"
+#: rest_api/serializers.py:390
+msgid "You can only pick existing users within this meeting"
+msgstr "Du kan bara välja existerande användare som är med i mötet"
 
-#: voteit/core/workflows.py:10
+#: workflows.py:10
 msgid "Unhandled"
 msgstr "Ohanterad"
 
-#: voteit/core/workflows.py:11
+#: workflows.py:11
 msgid "Accepted"
 msgstr "Accepterad"
 
-#: voteit/core/workflows.py:12
+#: workflows.py:12
 msgid "Rejected"
 msgstr "Nekad"
 
-#: voteit/core/workflows.py:27
+#: workflows.py:27
 msgid "Incomplete"
 msgstr "Ofullständig"
 
-#: voteit/core/workflows.py:28
+#: workflows.py:28
 msgid "Active"
 msgstr "Aktiv"
 
-#: voteit/core/workflows.py:45
+#: workflows.py:45
 msgid "Created"
-msgstr ""
+msgstr "Skapad"
 
-#: voteit/core/workflows.py:46
+#: workflows.py:46
 msgid "Scheduled"
-msgstr ""
+msgstr "Schemalagd"
 
-#: voteit/core/workflows.py:47
+#: workflows.py:47
 msgid "Sending"
-msgstr ""
+msgstr "Skickas"
 
-#: voteit/core/workflows.py:48
+#: workflows.py:48
 msgid "Sent"
-msgstr ""
+msgstr "Skickad"
 
-#: voteit/core/workflows.py:49
+#: workflows.py:49
 msgid "Failed"
-msgstr ""
+msgstr "Misslyckades"
+
+#, python-format
+#~ msgid "%(lookup_kw)s not specified"
+#~ msgstr "%(lookup_kw)s har inte angetts"
+
+#, python-format
+#~ msgid "No item found where %(lookup_field)s==%(lookup_val)s"
+#~ msgstr "Inget objekt hittades där %(lookup_field)s==%(lookup_val)s"
 
 #~ msgid "Permission '${perm}s' not allowed on ${context}s"
 #~ msgstr "Behörighet '${perm}s' tillåts inte på ${context}s"

@@ -164,14 +164,14 @@ class ModelContextMixin(ABC):
             lookup_val = request.GET.get(self.context_lookup_kwarg)
         if lookup_val is None:
             raise exceptions.ValidationError(
-                detail=_("%(lookup_kw)s not specified")
+                detail="%(lookup_kw)s not specified"
                 % {"lookup_kw": self.context_lookup_kwarg}
             )
         try:
             return self.context_queryset.get(**{self.context_lookup_field: lookup_val})
         except ObjectDoesNotExist:
             raise exceptions.NotFound(
-                _("No item found where %(lookup_field)s==%(lookup_val)s")
+                "No item found where %(lookup_field)s==%(lookup_val)s"
                 % {
                     "lookup_field": self.context_lookup_field,
                     "lookup_val": lookup_val,

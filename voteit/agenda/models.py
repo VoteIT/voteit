@@ -40,10 +40,10 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         Meeting, on_delete=models.CASCADE, related_name="agenda_items"
     )
     block_discussion: bool = models.BooleanField(
-        verbose_name=_("Block new discussion posts"), default=False
+        verbose_name="Block new discussion posts", default=False
     )
     block_proposals: bool = models.BooleanField(
-        verbose_name=_("Block new proposals"), default=False
+        verbose_name="Block new proposals", default=False
     )
     order: int = models.PositiveSmallIntegerField(default=0)
     related_modified: Optional[datetime] = models.DateTimeField(

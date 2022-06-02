@@ -3,41 +3,49 @@
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
-#, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
+"Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-09-10 14:53+0000\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: \n"
+"POT-Creation-Date: 2022-06-02 08:13+0000\n"
+"PO-Revision-Date: 2022-06-02 10:11+0200\n"
+"Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
+"Language-Team: \n"
+"Language: sv\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 2.3\n"
 
-#: voteit/proposal/workflows.py:12
+#: rest_api/serializers.py:179 rest_api/serializers.py:208
+msgid "Identical with original text"
+msgstr "Identisk med ursprungstexten"
+
+#: rest_api/serializers.py:259 rest_api/serializers.py:297
+msgid "Must be unique for agenda item"
+msgstr "Måste vara unik för dagordninspunkten"
+
+#: workflows.py:12
 msgid "Published"
-msgstr ""
+msgstr "Publicerad"
 
-#: voteit/proposal/workflows.py:13
+#: workflows.py:13
 msgid "Retracted"
-msgstr ""
+msgstr "Tillbakadraget"
 
-#: voteit/proposal/workflows.py:14
+#: workflows.py:14
 msgid "Voting"
-msgstr ""
+msgstr "I omröstning"
 
-#: voteit/proposal/workflows.py:15
+#: workflows.py:15
 msgid "Approved"
-msgstr ""
+msgstr "Bifallen"
 
-#: voteit/proposal/workflows.py:16
+#: workflows.py:16
 msgid "Denied"
-msgstr ""
+msgstr "Avslagen"
 
-#: voteit/proposal/workflows.py:17
+#: workflows.py:17
 msgid "Unhandled"
-msgstr ""
+msgstr "Ohanterad"

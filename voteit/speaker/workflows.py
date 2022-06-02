@@ -20,7 +20,7 @@ class SpeakerSystemWf:
     ACTIVE = "active"
     ARCHIVED = "archived"
     states = {
-        INACTIVE: _("inactive"),
+        INACTIVE: _("Inactive"),
         ACTIVE: _("Active"),
         ARCHIVED: _("Archived"),
     }

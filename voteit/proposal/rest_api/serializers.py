@@ -176,7 +176,7 @@ class DiffProposalCreateSerializer(ProposalCreateSerializer):
         attrs = super().validate(attrs)
         if isinstance(attrs["paragraph"], TextParagraph):
             if attrs["paragraph"].body == attrs["body"]:
-                raise ValidationError({"body": [_("identical to original text")]})
+                raise ValidationError({"body": [_("Identical with original text")]})
         else:
             raise TypeError("Got something other than TextParagraph as 'paragraph'")
         return attrs
@@ -205,7 +205,7 @@ class DiffProposalDetailSerializer(ProposalDetailSerializer):
 
     def validate_body(self, value):
         if self.instance.paragraph.body == value:
-            raise ValidationError(_("identical to original text"))
+            raise ValidationError(_("Identical with original text"))
         return value
 
 
