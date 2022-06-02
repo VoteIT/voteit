@@ -10,6 +10,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
 
 from voteit.core.loggers import log_auth
 from voteit.core.rest_api import router
@@ -119,3 +120,11 @@ class UserView(
             qs = self.User.objects.none()
         serializer = self.serializer_class(qs, many=True)
         return Response(serializer.data)
+
+
+@router.register("health", basename="health")
+class HealthCheckView(GenericViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request):
+        return Response("OK!")

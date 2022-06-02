@@ -239,3 +239,10 @@ class UserViewSetTests(APITestCase):
         url = reverse("user-logout")
         response = self.client.post(url)
         # FIXME: Check destroyed session?
+
+
+class HealthTests(APITestCase):
+    def test_healthcheck(self):
+        url = reverse("health-list")
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
