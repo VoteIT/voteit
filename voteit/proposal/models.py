@@ -11,6 +11,7 @@ from django.db import transaction
 from django.utils.timezone import now
 from django_fsm import FSMField
 from django_fsm import transition
+from django.utils.translation import gettext_lazy as _
 from model_utils.managers import InheritanceManager
 from typing import List
 from typing import Optional
@@ -91,6 +92,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         source=ProposalWf.PUBLISHED,
         target=ProposalWf.RETRACTED,
         permission=ProposalPermissions.RETRACT,
+        custom={"title": _("Retract")},
     )
     def retract(self):
         """Normal user operation to retract. Or for moderators."""
@@ -101,6 +103,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         source=[ProposalWf.PUBLISHED, ProposalWf.RETRACTED],
         target=ProposalWf.VOTING,
         permission=ProposalPermissions.CHANGE,
+        custom={"title": _("Lock for vote")},
     )
     def lock_for_vote(self):
         """When a vote starts, mark all proposals as "voting" so they can't be retracted.
@@ -114,6 +117,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         source=[ProposalWf.PUBLISHED, ProposalWf.VOTING, ProposalWf.DENIED],
         target=ProposalWf.APPROVED,
         permission=ProposalPermissions.CHANGE,
+        custom={"title": _("Approve")},
     )
     def approved(self):
         """Proposal approved via poll or moderator."""
@@ -124,6 +128,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         source=[ProposalWf.PUBLISHED, ProposalWf.VOTING, ProposalWf.APPROVED],
         target=ProposalWf.DENIED,
         permission=ProposalPermissions.CHANGE,
+        custom={"title": _("Deny")},
     )
     def denied(self):
         """Proposal denied via poll or moderator."""
@@ -134,6 +139,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         source=ProposalWf.PUBLISHED,
         target=ProposalWf.UNHANDLED,
         permission=ProposalPermissions.CHANGE,
+        custom={"title": _("Mark as unhandled")},
     )
     def unhandled(self):
         """Proposal was never handled. Automatic transition or from moderator."""
@@ -144,6 +150,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         source="+",
         target=ProposalWf.PUBLISHED,
         permission=ProposalPermissions.CHANGE,
+        custom={"title": _("Publish")},
     )
     def publish(self):
         """Reset proposal back to published."""

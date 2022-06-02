@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-02 08:13+0000\n"
-"PO-Revision-Date: 2022-06-02 10:11+0200\n"
+"POT-Creation-Date: 2022-06-02 21:46+0000\n"
+"PO-Revision-Date: 2022-06-02 23:47+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -17,6 +17,30 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 2.3\n"
+
+#: models.py:95
+msgid "Retract"
+msgstr "Dra tillbaka"
+
+#: models.py:106
+msgid "Lock for vote"
+msgstr "Lås för omröstning"
+
+#: models.py:120
+msgid "Approve"
+msgstr "Bifall"
+
+#: models.py:131
+msgid "Deny"
+msgstr "Avslå"
+
+#: models.py:142
+msgid "Mark as unhandled"
+msgstr "Markera som ohanterad"
+
+#: models.py:153
+msgid "Publish"
+msgstr "Publicerad"
 
 #: rest_api/serializers.py:179 rest_api/serializers.py:208
 msgid "Identical with original text"
