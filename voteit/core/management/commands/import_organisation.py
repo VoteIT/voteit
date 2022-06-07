@@ -63,9 +63,12 @@ class Command(BaseCommand):
         # This will destroy data, but active list or speaker should never be imported anyway.
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
+        from voteit.organisation.models import Organisation
 
         importer.add_clear_attrs(SpeakerListSystem, "active_list")
         importer.add_clear_attrs(SpeakerList, "current")
+        importer.add_clear_attrs(Organisation, "author", "last_modified_by")
+
         if merge_org:
             from voteit.organisation.models import Organisation
 
