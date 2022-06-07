@@ -20,5 +20,6 @@ class DiscussionPostAdmin(admin.ModelAdmin):
         "agenda_item",
         "author",
         "meeting_group",
+        "mentions",
     )
     search_fields = "body", "agenda_item__title", "agenda_item__meeting__title"

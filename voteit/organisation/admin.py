@@ -14,6 +14,7 @@ class OrganisationAdmin(admin.ModelAdmin):
         "title",
         "meeting_count",
     )
+    autocomplete_fields = ("mentions",)
 
     def meeting_count(self, obj: Organisation):
         return obj.meetings.count()

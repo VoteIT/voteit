@@ -37,6 +37,7 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
     search_fields = ("title",)
     inlines = (AgendaItemInline,)
     actions = ["report_clone_meeting"]
+    exclude = ("mentions",)
 
     def ai_count(self, obj: Meeting):
         return obj.agenda_items.count()
@@ -87,10 +88,11 @@ class MeetingRolesAdmin(admin.ModelAdmin):
 
 @admin.register(MeetingGroup)
 class MeetingGroupAdmin(admin.ModelAdmin):
-    autocomplete_fields = ("meeting",)
+    autocomplete_fields = ("meeting", "members")
     list_display = ("title", "meeting", "member_count")
     list_filter = ("meeting", "members")
     search_fields = ("title",)
+    exclude = ("mentions",)
 
     def member_count(self, group: MeetingGroup):
         return group.members.count()
