@@ -24,16 +24,9 @@ class ParticipantNumberAdmin(admin.ModelAdmin):
     )
 
 
-class PNInline(admin.TabularInline):
-    model = ParticipantNumber
-    fields = ("user", "number")
-    extra = 1
-
-
 @admin.register(PNSystem)
 class PNSystemAdmin(admin.ModelAdmin):
     autocomplete_fields = ("meeting",)
     list_display = ("meeting",)
     list_filter = ("meeting",)
     search_fields = ("meeting__title",)
-    inlines = (PNInline,)
