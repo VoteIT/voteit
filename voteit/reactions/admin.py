@@ -25,9 +25,7 @@ class ReactionAdmin(admin.ModelAdmin):
         "agenda_item",
     )
     list_filter = (
-        "object_id",
+        "agenda_item__meeting",
         "content_type",
         "button",
-        "user",
-        "agenda_item",
     )
