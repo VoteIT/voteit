@@ -25,6 +25,7 @@ from voteit.poll.models import Poll
 from voteit.poll.models import Vote
 from voteit.poll.schemas import RankingSchema
 from voteit.proposal.models import Proposal
+from voteit.reactions.models import Reaction
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 
@@ -85,6 +86,7 @@ class Command(BaseCommand):
         importer.add_clear_attrs(Organisation, "author", "last_modified_by")
         importer.add_pre_commit(update_all_poll_results)
         importer.add_pre_commit(update_all_votes)
+        importer.add_pre_commit(update_reactions_reference)
         importer.add_pre_commit(verify_json_attrs)
         if merge_org:
             assert len(importer.data.get(Organisation, [])) == 1
@@ -203,7 +205,6 @@ def update_all_poll_results(importer: Importer):
         elif method_name == "schulze":
             result: SchulzePollResult
             remap_schulze_round(importer, result)
-
         elif method_name == "repeated_schulze":
             result: RepeatedSchulzeResult
             result.candidates = [
@@ -272,3 +273,11 @@ def update_all_votes(importer: Importer):
             )
         vote.vote = vote_data
         Model.save_base(vote, raw=True)
+
+
+def update_reactions_reference(importer: Importer):
+    for deserialized in importer.data.get(Reaction, []):
+        reaction: Reaction = deserialized.object
+        model = reaction.content_type.model_class()
+        reaction.object = importer.get_remap_obj(model, reaction.object_id)
+        Model.save_base(reaction, raw=True)
