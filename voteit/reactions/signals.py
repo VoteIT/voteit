@@ -96,17 +96,18 @@ def _send_count(instance: Reaction, pre_delete=False):
         return
     if ai is None:
         return
-    count = instance.object.reaction_set.filter(button=instance.button).count()
-    if pre_delete:
-        count -= 1
-    msg = ReactionCount(
-        content_type=get_model_shortname(instance.content_type.model_class()),
-        object_id=instance.object_id,
-        button=instance.button.pk,
-        count=count,
-    )
-    ch = AgendaItemChannel.from_instance(ai)
-    ch.sync_publish(msg)
+    if instance.object:
+        count = instance.object.reaction_set.filter(button=instance.button).count()
+        if pre_delete:
+            count -= 1
+        msg = ReactionCount(
+            content_type=get_model_shortname(instance.content_type.model_class()),
+            object_id=instance.object_id,
+            button=instance.button.pk,
+            count=count,
+        )
+        ch = AgendaItemChannel.from_instance(ai)
+        ch.sync_publish(msg)
 
 
 @receiver(post_save, sender=Reaction)
