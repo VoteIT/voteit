@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from logging import getLogger
 from typing import TYPE_CHECKING
+from typing import Union
 
 from django.contrib.auth.models import AbstractUser
+from django.db import IntegrityError
+from django.db.models.signals import m2m_changed
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import Signal
@@ -38,6 +41,7 @@ from voteit.poll.workflows import PollWf
 
 if TYPE_CHECKING:
     from envelope.utils import AppState
+    from voteit.proposal.models import Proposal
 
 logger = getLogger(__name__)
 
@@ -197,3 +201,36 @@ def er_deleted(instance: ElectoralRegister = None, **kw):
         meeting_ch = MeetingChannel.from_instance(instance.meeting)
         msg = ElectoralRegisterDeleted(pk=instance.pk)
         meeting_ch.sync_publish(msg)
+
+
+@receiver(m2m_changed, sender=Poll.proposals.through)
+def validate_related_proposals(
+    instance: Union[Poll, Proposal], action, pk_set, reverse, **kw
+):
+    if action == "pre_add":
+        if reverse:
+            instance: Proposal
+            same_meeting_poll_pks = set(
+                Poll.objects.filter(
+                    meeting=instance.meeting, pk__in=pk_set
+                ).values_list("pk", flat=True)
+            )
+            alien_poll_pks = pk_set - same_meeting_poll_pks
+            if alien_poll_pks:
+                raise IntegrityError(
+                    f"Polls with pk {alien_poll_pks} aren't part of the same meeting"
+                )
+        else:
+            from voteit.proposal.models import Proposal
+
+            instance: Poll
+            same_meeting_prop_pks = set(
+                Proposal.objects.filter(
+                    agenda_item__meeting=instance.meeting, pk__in=pk_set
+                ).values_list("pk", flat=True)
+            )
+            alien_prop_pks = pk_set - same_meeting_prop_pks
+            if alien_prop_pks:
+                raise IntegrityError(
+                    f"Proposals with pk {alien_prop_pks} aren't part of the same meeting"
+                )

@@ -22,7 +22,7 @@ class PollRulesTests(TestCase):
         cls.poll = Poll.objects.create(
             method_name="simple", agenda_item=cls.ai, meeting=cls.meeting
         )
-        cls.poll.proposals.create()
+        cls.poll.proposals.create(agenda_item=cls.ai)
         cls.er = ElectoralRegister.objects.create()
         cls.poll.electoral_register = cls.er
         cls.poll.save()
@@ -242,7 +242,7 @@ class VoteRulesTests(TestCase):
         cls.poll = Poll.objects.create(
             method_name="simple", agenda_item=cls.ai, meeting=cls.meeting
         )
-        cls.poll.proposals.create()
+        cls.poll.proposals.create(agenda_item=cls.ai)
         cls.er = ElectoralRegister.objects.create()
         cls.poll.electoral_register = cls.er
         cls.poll.save()

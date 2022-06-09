@@ -22,12 +22,13 @@ class PresenceCheckPolicyTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.meeting.er_policy_name = PresenceCheckPolicy.name
         cls.meeting.save()
+        cls.ai = cls.meeting.agenda_items.create()
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
         cls.meeting.add_roles(cls.moderator, ROLE_POTENTIAL_VOTER)
         cls.meeting.add_roles(cls.participant, ROLE_POTENTIAL_VOTER)
         cls.poll = Poll.objects.create(meeting=cls.meeting, method_name="simple")
-        cls.poll.proposals.create()
+        cls.poll.proposals.create(agenda_item=cls.ai)
         # Presence check
         cls.presence_check: PresenceCheck = cls.meeting.presence_checks.create()
         cls.presence_check.present_users.add(cls.participant)

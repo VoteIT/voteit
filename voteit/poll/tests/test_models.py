@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.test import TestCase
 
 from voteit.poll.exceptions import ElectoralRegisterEmpty
@@ -63,7 +64,7 @@ class PollTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai: AgendaItem = cls.meeting.agenda_items.create()
         cls.poll: Poll = cls.ai.polls.create(method_name="simple")
-        cls.prop = cls.poll.proposals.create()
+        cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
         cls.meeting.add_roles(cls.moderator, ROLE_POTENTIAL_VOTER)
@@ -237,6 +238,20 @@ class PollTests(TestCase):
         self.prop.refresh_from_db()
         self.assertEqual(ProposalWf.PUBLISHED, self.prop.state)
 
+    def test_proposal_from_another_meeting(self):
+        from voteit.proposal.models import Proposal
+
+        other_prop = Proposal.objects.create()
+        with self.assertRaises(IntegrityError):
+            self.poll.proposals.add(other_prop)
+
+    def test_poll_from_another_meeting(self):
+        from voteit.proposal.models import Proposal
+
+        other_prop = Proposal.objects.create()
+        with self.assertRaises(IntegrityError):
+            other_prop.polls.add(self.poll)
+
 
 class VoteWeightTests(TestCase):
     @property
@@ -403,7 +418,7 @@ class VoteTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai: AgendaItem = cls.meeting.agenda_items.create()
         cls.poll: Poll = cls.ai.polls.create(method_name="simple")
-        cls.prop = cls.poll.proposals.create()
+        cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
         # cls.moderator = User.objects.get(username="moderator")
         cls.voter = User.objects.get(username="participant")
         cls.meeting.add_roles(cls.voter, ROLE_POTENTIAL_VOTER)

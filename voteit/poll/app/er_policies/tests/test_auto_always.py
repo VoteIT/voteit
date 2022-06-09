@@ -18,12 +18,13 @@ class AutoAlwaysTests(TestCase):
         cls.ElectoralRegister = ElectoralRegister
 
         cls.meeting = Meeting.objects.create(er_policy_name=AutoAlways.name)
+        cls.ai = cls.meeting.agenda_items.create()
         cls.user1 = User.objects.create(username="one")
         cls.user2 = User.objects.create(username="two")
         cls.meeting.add_roles(cls.user1, ROLE_POTENTIAL_VOTER)
         cls.meeting.add_roles(cls.user2, ROLE_POTENTIAL_VOTER)
         cls.poll = Poll.objects.create(meeting=cls.meeting, method_name="simple")
-        cls.poll.proposals.create()
+        cls.poll.proposals.create(agenda_item=cls.ai)
 
     def setUp(self):
         self.poll.refresh_from_db()

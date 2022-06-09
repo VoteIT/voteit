@@ -18,8 +18,8 @@ class PollDetailSerializerTests(TestCase):
             body="<b>Hello</b>",
             title="world",
         )
-        cls.prop1 = cls.poll.proposals.create()
-        cls.prop2 = cls.poll.proposals.create()
+        cls.prop1 = cls.poll.proposals.create(agenda_item=cls.ai)
+        cls.prop2 = cls.poll.proposals.create(agenda_item=cls.ai)
 
     @property
     def _cut(self):
@@ -101,7 +101,7 @@ class PollDetailSerializerTests(TestCase):
         # reset cache
         self.poll.method = self.poll.get_method_class()(self.poll)
         self.poll.settings = {"winners": 2}
-        prop3 = self.poll.proposals.create()
+        prop3 = self.poll.proposals.create(agenda_item=self.ai)
         serializer = self._cut(self.poll)
         expected_data = serializer.data.copy()
         self.assertEqual(
@@ -148,14 +148,15 @@ class PollDetailSerializerTests(TestCase):
 
 
 class PollCreateSerializerTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.meeting.models import Meeting
 
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create(title="Hello")
-        self.prop = self.ai.proposals.create()
-        self.er = self.meeting.electoral_registers.create()
-        self.voter = self.er.voters.create(username="one")
+        cls.meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create(title="Hello")
+        cls.prop = cls.ai.proposals.create()
+        cls.er = cls.meeting.electoral_registers.create()
+        cls.voter = cls.er.voters.create(username="one")
 
     @property
     def _cut(self):
@@ -325,7 +326,7 @@ class VoteSerializerTests(TestCase):
             title="world",
             electoral_register=cls.er,
         )
-        cls.prop = cls.poll.proposals.create()
+        cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
         cls.user = cls.er.voters.create(username="voter")
         cls.vote = cls.poll.votes.create(user=cls.user, vote="yes")
 

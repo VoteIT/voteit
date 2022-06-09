@@ -17,6 +17,7 @@ class AutoBeforePollTests(TestCase):
         cls.ABF = AutoBeforePoll
 
         cls.meeting: Meeting = Meeting.objects.create(er_policy_name=cls.ABF.name)
+        cls.ai = cls.meeting.agenda_items.create()
         cls.user1 = User.objects.create(username="one")
         cls.user2 = User.objects.create(username="two")
         cls.meeting.add_roles(cls.user1, ROLE_POTENTIAL_VOTER)
@@ -57,7 +58,7 @@ class AutoBeforePollTests(TestCase):
 
         first_er = self.meeting.er_policy.create_er(self.meeting)
         self.poll.upcoming()
-        prop = Proposal.objects.create()
+        prop = Proposal.objects.create(agenda_item=self.ai)
         self.poll.proposals.add(prop)
         self.poll.ongoing()
         self.assertEqual(first_er, self.poll.electoral_register)
@@ -77,7 +78,7 @@ class AutoBeforePollTests(TestCase):
 
     def test_initial_er_set_when_upcoming(self):
         self.poll.upcoming()
-        self.poll.proposals.create()
+        self.poll.proposals.create(agenda_item=self.ai)
         first_er = self.poll.electoral_register
         user3 = User.objects.create(username="three")
         self.meeting.add_roles(user3, ROLE_POTENTIAL_VOTER)
@@ -91,7 +92,7 @@ class AutoBeforePollTests(TestCase):
         self.meeting.er_policy_name = None
         self.meeting.save()
         self.poll.upcoming()
-        self.poll.proposals.create()
+        self.poll.proposals.create(agenda_item=self.ai)
         self.assertRaises(TransitionNotAllowed, self.poll.ongoing)
         self.meeting.er_policy_name = self.ABF.name
         self.meeting.save()

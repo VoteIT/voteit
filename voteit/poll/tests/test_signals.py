@@ -57,6 +57,7 @@ class MeetingSubscribedTests(TestCase):
 
         cls.meeting = Meeting.objects.get(pk=1)
         cls.meeting.er_policy_name = None
+        cls.ai = cls.meeting.agenda_items.create()
         cls.er = ElectoralRegister.objects.create(meeting=cls.meeting)
         cls.poll = cls.meeting.polls.create(
             method_name="simple", electoral_register=cls.er
@@ -69,7 +70,7 @@ class MeetingSubscribedTests(TestCase):
         cls.user = cls.er.voters.create(username="user")
         cls.meeting.add_roles(cls.user, "moderator")
         # Create a vote
-        cls.poll.proposals.create()
+        cls.poll.proposals.create(agenda_item=cls.ai)
         cls.vote = cls.poll.votes.create(user=cls.user, vote="yes")
 
     def setUp(self):
