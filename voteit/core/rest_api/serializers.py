@@ -185,7 +185,11 @@ class UpdateUserSerializer(serializers.ModelSerializer):
         except ValueError as exc:
             raise ValidationError(str(exc))
         user = self.context["request"].user
-        if self.Meta.model.objects.exclude(pk=user.pk).filter(userid=value).exists():
+        if (
+            self.Meta.model.objects.exclude(pk=user.pk)
+            .filter(userid=value, organisation=user.organisation)
+            .exists()
+        ):
             raise ValidationError("Not unique, try something else")
         return value
 

@@ -10,6 +10,8 @@ from rest_framework.serializers import ModelSerializer
 
 from voteit.core.testing import mk_hashtag
 from voteit.core.testing import mk_usertag
+from voteit.organisation.models import OAuth2Provider
+from voteit.organisation.models import Organisation
 
 User = get_user_model()
 
@@ -153,7 +155,6 @@ class UpdateUserSerializerTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.organisation.models import OAuth2Provider
 
         cls.mock_api_return = {
             "pk": 1,
@@ -236,3 +237,9 @@ class UpdateUserSerializerTests(TestCase):
     def test_update_userid_bad_name(self):
         serializer = self._mk_serializer({"userid": "HELLO"})
         self.assertIn("userid", serializer.errors)
+
+    def test_update_userid_same_as_other_org(self):
+        other_org = Organisation.objects.create()
+        other_org.users.create(username="other", userid="other")
+        serializer = self._mk_serializer({"userid": "other"})
+        self.assertFalse(serializer.errors)
