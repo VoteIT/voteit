@@ -84,8 +84,8 @@ class User(AbstractUser):
 
     def __str__(self):
         if self.userid:
-            return f"{self.get_full_name()} ({self.userid})"
-        return self.username
+            return f"{self.get_full_name()} ({self.userid}) O:{self.organisation.pk}"
+        return f"{self.username} O:{self.organisation.pk}"
 
     def valid_userid_guard(self) -> bool:
         """
