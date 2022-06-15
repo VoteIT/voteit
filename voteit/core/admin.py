@@ -85,6 +85,7 @@ class UserAdmin(FSMTransitionMixin, DefaultUserAdmin):
         "last_name",
         "email",
         "userid",
+        "username",
     )
     list_filter = (
         "organisation",

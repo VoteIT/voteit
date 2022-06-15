@@ -83,9 +83,10 @@ class User(AbstractUser):
         ]
 
     def __str__(self):
+        org_part = self.organisation and f"O:{self.organisation.pk}" or ""
         if self.userid:
-            return f"{self.get_full_name()} ({self.userid}) O:{self.organisation.pk}"
-        return f"{self.username} O:{self.organisation.pk}"
+            return f"{self.get_full_name()} ({self.userid}) {org_part}"
+        return f"[{self.username}] {org_part}"
 
     def valid_userid_guard(self) -> bool:
         """
