@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Model
 from dolly.core import Importer
 
+from voteit.discussion.models import DiscussionPost
 from voteit.organisation.models import Organisation
 from voteit.poll.app.polls.combined_simple import CombinedSimplePollResult
 from voteit.poll.app.polls.combined_simple import CombinedSimpleVoteSchema
@@ -84,10 +85,11 @@ class Command(BaseCommand):
         importer.add_clear_attrs(SpeakerListSystem, "active_list")
         importer.add_clear_attrs(SpeakerList, "current")
         importer.add_clear_attrs(Organisation, "author", "last_modified_by")
+        importer.add_pre_save(Reaction, update_reactions_reference)
         importer.add_pre_commit(update_all_poll_results)
         importer.add_pre_commit(update_all_votes)
-        importer.add_pre_commit(update_reactions_reference)
         importer.add_pre_commit(verify_json_attrs)
+        importer.add_explicit_dependency(Reaction, Proposal, DiscussionPost)
         if merge_org:
             assert len(importer.data.get(Organisation, [])) == 1
             deserialized_org = next(iter(importer.data[Organisation]))
@@ -142,8 +144,6 @@ def verify_schema_attr(obj, attr):
 
 
 def remap_schulze_round(importer, result: dict):
-    from voteit.proposal.models import Proposal
-
     new_pairs = []
     for pair in result.pairs:
         # [ [1,2], v]
@@ -275,9 +275,7 @@ def update_all_votes(importer: Importer):
         Model.save_base(vote, raw=True)
 
 
-def update_reactions_reference(importer: Importer):
-    for deserialized in importer.data.get(Reaction, []):
-        reaction: Reaction = deserialized.object
+def update_reactions_reference(importer: Importer, *items: Reaction):
+    for reaction in items:
         model = reaction.content_type.model_class()
         reaction.object = importer.get_remap_obj(model, reaction.object_id)
-        Model.save_base(reaction, raw=True)
