@@ -243,3 +243,9 @@ class UpdateUserSerializerTests(TestCase):
         other_org.users.create(username="other", userid="other")
         serializer = self._mk_serializer({"userid": "other"})
         self.assertFalse(serializer.errors)
+
+    def test_update_names(self):
+        serializer = self._mk_serializer({"first_name": "Hello", "last_name": "World"})
+        serializer.save()
+        self.assertEqual("Hello", self.user.first_name)
+        self.assertEqual("World", self.user.last_name)

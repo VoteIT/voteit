@@ -24,10 +24,10 @@ class IDProxy(ProviderResponseAdapter):
 
     def update(self, user: AbstractUser):
         given_name = self.response.get("given_name", None)
-        if given_name:
+        if given_name and not user.first_name:
             user.first_name = given_name
         family_name = self.response.get("family_name", None)
-        if family_name:
+        if family_name and not user.last_name:
             user.last_name = family_name
         if user.userid is None:
             suggestion = generate_valid_userid(user)

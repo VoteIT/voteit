@@ -162,9 +162,8 @@ def finish_auth(request: WSGIRequest):
             else:
                 user = adapted.register(organisation=provider.organisation)
                 logger.debug("Creating new user: %s", user.pk)
-            # FIXME - we want to implement this some other way - probably allow edit?
-            if not user.first_name:
-                adapted.update(user)
+            # Let the adapter handle conditions for update
+            adapted.update(user)
             AccessToken.objects.from_response(token_response, user, provider)
             request.session.pop("oauth_state", None)
             request.session.save()

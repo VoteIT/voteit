@@ -165,6 +165,7 @@ class UserSerializer(serializers.ModelSerializer):
             "img_url",
             "organisation",
             "organisation_roles",
+            "email",
         )
         read_only_fields = fields
 
@@ -176,6 +177,8 @@ class UpdateUserSerializer(serializers.ModelSerializer):
             "pk",
             "userid",
             "email",
+            "first_name",
+            "last_name",
         )
 
     def validate_userid(self, value: str):

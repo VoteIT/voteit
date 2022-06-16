@@ -198,6 +198,7 @@ class UserViewSetTests(APITestCase):
                 "img_url": None,
                 "organisation": 1,
                 "organisation_roles": [],
+                "email": "moderator@voteit.se",
             },
             data[0],
         )
@@ -224,6 +225,7 @@ class UserViewSetTests(APITestCase):
                 "pk": 1,
                 "state": "incomplete",
                 "userid": "moderator",
+                "email": "moderator@voteit.se",
             },
             data,
         )
