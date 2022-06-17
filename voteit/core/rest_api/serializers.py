@@ -155,30 +155,19 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = get_user_model()
-        fields = (
+        read_only_fields = (
             "pk",
             "state",
-            "userid",
             "full_name",
-            "first_name",
-            "last_name",
             "img_url",
             "organisation",
             "organisation_roles",
-            "email",
         )
-        read_only_fields = fields
-
-
-class UpdateUserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = get_user_model()
-        fields = (
-            "pk",
+        fields = read_only_fields + (
             "userid",
-            "email",
             "first_name",
             "last_name",
+            "email",
         )
 
     def validate_userid(self, value: str):

@@ -205,9 +205,9 @@ class UpdateUserSerializerTests(TestCase):
 
     @property
     def _cut(self):
-        from voteit.core.rest_api.serializers import UpdateUserSerializer
+        from voteit.core.rest_api.serializers import UserSerializer
 
-        return UpdateUserSerializer
+        return UserSerializer
 
     def _mk_serializer(self, data):
         request = RequestFactory().get("/")

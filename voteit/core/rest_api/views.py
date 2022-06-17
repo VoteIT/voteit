@@ -16,7 +16,8 @@ from voteit.core.loggers import log_auth
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.mixins import TransitionsMixin
-from voteit.core.rest_api.serializers import UpdateUserSerializer
+
+# from voteit.core.rest_api.serializers import UpdateUserSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.utils import get_identity_data
 from voteit.meeting.models import Meeting
@@ -77,8 +78,6 @@ class UserView(
     serializer_class = UserSerializer
     serializer_classes = {
         "logout": serializers.Serializer,
-        "update": UpdateUserSerializer,
-        "partial_update": UpdateUserSerializer,
     }
 
     @property
