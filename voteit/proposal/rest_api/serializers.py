@@ -126,6 +126,18 @@ class ProposalDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
 
 
 class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
+    prop_id = serializers.SerializerMethodField()
+
+    def get_prop_id(self, instance):
+        # FIXME Proposal id method should be used instead
+        try:
+            return instance.prop_id
+        except AttributeError:
+            if meeting_group := instance.get("meeting_group"):
+                return f"{meeting_group.groupid}-{{n}}"
+            author = instance.get("author")
+            return f"{author.userid}-{{n}}"
+
     class Meta:
         model = Proposal
         fields = [
@@ -133,8 +145,9 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "agenda_item",
             "body",
             "meeting_group",
-            "tags",
             "mentions",
+            "prop_id",
+            "tags",
         ]
         validators = (ValidateGroupAIContext(),)
         extra_kwargs = {
