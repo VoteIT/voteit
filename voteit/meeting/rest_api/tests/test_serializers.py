@@ -67,6 +67,7 @@ class MeetingRolesSerializerTests(TestCase):
             {
                 "pk": 1,
                 "userid": "moderator",
+                "email": "moderator@voteit.se",
                 "first_name": "Moderator",
                 "full_name": "Moderator",
                 "last_name": "",
