@@ -73,10 +73,15 @@ class MeetingRolesSerializerTests(TestCase):
                 "last_name": "",
                 "img_url": None,
                 "organisation": 1,
-                "organisation_roles": [],
                 "state": "incomplete",
             },
             dict(data["user"]),
         )
         self.assertEqual(1, data["meeting"])
         self.assertEqual(1, data["pk"])
+
+    def test_prefetch(self):
+        qs = MeetingRoles.objects.prefetch_related("user")
+        serializer = self._cut(instance=qs, many=True)
+        with self.assertNumQueries(2):
+            data = serializer.data
