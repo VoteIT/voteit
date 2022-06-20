@@ -18,7 +18,7 @@ from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.mixins import TransitionsMixin
 
 # from voteit.core.rest_api.serializers import UpdateUserSerializer
-from voteit.core.rest_api.serializers import UserSerializer
+from voteit.core.rest_api.serializers import UserSerializer, UserAndRolesSerializer
 from voteit.core.rest_api.utils import get_identity_data
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
@@ -75,7 +75,7 @@ class UserView(
     """
 
     permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = UserSerializer
+    serializer_class = UserAndRolesSerializer
     serializer_classes = {
         "logout": serializers.Serializer,
     }
@@ -109,7 +109,7 @@ class UserView(
         user = self.get_object()
         log_auth("Switch user", for_user=user, request=request)
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-        serializer = self.serializer_class(user)
+        serializer = self.get_serializer(user)
         return Response(serializer.data)
 
     @action(methods=["GET"], detail=False)
@@ -118,7 +118,7 @@ class UserView(
             qs = self.get_queryset().exclude(pk=request.user.pk)
         else:
             qs = self.User.objects.none()
-        serializer = self.serializer_class(qs, many=True)
+        serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
 
     @action(methods=["GET"], detail=False)

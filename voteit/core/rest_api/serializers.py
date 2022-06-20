@@ -144,14 +144,9 @@ class OptionalHyperlinkedIdentityField(serializers.HyperlinkedIdentityField):
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
-    organisation_roles = serializers.SerializerMethodField()
 
     def get_full_name(self, instance: AbstractUser):
         return instance.get_full_name()
-
-    def get_organisation_roles(self, instance: AbstractUser):
-        roles = instance.organisation_roles.first()
-        return [] if roles is None else roles.assigned
 
     class Meta:
         model = get_user_model()
@@ -161,7 +156,6 @@ class UserSerializer(serializers.ModelSerializer):
             "full_name",
             "img_url",
             "organisation",
-            "organisation_roles",
         )
         fields = read_only_fields + (
             "userid",
@@ -198,6 +192,21 @@ class UserSerializer(serializers.ModelSerializer):
                 _("Email you specified isn't validated. It must exist on your profile.")
             )
         return value
+
+
+class UserAndRolesSerializer(UserSerializer):
+    """
+    Expensive operation, should never be used with many objects, due to O(1+n).
+    """
+
+    organisation_roles = serializers.SerializerMethodField()
+
+    def get_organisation_roles(self, instance: AbstractUser):
+        roles = instance.organisation_roles.first()
+        return [] if roles is None else roles.assigned
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ("organisation_roles",)
 
 
 class TransitionSerializer(serializers.Serializer):

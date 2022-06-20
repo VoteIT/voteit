@@ -102,12 +102,12 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         if self.request.user.is_superuser:
             return self.queryset.filter(
                 context__organisation=self.request.user.organisation,
-            )
+            ).prefetch_related("user")
         # Filter on meetings where user is participant
         # UserPkFilter will return empty queryset if context (meeting) is missing in params.
         return self.queryset.filter(
             context__participants=self.request.user,
-        )
+        ).prefetch_related("user")
 
 
 @router.register("meeting-groups", basename="meeting-groups")
