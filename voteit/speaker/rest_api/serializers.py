@@ -1,5 +1,3 @@
-from typing import List
-
 from rest_framework import serializers
 from rest_framework import exceptions
 
@@ -40,6 +38,18 @@ class HistoricSpeakerListSerializer(serializers.Serializer):
         # model = Speaker
         fields = ("user", "times_spoken", "seconds_spoken")
         read_only_fields = fields
+
+
+class SpeakerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Speaker
+        read_only_fields = [
+            "user",
+            "speaker_list",
+            "started",
+            "pk",
+        ]
+        fields = ["seconds"] + read_only_fields
 
 
 class SpeakerListSystemSerializer(serializers.ModelSerializer):

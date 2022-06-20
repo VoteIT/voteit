@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from typing import Union
 
 import rules
 
@@ -8,9 +7,10 @@ from voteit.core.decorators import predicate
 from voteit.meeting.rules import can_view_meeting
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import meeting_upcoming_ongoing
+from voteit.speaker.abcs import SpeakerSystemContext
 from voteit.speaker.models import SpeakerList
-from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.permissions import SpeakerListPermissions
+from voteit.speaker.permissions import SpeakerPermissions
 from voteit.speaker.permissions import SpeakerSystemPermissions
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 from voteit.speaker.roles import ROLE_SPEAKER
@@ -21,44 +21,29 @@ if TYPE_CHECKING:
 
 
 @predicate
-def is_speaker_moderator(
-    user: AbstractUser, obj: Union[SpeakerListSystem, SpeakerList]
-) -> bool:
+def is_speaker_moderator(user: AbstractUser, context: SpeakerSystemContext) -> bool:
     """
     Check if a user has list moderator status within this speaker list system.
     """
-    if isinstance(obj, SpeakerListSystem):
-        return obj.has_roles(user, ROLE_LIST_MODERATOR)
-    elif isinstance(obj, SpeakerList):
-        return obj.speaker_system.has_roles(user, ROLE_LIST_MODERATOR)
-    else:  # pragma: no cover
-        return False
+    if isinstance(context, SpeakerSystemContext):
+        return context.speaker_system.has_roles(user, ROLE_LIST_MODERATOR)
+    # pragma: no cover
+    return False
 
 
 @predicate
-def has_speaker_role(
-    user: AbstractUser, obj: Union[SpeakerListSystem, SpeakerList]
-) -> bool:
+def has_speaker_role(user: AbstractUser, context: SpeakerSystemContext) -> bool:
     """
     Check if a user has speaker role status within this speaker list system.
     """
-    if isinstance(obj, SpeakerListSystem):
-        if obj.has_roles(user, ROLE_SPEAKER):
+    if isinstance(context, SpeakerSystemContext):
+        if context.speaker_system.has_roles(user, ROLE_SPEAKER):
             return True
-        if obj.meeting_roles_to_speaker:
-            return obj.meeting.has_any_roles(user, *obj.meeting_roles_to_speaker)
-        return False
-
-    elif isinstance(obj, SpeakerList):
-        if obj.speaker_system.has_roles(user, ROLE_SPEAKER):
-            return True
-        if obj.speaker_system.meeting_roles_to_speaker:
-            return obj.meeting.has_any_roles(
-                user, *obj.speaker_system.meeting_roles_to_speaker
+        if context.speaker_system.meeting_roles_to_speaker:
+            return context.speaker_system.meeting.has_any_roles(
+                user, *context.speaker_system.meeting_roles_to_speaker
             )
-        return False
-    else:  # pragma: no cover
-        return False
+    return False
 
 
 @predicate
@@ -75,24 +60,16 @@ def is_active_list(user: AbstractUser, speaker_list: SpeakerList) -> bool:
 
 
 @predicate
-def is_system_active(
-    user: AbstractUser, instance: Union[SpeakerListSystem, SpeakerList]
-) -> bool:
-    if isinstance(instance, SpeakerListSystem):
-        return instance.is_active
-    elif isinstance(instance, SpeakerList):
-        return instance.speaker_system.is_active
+def is_system_active(user: AbstractUser, context: SpeakerSystemContext) -> bool:
+    if isinstance(context, SpeakerSystemContext):
+        return context.speaker_system.is_active
     return False
 
 
 @predicate
-def is_system_not_archived(
-    user: AbstractUser, instance: Union[SpeakerListSystem, SpeakerList]
-) -> bool:
-    if isinstance(instance, SpeakerListSystem):
-        return not instance.is_archived
-    elif isinstance(instance, SpeakerList):
-        return not instance.speaker_system.is_archived
+def is_system_not_archived(user: AbstractUser, context: SpeakerSystemContext) -> bool:
+    if isinstance(context, SpeakerSystemContext):
+        return not context.speaker_system.is_archived
     return False
 
 
@@ -170,4 +147,27 @@ rules.add_perm(
     SpeakerSystemPermissions.VIEW_ROLES,
     # Due to possible contextless systems later on
     can_view_meeting | is_speaker_moderator | has_speaker_role,
+)
+
+
+# Speaker objects themselves, only for list moderators really
+rules.add_perm(
+    SpeakerPermissions.ADD,
+    (is_speaker_moderator | is_moderator) & meeting_upcoming_ongoing,
+)
+rules.add_perm(
+    SpeakerPermissions.CHANGE,
+    (is_speaker_moderator | is_moderator)
+    & meeting_upcoming_ongoing
+    & is_system_not_archived,
+)
+rules.add_perm(
+    SpeakerPermissions.DELETE,
+    (is_speaker_moderator | is_moderator)
+    & meeting_upcoming_ongoing
+    & is_system_not_archived,
+)
+rules.add_perm(
+    SpeakerPermissions.VIEW,
+    is_speaker_moderator | is_moderator,
 )

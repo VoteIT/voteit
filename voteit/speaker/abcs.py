@@ -10,12 +10,25 @@ from django.db.models import Max
 from django.utils.timezone import now
 from pydantic.main import BaseModel
 
+from voteit.core.abcs import ABCModel
 
 if TYPE_CHECKING:
     from voteit.speaker.models import SpeakerListSystem
     from voteit.speaker.models import SpeakerList
 
 logger = getLogger(__name__)
+
+
+class SpeakerSystemContext(ABCModel):
+    @property
+    @abstractmethod
+    def speaker_system(self) -> SpeakerListSystem:
+        """
+        Return the speaker_system object. It could be a ForeignKey relation or something that gets the object.
+        """
+
+    class Meta:
+        abstract = True
 
 
 class ListMethod(ABC):

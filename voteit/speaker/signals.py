@@ -4,18 +4,19 @@ from typing import TYPE_CHECKING
 from typing import Type
 
 from django.db import models
-from django.db.models.signals import pre_delete
 from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
+from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
-
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
+
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import disable_on_raw_save
-from voteit.core.messages.role_updates import RolesAdded, RolesRemoved
+from voteit.core.messages.role_updates import RolesAdded
+from voteit.core.messages.role_updates import RolesRemoved
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
@@ -25,7 +26,6 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.signals import archive_meeting
-
 from voteit.speaker.messages import SpeakerListAdded
 from voteit.speaker.messages import SpeakerListChanged
 from voteit.speaker.messages import SpeakerListDeleted
@@ -140,6 +140,10 @@ def notify_started_speaker(speaker: Speaker, **kwargs):
 
 @receiver(speaker_stopped)
 def notify_stopped_speaker(speaker: Speaker, **kwargs):
+    _send_speaker_stopped(speaker)
+
+
+def _send_speaker_stopped(speaker: Speaker):
     msg = SpeakerStopped(
         user=speaker.user.pk,
         pk=speaker.pk,
@@ -185,6 +189,9 @@ def notify_added_or_changed_speaker_system(
             # And the order
             order_msg = _get_list_order_msg(instance.active_list)
             ch.sync_publish(order_msg)
+            # Send last 3 spoken
+            for speaker in active_list.history_qs()[:3]:
+                _send_speaker_stopped(speaker)
 
 
 @receiver(pre_delete, sender=SpeakerListSystem)
@@ -200,7 +207,8 @@ def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
 def meeting_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    """Send current state to meeting channel.
+    """
+    Send current state to meeting channel.
     - Speaker systems
     - Active list from each system
     - Order of any active list

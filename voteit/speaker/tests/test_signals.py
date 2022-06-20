@@ -1,13 +1,17 @@
+from datetime import datetime
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+from pytz import UTC
+
 from envelope.messages.channels import Subscribe
 from envelope.messages.channels import Subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
+from voteit.speaker.messages import SpeakerStopped
 
 User = get_user_model()
 
@@ -284,6 +288,35 @@ class SignalSystemChangesTests(TestCase):
         self.system.save()
         messages = [x.args[0] for x in mock_publish.mock_calls]
         self.assertEqual(list_two.pk, messages[1].data.pk)
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_system_changes_active_list_pushes_last_spoken(self, mock_publish):
+        list_one = self.system.speaker_lists.create()
+        user_one = User.objects.create(username="one")
+        user_two = User.objects.create(username="two")
+        list_one.speaker_items.create(
+            user=user_one, seconds=1, started=datetime(1971, 1, 1, tzinfo=UTC)
+        )
+        list_one.speaker_items.create(
+            user=user_two, seconds=2, started=datetime(1972, 1, 1, tzinfo=UTC)
+        )
+        list_one.speaker_items.create(
+            user=user_one, seconds=3, started=datetime(1973, 1, 1, tzinfo=UTC)
+        )
+        list_one.speaker_items.create(
+            user=user_two, seconds=4, started=datetime(1974, 1, 1, tzinfo=UTC)
+        )
+        mock_publish.reset_mock()
+        self.system.active_list = list_one
+        self.system.save()
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        message_names = [x.name for x in messages]
+        self.assertIn(SpeakerStopped.name, message_names)
+        stopped_messages = [x for x in messages if x.name == "speaker.stopped"]
+        self.assertEqual(3, len(stopped_messages))
+        self.assertEqual(4, stopped_messages[0].data.seconds)
+        self.assertEqual(3, stopped_messages[1].data.seconds)
+        self.assertEqual(2, stopped_messages[2].data.seconds)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

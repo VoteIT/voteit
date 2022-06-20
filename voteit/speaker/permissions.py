@@ -22,3 +22,11 @@ class SpeakerListPermissions(ModelPermissions):
     LEAVE = P("speaker.leave_speakerlist")
     START = P("speaker.start_speaker_in_list")
     STOP = P("speaker.stop_speaker_in_list")
+
+
+class SpeakerPermissions(ModelPermissions):
+    model = "speaker"
+    ADD = P("speaker.add_speaker", context="speaker_list")
+    CHANGE = P("speaker.change_speaker")
+    DELETE = P("speaker.delete_speaker")
+    VIEW = P("speaker.view_speaker")

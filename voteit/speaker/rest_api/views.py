@@ -2,19 +2,24 @@ from logging import getLogger
 
 from django.db import models
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.mixins import DestroyModelMixin
 from rest_framework.mixins import ListModelMixin
+from rest_framework.mixins import RetrieveModelMixin
+from rest_framework.mixins import UpdateModelMixin
 from rest_framework.viewsets import GenericViewSet
 from rest_framework import exceptions
 from rest_framework.permissions import IsAuthenticated
 
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.permissions import SpeakerSystemPermissions
 from voteit.speaker.rest_api import serializers
 from voteit.speaker.rest_api.filters import SpeakerFilterSet
@@ -29,7 +34,6 @@ class SpeakerListViewSet(DefaultModelViewSet):
     model = SpeakerList
     queryset = SpeakerList.objects.all()
     serializer_class = serializers.SpeakerListSerializer
-    serializer_classes = {"historic": serializers.HistoricSpeakerListSerializer}
     context_lookup_kwarg: str = "speaker_system"
     context_lookup_field: str = "pk"
     context_queryset = SpeakerListSystem.objects.all()
@@ -110,3 +114,39 @@ class SpeakerListSystemViewSet(DefaultModelViewSet):
         if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
             return self.queryset.filter(meeting=meeting)
         self.queryset.none()
+
+
+@router.register("speakers", basename="speakers")
+class SpeakerViewSet(
+    AutoPermissionViewSetMixin,
+    ModelContextMixin,
+    RetrieveModelMixin,
+    UpdateModelMixin,
+    DestroyModelMixin,
+    ListModelMixin,
+    GenericViewSet,
+):
+    """
+    REST interface to fetch speakers that have already spoken.
+    Either to view the list or to modify them in case something went wrong.
+    """
+
+    model = Speaker
+    queryset = Speaker.objects.filter(seconds__isnull=False)
+    serializer_class = serializers.SpeakerSerializer
+    context_lookup_kwarg: str = "speaker_list"
+    context_lookup_field: str = "pk"
+    context_queryset = SpeakerList.objects.all()
+
+    def get_queryset(self):
+        if self.detail:
+            return self.queryset
+        try:
+            speaker_list = self.get_context(self.request)
+        except exceptions.ValidationError:
+            speaker_list = None
+        if speaker_list and self.request.user.has_perm(
+            SpeakerListPermissions.VIEW, speaker_list
+        ):
+            return self.queryset.filter(speaker_list=speaker_list)
+        return self.queryset.none()

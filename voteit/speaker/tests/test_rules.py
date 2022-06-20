@@ -234,3 +234,73 @@ class SpeakerListSystemTests(TestCase):
         self.assertIs(self.user_list_moderator.has_perm(VIEW, self.system), True)
         self.assertIs(self.user_speaker.has_perm(VIEW, self.system), True)
         self.assertIs(self.user_any.has_perm(VIEW, self.system), False)
+
+
+class SpeakerPermissionTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.speaker.roles import ROLE_SPEAKER
+        from voteit.speaker.roles import ROLE_LIST_MODERATOR
+        from voteit.meeting.models import Meeting
+        from voteit.meeting.roles import ROLE_MODERATOR
+        from voteit.speaker.models import SpeakerListSystem
+        from voteit.speaker.models import SpeakerList
+        from voteit.meeting.roles import ROLE_PROPOSER
+
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.system: SpeakerListSystem = cls.meeting.speaker_systems.create(
+            method_name="simple",
+            state="active",
+            meeting_roles_to_speaker=[ROLE_PROPOSER],
+        )
+        cls.user_meeting_moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.user_meeting_moderator, ROLE_MODERATOR)
+        cls.user_list_moderator = User.objects.create(username="list_moderator")
+        cls.system.add_roles(cls.user_list_moderator, ROLE_LIST_MODERATOR)
+        cls.user_speaker = User.objects.create(username="in")
+        cls.user_proposer = User.objects.create(username="proposer")
+        cls.system.add_roles(cls.user_speaker, ROLE_SPEAKER)
+        cls.meeting.add_roles(cls.user_proposer, ROLE_PROPOSER)
+        cls.user_any = User.objects.create(username="jane")
+        cls.list: SpeakerList = cls.system.speaker_lists.create()
+        cls.system.active_list = cls.list
+        cls.speaker = cls.list.speaker_items.create(user=cls.user_speaker)
+        cls.system.save()
+
+    def setUp(self):
+        self.system.refresh_from_db()
+        self.meeting.refresh_from_db()
+        self.list.refresh_from_db()
+
+    def p(self, name):
+        from voteit.speaker.permissions import SpeakerPermissions
+
+        return getattr(SpeakerPermissions, name)
+
+    def test_add_speaker_list(self):
+        ADD = self.p("ADD")
+        self.assertTrue(self.user_meeting_moderator.has_perm(ADD, self.list))
+        self.assertTrue(self.user_list_moderator.has_perm(ADD, self.list))
+        self.assertFalse(self.user_speaker.has_perm(ADD, self.list))
+        self.assertFalse(self.user_any.has_perm(ADD, self.list))
+
+    def test_view_speaker(self):
+        VIEW = self.p("VIEW")
+        self.assertTrue(self.user_meeting_moderator.has_perm(VIEW, self.speaker))
+        self.assertTrue(self.user_list_moderator.has_perm(VIEW, self.speaker))
+        self.assertFalse(self.user_speaker.has_perm(VIEW, self.speaker))
+        self.assertFalse(self.user_any.has_perm(VIEW, self.speaker))
+
+    def test_change_speaker(self):
+        CHANGE = self.p("CHANGE")
+        self.assertTrue(self.user_meeting_moderator.has_perm(CHANGE, self.speaker))
+        self.assertTrue(self.user_list_moderator.has_perm(CHANGE, self.speaker))
+        self.assertFalse(self.user_speaker.has_perm(CHANGE, self.speaker))
+        self.assertFalse(self.user_any.has_perm(CHANGE, self.speaker))
+
+    def test_delete_speaker(self):
+        DELETE = self.p("DELETE")
+        self.assertTrue(self.user_meeting_moderator.has_perm(DELETE, self.speaker))
+        self.assertTrue(self.user_list_moderator.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_speaker.has_perm(DELETE, self.speaker))
+        self.assertFalse(self.user_any.has_perm(DELETE, self.speaker))

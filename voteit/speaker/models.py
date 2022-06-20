@@ -30,6 +30,7 @@ from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.decorators import ensure_atomic
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
+from voteit.speaker.abcs import SpeakerSystemContext
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.permissions import SpeakerSystemPermissions
 from voteit.speaker.utils import get_list_method_registry
@@ -62,7 +63,7 @@ class SpeakerSystemRoles(Roles, MeetingContext):
     }
 
 
-class SpeakerListSystem(RoleContextMixin, MeetingContext):
+class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     """All speaker list things relate here, while this in turn might relate to a meeting.
     A list system has its own rules and moderators.
     """
@@ -117,6 +118,13 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         """Fetch the poll method class, a django proxy model."""
         reg = get_list_method_registry()
         return reg[self.method_name]
+
+    @property
+    def speaker_system(self) -> SpeakerListSystem:
+        """
+        Fulfilling SpeakerSystemContext
+        """
+        return self
 
     @property
     def method(self) -> ListMethod:
@@ -216,7 +224,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext):
         return self.title and self.title[:30] or f"Speaker id {self.pk}"
 
 
-class Speaker(models.Model):
+class Speaker(MeetingContext, SpeakerSystemContext):
     """Information about a user who's entered a speaker list."""
 
     name = "speaker"
@@ -262,6 +270,14 @@ class Speaker(models.Model):
         """The definition of being in the queue is that order is set to a number"""
         return self.order is not None
 
+    @property
+    def meeting(self) -> Optional[Meeting]:
+        return self.speaker_list.meeting
+
+    @property
+    def speaker_system(self) -> SpeakerListSystem:
+        return self.speaker_list.speaker_system
+
     # Type hinting
     objects = models.Manager()
 
@@ -282,7 +298,7 @@ class Speaker(models.Model):
         speaker_stopped.send(sender=self.__class__, speaker=self)
 
 
-class SpeakerList(AgendaItemContext, MeetingContext):
+class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     name = "speaker_list"
     title = models.CharField(max_length=200)
     state = FSMField(
@@ -315,7 +331,9 @@ class SpeakerList(AgendaItemContext, MeetingContext):
 
     @property
     def meeting(self) -> Optional[Meeting]:
-        """While not directly related, it still good to be able to do lookups this way"""
+        """
+        While not directly related, it's still good to be able to do lookups this way
+        """
         if self.speaker_system:
             return self.speaker_system.meeting
 
