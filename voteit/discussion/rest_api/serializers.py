@@ -33,10 +33,15 @@ class DiscussionPostDetailSerializer(RichTextSerializerMixin, BaseModelSerialize
 class DiscussionPostCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
     class Meta:
         model = models.DiscussionPost
-        fields = [
-            "body",
-            "tags",
+        read_only_fields = [
+            "created",
+            "pk",
+        ]
+        fields = read_only_fields + [
             "agenda_item",
+            "author",
+            "body",
             "meeting_group",
+            "tags",
         ]
         validators = (ValidateGroupAIContext(),)
