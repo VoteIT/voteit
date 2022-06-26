@@ -283,7 +283,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
     # FIXME: Split this to get saner errors
     def start_check(self, exceptions=False) -> bool:
-        """Check that this poll could be started. A very basic check for the most obvious things.
+        """
+        Check if this poll can be started. A very basic check for the most obvious things.
         Note that it's used as a transition condition, so it must return True if everything is ok!
         """
         try:
