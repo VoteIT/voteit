@@ -91,6 +91,19 @@ def meeting_not_archived(user: AbstractUser, context: MeetingContext) -> bool:
 
 
 @predicate
+def meeting_not_fully_archived(user: AbstractUser, context: MeetingContext) -> bool:
+    """
+    Special case for archiving controls. If a meeting is in the state archiving, the process can be aborted.
+    This should not be used for something other than the archive-permission.
+    """
+    return (
+        isinstance(context, MeetingContext)
+        and context.meeting is not None
+        and context.meeting.state != MeetingWf.ARCHIVED
+    )
+
+
+@predicate
 def meeting_upcoming_ongoing(user: AbstractUser, context: MeetingContext) -> bool:
     return (
         isinstance(context, MeetingContext)
@@ -113,12 +126,13 @@ def can_view_meeting(user: AbstractUser, context: MeetingContext) -> bool:
 
 rules.add_perm(MeetingPermissions.ADD, is_manager | is_meeting_creator)
 rules.add_perm(MeetingPermissions.VIEW, can_view_meeting)
-rules.add_perm(MeetingPermissions.MODERATE, is_not_archived & is_moderator)
+rules.add_perm(MeetingPermissions.MODERATE, meeting_not_archived & is_moderator)
+rules.add_perm(MeetingPermissions.ARCHIVE, meeting_not_fully_archived & is_moderator)
 # We might want to add editor role later on
-rules.add_perm(MeetingPermissions.CHANGE, is_not_archived & is_moderator)
-rules.add_perm(MeetingPermissions.DELETE, is_not_archived & is_moderator)
+rules.add_perm(MeetingPermissions.CHANGE, meeting_not_archived & is_moderator)
+rules.add_perm(MeetingPermissions.DELETE, meeting_not_archived & is_moderator)
 rules.add_perm(
-    MeetingPermissions.CHANGE_ROLES, is_not_archived & (is_moderator | is_manager)
+    MeetingPermissions.CHANGE_ROLES, meeting_not_archived & (is_moderator | is_manager)
 )
 rules.add_perm(MeetingPermissions.VIEW_ROLES, can_view_meeting | is_manager)
 

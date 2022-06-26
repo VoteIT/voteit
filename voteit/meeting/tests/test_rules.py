@@ -5,6 +5,7 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
+from voteit.meeting.workflows import MeetingWf
 
 User = get_user_model()
 
@@ -120,6 +121,24 @@ class MeetingPermissionTests(TestCase):
         self.assertFalse(self.participant.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.org_manager.has_perm(CHANGE, self.meeting))
 
+    def test_can_change_meeting_archived(self):
+        self.meeting.archive()
+        self.meeting.save()
+        CHANGE = self.p("CHANGE")
+        self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting))
+        self.assertFalse(self.moderator.has_perm(CHANGE, self.meeting))
+        self.assertFalse(self.participant.has_perm(CHANGE, self.meeting))
+        self.assertFalse(self.org_manager.has_perm(CHANGE, self.meeting))
+
+    def test_can_change_meeting_archive_requested(self):
+        self.meeting.state = MeetingWf.ARCHIVING
+        self.meeting.save()
+        CHANGE = self.p("CHANGE")
+        self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting))
+        self.assertFalse(self.moderator.has_perm(CHANGE, self.meeting))
+        self.assertFalse(self.participant.has_perm(CHANGE, self.meeting))
+        self.assertFalse(self.org_manager.has_perm(CHANGE, self.meeting))
+
     def test_can_delete_meeting(self):
         DELETE = self.p("DELETE")
         self.assertFalse(self.anon_user.has_perm(DELETE, self.meeting))
@@ -133,6 +152,15 @@ class MeetingPermissionTests(TestCase):
         self.assertTrue(self.moderator.has_perm(CHANGE_ROLES, self.meeting))
         self.assertFalse(self.participant.has_perm(CHANGE_ROLES, self.meeting))
         self.assertTrue(self.org_manager.has_perm(CHANGE_ROLES, self.meeting))
+
+    def test_can_change_roles_archived(self):
+        CHANGE_ROLES = self.p("CHANGE_ROLES")
+        self.meeting.archive()
+        self.meeting.save()
+        self.assertFalse(self.anon_user.has_perm(CHANGE_ROLES, self.meeting))
+        self.assertFalse(self.moderator.has_perm(CHANGE_ROLES, self.meeting))
+        self.assertFalse(self.participant.has_perm(CHANGE_ROLES, self.meeting))
+        self.assertFalse(self.org_manager.has_perm(CHANGE_ROLES, self.meeting))
 
     def test_can_view_roles(self):
         VIEW_ROLES = self.p("VIEW_ROLES")
@@ -149,6 +177,23 @@ class MeetingPermissionTests(TestCase):
         self.assertTrue(self.moderator.has_perm(VIEW_ROLES, self.meeting))
         self.assertTrue(self.participant.has_perm(VIEW_ROLES, self.meeting))
         self.assertTrue(self.org_manager.has_perm(VIEW_ROLES, self.meeting))
+
+    def test_can_archive_meeting(self):
+        ARCHIVE = self.p("ARCHIVE")
+        self.assertFalse(self.anon_user.has_perm(ARCHIVE, self.meeting))
+        self.assertTrue(self.moderator.has_perm(ARCHIVE, self.meeting))
+        self.assertFalse(self.participant.has_perm(ARCHIVE, self.meeting))
+        self.assertFalse(self.org_manager.has_perm(ARCHIVE, self.meeting))
+
+    def test_can_archive_meeting_abort_state(self):
+        # Essentially the archive permission is used to request abort too
+        self.meeting.state = MeetingWf.ARCHIVING
+        self.meeting.save()
+        ARCHIVE = self.p("ARCHIVE")
+        self.assertFalse(self.anon_user.has_perm(ARCHIVE, self.meeting))
+        self.assertTrue(self.moderator.has_perm(ARCHIVE, self.meeting))
+        self.assertFalse(self.participant.has_perm(ARCHIVE, self.meeting))
+        self.assertFalse(self.org_manager.has_perm(ARCHIVE, self.meeting))
 
 
 class MeetingGroupPermissionTests(TestCase):
@@ -181,7 +226,7 @@ class MeetingGroupPermissionTests(TestCase):
         self.assertTrue(self.moderator.has_perm(ADD, self.meeting))
         self.assertFalse(self.participant.has_perm(ADD, self.meeting))
 
-    def test_can_archived(self):
+    def test_can_add_archived(self):
         ADD = self.p("ADD")
 
         self.meeting.archive()

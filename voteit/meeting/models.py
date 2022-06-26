@@ -230,7 +230,12 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     def abort_archiving(self):
         self.archive_after = None
 
-    @transition(field=state, target=MeetingWf.ARCHIVED, permission=NOT_ALLOWED)
+    @transition(
+        field=state,
+        source="+",
+        target=MeetingWf.ARCHIVED,
+        permission=NOT_ALLOWED,
+    )
     def archive(self):
         from voteit.meeting.signals import archive_meeting  # Avoid circular import
 
