@@ -18,6 +18,7 @@ class SpeakerListPermissions(ModelPermissions):
     CHANGE = P("speaker.change_speakerlist")
     DELETE = P("speaker.delete_speakerlist")
     VIEW = P("speaker.view_speakerlist")
+    ACTIVATE = P("speaker.activate_speakerlist")
     ENTER = P("speaker.enter_speakerlist")
     LEAVE = P("speaker.leave_speakerlist")
     START = P("speaker.start_speaker_in_list")

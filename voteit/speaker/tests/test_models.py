@@ -5,18 +5,20 @@ from django.db import IntegrityError
 from django.dispatch import receiver
 from django.test import TestCase
 from django.utils.timezone import now
+from django_fsm import TransitionNotAllowed
 
 User = get_user_model()
 
 
 class SpeakerTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.speaker.models import SpeakerListSystem
         from voteit.speaker.models import SpeakerList
 
-        self.system = SpeakerListSystem.objects.create(method_name="simple")
-        self.list = SpeakerList.objects.create(speaker_system=self.system)
-        self.user = User.objects.create(username="jane")
+        cls.system = SpeakerListSystem.objects.create(method_name="simple")
+        cls.list = SpeakerList.objects.create(speaker_system=cls.system)
+        cls.user = User.objects.create(username="jane")
 
     @property
     def Speaker(self):
@@ -208,10 +210,11 @@ class SpeakerListTests(TestCase):
 
 
 class SpeakerListSystemsTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         from voteit.speaker.models import SpeakerListSystem
 
-        self.system = SpeakerListSystem.objects.create(
+        cls.system = SpeakerListSystem.objects.create(
             method_name="simple", state="active"
         )
 
@@ -243,3 +246,29 @@ class SpeakerListSystemsTests(TestCase):
         speaker_one.refresh_from_db()
         self.assertEqual(1, speaker_one.seconds)
         self.assertFalse(speaker_one.in_queue)
+
+    def test_set_active_that_belongs_to_other_system(self):
+        from voteit.speaker.models import SpeakerListSystem
+
+        other_sys = SpeakerListSystem.objects.create(
+            method_name="simple", state="active"
+        )
+        other_list = other_sys.speaker_lists.create()
+        self.system.active_list = other_list
+        self.assertRaises(IntegrityError, self.system.save)
+
+    def test_inactivating_causes_active_list_to_become_inactive(self):
+        slist = self.system.speaker_lists.create()
+        self.system.active_list = slist
+        self.system.inactivate()
+        self.assertIsNone(self.system.active_list)
+
+    def test_inactivating_with_speaker_causes_error(self):
+        user = User.objects.create(username="speaker")
+        slist = self.system.speaker_lists.create()
+        self.system.active_list = slist
+        speaker = slist.speaker_items.create(user=user)
+        slist.current = speaker
+        slist.save()
+        with self.assertRaises(TransitionNotAllowed):
+            self.system.inactivate()

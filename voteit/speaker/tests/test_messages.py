@@ -130,7 +130,6 @@ class SpeakerListSetActiveTests(TestCase):
         return self._cut(mm={"user_pk": self.user.pk, "consumer_name": "abc"}, **kw)
 
     def test_set_active(self):
-
         msg = self._mk_one()
         response = msg.run_job()
         self.assertIsInstance(response, Status)
@@ -152,6 +151,12 @@ class SpeakerListSetActiveTests(TestCase):
         other_list.start_speaker(other_speaker)
         msg = self._mk_one()
         self.assertRaises(ValidationErrorMsg, msg.run_job)
+
+    def test_set_active_system_is_inactive(self):
+        self.system.inactivate()
+        self.system.save()
+        msg = self._mk_one()
+        self.assertRaises(UnauthorizedError, msg.run_job)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

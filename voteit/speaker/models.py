@@ -158,6 +158,11 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     def organisation(self) -> Organisation:
         return self.meeting.organisation
 
+    def no_active_speaker_guard(self) -> bool:
+        if self.active_list:
+            return not bool(self.active_list.current)
+        return True
+
     @transition(
         field=state,
         source=SpeakerSystemWf.INACTIVE,
@@ -175,6 +180,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         source=SpeakerSystemWf.ACTIVE,
         target=SpeakerSystemWf.INACTIVE,
         permission=SpeakerSystemPermissions.CHANGE,
+        conditions=[no_active_speaker_guard],
         custom={"title": _("Inactivate")},
     )
     def inactivate(self):
@@ -182,6 +188,9 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         Make system disabled and hidden for users. This is not a permission though,
         so users can still view the information if they dig around in the frontends source.
         """
+        if self.active_list is not None:
+            self.active_list = None
+        self.save()
 
     @transition(
         field=state,
@@ -203,6 +212,8 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         for role in self.meeting_roles_to_speaker:
             if role not in MeetingRoles.valid_roles:
                 raise ValueError(f"{role} is not a valid meeting role")
+        if self.active_list and self.active_list not in self.speaker_lists.all():
+            raise IntegrityError("Active list belongs to another speaker system")
         super(SpeakerListSystem, self).save(**kw)
 
     @property

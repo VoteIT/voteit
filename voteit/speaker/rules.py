@@ -93,6 +93,10 @@ rules.add_perm(
     is_system_not_archived & (is_speaker_moderator | is_moderator),
 )
 rules.add_perm(
+    SpeakerListPermissions.ACTIVATE,
+    is_system_not_archived & is_system_active & (is_speaker_moderator | is_moderator),
+)
+rules.add_perm(
     SpeakerListPermissions.DELETE,
     is_system_not_archived & (is_speaker_moderator | is_moderator),
 )

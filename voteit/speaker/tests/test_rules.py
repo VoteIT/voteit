@@ -168,6 +168,22 @@ class SpeakerListTests(TestCase):
         self.assertFalse(self.user_speaker.has_perm(STOP, self.list))
         self.assertFalse(self.user_any.has_perm(STOP, self.list))
 
+    def test_activate_list_inactive_system(self):
+        ACTIVATE = self.p("ACTIVATE")
+        self.system.inactivate()
+        self.system.save()
+        self.assertFalse(self.user_meeting_moderator.has_perm(ACTIVATE, self.list))
+        self.assertFalse(self.user_list_moderator.has_perm(ACTIVATE, self.list))
+        self.assertFalse(self.user_speaker.has_perm(ACTIVATE, self.list))
+        self.assertFalse(self.user_any.has_perm(ACTIVATE, self.list))
+
+    def test_activate_list(self):
+        ACTIVATE = self.p("ACTIVATE")
+        self.assertTrue(self.user_meeting_moderator.has_perm(ACTIVATE, self.list))
+        self.assertTrue(self.user_list_moderator.has_perm(ACTIVATE, self.list))
+        self.assertFalse(self.user_speaker.has_perm(ACTIVATE, self.list))
+        self.assertFalse(self.user_any.has_perm(ACTIVATE, self.list))
+
 
 class SpeakerListSystemTests(TestCase):
     @classmethod
