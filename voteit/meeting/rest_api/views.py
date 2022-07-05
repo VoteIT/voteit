@@ -9,6 +9,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
+from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.meeting import roles
 from voteit.meeting.models import Meeting
@@ -26,7 +27,6 @@ __all__ = (
     "MeetingGroupViewSet",
 )
 
-from ...core.rest_api import router
 
 
 @router.register("meetings", basename="meeting")

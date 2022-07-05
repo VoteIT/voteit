@@ -3,6 +3,8 @@ from django.test import RequestFactory
 from django.test import TestCase
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
+from voteit.poll.app.er_policies.auto_always import AutoAlways
+from voteit.poll.app.polls.simple import Simple
 
 User = get_user_model()
 
@@ -12,6 +14,8 @@ class MeetingSerializerTests(TestCase):
 
     def setUp(self):
         self.meeting = Meeting.objects.get(pk=1)
+        self.participant = User.objects.get(username="participant")
+        self.moderator = User.objects.get(username="moderator")
 
     @property
     def _cut(self):
@@ -26,27 +30,72 @@ class MeetingSerializerTests(TestCase):
         return request
 
     def test_roles_moderator(self):
-        moderator = User.objects.get(username="moderator")
-        request = self._mk_request(moderator)
+        request = self._mk_request(self.moderator)
         serializer = self._cut(self.meeting, context={"request": request})
         self.assertEqual(
             {"participant", "moderator"}, set(serializer.data["current_user_roles"])
         )
 
     def test_participant(self):
-        participant = User.objects.get(username="participant")
-        request = self._mk_request(participant)
+        request = self._mk_request(self.participant)
         serializer = self._cut(self.meeting, context={"request": request})
         self.assertEqual({"participant"}, set(serializer.data["current_user_roles"]))
 
+
+class MeetingDetailSerializerTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    def setUp(self):
+        self.meeting = Meeting.objects.get(pk=1)
+        self.participant = User.objects.get(username="participant")
+        self.moderator = User.objects.get(username="moderator")
+
+    @property
+    def _cut(self):
+        from voteit.meeting.rest_api.serializers import MeetingDetailSerializer
+
+        return MeetingDetailSerializer
+
+    def _mk_request(self, user):
+        rf = RequestFactory()
+        request = rf.get("/")
+        request.user = user
+        return request
+
     def test_create(self):
-        participant = User.objects.get(username="participant")
-        request = self._mk_request(participant)
-        serializer = self._cut(data={"title": "Hello"}, context={"request": request})
+        request = self._mk_request(self.participant)
+        serializer = self._cut(
+            data={"title": "Hello", "er_policy_name": AutoAlways.name},
+            context={"request": request},
+        )
         serializer.is_valid()
         self.assertFalse(serializer.errors)
         instance = serializer.save()
         self.assertIsInstance(instance, Meeting)
+
+    def test_update_er_policy(self):
+        request = self._mk_request(self.participant)
+        serializer = self._cut(
+            self.meeting,
+            data={"title": "Hello", "er_policy_name": AutoAlways.name},
+            context={"request": request},
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        serializer.save()
+        # breakpoint()
+        self.assertEqual(AutoAlways.name, self.meeting.er_policy_name)
+
+    def test_update_er_policy_ongoing_polls(self):
+        self.meeting.polls.create(state="ongoing", method_name=Simple.name)
+        request = self._mk_request(self.participant)
+        serializer = self._cut(
+            self.meeting,
+            data={"title": "Hello", "er_policy_name": AutoAlways.name},
+            context={"request": request},
+        )
+        serializer.is_valid()
+        self.assertIn("er_policy_name", serializer.errors)
 
 
 class MeetingRolesSerializerTests(TestCase):

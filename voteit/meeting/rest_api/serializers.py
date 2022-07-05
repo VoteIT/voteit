@@ -1,21 +1,26 @@
+from __future__ import annotations
 from contextlib import suppress
-from typing import List
 from typing import Optional
+from typing import TYPE_CHECKING
 from typing import Type
 
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from voteit.core.models import Roles
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.meeting import models
 
+if TYPE_CHECKING:
+    from voteit.meeting.models import Meeting
+
 
 class UserRolesMixin(serializers.Serializer):
     current_user_roles = serializers.SerializerMethodField()
 
-    def get_current_user_roles(self, instance) -> Optional[List[str]]:
+    def get_current_user_roles(self, instance) -> Optional[list[str]]:
         """Return current user roles, if available, for a meeting."""
         if self.context:
             user = self.context["request"].user
@@ -62,6 +67,17 @@ class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
             validated_data["organisation"] = user.organisation
         return super().create(validated_data)
 
+    def validate_er_policy_name(self, value):
+        from voteit.poll.workflows import PollWf
+
+        if self.instance is not None:
+            self.instance: Meeting
+            if self.instance.polls.filter(state=PollWf.ONGOING).exists():
+                raise ValidationError(
+                    "There are ongoing polls - close them before changing policy."
+                )
+        return value
+
 
 class AgendaOrderSerializer(serializers.Serializer):
     order = serializers.ListSerializer(child=serializers.IntegerField())
@@ -95,9 +111,7 @@ class RoleValidator:
 
     def __call__(self, value):
         if value not in self.roles_cls.valid_roles:
-            raise serializers.ValidationError(
-                f'The role "{value}" is not valid for this context.'
-            )
+            raise ValidationError(f'The role "{value}" is not valid for this context.')
 
 
 class RoleSerializer(serializers.Serializer):
