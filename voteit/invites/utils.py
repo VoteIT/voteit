@@ -56,7 +56,9 @@ def create_invites(created_by: User = None, **kwargs):
         if invite_qs.exists():
             try:
                 # First filter out excludable
-                invite: MeetingInvite = invite_qs.exclude(state__in=add_data.skip_states).get()
+                invite: MeetingInvite = invite_qs.exclude(
+                    state__in=add_data.skip_states
+                ).get()
             except ObjectDoesNotExist:
                 skipped_count += 1
                 continue
@@ -66,22 +68,22 @@ def create_invites(created_by: User = None, **kwargs):
                     f"Data on row {i} matched different invites that already exist. You need to clear them first."
                 )
 
-            # So we need to update this single existing invite and set permissions according to the new state
-            user: Optional[User] = invite.used_by
-            if user:
-                # Adjust existing roles
-                requested_roles = set(invite.roles)
-                current_roles = meeting.get_roles(user) or set()
-                if remove_roles := requested_roles - current_roles:
-                    meeting.remove_roles(user, *remove_roles)
-                if add_roles := current_roles - requested_roles:
-                    meeting.add_roles(user, *add_roles)
             # Update invite
             invite.invite_data = row
             invite.roles = add_data.roles
             invite.last_modified_by = created_by
             invite.save()
             changed.append(invite.pk)
+            #  Set permissions according to the new state
+            user: Optional[User] = invite.used_by
+            if user:
+                # Adjust existing roles
+                requested_roles = set(invite.roles)
+                current_roles = meeting.get_roles(user) or set()
+                if remove_roles := current_roles - requested_roles:
+                    meeting.remove_roles(user, *remove_roles)
+                if add_roles := requested_roles - current_roles:
+                    meeting.add_roles(user, *add_roles)
         else:
             # We need to create a new invite
             invite = meeting.invites.create(
