@@ -58,7 +58,8 @@ class UserSearchViewSet(ModelContextMixin, viewsets.ReadOnlyModelViewSet):
             meeting = self.get_context(self.request)
         except ValidationError:
             meeting = None
-        if meeting and user.has_perm(MeetingPermissions.MODERATE, meeting):
+        # FIXME: Public meeting is used in an odd way in frontend. This needs to be cleaned up.
+        if meeting and meeting.has_roles(user, "participant"):
             return meeting.participants.all()
         return UserModel.objects.none()
 

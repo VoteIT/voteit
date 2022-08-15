@@ -93,7 +93,7 @@ class UserSearchViewSetTests(APITestCase):
         response = self.client.get(url, data={"meeting": self.meeting.pk})
         self.assertEqual(200, response.status_code)
         data = response.json()
-        self.assertEqual(0, len(data))
+        self.assertEqual(2, len(data))
 
     def test_update(self):
         self.client.force_login(self.superuser)
