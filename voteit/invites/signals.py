@@ -16,6 +16,7 @@ from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api.serializers import MeetingInviteSerializer
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.signals import archive_meeting
+from voteit.meeting.signals import meeting_joined
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -27,6 +28,17 @@ if TYPE_CHECKING:
 def expire_unused_invites(meeting, **kw):
     # Note: This will bypass the transaction, but that should be fine. Remember to change if we need to.
     meeting.invites.filter(state=InviteWf.OPEN).update(state=InviteWf.EXPIRED)
+
+
+@receiver(meeting_joined)
+def auto_use_invite(meeting, user, **kw):
+    if user.email:
+        invite = meeting.invites.filter(
+            state=InviteWf.OPEN, type="email", invite_data=user.email
+        ).first()
+        if invite is not None:
+            invite.accept(user)
+            invite.save()
 
 
 @receiver(channel_subscribed, sender=MeetingInvitesChannel)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import Signal
@@ -36,6 +37,33 @@ if TYPE_CHECKING:
 
 # Signal providing an atomic transaction to do cleanup when a meeting is archived
 archive_meeting = Signal(providing_args=["meeting"])
+# Meeting joined signal, whenever a user gets roles within a meeting
+# hook this up to other things that needs to be checked, for instance if there's an unused invite
+# Arguments
+#   meeting
+#   user
+#   meeting_roles (Meeting roles object)
+meeting_joined = Signal()
+
+
+@receiver(post_save, sender=MeetingRoles)
+@disable_on_raw_save
+@on_transaction_commit
+def meeting_roles_created(instance: MeetingRoles, created: bool = None, **kw):
+    """
+    Note! This is only run after transaction commits, and it creates a new transaction.
+    Why the fuzz? Since we don't know where the role creation originated we need to make sure that any other
+    adjustments will be complete. (Like marking an invite as accepted)
+    """
+
+    if created:
+        with transaction.atomic(durable=True):
+            meeting_joined.send(
+                sender=MeetingRoles,
+                meeting=instance.meeting,
+                user=instance.user,
+                meeting_roles=instance,
+            )
 
 
 # FIXME: What about deleted? Some kind of crash and burn message?

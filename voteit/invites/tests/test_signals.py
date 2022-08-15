@@ -15,6 +15,28 @@ _channel_layers_setting = {
 }
 
 
+class AutoUseInviteTests(TestCase):
+    def setUp(self):
+        from voteit.invites.models import MeetingInvite
+
+        self.meeting = Meeting.objects.create()
+        self.user = User.objects.create(username="a", email="a@betahaus.net")
+        self.inv1 = MeetingInvite.objects.create(
+            meeting=self.meeting,
+            created_by=self.user,
+            invite_data="a@betahaus.net",
+            roles=["discusser", "potential_voter"],
+        )
+
+    def test_auto_use(self):
+        with FakeCommit():
+            self.meeting.add_roles(self.user, "participant")
+        self.assertEqual(
+            {"participant", "discusser", "potential_voter"},
+            set(self.meeting.get_roles(self.user)),
+        )
+
+
 class InvitesExpireWhenMeetingArchivedTests(TestCase):
     def setUp(self):
         from voteit.invites.models import MeetingInvite

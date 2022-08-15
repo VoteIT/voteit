@@ -1,13 +1,14 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.dispatch import receiver
 from django.test import TestCase
 from django.test import override_settings
 
 from envelope.messages.channels import Subscribe
 from envelope.messages.channels import Subscribed
 from voteit.core.testing import FakeCommit
-
+from voteit.meeting.models import Meeting
 from voteit.meeting.channels import MeetingChannel
 
 User = get_user_model()
@@ -16,11 +17,49 @@ _channel_layers_setting = {
 }
 
 
+class MeetingJoinedSignalTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+        cls.user = User.objects.create(username="user")
+
+    @property
+    def _fut(self):
+        from voteit.meeting.signals import meeting_joined
+
+        return meeting_joined
+
+    def test_signal_sent(self):
+        L = []
+
+        @receiver(self._fut)
+        def my_listener(**kw):
+            L.append(kw)
+
+        with FakeCommit():
+            self.meeting.add_roles(self.user, "participant")
+            self.assertFalse(L)
+        self.assertTrue(L)
+        kwargs = L[0]
+        self.assertEqual(self.meeting, kwargs.pop("meeting"))
+        self.assertEqual(self.user, kwargs.pop("user"))
+        self.assertEqual({"participant"}, set(kwargs.pop("meeting_roles").assigned))
+
+    def test_signal_send_after_invite_used(self):
+        @receiver(self._fut)
+        def my_listener(user, **kw):
+            one = self.meeting.invites.filter(invite_data="blaha").first()
+            self.assertEqual(one.state, "accepted")
+
+        invite = self.meeting.invites.create(invite_data="blaha", created_by=self.user)
+        with FakeCommit():
+            invite.accept(self.user)
+            invite.save()
+
+
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class MeetingChangedTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-
         self.meeting = Meeting.objects.create()
 
     # We don't handle added right now
@@ -40,14 +79,13 @@ class MeetingChangedTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class MeetingChannelSubscribedTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-
-        self.meeting: Meeting = Meeting.objects.create()
-        self.user: User = self.meeting.participants.create(username="user")
-        self.meeting.add_roles(self.user, "moderator")
-        self.group = self.meeting.groups.create(title="Gang")
-        self.group.members.add(self.user)
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.user: User = cls.meeting.participants.create(username="user")
+        cls.meeting.add_roles(cls.user, "moderator")
+        cls.group = cls.meeting.groups.create(title="Gang")
+        cls.group.members.add(cls.user)
 
     def test_roles_in_app_state(self):
         msg = Subscribe(
@@ -89,11 +127,10 @@ class MeetingChannelSubscribedTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class MeetingGroupChangedTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-
-        self.meeting = Meeting.objects.create()
-        self.group = self.meeting.groups.create()
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+        cls.group = cls.meeting.groups.create()
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added(self, mock_publish):
