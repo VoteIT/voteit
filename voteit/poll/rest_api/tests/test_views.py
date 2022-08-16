@@ -118,7 +118,7 @@ class PollViewSetTests(APITestCase):
         poll = self.meeting.polls.create(
             agenda_item=self.ai_private, method_name="simple", state="upcoming"
         )
-        url = f"/api/polls/{poll.pk}/"
+        url = reverse("poll-detail", kwargs={"pk": poll.pk})
         self.client.force_login(self.moderator)
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
@@ -135,7 +135,7 @@ class PollViewSetTests(APITestCase):
 
     def test_get_private_poll(self):
         poll = self.meeting.polls.create(agenda_item=self.ai, method_name="simple")
-        url = f"/api/polls/{poll.pk}/"
+        url = reverse("poll-detail", kwargs={"pk": poll.pk})
         self.client.force_login(self.moderator)
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
@@ -153,7 +153,7 @@ class PollViewSetTests(APITestCase):
 
         meeting = Meeting.objects.create()
         poll = meeting.polls.create(method_name="simple", state="upcoming")
-        url = f"/api/polls/{poll.pk}/"
+        url = reverse("poll-detail", kwargs={"pk": poll.pk})
         self.client.force_login(self.moderator)
         response = self.client.get(url)
         self.assertEqual(403, response.status_code)
@@ -168,13 +168,25 @@ class PollViewSetTests(APITestCase):
 
     def test_change(self):
         poll = self.meeting.polls.create(method_name="simple", title="First")
-        url = f"/api/polls/{poll.pk}/"
+        url = reverse("poll-detail", kwargs={"pk": poll.pk})
         self.client.force_login(self.moderator)
         data = {"title": "And then"}  # Readonly
         response = self.client.patch(url, data)
         self.assertEqual(200, response.status_code)
         poll.refresh_from_db(fields=("title",))
         self.assertEqual("First", poll.title)
+
+    def test_transition_without_register(self):
+        poll = self.meeting.polls.create(
+            method_name="simple", title="First", state="upcoming"
+        )
+        self.meeting.electoral_registers.create()
+        url = reverse("poll-transitions", kwargs={"pk": poll.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data={"transition": "ongoing"})
+        self.assertEqual(400, response.status_code)
+        data = response.json()
+        # FIXME
 
 
 class ElectoralRegisterViewSetTests(APITestCase):

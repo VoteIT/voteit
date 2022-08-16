@@ -46,12 +46,6 @@ class PresenceCheckPolicyTests(TestCase):
             set(self.meeting.latest_er.voters.all()),
         )
 
-    def test_starting_poll(self):
-        self.poll.upcoming()
-        self.assertRaises(
-            ElectoralRegisterMissing, self.poll.start_check, exceptions=True
-        )
-
     def test_with_no_present(self):
         self.presence_check.present_users.remove(self.participant)
         self.presence_check.close()
@@ -60,6 +54,4 @@ class PresenceCheckPolicyTests(TestCase):
             set(self.meeting.latest_er.voters.all()),
         )
         self.poll.upcoming()
-        self.assertRaises(
-            ElectoralRegisterEmpty, self.poll.start_check, exceptions=True
-        )
+        self.assertFalse(self.poll.electoral_register_empty_guard())

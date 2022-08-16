@@ -281,31 +281,27 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
     validate_settings_guard.title = "Invalid settings"
 
-    # FIXME: Split this to get saner errors
-    def start_check(self, exceptions=False) -> bool:
-        """
-        Check if this poll can be started. A very basic check for the most obvious things.
-        Note that it's used as a transition condition, so it must return True if everything is ok!
-        """
+    def electoral_register_missing_guard(self):
+        if self.meeting is not None:
+            return self.meeting.get_latest_er() is not None
+        return True
+
+    def electoral_register_empty_guard(self):
+        if self.meeting is not None:
+            er = self.meeting.get_latest_er()
+            return er.voters.exists()
+        return True
+
+    def no_proposals_guard(self):
+        return self.proposals.exists()
+
+    def method_guard(self):
         try:
-            # Check meetings electoral register
-            if self.meeting is not None:
-                # Meeting should normally not be none.
-                # In case it is it's probably a unit test or outside of regular er context
-                meetings_er = self.meeting.get_latest_er()
-                if meetings_er is None:
-                    raise ElectoralRegisterMissing()
-                if meetings_er.voters.count() < 1:
-                    raise ElectoralRegisterEmpty()
-            if self.proposals.count() < 1:
-                raise InvalidProposalCount("No proposals")
             method = self.method  # Will raise exception if doesn't exist
             # And check the specifics for the poll method
             method.start_check()
         except PollError as exc:
-            if exceptions:
-                raise exc
-            logger.exception("Poll can't start:")
+            logger.exception("Poll can't start")
             return False
         return True
 
@@ -327,7 +323,13 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         source=PollWf.UPCOMING,
         target=PollWf.ONGOING,
-        conditions=[validate_settings_guard, start_check],
+        conditions=[
+            validate_settings_guard,
+            electoral_register_missing_guard,
+            electoral_register_empty_guard,
+            no_proposals_guard,
+            method_guard,
+        ],
         permission=PollPermissions.CHANGE_STATE,
         custom={"title": _("Start")},
     )

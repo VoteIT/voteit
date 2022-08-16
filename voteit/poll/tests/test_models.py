@@ -83,23 +83,22 @@ class PollTests(TestCase):
     def test_start_check_no_electoral_register_no_meeting(self):
         self.poll.meeting = None
         self.poll.save()
-        self.failUnless(self.poll.start_check(exceptions=True))
+        self.assertTrue(self.poll.electoral_register_empty_guard())
 
     def test_start_check_no_electoral_register_checked_against_meeting(self):
+        self.assertTrue(self.poll.electoral_register_missing_guard())
         self.er.delete()
-        self.assertRaises(
-            ElectoralRegisterMissing, self.poll.start_check, exceptions=True
-        )
+        self.assertFalse(self.poll.electoral_register_missing_guard())
 
     def test_start_check_electoral_register_empty(self):
+        self.assertTrue(self.poll.electoral_register_empty_guard())
         self.er.voters.remove(self.participant, self.moderator)
-        self.assertRaises(
-            ElectoralRegisterEmpty, self.poll.start_check, exceptions=True
-        )
+        self.assertFalse(self.poll.electoral_register_empty_guard())
 
     def test_start_check_no_proposals(self):
+        self.assertTrue(self.poll.no_proposals_guard())
         self.poll.proposals.all().delete()
-        self.assertRaises(InvalidProposalCount, self.poll.start_check, exceptions=True)
+        self.assertFalse(self.poll.no_proposals_guard())
 
     def test_opening_poll(self):
         self.poll.upcoming()
