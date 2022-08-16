@@ -11,7 +11,7 @@ from envelope.signals import channel_subscribed
 
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import receiver_all_subclasses
-from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import MeetingChannel
 from voteit.participant_number.messages import PNAdded
 from voteit.participant_number.messages import PNChanged
 from voteit.participant_number.messages import PNDeleted
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-@receiver(channel_subscribed, sender=ModeratorsChannel)
+@receiver(channel_subscribed, sender=MeetingChannel)
 def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
     """
     Populate app_state with participant numbers
@@ -47,7 +47,7 @@ def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
 def pn_updated(instance: ParticipantNumber = None, created=None, **kw):
     if instance.pns.meeting is None:
         return
-    moderators_ch = ModeratorsChannel.from_instance(instance.pns.meeting)
+    channel = MeetingChannel.from_instance(instance.pns.meeting)
     msg_klass = created and PNAdded or PNChanged
     msg = msg_klass(
         meeting=instance.pns.meeting.pk,
@@ -55,15 +55,15 @@ def pn_updated(instance: ParticipantNumber = None, created=None, **kw):
         user=instance.user.pk,
         pk=instance.pk,
     )
-    moderators_ch.sync_publish(msg)
+    channel.sync_publish(msg)
 
 
 @receiver_all_subclasses(pre_delete, sender=ParticipantNumber)
 def pn_deleted(instance: ParticipantNumber = None, **kw):
     if instance.pns.meeting is None:
         return
-    moderators_ch = ModeratorsChannel.from_instance(instance.pns.meeting)
+    channel = MeetingChannel.from_instance(instance.pns.meeting)
     msg = PNDeleted(
         pk=instance.pk,
     )
-    moderators_ch.sync_publish(msg)
+    channel.sync_publish(msg)
