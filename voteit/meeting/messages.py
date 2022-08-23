@@ -65,7 +65,5 @@ class CopyMeeting(ContextAction):
         meeting: Meeting = self.context
         update = Status.from_message(self)
         websocket_send(update, state=update.RUNNING, on_commit=False)
-        cloned_meeting = clone_meeting(meeting)
-        cloned_meeting.title = f"Copy of {meeting.title}"[:100]
-        cloned_meeting.save()
+        clone_meeting(meeting, user=self.user)
         websocket_send(update, state=update.SUCCESS)

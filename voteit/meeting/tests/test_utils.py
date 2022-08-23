@@ -2,8 +2,16 @@ from django.contrib.auth import get_user_model
 from dolly.utils import get_data_id_struct
 
 from voteit.core.utils import get_model_by_shortname
-from voteit.meeting.models import Meeting
 from voteit.organisation.models import Organisation
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.utils import clone_meeting
+from voteit.meeting.utils import collect_meeting
+from voteit.meeting.utils import get_default_models_ignored_on_clone
+from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.models import SpeakerList
+
 
 User = get_user_model()
 
@@ -17,13 +25,12 @@ class MeetingCloneTests(TestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.organisation: Organisation = Organisation.objects.get(pk=1)
+        cls.user = User.objects.get(pk=1)
 
     def setUp(self):
         pass
 
     def test_collect_without_restrictions(self):
-        from voteit.meeting.utils import collect_meeting
-
         data = collect_meeting(self.meeting)
         items = get_data_id_struct(data)
         self.assertEqual({1}, items.pop(get_model_by_shortname("organisation")))
@@ -46,9 +53,6 @@ class MeetingCloneTests(TestCase):
         self.assertFalse(items)
 
     def test_collect_with_default_ignored(self):
-        from voteit.meeting.utils import collect_meeting
-        from voteit.meeting.utils import get_default_models_ignored_on_clone
-
         ignored_types = get_default_models_ignored_on_clone()
         data = collect_meeting(self.meeting, exclude=ignored_types)
         for m in ignored_types:
@@ -68,17 +72,41 @@ class MeetingCloneTests(TestCase):
             self.assertIsNotNone(data.pop(m))
 
     def test_clone_meeting(self):
-        from voteit.meeting.utils import clone_meeting
-        from voteit.meeting.utils import collect_meeting
-        from voteit.meeting.utils import get_default_models_ignored_on_clone
-
         counted = {}
         ignored_types = get_default_models_ignored_on_clone()
         data = collect_meeting(self.meeting, exclude=ignored_types)
         for m, values in data.items():
             counted[m] = m.objects.all().count()
         initial_pk = self.meeting.pk
-        new_meeting = clone_meeting(self.meeting)
+        new_meeting = clone_meeting(self.meeting, user=self.user)
         self.assertNotEqual(new_meeting.pk, initial_pk)
         for m, initial_count in counted.items():
             self.assertEqual(initial_count * 2, m.objects.all().count())
+        self.assertEqual("Copy of Testfixture meeting", new_meeting.title)
+        self.assertEqual(
+            {ROLE_MODERATOR, ROLE_PARTICIPANT}, new_meeting.get_roles(self.user)
+        )
+
+    def test_clone_with_active_speakerlist(self):
+        sls: SpeakerListSystem = self.meeting.speaker_systems.create(
+            method_name="simple"
+        )
+        slist = sls.speaker_lists.create()
+        sls.active_list = slist
+        sls.save()
+        self.assertEqual(1, SpeakerListSystem.objects.count())
+        self.assertEqual(1, SpeakerList.objects.count())
+        new_meeting = clone_meeting(self.meeting, user=self.user)
+        self.assertEqual(2, SpeakerListSystem.objects.count())
+        self.assertEqual(1, new_meeting.speaker_systems.count())
+        self.assertEqual(1, SpeakerList.objects.count())
+
+    def test_reset_wf(self):
+        self.meeting.state = "ongoing"
+        self.meeting.save()
+        self.assertEqual(1, self.meeting.agenda_items.filter(state="private").count())
+        self.assertEqual(2, self.meeting.agenda_items.filter(state="upcoming").count())
+        new_meeting = clone_meeting(self.meeting, user=self.user, reset_wf=True)
+        self.assertEqual("upcoming", new_meeting.state)
+        self.assertEqual(3, new_meeting.agenda_items.filter(state="private").count())
+        self.assertEqual(0, new_meeting.agenda_items.filter(state="ongoing").count())

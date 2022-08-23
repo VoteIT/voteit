@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django.db import transaction
 from django.http import HttpResponse
+from django.http import HttpResponseRedirect
 from django.template import loader
+from django.urls import reverse
 from dolly.core import LiveCloner
 from fsm_admin.mixins import FSMTransitionMixin
 
@@ -9,6 +11,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
+from voteit.meeting.utils import clone_meeting
 from voteit.meeting.utils import collect_meeting
 from voteit.meeting.utils import get_default_models_ignored_on_clone
 from voteit.proposal.models import Proposal
@@ -36,7 +39,7 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
     list_filter = "organisation", "state"
     search_fields = ("title",)
     inlines = (AgendaItemInline,)
-    actions = ["report_clone_meeting"]
+    actions = ["report_clone_meeting", "clone_meeting"]
     exclude = ("mentions",)
 
     def ai_count(self, obj: Meeting):
@@ -50,6 +53,8 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
     proposal_count.short_description = "Proposals"
 
     def report_clone_meeting(self, request, queryset):
+        from voteit.speaker.models import SpeakerListSystem
+
         if queryset.count() != 1:
             self.message_user(
                 request,
@@ -60,6 +65,7 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
         meeting = queryset.first()
         data = collect_meeting(meeting, exclude=exclude_models)
         cloner = LiveCloner(data=data)
+        cloner.add_clear_attrs(SpeakerListSystem, "active_list")
         cloner.logging_enabled = True
         with transaction.atomic(durable=True):
             cloner()
@@ -67,6 +73,21 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
         template = loader.get_template("dolly/log.html")
         context = {"log": cloner.log, "title": "Dry-run clone report"}
         return HttpResponse(template.render(context, request))
+
+    def clone_meeting(self, request, queryset):
+        if queryset.count() != 1:
+            self.message_user(
+                request,
+                "Select exactly 1 to clone",
+                self.ERROR,
+            )
+        meeting = queryset.first()
+        with transaction.atomic(durable=True):
+            cloned_meeting = clone_meeting(meeting, user=request.user)
+        url = reverse(
+            "admin:meeting_meeting_change", kwargs={"object_id": cloned_meeting.pk}
+        )
+        return HttpResponseRedirect(url)
 
 
 @admin.register(MeetingRoles)

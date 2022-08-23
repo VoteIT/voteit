@@ -45,6 +45,7 @@ __all__ = "SpeakerSystemRoles", "SpeakerListSystem", "Speaker", "SpeakerList"
 
 
 class SpeakerSystemRoles(Roles, MeetingContext):
+    name = "speaker_roles"
     context: SpeakerListSystem = models.ForeignKey(
         "SpeakerListSystem", on_delete=models.CASCADE
     )
