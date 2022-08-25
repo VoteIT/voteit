@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from logging import getLogger
 from typing import TYPE_CHECKING
 from typing import Type
 
@@ -18,6 +19,8 @@ if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
     from voteit.core.models import User
     from django.db.models import Model
+
+logger = getLogger(__name__)
 
 
 def collect_meeting(meeting: Meeting, exclude: list[Type[Model]] = ()):
@@ -107,5 +110,10 @@ def clone_meeting(
     if prefix:
         meeting.title = f"{prefix} {meeting.title}"[:100]
         meeting.save()
-    meeting.add_roles(user, ROLE_MODERATOR)
+    if user.organisation == meeting.organisation:
+        meeting.add_roles(user, ROLE_MODERATOR)
+    else:
+        logger.warning(
+            f"User {user} doesn't belong to organisation {meeting.organisation} so that user won't be added as moderator."
+        )
     return meeting
