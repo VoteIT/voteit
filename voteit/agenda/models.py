@@ -231,6 +231,7 @@ class LastRead(AgendaItemContext, MeetingContext):
     Frontend checks modified against timestamp to see if there are any new posts.
     """
 
+    name = "last_read"
     agenda_item: AgendaItem = models.ForeignKey(
         AgendaItem,
         on_delete=models.CASCADE,

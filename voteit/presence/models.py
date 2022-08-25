@@ -25,6 +25,8 @@ class Presence(MeetingContext):
     As an object, there's no usecase to allow change since it implies tampering with the system.
     """
 
+    name = "presence"
+
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT
     )

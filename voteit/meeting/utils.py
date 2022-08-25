@@ -39,10 +39,18 @@ def get_default_ignored_on_clone() -> set[str]:
     Fetch shortnames that should (probably) be ignored when you clone a meeting.
     """
     return {
+        "bug_report",
         "electoral_register",
+        "last_read",
+        "invite_dispatch",
+        "meeting_invite",
         "meeting_roles",
         "organisation",
         "poll",
+        "pnsystem",
+        "presence",
+        "presence_check",
+        "presence_system",
         "reaction",
         "speaker",
         "speaker_list",

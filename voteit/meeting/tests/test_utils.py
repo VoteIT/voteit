@@ -9,6 +9,8 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.utils import clone_meeting
 from voteit.meeting.utils import collect_meeting
 from voteit.meeting.utils import get_default_models_ignored_on_clone
+from voteit.participant_number.models import PNSystem
+from voteit.participant_number.models import ParticipantNumber
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.models import SpeakerList
 
@@ -110,3 +112,13 @@ class MeetingCloneTests(TestCase):
         self.assertEqual("upcoming", new_meeting.state)
         self.assertEqual(3, new_meeting.agenda_items.filter(state="private").count())
         self.assertEqual(0, new_meeting.agenda_items.filter(state="ongoing").count())
+
+    def test_related_to_ignored(self):
+        pns: PNSystem = PNSystem.objects.create(meeting=self.meeting)
+        number = pns.numbers.create(user=self.user, number=1)
+        self.assertEqual(1, ParticipantNumber.objects.count())
+        new_meeting = clone_meeting(self.meeting, user=self.user)
+        new_meeting.refresh_from_db()
+        with self.assertRaises(PNSystem.DoesNotExist):
+            new_meeting.pn_system
+        self.assertEqual(1, ParticipantNumber.objects.count())

@@ -21,6 +21,7 @@ __all__ = ("BugReport",)
 
 
 class BugReport(MeetingContext):
+    name = "bug_report"
     meeting: Meeting = models.ForeignKey(Meeting, models.CASCADE)
     user: UserType = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE
