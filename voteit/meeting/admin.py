@@ -66,6 +66,7 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
         data = collect_meeting(meeting, exclude=exclude_models)
         cloner = LiveCloner(data=data)
         cloner.add_clear_attrs(SpeakerListSystem, "active_list")
+        cloner.add_clear_attrs(Meeting, "participants")
         cloner.logging_enabled = True
         with transaction.atomic(durable=True):
             cloner()

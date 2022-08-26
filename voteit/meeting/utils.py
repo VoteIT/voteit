@@ -95,6 +95,7 @@ def clone_meeting(
     Clone meeting and return the newly cloned. Will also add cloning user as moderator.
 
     """
+    from voteit.meeting.models import Meeting
     from voteit.speaker.models import SpeakerListSystem
 
     assert user is not None
@@ -104,6 +105,7 @@ def clone_meeting(
     cloner = LiveCloner(data=data)
     # This should never be copied
     cloner.add_clear_attrs(SpeakerListSystem, "active_list")
+    cloner.add_clear_attrs(Meeting, "participants")
     if reset_wf:
         for mod in cloner.data:
             wf_fields = set()
