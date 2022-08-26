@@ -1,5 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase, RequestFactory
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import ValidationError
+
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 
 User = get_user_model()
 
@@ -7,8 +12,6 @@ User = get_user_model()
 class PollDetailSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting: Meeting = Meeting.objects.create()
         cls.ai = cls.meeting.agenda_items.create(title="Hello")
         cls.poll = cls.meeting.polls.create(
@@ -69,32 +72,33 @@ class PollDetailSerializerTests(TestCase):
             data,
         )
 
-        def test_serializer_simple_finished(self):
-            self.poll.abstains = 5
-            self.poll.save()
-            serializer = self._cut(self.poll)
-            data = serializer.data
-            data.pop("started")
-            data.pop("closed")
-            self.assertEqual(
-                {
-                    "pk": self.poll.pk,
-                    "body": "<b>Hello</b>",
-                    "title": "world",
-                    "agenda_item": self.ai.pk,
-                    "electoral_register": None,
-                    "initial_electoral_register": None,
-                    "meeting": self.meeting.pk,
-                    "method_name": "simple",
-                    "proposals": [self.prop1.pk, self.prop2.pk],
-                    "result": None,
-                    "settings": None,
-                    "state": "private",
-                    "url": None,
-                    "abstain_count": 5,
-                },
-                data,
-            )
+    def test_serializer_simple_finished(self):
+        self.poll.abstains = 5
+        self.poll.state = "finished"
+        self.poll.save()
+        serializer = self._cut(self.poll)
+        data = serializer.data
+        data.pop("started")
+        data.pop("closed")
+        self.assertEqual(
+            {
+                "pk": self.poll.pk,
+                "body": "<b>Hello</b>",
+                "title": "world",
+                "agenda_item": self.ai.pk,
+                "electoral_register": None,
+                "initial_electoral_register": None,
+                "meeting": self.meeting.pk,
+                "method_name": "simple",
+                "proposals": [self.prop1.pk, self.prop2.pk],
+                "result": None,
+                "settings": None,
+                "state": "finished",
+                "url": None,
+                "abstain_count": 5,
+            },
+            data,
+        )
 
     def test_serializer_repeated_schulze(self):
         self.poll.method_name = "repeated_schulze"
@@ -150,13 +154,13 @@ class PollDetailSerializerTests(TestCase):
 class PollCreateSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
-        cls.meeting = Meeting.objects.create()
+        cls.meeting: Meeting = Meeting.objects.create()
         cls.ai = cls.meeting.agenda_items.create(title="Hello")
         cls.prop = cls.ai.proposals.create()
         cls.er = cls.meeting.electoral_registers.create()
         cls.voter = cls.er.voters.create(username="one")
+        cls.moderator = cls.meeting.participants.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
 
     @property
     def _cut(self):
@@ -172,6 +176,14 @@ class PollCreateSerializerTests(TestCase):
         kw.setdefault("proposals", [self.prop.pk])
         return kw
 
+    def _mk_request(self, user=None):
+        if user is None:
+            user = self.moderator
+        rf = RequestFactory()
+        request = rf.request()
+        request.user = user
+        return request
+
     def test_serializer_no_props(self):
         data = self._fixture()
         data.pop("proposals")
@@ -181,7 +193,7 @@ class PollCreateSerializerTests(TestCase):
 
     def test_serializer_minimal(self):
         data = self._fixture()
-        serializer = self._cut(data=data)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
         instance.electoral_register = self.er
@@ -275,10 +287,31 @@ class PollCreateSerializerTests(TestCase):
         self.meeting.save()
         self.meeting.add_roles(self.voter, "potential_voter")
         data = self._fixture(start=True)
-        serializer = self._cut(data=data)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
         self.assertEqual("ongoing", instance.state)
+
+    def test_serializer_create_simple_start_transition_bad_er(self):
+        self.meeting.er_policy_name = "manual"
+        self.meeting.save()
+        self.er.delete()
+        data = self._fixture(start=True)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
+        self.assertTrue(serializer.is_valid())
+        # FIXME: Raise validation error
+        with self.assertRaises(ValidationError):
+            instance = serializer.save()
+
+    def test_serializer_create_simple_start_transition_bad_perm(self):
+        data = self._fixture(start=True)
+        serializer = self._cut(
+            data=data, context={"request": self._mk_request(user=self.voter)}
+        )
+        self.assertTrue(serializer.is_valid())
+        # FIXME: Raise validation error
+        with self.assertRaises(PermissionDenied):
+            instance = serializer.save()
 
 
 class ElectoralRegisterSerializerTests(TestCase):
@@ -313,8 +346,6 @@ class ElectoralRegisterSerializerTests(TestCase):
 class VoteSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting = Meeting.objects.create()
         cls.er = cls.meeting.electoral_registers.create()
         cls.ai = cls.meeting.agenda_items.create(title="Hello")

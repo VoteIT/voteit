@@ -1,4 +1,3 @@
-from typing import Generator
 from typing import Optional
 from typing import Type
 
@@ -7,6 +6,8 @@ from rest_framework import serializers
 
 from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
+from voteit.core.rest_api.utils import drf_do_transition
+from voteit.core.rest_api.utils import get_valid_transitions_dict
 from voteit.poll import models
 from voteit.poll.abcs import PollMethod
 from voteit.poll.utils import get_poll_method_registry
@@ -123,8 +124,21 @@ class PollCreateSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             poll = super().create(validated_data)
             if start:
-                poll.upcoming()
-                poll.ongoing()
+                user = self.context["request"].user
+                valid_transitions = get_valid_transitions_dict(poll)
+                drf_do_transition(
+                    instance=poll,
+                    transition_name="upcoming",
+                    valid_transitions=valid_transitions,
+                    user=user,
+                )
+                valid_transitions = get_valid_transitions_dict(poll)
+                drf_do_transition(
+                    instance=poll,
+                    transition_name="ongoing",
+                    valid_transitions=valid_transitions,
+                    user=user,
+                )
                 poll.save()
         return poll
 

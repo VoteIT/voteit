@@ -7,11 +7,14 @@ from typing import Generator
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils.translation import gettext as _
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 
 from voteit.core.permissions import NOT_ALLOWED
 
 if TYPE_CHECKING:
+    from django.db.models import Model
     from voteit.core.models import User
     from voteit.organisation.models import OAuth2Provider
     from voteit.organisation.models import Organisation
@@ -44,6 +47,13 @@ def get_identity_data(user: User) -> Dict:
     return response.json()
 
 
+def perm_denied_msg(perm, obj):
+    return _("You're missing the permission '%(perm)s' on %(obj)s.") % {
+        "perm": perm,
+        "obj": obj,
+    }
+
+
 def get_valid_transitions(
     instance,
     attr="state",
@@ -71,6 +81,64 @@ def get_valid_transitions(
             # Is this a hidden transition?
             if valid_transition.permission != NOT_ALLOWED:
                 yield valid_transition
+
+
+def get_valid_transitions_dict(
+    instance: Model,
+    attr: str = "state",
+) -> dict[str, Transition]:
+    return dict([(x.name, x) for x in get_valid_transitions(instance, attr=attr)])
+
+
+def drf_do_transition(
+    *,
+    instance: Model,
+    transition_name,
+    valid_transitions: dict,
+    user: User,
+    field_name: str = "state",
+):
+    """
+    This method produces predictable exceptions when running transitions. It's meant for DRF contexts.
+    """
+    if transition_name is None:
+        raise ValidationError(detail={"transition": [_("Transition not specified")]})
+    if transition_name not in valid_transitions:
+        raise ValidationError(
+            detail={
+                "transition": [
+                    _("Invalid transition: %(name)s") % {"name": transition_name}
+                ]
+            }
+        )
+    transition = valid_transitions[transition_name]
+    meta = transition.method._django_fsm
+    current_state = getattr(instance, field_name)
+    if not meta.has_transition(current_state):
+        raise ValidationError(
+            detail={
+                "transition": [
+                    _("Can't switch from state '%(state)s' using method '%(method)s'")
+                    % {
+                        "state": current_state,
+                        "method": transition.method.__name__,
+                    }
+                ]
+            }
+        )
+    for condition in transition.conditions:
+        if not condition(instance):
+            raise ValidationError(
+                detail={
+                    "transition": [
+                        _("Guard %(guard)s blocks transition %(name)s")
+                        % {"name": transition_name, "guard": condition.__name__}
+                    ]
+                }
+            )
+    if not transition.has_perm(instance, user):
+        raise PermissionDenied(perm_denied_msg(transition.permission, instance))
+    getattr(instance, transition_name)()
 
 
 def _pos_int_or_validation_error(value) -> int:

@@ -1,4 +1,3 @@
-import logging
 from abc import ABC
 from abc import abstractmethod
 from logging import getLogger
@@ -8,7 +7,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.query import QuerySet
-from django.utils.translation import gettext as _
 from rest_framework import exceptions
 from rest_framework import permissions
 from rest_framework.decorators import action
@@ -18,17 +16,13 @@ from rest_framework.serializers import Serializer
 
 from voteit.core.rest_api.serializers import FSMTransitionSerializer
 from voteit.core.rest_api.serializers import TransitionSerializer
+from voteit.core.rest_api.utils import drf_do_transition
 from voteit.core.rest_api.utils import get_valid_transitions
+from voteit.core.rest_api.utils import get_valid_transitions_dict
+from voteit.core.rest_api.utils import perm_denied_msg
 from voteit.core.utils import get_permission_registry
 
 logger = getLogger(__name__)
-
-
-def perm_denied_msg(perm, obj):
-    return _("You're missing the permission '%(perm)s' on %(obj)s.") % {
-        "perm": perm,
-        "obj": obj,
-    }
 
 
 class AutoPermissionViewSetMixin:
@@ -230,57 +224,14 @@ class TransitionsMixin(SerializerClassesMixin):
             return Response(transition_serializer.data)
         else:
             transition_name = request.data.get("transition", None)
-            if transition_name is None:
-                raise exceptions.ValidationError(
-                    detail={"transition": [_("Transition not specified")]}
-                )
-            transitions = dict(
-                [
-                    (x.name, x)
-                    for x in get_valid_transitions(instance, attr=self.fsm_field_name)
-                ]
+            valid_transitions = get_valid_transitions_dict(instance)
+            drf_do_transition(
+                instance=instance,
+                field_name=self.fsm_field_name,
+                transition_name=transition_name,
+                valid_transitions=valid_transitions,
+                user=request.user,
             )
-            if transition_name not in transitions:
-                raise exceptions.ValidationError(
-                    detail={
-                        "transition": [
-                            _("Invalid transition: %(name)s")
-                            % {"name": transition_name}
-                        ]
-                    }
-                )
-            transition = transitions[transition_name]
-            meta = transition.method._django_fsm
-            current_state = getattr(instance, self.fsm_field_name)
-            if not meta.has_transition(current_state):
-                raise exceptions.ValidationError(
-                    detail={
-                        "transition": [
-                            _(
-                                "Can't switch from state '%(state)s' using method '%(method)s'"
-                            )
-                            % {
-                                "state": current_state,
-                                "method": transition.method.__name__,
-                            }
-                        ]
-                    }
-                )
-            for condition in transition.conditions:
-                if not condition(instance):
-                    raise exceptions.ValidationError(
-                        detail={
-                            "transition": [
-                                _("Guard %(guard)s blocks transition %(name)s")
-                                % {"name": transition_name, "guard": condition.__name__}
-                            ]
-                        }
-                    )
-            if not transition.has_perm(instance, request.user):
-                raise exceptions.PermissionDenied(
-                    perm_denied_msg(transition.permission, instance)
-                )
-            getattr(instance, transition_name)()
             instance.save()
             # TODO Possibly return serialized object, but strictly speaking not necessary.
             return Response(status=201, data={})
