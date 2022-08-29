@@ -289,6 +289,9 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     def electoral_register_empty_guard(self):
         if self.meeting is not None:
             er = self.meeting.get_latest_er()
+            if er is None:
+                # All guards seem to fire even if previous guards fail.
+                return False
             return er.voters.exists()
         return True
 
