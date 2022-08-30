@@ -89,7 +89,12 @@ class MeetingRolesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.MeetingRoles
-        fields = read_only_fields = "pk", "user", "meeting", "assigned"
+        fields = read_only_fields = (
+            "pk",
+            "user",
+            "meeting",
+            "assigned",
+        )
 
 
 class MeetingAddParticipantSerializer(serializers.ModelSerializer):

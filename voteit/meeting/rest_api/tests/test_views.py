@@ -262,3 +262,67 @@ class MeetingGroupViewSetTests(APITestCase):
         url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
         response = self.client.delete(url)
         self.assertEqual(403, response.status_code)
+
+
+class MeetingRolesViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.org_manager = User.objects.get(username="org_manager")
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.user_jeff = cls.meeting.participants.create(username="jeff")
+        cls.meeting.add_roles(cls.user_jeff, "participant")
+        cls.other_meeting = Meeting.objects.create()
+        cls.other_meeting.add_roles(cls.moderator, "moderator")
+        cls.other_meeting.add_roles(cls.participant, "participant")
+
+    def test_org_manager_without_meeting(self):
+        self.client.force_login(self.org_manager)
+        url = reverse("meeting-roles-list")
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([], response.json())
+
+    def test_org_manager_with_meeting(self):
+        self.client.force_login(self.org_manager)
+        url = reverse("meeting-roles-list")
+        response = self.client.get(url, {"meeting": self.meeting.pk})
+        self.assertEqual(403, response.status_code)
+
+    def test_with_filter_participant(self):
+        self.client.force_login(self.participant)
+        url = reverse("meeting-roles-list")
+        response = self.client.get(
+            url,
+            {
+                "meeting": self.meeting.pk,
+                "user_id_in": f"{self.participant.pk},{self.user_jeff.pk}",
+            },
+        )
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(2, len(data))
+        self.assertEqual(
+            {self.participant.pk, self.user_jeff.pk},
+            {x["user"]["pk"] for x in data},
+        )
+
+    def test_participant_with_temp_context(self):
+        self.client.force_login(self.participant)
+        url = reverse("meeting-roles-list")
+        response = self.client.get(url, {"context": self.meeting.pk})
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(
+            {self.participant.pk, self.user_jeff.pk, self.moderator.pk},
+            {x["user"]["pk"] for x in data},
+        )
+
+    def test_same_org_but_another_meeting_so_not_allowed(self):
+        self.client.force_login(self.user_jeff)
+        url = reverse("meeting-roles-list")
+        response = self.client.get(url, {"meeting": self.other_meeting.pk})
+        self.assertEqual(403, response.status_code)

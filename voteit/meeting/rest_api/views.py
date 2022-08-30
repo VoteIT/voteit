@@ -5,6 +5,7 @@ from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
@@ -26,7 +27,6 @@ __all__ = (
     "MeetingRolesViewSet",
     "MeetingGroupViewSet",
 )
-
 
 
 @router.register("meetings", basename="meeting")
@@ -86,28 +86,29 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     model = MeetingRoles
     queryset = MeetingRoles.objects.all()
     serializer_class = serializers.MeetingRolesSerializer
-    filter_backends = (
-        DjangoFilterBackend,
-        SearchFilter,
-    )
-    filter_class = UserPkFilter
-    search_fields = (
-        "^user__first_name",
-        "^user__last_name",
-    )
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = UserPkFilter
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
-        # Only superuser can list all on organisation
-        if self.request.user.is_superuser:
-            return self.queryset.filter(
-                context__organisation=self.request.user.organisation,
-            ).prefetch_related("user")
-        # Filter on meetings where user is participant
-        # UserPkFilter will return empty queryset if context (meeting) is missing in params.
-        return self.queryset.filter(
-            context__participants=self.request.user,
-        ).prefetch_related("user")
+        # This is a temp fix to extract meeting PK. Context is still used by the frontend.
+        meeting_pk = self.request.query_params.get(
+            "meeting", self.request.query_params.get("context", None)
+        )
+        if meeting_pk is None:
+            return self.queryset.none()
+        try:
+            meeting_pk = int(meeting_pk)
+        except (ValueError, TypeError):
+            raise ValidationError({"meeting": ["Must be a number"]})
+        meeting = Meeting.objects.filter(pk=meeting_pk).first()
+        if meeting is None:
+            raise ValidationError({"meeting": ["No such meeting"]})
+        # FIXME: Public meeting is used in an odd way in frontend. This needs to be cleaned up.
+        # Related to #206
+        if not meeting.has_any_roles(self.request.user, "participant", "moderator"):
+            raise PermissionDenied()
+        return self.queryset.filter(context=meeting).prefetch_related("user")
 
 
 @router.register("meeting-groups", basename="meeting-groups")

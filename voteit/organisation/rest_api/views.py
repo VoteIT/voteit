@@ -124,7 +124,7 @@ class OrganisationRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         DjangoFilterBackend,
         SearchFilter,
     )
-    filter_class = UserPkFilter
+    filterset_class = UserPkFilter
     search_fields = (
         "^user__first_name",
         "^user__last_name",
