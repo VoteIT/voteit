@@ -106,6 +106,7 @@ class ProposalDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
         model = Proposal
         read_only_fields = [
             "created",
+            "modified",
             "state",
             "prop_id",
             "state",
