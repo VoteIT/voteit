@@ -9,6 +9,7 @@ class MeetingPermissions(ModelPermissions):
     CHANGE = P("meeting.change_meeting")
     DELETE = P("meeting.delete_meeting")
     VIEW = P("meeting.view_meeting")
+    LIST = P("meeting.list_meeting")  # Include basic meeting details in listings
     MODERATE = P("meeting.moderate_meeting")
     ARCHIVE = P("meeting.archive_meeting")
     CHANGE_ROLES = P("meeting.change_roles_meeting")

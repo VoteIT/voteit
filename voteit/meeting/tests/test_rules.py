@@ -107,6 +107,22 @@ class MeetingPermissionTests(TestCase):
         self.assertTrue(self.participant.has_perm(VIEW, self.meeting))
         self.assertTrue(self.org_manager.has_perm(VIEW, self.meeting))
 
+    def test_list_meeting(self):
+        LIST = self.p("LIST")
+        self.assertFalse(self.anon_user.has_perm(LIST, self.meeting))
+        self.assertTrue(self.moderator.has_perm(LIST, self.meeting))
+        self.assertTrue(self.participant.has_perm(LIST, self.meeting))
+        self.assertFalse(self.org_manager.has_perm(LIST, self.meeting))
+
+    def test_list_meeting_list_on(self):
+        LIST = self.p("LIST")
+        self.meeting.visible_in_lists = True
+        self.meeting.save()
+        self.assertTrue(self.anon_user.has_perm(LIST, self.meeting))
+        self.assertTrue(self.moderator.has_perm(LIST, self.meeting))
+        self.assertTrue(self.participant.has_perm(LIST, self.meeting))
+        self.assertTrue(self.org_manager.has_perm(LIST, self.meeting))
+
     def test_can_moderate(self):
         MODERATE = self.p("MODERATE")
         self.assertFalse(self.anon_user.has_perm(MODERATE, self.meeting))

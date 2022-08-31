@@ -57,6 +57,17 @@ class MeetingViewSetTests(APITestCase):
         meeting = Meeting.objects.get(pk=data["pk"])
         self.assertTrue(meeting.has_roles(org_manager, "moderator"))
 
+    def test_create_public_ignored_but_visible_in_lists_works(self):
+        url = reverse("meeting-list")
+        data = {"title": "Hello world", "visible_in_lists": True, "public": True}
+        org_manager = User.objects.get(username="org_manager")
+        self.client.force_login(org_manager)
+        response = self.client.post(url, data)
+        data = response.json()
+        meeting = Meeting.objects.get(pk=data["pk"])
+        self.assertTrue(meeting.visible_in_lists)
+        self.assertFalse(meeting.public)
+
     def test_get(self):
         url = reverse("meeting-list")
         participant = User.objects.get(username="participant")
@@ -68,15 +79,12 @@ class MeetingViewSetTests(APITestCase):
     def test_transition_moderator(self):
         url = reverse("meeting-transitions", kwargs={"pk": 1})
         moderator = User.objects.get(username="moderator")
-
-        # url = f"/api/meeting-invites/{self.invite.pk}/transitions/"
         data = {"transition": "ongoing"}
         self.client.force_login(moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 201)
 
     def test_bad_transition_moderator(self):
-        # url = f"/api/meeting-invites/{self.invite.pk}/transitions/"
         url = reverse("meeting-transitions", kwargs={"pk": 1})
         moderator = User.objects.get(username="moderator")
         data = {"transition": "wooohoooo"}
@@ -85,7 +93,6 @@ class MeetingViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_transition_unauthorized_users(self):
-        # url = f"/api/meeting-invites/{self.invite.pk}/transitions/"
         url = reverse("meeting-transitions", kwargs={"pk": 1})
         data = {"transition": "ongoing"}
         response = self.client.post(url, data)

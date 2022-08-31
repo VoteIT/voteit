@@ -9,7 +9,6 @@ from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.db import models
 from django.db import transaction
 from django.utils import timezone
@@ -96,6 +95,9 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     )
     public: bool = models.BooleanField(
         verbose_name="Is this meeting viewable by anyone?", default=False
+    )
+    visible_in_lists: bool = models.BooleanField(
+        verbose_name="Show basic meeting details in lists?", default=False
     )
     er_policy_name: Optional[str] = models.CharField(
         verbose_name="ID of used electoral policy",
@@ -261,7 +263,9 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
                 return user.organisation.meetings.all()
             else:
                 return user.organisation.meetings.filter(
-                    models.Q(public=True) | models.Q(participants=user)
+                    models.Q(visible_in_lists=True)
+                    | models.Q(participants=user)
+                    | models.Q(public=True)
                 ).distinct()
 
     class Manager(models.Manager):

@@ -129,6 +129,7 @@ class ElectoralRegister(MeetingContext):
 
     class QuerySet(models.QuerySet):
         def for_user(self, user: AbstractUser):
+            # Note: This returns _all_ ERs from any meeting where a user is a participant!
             return self.filter(meeting__participants=user).distinct()
 
     class Manager(models.Manager):

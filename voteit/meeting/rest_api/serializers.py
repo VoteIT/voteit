@@ -21,7 +21,9 @@ class UserRolesMixin(serializers.Serializer):
     current_user_roles = serializers.SerializerMethodField()
 
     def get_current_user_roles(self, instance) -> Optional[list[str]]:
-        """Return current user roles, if available, for a meeting."""
+        """
+        Return current user roles, if available, for a meeting.
+        """
         if self.context:
             user = self.context["request"].user
             with suppress(ObjectDoesNotExist):
@@ -39,6 +41,7 @@ class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
             "start_time",
             "end_time",
             "public",
+            "visible_in_lists",
             "current_user_roles",
         )
 
@@ -53,12 +56,13 @@ class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
             "end_time",
             "organisation",
             "current_user_roles",
+            "public",
         ]
         fields = read_only_fields + [
             "title",
             "body",
             "er_policy_name",
-            "public",
+            "visible_in_lists",
         ]
 
     def create(self, validated_data):

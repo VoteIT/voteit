@@ -97,6 +97,8 @@ class ProposalDetailSerializerTests(TestCase):
         self.assertEqual(self.group.pk, data.pop("meeting_group"))
         self.assertEqual([], data.pop("mentions"))
         self.assertEqual("proposal", data.pop("shortname"))
+        dt = datetime.strptime(data.pop("modified"), "%Y-%m-%dT%H:%M:%S.%f%z")
+        self.assertIsInstance(dt, datetime)
         # Make sure we checked everything
         self.assertFalse(data.keys())
 

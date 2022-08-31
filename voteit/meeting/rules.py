@@ -114,7 +114,8 @@ def meeting_upcoming_ongoing(user: AbstractUser, context: MeetingContext) -> boo
 
 @predicate
 def can_view_meeting(user: AbstractUser, context: MeetingContext) -> bool:
-    """Shorthand for the combinations to allow attached meeting to be viewed.
+    """
+    Shorthand for the combinations to allow attached meeting to be viewed.
     Import and use this for any underlying things that implement MeetingContext
     """
     return is_authenticated(user) and (
@@ -124,8 +125,25 @@ def can_view_meeting(user: AbstractUser, context: MeetingContext) -> bool:
     )
 
 
+@predicate
+def visible_in_lists(user: AbstractUser, context: MeetingContext) -> bool:
+    """
+    Allow meeting to be included in basic listings. For instance details like how many proposals, basic intro, title etc.
+    No sensitive information of course.
+    """
+    return (
+        isinstance(context, MeetingContext)
+        and context.meeting is not None
+        and context.meeting.visible_in_lists
+    )
+
+
 rules.add_perm(MeetingPermissions.ADD, is_manager | is_meeting_creator)
 rules.add_perm(MeetingPermissions.VIEW, can_view_meeting)
+rules.add_perm(
+    MeetingPermissions.LIST,
+    is_authenticated & (visible_in_lists | is_participant | is_moderator),
+)
 rules.add_perm(MeetingPermissions.MODERATE, meeting_not_archived & is_moderator)
 rules.add_perm(MeetingPermissions.ARCHIVE, meeting_not_fully_archived & is_moderator)
 # We might want to add editor role later on
