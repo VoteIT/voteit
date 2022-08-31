@@ -6,6 +6,7 @@ from typing import Dict
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.models.query import QuerySet
 from rest_framework import exceptions
 from rest_framework import permissions
@@ -225,14 +226,15 @@ class TransitionsMixin(SerializerClassesMixin):
         else:
             transition_name = request.data.get("transition", None)
             valid_transitions = get_valid_transitions_dict(instance)
-            drf_do_transition(
-                instance=instance,
-                field_name=self.fsm_field_name,
-                transition_name=transition_name,
-                valid_transitions=valid_transitions,
-                user=request.user,
-            )
-            instance.save()
+            with transaction.atomic(durable=True):
+                drf_do_transition(
+                    instance=instance,
+                    field_name=self.fsm_field_name,
+                    transition_name=transition_name,
+                    valid_transitions=valid_transitions,
+                    user=request.user,
+                )
+                instance.save()
             # TODO Possibly return serialized object, but strictly speaking not necessary.
             return Response(status=201, data={})
 
