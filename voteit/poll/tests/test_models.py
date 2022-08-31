@@ -217,10 +217,13 @@ class PollTests(TestCase):
             "Proposal state must not cause an exception if it can't change.",
         )
 
-    def test_cancel_resets_proposals(self):
+    def test_cancel_resets_locked_proposals(self):
         self.poll.upcoming()
         self.poll.ongoing()
         self.prop.refresh_from_db()
+        self.prop2 = self.poll.proposals.create(
+            agenda_item=self.ai, state=ProposalWf.APPROVED
+        )
         self.assertEqual(ProposalWf.VOTING, self.prop.state)
         self.poll.votes.create(user=self.moderator, vote="no")
         self.poll.votes.create(user=self.participant, vote="yes")
@@ -228,6 +231,7 @@ class PollTests(TestCase):
         self.poll.save()
         self.prop.refresh_from_db()
         self.assertEqual(ProposalWf.PUBLISHED, self.prop.state)
+        self.assertEqual(ProposalWf.APPROVED, self.prop2.state)
 
     def test_private_resets_proposals(self):
         self.poll.upcoming()

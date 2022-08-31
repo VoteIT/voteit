@@ -47,6 +47,7 @@ from voteit.poll.permissions import PollPermissions
 from voteit.poll.schemas import PollResult
 from voteit.poll.utils import get_poll_method_registry
 from voteit.poll.workflows import PollWf
+from voteit.proposal.workflows import ProposalWf
 
 if TYPE_CHECKING:
     from voteit.poll.abcs import PollMethod
@@ -309,6 +310,23 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             return False
         return True
 
+    def _lock_proposals(self):
+        for proposal in self.proposals.filter(
+            state=ProposalWf.PUBLISHED
+        ).select_subclasses():
+            with suppress(TransitionNotAllowed):
+                proposal.lock_for_vote()
+                proposal.save()
+
+    def _publish_proposals(self):
+        for proposal in self.proposals.filter(
+            state=ProposalWf.VOTING
+        ).select_subclasses():
+            with suppress(TransitionNotAllowed):
+                # It doesn't really matter if this fails. Proposals might already be published for some reason.
+                proposal.publish()
+                proposal.save()
+
     @transition(
         field=state,
         source=PollWf.PRIVATE,
@@ -318,10 +336,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         custom={"title": _("Make upcoming")},
     )
     def upcoming(self):
-        for proposal in self.proposals.all().select_subclasses():
-            with suppress(TransitionNotAllowed):
-                proposal.lock_for_vote()
-                proposal.save()
+        self._lock_proposals()
 
     @transition(
         field=state,
@@ -342,6 +357,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         assert self.electoral_register, "No electoral register"
         self.initial_electoral_register = self.electoral_register
         self.started = now()
+        self._lock_proposals()
 
     @transition(
         field=state,
@@ -399,9 +415,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     )
     def cancel(self):
         self._mark_closed()
-        for proposal in self.proposals.all().select_subclasses():
-            proposal.publish()
-            proposal.save()
+        self._publish_proposals()
 
     @transition(
         field=state,
@@ -411,9 +425,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         custom={"title": _("Revert to private")},
     )
     def unpublish(self):
-        for proposal in self.proposals.all().select_subclasses():
-            proposal.publish()
-            proposal.save()
+        self._publish_proposals()
 
     @transition(
         field=state,
