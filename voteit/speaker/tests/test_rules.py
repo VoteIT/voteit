@@ -119,7 +119,7 @@ class SpeakerListTests(TestCase):
         self.assertTrue(self.user_list_moderator.has_perm(LEAVE, self.list))
         self.assertTrue(self.user_speaker.has_perm(LEAVE, self.list))
         self.assertTrue(self.user_proposer.has_perm(LEAVE, self.list))
-        self.assertFalse(self.user_any.has_perm(LEAVE, self.list))
+        self.assertTrue(self.user_any.has_perm(LEAVE, self.list))
 
     def test_leave_currently_speaking(self):
         LEAVE = self.p("LEAVE")
@@ -128,13 +128,13 @@ class SpeakerListTests(TestCase):
         self.assertTrue(self.user_list_moderator.has_perm(LEAVE, self.list))
         self.assertTrue(self.user_speaker.has_perm(LEAVE, self.list))
         self.assertTrue(self.user_proposer.has_perm(LEAVE, self.list))
-        self.assertFalse(self.user_any.has_perm(LEAVE, self.list))
+        self.assertTrue(self.user_any.has_perm(LEAVE, self.list))
         self.list.current = speaker
         self.list.save()
         self.assertTrue(self.user_meeting_moderator.has_perm(LEAVE, self.list))
         self.assertTrue(self.user_list_moderator.has_perm(LEAVE, self.list))
         self.assertFalse(self.user_speaker.has_perm(LEAVE, self.list))
-        self.assertFalse(self.user_any.has_perm(LEAVE, self.list))
+        self.assertTrue(self.user_any.has_perm(LEAVE, self.list))
 
     def test_start(self):
         START = self.p("START")

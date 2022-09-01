@@ -116,7 +116,7 @@ rules.add_perm(
 # Lists should be emptied on archive, so don't bother about that
 rules.add_perm(
     SpeakerListPermissions.LEAVE,
-    (has_speaker_role | (is_speaker_moderator | is_moderator)) & not_currently_speaking,
+    not_currently_speaking,
 )
 rules.add_perm(
     SpeakerListPermissions.START,
