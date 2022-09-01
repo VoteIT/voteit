@@ -12,8 +12,9 @@ if TYPE_CHECKING:
     from django.db.models import Model
 
 
-roles_added = Signal(providing_args=["sender", "instance", "roles"])
-roles_removed = Signal(providing_args=["sender", "instance", "roles"])
+# The following signals will provide arguments "sender", "instance" and "roles"
+roles_added = Signal()
+roles_removed = Signal()
 
 
 @receiver(class_prepared)
