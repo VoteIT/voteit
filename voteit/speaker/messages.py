@@ -309,7 +309,6 @@ class ModeratorSpeakerListShuffle(ListMessage):
 class OrderSchema(BaseModel):
     pk: int  # speaker list pk
     queue: List[int]  # user pks, unique values
-    history: List[List[int]]  # List of [User pk, seconds] in descending spoken order
     current: Optional[int]  # current user pk if speaker
 
 

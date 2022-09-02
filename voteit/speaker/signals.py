@@ -85,10 +85,9 @@ def reorder_after_delete(sender: Type[Speaker], instance: Speaker, **kwargs):
 
 def _get_list_order_msg(speaker_list: SpeakerList) -> SpeakerListOrder:
     user_pks = list(speaker_list.speakers_qs().values_list("user", flat=True))
-    history = list(speaker_list.history_qs().values_list("user", "seconds"))
     current = speaker_list.current and speaker_list.current.user.pk or None
     return SpeakerListOrder(
-        pk=speaker_list.pk, queue=user_pks, history=history, current=current
+        pk=speaker_list.pk, queue=user_pks, current=current
     )
 
 
