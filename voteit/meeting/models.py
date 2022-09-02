@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from voteit.participant_number.models import PNSystem
     from voteit.presence.models import PresenceSystem
     from voteit.presence.models import PresenceCheck
+    from voteit.speaker.models import SpeakerListSystem
 
 __all__ = "Meeting", "MeetingRoles", "MeetingGroup"
 
@@ -287,7 +288,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     presence_checks: PresenceCheck.Manager
     polls: models.QuerySet
     reaction_buttons: models.QuerySet
-    speaker_systems: models.QuerySet
+    speaker_systems: models.QuerySet[SpeakerListSystem]
 
 
 class MeetingGroup(BaseContent, MeetingContext):

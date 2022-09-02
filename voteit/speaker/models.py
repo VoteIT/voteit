@@ -449,7 +449,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
             "created"
         )
 
-    def start_speaker(self, speaker: Speaker) -> None:
+    def start_speaker(self, speaker: Speaker = None) -> None:
         """Start a a specific user in the queue, or first user"""
         if speaker := speaker or self.speakers_qs().first():
             if speaker.started is None:

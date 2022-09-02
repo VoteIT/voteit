@@ -310,6 +310,7 @@ class OrderSchema(BaseModel):
     pk: int  # speaker list pk
     queue: List[int]  # user pks, unique values
     current: Optional[int]  # current user pk if speaker
+    times_spoken: list[list[int, int]]  # User pk and times spoken
 
 
 @outgoing

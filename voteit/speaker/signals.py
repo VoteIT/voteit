@@ -22,6 +22,7 @@ from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -86,8 +87,15 @@ def reorder_after_delete(sender: Type[Speaker], instance: Speaker, **kwargs):
 def _get_list_order_msg(speaker_list: SpeakerList) -> SpeakerListOrder:
     user_pks = list(speaker_list.speakers_qs().values_list("user", flat=True))
     current = speaker_list.current and speaker_list.current.user.pk or None
+    times_spoken = list(
+        speaker_list.history_qs()
+        .values("user")
+        .annotate(times_spoken=models.Count("user"))
+        .order_by()
+        .values_list("user", "times_spoken")
+    )
     return SpeakerListOrder(
-        pk=speaker_list.pk, queue=user_pks, current=current
+        pk=speaker_list.pk, queue=user_pks, current=current, times_spoken=times_spoken
     )
 
 
@@ -247,6 +255,18 @@ def meeting_channel_subscribed(
                     started=speaker.started,
                 )
                 app_state.append(msg)
+
+
+@receiver(channel_subscribed, sender=ModeratorsChannel)
+def moderator_channel_subscribed(context: Meeting, app_state: AppState, **kw):
+    """
+    Send last three historic speakers for every active list to moderators
+    """
+    for system in context.speaker_systems.filter(active_list__isnull=False):
+        for speaker in system.active_list.history_qs()[:3].values(
+            "pk", "user", "speaker_list", "started", "seconds"
+        ):
+            app_state.append(SpeakerStopped(data=speaker))
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)

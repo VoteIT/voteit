@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+from django.utils import timezone
 from pytz import UTC
 
 from envelope.messages.channels import Subscribe
@@ -11,6 +12,7 @@ from envelope.messages.channels import Subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ModeratorsChannel
 from voteit.speaker.messages import SpeakerStopped
 
 User = get_user_model()
@@ -157,12 +159,13 @@ class SignalListChangesTests(TestCase):
         from voteit.meeting.models import Meeting
 
         cls.participant = User.objects.get(username="participant")
+        cls.moderator = User.objects.get(username="moderator")
         cls.meeting = Meeting.objects.get(pk=1)
         cls.ai = cls.meeting.agenda_items.create()
-        cls.system = SpeakerListSystem.objects.create(
+        cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
             method_name="simple", meeting=cls.meeting
         )
-        cls.speaker_list = SpeakerList.objects.create(
+        cls.speaker_list: SpeakerList = SpeakerList.objects.create(
             speaker_system=cls.system, agenda_item=cls.ai, title="Hello"
         )
         cls.speaker = cls.speaker_list.speaker_items.create(user=cls.participant)
@@ -197,6 +200,54 @@ class SignalListChangesTests(TestCase):
         self.assertEqual(self.system.pk, data.speaker_system)
         self.assertEqual(self.ai.pk, data.agenda_item)
         self.assertEqual(self.speaker_list.title, data.title)
+
+    def test_moderators_get_stopped_speakers(self):
+        self.system.active_list = self.speaker_list
+        self.system.save()
+        for _ in range(4):
+            self.speaker_list.speaker_items.create(user=self.participant, seconds=123)
+        msg = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
+            pk=self.meeting.pk,
+            channel_type=ModeratorsChannel.name,
+        ).run_job()
+        self.assertEqual(self.speaker_list.history_qs().count(), 4)
+        self.assertEqual(
+            sum(x.t == "speaker.stopped" for x in msg.data.app_state),
+            3,
+            "Only 3 latest are sent automatically. Other fetched by REST call.",
+        )
+
+    def test_meeting_get_speaker_order(self):
+        self.system.active_list = self.speaker_list
+        self.system.save()
+        for _ in range(4):
+            self.speaker_list.speaker_items.create(user=self.participant)
+            self.speaker_list.start_speaker()
+        msg = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.participant.pk},
+            pk=self.meeting.pk,
+            channel_type=MeetingChannel.name,
+        ).run_job()
+        order_message = next(
+            m for m in msg.data.app_state if m.t == "speaker_list.order"
+        )
+        self.assertTrue(order_message, "There should be a speaker_list.order message")
+        self.assertEqual(
+            order_message.p["times_spoken"],
+            [[self.participant.pk, 3]],
+            "Participant spoke 3 times already",
+        )
+        self.assertEqual(
+            order_message.p["current"],
+            self.participant.pk,
+            "Participant is currently speaking",
+        )
+        self.assertEqual(
+            order_message.p["queue"],
+            [self.participant.pk],
+            "Participant is in queue",
+        )
 
     @patch.object(AgendaItemChannel, "sync_publish")
     def test_list_deleted(self, mock_publish):
