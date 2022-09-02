@@ -49,9 +49,10 @@ if TYPE_CHECKING:
     from envelope.core.message import Message
 
 
-list_updated = Signal(providing_args=["sender", "instance"])
-speaker_started = Signal(providing_args=["sender", "speaker"])
-speaker_stopped = Signal(providing_args=["sender", "speaker"])
+# The following signals will provide arguments "sender" and "instance"
+list_updated = Signal()
+speaker_started = Signal()
+speaker_stopped = Signal()
 
 
 @receiver(post_save, sender=Speaker)

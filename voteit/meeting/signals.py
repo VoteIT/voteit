@@ -36,7 +36,8 @@ if TYPE_CHECKING:
 
 
 # Signal providing an atomic transaction to do cleanup when a meeting is archived
-archive_meeting = Signal(providing_args=["meeting"])
+# Will provide argument "meeting"
+archive_meeting = Signal()
 # Meeting joined signal, whenever a user gets roles within a meeting
 # hook this up to other things that needs to be checked, for instance if there's an unused invite
 # Arguments
