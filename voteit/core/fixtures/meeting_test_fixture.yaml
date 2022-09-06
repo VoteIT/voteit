@@ -70,7 +70,6 @@
   pk: 1
   fields:
     provider_id: idproxy
-    title: ID Proxy
     organisation: 1
     scope: email
     client_id: cid_org1

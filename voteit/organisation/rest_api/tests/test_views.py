@@ -184,7 +184,7 @@ class IDProxyOrganisationViewSetTests(APITestCase):
         data = {
             "title": "Item no 1",
             "provider": {
-                "title": "hello world",
+                "scope": "hello",
             },
         }
         response = self.client.patch(url, data, HTTP_API_KEY="secret")
@@ -194,5 +194,5 @@ class IDProxyOrganisationViewSetTests(APITestCase):
         self.org.provider.refresh_from_db()
         self.assertEqual("Item no 1", self.org.title)
         self.assertEqual("Item no 1", data["title"])
-        self.assertEqual("hello world", self.org.provider.title)
-        self.assertEqual("hello world", data["provider"]["title"])
+        self.assertEqual("hello", self.org.provider.scope)
+        self.assertEqual("hello", data["provider"]["scope"])

@@ -12,7 +12,6 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.urls import reverse
 from django.utils.timezone import now
-from django.utils.translation import gettext_lazy as _
 from pytz import utc
 from requests_oauthlib import OAuth2Session
 
@@ -33,7 +32,9 @@ _marker = object()
 
 
 class OrganisationRoles(Roles):
-    """Contains assigned meeting roles for a specific meeting and user"""
+    """
+    Contains assigned meeting roles for a specific meeting and user
+    """
 
     name = "organisation_roles"
 
@@ -54,7 +55,15 @@ class OrganisationRoles(Roles):
 class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     name = "organisation"
     roles_cls = OrganisationRoles
-    title: str = models.CharField(max_length=100)
+    title: str = models.CharField(
+        verbose_name="Title of the organisation itself", max_length=100
+    )
+    page_title: str = models.CharField(
+        verbose_name="Intro page title",
+        max_length=150,
+        default="",
+        blank=True,
+    )
     body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
     host: str = models.CharField(
         verbose_name="Host name part, excluding ports. For instance: 'meeting.voteit.se'",
@@ -80,6 +89,11 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     def __repr__(self):
         return f"Organisation {self.title}"
 
+    def save(self, **kwargs):
+        if not self.page_title:
+            self.page_title = self.title
+        super().save(**kwargs)
+
     # Type annotations
     provider: Optional[OAuth2Provider]
     objects: models.Manager
@@ -97,7 +111,6 @@ class OAuth2Provider(OrganisationContext):
 
     name = "oauth2_provider"
     provider_id: str = models.CharField(max_length=30)
-    title: str = models.CharField(max_length=50)
     organisation: Optional[Organisation] = models.OneToOneField(
         "organisation.Organisation",
         on_delete=models.CASCADE,
@@ -124,7 +137,9 @@ class OAuth2Provider(OrganisationContext):
 
     @property
     def id_backend_host(self):
-        """ID_BACKEND_HOST only needed in dev"""
+        """
+        ID_BACKEND_HOST only needed in dev
+        """
         return getattr(settings, "ID_HOST_BACKEND", settings.ID_HOST)
 
     @property
@@ -139,6 +154,12 @@ class OAuth2Provider(OrganisationContext):
     def identity_url(self) -> str:
         return f"{self.id_backend_host}/api/identity/"
 
+    @property
+    def title(self):
+        if self.organisation:
+            return self.organisation.title
+        return f"Provider {self.pk}"
+
     class Meta:
         verbose_name = "OAuth2Provider"
         verbose_name_plural = "OAuth2Providers"
@@ -148,6 +169,8 @@ class OAuth2Provider(OrganisationContext):
         return get_provider_response_adapters()[self.provider_id]
 
     def save(self, **kw):
+        if not self.provider_id:
+            self.provider_id = "idproxy"
         adapters = get_provider_response_adapters()
         if self.provider_id not in adapters:
             raise ValueError(

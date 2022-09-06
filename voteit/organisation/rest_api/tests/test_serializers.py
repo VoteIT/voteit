@@ -26,6 +26,10 @@ class OrganisationSerializerTests(TestCase):
         self.assertEqual(data.pop("title"), self.org.title)
         self.assertEqual(data.pop("login_url"), "/begin-auth/")
         self.assertEqual(data.pop("scope"), ["email"])
+        self.assertIsNotNone(data.pop("id_host"))
+        self.assertIsNotNone(data.pop("page_title"))
+        self.assertIsNotNone(data.pop("body"))
+        self.assertFalse(data, "Not everything was checked")
 
     def test_get_with_provider(self):
         from voteit.organisation.models import OAuth2Provider
@@ -89,7 +93,6 @@ class IDProviderSerializerTests(TestCase):
         serializer = self._cut(self.provider)
         data = serializer.data
         self.assertEqual(data.pop("pk"), self.provider.pk)
-        self.assertEqual(data.pop("title"), self.provider.title)
         self.assertNotIn("client_id", data)
         self.assertNotIn("client_secret", data)
 

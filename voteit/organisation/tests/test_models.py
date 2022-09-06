@@ -1,5 +1,7 @@
 from django.test import TestCase
-from voteit.organisation.schemas import OAuthTokenSchema
+
+from voteit.organisation.models import OAuth2Provider
+from voteit.organisation.models import Organisation
 
 
 class OrganisationTests(TestCase):
@@ -19,6 +21,16 @@ class OrganisationTests(TestCase):
         org = self.Organisation.objects.create()
         meeting = self.Meeting.objects.create(organisation=org)
         self.assertEqual(org, meeting.organisation)
+
+
+class OAuth2ProviderTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+
+    def test_title_no_org(self):
+        provider = OAuth2Provider.objects.create()
+        self.assertEqual(f"Provider {provider.pk}", provider.title)
 
 
 # class AccessTokenTests(TestCase):

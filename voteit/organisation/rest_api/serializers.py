@@ -24,8 +24,8 @@ class OrganisationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Organisation
-        read_only_fields = ["pk", "login_url", "scope", "id_host"]
-        fields = read_only_fields + ["title", "body"]
+        read_only_fields = ["pk", "login_url", "scope", "id_host", "title"]
+        fields = read_only_fields + ["page_title", "body"]
 
     def get_login_url(self, instance: Organisation) -> Optional[str]:
         with suppress(ObjectDoesNotExist):
@@ -59,6 +59,10 @@ class IDProviderSerializer(serializers.ModelSerializer):
 
 
 class IDProviderUpdateSerializer(serializers.ModelSerializer):
+    """
+    This is for internal use, don't use this for external endpoints!
+    """
+
     pk = serializers.IntegerField(read_only=True)
 
     class Meta:
