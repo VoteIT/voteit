@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from abc import ABC
 from datetime import datetime
-
 from typing import List
 from typing import Optional
 
@@ -10,7 +9,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
-
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.common import Status
@@ -18,10 +16,10 @@ from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import NotFoundError
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import websocket_send
+
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
-
 from voteit.messaging.base import BaseObjectDeleted
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.permissions import SpeakerListPermissions
@@ -208,28 +206,6 @@ class StopSpeakerInList(ModeratorListMessage):
         return msg
 
 
-class SpeakerStatsSchema(BaseModel):
-    pk: int  # Speaker pk
-    user: int  # User speaker
-    speaker_list: int
-    started: Optional[datetime]
-    seconds: Optional[int]
-
-
-@outgoing
-class SpeakerStarted(Message):
-    name = "speaker.started"
-    schema = SpeakerStatsSchema
-    data: SpeakerStatsSchema
-
-
-@outgoing
-class SpeakerStopped(Message):
-    name = "speaker.stopped"
-    schema = SpeakerStatsSchema
-    data: SpeakerStatsSchema
-
-
 @incoming
 class ModeratorSpeakerListEnter(ModeratorListMessage):
     name = "speaker_list.mod_enter"
@@ -376,3 +352,23 @@ class SpeakerSystemChanged(Message):
 @outgoing
 class SpeakerSystemDeleted(BaseObjectDeleted):
     name = "speaker_system.deleted"
+
+
+class SpeakerSchema(BaseModel):
+    pk: int  # Speaker pk
+    user: int  # User speaker
+    speaker_list: int
+    started: Optional[datetime]
+    seconds: Optional[int]
+
+
+@outgoing
+class SpeakerChanged(Message):
+    name = "speaker.changed"
+    schema = SpeakerSchema
+    data: SpeakerSchema
+
+
+@outgoing
+class SpeakerDeleted(BaseObjectDeleted):
+    name = "speaker.deleted"

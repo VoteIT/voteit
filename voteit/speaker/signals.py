@@ -15,6 +15,7 @@ from envelope.signals import channel_subscribed
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import disable_on_raw_save
+from voteit.core.decorators import on_transaction_commit
 from voteit.core.messages.role_updates import RolesAdded
 from voteit.core.messages.role_updates import RolesRemoved
 from voteit.core.role import Role
@@ -22,17 +23,17 @@ from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
-from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.signals import archive_meeting
+from voteit.speaker.channels import SpeakerListSystemChannel
+from voteit.speaker.messages import SpeakerChanged
+from voteit.speaker.messages import SpeakerDeleted
 from voteit.speaker.messages import SpeakerListAdded
 from voteit.speaker.messages import SpeakerListChanged
 from voteit.speaker.messages import SpeakerListDeleted
 from voteit.speaker.messages import SpeakerListOrder
-from voteit.speaker.messages import SpeakerStarted
-from voteit.speaker.messages import SpeakerStopped
 from voteit.speaker.messages import SpeakerSystemAdded
 from voteit.speaker.messages import SpeakerSystemChanged
 from voteit.speaker.messages import SpeakerSystemDeleted
@@ -42,18 +43,18 @@ from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.models import SpeakerSystemRoles
 from voteit.speaker.rest_api.serializers import SpeakerListSerializer
 from voteit.speaker.rest_api.serializers import SpeakerListSystemSerializer
+from voteit.speaker.rest_api.serializers import SpeakerSerializer
 from voteit.speaker.utils import publish_list_msg
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from envelope.utils import AppState
-    from envelope.core.message import Message
 
 
 # The following signals will provide arguments "sender" and "instance"
 list_updated = Signal()
-speaker_started = Signal()
-speaker_stopped = Signal()
+# speaker_started = Signal()
+# speaker_stopped = Signal()
 
 
 @receiver(post_save, sender=Speaker)
@@ -99,20 +100,11 @@ def _get_list_order_msg(speaker_list: SpeakerList) -> SpeakerListOrder:
     )
 
 
-def publish_active_list_msg(speaker_list: SpeakerList, msg: Message):
-    """
-    Push a message to the currently active list. Just use this if you can assume that this list is active.
-    Started/Stopped messages are always sent from the active list for instance.
-    """
-    if speaker_list.meeting is not None:
-        ch = MeetingChannel.from_instance(speaker_list.meeting)
-        ch.sync_publish(msg)
-
-
 @receiver(list_updated)
 @disable_on_raw_save
 def push_list_order_change(instance: SpeakerList, **kw):
-    """When speakers reorder, send an update of the order.
+    """
+    When speakers reorder, send an update of the order.
     This is not transmitted on save for the speaker list,
     since the speaker items are separate.
 
@@ -125,7 +117,9 @@ def push_list_order_change(instance: SpeakerList, **kw):
 @receiver(post_save, sender=SpeakerList)
 @disable_on_raw_save
 def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **kw):
-    """Send to Agenda or meeting channel depending on if it's the active list."""
+    """
+    Send to Agenda or meeting channel depending on if it's the active list.
+    """
     if created:
         msg_class = SpeakerListAdded
     else:
@@ -133,33 +127,6 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
     data = SpeakerListSerializer(instance).data
     msg = msg_class(**data)
     publish_list_msg(instance, msg)
-
-
-@receiver(speaker_started)
-def notify_started_speaker(speaker: Speaker, **kwargs):
-    msg = SpeakerStarted(
-        user=speaker.user.pk,
-        pk=speaker.pk,
-        speaker_list=speaker.speaker_list.pk,
-        started=speaker.started,
-    )
-    publish_active_list_msg(speaker.speaker_list, msg)
-
-
-@receiver(speaker_stopped)
-def notify_stopped_speaker(speaker: Speaker, **kwargs):
-    _send_speaker_stopped(speaker)
-
-
-def _send_speaker_stopped(speaker: Speaker):
-    msg = SpeakerStopped(
-        user=speaker.user.pk,
-        pk=speaker.pk,
-        speaker_list=speaker.speaker_list.pk,
-        started=speaker.started,
-        seconds=speaker.seconds,
-    )
-    publish_active_list_msg(speaker.speaker_list, msg)
 
 
 @receiver(pre_delete, sender=SpeakerList)
@@ -173,7 +140,9 @@ def notify_deleted_speaker_list(instance: SpeakerList, **kw):
 def notify_added_or_changed_speaker_system(
     instance: SpeakerListSystem, created=None, **kw
 ):
-    """Updates to speaker system, pushed to meeting channel."""
+    """
+    Updates to speaker system, pushed to meeting channel.
+    """
     if instance.meeting is not None:
         if created:
             msg_class = SpeakerSystemAdded
@@ -184,12 +153,7 @@ def notify_added_or_changed_speaker_system(
         ch = MeetingChannel.from_instance(instance.meeting)
         ch.sync_publish(msg)
         # Also push list and order when speaker system changes since it may have changed active list
-        active_list = None
-        try:
-            active_list = instance.active_list
-        except SpeakerList.DoesNotExist:
-            pass
-        if active_list:
+        if instance.active_list:
             msg_class = SpeakerListChanged
             data = SpeakerListSerializer(instance.active_list).data
             list_msg = msg_class(**data)
@@ -197,14 +161,18 @@ def notify_added_or_changed_speaker_system(
             # And the order
             order_msg = _get_list_order_msg(instance.active_list)
             ch.sync_publish(order_msg)
-            # Send last 3 spoken
-            for speaker in active_list.history_qs()[:3]:
-                _send_speaker_stopped(speaker)
+            # Send speaker history
+            sls_ch = SpeakerListSystemChannel.from_instance(instance)
+            for speaker in instance.active_list.history_qs():
+                msg = create_speaker_changed(speaker)
+                sls_ch.sync_publish(msg)
 
 
 @receiver(pre_delete, sender=SpeakerListSystem)
 def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
-    """Notify meeting that the speaker system is no more."""
+    """
+    Notify meeting that the speaker system is no more. We had a good run dear friends, you will be missed :(
+    """
     if instance.meeting is not None:
         msg = SpeakerSystemDeleted(pk=instance.pk)
         ch = MeetingChannel.from_instance(instance.meeting)
@@ -248,25 +216,20 @@ def meeting_channel_subscribed(
             if system.active_list.current is not None:
                 speaker = system.active_list.current
                 # Append current ongoing speaker
-                msg = SpeakerStarted(
-                    user=speaker.user.pk,
-                    pk=speaker.pk,
-                    speaker_list=system.active_list.pk,
-                    started=speaker.started,
-                )
+                msg = create_speaker_changed(speaker)
                 app_state.append(msg)
 
 
-@receiver(channel_subscribed, sender=ModeratorsChannel)
-def moderator_channel_subscribed(context: Meeting, app_state: AppState, **kw):
-    """
-    Send last three historic speakers for every active list to moderators
-    """
-    for system in context.speaker_systems.filter(active_list__isnull=False):
-        for speaker in system.active_list.history_qs()[:3].values(
+@receiver(channel_subscribed, sender=SpeakerListSystemChannel)
+def list_system_channel_subscribed(
+    context: SpeakerListSystem, app_state: AppState, **kw
+):
+    if active_list := context.active_list:
+        # This is for historic speakers
+        for speaker in active_list.history_qs().values(
             "pk", "user", "speaker_list", "started", "seconds"
         ):
-            app_state.append(SpeakerStopped(data=speaker))
+            app_state.append(SpeakerChanged(data=speaker))
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)
@@ -347,3 +310,37 @@ def push_roles_removed(instance: SpeakerSystemRoles, roles: list[Role], **kwargs
             user_pk=instance.user.pk,
         ),
     )
+
+
+@receiver(pre_delete, sender=Speaker)
+def push_speaker_deleted(instance: Speaker, **kwargs):
+    if instance.speaker_list.is_active_list:
+        if instance.speaker_list.meeting:
+            msg = SpeakerDeleted(pk=instance.pk)
+            ch = MeetingChannel.from_instance(instance.speaker_list.meeting)
+            ch.sync_publish(msg)
+
+
+@receiver(post_save, sender=Speaker)
+@disable_on_raw_save
+@on_transaction_commit
+def push_speaker_changed(instance: Speaker, created=False, **kwargs):
+    """
+    We only care about currently speaking, stopped + historic speakers here, since other items are part of the speaker order.
+    """
+    if created or instance.started is None:
+        # Speakers in the queue are sent as order instead. We only care about started or historic speakers
+        return
+    if instance.speaker_list.is_active_list:
+        if (
+            instance.speaker_list.speaker_system is not None
+            and instance.speaker_list.meeting is not None
+        ):
+            msg = create_speaker_changed(instance)
+            ch = MeetingChannel.from_instance(instance.speaker_list.meeting)
+            ch.sync_publish(msg, on_commit=False)  # Already post transaction
+
+
+def create_speaker_changed(speaker: Speaker) -> SpeakerChanged:
+    data = SpeakerSerializer(speaker).data
+    return SpeakerChanged(data=data)

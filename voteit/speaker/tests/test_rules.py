@@ -228,6 +228,31 @@ class SpeakerListSystemTests(TestCase):
         self.assertIs(self.user_speaker.has_perm(CHANGE, self.system), False)
         self.assertIs(self.user_any.has_perm(CHANGE, self.system), False)
 
+    def test_change_system_archived(self):
+        CHANGE = self.p("CHANGE")
+        self.system.archive()
+        self.system.save()
+        self.assertIs(self.user_meeting_moderator.has_perm(CHANGE, self.system), False)
+        self.assertIs(self.user_list_moderator.has_perm(CHANGE, self.system), False)
+        self.assertIs(self.user_speaker.has_perm(CHANGE, self.system), False)
+        self.assertIs(self.user_any.has_perm(CHANGE, self.system), False)
+
+    def test_manage_system(self):
+        MANAGE = self.p("MANAGE")
+        self.assertIs(self.user_meeting_moderator.has_perm(MANAGE, self.system), True)
+        self.assertIs(self.user_list_moderator.has_perm(MANAGE, self.system), True)
+        self.assertIs(self.user_speaker.has_perm(MANAGE, self.system), False)
+        self.assertIs(self.user_any.has_perm(MANAGE, self.system), False)
+
+    def test_manage_system_archived(self):
+        MANAGE = self.p("MANAGE")
+        self.system.archive()
+        self.system.save()
+        self.assertIs(self.user_meeting_moderator.has_perm(MANAGE, self.system), True)
+        self.assertIs(self.user_list_moderator.has_perm(MANAGE, self.system), True)
+        self.assertIs(self.user_speaker.has_perm(MANAGE, self.system), False)
+        self.assertIs(self.user_any.has_perm(MANAGE, self.system), False)
+
     def test_delete_system(self):
         DELETE = self.p("DELETE")
         self.assertIs(self.user_meeting_moderator.has_perm(DELETE, self.system), True)

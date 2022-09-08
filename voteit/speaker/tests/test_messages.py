@@ -4,17 +4,53 @@ from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.test import TestCase
 
+from envelope.messages.channels import Subscribe
+from envelope.messages.channels import Subscribed
 from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import NotFoundError
+from envelope.messages.errors import SubscribeError
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
-
+from voteit.meeting.models import Meeting
+from voteit.speaker.channels import SpeakerListSystemChannel
+from voteit.speaker.models import SpeakerListSystem
 
 User = get_user_model()
 _channel_layers_setting = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
 }
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class SpeakerListSystemChannelSubscribeTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.participant = User.objects.get(username="participant")
+        cls.moderator = User.objects.get(username="moderator")
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
+            method_name="simple", meeting=cls.meeting
+        )
+
+    def _mk_msg(self, user):
+        return Subscribe(
+            mm={"consumer_name": "abc", "user_pk": user.pk},
+            pk=self.system.pk,
+            channel_type=SpeakerListSystemChannel.name,
+        )
+
+    def test_subscribe_moderator(self):
+        msg = self._mk_msg(self.moderator)
+        response = msg.run_job()
+        self.assertIsInstance(response, Subscribed)
+
+    def test_subscribe_participant(self):
+        msg = self._mk_msg(self.participant)
+        with self.assertRaises(SubscribeError):
+            msg.run_job()
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -400,8 +436,6 @@ class ModeratorSpeakerListLeaveTests(TestCase):
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ModeratorSpeakerListUndoTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
         user = User.objects.create(username="jane")
         system = meeting.speaker_systems.create(method_name="simple", state="active")
@@ -429,7 +463,7 @@ class ModeratorSpeakerListUndoTests(TestCase):
     def test_undo(self):
         self.assertEqual(self.list.current, self.speaker)
         msg = self._mk_one()
-        response = msg.run_job()
+        msg.run_job()
         self.list.refresh_from_db()
         self.assertIs(self.list.current, None)
 

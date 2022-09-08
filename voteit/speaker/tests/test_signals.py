@@ -4,16 +4,22 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from django.utils import timezone
+from django.utils.timezone import now
 from pytz import UTC
 
 from envelope.messages.channels import Subscribe
 from envelope.messages.channels import Subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
+from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
-from voteit.speaker.messages import SpeakerStopped
+from voteit.meeting.models import Meeting
+from voteit.speaker.channels import SpeakerListSystemChannel
+from voteit.speaker.messages import SpeakerChanged
+from voteit.speaker.models import Speaker
+from voteit.speaker.models import SpeakerList
+from voteit.speaker.models import SpeakerListSystem
 
 User = get_user_model()
 
@@ -23,15 +29,46 @@ _channel_layers_setting = {
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class SpeakerListSystemAppStateTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.participant = User.objects.get(username="participant")
+        cls.moderator = User.objects.get(username="moderator")
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
+            method_name="simple", meeting=cls.meeting
+        )
+        cls.speaker_list: SpeakerList = SpeakerList.objects.create(
+            speaker_system=cls.system, agenda_item=cls.ai, title="Hello"
+        )
+        cls.speaker = cls.speaker_list.speaker_items.create(user=cls.participant)
+        for _ in range(4):
+            cls.speaker_list.speaker_items.create(user=cls.participant, seconds=123)
+
+    def test_stopped_speakers_sent(self):
+        self.system.active_list = self.speaker_list
+        self.system.save()
+        msg = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
+            pk=self.system.pk,
+            channel_type=SpeakerListSystemChannel.name,
+        )
+        response = msg.run_job()
+        self.assertEqual(self.speaker_list.history_qs().count(), 4)
+        self.assertEqual(
+            sum(x.t == "speaker.changed" for x in response.data.app_state),
+            4,
+            "Only 4 latest are sent automatically. Other fetched by REST call.",
+        )
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalListOrderChangeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-
-        from voteit.speaker.models import SpeakerListSystem
-        from voteit.speaker.models import SpeakerList
-
-        from voteit.meeting.models import Meeting
-
         cls.meeting = Meeting.objects.create()
         cls.ai = cls.meeting.agenda_items.create()
         cls.system = SpeakerListSystem.objects.create(
@@ -88,39 +125,31 @@ class SignalListOrderChangeTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalStartedStoppedTests(TestCase):
-    def setUp(self):
-
-        from voteit.speaker.models import SpeakerListSystem
-        from voteit.speaker.models import SpeakerList
-        from voteit.speaker.models import Speaker
-
-        from voteit.meeting.models import Meeting
-
-        self.meeting = Meeting.objects.create()
-        # self.ai = self.meeting.agenda_items.create()
-        self.system: SpeakerListSystem = SpeakerListSystem.objects.create(
-            method_name="simple", meeting=self.meeting
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+        cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
+            method_name="simple", meeting=cls.meeting
         )
-        self.speaker_list: SpeakerList = SpeakerList.objects.create(
-            speaker_system=self.system, title="Hello"  # agenda_item=self.ai
+        cls.speaker_list: SpeakerList = SpeakerList.objects.create(
+            speaker_system=cls.system, title="Hello"  # agenda_item=self.ai
         )
-        self.system.active_list = self.speaker_list
-        self.system.save()
-        self.user: User = self.meeting.participants.create(username="user")
-        self.speaker: Speaker = self.speaker_list.speaker_items.create(user=self.user)
+        cls.system.active_list = cls.speaker_list
+        cls.system.save()
+        cls.user: User = cls.meeting.participants.create(username="user")
+        cls.speaker: Speaker = cls.speaker_list.speaker_items.create(user=cls.user)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_start_speaker(self, mock_publish):
-        from voteit.speaker.messages import SpeakerStarted
-
-        self.speaker_list.start_speaker(self.speaker)
+        with FakeCommit():
+            self.speaker_list.start_speaker(self.speaker)
         self.assertTrue(mock_publish.called)
         msg = None
         for mcall in mock_publish.mock_calls:
-            if isinstance(mcall.args[0], SpeakerStarted):
+            if isinstance(mcall.args[0], SpeakerChanged):
                 msg = mcall.args[0]
                 break
-        self.assertIsNotNone(msg, "SpeakerStarted never found in meeting channel")
+        self.assertIsNotNone(msg, "SpeakerChanged never found in meeting channel")
         data = msg.data
         self.assertEqual(self.speaker.pk, data.pk)
         self.assertEqual(self.speaker.started, data.started)
@@ -128,18 +157,18 @@ class SignalStartedStoppedTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_stop_speaker(self, mock_publish):
-        from voteit.speaker.messages import SpeakerStopped
-
-        self.speaker_list.start_speaker(self.speaker)
+        with FakeCommit():
+            self.speaker_list.start_speaker(self.speaker)
         mock_publish.reset_mock()
-        self.speaker_list.stop_speaker()
+        with FakeCommit():
+            self.speaker_list.stop_speaker()
         self.assertTrue(mock_publish.called)
         msg = None
         for mcall in mock_publish.mock_calls:
-            if isinstance(mcall.args[0], SpeakerStopped):
+            if isinstance(mcall.args[0], SpeakerChanged):
                 msg = mcall.args[0]
                 break
-        self.assertIsNotNone(msg, "SpeakerStopped never found in meeting channel")
+        self.assertIsNotNone(msg, "SpeakerChanged never found in meeting channel")
         data = msg.data
         self.assertEqual(self.speaker.pk, data.pk)
         self.assertEqual(self.speaker.started, data.started)
@@ -152,12 +181,6 @@ class SignalListChangesTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-
-        from voteit.speaker.models import SpeakerListSystem
-        from voteit.speaker.models import SpeakerList
-
-        from voteit.meeting.models import Meeting
-
         cls.participant = User.objects.get(username="participant")
         cls.moderator = User.objects.get(username="moderator")
         cls.meeting = Meeting.objects.get(pk=1)
@@ -200,23 +223,6 @@ class SignalListChangesTests(TestCase):
         self.assertEqual(self.system.pk, data.speaker_system)
         self.assertEqual(self.ai.pk, data.agenda_item)
         self.assertEqual(self.speaker_list.title, data.title)
-
-    def test_moderators_get_stopped_speakers(self):
-        self.system.active_list = self.speaker_list
-        self.system.save()
-        for _ in range(4):
-            self.speaker_list.speaker_items.create(user=self.participant, seconds=123)
-        msg = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
-            pk=self.meeting.pk,
-            channel_type=ModeratorsChannel.name,
-        ).run_job()
-        self.assertEqual(self.speaker_list.history_qs().count(), 4)
-        self.assertEqual(
-            sum(x.t == "speaker.stopped" for x in msg.data.app_state),
-            3,
-            "Only 3 latest are sent automatically. Other fetched by REST call.",
-        )
 
     def test_meeting_get_speaker_order(self):
         self.system.active_list = self.speaker_list
@@ -264,14 +270,12 @@ class SignalListChangesTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalSystemChangesTests(TestCase):
-    def setUp(self):
-        from voteit.speaker.models import SpeakerListSystem
-        from voteit.meeting.models import Meeting
-
-        self.meeting: Meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.system: SpeakerListSystem = SpeakerListSystem.objects.create(
-            method_name="simple", meeting=self.meeting, title="We speak in order"
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
+            method_name="simple", meeting=cls.meeting, title="We speak in order"
         )
 
     @patch.object(MeetingChannel, "sync_publish")
@@ -340,7 +344,7 @@ class SignalSystemChangesTests(TestCase):
         messages = [x.args[0] for x in mock_publish.mock_calls]
         self.assertEqual(list_two.pk, messages[1].data.pk)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(SpeakerListSystemChannel, "sync_publish")
     def test_system_changes_active_list_pushes_last_spoken(self, mock_publish):
         list_one = self.system.speaker_lists.create()
         user_one = User.objects.create(username="one")
@@ -362,9 +366,9 @@ class SignalSystemChangesTests(TestCase):
         self.system.save()
         messages = [x.args[0] for x in mock_publish.mock_calls]
         message_names = [x.name for x in messages]
-        self.assertIn(SpeakerStopped.name, message_names)
-        stopped_messages = [x for x in messages if x.name == "speaker.stopped"]
-        self.assertEqual(3, len(stopped_messages))
+        self.assertIn(SpeakerChanged.name, message_names)
+        stopped_messages = [x for x in messages if x.name == "speaker.changed"]
+        self.assertEqual(4, len(stopped_messages))
         self.assertEqual(4, stopped_messages[0].data.seconds)
         self.assertEqual(3, stopped_messages[1].data.seconds)
         self.assertEqual(2, stopped_messages[2].data.seconds)
@@ -372,33 +376,31 @@ class SignalSystemChangesTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ChannelSubscribedTests(TestCase):
-    def setUp(self):
-        from voteit.speaker.models import SpeakerListSystem
-        from voteit.meeting.models import Meeting
-
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.ai.upcoming()
-        self.ai.save()
-        self.system = SpeakerListSystem.objects.create(
-            method_name="simple", meeting=self.meeting, title="We speak in order"
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.ai.upcoming()
+        cls.ai.save()
+        cls.system = SpeakerListSystem.objects.create(
+            method_name="simple", meeting=cls.meeting, title="We speak in order"
         )
         # Create lists
-        self.other_list = self.system.speaker_lists.create(agenda_item=self.ai)
-        self.active_list = self.system.speaker_lists.create(agenda_item=self.ai)
-        self.system.active_list = self.active_list
-        self.system.save()
+        cls.other_list = cls.system.speaker_lists.create(agenda_item=cls.ai)
+        cls.active_list = cls.system.speaker_lists.create(agenda_item=cls.ai)
+        cls.system.active_list = cls.active_list
+        cls.system.save()
         # Create speakers
-        self.user_one = User.objects.create(username="one")
-        self.user_two = User.objects.create(username="two")
-        self.speaker_one = self.active_list.speaker_items.create(user=self.user_one)
-        self.speaker_two = self.active_list.speaker_items.create(user=self.user_two)
+        cls.user_one = User.objects.create(username="one")
+        cls.user_two = User.objects.create(username="two")
+        cls.speaker_one = cls.active_list.speaker_items.create(user=cls.user_one)
+        cls.speaker_two = cls.active_list.speaker_items.create(user=cls.user_two)
         # Start speaker
-        self.active_list.start_speaker(self.speaker_one)
+        cls.active_list.start_speaker(cls.speaker_one)
         # Moderator
-        self.moderator = User.objects.create(username="moderator")
-        self.meeting.add_roles(self.moderator, "participant")
-        self.system.add_roles(self.moderator, "list_moderator")
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, "participant")
+        cls.system.add_roles(cls.moderator, "list_moderator")
 
     def _mk_one(self, pk, channel_type):
         return Subscribe(
@@ -424,7 +426,7 @@ class ChannelSubscribedTests(TestCase):
         )
         self.assertEqual(
             1,
-            sum([1 for x in response.data.app_state if x.t == "speaker.started"]),
+            sum([1 for x in response.data.app_state if x.t == "speaker.changed"]),
         )
         self.assertEqual(
             [self.user_two.pk],
@@ -467,12 +469,11 @@ class ChannelSubscribedTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class RolesRelationsTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-
-        self.meeting: Meeting = Meeting.objects.create()
-        self.system = self.meeting.speaker_systems.create(method_name="simple")
-        self.user = User.objects.create(username="jane")
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.system = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.user = User.objects.create(username="jane")
 
     def test_removing_participant_removes_system_roles(self):
         self.meeting.add_roles(self.user, "participant")
@@ -483,3 +484,103 @@ class RolesRelationsTests(TestCase):
     def test_adding_system_roles_adds_participant(self):
         self.system.add_roles(self.user, "speaker")
         self.assertTrue(self.meeting.get_roles(self.user))
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class SpeakerSignalTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
+            method_name="simple",
+            meeting=cls.meeting,
+            title="We speak in order",
+            state="active",
+        )
+        cls.active_speaker_list = cls.system.speaker_lists.create()
+        cls.system.active_list = cls.active_speaker_list
+        cls.system.save()
+        cls.inactive_speaker_list = cls.system.speaker_lists.create()
+        cls.user = User.objects.create(username="le_speaker")
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_speaker_created_on_active_list(self, mock_publish):
+        with FakeCommit():
+            self.active_speaker_list.speaker_items.create(user=self.user)
+        self.assertNotIn(
+            "speaker.changed", [x.args[0].name for x in mock_publish.mock_calls]
+        )
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_speaker_deleted_inactive_list_stopped_speaker(self, mock_publish):
+        speaker = self.inactive_speaker_list.speaker_items.create(
+            user=self.user, seconds=10, started=now()
+        )
+        with FakeCommit():
+            speaker.delete()
+
+        self.assertNotIn(
+            "speaker.deleted", [x.args[0].name for x in mock_publish.mock_calls]
+        )
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_speaker_deleted_active_list_stopped_speaker(self, mock_publish):
+        speaker = self.active_speaker_list.speaker_items.create(
+            user=self.user, seconds=10, started=now()
+        )
+        mock_publish.reset_mock()
+        with FakeCommit():
+            speaker.delete()
+        self.assertTrue(mock_publish.called)
+        self.assertIn(
+            "speaker.deleted", [x.args[0].name for x in mock_publish.mock_calls]
+        )
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_speaker_deleted_active_list_upcoming(self, mock_publish):
+        speaker = self.active_speaker_list.speaker_items.create(
+            user=self.user, seconds=10, started=now()
+        )
+        mock_publish.reset_mock()
+        with FakeCommit():
+            speaker.delete()
+        self.assertTrue(mock_publish.called)
+        self.assertIn(
+            "speaker.deleted", [x.args[0].name for x in mock_publish.mock_calls]
+        )
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_upcoming_speaker_changed(self, mock_publish):
+        speaker = self.active_speaker_list.speaker_items.create(user=self.user, order=0)
+        mock_publish.reset_mock()
+        with FakeCommit():
+            speaker.order = 1
+            speaker.save()
+        self.assertFalse(mock_publish.called)
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_speaker_started(self, mock_publish):
+        speaker = self.active_speaker_list.speaker_items.create(user=self.user)
+        with FakeCommit():
+            speaker.started = now()
+            speaker.save()
+
+        self.assertTrue(mock_publish.called)
+        self.assertIn(
+            "speaker.changed", [x.args[0].name for x in mock_publish.mock_calls]
+        )
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_historic_speaker_changed(self, mock_publish):
+        speaker = self.active_speaker_list.speaker_items.create(
+            user=self.user, seconds=10, started=now()
+        )
+        mock_publish.reset_mock()
+        with FakeCommit():
+            speaker.seconds = 11
+            speaker.save()
+        self.assertTrue(mock_publish.called)
+        self.assertIn(
+            "speaker.changed", [x.args[0].name for x in mock_publish.mock_calls]
+        )

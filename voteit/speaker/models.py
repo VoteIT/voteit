@@ -19,7 +19,6 @@ from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
 from pydantic.main import BaseModel
-from typing import List
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.abcs import AgendaItemContext
@@ -65,7 +64,8 @@ class SpeakerSystemRoles(Roles, MeetingContext):
 
 
 class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
-    """All speaker list things relate here, while this in turn might relate to a meeting.
+    """
+    All speaker list things relate here, while this in turn might relate to a meeting.
     A list system has its own rules and moderators.
     """
 
@@ -107,7 +107,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         on_delete=models.SET_NULL,
         related_name="active_in_system",
     )
-    meeting_roles_to_speaker: List[str] = ArrayField(
+    meeting_roles_to_speaker: list[str] = ArrayField(
         models.CharField(max_length=20), default=tuple
     )
 
@@ -299,16 +299,6 @@ class Speaker(MeetingContext, SpeakerSystemContext):
     def __str__(self):
         return f"Speaker id {self.pk}"
 
-    def signal_started(self):
-        from voteit.speaker.signals import speaker_started
-
-        speaker_started.send(sender=self.__class__, speaker=self)
-
-    def signal_stopped(self):
-        from voteit.speaker.signals import speaker_stopped
-
-        speaker_stopped.send(sender=self.__class__, speaker=self)
-
 
 class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     name = "speaker_list"
@@ -449,8 +439,11 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
             "created"
         )
 
+    @ensure_atomic
     def start_speaker(self, speaker: Speaker = None) -> None:
-        """Start a a specific user in the queue, or first user"""
+        """
+        Start a specific user in the queue, or first user
+        """
         if speaker := speaker or self.speakers_qs().first():
             if speaker.started is None:
                 self.stop_speaker()
@@ -459,13 +452,16 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
                 speaker.save()
                 self.current = speaker
                 self.save()
-                speaker.signal_started()
+                # speaker.signal_started()
             else:  # pragma: no coverage
                 # FIXME: Something...?
                 raise ValueError()
 
+    @ensure_atomic
     def stop_speaker(self) -> None:
-        """Stop current speaker and set spoken time"""
+        """
+        Stop current speaker and set spoken time
+        """
         if speaker := self.current:
             end_td = now() - speaker.started
             speaker.seconds = min(
@@ -474,8 +470,9 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
             speaker.save()
             self.current = None
             self.save()
-            speaker.signal_stopped()
+            # The end of the atomic transaction will trigger a speaker changed message here
 
+    @ensure_atomic
     def undo_speaker(self) -> bool:
         """Move current speaker back to top of queue"""
         speaker = self.current
@@ -487,7 +484,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
             speaker.save()
             self.current = None
             self.save()
-            speaker.signal_stopped()
+            # The end of the atomic transaction will trigger a speaker changed message
             self.reorder(force_signal=True)
             return True
 

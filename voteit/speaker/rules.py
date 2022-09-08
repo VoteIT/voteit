@@ -135,6 +135,10 @@ rules.add_perm(
     is_moderator & meeting_upcoming_ongoing & is_system_not_archived,
 )
 rules.add_perm(
+    SpeakerSystemPermissions.MANAGE,
+    is_moderator | is_speaker_moderator,
+)
+rules.add_perm(
     SpeakerSystemPermissions.DELETE,
     is_moderator & meeting_upcoming_ongoing & is_system_not_archived,
 )
