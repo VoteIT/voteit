@@ -34,7 +34,6 @@ from voteit.speaker.messages import SpeakerListAdded
 from voteit.speaker.messages import SpeakerListChanged
 from voteit.speaker.messages import SpeakerListDeleted
 
-# from voteit.speaker.messages import SpeakerListOrder
 from voteit.speaker.messages import SpeakerSystemAdded
 from voteit.speaker.messages import SpeakerSystemChanged
 from voteit.speaker.messages import SpeakerSystemDeleted
@@ -45,6 +44,7 @@ from voteit.speaker.models import SpeakerSystemRoles
 from voteit.speaker.rest_api.serializers import SpeakerListSerializer
 from voteit.speaker.rest_api.serializers import SpeakerListSystemSerializer
 from voteit.speaker.rest_api.serializers import SpeakerSerializer
+from voteit.speaker.workflows import SpeakerSystemWf
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -180,7 +180,9 @@ def ai_channel_subscribed(
     """
     Send any lists related to this agenda item.
     """
-    lists_qs = context.speaker_lists.filter(active_in_system__isnull=True)
+    lists_qs = context.speaker_lists.filter(
+        speaker_system__state=SpeakerSystemWf.ACTIVE
+    )
     app_state.append_from_queryset(lists_qs, SpeakerListSerializer, SpeakerListAdded)
 
 

@@ -309,7 +309,10 @@ class ChannelSubscribedTests(TestCase):
         cls.ai.upcoming()
         cls.ai.save()
         cls.system = SpeakerListSystem.objects.create(
-            method_name="simple", meeting=cls.meeting, title="We speak in order"
+            method_name="simple",
+            meeting=cls.meeting,
+            title="We speak in order",
+            state="active",
         )
         # Create lists
         cls.other_list = cls.system.speaker_lists.create(agenda_item=cls.ai)
@@ -356,15 +359,13 @@ class ChannelSubscribedTests(TestCase):
         msg = self._mk_one(self.ai.pk, "agenda_item")
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
-        appstates = dict((x.t, x.p) for x in response.data.app_state)
-        self.assertIn("speaker_list.added", appstates)
-        # The active list has already been transmitted
+        payloads = [
+            x.p for x in response.data.app_state if x.t == SpeakerListAdded.name
+        ]
+        self.assertEqual(2, len(payloads))
         self.assertEqual(
-            1,
-            sum([1 for x in response.data.app_state if x.t == "speaker_list.added"]),
+            {self.active_list.pk, self.other_list.pk}, {x["pk"] for x in payloads}
         )
-        list_added = appstates["speaker_list.added"]
-        self.assertEqual(self.other_list.pk, list_added["pk"])
 
     def test_subscribe_speaker_list_system(self):
         msg = self._mk_one(self.system.pk, SpeakerListSystemChannel.name)
