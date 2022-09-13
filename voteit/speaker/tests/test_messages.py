@@ -3,7 +3,7 @@ from datetime import datetime
 from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.test import TestCase
-
+from django.utils.timezone import now
 from envelope.messages.channels import Subscribe
 from envelope.messages.channels import Subscribed
 from envelope.messages.common import Status
@@ -12,8 +12,10 @@ from envelope.messages.errors import NotFoundError
 from envelope.messages.errors import SubscribeError
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
+
 from voteit.meeting.models import Meeting
 from voteit.speaker.channels import SpeakerListSystemChannel
+from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 
 User = get_user_model()
@@ -29,7 +31,8 @@ class SpeakerListSystemChannelSubscribeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.participant = User.objects.get(username="participant")
-        cls.moderator = User.objects.get(username="moderator")
+        # cls.moderator = User.objects.get(username="moderator")
+        cls.outsider = User.objects.create(username="outsider")
         cls.meeting = Meeting.objects.get(pk=1)
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
             method_name="simple", meeting=cls.meeting
@@ -42,13 +45,13 @@ class SpeakerListSystemChannelSubscribeTests(TestCase):
             channel_type=SpeakerListSystemChannel.name,
         )
 
-    def test_subscribe_moderator(self):
-        msg = self._mk_msg(self.moderator)
+    def test_subscribe_(self):
+        msg = self._mk_msg(self.participant)
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
 
-    def test_subscribe_participant(self):
-        msg = self._mk_msg(self.participant)
+    def test_subscribe_outsider(self):
+        msg = self._mk_msg(self.outsider)
         with self.assertRaises(SubscribeError):
             msg.run_job()
 
@@ -57,13 +60,10 @@ class SpeakerListSystemChannelSubscribeTests(TestCase):
 class SpeakerListEnterTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.speaker.models import SpeakerListSystem
-        from voteit.speaker.models import SpeakerList
-
-        cls.system = SpeakerListSystem.objects.create(
+        cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
             method_name="simple", state="active"
         )
-        cls.list = SpeakerList.objects.create(speaker_system=cls.system)
+        cls.list: SpeakerList = SpeakerList.objects.create(speaker_system=cls.system)
         cls.user = User.objects.create(username="jane")
         cls.system.add_roles(cls.user, "speaker")
 
@@ -100,9 +100,9 @@ class SpeakerListEnterTests(TestCase):
 class SpeakerListLeaveTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.speaker.models import SpeakerListSystem
-
-        cls.system = SpeakerListSystem.objects.create(method_name="simple")
+        cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
+            method_name="simple"
+        )
         cls.user = User.objects.create(username="jane")
         cls.system.add_roles(cls.user, "speaker")
 
@@ -133,7 +133,8 @@ class SpeakerListLeaveTests(TestCase):
         self.assertRaises(BadRequestError, msg.run_job)
 
     def test_leave_with_old_entry(self):
-        self.speaker.order = None
+        self.speaker.seconds = 10
+        self.speaker.started = now()
         self.speaker.save()
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
         msg = self._mk_one()
@@ -144,14 +145,11 @@ class SpeakerListLeaveTests(TestCase):
 class SpeakerListSetActiveTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.speaker.models import SpeakerList
-        from voteit.meeting.models import Meeting
-
-        meeting = Meeting.objects.create()
+        meeting: Meeting = Meeting.objects.create()
         cls.system = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        cls.list = SpeakerList.objects.create(speaker_system=cls.system)
+        cls.list: SpeakerList = SpeakerList.objects.create(speaker_system=cls.system)
         cls.user = User.objects.create(username="jane")
         cls.system.add_roles(cls.user, "list_moderator")
 
@@ -199,11 +197,8 @@ class SpeakerListSetActiveTests(TestCase):
 class StartSpeakerInListTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.speaker.models import SpeakerList
-        from voteit.meeting.models import Meeting
-
-        meeting = Meeting.objects.create()
-        cls.system = meeting.speaker_systems.create(
+        meeting: Meeting = Meeting.objects.create()
+        cls.system: SpeakerListSystem = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
         cls.list = SpeakerList.objects.create(speaker_system=cls.system)
@@ -263,24 +258,22 @@ class StartSpeakerInListTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class StopSpeakerInListTests(TestCase):
-    def setUp(self):
-        from voteit.speaker.models import SpeakerList
-        from voteit.meeting.models import Meeting
-
-        meeting = Meeting.objects.create()
-        self.system = meeting.speaker_systems.create(
+    @classmethod
+    def setUpTestData(cls):
+        meeting: Meeting = Meeting.objects.create()
+        cls.system: SpeakerListSystem = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(speaker_system=self.system)
-        self.system.active_list = self.list
-        self.system.save()
-        self.user = User.objects.create(username="jane")
-        self.speaker = self.list.speaker_items.create(user=self.user)
-        self.list.start_speaker(self.speaker)
-        self.list.refresh_from_db()
-        self.moderator = User.objects.create(username="moderator")
-        self.system.add_roles(self.user, "speaker")
-        self.system.add_roles(self.moderator, "list_moderator")
+        cls.list = SpeakerList.objects.create(speaker_system=cls.system)
+        cls.system.active_list = cls.list
+        cls.system.save()
+        cls.user = User.objects.create(username="jane")
+        cls.speaker = cls.list.speaker_items.create(user=cls.user)
+        cls.list.start_speaker(cls.speaker)
+        cls.list.refresh_from_db()
+        cls.moderator = User.objects.create(username="moderator")
+        cls.system.add_roles(cls.user, "speaker")
+        cls.system.add_roles(cls.moderator, "list_moderator")
 
     @property
     def _cut(self):
@@ -318,10 +311,6 @@ class StopSpeakerInListTests(TestCase):
 class ModeratorSpeakerListEnterTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.speaker.models import SpeakerList
-        from voteit.speaker.models import SpeakerListSystem
-        from voteit.meeting.models import Meeting
-
         meeting: Meeting = Meeting.objects.create()
         cls.system: SpeakerListSystem = meeting.speaker_systems.create(
             method_name="simple", state="active"
@@ -385,20 +374,18 @@ class ModeratorSpeakerListEnterTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ModeratorSpeakerListLeaveTests(TestCase):
-    def setUp(self):
-        from voteit.speaker.models import SpeakerList
-        from voteit.meeting.models import Meeting
-
-        meeting = Meeting.objects.create()
-        self.system = meeting.speaker_systems.create(
+    @classmethod
+    def setUpTestData(cls):
+        meeting: Meeting = Meeting.objects.create()
+        cls.system: SpeakerListSystem = meeting.speaker_systems.create(
             method_name="simple", state="active"
         )
-        self.list = SpeakerList.objects.create(speaker_system=self.system)
-        self.user = User.objects.create(username="jane")
-        self.system.add_roles(self.user, "speaker")
-        self.speaker = self.list.speaker_items.create(user=self.user)
-        self.moderator = User.objects.create(username="moderator")
-        self.system.add_roles(self.moderator, "list_moderator")
+        cls.list: SpeakerList = SpeakerList.objects.create(speaker_system=cls.system)
+        cls.user = User.objects.create(username="jane")
+        cls.system.add_roles(cls.user, "speaker")
+        cls.speaker = cls.list.speaker_items.create(user=cls.user)
+        cls.moderator = User.objects.create(username="moderator")
+        cls.system.add_roles(cls.moderator, "list_moderator")
 
     @property
     def _cut(self):
@@ -426,7 +413,8 @@ class ModeratorSpeakerListLeaveTests(TestCase):
         self.assertRaises(BadRequestError, msg.run_job)
 
     def test_leave_with_old_entry(self):
-        self.speaker.order = None
+        self.speaker.seconds = 10
+        self.speaker.started = now()
         self.speaker.save()
         self.assertTrue(self.list.speakers.filter(pk=self.user.pk).exists())
         msg = self._mk_one()
@@ -435,18 +423,19 @@ class ModeratorSpeakerListLeaveTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class ModeratorSpeakerListUndoTests(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         meeting = Meeting.objects.create()
         user = User.objects.create(username="jane")
         system = meeting.speaker_systems.create(method_name="simple", state="active")
         system.add_roles(user, "speaker")
-        self.list = system.speaker_lists.create()
-        system.active_list = self.list
+        cls.list = system.speaker_lists.create()
+        system.active_list = cls.list
         system.save()
-        self.speaker = self.list.speaker_items.create(user=user)
-        self.list.start_speaker(self.speaker)
-        self.moderator = User.objects.create(username="moderator")
-        system.add_roles(self.moderator, "list_moderator")
+        cls.speaker = cls.list.speaker_items.create(user=user)
+        cls.list.start_speaker(cls.speaker)
+        cls.moderator = User.objects.create(username="moderator")
+        system.add_roles(cls.moderator, "list_moderator")
 
     @property
     def _cut(self):
@@ -478,9 +467,6 @@ class ModeratorSpeakerListUndoTests(TestCase):
 class SpeakerListShuffleTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.speaker.models import SpeakerListSystem
-        from voteit.speaker.models import SpeakerList
-
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
             method_name="simple", state="active"
         )
@@ -489,7 +475,6 @@ class SpeakerListShuffleTests(TestCase):
         cls.list: SpeakerList = SpeakerList.objects.create(speaker_system=cls.system)
         for i in range(10):
             user = cls.list.speakers.create(username=f"user-{i}")
-            cls.list.speaker_items.create(user=user, order=i)
 
     @property
     def _cut(self):
@@ -504,14 +489,13 @@ class SpeakerListShuffleTests(TestCase):
         )
 
     def test_shuffle_causes_new_order(self):
-        current_order = self.list.current_order()
-        self.assertEqual(10, len(current_order))
+        order_list = self.list.order_list
+        self.assertEqual(10, len(order_list))
         msg = self._mk_one()
         order_changed = False
         for i in range(5):
             msg.run_job()
-            if current_order != self.list.current_order():
+            if order_list != msg.context.order_list:
                 order_changed = True
                 break
-
         self.assertTrue(order_changed)

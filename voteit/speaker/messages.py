@@ -65,9 +65,7 @@ class SpeakerListEnter(ListMessage):
 
     def run_job(self) -> Status:
         self.assert_perm()
-        existing_obj = self.context.speaker_items.filter(
-            user=self.user, order__isnull=False
-        ).first()
+        existing_obj = self.context.speakers_in_queue().filter(user=self.user).first()
         if existing_obj is not None:
             raise BadRequestError.from_message(self, msg=_("Already in list"))
         self.context.speaker_items.create(user=self.user)
@@ -83,9 +81,7 @@ class SpeakerListLeave(ListMessage):
 
     def run_job(self) -> Status:
         self.assert_perm()
-        existing_obj = self.context.speaker_items.filter(
-            user=self.user, order__isnull=False
-        ).first()
+        existing_obj = self.context.speakers_in_queue().filter(user=self.user).first()
         if existing_obj is None:
             raise BadRequestError.from_message(self, msg=_("Not in list"))
         existing_obj.delete()
@@ -140,9 +136,7 @@ class StartSpeakerInList(ModeratorListMessage):
     def run_job(self) -> Status:
         self.assert_perm()
         user = self.get_user()
-        speaker = self.context.speaker_items.filter(
-            user=user, order__isnull=False
-        ).first()
+        speaker = self.context.speakers_in_queue().filter(user=user).first()
         if speaker is None:
             raise ValidationErrorMsg.from_message(
                 self,
@@ -156,7 +150,6 @@ class StartSpeakerInList(ModeratorListMessage):
                 ],
             )
         self.context.start_speaker(speaker)
-        self.context.signal_list_updated()
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
         return msg
@@ -200,7 +193,6 @@ class StopSpeakerInList(ModeratorListMessage):
                 ],
             )
         self.context.stop_speaker()
-        self.context.signal_list_updated()
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
         return msg
@@ -223,10 +215,7 @@ class ModeratorSpeakerListEnter(ModeratorListMessage):
                 raise BadRequestError.from_message(
                     self, msg=_("User isn't part of this meeting")
                 )
-
-        existing_obj = self.context.speaker_items.filter(
-            user=user, order__isnull=False
-        ).first()
+        existing_obj = self.context.speakers_in_queue().filter(user=user).first()
         if existing_obj is not None:
             raise BadRequestError.from_message(self, msg=_("Already in list"))
         self.context.speaker_items.create(user=user)
@@ -244,9 +233,7 @@ class ModeratorSpeakerListLeave(ModeratorListMessage):
     def run_job(self) -> Status:
         self.assert_perm()
         user = self.get_user()
-        existing_obj = self.context.speaker_items.filter(
-            user=user, order__isnull=False
-        ).first()
+        existing_obj = self.context.speakers_in_queue().filter(user=user).first()
         if existing_obj is None:
             raise BadRequestError.from_message(self, msg=_("Not in list"))
         existing_obj.delete()
@@ -282,26 +269,14 @@ class ModeratorSpeakerListShuffle(ListMessage):
         return msg
 
 
-class OrderSchema(BaseModel):
-    pk: int  # speaker list pk
-    queue: List[int]  # user pks, unique values
-    current: Optional[int]  # current user pk if speaker
-    times_spoken: list[list[int, int]]  # User pk and times spoken
-
-
-@outgoing
-class SpeakerListOrder(Message):
-    name = "speaker_list.order"
-    schema = OrderSchema
-    data: OrderSchema
-
-
 class SpeakerListSchema(BaseModel):
     title: Optional[str]
     pk: int
     state: str
     speaker_system: int  # pk
     agenda_item: Optional[int]  # pk
+    queue: List[int]  # user pks, unique values
+    current: Optional[int]  # current user pk if speaker
 
 
 @outgoing
@@ -365,6 +340,13 @@ class SpeakerSchema(BaseModel):
 @outgoing
 class SpeakerChanged(Message):
     name = "speaker.changed"
+    schema = SpeakerSchema
+    data: SpeakerSchema
+
+
+@outgoing
+class SpeakerAdded(Message):
+    name = "speaker.added"
     schema = SpeakerSchema
     data: SpeakerSchema
 

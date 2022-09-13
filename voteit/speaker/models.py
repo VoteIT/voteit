@@ -203,8 +203,9 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         self.active_list = None
         for slist in self.speaker_lists.all():
             slist.stop_speaker()
-            for speaker in slist.speakers_qs():
-                speaker.delete()
+            slist.speakers_in_queue().delete()
+            slist.order_list = []
+            slist.save()
         self.save()
 
     def save(self, **kw):
@@ -237,7 +238,9 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
 
 
 class Speaker(MeetingContext, SpeakerSystemContext):
-    """Information about a user who's entered a speaker list."""
+    """
+    Information about a user who's entered a speaker list.
+    """
 
     name = "speaker"
 
@@ -249,21 +252,13 @@ class Speaker(MeetingContext, SpeakerSystemContext):
     )
     # Note: Created is also needed for "historic" positions within a speaker list in case they're rearranged.
     created: datetime = models.DateTimeField(editable=False, default=now)
-    order: Optional[int] = models.PositiveSmallIntegerField(null=True)
-    safe_pos: bool = models.BooleanField(default=False)
     started: Optional[datetime] = models.DateTimeField(null=True)
     seconds: Optional[int] = models.PositiveSmallIntegerField(null=True)
 
     importers = {"organisation": {}}
 
     class Meta:
-        constraints = [
-            # Save doesn't work with this when we reorder. Really?
-            # models.UniqueConstraint(
-            #     fields=["list", "order"],
-            #     name="%(app_label)s_%(class)s_speakers_position_unique",
-            # )
-        ]
+        constraints = []
 
     @property
     def ended(self) -> Optional[datetime]:
@@ -272,15 +267,18 @@ class Speaker(MeetingContext, SpeakerSystemContext):
 
     @property
     def current(self) -> bool:
-        """We're guessing that this is the current speaker
+        """
+        We're guessing that this is the current speaker
         if it has a started timestamp and no recorded spoken seconds.
         """
         return self.started is not None and self.seconds is None
 
     @property
     def in_queue(self) -> bool:
-        """The definition of being in the queue is that order is set to a number"""
-        return self.order is not None
+        """
+        The definition of being in the queue is that started isn't set.
+        """
+        return self.started is None
 
     @property
     def meeting(self) -> Optional[Meeting]:
@@ -292,12 +290,19 @@ class Speaker(MeetingContext, SpeakerSystemContext):
 
     # Type hinting
     objects = models.Manager()
+    user_id: int
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.pk}>"
 
     def __str__(self):
         return f"Speaker id {self.pk}"
+
+    def save(self, **kwargs):
+        new_obj = self.pk is None
+        super().save(**kwargs)
+        if new_obj:
+            self.speaker_list.reorder()
 
 
 class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
@@ -322,7 +327,9 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     speakers = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through=Speaker, related_name="speaker_lists"
     )
-
+    order: str = models.TextField(
+        verbose_name="Order of user PK, comma separated", default=""
+    )
     exporters = {
         "meeting": {
             "meeting_kw": "speaker_system__meeting",
@@ -350,6 +357,17 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
             return self.active_in_system is not None
         return False
 
+    @property
+    def order_list(self) -> list[int]:
+        if not self.order:
+            return []
+        return [int(x) for x in self.order.split(",")]
+
+    @order_list.setter
+    def order_list(self, value: list[int | str]):
+        [int(x) for x in value]
+        self.order = ",".join(str(x) for x in value)
+
     @transition(
         field=state,
         source=SpeakerListWf.CLOSED,
@@ -376,86 +394,57 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         Randomize the order of the speakers. Run reorder afterwards to make sure any other priorities gets applied.
         """
         self.method.shuffle(self)
-        self.reorder(force_signal=True)
+        self.reorder()
 
-    @ensure_atomic
-    def reorder(self, force_signal=False):
+    def reorder(self):
         """
         Something have changed within the list that makes reordering necessary.
         Usually when a user is added or removed, but it can be triggered for attribute changes on users too.
         """
-        current = self.current_order()
+        order_list = self.order_list
         new_order = self.method.reorder(self)
-        safe_updated = False
-        # Check if a speaker should be moved to a safe position - only if the list is active.
-        if self.is_active_list:
-            system = self.speaker_system
-            safe_pos = system.safe_positions
-            if (
-                safe_pos
-                and safe_pos
-                > self.speaker_items.filter(order__isnull=False, safe_pos=True).count()
-            ):
-                # FIXME: Do something smarter
-                for speaker in list(self.speakers_qs()[:safe_pos]):
-                    if not speaker.safe_pos:
-                        speaker.safe_pos = True
-                        speaker.save()
-                        safe_updated = True
-        # Outside of transaction block, the save must be done first!
-        if current != new_order or safe_updated or force_signal:
-            self.signal_list_updated()
+        if order_list != new_order:
+            self.order_list = new_order
+            self.save()
         return new_order
 
-    def signal_list_updated(self):
-        # Circular import :(
-        from voteit.speaker.signals import list_updated
-
-        list_updated.send(sender=self.__class__, instance=self)
-
-    def current_order(self):
+    def speakers_in_queue(self) -> models.QuerySet[Speaker]:
         """
-        Return an ordered list of primary keys for speaker items that are in the queue.
+        Unsorted speaker models in queue. Normally there's no need to touch these.
         """
-        return list(self.speakers_qs().values_list("pk", flat=True))
+        return self.speaker_items.filter(seconds__isnull=True, started__isnull=True)
 
-    def safe_speakers_qs(self) -> models.QuerySet:
-        return self.speaker_items.filter(order__isnull=False, safe_pos=True).order_by(
-            "order"
-        )
+    def historic_speakers(self) -> models.QuerySet[Speaker]:
+        return self.speaker_items.filter(seconds__isnull=False, started__isnull=False)
 
-    def speakers_qs(self) -> models.QuerySet:
-        """Return an ordered queryset with the speakers in the current list."""
-        return self.speaker_items.filter(order__isnull=False).order_by(
-            "-safe_pos", "order"
-        )
+    def started_or_historic_speakers(self) -> models.QuerySet[Speaker]:
+        return self.speaker_items.filter(started__isnull=False)
 
-    def history_qs(self) -> models.QuerySet:
-        """Return an ordered queryset with the speakers in the current list."""
-        return self.speaker_items.filter(seconds__isnull=False).order_by("-started")
-
-    def speakers_unsafe_created_qs(self) -> models.QuerySet:
-        return self.speaker_items.filter(order__isnull=False, safe_pos=False).order_by(
-            "created"
+    def get_user_pk_in_queue_created_order(self) -> list[int]:
+        return list(
+            self.speakers_in_queue()
+            .order_by("created")
+            .values_list("user_id", flat=True)
         )
 
     @ensure_atomic
-    def start_speaker(self, speaker: Speaker = None) -> None:
+    def start_speaker(self, speaker: Speaker) -> None:
         """
-        Start a specific user in the queue, or first user
+        Start a specific user in the queue
         """
-        if speaker := speaker or self.speakers_qs().first():
-            if speaker.started is None:
-                self.stop_speaker()
-                speaker.order = None
-                speaker.started = now()
-                speaker.save()
-                self.current = speaker
-                self.save()
-                # speaker.signal_started()
-            else:  # pragma: no coverage
-                # FIXME: Something...?
-                raise ValueError()
+        order_list = self.order_list
+        order_list.remove(speaker.user.pk)
+        if speaker.started is None:
+            self.stop_speaker()
+            # speaker.order = None
+            speaker.started = now()
+            speaker.save()
+            self.current = speaker
+            self.order_list = order_list
+            self.save()
+        else:  # pragma: no coverage
+            # FIXME: Something...?
+            raise ValueError()
 
     @ensure_atomic
     def stop_speaker(self) -> None:
@@ -479,13 +468,16 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         if speaker is None:
             return False
         else:
-            speaker.order = 0  # FIXME Is this OK? //JS
             speaker.started = None
             speaker.save()
             self.current = None
+            order_list = self.order_list
+            if speaker.user.pk not in order_list:
+                order_list.insert(0, speaker.user.pk)
+                self.order_list = order_list
             self.save()
             # The end of the atomic transaction will trigger a speaker changed message
-            self.reorder(force_signal=True)
+            self.reorder()
             return True
 
     def save(self, **kw):

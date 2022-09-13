@@ -6,7 +6,6 @@ from logging import getLogger
 from random import shuffle
 from typing import TYPE_CHECKING, List, Optional
 
-from django.db.models import Max
 from django.utils.timezone import now
 from pydantic.main import BaseModel
 
@@ -15,6 +14,8 @@ from voteit.core.abcs import ABCModel
 if TYPE_CHECKING:
     from voteit.speaker.models import SpeakerListSystem
     from voteit.speaker.models import SpeakerList
+    from django.contrib.auth.models import AbstractUser
+
 
 logger = getLogger(__name__)
 
@@ -38,17 +39,23 @@ class ListMethod(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        """Unique name for method"""
+        """
+        Unique name for method
+        """
 
     @property
     @abstractmethod
     def title(self) -> str:
-        """Human-readable title"""
+        """
+        Human-readable title
+        """
 
     @property
     @abstractmethod
     def description(self) -> str:
-        """Human-readable explanation of what this does."""
+        """
+        Human-readable explanation of what this does.
+        """
 
     @property
     def settings_schema(self) -> Optional[BaseModel]:
@@ -58,20 +65,31 @@ class ListMethod(ABC):
         """
         return None
 
+    def get_spoken_count(
+        self, speaker_list: SpeakerList, user: AbstractUser | int
+    ) -> int:
+        if not isinstance(user, int):
+            user = user.pk
+        return speaker_list.speaker_items.filter(
+            seconds__isnull=False, user_id=user
+        ).count()
+
     def shuffle(self, speaker_list: SpeakerList) -> List[int]:
         """
         Shuffle order - should always be handled within an atomic transaction.
+        It fetches speaker objects rather than usign the cached speaker_list.order
         """
-        list_items = list(speaker_list.speaker_items.filter(order__isnull=False))
-        shuffle(list_items)
-        new_order = []
-        new_created_base = now() - timedelta(seconds=len(list_items))
-        for order, speaker in enumerate(list_items, 1):
-            speaker.order = order
-            speaker.safe_pos = False
-            speaker.created = new_created_base + timedelta(seconds=order)
+        speaker_qs = speaker_list.speakers_in_queue()
+        new_order = list(
+            speaker_list.speakers_in_queue().values_list("user_id", flat=True)
+        )
+        shuffle(new_order)
+        new_created_base = now() - timedelta(seconds=len(new_order))
+        for i, speaker in enumerate(
+            sorted(speaker_qs, key=lambda x: new_order.index(x.user_id)), 1
+        ):
+            speaker.created = new_created_base + timedelta(seconds=i)
             speaker.save()
-            new_order.append(speaker.pk)
         return new_order
 
     def reorder(self, speaker_list: SpeakerList) -> List[int]:
@@ -79,24 +97,18 @@ class ListMethod(ABC):
         Override this method to implement actual quotas or similar.
         The default one simply orders users according to the order they entered the list.
 
-        This method returns the primary keys of the speakers according to the new order.
+        This method returns the primary keys of the users according to the new order.
         Make sure to include the safe speakers!
 
-        Handle within an atomic transaction!
+        Handle within an atomic transaction.
         """
-        new_order = list(speaker_list.safe_speakers_qs().values_list("pk", flat=True))
-        result = speaker_list.speaker_items.filter(
-            order__isnull=False, safe_pos=True
-        ).aggregate(Max("order"))
-        max_order = result["order__max"]
-        if max_order is None:
-            start_order = 1
-        else:
-            start_order = max_order + 1
-        for order, speaker in enumerate(
-            speaker_list.speakers_unsafe_created_qs().all(), start_order
-        ):
-            speaker.order = order
-            speaker.save()
-            new_order.append(speaker.pk)
-        return new_order
+        resorted_queue = speaker_list.get_user_pk_in_queue_created_order()
+        if speaker_list.speaker_system.safe_positions:
+            safe_in_queue = speaker_list.order_list[
+                : speaker_list.speaker_system.safe_positions
+            ]
+            for pk in reversed(safe_in_queue):
+                if pk in resorted_queue:
+                    resorted_queue.remove(pk)
+                    resorted_queue.insert(0, pk)
+        return resorted_queue

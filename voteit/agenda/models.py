@@ -223,6 +223,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     last_read_set: models.QuerySet
     text_documents: models.QuerySet
     text_paragraphs: models.QuerySet
+    speaker_lists: models.QuerySet
 
 
 class LastRead(AgendaItemContext, MeetingContext):

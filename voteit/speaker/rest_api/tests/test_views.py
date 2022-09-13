@@ -423,7 +423,7 @@ class SpeakerViewSetTestCase(APITestCase):
             user=cls.participant, started=datetime(1913, 1, 1, tzinfo=UTC), seconds=3
         )
         cls.fourth_ongoing = cls.slist.speaker_items.create(
-            user=cls.moderator, started=datetime(1914, 1, 1, tzinfo=UTC), order=1
+            user=cls.moderator, started=datetime(1914, 1, 1, tzinfo=UTC)
         )
 
     def test_create(self):

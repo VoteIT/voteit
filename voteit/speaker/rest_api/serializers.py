@@ -9,12 +9,16 @@ from voteit.speaker.models import SpeakerListSystem
 
 
 class SpeakerListSerializer(serializers.ModelSerializer):
+    queue = serializers.SerializerMethodField()
+    current = serializers.SerializerMethodField()
     # FIXME: Don't allow system and agenda items to be within different meetings
     # It's at least prevented in .save() right now
     class Meta:
         model = SpeakerList
         read_only_fields = [
             "state",
+            "queue",
+            "current",
         ]
         fields = [
             "pk",
@@ -27,6 +31,13 @@ class SpeakerListSerializer(serializers.ModelSerializer):
             "agenda_item": {"required": True},
             "meeting": {"required": True},
         }
+
+    def get_queue(self, instance: SpeakerList) -> list[int]:
+        return instance.order_list
+
+    def get_current(self, instance: SpeakerList) -> list[int]:
+        if instance.current:
+            return instance.current.user_id
 
 
 class HistoricSpeakerListSerializer(serializers.Serializer):

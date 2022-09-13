@@ -21,4 +21,4 @@ class SpeakerListSystemChannel(ContextChannel):
     name = "sls"
     logger = logger
     model = SpeakerListSystem
-    permission = SpeakerSystemPermissions.MANAGE
+    permission = SpeakerSystemPermissions.VIEW

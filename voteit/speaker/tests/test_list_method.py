@@ -1,6 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.speaker.models import Speaker
+from voteit.speaker.models import SpeakerList
+from voteit.speaker.models import SpeakerListSystem
 
 User = get_user_model()
 
@@ -12,9 +15,6 @@ class ListMethodTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.speaker.models import SpeakerListSystem
-        from voteit.speaker.models import SpeakerList
-
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
             method_name="simple"
         )
@@ -22,19 +22,15 @@ class ListMethodTests(TestCase):
             speaker_system=cls.system
         )
         for i in range(5):
-            user = cls.speaker_list.speakers.create(username=f"user-{i}")
-            cls.speaker_list.speaker_items.create(user=user, order=i)
-
-    # def test_reorder(self):
-    #     pass
+            cls.speaker_list.speakers.create(username=f"user-{i}")
 
     def test_shuffle(self):
-        current_order = self.speaker_list.current_order()
+        current_order = self.speaker_list.order_list
         self.assertEqual(5, len(current_order))
         order_changed = False
         for i in range(5):
             self.speaker_list.shuffle()
-            if current_order != self.speaker_list.current_order():
+            if current_order != self.speaker_list.order_list:
                 order_changed = True
                 break
 

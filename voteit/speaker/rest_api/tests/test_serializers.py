@@ -1,19 +1,29 @@
 from datetime import timedelta
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils.timezone import now
 
+from voteit.meeting.models import Meeting
+from voteit.speaker.models import SpeakerList
+
+User = get_user_model()
+
 
 class SpeakerListSerializerTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
+    fixtures = ["meeting_test_fixture"]
 
-        self.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
-        self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
-        self.system = self.meeting.speaker_systems.create(method_name="simple")
-        self.slist = self.system.speaker_lists.create(agenda_item=self.ai)
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
+        cls.system = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.slist: SpeakerList = cls.system.speaker_lists.create(agenda_item=cls.ai)
+        cls.participant = User.objects.get(username="participant")
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant_speaker = cls.slist.speaker_items.create(user=cls.participant)
+        cls.moderator_speaker = cls.slist.speaker_items.create(user=cls.moderator)
+        cls.slist.start_speaker(cls.participant_speaker)
 
     @property
     def _cut(self):
@@ -32,6 +42,8 @@ class SpeakerListSerializerTests(TestCase):
                 "speaker_system": self.system.pk,
                 "agenda_item": self.ai.pk,
                 "state": "open",
+                "queue": [self.moderator.pk],
+                "current": self.participant.pk,
             },
             data,
         )
@@ -52,11 +64,13 @@ class HistoricSpeakerListSerializerTests(TestCase):
 
     def test_get(self):
         # Queue is not part of this
-        serializer = self._cut({
-            "user": 1,
-            "times_spoken": 3,
-            "seconds_spoken": 200,
-        })
+        serializer = self._cut(
+            {
+                "user": 1,
+                "times_spoken": 3,
+                "seconds_spoken": 200,
+            }
+        )
         data = serializer.data
         self.assertEqual(data["user"], 1)
         self.assertEqual(data["times_spoken"], 3)
