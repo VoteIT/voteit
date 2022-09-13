@@ -109,6 +109,8 @@ class ScottishSTV(PollMethod):
         >>> method = ScottishSTV(None)
         >>> method.vote_to_str(data)
         '1,3,2'
+        >>> method.vote_to_str(RankingSchema(ranking=[]))
+        ''
         """
         return ",".join([str(x) for x in data.ranking])
 
@@ -118,8 +120,14 @@ class ScottishSTV(PollMethod):
         >>> data = method.vote_to_obj("4,1,3,2")
         >>> data.ranking
         [4, 1, 3, 2]
+        >>> data = method.vote_to_obj("")
+        >>> data.ranking
+        []
         """
-        ranking = [int(x) for x in text.split(",")]
+        if text:
+            ranking = [int(x) for x in text.split(",")]
+        else:
+            ranking = []
         return self.vote_schema(ranking=ranking)
 
     def calculate_result(self, counter: Counter) -> STVResultSchema:
