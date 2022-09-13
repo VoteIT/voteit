@@ -266,9 +266,11 @@ def push_speaker_deleted(instance: Speaker, **kwargs):
 @on_transaction_commit
 def push_speaker_changed(instance: Speaker, created=False, **kwargs):
     """
-    We only care about currently speaking, stopped + historic speakers here, since other items are part of the speaker order.
+    We mostly care about currently speaking, stopped + historic speakers here,
+    since other items are part of the speaker list. But since speakers who've started speaking
+    and then pushed back to queue via undo will be reset, this should be sent on every change.
     """
-    if created or instance.started is None:
+    if created:
         # Speakers in the queue are sent as order instead. We only care about started or historic speakers
         return
     if instance.speaker_list.is_active_list:

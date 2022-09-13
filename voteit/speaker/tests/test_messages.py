@@ -1,4 +1,5 @@
 from datetime import datetime
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import override_settings
@@ -12,6 +13,7 @@ from envelope.messages.errors import NotFoundError
 from envelope.messages.errors import SubscribeError
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
+from voteit.core.testing import FakeCommit
 
 from voteit.meeting.models import Meeting
 from voteit.speaker.channels import SpeakerListSystemChannel
@@ -461,6 +463,20 @@ class ModeratorSpeakerListUndoTests(TestCase):
         self.assertFalse(self.list.current)
         msg = self._mk_one()
         self.assertRaises(BadRequestError, msg.run_job)
+
+    @patch.object(SpeakerListSystemChannel, "sync_publish")
+    def test_undo_received_messages(self, mock_publish):
+        from voteit.speaker.messages import SpeakerListChanged
+        from voteit.speaker.messages import SpeakerChanged
+
+        self.assertEqual(self.list.current, self.speaker)
+        msg = self._mk_one()
+        with FakeCommit():
+            msg.run_job()
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(2, len(messages))
+        self.assertIsInstance(messages[0], SpeakerListChanged)
+        self.assertIsInstance(messages[1], SpeakerChanged)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

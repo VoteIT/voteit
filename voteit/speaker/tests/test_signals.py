@@ -432,8 +432,9 @@ class SpeakerSignalTests(TestCase):
         self.assertFalse(mock_publish.called)
 
         with FakeCommit():
+            # All updates are sent for active lists
             self.active_speaker.save()
-        self.assertFalse(mock_publish.called)
+        self.assertTrue(mock_publish.called)
 
     @patch.object(SpeakerListSystemChannel, "sync_publish")
     def test_speaker_changed_and_started(self, mock_publish):
