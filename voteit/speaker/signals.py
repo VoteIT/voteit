@@ -261,6 +261,13 @@ def push_speaker_deleted(instance: Speaker, **kwargs):
         ch.sync_publish(msg)
 
 
+@receiver(post_delete, sender=Speaker)
+@disable_on_raw_save
+def push_speaker_deleted(instance: Speaker, **kwargs):
+    instance.speaker_list.reorder()
+
+
+
 @receiver(post_save, sender=Speaker)
 @disable_on_raw_save
 @on_transaction_commit

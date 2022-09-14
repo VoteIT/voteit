@@ -467,18 +467,13 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         speaker = self.current
         if speaker is None:
             return False
-        else:
-            speaker.started = None
-            speaker.save()
-            self.current = None
-            order_list = self.order_list
-            if speaker.user.pk not in order_list:
-                order_list.insert(0, speaker.user.pk)
-                self.order_list = order_list
-            self.save()
-            # The end of the atomic transaction will trigger a speaker changed message
-            self.reorder()
-            return True
+
+        speaker.started = None
+        speaker.save()
+        self.current = None
+        # The end of the atomic transaction will trigger a speaker changed message
+        self.reorder()
+        return True
 
     def save(self, **kw):
         if self.title is None:
