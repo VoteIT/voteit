@@ -8,6 +8,15 @@ User = get_user_model()
 
 
 class ProposalTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+
     @property
     def _cut(self):
         from voteit.proposal.models import Proposal
@@ -28,23 +37,31 @@ class ProposalTests(TestCase):
         self.assertIn("hello", prop.tags)
 
     def test_prop_id_unique_to_agenda(self):
-        meeting = Meeting.objects.create()
-        ai = meeting.agenda_items.create()
-        self._mk_one(prop_id="hello", agenda_item=ai)
+        one = self._mk_one(prop_id="hello", agenda_item=self.ai)
+        self.assertEqual("hello", one.prop_id)
         with self.assertRaises(IntegrityError):
-            self._mk_one(prop_id="hello", agenda_item=ai)
+            self._mk_one(prop_id="hello", agenda_item=self.ai)
 
     def test_default_prop_id_based_on_userid(self):
         user = User.objects.create(username="not-used", userid="hi")
         user2 = User.objects.create(username="for-this", userid="hello")
-        meeting = Meeting.objects.create()
-        ai = meeting.agenda_items.create()
-        prop = self._mk_one(agenda_item=ai, author=user)
+        prop = self._mk_one(agenda_item=self.ai, author=user)
         self.assertEqual("hi-1", prop.prop_id)
-        prop = self._mk_one(agenda_item=ai, author=user)
+        prop = self._mk_one(agenda_item=self.ai, author=user)
         self.assertEqual("hi-2", prop.prop_id)
-        prop = self._mk_one(agenda_item=ai, author=user2)
+        prop = self._mk_one(agenda_item=self.ai, author=user2)
         self.assertEqual("hello-1", prop.prop_id)
+
+    # def test_userid_based_prop_id_changed_with_author(self):
+    #     prop = self._mk_one(agenda_item=self.ai, author=self.moderator)
+    #     self.assertEqual("moderator-1", prop.prop_id)
+    #     self.assertEqual(["moderator-1"], prop.tags)
+    #     prop.author = self.participant
+    #     self.assertEqual("participant-1", prop.prop_id)
+    #     self.assertEqual(["participant-1"], prop.tags)
+    #
+    # def test_userid_based_prop_id_not_changed_with_author_if_used_elsewhere(self):
+    #     pass
 
 
 class DiffProposalTests(TestCase):

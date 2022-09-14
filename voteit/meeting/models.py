@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from voteit.presence.models import PresenceSystem
     from voteit.presence.models import PresenceCheck
     from voteit.speaker.models import SpeakerListSystem
+    from voteit.proposal.abcs import ProposalIDPolicy
 
 __all__ = "Meeting", "MeetingRoles", "MeetingGroup"
 
@@ -142,7 +143,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     }
 
     @cached_property
-    def pid_policy(self) -> ElectoralRegisterPolicy:
+    def pid_policy(self) -> ProposalIDPolicy:
         reg = get_proposal_id_registry()
         if self.proposal_id_policy_name:
             return reg[self.proposal_id_policy_name](self)
