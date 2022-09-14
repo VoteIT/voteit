@@ -28,6 +28,8 @@ __all__ = (
     "MeetingGroupViewSet",
 )
 
+from ..models import MeetingComponent
+
 
 @router.register("meetings", basename="meeting")
 class MeetingViewSet(DefaultModelViewSet):
@@ -132,6 +134,38 @@ class MeetingGroupViewSet(DefaultModelViewSet):
         if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
             return MeetingGroup.objects.filter(meeting=meeting)
         return MeetingGroup.objects.none()
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
+
+@router.register("meeting-components", basename="meeting-components")
+class MeetingComponentViewSet(DefaultModelViewSet):
+    model = MeetingComponent
+    serializer_class = serializers.MeetingComponentSerializer
+    serializer_classes = {"create": serializers.CreateMeetingComponentSerializer}
+    context_lookup_kwarg: str = "meeting"
+
+    @property
+    def context_queryset(self) -> QuerySet:
+        return Meeting.objects.for_user(self.request.user)
+
+    def get_queryset(self):
+        if self.detail:
+            # Permission checked against object
+            return MeetingComponent.objects.all()
+        try:
+            meeting = self.get_context(self.request)
+        except ValidationError:
+            meeting = None
+        if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
+            return MeetingComponent.objects.filter(meeting=meeting)
+        return MeetingComponent.objects.none()
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):

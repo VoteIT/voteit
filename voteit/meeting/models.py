@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from datetime import datetime
 from datetime import timedelta
 from itertools import count
@@ -9,6 +10,7 @@ from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
 from django.utils import timezone
@@ -18,6 +20,8 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
+from pydantic import BaseModel
+from pydantic import ValidationError
 
 from voteit.core.abcs import MeetingContext
 from voteit.core.abcs import OrganisationContext
@@ -28,7 +32,10 @@ from voteit.core.models import Roles
 from voteit.core.models import User
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.utils import relaxed_clean_html
+from voteit.core.workflows import EnabledWf
+from voteit.meeting.permissions import MeetingComponentPermissions
 from voteit.meeting.permissions import MeetingPermissions
+from voteit.meeting.utils import get_meeting_component_adapters
 from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.permissions import OrgPermissions
 from voteit.poll.utils import get_electoral_policy_registry
@@ -45,8 +52,9 @@ if TYPE_CHECKING:
     from voteit.presence.models import PresenceCheck
     from voteit.speaker.models import SpeakerListSystem
     from voteit.proposal.abcs import ProposalIDPolicy
+    from voteit.meeting.abcs import MeetingComponentAdapter
 
-__all__ = "Meeting", "MeetingRoles", "MeetingGroup"
+__all__ = "Meeting", "MeetingRoles", "MeetingGroup", "MeetingComponent"
 
 
 logger = getLogger(__name__)
@@ -291,6 +299,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     polls: models.QuerySet
     reaction_buttons: models.QuerySet
     speaker_systems: models.QuerySet[SpeakerListSystem]
+    components: models.QuerySet[MeetingComponent]
 
 
 class MeetingGroup(BaseContent, MeetingContext):
@@ -340,4 +349,101 @@ class MeetingGroup(BaseContent, MeetingContext):
     # Type annotations - relations
     proposals: models.QuerySet
     discussions: models.QuerySet
+    objects: models.Manager
+
+
+class MeetingComponent(MeetingContext):
+    name: str = "meeting_component"
+    state: str = FSMField(
+        default=EnabledWf.initial, choices=EnabledWf.choices(), editable=False
+    )
+    component_name: str = models.CharField(max_length=30)
+    meeting: Meeting = models.ForeignKey(
+        "Meeting", on_delete=models.CASCADE, related_name="components"
+    )
+    settings_data: Optional[dict] = models.JSONField(
+        verbose_name="JSON-serialized settings",
+        editable=False,
+        null=True,
+        encoder=DjangoJSONEncoder,
+    )
+
+    class Meta:
+        verbose_name = "Meeting component"
+        verbose_name_plural = "Meeting components"
+
+    @cached_property
+    def component(self) -> MeetingComponentAdapter:
+        reg = get_meeting_component_adapters()
+        with suppress(KeyError):
+            return reg[self.component_name]
+
+    @property
+    def is_valid(self):
+        if self.component is None:
+            return False
+        schema = self.component.schema
+        if schema is None:
+            return True
+        if schema is not None:
+            data = self.settings_data
+            if data is None:
+                data = {}
+            with suppress(ValidationError):
+                schema(**data)
+                return True
+        return False
+
+    @property
+    def settings(self) -> Optional[BaseModel]:
+        if self.is_valid:
+            schema = self.component.schema
+            if schema is not None:
+                return schema(**self.settings_data)
+
+    @settings.setter
+    def settings(self, value: dict | BaseModel | None):
+        if not self.component:
+            raise ValueError(f"{self.component.name} is not valid")
+        schema = self.component.schema
+        if schema is None:
+            if value is None:  # Don't bother
+                return
+            raise ValueError(f"Component {self.component.name} has no schema")
+        if isinstance(value, dict):
+            data = schema(**value)
+        elif isinstance(value, schema):
+            data = value
+        else:  # pragma: no cover
+            raise ValueError(f"{value} is not a schema or a dict")
+        self.settings_data = data.dict()
+
+    def valid_component_name(self) -> bool:
+        return self.component_name in get_meeting_component_adapters()
+
+    def valid_settings(self) -> bool:
+        return self.is_valid
+
+    @transition(
+        field=state,
+        source=EnabledWf.OFF,
+        target=EnabledWf.ON,
+        permission=MeetingComponentPermissions.CHANGE,
+        custom={"title": _("Enable")},
+        conditions=[valid_component_name, valid_settings],
+    )
+    def enable(self):
+        pass
+
+    @transition(
+        field=state,
+        source=EnabledWf.ON,
+        target=EnabledWf.OFF,
+        permission=MeetingComponentPermissions.CHANGE,
+        custom={"title": _("Disable")},
+    )
+    def disable(self):
+        pass
+
+    # Type annotations - relations
     objects: models.Manager

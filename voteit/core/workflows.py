@@ -53,3 +53,17 @@ class SendWf:
     @classmethod
     def choices(cls):
         return cls.states.items()
+
+
+class EnabledWf:
+    ON = "on"
+    OFF = "off"
+    states = {
+        ON: _("On"),
+        OFF: _("Off"),
+    }
+    initial = OFF
+
+    @classmethod
+    def choices(cls):
+        return cls.states.items()

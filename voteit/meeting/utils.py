@@ -10,10 +10,10 @@ from dolly.core import LiveCloner
 from dolly.utils import get_inf_collector
 from dolly.utils import get_model_formatted_dict
 
+from voteit.core.component import Registry
 from voteit.core.decorators import ensure_atomic
 from voteit.core.utils import get_content_registry
 from voteit.core.utils import get_model_by_shortname
-from voteit.meeting.roles import ROLE_MODERATOR
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
@@ -96,6 +96,7 @@ def clone_meeting(
 
     """
     from voteit.meeting.models import Meeting
+    from voteit.meeting.roles import ROLE_MODERATOR
     from voteit.speaker.models import SpeakerListSystem
 
     assert user is not None
@@ -127,3 +128,9 @@ def clone_meeting(
             f"User {user} doesn't belong to organisation {meeting.organisation} so that user won't be added as moderator."
         )
     return meeting
+
+
+def get_meeting_component_adapters() -> Registry:
+    from voteit.meeting.registries import meeting_components
+
+    return meeting_components

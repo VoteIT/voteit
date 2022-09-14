@@ -18,14 +18,20 @@ from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
+from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.messages import MeetingChanged
+from voteit.meeting.messages import MeetingComponentAdded
+from voteit.meeting.messages import MeetingComponentChanged
+from voteit.meeting.messages import MeetingComponentDeleted
 from voteit.meeting.messages import MeetingGroupAdded
 from voteit.meeting.messages import MeetingGroupChanged
 from voteit.meeting.messages import MeetingGroupDeleted
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingComponent
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.models import MeetingGroup
+from voteit.meeting.rest_api.serializers import MeetingComponentSerializer
 from voteit.meeting.rest_api.serializers import MeetingDetailSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
 
@@ -98,6 +104,12 @@ def meeting_channel_subscribed(
     app_state.append_from_queryset(
         context.groups.all(), MeetingGroupSerializer, MeetingGroupAdded
     )
+    # Append enabled components
+    app_state.append_from_queryset(
+        context.components.filter(state=EnabledWf.ON),
+        MeetingComponentSerializer,
+        MeetingComponentAdded,
+    )
 
 
 @receiver(post_save, sender=MeetingGroup)
@@ -113,10 +125,46 @@ def meeting_group_updated(instance: MeetingGroup = None, created=None, **kw):
     meeting_ch.sync_publish(msg)
 
 
+@receiver(post_save, sender=MeetingComponent)
+@disable_on_raw_save
+@on_transaction_commit
+def meeting_component_updated(instance: MeetingComponent = None, created=None, **kw):
+    """
+    Components behave a bit differently from other things. We really only care about enabled components.
+    If they're disabled, they should even be deleted from the frontends datalayer.
+
+    To actually edit components (including disabled ones) we'll use the ones from the rest endpoint.
+    """
+    meeting_ch = MeetingChannel.from_instance(instance.meeting)
+    data = MeetingComponentSerializer(instance).data
+    component_on = data["state"] == EnabledWf.ON
+    msg = None
+    if created:
+        if component_on:
+            msg = MeetingComponentAdded(**data)
+    else:
+        # Update
+        if component_on:
+            msg = MeetingComponentChanged(**data)
+        else:
+            msg = MeetingComponentDeleted(**data)
+    if msg:
+        meeting_ch.sync_publish(msg)
+
+
 @receiver(pre_delete, sender=MeetingGroup)
 def meeting_group_delete(instance=None, **kw):
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
     msg = MeetingGroupDeleted(pk=instance.pk)
+    # Sent after transaction commit!
+    meeting_ch.sync_publish(msg)
+
+
+@receiver(pre_delete, sender=MeetingComponent)
+def meeting_component_delete(instance=None, **kw):
+    meeting_ch = MeetingChannel.from_instance(instance.meeting)
+    msg = MeetingComponentDeleted(pk=instance.pk)
+    # Sent after transaction commit!
     meeting_ch.sync_publish(msg)
 
 

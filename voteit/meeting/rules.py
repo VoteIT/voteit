@@ -9,6 +9,7 @@ from rules import is_authenticated
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_not_archived
+from voteit.meeting.permissions import MeetingComponentPermissions
 from voteit.meeting.permissions import MeetingGroupPermissions
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.roles import ROLE_DISCUSSER
@@ -159,3 +160,8 @@ rules.add_perm(MeetingGroupPermissions.ADD, meeting_not_archived & is_moderator)
 rules.add_perm(MeetingGroupPermissions.VIEW, can_view_meeting)
 rules.add_perm(MeetingGroupPermissions.CHANGE, meeting_not_archived & is_moderator)
 rules.add_perm(MeetingGroupPermissions.DELETE, meeting_not_archived & is_moderator)
+
+rules.add_perm(MeetingComponentPermissions.ADD, meeting_not_archived & is_moderator)
+rules.add_perm(MeetingComponentPermissions.VIEW, can_view_meeting)
+rules.add_perm(MeetingComponentPermissions.CHANGE, meeting_not_archived & is_moderator)
+rules.add_perm(MeetingComponentPermissions.DELETE, meeting_not_archived & is_moderator)

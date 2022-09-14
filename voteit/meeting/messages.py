@@ -34,6 +34,21 @@ class MeetingGroupDeleted(BaseObjectDeleted):
     name = "meeting_group.deleted"
 
 
+@outgoing
+class MeetingComponentAdded(BaseObjectAdded):
+    name = "meeting_component.added"
+
+
+@outgoing
+class MeetingComponentChanged(BaseObjectChanged):
+    name = "meeting_component.changed"
+
+
+@outgoing
+class MeetingComponentDeleted(BaseObjectDeleted):
+    name = "meeting_component.deleted"
+
+
 class CopyMeetingSchema(BaseModel):
     meeting: int
     # Settings etc later on

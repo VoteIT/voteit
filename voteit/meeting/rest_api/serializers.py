@@ -10,8 +10,11 @@ from rest_framework.exceptions import ValidationError
 
 from voteit.core.models import Roles
 from voteit.core.rest_api.serializers import BaseModelSerializer
+from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.core.rest_api.serializers import UserSerializer
+from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.meeting import models
+from voteit.meeting.utils import get_meeting_component_adapters
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
@@ -134,4 +137,50 @@ class MeetingGroupSerializer(BaseModelSerializer):
 
     class Meta:
         model = models.MeetingGroup
-        fields = "__all__"
+        exclude = ("id",)
+
+
+class CreateMeetingComponentSerializer(serializers.ModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
+    settings = PydanticFieldSerializer(allow_null=True, required=False)
+
+    class Meta:
+        model = models.MeetingComponent
+        exclude = ("id", "settings_data")
+        read_only_fields = ["state"]
+
+    def validate_component_name(self, value: str):
+        registry = get_meeting_component_adapters()
+        if value not in registry:
+            raise ValidationError("No such meeting component")
+        # Will raise error if meeting doesn't exist
+        component_adapter = registry[value]
+        if not component_adapter.multiple:
+            meeting = meeting_from_unsafe_data(self)
+            if meeting.components.filter(component_name=value).exists():
+                raise ValidationError(
+                    "Only one of these components are allowed per meeting."
+                )
+        return value
+
+
+class MeetingComponentSerializer(CreateMeetingComponentSerializer):
+    class Meta(CreateMeetingComponentSerializer.Meta):
+        read_only_fields = [
+            "component_name",
+            "meeting",
+        ] + CreateMeetingComponentSerializer.Meta.read_only_fields
+
+    def validate_settings(self, value):
+        schema = self.instance.component.schema
+        if schema:
+            try:
+                schema(**value)
+            except ValueError as exc:
+                # Better than nothing!
+                raise ValidationError(str(exc))
+        else:
+            # No schema, so no values are allowed!
+            if value is not None:
+                raise ValidationError("Component has no schema, so no settings allowed")
+        return value

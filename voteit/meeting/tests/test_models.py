@@ -1,8 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
+from django_fsm import TransitionNotAllowed
+from pydantic import BaseModel
 
+from voteit.meeting.abcs import MeetingComponentAdapter
 from voteit.meeting.models import Meeting
+from voteit.meeting.registries import meeting_components
 from voteit.organisation.models import Organisation
 
 User = get_user_model()
@@ -161,3 +165,51 @@ class MeetingRolesTests(TestCase):
     def test_unique_constraint(self):
         with self.assertRaises(IntegrityError):
             self._cut.objects.create(user=self.moderator, context=self.meeting)
+
+
+class NumberSchema(BaseModel):
+    number: int
+
+
+class NumberComponent(MeetingComponentAdapter):
+    name = "mock_number"
+    title = "Number"
+    schema = NumberSchema
+
+
+class NoneComponent(MeetingComponentAdapter):
+    name = "mock_none"
+    title = "None"
+
+
+class MeetingComponentTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        # cls.moderator = User.objects.get(username="moderator")
+        cls.meeting = Meeting.objects.create()
+        meeting_components[NumberComponent.name] = NumberComponent
+        meeting_components[NoneComponent.name] = NoneComponent
+        cls.number = cls.meeting.components.create(component_name="mock_number")
+        cls.none = cls.meeting.components.create(component_name="mock_none")
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        meeting_components.pop(NumberComponent.name)
+        meeting_components.pop(NoneComponent.name)
+
+    def test_wf_constraint(self):
+        self.none.enable()
+        with self.assertRaises(TransitionNotAllowed):
+            self.number.enable()
+        self.number.settings = {"number": 1}
+        self.number.enable()
+        self.number.settings_data = {"number": "B"}
+        self.number.disable()
+        # Only checked on enable
+        with self.assertRaises(TransitionNotAllowed):
+            self.number.enable()
+
+    def test_settings_no_schema(self):
+        with self.assertRaises(ValueError):
+            self.none.settings = {}
