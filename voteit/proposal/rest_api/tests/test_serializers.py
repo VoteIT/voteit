@@ -5,7 +5,12 @@ from django.test import RequestFactory
 from django.test import TestCase
 from typing import TYPE_CHECKING
 
+from voteit.agenda.models import AgendaItem
 from voteit.core.testing import mk_hashtag
+from voteit.meeting.models import Meeting
+from voteit.proposal.models import Proposal
+from voteit.proposal.models import TextDocument
+from voteit.proposal.models import TextParagraph
 
 if TYPE_CHECKING:
     from voteit.proposal.models import DiffProposal
@@ -16,13 +21,6 @@ class GenericProposalSerializerTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.agenda.models import AgendaItem
-        from voteit.meeting.models import Meeting
-        from voteit.proposal.models import Proposal
-        from voteit.proposal.models import DiffProposal
-        from voteit.proposal.models import TextParagraph
-        from voteit.proposal.models import TextDocument
-
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai: AgendaItem = cls.meeting.agenda_items.create()
         cls.prop: Proposal = Proposal.objects.create(agenda_item=cls.ai)
@@ -55,20 +53,19 @@ class GenericProposalSerializerTests(TestCase):
 
 
 class ProposalDetailSerializerTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-
-        self.meeting: Meeting = Meeting.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        self.group = self.meeting.groups.create()
-        self.user = self.meeting.participants.create(username="jane")
-        self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
+        cls.group = cls.meeting.groups.create()
+        cls.user = cls.meeting.participants.create(username="jane")
+        cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
         tag_html = mk_hashtag("world")
-        self.prop = self.ai.proposals.create(
-            author=self.user,
+        cls.prop = cls.ai.proposals.create(
+            author=cls.user,
             body=f"Hello {tag_html}",
-            meeting_group=self.group,
+            meeting_group=cls.group,
             tags=["world"],
         )
 
@@ -113,8 +110,6 @@ class ProposalDetailSerializerTests(TestCase):
 class ProposalCreateSerializer(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
@@ -177,12 +172,6 @@ class ProposalCreateSerializer(TestCase):
 class DiffProposalDetailSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
-        from voteit.proposal.models import TextParagraph
-        from voteit.proposal.models import TextDocument
-        from voteit.proposal.models import DiffProposal
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
@@ -232,11 +221,6 @@ class DiffProposalDetailSerializerTests(TestCase):
 class DiffProposalCreateSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
-        from voteit.proposal.models import TextParagraph
-        from voteit.proposal.models import TextDocument
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
@@ -340,10 +324,6 @@ class TextDocumentSerializerTests(TestCase):
 class CreateTextDocumentSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
-        from voteit.proposal.models import TextDocument
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )

@@ -222,6 +222,17 @@ def update_all_poll_results(importer: Importer):
                     (importer.get_remap_obj(Proposal, k).pk, v)
                     for k, v in stv_round.vote_count
                 ]
+        elif method_name == "schulze_stv":
+            # Probably not supported!
+            result.candidates = [
+                importer.get_remap_obj(Proposal, x).pk for x in result.candidates
+            ]
+            result.winners = [
+                importer.get_remap_obj(Proposal, x).pk for x in result.winners
+            ]
+            raise ValueError(
+                f"Need to handle remapping of results for method {method_name}"
+            )
         else:
             raise ValueError(
                 f"Need to handle remapping of results for method {method_name}"
@@ -263,10 +274,11 @@ def update_all_votes(importer: Importer):
                 for (pk, rank) in vote_data.ranking
             ]
         elif method_name in ("irv", "scottish_stv"):
-            vote_data: RankingSchema
-            vote_data.choices = [
-                importer.get_remap_obj(Proposal, pk).pk for pk in vote_data.choices
-            ]
+            vote_data: RankingSchema | str  # Maybe an empty string
+            if vote_data:
+                vote_data.ranking = [
+                    importer.get_remap_obj(Proposal, pk).pk for pk in vote_data.ranking
+                ]
         else:
             raise ValueError(
                 f"Need to handle remapping of vote for method {method_name}"
