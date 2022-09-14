@@ -70,6 +70,7 @@ class MeetingRoles(Roles, MeetingContext):
 
     class Meta:
         verbose_name = verbose_name_plural = "Meeting roles"
+        unique_together = (("user", "context"),)
 
     exporters = {"meeting": {"meeting_kw": "context"}}
     importers = {

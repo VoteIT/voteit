@@ -50,6 +50,8 @@ class OrganisationRoles(Roles):
 
     class Meta:
         verbose_name = verbose_name_plural = "Organisation roles"
+        unique_together = (("user", "context"),)
+
 
 
 class Organisation(BaseContent, RoleContextMixin, OrganisationContext):

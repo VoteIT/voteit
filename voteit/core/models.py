@@ -246,6 +246,7 @@ class Roles(ABCModel):
 
     class Meta:
         abstract = True
+        # Note: This isn't inherited to any other subclassing model!
         unique_together = (("user", "context"),)
 
     def add(self, *roles: Union[Role, str]) -> Optional[Set[Role]]:
