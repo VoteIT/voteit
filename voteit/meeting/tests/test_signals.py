@@ -151,6 +151,7 @@ class MeetingChannelSubscribedTests(TestCase):
                 "meeting": self.meeting.pk,
                 "component_name": FlashMessage.name,
                 "state": EnabledWf.ON,
+                "is_valid": True,
             },
             payloads[0],
         )
@@ -161,6 +162,7 @@ class MeetingChannelSubscribedTests(TestCase):
                 "meeting": self.meeting.pk,
                 "component_name": ProposalPrint.name,
                 "state": EnabledWf.ON,
+                "is_valid": True,
             },
             payloads[1],
         )
@@ -177,17 +179,7 @@ class MeetingChannelSubscribedTests(TestCase):
         payloads = [
             x.p for x in response.data.app_state if x.t == "meeting_component.added"
         ]
-        self.assertEqual(1, len(payloads))
-        self.assertEqual(
-            {
-                "pk": self.flash.pk,
-                "settings": None,
-                "meeting": self.meeting.pk,
-                "component_name": FlashMessage.name,
-                "state": EnabledWf.ON,
-            },
-            payloads[0],
-        )
+        self.assertEqual(0, len(payloads))
 
     def test_meeting_components_disabled(self):
         self.flash.disable()
@@ -207,6 +199,7 @@ class MeetingChannelSubscribedTests(TestCase):
                 "meeting": self.meeting.pk,
                 "component_name": ProposalPrint.name,
                 "state": EnabledWf.ON,
+                "is_valid": True,
             },
             payloads[0],
         )

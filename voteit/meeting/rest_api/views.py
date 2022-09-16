@@ -148,7 +148,10 @@ class MeetingGroupViewSet(DefaultModelViewSet):
 class MeetingComponentViewSet(DefaultModelViewSet):
     model = MeetingComponent
     serializer_class = serializers.MeetingComponentSerializer
-    serializer_classes = {"create": serializers.CreateMeetingComponentSerializer}
+    serializer_classes = {
+        "create": serializers.CreateMeetingComponentSerializer,
+        "retrieve": serializers.VerboseMeetingComponentSerializer,
+    }
     context_lookup_kwarg: str = "meeting"
 
     @property
@@ -166,11 +169,3 @@ class MeetingComponentViewSet(DefaultModelViewSet):
         if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
             return MeetingComponent.objects.filter(meeting=meeting)
         return MeetingComponent.objects.none()
-
-    @transaction.atomic
-    def create(self, request, *args, **kwargs):
-        return super().create(request, *args, **kwargs)
-
-    @transaction.atomic
-    def update(self, request, *args, **kwargs):
-        return super().update(request, *args, **kwargs)

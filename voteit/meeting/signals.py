@@ -105,11 +105,11 @@ def meeting_channel_subscribed(
         context.groups.all(), MeetingGroupSerializer, MeetingGroupAdded
     )
     # Append enabled components
-    app_state.append_from_queryset(
-        context.components.filter(state=EnabledWf.ON),
-        MeetingComponentSerializer,
-        MeetingComponentAdded,
-    )
+    for component in context.components.filter(state=EnabledWf.ON):
+        if component.is_valid:
+            app_state.append_from(
+                component, MeetingComponentSerializer, MeetingComponentAdded
+            )
 
 
 @receiver(post_save, sender=MeetingGroup)
@@ -138,13 +138,15 @@ def meeting_component_updated(instance: MeetingComponent = None, created=None, *
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
     data = MeetingComponentSerializer(instance).data
     component_on = data["state"] == EnabledWf.ON
+    is_valid = data["is_valid"]
     msg = None
     if created:
-        if component_on:
+        if component_on and is_valid:
             msg = MeetingComponentAdded(**data)
     else:
         # Update
-        if component_on:
+        if component_on and is_valid:
+            # Only send if valid
             msg = MeetingComponentChanged(**data)
         else:
             msg = MeetingComponentDeleted(**data)

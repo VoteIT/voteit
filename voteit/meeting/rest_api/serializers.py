@@ -1,7 +1,6 @@
 from __future__ import annotations
 from contextlib import suppress
 from typing import Optional
-from typing import TYPE_CHECKING
 from typing import Type
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -13,11 +12,11 @@ from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
-from voteit.meeting import models
+from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingComponent
+from voteit.meeting.models import MeetingGroup
+from voteit.meeting.models import MeetingRoles
 from voteit.meeting.utils import get_meeting_component_adapters
-
-if TYPE_CHECKING:
-    from voteit.meeting.models import Meeting
 
 
 class UserRolesMixin(serializers.Serializer):
@@ -35,7 +34,7 @@ class UserRolesMixin(serializers.Serializer):
 
 class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
     class Meta:
-        model = models.Meeting
+        model = Meeting
         fields = read_only_fields = (
             "url",
             "pk",
@@ -51,7 +50,7 @@ class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
 
 class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
     class Meta:
-        model = models.Meeting
+        model = Meeting
         read_only_fields = [
             "pk",
             "state",
@@ -95,7 +94,7 @@ class MeetingRolesSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
 
     class Meta:
-        model = models.MeetingRoles
+        model = MeetingRoles
         fields = read_only_fields = (
             "pk",
             "user",
@@ -109,7 +108,7 @@ class MeetingAddParticipantSerializer(serializers.ModelSerializer):
     meeting_id = serializers.IntegerField(source="context_id")
 
     class Meta:
-        model = models.MeetingRoles
+        model = MeetingRoles
         fields = "user_id", "meeting_id"
 
 
@@ -128,7 +127,7 @@ class RoleValidator:
 
 class RoleSerializer(serializers.Serializer):
     role = serializers.CharField(
-        max_length=20, validators=[RoleValidator(roles_cls=models.MeetingRoles)]
+        max_length=20, validators=[RoleValidator(roles_cls=MeetingRoles)]
     )
 
 
@@ -136,7 +135,7 @@ class MeetingGroupSerializer(BaseModelSerializer):
     pk = serializers.IntegerField(read_only=True)
 
     class Meta:
-        model = models.MeetingGroup
+        model = MeetingGroup
         exclude = ("id",)
 
 
@@ -145,7 +144,7 @@ class CreateMeetingComponentSerializer(serializers.ModelSerializer):
     settings = PydanticFieldSerializer(allow_null=True, required=False)
 
     class Meta:
-        model = models.MeetingComponent
+        model = MeetingComponent
         exclude = ("id", "settings_data")
         read_only_fields = ["state"]
 
@@ -165,6 +164,8 @@ class CreateMeetingComponentSerializer(serializers.ModelSerializer):
 
 
 class MeetingComponentSerializer(CreateMeetingComponentSerializer):
+    is_valid = serializers.BooleanField(read_only=True)
+
     class Meta(CreateMeetingComponentSerializer.Meta):
         read_only_fields = [
             "component_name",
@@ -184,3 +185,11 @@ class MeetingComponentSerializer(CreateMeetingComponentSerializer):
             if value is not None:
                 raise ValidationError("Component has no schema, so no settings allowed")
         return value
+
+
+class VerboseMeetingComponentSerializer(MeetingComponentSerializer):
+    schema = serializers.SerializerMethodField()
+
+    def get_schema(self, instance: MeetingComponent):
+        if instance.component and instance.component.schema is not None:
+            return instance.component.schema.schema()

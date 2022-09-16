@@ -170,6 +170,7 @@ class MeetingComponentSerializerTests(TestCase):
                 "meeting": self.meeting.pk,
                 "settings": None,
                 "component_name": ProposalPrint.name,
+                "is_valid": True,
             },
             serializer.data,
         )
@@ -185,6 +186,7 @@ class MeetingComponentSerializerTests(TestCase):
                 "meeting": self.meeting.pk,
                 "settings": None,
                 "component_name": FlashMessage.name,
+                "is_valid": False,
             },
             serializer.data,
         )
@@ -199,6 +201,7 @@ class MeetingComponentSerializerTests(TestCase):
                 "meeting": self.meeting.pk,
                 "settings": None,
                 "component_name": "jeff",
+                "is_valid": False,
             },
             serializer.data,
         )
