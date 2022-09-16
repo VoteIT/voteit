@@ -236,7 +236,8 @@ class TransitionsMixin(SerializerClassesMixin):
                 )
                 instance.save()
             # TODO Possibly return serialized object, but strictly speaking not necessary.
-            return Response(status=201, data={})
+            new_state = getattr(instance, self.fsm_field_name)
+            return Response(status=201, data={self.fsm_field_name: new_state})
 
     def get_serializer_class(self):
         if self.action == "transitions":
