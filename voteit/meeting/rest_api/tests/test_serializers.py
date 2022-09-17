@@ -1,14 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.test import TestCase
-from pydantic import BaseModel
 
-from voteit.meeting.abcs import MeetingComponentAdapter
-from voteit.meeting.app.components.message import FlashMessage
-from voteit.meeting.app.components.proposal_print import ProposalPrint
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
-from voteit.meeting.registries import meeting_components
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.polls.simple import Simple
 
@@ -140,116 +135,3 @@ class MeetingRolesSerializerTests(TestCase):
         serializer = self._cut(instance=qs, many=True)
         with self.assertNumQueries(2):
             data = serializer.data
-
-
-class MeetingComponentSerializerTests(TestCase):
-    fixtures = ["meeting_test_fixture"]
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.get(pk=1)
-        cls.print_component = cls.meeting.components.create(
-            component_name=ProposalPrint.name
-        )
-        cls.flash_component = cls.meeting.components.create(
-            component_name=FlashMessage.name, settings={"msg": "Hello"}
-        )
-
-    @property
-    def _cut(self):
-        from voteit.meeting.rest_api.serializers import MeetingComponentSerializer
-
-        return MeetingComponentSerializer
-
-    def test_serialize_print(self):
-        serializer = self._cut(self.print_component)
-        self.assertEqual(
-            {
-                "state": "off",
-                "pk": self.print_component.pk,
-                "meeting": self.meeting.pk,
-                "settings": None,
-                "component_name": ProposalPrint.name,
-                "is_valid": True,
-            },
-            serializer.data,
-        )
-
-    def test_serialize_number_bad_data(self):
-        self.flash_component.settings_data = {"msg": None}
-        self.flash_component.save()
-        serializer = self._cut(self.flash_component)
-        self.assertEqual(
-            {
-                "state": "off",
-                "pk": self.flash_component.pk,
-                "meeting": self.meeting.pk,
-                "settings": None,
-                "component_name": FlashMessage.name,
-                "is_valid": False,
-            },
-            serializer.data,
-        )
-
-    def test_serialize_bad_name(self):
-        bad_component = self.meeting.components.create(component_name="jeff")
-        serializer = self._cut(bad_component)
-        self.assertEqual(
-            {
-                "state": "off",
-                "pk": bad_component.pk,
-                "meeting": self.meeting.pk,
-                "settings": None,
-                "component_name": "jeff",
-                "is_valid": False,
-            },
-            serializer.data,
-        )
-
-    def test_sane_data(self):
-        serializer = self._cut(
-            self.flash_component, data={"settings": {"msg": "Bye"}}, partial=True
-        )
-        serializer.is_valid()
-        self.assertFalse(serializer.errors)
-
-    def test_bad_data(self):
-        serializer = self._cut(
-            self.flash_component, data={"settings": {"msg": None}}, partial=True
-        )
-        serializer.is_valid()
-        self.assertIn("settings", serializer.errors)
-
-
-class CreateMeetingComponentSerializerTests(TestCase):
-    fixtures = ["meeting_test_fixture"]
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.get(pk=1)
-        cls.print_component = cls.meeting.components.create(
-            component_name=ProposalPrint.name
-        )
-        cls.flash_component = cls.meeting.components.create(
-            component_name=FlashMessage.name, settings={"msg": "Hello"}
-        )
-
-    @property
-    def _cut(self):
-        from voteit.meeting.rest_api.serializers import CreateMeetingComponentSerializer
-
-        return CreateMeetingComponentSerializer
-
-    def test_duplicate_allowed(self):
-        serializer = self._cut(
-            data={"component_name": FlashMessage.name, "meeting": self.meeting.pk}
-        )
-        serializer.is_valid()
-        self.assertFalse(serializer.errors)
-
-    def test_duplicate_not_allowed(self):
-        serializer = self._cut(
-            data={"component_name": ProposalPrint.name, "meeting": self.meeting.pk}
-        )
-        serializer.is_valid()
-        self.assertIn("component_name", serializer.errors)

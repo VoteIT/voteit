@@ -1,7 +1,8 @@
 from pydantic import BaseModel
 
-from voteit.meeting.abcs import MeetingComponentAdapter
-from voteit.meeting.registries import meeting_components
+from voteit.components.abcs import ComponentAdapter
+from voteit.components.registries import organisation_components
+from voteit.components.registries import meeting_components
 
 
 class MessageSchema(BaseModel):
@@ -9,8 +10,9 @@ class MessageSchema(BaseModel):
     type: str = "info"
 
 
+@organisation_components
 @meeting_components
-class FlashMessage(MeetingComponentAdapter):
+class FlashMessage(ComponentAdapter):
     """
     An announcement or similar
     """

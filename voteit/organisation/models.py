@@ -27,6 +27,7 @@ from voteit.organisation.utils import get_provider_response_adapters
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from voteit.organisation.abcs import ProviderResponseAdapter
+    from voteit.components.models import OrganisationComponent
 
 _marker = object()
 
@@ -51,7 +52,6 @@ class OrganisationRoles(Roles):
     class Meta:
         verbose_name = verbose_name_plural = "Organisation roles"
         unique_together = (("user", "context"),)
-
 
 
 class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
@@ -102,6 +102,7 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     tos: models.QuerySet
     users: models.QuerySet
     meetings: models.QuerySet
+    components: models.QuerySet[OrganisationComponent]
 
 
 class OAuth2Provider(OrganisationContext):

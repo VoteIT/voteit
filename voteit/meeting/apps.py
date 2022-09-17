@@ -13,6 +13,3 @@ class MeetingConfig(AppConfig):
         from voteit.meeting import channels
         from voteit.meeting import messages
         from voteit.meeting import signals
-        from voteit.meeting.app.components import register
-
-        register()
