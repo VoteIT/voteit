@@ -14,21 +14,20 @@ from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.meeting import roles
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingComponent
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.permissions import MeetingPermissions
+from voteit.meeting.rest_api import serializers
 from voteit.meeting.rest_api.filters import UserPkFilter
 from voteit.organisation.models import Organisation
-
-from . import serializers
 
 __all__ = (
     "MeetingViewSet",
     "MeetingRolesViewSet",
     "MeetingGroupViewSet",
+    "MeetingComponentViewSet",
 )
-
-from ..models import MeetingComponent
 
 
 @router.register("meetings", basename="meeting")
