@@ -11,37 +11,99 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('organisation', '0008_alter_organisationroles_unique_together'),
-        ('meeting', '0007_alter_meetingroles_unique_together'),
+        ("organisation", "0008_alter_organisationroles_unique_together"),
+        ("meeting", "0007_alter_meetingroles_unique_together"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='OrganisationComponent',
+            name="OrganisationComponent",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('state', django_fsm.FSMField(choices=[('on', 'On'), ('off', 'Off')], default='off', editable=False, max_length=50)),
-                ('component_name', models.CharField(max_length=30)),
-                ('settings_data', models.JSONField(editable=False, encoder=django.core.serializers.json.DjangoJSONEncoder, null=True, verbose_name='JSON-serialized settings')),
-                ('organisation', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='components', to='organisation.organisation')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "state",
+                    django_fsm.FSMField(
+                        choices=[("on", "On"), ("off", "Off")],
+                        default="off",
+                        editable=False,
+                        max_length=50,
+                    ),
+                ),
+                ("component_name", models.CharField(max_length=30)),
+                (
+                    "settings_data",
+                    models.JSONField(
+                        blank=True,
+                        encoder=django.core.serializers.json.DjangoJSONEncoder,
+                        null=True,
+                        verbose_name="JSON-serialized settings",
+                    ),
+                ),
+                (
+                    "organisation",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="components",
+                        to="organisation.organisation",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Organisation component',
-                'verbose_name_plural': 'Organisation components',
+                "verbose_name": "Organisation component",
+                "verbose_name_plural": "Organisation components",
             },
         ),
         migrations.CreateModel(
-            name='MeetingComponent',
+            name="MeetingComponent",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('state', django_fsm.FSMField(choices=[('on', 'On'), ('off', 'Off')], default='off', editable=False, max_length=50)),
-                ('component_name', models.CharField(max_length=30)),
-                ('settings_data', models.JSONField(editable=False, encoder=django.core.serializers.json.DjangoJSONEncoder, null=True, verbose_name='JSON-serialized settings')),
-                ('meeting', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='components', to='meeting.meeting')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "state",
+                    django_fsm.FSMField(
+                        choices=[("on", "On"), ("off", "Off")],
+                        default="off",
+                        editable=False,
+                        max_length=50,
+                    ),
+                ),
+                ("component_name", models.CharField(max_length=30)),
+                (
+                    "settings_data",
+                    models.JSONField(
+                        blank=True,
+                        encoder=django.core.serializers.json.DjangoJSONEncoder,
+                        null=True,
+                        verbose_name="JSON-serialized settings",
+                    ),
+                ),
+                (
+                    "meeting",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="components",
+                        to="meeting.meeting",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Meeting component',
-                'verbose_name_plural': 'Meeting components',
+                "verbose_name": "Meeting component",
+                "verbose_name_plural": "Meeting components",
             },
         ),
     ]

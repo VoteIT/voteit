@@ -9,7 +9,6 @@ from voteit.components.models import MeetingComponent
 from voteit.meeting.permissions import MeetingPermissions
 
 __all__ = ("MeetingComponentViewSet",)
-# FIXME: Endpoint for organisations
 
 
 @router.register("meeting-components", basename="meeting-components")

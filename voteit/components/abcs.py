@@ -25,8 +25,8 @@ class Component(ABCModel):
     component_name: str = models.CharField(max_length=30)
     settings_data: Optional[dict] = models.JSONField(
         verbose_name="JSON-serialized settings",
-        editable=False,
         null=True,
+        blank=True,
         encoder=DjangoJSONEncoder,
     )
 
@@ -63,6 +63,8 @@ class Component(ABCModel):
             data = self.settings_data
             if data is None:
                 data = {}
+            elif not isinstance(data, dict):
+                return False
             with suppress(ValidationError):
                 schema(**data)
                 return True
@@ -100,6 +102,12 @@ class Component(ABCModel):
 
     # Type annotations - relations
     objects: models.Manager
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}: {self.component_name}>"
+
+    def __str__(self):
+        return f"Component: {self.component_name}"
 
 
 class ComponentAdapter(ABC):

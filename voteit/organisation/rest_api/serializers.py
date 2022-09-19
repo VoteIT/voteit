@@ -1,14 +1,17 @@
 from contextlib import suppress
+from typing import List
 from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from rest_framework import serializers
-from rest_framework.reverse import reverse
 from rest_framework.exceptions import ValidationError
-from typing import List
-from voteit.core.rest_api.serializers import BaseModelSerializer, UserSerializer
+from rest_framework.reverse import reverse
+
+from voteit.components.rest_api.serializers import OrganisationComponentSerializer
+from voteit.core.rest_api.serializers import BaseModelSerializer
+from voteit.core.rest_api.serializers import UserSerializer
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
@@ -21,11 +24,14 @@ class OrganisationSerializer(serializers.ModelSerializer):
     login_url = serializers.SerializerMethodField()
     id_host = serializers.SerializerMethodField()
     scope = serializers.SerializerMethodField()
+    components = OrganisationComponentSerializer(
+        read_only=True, many=True, source="enabled_components"
+    )
 
     class Meta:
         model = Organisation
         read_only_fields = ["pk", "login_url", "scope", "id_host", "title"]
-        fields = read_only_fields + ["page_title", "body"]
+        fields = read_only_fields + ["page_title", "body", "components"]
 
     def get_login_url(self, instance: Organisation) -> Optional[str]:
         with suppress(ObjectDoesNotExist):

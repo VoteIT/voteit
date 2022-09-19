@@ -29,6 +29,7 @@ class OrganisationSerializerTests(TestCase):
         self.assertIsNotNone(data.pop("id_host"))
         self.assertIsNotNone(data.pop("page_title"))
         self.assertIsNotNone(data.pop("body"))
+        self.assertIsInstance(data.pop("components"), list)
         self.assertFalse(data, "Not everything was checked")
 
     def test_get_with_provider(self):

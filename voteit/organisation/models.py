@@ -21,6 +21,7 @@ from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.utils import relaxed_clean_html
+from voteit.core.workflows import EnabledWf
 from voteit.organisation.schemas import OAuthTokenSchema
 from voteit.organisation.utils import get_provider_response_adapters
 
@@ -84,6 +85,11 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     def organisation(self) -> Optional[Organisation]:
         # For OrganisationContext
         return self
+
+    def enabled_components(self):
+        for component in self.components.filter(state=EnabledWf.ON):
+            if component.is_valid:
+                yield component
 
     def __str__(self):
         return self.title
