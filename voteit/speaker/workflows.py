@@ -24,7 +24,7 @@ class SpeakerSystemWf:
         ACTIVE: _("Active"),
         ARCHIVED: _("Archived"),
     }
-    initial = INACTIVE
+    initial = ACTIVE
 
     @classmethod
     def choices(cls):

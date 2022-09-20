@@ -13,6 +13,7 @@ from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
+from voteit.speaker.workflows import SpeakerSystemWf
 
 User = get_user_model()
 
@@ -181,7 +182,9 @@ class SpeakerListSystemViewTestCase(APITestCase):
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        cls.system = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.system = cls.meeting.speaker_systems.create(
+            method_name="simple", state=SpeakerSystemWf.INACTIVE
+        )
         cls.participant: User = User.objects.create_user("participant")
         cls.moderator: User = User.objects.create_user("moderator")
         cls.outsider: User = User.objects.create_user("outsider")
