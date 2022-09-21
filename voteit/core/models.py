@@ -16,10 +16,7 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
-from typing import Dict
-from typing import List
 from typing import Optional
-from typing import Set
 from typing import TYPE_CHECKING
 from typing import Union
 
@@ -55,21 +52,21 @@ class User(AbstractUser):
         default=UserWf.initial, choices=UserWf.choices(), editable=False
     )
     # Note that this is only null to make testing easier, it should never be null!
-    organisation: Organisation = models.ForeignKey(
+    organisation: Optional[Organisation] = models.ForeignKey(
         "organisation.Organisation",
         on_delete=models.CASCADE,
         null=True,
         related_name="users",
     )
     # Some meetings may require this to be set
-    userid: str = models.CharField(
+    userid: Optional[str] = models.CharField(
         max_length=50,
         blank=True,
         null=True,
         validators=[userid_validator],
     )
-    identity_id: str = models.CharField(max_length=80, blank=True, null=True)
-    img_url: str = models.URLField(
+    identity_id: Optional[str] = models.CharField(max_length=80, blank=True, null=True)
+    img_url: Optional[str] = models.URLField(
         "Profile image url", blank=True, null=True
     )  # FIXME Validator and scheme
 
@@ -158,21 +155,21 @@ class RoleContextMixin(OrganisationContext):
         Return the Roles class that this context uses.
         """
 
-    def add_roles(self, user: User, *roles: Role) -> Optional[Set[Role]]:
+    def add_roles(self, user: User, *roles: Role) -> Optional[set[Role]]:
         assert isinstance(user, User)
         roles_model, created = self.roles_cls.objects.get_or_create(
             user=user, context=self
         )
         return roles_model.add(*roles)
 
-    def remove_roles(self, user: User, *roles: Role) -> Optional[Set[Role]]:
+    def remove_roles(self, user: User, *roles: Role) -> Optional[set[Role]]:
         assert isinstance(user, User)
         roles_model = self.roles_cls.objects.filter(user=user, context=self).first()
         if roles_model is not None:
             return roles_model.remove(*roles)
 
     @real_user_only
-    def get_roles(self, user: User) -> Optional[Set[Role]]:
+    def get_roles(self, user: User) -> Optional[set[Role]]:
         roles_model = self.roles_cls.objects.filter(user=user, context=self).first()
         if roles_model is not None:
             # Note, may raise AssertionError if some roles are invalid
@@ -182,20 +179,20 @@ class RoleContextMixin(OrganisationContext):
         return None
 
     @real_user_only
-    def has_roles(self, user: User, *roles: Union[str, Role]) -> bool:
+    def has_roles(self, user: User, *roles: str | Role) -> bool:
         q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
             user=user, context=self, assigned__contains=q
         ).exists()
 
     @real_user_only
-    def has_any_roles(self, user: User, *roles: Union[str, Role]) -> bool:
+    def has_any_roles(self, user: User, *roles: str | Role) -> bool:
         q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
             user=user, context=self, assigned__overlap=q
         ).exists()
 
-    def get_userids_with_roles(self, *roles: Union[str, Role]):
+    def get_userids_with_roles(self, *roles: str | Role):
         q = self.roles_to_strings(*roles)
         return self.roles_cls.objects.filter(
             context=self,
@@ -219,7 +216,7 @@ class RoleContextMixin(OrganisationContext):
                 raise ValueError(f"{role} is not a str or Role object")
         return r
 
-    def filter_valid_roles(self, *roles: Union[Role, str]) -> Set[str]:
+    def filter_valid_roles(self, *roles: Role | str) -> set[str]:
         items = self.roles_to_strings(*roles)
         return set([x for x in items if x in self.roles_cls.valid_roles])
 
@@ -230,26 +227,28 @@ class RoleContextMixin(OrganisationContext):
 class Roles(ABCModel):
     """Context for role assignments"""
 
-    valid_roles: Dict = None  # Don't instantiate dict here!
+    valid_roles: dict = None  # Don't instantiate dict here!
     # It's a good idea to override the user relation to have a sane related_name
     user: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="roles_%(app_label)s_%(class)s",
     )
-    assigned: List = ArrayField(models.CharField(max_length=20), default=tuple)
+    assigned: list[str] = ArrayField(models.CharField(max_length=20), default=tuple)
 
     @property
     @abstractmethod
     def context(self) -> RoleContextMixin:
-        """Create a ForeignKey relation to the model that acts as context for this roleset. For instance Meeting"""
+        """
+        Create a ForeignKey relation to the model that acts as context for this roleset. For instance Meeting
+        """
 
     class Meta:
         abstract = True
         # Note: This isn't inherited to any other subclassing model!
         unique_together = (("user", "context"),)
 
-    def add(self, *roles: Union[Role, str]) -> Optional[Set[Role]]:
+    def add(self, *roles: Role | str) -> Optional[set[Role]]:
         checked = self.validate_roles(*roles)
         assigned = set(self.assigned)
         query_add = set([x.name for x in self.get_required_roles(*checked)])
@@ -262,7 +261,7 @@ class Roles(ABCModel):
             return role_objs
         return None
 
-    def remove(self, *roles: Union[Role, str]) -> Optional[Set[Role]]:
+    def remove(self, *roles: Role | str) -> Optional[set[Role]]:
         checked = self.validate_roles(*roles)
         assigned = set(self.assigned)
         query_remove = set([x.name for x in self.get_reverse_required_roles(*checked)])
@@ -278,7 +277,7 @@ class Roles(ABCModel):
             return role_objs
         return None
 
-    def get_required_roles(self, *roles: Role) -> Set[Role]:
+    def get_required_roles(self, *roles: Role) -> set[Role]:
         required = set()
         for x in roles:
             required.add(x)
@@ -286,7 +285,7 @@ class Roles(ABCModel):
                 required.update(self.get_required_roles(*x.requires))
         return required
 
-    def get_reverse_required_roles(self, *roles: Role) -> Set[Role]:
+    def get_reverse_required_roles(self, *roles: Role) -> set[Role]:
         """If you aim to remove for instance the role Proposer - the participant role will be removed also."""
         required = set()
         to_check = set(roles)
@@ -295,7 +294,7 @@ class Roles(ABCModel):
                 required.add(role)
         return required
 
-    def validate_roles(self, *roles: Union[Role, str]) -> Set[Role]:
+    def validate_roles(self, *roles: Role | str) -> set[Role]:
         found = set()
         for x in roles:
             if isinstance(x, str):
@@ -321,7 +320,7 @@ class Roles(ABCModel):
                 cls.valid_roles = {}
             cls.valid_roles[role.name] = role
 
-    def __contains__(self, role: Union[Role, str]):
+    def __contains__(self, role: Role | str):
         if isinstance(role, Role):
             role = role.name
         return role in self.assigned
@@ -352,7 +351,7 @@ class Roles(ABCModel):
 class BaseContent(ABCModel):
     body: str = RichTextField(blank=True, default="", html_cleaner=strict_clean_html)
     created: datetime = models.DateTimeField(editable=False, default=now)
-    author: User = models.ForeignKey(
+    author: Optional[User] = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         editable=False,
@@ -360,7 +359,7 @@ class BaseContent(ABCModel):
         related_name="author_%(app_label)s_%(class)s",
     )
     modified: datetime = models.DateTimeField(editable=False, auto_now=True)
-    last_modified_by: User = models.ForeignKey(
+    last_modified_by: Optional[User] = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         editable=False,
@@ -372,7 +371,7 @@ class BaseContent(ABCModel):
         related_name="mentions_%(app_label)s_%(class)s",
         blank=True,
     )
-    tags: List = ArrayField(
+    tags: list[str] = ArrayField(
         models.CharField(max_length=100), default=list, blank=True, editable=True
     )
 
