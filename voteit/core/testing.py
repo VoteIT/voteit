@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.db.transaction import get_connection
 
 user_tag = """
-<span class="mention" data-index="0" data-denotation-char="@" data-id="{userid}" data-value="{name}">
+<span class="mention" data-index="0" data-denotation-char="@" data-id="{user_pk}" data-value="{name}">
 <span contenteditable="false"><span class="ql-mention-denotation-char">@</span>{name}</span></span>
 """
 
@@ -15,15 +15,15 @@ user_tag = """
 def mk_usertag(value, name="Jane Doe", any=False) -> str:
     User = get_user_model()
     if isinstance(value, User):
-        return user_tag.format(userid=value.pk, name=name)
+        return user_tag.format(user_pk=value.pk, name=name)
     try:
         value = int(value)
     except ValueError:
         pass
     if isinstance(value, int):
-        return user_tag.format(userid=value, name=name)
+        return user_tag.format(user_pk=value, name=name)
     if any:
-        return user_tag.format(userid=value, name=name)
+        return user_tag.format(user_pk=value, name=name)
     raise TypeError("Must be a user or an int")
 
 
