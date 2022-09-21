@@ -85,8 +85,9 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     model = MeetingRoles
     queryset = MeetingRoles.objects.all()
     serializer_class = serializers.MeetingRolesSerializer
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = UserPkFilter
+    search_fields = ("^user__userid", "^user__first_name", "^user__last_name")
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
