@@ -63,14 +63,12 @@ def moderators_channel_subscribed(
 def meeting_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    for last_read in context.last_read_set.filter(user=user).prefetch_related(
-        "agenda_item"
-    ):
+    for last_read in context.last_read_set.filter(user=user):
         # This will cause last read to be sent for private agenda items that the user has visited,
         # but that shouldn't be a problem.
         app_state.append(
             LastReadChanged(
-                timestamp=last_read.timestamp, agenda_item=last_read.agenda_item.pk
+                timestamp=last_read.timestamp, agenda_item=last_read.agenda_item_id
             )
         )
 
