@@ -1,6 +1,8 @@
 from collections import Counter
+from random import sample, randint, seed
 
 from django.test import TestCase
+from pydantic import ValidationError
 
 from envelope.messages.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
@@ -38,9 +40,9 @@ class IRVTests(TestCase):
         self.assertEquals(vote_data.ranking, [one.pk, two.pk])
 
     def test_random_votes_result(self):
-        from random import sample, randint
         from voteit.proposal.workflows import ProposalWf
 
+        seed(1337)
         for n in range(10):
             self.poll.proposals.create()
         self.assertIsNone(self.poll.method.start_check())
@@ -133,3 +135,111 @@ class AddVoteTests(TestCase):
     def test_add_bad_vote(self):
         msg = self._mk_one(vote={"ranking": [-1, self.prop2.pk]})
         self.assertRaises(ValidationErrorMsg, msg.run_job)
+
+
+class RepeatedIRVTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.poll.models import Poll
+        from voteit.poll.models import ElectoralRegister
+
+        cls.er = er = ElectoralRegister.objects.create()
+        cls.poll = Poll.objects.create(
+            electoral_register=er,
+            method_name="repeated_irv",
+            settings={"winners": 2},
+        )
+        cls.voter = er.voters.create(username="a_voter")
+
+    @property
+    def RepeatedIRV(self):
+        from voteit.poll.app.polls.irv import RepeatedIRV
+
+        return RepeatedIRV
+
+    def test_one_winner(self):
+        from voteit.poll.models import Poll
+
+        with self.assertRaises(ValidationError):
+            Poll.objects.create(
+                electoral_register=self.er,
+                method_name="repeated_irv",
+                settings={"winners": 1},
+            )
+
+    def test_start_check(self):
+        self.assertRaises(InvalidProposalCount, self.poll.method.start_check)
+
+    def test_vote_schema(self):
+        from voteit.poll.schemas import RankingSchema
+
+        one = self.poll.proposals.create()
+        two = self.poll.proposals.create()
+        self.poll.proposals.create()
+        self.poll.upcoming()
+        self.poll.ongoing()
+        vote = self.poll.votes.create(user=self.voter, vote=f"{one.pk},{two.pk}")
+        vote_data = vote.vote
+        self.assertIsInstance(vote_data, RankingSchema)
+        self.assertEquals(vote_data.ranking, [one.pk, two.pk])
+
+    def test_random_votes_result(self):
+        from voteit.proposal.workflows import ProposalWf
+
+        seed(1337)
+        for n in range(10):
+            self.poll.proposals.create()
+        self.assertIsNone(self.poll.method.start_check())
+        proposal_pks = list(self.poll.proposals.values_list("pk", flat=True))
+        for n in range(20):
+            self.er.voters.create(username=f"voter-{n}")
+        self.poll.upcoming()
+        self.poll.ongoing()
+        for voter in self.er.voters.all():
+            self.poll.votes.create(
+                user=voter,
+                vote_data=",".join(
+                    str(pk) for pk in sample(proposal_pks, randint(3, 10))
+                ),
+            )
+        self.poll.close()
+        result = self.poll.result
+        self.assertEqual(len(result.approved), 2)
+        self.assertEqual(len(result.denied), 8)
+        for state, count in (
+            (ProposalWf.VOTING, 0),
+            (ProposalWf.APPROVED, 2),
+            (ProposalWf.DENIED, 8),
+        ):
+            self.assertEqual(self.poll.proposals.filter(state=state).count(), count)
+
+    def test_result(self):
+        one = self.poll.proposals.create()
+        two = self.poll.proposals.create()
+        three = self.poll.proposals.create()
+        counter = Counter()
+        counter[f"{one.pk},{two.pk},{three.pk}"] = 5
+        counter[f"{one.pk},{three.pk}"] = 2
+        counter[f"{three.pk},{two.pk}"] = 4
+        result = self.poll.method.calculate_result(counter)
+        self.assertEqual([one.pk, three.pk], result.approved)
+        self.assertIsInstance(result.json(), str)
+
+    def test_no_majority(self):
+        result = self.poll.method.calculate_result(
+            {str(self.poll.proposals.create().pk): 1 for _ in range(3)}
+        )
+        self.assertIs(result.complete, False)
+
+    def test_one_reaches_quota(self):
+        one = self.poll.proposals.create()
+        two = self.poll.proposals.create()
+        three = self.poll.proposals.create()
+        counter = Counter()
+        counter[str(one.pk)] = 5
+        counter[f"{one.pk},{three.pk}"] = 2
+        counter[f"{three.pk},{two.pk}"] = 2
+        result = self.poll.method.calculate_result(counter)
+        self.assertEqual([one.pk], result.approved)
+        self.assertIsInstance(result.json(), str)
+        self.assertIs(result.complete, False)
