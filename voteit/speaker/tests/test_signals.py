@@ -288,6 +288,7 @@ class SignalSystemChangesTests(TestCase):
     @patch.object(MeetingChannel, "sync_publish")
     def test_system_changes_active_list(self, mock_publish):
         from voteit.speaker.messages import SpeakerSystemChanged
+        from voteit.speaker.messages import SpeakerListChanged
 
         list_one: SpeakerList = self.system.speaker_lists.create()
         mock_publish.reset_mock()
@@ -298,6 +299,8 @@ class SignalSystemChangesTests(TestCase):
         message_names = [x.name for x in messages]
         self.assertIn(SpeakerSystemChanged.name, message_names)
         self.assertEqual(list_one.pk, messages[0].data.active_list)
+        self.assertIn(SpeakerListChanged.name, message_names)
+        self.assertEqual(list_one.pk, messages[1].data.pk)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

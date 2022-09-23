@@ -138,14 +138,19 @@ def notify_added_or_changed_speaker_system(
     Updates to speaker system, pushed to meeting channel.
     """
     if instance.meeting is not None:
+        meeting_ch = MeetingChannel.from_instance(instance.meeting)
         if created:
             msg_class = SpeakerSystemAdded
         else:
             msg_class = SpeakerSystemChanged
         data = SpeakerListSystemSerializer(instance).data
         msg = msg_class(**data)
-        meeting_ch = MeetingChannel.from_instance(instance.meeting)
         meeting_ch.sync_publish(msg)
+        # If there's an active list, push that list too
+        if instance.active_list is not None:
+            list_data = SpeakerListSerializer(instance.active_list).data
+            list_msg = SpeakerListChanged(data=list_data)
+            meeting_ch.sync_publish(list_msg)
 
 
 @receiver(pre_delete, sender=SpeakerListSystem)
@@ -265,7 +270,6 @@ def push_speaker_deleted(instance: Speaker, **kwargs):
 @disable_on_raw_save
 def push_speaker_deleted(instance: Speaker, **kwargs):
     instance.speaker_list.reorder()
-
 
 
 @receiver(post_save, sender=Speaker)
