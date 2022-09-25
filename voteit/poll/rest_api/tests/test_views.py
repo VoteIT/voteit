@@ -38,6 +38,19 @@ class PollViewSetTests(APITestCase):
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 201)
 
+    def test_create_very_long_title(self):
+        url = reverse("poll-list")
+        data = {
+            "title": "A" * 200,
+            "meeting": self.meeting.pk,
+            "method_name": "simple",
+            "agenda_item": self.ai.pk,
+            "proposals": [self.prop.pk],
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertContains(response, "title", status_code=400)
+
     def test_create_wrong_user(self):
         url = reverse("poll-list")
         data = {
