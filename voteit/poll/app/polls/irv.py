@@ -128,6 +128,13 @@ class RepeatedIRVPoll(STVPollBase):
         self.select(winner, ElectionRound.SELECTION_METHOD_DIRECT)
 
 
+@incoming
+class AddIRVVote(AddVote):
+    name = "repeated_irv_vote.add"
+    schema = AddRankedVoteSchema
+    data: AddRankedVoteSchema
+
+
 class RepeatedIRVSettings(BaseModel):
     winners: int
     allow_random: bool = True
