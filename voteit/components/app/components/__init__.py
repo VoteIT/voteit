@@ -1,3 +1,4 @@
 def register():
-    from .proposal_print import ProposalPrint
-    from .message import FlashMessage
+    from . import proposal_print
+    from . import message
+    from . import irv
