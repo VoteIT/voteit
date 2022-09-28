@@ -250,6 +250,14 @@ class LastRead(AgendaItemContext, MeetingContext):
     )
     timestamp: datetime = models.DateTimeField(auto_now_add=True, editable=False)
 
+    class Meta:
+        constraints = (
+            models.UniqueConstraint(
+                fields=["agenda_item", "meeting", "user"],
+                name="unique_last_read_combination",
+            ),
+        )
+
     def save(self, **kwargs):
         if self.pk is None:  # created
             self.meeting = self.agenda_item.meeting

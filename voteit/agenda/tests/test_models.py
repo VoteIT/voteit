@@ -2,6 +2,7 @@ from datetime import datetime
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.db import IntegrityError
 from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
@@ -89,3 +90,23 @@ class AgendaItemTests(TestCase):
         messages = set([x.args[0] for x in mock_channel.mock_calls])
         agenda_messages = [x for x in messages if x.name == "agenda_item.changed"]
         self.assertEqual(1, len(agenda_messages))
+
+
+class LastReadTests(TestCase):
+    fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+
+        cls.meeting = meeting = Meeting.objects.first()
+        cls.ai = meeting.agenda_items.first()
+        cls.user = meeting.participants.first()
+
+    def test_unique_constraint(self):
+        self.user.last_read_set.create(meeting=self.meeting, agenda_item=self.ai)
+        self.assertEqual(
+            self.user.last_read_set.count(), 1, "There should be one last read now"
+        )
+        with self.assertRaises(IntegrityError):
+            self.user.last_read_set.create(meeting=self.meeting, agenda_item=self.ai)
