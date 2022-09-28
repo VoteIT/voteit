@@ -18,7 +18,7 @@ from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.rest_api import serializers
-from voteit.meeting.rest_api.filters import UserPkFilter
+from voteit.meeting.rest_api.filters import MeetingRolesFilter
 from voteit.organisation.models import Organisation
 
 __all__ = (
@@ -86,7 +86,7 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     queryset = MeetingRoles.objects.all()
     serializer_class = serializers.MeetingRolesSerializer
     filter_backends = (DjangoFilterBackend, SearchFilter)
-    filterset_class = UserPkFilter
+    filterset_class = MeetingRolesFilter
     search_fields = ("^user__userid", "^user__first_name", "^user__last_name")
     permission_classes = (permissions.IsAuthenticated,)
 

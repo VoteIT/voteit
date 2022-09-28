@@ -336,11 +336,14 @@ class MeetingRolesViewSetTests(APITestCase):
         response = self.client.get(url, {"meeting": self.other_meeting.pk})
         self.assertEqual(403, response.status_code)
 
+    @property
+    def roles_url(self):
+        return reverse("meeting-roles-list")
+
     def test_participant_name_search(self):
         self.client.force_login(self.participant)
-        url = reverse("meeting-roles-list")
         response = self.client.get(
-            url,
+            self.roles_url,
             {
                 "meeting": self.meeting.pk,
                 "search": "Jeff",
@@ -351,7 +354,27 @@ class MeetingRolesViewSetTests(APITestCase):
 
     def test_participant_userid_search(self):
         self.client.force_login(self.participant)
-        url = reverse("meeting-roles-list")
-        response = self.client.get(url, {"meeting": self.meeting.pk, "search": "k"})
+        response = self.client.get(
+            self.roles_url, {"meeting": self.meeting.pk, "search": "k"}
+        )
         self.assertContains(response, "Jeff")
         self.assertEqual(len(response.json()), 1)
+
+    def test_participant_role_search(self):
+        for role in ("proposer", "discusser"):
+            user = self.meeting.participants.create(
+                username=role, userid=role, first_name=role.title()
+            )
+            self.meeting.add_roles(user, role)
+        self.client.force_login(self.participant)
+        response = self.client.get(
+            self.roles_url,
+            {"meeting": self.meeting.pk, "any_roles": "proposer,discusser"},
+        )
+        self.assertEqual(len(response.json()), 2, "Should match any of the roles")
+        response = self.client.get(
+            self.roles_url,
+            {"meeting": self.meeting.pk, "any_roles": "participant"},
+        )
+        self.assertContains(response, "Jeff")
+        self.assertEqual(len(response.json()), 5, "Should match all users")
