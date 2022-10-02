@@ -16,7 +16,7 @@ class VoterWeightItemInline(admin.TabularInline):
 @admin.register(ElectoralRegister)
 class ERAdmin(admin.ModelAdmin):
     list_display = "__str__", "meeting", "voters_count"
-    list_filter = ("meeting__organisation", "meeting")
+    list_filter = ("meeting__organisation",)
     autocomplete_fields = ("meeting",)
 
     def voters_count(self, er: ElectoralRegister) -> int:
@@ -30,7 +30,7 @@ class ERAdmin(admin.ModelAdmin):
 @admin.register(VoterWeight)
 class VoterWeightAdmin(admin.ModelAdmin):
     list_display = "__str__", "meeting_title", "user", "weight"
-    list_filter = ("register__meeting__organisation", "register__meeting", "user")
+    list_filter = ("register__meeting__organisation",)
     search_fields = (
         "register__meeting__title",
         "user__userid",
@@ -50,6 +50,7 @@ class PollAdmin(FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = ["state"]
     list_display = (
         "title",
+        "meeting",
         "state",
         "method_name",
         "electoral_register",
@@ -57,8 +58,8 @@ class PollAdmin(FSMTransitionMixin, admin.ModelAdmin):
     )
     list_filter = (
         "state",
-        "agenda_item",
         "method_name",
+        "meeting__organisation",
     )
     search_fields = (
         "title",

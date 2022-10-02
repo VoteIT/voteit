@@ -39,7 +39,7 @@ class OrganisationRolesAdmin(admin.ModelAdmin):
 class AccessTokenAdmin(admin.ModelAdmin):
     autocomplete_fields = ("user",)
     list_display = "user", "updated"
-    list_filter = ("user",)
+    list_filter = ("user__organisation",)
 
 
 @admin.register(TermsOfService)
