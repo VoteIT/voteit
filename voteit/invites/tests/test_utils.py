@@ -31,6 +31,7 @@ class CreateInvitesTests(TestCase):
     def test_add(self):
         result = self._fut(
             roles=["participant", "discusser"],
+            type="email",
             invite_data=self.emails,
             created_by=self.moderator,
             meeting=self.meeting.pk,
@@ -42,6 +43,7 @@ class CreateInvitesTests(TestCase):
     def test_add_modifies_already_existing_invites(self):
         invite = self.meeting.invites.create(
             invite_data="one@betahaus.net",
+            type="email",
             roles=["participant"],
             created_by=self.moderator,
         )
@@ -51,6 +53,7 @@ class CreateInvitesTests(TestCase):
         # last_modified_by = created_by,
         result = self._fut(
             roles=["participant", "discusser"],
+            type="email",
             invite_data=self.emails,
             created_by=self.moderator,
             meeting=self.meeting.pk,
@@ -71,6 +74,7 @@ class CreateInvitesTests(TestCase):
         self.assertEqual(self.participant, invite.used_by)
         result = self._fut(
             roles=["participant", "discusser"],
+            type="email",
             invite_data=self.emails,
             created_by=self.moderator,
             meeting=self.meeting.pk,

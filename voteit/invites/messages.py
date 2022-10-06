@@ -38,7 +38,7 @@ class AddInvitesSchema(BaseModel):
     model: str = Field("meeting", const=True)  # Constant
     skip_states: Set[str] = {InviteWf.REJECTED}
     invite_data: List[str]
-    type: str = "email"
+    type: str
     meeting: int
 
     # Validators
@@ -55,33 +55,33 @@ class AddInvitesSchema(BaseModel):
     @root_validator(skip_on_failure=True)
     def validate_invite_data(cls, values):
         """
-        >>> AddInvitesSchema(roles=['participant'], invite_data=['hello@betahaus.net'], meeting=1)
+        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['hello@betahaus.net'], meeting=1)
         AddInvitesSchema(roles=['participant'], model='meeting', skip_states={'rejected'}, invite_data=['hello@betahaus.net'], type='email', meeting=1)
 
-        >>> AddInvitesSchema(roles=['participant'], invite_data=['HELLO@betahaus.net'], meeting=1)
+        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['HELLO@betahaus.net'], meeting=1)
         AddInvitesSchema(roles=['participant'], model='meeting', skip_states={'rejected'}, invite_data=['hello@betahaus.net'], type='email', meeting=1)
 
         Blankspace should be skipped or trimmed
-        >>> AddInvitesSchema(roles=['participant'], invite_data=['', '    WoHo@betahaus.net', ' '], meeting=1)
+        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['', '    WoHo@betahaus.net', ' '], meeting=1)
         AddInvitesSchema(roles=['participant'], model='meeting', skip_states={'rejected'}, invite_data=['woho@betahaus.net'], type='email', meeting=1)
 
-        >>> AddInvitesSchema(roles=['participant'], invite_data=['bad_email'], meeting=1)
+        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['bad_email'], meeting=1)
         Traceback (most recent call last):
         ...
         pydantic.error_wrappers.ValidationError:
 
         No real data
-        >>> AddInvitesSchema(roles=['participant'], invite_data=['  ', ''], meeting=1)
+        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['  ', ''], meeting=1)
         Traceback (most recent call last):
         ...
         pydantic.error_wrappers.ValidationError:
 
-        >>> AddInvitesSchema(roles=['participant'], invite_data=['something'], meeting=1)
+        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['something'], meeting=1)
         Traceback (most recent call last):
         ...
         pydantic.error_wrappers.ValidationError:
 
-        >>> AddInvitesSchema(roles=['participant'], invite_data=None, meeting=1)
+        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=None, meeting=1)
         Traceback (most recent call last):
         ...
         pydantic.error_wrappers.ValidationError:

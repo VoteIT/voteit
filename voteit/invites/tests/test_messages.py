@@ -45,7 +45,7 @@ class AddInvitesTests(TestCase):
         data = []
         for name in ["one", "two", "three"]:
             data.append(f"{name}@betahaus.net")
-        msg = self._mk_one(invite_data=data, roles=["participant"])
+        msg = self._mk_one(invite_data=data, type="email", roles=["participant"])
         with FakeCommit():
             response = msg.run_job()
         self.assertEqual(3, len(response.data.added))
@@ -84,7 +84,7 @@ class AddInvitesTests(TestCase):
         for name in ["one", "two", "three"]:
             data.append(f"{name}@betahaus.net")
         msg = self._mk_one(
-            user_pk=moderator.pk, invite_data=data, roles=["participant"]
+            user_pk=moderator.pk, invite_data=data, type="email", roles=["participant"]
         )
         with FakeCommit():
             response = msg.run_job()

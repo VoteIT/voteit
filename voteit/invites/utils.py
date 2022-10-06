@@ -87,6 +87,7 @@ def create_invites(created_by: User = None, **kwargs):
         else:
             # We need to create a new invite
             invite = meeting.invites.create(
+                type=add_data.type,
                 invite_data=row,
                 created_by=created_by,
                 roles=add_data.roles,
