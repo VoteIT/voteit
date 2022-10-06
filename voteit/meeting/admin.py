@@ -95,11 +95,7 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
 class MeetingRolesAdmin(admin.ModelAdmin):
     autocomplete_fields = "user", "context"
     list_display = "user", "assigned", "context"
-    list_filter = (
-        "context",
-        "user",
-        "user__organisation",
-    )
+    list_filter = ("user__organisation",)
     search_fields = (
         "context__title",
         "user__last_name",

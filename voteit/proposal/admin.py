@@ -14,20 +14,23 @@ class ProposalAdmin(FSMTransitionMixin, admin.ModelAdmin):
         "__str__",
         "state",
         "meeting",
-        "agenda_item",
         "author",
+        "meeting_group",
     )
     list_filter = (
         "state",
-        "agenda_item",
-        "agenda_item__meeting",
-        "author",
+        "author__organisation",
     )
     search_fields = (
         "body",
         "prop_id",
         "agenda_item__title",
         "agenda_item__meeting__title",
+        "author__first_name",
+        "author__last_name",
+        "author__userid",
+        "meeting_group__groupid",
+        "meeting_group__title",
     )
     autocomplete_fields = (
         "agenda_item",

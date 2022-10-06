@@ -14,7 +14,6 @@ class ParticipantNumberAdmin(admin.ModelAdmin):
     # list_display_links = ("pns",)
     list_filter = (
         "pns",
-        "user",
         "user__organisation",
     )
     search_fields = (
@@ -28,5 +27,5 @@ class ParticipantNumberAdmin(admin.ModelAdmin):
 class PNSystemAdmin(admin.ModelAdmin):
     autocomplete_fields = ("meeting",)
     list_display = ("meeting",)
-    list_filter = ("meeting",)
+    list_filter = ("meeting__organisation",)
     search_fields = ("meeting__title",)

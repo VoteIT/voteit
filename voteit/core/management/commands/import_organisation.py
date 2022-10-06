@@ -212,7 +212,7 @@ def update_all_poll_results(importer: Importer):
             ]
             for res_round in result.rounds:
                 remap_schulze_round(importer, res_round)
-        elif method_name == "scottish_stv":
+        elif method_name in ("scottish_stv", "irv", "repeated_irv"):
             result: STVResultSchema
             for stv_round in result.rounds:
                 stv_round.selected = [
@@ -273,7 +273,7 @@ def update_all_votes(importer: Importer):
                 (importer.get_remap_obj(Proposal, pk).pk, rank)
                 for (pk, rank) in vote_data.ranking
             ]
-        elif method_name in ("irv", "scottish_stv"):
+        elif method_name in ("irv", "repeated_irv", "scottish_stv"):
             vote_data: RankingSchema | str  # Maybe an empty string
             if vote_data:
                 vote_data.ranking = [
