@@ -2,11 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Counter
-from typing import Dict
-from typing import List
 from typing import Optional
-from typing import Tuple
-from typing import Union
 
 from django.utils.translation import gettext as _
 from py3votecore.schulze_method import SchulzeMethod
@@ -27,7 +23,7 @@ __all__ = ("Schulze", "RepeatedSchulze")
 
 class SchulzeVoteSchema(BaseModel):
     # FIXME Will not serialize: https://github.com/django/channels_redis/issues/216
-    ranking: List[Tuple[int, int]]
+    ranking: list[tuple[int, int]]
 
 
 class AddVoteSchema(GenericAddVoteSchema):
@@ -49,11 +45,11 @@ class AddRepeatedSchulzeVote(AddVote):
 
 
 class SchulzePollResult(PollResult):
-    pairs: List[Tuple[Tuple[int, int], int]] = []
-    candidates: List[int]
+    pairs: list[tuple[tuple[int, int], int]] = []
+    candidates: list[int]
     winner: int
-    strong_pairs: List[Tuple[Tuple[int, int], int]] = []
-    tied_winners: Optional[List[int]]
+    strong_pairs: list[tuple[tuple[int, int], int]] = []
+    tied_winners: Optional[list[int]]
 
 
 class SchulzeSettingsSchema(BaseModel):
@@ -103,7 +99,7 @@ class Schulze(PollMethod):
             vals = json.loads(text)
         return self.vote_schema(ranking=vals)
 
-    def schulze_format(self, counter: Counter) -> List[Dict]:
+    def schulze_format(self, counter: Counter) -> list[dict]:
         """
         Internal helper to fix expected input.
         """
@@ -114,7 +110,7 @@ class Schulze(PollMethod):
             input.append({"count": count, "ballot": ranking})
         return input
 
-    def schulze_to_poll_result(self, data: Dict) -> SchulzePollResult:
+    def schulze_to_poll_result(self, data: dict) -> SchulzePollResult:
         """
         The library we use presents part of the result as dicts with tuple of pairs as key.
         This doesn't work with json, so we have to reformat a bit.
@@ -152,7 +148,7 @@ class Schulze(PollMethod):
         method = SchulzeMethod(
             input_data, ballot_notation=SchulzeMethod.BALLOT_NOTATION_RATING
         )
-        data: Dict = method.as_dict()
+        data: dict = method.as_dict()
         res = self.schulze_to_poll_result(data)
         if res.winner == 0:
             # The virtual deny proposal won, so don't make any of the proposals as winners!
@@ -197,8 +193,8 @@ class Schulze(PollMethod):
 
 
 class RepeatedSchulzeResult(PollResult):
-    rounds: List[SchulzePollResult] = []
-    candidates: List[int]
+    rounds: list[SchulzePollResult] = []
+    candidates: list[int]
 
 
 class RepeatedSchulzeSettingsSchema(SchulzeSettingsSchema):
@@ -239,7 +235,7 @@ class RepeatedSchulze(Schulze):
             method = SchulzeMethod(
                 input_data, ballot_notation=SchulzeMethod.BALLOT_NOTATION_RATING
             )
-            data: Dict = method.as_dict()
+            data: dict = method.as_dict()
             this_round = self.schulze_to_poll_result(data)
             rounds.append(this_round)
             # Eliminate elected
