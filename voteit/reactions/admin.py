@@ -12,7 +12,11 @@ class ReactionButtonAdmin(admin.ModelAdmin):
         "active",
         "pk",
     )
-    list_filter = ("active", "meeting")
+    list_filter = ("active", "meeting__organisation")
+    search_fields = (
+        "meeting__title",
+        "title",
+    )
 
 
 @admin.register(Reaction)
@@ -24,8 +28,5 @@ class ReactionAdmin(admin.ModelAdmin):
         "user",
         "agenda_item",
     )
-    list_filter = (
-        "agenda_item__meeting",
-        "content_type",
-        "button",
-    )
+    list_filter = ("user__organisation",)
+    search_fields = ("meeting__title", "title", "user__userid")

@@ -26,10 +26,8 @@ class MeetingInviteAdmin(FSMTransitionMixin, admin.ModelAdmin):
         "roles",
     )
     list_filter = (
-        "meeting",
+        "meeting__organisation",
         "state",
-        "created_by",
-        "used_by",
         "type",
     )
 
@@ -43,11 +41,7 @@ class InviteDispatchAdmin(admin.ModelAdmin):
         "subject",
         "dispatcher_name",
     )
-    list_filter = (
-        "meeting",
-        "created_by",
-        "dispatcher_name",
-    )
+    list_filter = ("meeting__organisation",)
     actions = ["send_all_invites"]
 
     @admin.action(description="Send invites")

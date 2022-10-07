@@ -51,23 +51,28 @@ class DiffProposalAdmin(FSMTransitionMixin, admin.ModelAdmin):
         "meeting",
         "agenda_item",
         "author",
+        "meeting_group",
     )
     list_filter = (
         "state",
-        "agenda_item",
-        "agenda_item__meeting",
-        "author",
+        "author__organisation",
     )
     search_fields = (
         "body",
         "prop_id",
         "agenda_item__title",
         "agenda_item__meeting__title",
+        "author__first_name",
+        "author__last_name",
+        "author__userid",
+        "meeting_group__groupid",
+        "meeting_group__title",
     )
     autocomplete_fields = (
         "agenda_item",
         "author",
         "meeting_group",
+        "mentions",
     )
     exclude = ("state",)
 
@@ -80,10 +85,7 @@ class TextDocumentAdmin(admin.ModelAdmin):
         "agenda_item",
         "base_tag",
     )
-    list_filter = (
-        "agenda_item",
-        "agenda_item__meeting",
-    )
+    list_filter = ("agenda_item__meeting__organisation",)
     search_fields = (
         "body",
         "base_tag",
