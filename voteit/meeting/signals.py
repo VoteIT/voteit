@@ -102,7 +102,6 @@ def meeting_channel_subscribed(
 
 @receiver(post_save, sender=MeetingGroup)
 @disable_on_raw_save
-@on_transaction_commit
 def meeting_group_updated(instance: MeetingGroup = None, created=None, **kw):
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
     data = MeetingGroupSerializer(instance).data
