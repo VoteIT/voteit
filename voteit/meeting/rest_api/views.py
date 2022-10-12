@@ -1,5 +1,11 @@
+import csv
+
 from django.db import transaction
+from django.db.models import Count
 from django.db.models import QuerySet
+from django.db.models import F
+from django.db.models import Q
+from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework import permissions
@@ -10,8 +16,10 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
+from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.meeting import roles
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -140,3 +148,53 @@ class MeetingGroupViewSet(DefaultModelViewSet):
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         return super().update(request, *args, **kwargs)
+
+
+@router.register("export-participants", basename="export-participants")
+class ExportParticipantsViewSet(viewsets.GenericViewSet):
+    model = Meeting
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self) -> QuerySet:
+        return Meeting.objects.for_user(self.request.user)
+
+    def list(self, request):
+        return Response()
+
+    def get_export_qs(self, meeting):
+        return meeting.roles.all().annotate(
+            first_name=F("user__first_name"),
+            last_name=F("user__first_name"),
+            email=F("user__email"),
+            userid=F("user__userid"),
+        )
+
+    @action(
+        methods=["get"],
+        detail=True,
+        serializer_class=serializers.ParticipantExportSerializer,
+    )
+    @has_perm_drf(MeetingPermissions.MODERATE)
+    def csv(self, request, *args, **kwargs):
+        meeting = self.get_object()
+        serializer = self.get_serializer(self.get_export_qs(meeting), many=True)
+        response = HttpResponse(content_type="text/csv")
+        response[
+            "Content-Disposition"
+        ] = 'attachment; filename="participants_export.csv"'
+        writer = csv.DictWriter(response, fieldnames=serializer.data[0].keys())
+        writer.writeheader()
+        for row in serializer.data:
+            writer.writerow(row)
+        return response
+
+    @action(
+        methods=["get"],
+        detail=True,
+        serializer_class=serializers.ParticipantExportSerializer,
+    )
+    @has_perm_drf(MeetingPermissions.MODERATE)
+    def json(self, request, *args, **kwargs):
+        meeting = self.get_object()
+        serializer = self.get_serializer(self.get_export_qs(meeting), many=True)
+        return Response(serializer.data)
