@@ -1,9 +1,14 @@
+from logging import getLogger
+
 from rest_framework import serializers
 from rest_framework import exceptions
 
 from voteit.invites.models import MeetingInvite
 from voteit.invites.utils import get_invite_data_registry
 from voteit.core.rest_api.serializers import BaseModelSerializer
+
+
+logger = getLogger(__name__)
 
 
 class InviteQuerySerializer(serializers.Serializer):
@@ -13,7 +18,7 @@ class InviteQuerySerializer(serializers.Serializer):
 
     def validate_scope(self, value):
         if value not in get_invite_data_registry():
-            raise exceptions.ValidationError("No such invite scope type")
+            logger.warning(f"No invite scope {value}")
         return value
 
 

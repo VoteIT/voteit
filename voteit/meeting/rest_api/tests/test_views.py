@@ -378,3 +378,58 @@ class MeetingRolesViewSetTests(APITestCase):
         )
         self.assertContains(response, "Jeff")
         self.assertEqual(len(response.json()), 5, "Should match all users")
+
+
+class ExportParticipantsViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        int_user = cls.meeting.participants.create(
+            username="hao", first_name="Özgür", last_name="好"
+        )
+
+    def test_not_allowed(self):
+        url = reverse("export-participants-json", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.participant)
+        response = self.client.get(url)
+        self.assertContains(
+            response, "permission meeting.moderate_meeting", status_code=403
+        )
+
+    def test_json(self):
+        url = reverse("export-participants-json", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        data = response.json()
+        self.assertIn(
+            {
+                "first_name": "Participant",
+                "last_name": "Participant",
+                "email": "participant@voteit.se",
+                "userid": "participant",
+                "moderator": False,
+                "potential_voter": False,
+                "discusser": False,
+                "proposer": False,
+            },
+            data,
+        )
+
+    def test_csv(self):
+        url = reverse("export-participants-csv", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual("text/csv", response.headers.get("Content-Type"))
+        rows = response.content.splitlines()
+        self.assertIn(
+            b"Moderator,Moderator,moderator@voteit.se,moderator,True,False,False,False",
+            rows,
+        )
+        self.assertIn(
+            b"\xc3\x96zg\xc3\xbcr,\xc3\x96zg\xc3\xbcr,,,False,False,False,False",
+            rows,
+        )

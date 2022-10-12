@@ -13,7 +13,6 @@ from django_fsm import FSMField
 from django_fsm import transition
 from django.utils.translation import gettext_lazy as _
 from model_utils.managers import InheritanceManager
-from typing import List
 from typing import Optional
 from typing import TYPE_CHECKING
 
@@ -251,8 +250,14 @@ class TextDocument(AgendaItemContext, MeetingContext):
     objects: models.Manager
     text_paragraphs: models.QuerySet
 
+    def __str__(self):
+        return self.title and self.title or f"TextDoc({self.pk})"
 
-def get_paragraphs(text: str) -> List[str]:
+    def __repr__(self):
+        return f"TextDocument({self.pk}) {self.title[:50]}"
+
+
+def get_paragraphs(text: str) -> list[str]:
     """
     Split text into paragraphs. Two linebreaks means new.
     """

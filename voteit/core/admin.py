@@ -7,10 +7,10 @@ from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.core.models import User
 
-
 _user_fieldsets = list(DefaultUserAdmin.fieldsets)
 _user_fieldsets[0][1]["fields"] = list(_user_fieldsets[0][1]["fields"])
 _user_fieldsets[0][1]["fields"].append("userid")
+_user_fieldsets[0][1]["fields"].append("identity_id")
 _user_fieldsets.insert(
     1,
     (
@@ -68,6 +68,46 @@ class OnlineFilter(admin.SimpleListFilter):
                 ).distinct()
 
 
+class LinkedFilter(admin.SimpleListFilter):
+    title = "ID-linked"
+
+    # Parameter for the filter that will be used in the URL query.
+    parameter_name = "linked"
+    # Constants
+    YES = "1"
+    NO = "0"
+
+    def lookups(self, request, model_admin):
+        """
+        Returns a list of tuples. The first element in each
+        tuple is the coded value for the option that will
+        appear in the URL query. The second element is the
+        human-readable name for the option that will appear
+        in the right sidebar.
+        """
+        return (
+            (self.YES, "Yes"),
+            (self.NO, "No"),
+        )
+
+    def queryset(self, request, queryset):
+        """
+        Returns the filtered queryset based on the value
+        provided in the query string and retrievable via
+        `self.value()`.
+        """
+        # decide how to filter the queryset.
+        if self.value():
+            if self.value() == self.YES:
+                return queryset.filter(
+                    identity_id__isnull=False,
+                ).distinct()
+            elif self.value() == self.NO:
+                return queryset.filter(
+                    identity_id__isnull=True,
+                ).distinct()
+
+
 @admin.register(User)
 class UserAdmin(FSMTransitionMixin, DefaultUserAdmin):
     fsm_field = ("state",)
@@ -79,6 +119,7 @@ class UserAdmin(FSMTransitionMixin, DefaultUserAdmin):
         "first_name",
         "last_name",
         "date_joined",
+        "is_linked",
     )
     search_fields = (
         "first_name",
@@ -91,7 +132,12 @@ class UserAdmin(FSMTransitionMixin, DefaultUserAdmin):
         "organisation",
         "state",
         OnlineFilter,
+        LinkedFilter,
         "is_active",
         "date_joined",
         "last_login",
     )
+
+    @admin.display(description="ID-linked", boolean=True)
+    def is_linked(self, user):
+        return user.identity_id is not None

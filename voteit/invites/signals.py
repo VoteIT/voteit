@@ -55,7 +55,6 @@ def invites_channel_subscribed(
 
 @receiver(post_save, sender=MeetingInvite)
 @disable_on_raw_save
-@on_transaction_commit
 def meeting_invite_changed(instance: MeetingInvite = None, created=None, **kw):
     ch = MeetingInvitesChannel.from_instance(instance.meeting)
     data = MeetingInviteSerializer(instance).data

@@ -13,6 +13,10 @@ from voteit.core.rest_api.serializers import UserSerializer
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
+from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.roles import ROLE_PROPOSER
 
 
 class UserRolesMixin(serializers.Serializer):
@@ -133,3 +137,30 @@ class MeetingGroupSerializer(BaseModelSerializer):
     class Meta:
         model = MeetingGroup
         exclude = ("id",)
+
+
+class ParticipantExportSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    email = serializers.CharField()
+    userid = serializers.CharField()
+    moderator = serializers.SerializerMethodField()
+    potential_voter = serializers.SerializerMethodField()
+    discusser = serializers.SerializerMethodField()
+    proposer = serializers.SerializerMethodField()
+
+    def get_moderator(self, roles: MeetingRoles) -> bool:
+        return ROLE_MODERATOR in roles.assigned
+
+    def get_potential_voter(self, roles: MeetingRoles) -> bool:
+        return ROLE_POTENTIAL_VOTER in roles.assigned
+
+    def get_discusser(self, roles: MeetingRoles) -> bool:
+        return ROLE_DISCUSSER in roles.assigned
+
+    def get_proposer(self, roles: MeetingRoles) -> bool:
+        return ROLE_PROPOSER in roles.assigned
+
+    class Meta:
+        model = MeetingRoles
+        exclude = ("id", "assigned", "context", "user")

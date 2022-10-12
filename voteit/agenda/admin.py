@@ -9,12 +9,13 @@ class AgendaAdmin(FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = ["state"]
     list_display = (
         "title",
+        "meeting",
         "proposal_count",
         "state",
     )
     list_filter = (
         "state",
-        "meeting",
+        "meeting__organisation",
     )
     autocomplete_fields = (
         "meeting",
@@ -23,6 +24,7 @@ class AgendaAdmin(FSMTransitionMixin, admin.ModelAdmin):
     search_fields = (
         "title",
         "body",
+        "meeting__title",
     )
     exclude = ("order",)
 

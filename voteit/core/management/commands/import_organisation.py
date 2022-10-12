@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import traceback
+from logging import getLogger
 
 from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand
@@ -29,6 +30,8 @@ from voteit.proposal.models import Proposal
 from voteit.reactions.models import Reaction
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
+
+logger = getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -230,9 +233,28 @@ def update_all_poll_results(importer: Importer):
             result.winners = [
                 importer.get_remap_obj(Proposal, x).pk for x in result.winners
             ]
-            raise ValueError(
-                f"Need to handle remapping of results for method {method_name}"
-            )
+            logger.warning("Schulze STV historic data: %s", result)
+            # raise ValueError(
+            #     f"Need to handle remapping of results for method {method_name}"
+            # )
+        elif method_name == "schulze_pr":
+            # Probably not supported!
+            result.candidates = [
+                importer.get_remap_obj(Proposal, x).pk for x in result.candidates
+            ]
+            result.order = [
+                importer.get_remap_obj(Proposal, x).pk for x in result.order
+            ]
+            rounds = []
+            for round in result.rounds:
+                rounds.append(
+                    {"winner": importer.get_remap_obj(Proposal, round["winner"]).pk}
+                )
+            result.rounds = rounds
+            logger.warning("Schulze PR historic data: %s", result)
+            # raise ValueError(
+            #     f"Need to handle remapping of results for method {method_name}"
+            # )
         else:
             raise ValueError(
                 f"Need to handle remapping of results for method {method_name}"
@@ -267,7 +289,12 @@ def update_all_votes(importer: Importer):
             vote_data.choices = [
                 importer.get_remap_obj(Proposal, pk).pk for pk in vote_data.choices
             ]
-        elif method_name in ("schulze", "repeated_schulze"):
+        elif method_name in (
+            "schulze",
+            "repeated_schulze",
+            "schulze_pr",
+            "schulze_stv",
+        ):
             vote_data: SchulzeVoteSchema
             vote_data.ranking = [
                 (importer.get_remap_obj(Proposal, pk).pk, rank)
