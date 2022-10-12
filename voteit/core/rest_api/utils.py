@@ -43,7 +43,8 @@ def get_identity_data(user: User) -> Dict:
     response = oauth_session.get(provider.identity_url)
     # Not the correct serializer exception, but this is kind of the crash and burn...
     # FIXME: Cases to handle: Token expired, user not found etc
-    response.raise_for_status()
+    if not response.ok:
+        raise ValidationError(response.json())
     return response.json()
 
 
