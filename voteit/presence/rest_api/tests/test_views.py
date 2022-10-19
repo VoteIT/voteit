@@ -36,6 +36,7 @@ class PresenceSystemTests(APITestCase):
             response.status_code,
             201,
         )
+        self.meeting.refresh_from_db()
         self.assertIsNotNone(self.meeting.presence_system)
 
     def test_create_bad_users(self):

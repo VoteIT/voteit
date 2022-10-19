@@ -80,10 +80,9 @@ class User(AbstractUser):
         ]
 
     def __str__(self):
-        org_part = self.organisation and f"O:{self.organisation.pk}" or ""
         if self.userid:
-            return f"{self.get_full_name()} ({self.userid}) {org_part}"
-        return f"[{self.username}] {org_part}"
+            return f"{self.get_full_name()} ({self.userid}) {self.organisation_id}"
+        return f"[{self.username}] {self.organisation_id}"
 
     def valid_userid_guard(self) -> bool:
         """
@@ -131,6 +130,7 @@ class User(AbstractUser):
     # Annotations
     last_read_set: models.QuerySet
     access_tokens: models.QuerySet
+    organisation_id: Optional[int]
 
 
 def real_user_only(method):
