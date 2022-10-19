@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from typing import Tuple
 from typing import Type
 
+from auditlog.context import set_actor
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.functional import cached_property
@@ -102,15 +103,16 @@ class AddRoles(BaseRoles):
 
     def run_job(self) -> Status:
         users_qs = self.validate_and_fetch()
-        for user in users_qs:
-            if roles_objs := self.context.add_roles(user, *self.data.roles):
-                log_roles_change(
-                    "Added",
-                    actor=self.user,
-                    for_user=user,
-                    context=self.context,
-                    roles=roles_objs,
-                )
+        with set_actor(self.user):
+            for user in users_qs:
+                if roles_objs := self.context.add_roles(user, *self.data.roles):
+                    log_roles_change(
+                        "Added",
+                        actor=self.user,
+                        for_user=user,
+                        context=self.context,
+                        roles=roles_objs,
+                    )
         if self.mm.consumer_name:  # If this is a script, consumer_name will be None
             response = Status.from_message(self)
             websocket_send(response, state=response.SUCCESS)
@@ -129,16 +131,17 @@ class RemoveRoles(BaseRoles):
 
         users_qs = self.validate_and_fetch()
         notify_users = set()
-        for user in users_qs:
-            if roles_objs := self.context.remove_roles(user, *self.data.roles):
-                log_roles_change(
-                    "Removed",
-                    actor=self.user,
-                    for_user=user,
-                    context=self.context,
-                    roles=roles_objs,
-                )
-                notify_users.add(user)
+        with set_actor(self.user):
+            for user in users_qs:
+                if roles_objs := self.context.remove_roles(user, *self.data.roles):
+                    log_roles_change(
+                        "Removed",
+                        actor=self.user,
+                        for_user=user,
+                        context=self.context,
+                        roles=roles_objs,
+                    )
+                    notify_users.add(user)
         response = None
         if self.mm.consumer_name:  # If this is a script, consumer_name will be None
             response = Status.from_message(self)

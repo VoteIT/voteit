@@ -1,3 +1,4 @@
+from auditlog.context import set_actor
 from pydantic import BaseModel
 from envelope.core.message import ContextAction
 from envelope.messages.common import Status
@@ -65,5 +66,6 @@ class CopyMeeting(ContextAction):
         meeting: Meeting = self.context
         update = Status.from_message(self)
         websocket_send(update, state=update.RUNNING, on_commit=False)
-        clone_meeting(meeting, user=self.user)
+        with set_actor(self.user):
+            clone_meeting(meeting, user=self.user)
         websocket_send(update, state=update.SUCCESS)

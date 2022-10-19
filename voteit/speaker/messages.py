@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import List
 from typing import Optional
 
+from auditlog.context import set_actor
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext as _
@@ -117,8 +118,9 @@ class SetActiveList(ListMessage):
                         }
                     ],
                 )
-            system.active_list = self.context
-            system.save()
+            with set_actor(self.user):
+                system.active_list = self.context
+                system.save()
             msg = Status.from_message(self)
             websocket_send(msg, state=msg.SUCCESS)
             return msg

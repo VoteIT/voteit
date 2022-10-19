@@ -3,6 +3,8 @@ from __future__ import annotations
 from logging import getLogger
 from typing import List
 from typing import Optional
+
+from auditlog.context import set_actor
 from pydantic import Field
 from pydantic import root_validator
 from pydantic import validator
@@ -131,10 +133,12 @@ class AddInvites(ContextAction):
 
         """
         self.assert_perm()
+
         try:
-            added, changed, skipped_count = create_invites(
-                created_by=self.user, **self.data.dict()
-            )
+            with set_actor(self.user):
+                added, changed, skipped_count = create_invites(
+                    created_by=self.user, **self.data.dict()
+                )
         except InviteError as exc:
             raise BadRequestError.from_message(
                 self,

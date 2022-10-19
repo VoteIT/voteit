@@ -1,5 +1,6 @@
 from typing import Optional
 
+from auditlog.context import set_actor
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext as _
@@ -87,12 +88,13 @@ class ChangePresence(BaseObjectAction):
                     ],
                 )
         # Modifications will be pushed to presence check channel + to specific user. See signals
-        if self.data.present:
-            self.context.presences.get_or_create(user=user_to_modify)
-        else:
-            presence = self.context.presences.filter(user=user_to_modify).first()
-            if presence is not None:
-                presence.delete()
+        with set_actor(self.user):
+            if self.data.present:
+                self.context.presences.get_or_create(user=user_to_modify)
+            else:
+                presence = self.context.presences.filter(user=user_to_modify).first()
+                if presence is not None:
+                    presence.delete()
         if self.mm.consumer_name is not None:
             response = Status.from_message(self)
             websocket_send(response, state=response.SUCCESS)
