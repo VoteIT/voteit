@@ -332,7 +332,8 @@ class Roles(ABCModel):
 
     def save(self, **kwargs):
         if self.user.organisation is None:
-            logger.warning(f"User {self.user} has no organisation")
+            # Just skip this
+            ...
         elif self.context.organisation is None:
             logger.warning(
                 f"Context {self.context} has no organisation, assigning user roles blindly"
