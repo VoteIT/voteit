@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from logging import getLogger
-from typing import List
 from typing import Optional
 
 from auditlog.context import set_actor
@@ -9,37 +8,35 @@ from pydantic import Field
 from pydantic import root_validator
 from pydantic import validator
 from pydantic.main import BaseModel
-from typing import Set
-
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
+from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
+
+from voteit.core.validators import root_validate_roles_and_model
+from voteit.core.workflows import SendWf
 from voteit.invites.exceptions import InviteError
 from voteit.invites.permissions import MeetingInvitePermissions
+from voteit.invites.utils import create_dispatch_and_schedule_invites
 from voteit.invites.utils import create_invites
 from voteit.invites.utils import get_dispatchers_registry
 from voteit.invites.utils import get_invite_data_registry
-from voteit.invites.utils import create_dispatch_and_schedule_invites
 from voteit.invites.workflows import InviteWf
-from voteit.core.validators import root_validate_roles_and_model
-from voteit.core.workflows import SendWf
 from voteit.meeting.models import Meeting
-from voteit.messaging.decorators import incoming
-from voteit.messaging.decorators import outgoing
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
-
-from envelope.messages.errors import BadRequestError
+from voteit.messaging.decorators import incoming
+from voteit.messaging.decorators import outgoing
 
 logger = getLogger(__name__)
 
 
 class AddInvitesSchema(BaseModel):
-    roles: List[str]
+    roles: list[str]
     model: str = Field("meeting", const=True)  # Constant
-    skip_states: Set[str] = {InviteWf.REJECTED}
-    invite_data: List[str]
+    skip_states: set[str] = {InviteWf.REJECTED}
+    invite_data: list[str]
     type: str
     meeting: int
 
@@ -155,8 +152,8 @@ class AddInvites(ContextAction):
 
 
 class InvitesAddedSchema(BaseModel):
-    added: List[int]
-    changed: List[int]
+    added: list[int]
+    changed: list[int]
     skipped_count: int = 0
 
 
@@ -174,12 +171,12 @@ class SendInvitesSchema(BaseModel):
     meeting: int
     subject: Optional[str]  # FIXME - None means default from send dispatcher
     body: str  # FIXME
-    states: List[str] = [SendWf.FAILED, SendWf.SENT, SendWf.CREATED]
+    states: list[str] = [SendWf.FAILED, SendWf.SENT, SendWf.CREATED]
     dispatcher_name: str = "send_email"
     resend_minimum: int = 24  # Don't resend before this
 
     @validator("states")
-    def validate_states(cls, v: List[str]):
+    def validate_states(cls, v: list[str]):
         """
         >>> SendInvitesSchema.validate_states(['hello'])
         Traceback (most recent call last):

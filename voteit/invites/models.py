@@ -3,9 +3,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from datetime import datetime
 from logging import getLogger
-from typing import List
 from typing import Optional
-from typing import Set
 from typing import TYPE_CHECKING
 
 from django.conf import settings
@@ -44,7 +42,7 @@ class MeetingInviteManager(models.Manager):
         return get_invite_data_registry()
 
     @cached_property
-    def invite_reg_keys(self) -> Set:
+    def invite_reg_keys(self) -> set[str]:
         return set(self.invite_data_registry.keys())
 
     def check_query_keys(self, keys):
@@ -54,7 +52,9 @@ class MeetingInviteManager(models.Manager):
                 "Invite search with indexes that doesn't exist: %s", no_such_data
             )
 
-    def find_open_invites(self, organisation=None, /, **kw) -> models.QuerySet:
+    def find_open_invites(
+        self, organisation=None, /, **kw
+    ) -> models.QuerySet[MeetingInvite]:
         qs = self.find_invites(**kw).filter(state=InviteWf.OPEN)
         if organisation is None:
             return qs
@@ -119,7 +119,7 @@ class MeetingInvite(MeetingContext):
         related_name="invites",
     )
     # FIXME: Validate roles - ValueError
-    roles: List = ArrayField(models.CharField(max_length=20), default=tuple)
+    roles: list[str] = ArrayField(models.CharField(max_length=20), default=tuple)
     type: str = models.CharField(
         verbose_name="Type of invite", default="email", max_length=20
     )

@@ -1,9 +1,7 @@
 from logging import getLogger
-from typing import Dict
 from typing import TYPE_CHECKING
 
 from django.db import transaction
-from django.http import HttpResponseForbidden
 from django.utils.functional import cached_property
 from rest_framework import mixins
 from rest_framework import viewsets
@@ -79,7 +77,7 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
         return Response(serializer.data)
 
     @cached_property
-    def search_data(self) -> Dict:
+    def search_data(self) -> dict:
         many = isinstance(self.request.data, list)
         serializer = serializers.InviteQuerySerializer(
             data=self.request.data, many=many
@@ -135,7 +133,7 @@ class HandleMatchedInvitesViewSet(
     permission_classes = [IsAuthenticated]
 
     @cached_property
-    def identity_data(self) -> Dict:
+    def identity_data(self) -> dict:
         return get_identity_data(self.request.user)
 
     def get_queryset(self):
