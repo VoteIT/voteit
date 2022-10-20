@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
+from rest_framework.exceptions import APIException
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
+from requests.exceptions import ConnectionError as RConnectionError
 
 from voteit.core.permissions import NOT_ALLOWED
 
@@ -40,7 +42,16 @@ def get_identity_data(user: User) -> Dict:
             "The organisation you belong to has no login provider, so login will never work"
         )
     oauth_session = user.oauth_session()
-    response = oauth_session.get(provider.identity_url)
+    try:
+        response = oauth_session.get(provider.identity_url)
+    except RConnectionError:
+        # Proper exception later?
+        exc = APIException(
+            detail="Identity service not available - can't login",
+            code="service_unavailable",
+        )
+        exc.status_code = 503
+        raise exc
     # Not the correct serializer exception, but this is kind of the crash and burn...
     # FIXME: Cases to handle: Token expired, user not found etc
     if not response.ok:
