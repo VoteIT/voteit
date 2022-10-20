@@ -83,3 +83,29 @@ class CreateInvitesTests(TestCase):
         self.assertEqual(
             {"participant", "discusser"}, self.meeting.get_roles(self.participant)
         )
+
+    def test_add_modifies_expired_or_revoked_invites(self):
+        invite_exp = self.meeting.invites.create(
+            invite_data="one@betahaus.net",
+            roles=["participant"],
+            created_by=self.moderator,
+            state=InviteWf.EXPIRED,
+        )
+        invite_rev = self.meeting.invites.create(
+            invite_data="two@betahaus.net",
+            roles=["participant"],
+            created_by=self.moderator,
+            state=InviteWf.REVOKED,
+        )
+        result = self._fut(
+            roles=["participant", "discusser"],
+            type="email",
+            invite_data=self.emails,
+            created_by=self.moderator,
+            meeting=self.meeting.pk,
+        )
+        self.assertEqual((1, 2, 0), (len(result[0]), len(result[1]), result[2]))
+        invite_exp.refresh_from_db()
+        invite_rev.refresh_from_db()
+        self.assertEqual(InviteWf.OPEN, invite_exp.state)
+        self.assertEqual(InviteWf.OPEN, invite_rev.state)

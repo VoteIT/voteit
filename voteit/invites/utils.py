@@ -12,6 +12,7 @@ from django.utils.translation import gettext as _
 
 from voteit.invites.exceptions import InviteError
 from voteit.core.workflows import SendWf
+from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
@@ -72,10 +73,12 @@ def create_invites(created_by: User = None, **kwargs):
             invite.invite_data = row
             invite.roles = add_data.roles
             invite.last_modified_by = created_by
+            user: Optional[User] = invite.used_by
+            if not user and invite.state not in {InviteWf.ACCEPTED, InviteWf.OPEN}:
+                invite.state = InviteWf.OPEN
             invite.save()
             changed.append(invite.pk)
             #  Set permissions according to the new state
-            user: Optional[User] = invite.used_by
             if user:
                 # Adjust existing roles
                 requested_roles = set(invite.roles)
