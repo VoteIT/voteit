@@ -20,7 +20,8 @@ class _AbstractModelMeta(ABCMeta, type(models.Model)):
 
 
 class ABCModel(models.Model, metaclass=_AbstractModelMeta):
-    """Abstract classes based on ABCMeta don't work in django -
+    """
+    Abstract classes based on ABCMeta don't work in django -
     this is a workaround to make them behave correctly.
     Remove this as soon as it's fixed in django.
 
@@ -34,7 +35,6 @@ class ABCModel(models.Model, metaclass=_AbstractModelMeta):
 
         Any model that has None here will get it's name from __name__.lower()
         You can set this instead by doing name = "somename"
-
     """
 
     name = None
@@ -43,39 +43,62 @@ class ABCModel(models.Model, metaclass=_AbstractModelMeta):
         abstract = True
 
 
-class AgendaItemContext(ABCModel):
-    """ Subclassed by things that have a relation to an agenda item. Even the agenda item itself."""
+class AuditLogMixin:
+    agenda_item: Optional[AgendaItem]
+    meeting: Optional[Meeting]
+
+    def get_additional_data(self):
+        if getattr(self, "agenda_item", None) and self.agenda_item.pk:
+            return {"ai": self.agenda_item.pk, "m": self.agenda_item.meeting_id}
+        elif getattr(self, "meeting_id", None):
+            return {"m": self.meeting_id}
+        elif getattr(self, "meeting", None) and self.meeting.pk:
+            return {"m": self.meeting.pk}
+
+
+class AgendaItemContext(AuditLogMixin, ABCModel):
+    """
+    Subclassed by things that have a relation to an agenda item. Even the agenda item itself.
+    """
 
     @property
     @abstractmethod
     def agenda_item(self) -> Optional[AgendaItem]:
-        """ Return the AgendaItem object. Probably a foreign key relation."""
-        pass
+        """
+        Return the AgendaItem object. Probably a foreign key relation.
+        """
 
     class Meta:
         abstract = True
 
 
-class MeetingContext(ABCModel):
-    """ This class may be within the scope of a meeting."""
+class MeetingContext(AuditLogMixin, ABCModel):
+    """
+    This class may be within the scope of a meeting.
+    """
 
     @property
     @abstractmethod
     def meeting(self) -> Optional[Meeting]:
-        """ Return the meeting object. It could be a ForeignKey relation or something that gets the meeting"""
-        pass
+        """
+        Return the meeting object. It could be a ForeignKey relation or something that gets the meeting
+        """
 
     class Meta:
         abstract = True
 
 
 class OrganisationContext(ABCModel):
-    """ This class may be within the scope of an organisation."""
+    """
+    This class may be within the scope of an organisation.
+    """
 
     @property
     @abstractmethod
     def organisation(self) -> Optional[Organisation]:
-        """ Return the organisation object. It could be a ForeignKey relation or a property"""
+        """
+        Return the organisation object. It could be a ForeignKey relation or a property
+        """
 
     class Meta:
         abstract = True

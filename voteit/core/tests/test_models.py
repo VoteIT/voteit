@@ -2,7 +2,11 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.dispatch import receiver
 from django.test import TestCase
+
+from auditlog.models import LogEntry
 from voteit.core.testing import mk_usertag, mk_hashtag
+from voteit.meeting.models import Meeting
+from voteit.proposal.models import Proposal
 
 
 class UserTests(TestCase):
@@ -188,3 +192,24 @@ class BaseContentTests(TestCase):
         self.meeting.body = "<javascript>is annoying"
         self.meeting.save()
         self.assertEqual("&lt;javascript&gt;is annoying", self.meeting.body)
+
+
+class AuditLogTests(TestCase):
+    def test_get_additional_data(self):
+        meeting = Meeting.objects.create()
+        m_logs_qs = LogEntry.objects.get_for_object(meeting)
+        self.assertEqual(1, m_logs_qs.count())
+        first = m_logs_qs.first()
+        self.assertEqual({"m": meeting.pk}, first.additional_data)
+        ai = meeting.agenda_items.create()
+        ai_logs_qs = LogEntry.objects.get_for_object(ai)
+        self.assertEqual(1, ai_logs_qs.count())
+        first = ai_logs_qs.first()
+        self.assertEqual({"m": meeting.pk, "ai": ai.pk}, first.additional_data)
+        prop = ai.proposals.create(
+            body="Important stuff",
+        )
+        p_logs_qs = LogEntry.objects.get_for_object(prop)
+        self.assertEqual(1, p_logs_qs.count())
+        first = p_logs_qs.first()
+        self.assertEqual({"m": meeting.pk, "ai": ai.pk}, first.additional_data)
