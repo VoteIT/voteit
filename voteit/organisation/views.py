@@ -4,6 +4,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+from auditlog.context import set_actor
 from django.conf import settings
 from django.contrib.auth import login
 from django.core.handlers.wsgi import WSGIRequest
@@ -19,7 +20,6 @@ from requests_oauthlib import OAuth2Session
 
 from voteit.core.loggers import log_auth
 from voteit.organisation.models import AccessToken
-
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.schemas import OAuthStateSchema
@@ -152,8 +152,9 @@ def finish_auth(request: WSGIRequest):
                     for_user=user,
                     request=request,
                 )
-                user.identity_id = adapted.identity_id
-                user.save()
+                with set_actor(user):
+                    user.identity_id = adapted.identity_id
+                    user.save()
             # Including any newly inherited
             users_qs = adapted.get_users(provider.organisation)
             if users_qs.count():
@@ -163,8 +164,9 @@ def finish_auth(request: WSGIRequest):
                 user = adapted.register(organisation=provider.organisation)
                 logger.debug("Creating new user: %s", user.pk)
             # Let the adapter handle conditions for update
-            adapted.update(user)
-            AccessToken.objects.from_response(token_response, user, provider)
+            with set_actor(user):
+                adapted.update(user)
+                AccessToken.objects.from_response(token_response, user, provider)
             request.session.pop("oauth_state", None)
             request.session.save()
     except DatabaseError:
@@ -180,7 +182,8 @@ def finish_auth(request: WSGIRequest):
         return HttpResponse(f"Login failed, retry: {next_url}")
     else:
         # Any session login kind with http only cookie would do
-        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        with set_actor(user):
+            login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         log_auth(
             "Finish auth: Logged in", context=provider, actor=user, request=request
         )
