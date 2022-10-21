@@ -192,7 +192,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     def valid_er_policy_guard(self) -> bool:
         return self.er_policy_name in get_electoral_policy_registry()
 
-    valid_er_policy_guard.title = "Must have valid ER policy name"
+    valid_er_policy_guard.title = _("Must have valid electoral register policy name")
 
     @transition(
         field=state,

@@ -140,14 +140,14 @@ def drf_do_transition(
         )
     for condition in transition.conditions:
         if not condition(instance):
-            raise ValidationError(
-                detail={
-                    "transition": [
-                        _("Guard %(guard)s blocks transition %(name)s")
-                        % {"name": transition_name, "guard": condition.__name__}
-                    ]
+            if hasattr(condition, "title"):
+                msg = condition.title
+            else:
+                msg = _("Guard %(guard)s blocks transition %(name)s") % {
+                    "name": transition_name,
+                    "guard": condition.__name__,
                 }
-            )
+            raise ValidationError(detail={"transition": [msg]})
     if not transition.has_perm(instance, user):
         raise PermissionDenied(perm_denied_msg(transition.permission, instance))
     getattr(instance, transition_name)()

@@ -1,6 +1,9 @@
 from django.test import TestCase
+from rest_framework.exceptions import ValidationError
 
+from voteit.core.rest_api.utils import drf_do_transition
 from voteit.core.rest_api.utils import get_valid_transitions
+from voteit.core.rest_api.utils import get_valid_transitions_dict
 
 
 class UtilsTests(TestCase):
@@ -31,4 +34,19 @@ class UtilsTests(TestCase):
                 "upcoming",
             ],
             [x.name for x in get_valid_transitions(self.meeting)],
+        )
+
+    def test_drf_do_transition(self):
+        user = self.meeting.participants.create()
+        valid_transitions = get_valid_transitions_dict(self.meeting)
+        self.meeting.er_policy_name = "jeff"
+        with self.assertRaises(ValidationError) as cm:
+            drf_do_transition(
+                instance=self.meeting,
+                valid_transitions=dict(valid_transitions),
+                transition_name="ongoing",
+                user=user,
+            )
+        self.assertIn(
+            "Must have valid electoral register policy name", str(cm.exception)
         )

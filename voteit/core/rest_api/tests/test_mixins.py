@@ -57,7 +57,7 @@ class TransitionsMixinTests(APITestCase):
                     "conditions": [
                         {
                             "allowed": True,
-                            "title": "Must have valid ER policy name",
+                            "title": "Must have valid electoral register policy name",
                             "name": "valid_er_policy_guard",
                         }
                     ],
