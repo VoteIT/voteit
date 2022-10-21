@@ -8,6 +8,7 @@ from django.db import models
 from django.utils.timezone import now
 from typing import Optional
 
+from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
 
 
@@ -60,7 +61,7 @@ class ParticipantNumber(models.Model):
         super().save(**kwargs)
 
 
-class PNSystem(models.Model):
+class PNSystem(MeetingContext):
     """
     The Participant number system has a 1-1 relation to a meeting.
 

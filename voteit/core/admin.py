@@ -2,10 +2,16 @@ from datetime import timedelta
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin
+from django.urls import NoReverseMatch
+from django.urls import reverse
+from django.utils.html import format_html
 from django.utils.timezone import now
 from fsm_admin.mixins import FSMTransitionMixin
 
+from auditlog.admin import LogEntryAdmin
+from auditlog.models import LogEntry
 from voteit.core.models import User
+from voteit.meeting.models import Meeting
 
 _user_fieldsets = list(DefaultUserAdmin.fieldsets)
 _user_fieldsets[0][1]["fields"] = list(_user_fieldsets[0][1]["fields"])
@@ -141,3 +147,28 @@ class UserAdmin(FSMTransitionMixin, DefaultUserAdmin):
     @admin.display(description="ID-linked", boolean=True)
     def is_linked(self, user):
         return user.identity_id is not None
+
+
+# Replace existing
+admin.site.unregister(LogEntry)
+
+
+@admin.register(LogEntry)
+class VoteITLogEntryAdmin(LogEntryAdmin):
+    list_display = LogEntryAdmin.list_display + ["meeting"]
+    list_filter = ["actor__organisation"] + LogEntryAdmin.list_filter
+
+    @admin.display(description="Meeting")
+    def meeting(self, obj: LogEntry):
+        if meeting_pk := obj.additional_data and obj.additional_data.get("m", None):
+            try:
+                meeting = Meeting.objects.get(pk=meeting_pk)
+            except Meeting.DoesNotExist as exc:
+                return f"Deleted: {meeting_pk}"
+            viewname = "admin:meeting_meeting_change"
+            try:
+                link = reverse(viewname, args=[meeting.pk])
+            except NoReverseMatch:
+                return "%s" % meeting
+            return format_html('<a href="{}">{}</a>', link, meeting)
+        return "-"

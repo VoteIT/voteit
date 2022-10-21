@@ -3,10 +3,10 @@ from django.db import IntegrityError
 from django.dispatch import receiver
 from django.test import TestCase
 
+from auditlog.context import set_actor
 from auditlog.models import LogEntry
-from voteit.core.testing import mk_usertag, mk_hashtag
+from voteit.core.testing import mk_hashtag
 from voteit.meeting.models import Meeting
-from voteit.proposal.models import Proposal
 
 
 class UserTests(TestCase):
@@ -195,6 +195,13 @@ class BaseContentTests(TestCase):
 
 
 class AuditLogTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        User = get_user_model()
+        cls.moderator = User.objects.get(username="moderator")
+
     def test_get_additional_data(self):
         meeting = Meeting.objects.create()
         m_logs_qs = LogEntry.objects.get_for_object(meeting)

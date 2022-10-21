@@ -77,6 +77,12 @@ class MeetingRoles(Roles, MeetingContext):
         verbose_name = verbose_name_plural = "Meeting roles"
         unique_together = (("user", "context"),)
 
+    def get_additional_data(self):
+        """
+        Extra annotations for auditlog
+        """
+        return {"m": self.context.pk, "o": self.context.organisation_id}
+
     exporters = {"meeting": {"meeting_kw": "context"}}
     importers = {
         "meeting": {"remap_relations": {"meeting": "context"}},

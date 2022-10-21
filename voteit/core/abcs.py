@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
     from voteit.agenda.models import AgendaItem
     from voteit.organisation.models import Organisation
+    from voteit.core.models import User
 
 __all__ = ("ABCModel", "AgendaItemContext", "MeetingContext", "OrganisationContext")
 
@@ -48,12 +49,22 @@ class AuditLogMixin:
     meeting: Optional[Meeting]
 
     def get_additional_data(self):
+        """
+        Annotate logentry with some extra data. Avoid expensive lookups here,
+        we can always add annotations to the log afterwards.
+        """
+        data = {}
+        if hasattr(self, "organisation_id") and self.organisation_id:
+            data["o"] = self.organisation_id
         if getattr(self, "agenda_item", None) and self.agenda_item.pk:
-            return {"ai": self.agenda_item.pk, "m": self.agenda_item.meeting_id}
+            data.update({"ai": self.agenda_item.pk, "m": self.agenda_item.meeting_id})
         elif getattr(self, "meeting_id", None):
-            return {"m": self.meeting_id}
+            data["m"] = self.meeting_id
         elif getattr(self, "meeting", None) and self.meeting.pk:
-            return {"m": self.meeting.pk}
+            data["m"] = self.meeting.pk
+            if self.meeting.organisation_id:
+                data["o"] = self.meeting.organisation_id
+        return data
 
 
 class AgendaItemContext(AuditLogMixin, ABCModel):
@@ -88,7 +99,7 @@ class MeetingContext(AuditLogMixin, ABCModel):
         abstract = True
 
 
-class OrganisationContext(ABCModel):
+class OrganisationContext(AuditLogMixin, ABCModel):
     """
     This class may be within the scope of an organisation.
     """

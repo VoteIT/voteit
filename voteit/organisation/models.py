@@ -15,6 +15,7 @@ from django.utils.timezone import now
 from pytz import utc
 from requests_oauthlib import OAuth2Session
 
+from voteit.core.abcs import AuditLogMixin
 from voteit.core.abcs import OrganisationContext
 from voteit.core.fields import RichTextField
 from voteit.core.models import BaseContent
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
 _marker = object()
 
 
-class OrganisationRoles(Roles):
+class OrganisationRoles(OrganisationContext, Roles):
     """
     Contains assigned meeting roles for a specific meeting and user
     """
@@ -53,6 +54,16 @@ class OrganisationRoles(Roles):
     class Meta:
         verbose_name = verbose_name_plural = "Organisation roles"
         unique_together = (("user", "context"),)
+
+    @property
+    def organisation(self) -> Optional[Organisation]:
+        return self.context
+
+    def get_additional_data(self):
+        """
+        For auditlog
+        """
+        return {"o": self.context_id}
 
 
 class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
