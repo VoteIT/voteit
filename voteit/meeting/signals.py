@@ -102,14 +102,19 @@ def meeting_channel_subscribed(
 
 @receiver(post_save, sender=MeetingGroup)
 @disable_on_raw_save
+@on_transaction_commit
 def meeting_group_updated(instance: MeetingGroup = None, created=None, **kw):
+    """
+    Important! The serializer includes M2M-relations so the on_transaction_commit decorator must be here since
+    the relations won't exist on post_save.
+    """
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
     data = MeetingGroupSerializer(instance).data
     if created:
         msg = MeetingGroupAdded(**data)
     else:
         msg = MeetingGroupChanged(**data)
-    meeting_ch.sync_publish(msg)
+    meeting_ch.sync_publish(msg, on_commit=False)
 
 
 @receiver(pre_delete, sender=MeetingGroup)
