@@ -303,6 +303,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     reaction_buttons: models.QuerySet
     speaker_systems: models.QuerySet[SpeakerListSystem]
     components: models.QuerySet[MeetingComponent]
+    roles: models.QuerySet[MeetingRoles]
 
 
 class MeetingGroup(BaseContent, MeetingContext):

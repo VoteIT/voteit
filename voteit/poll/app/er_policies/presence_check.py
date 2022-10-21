@@ -43,6 +43,12 @@ class PresenceCheckPolicy(ElectoralRegisterPolicy):
             (x, 1) for x in present_potential_voters.values_list("pk", flat=True)
         )
 
+    def poll_will_have_voters(self, **kwargs):
+        """
+        Check for presence check can't be done this way, but it shouldn't block.
+        """
+        return True
+
 
 @receiver(post_transition, sender=PresenceCheck)
 def create_new_er_from_present_users(

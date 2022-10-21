@@ -4,6 +4,8 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
 
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 from voteit.poll.exceptions import ElectoralRegisterEmpty
 from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidPollMethod
@@ -99,6 +101,13 @@ class PollTests(TestCase):
         self.assertTrue(self.poll.no_proposals_guard())
         self.poll.proposals.all().delete()
         self.assertFalse(self.poll.no_proposals_guard())
+
+    def test_polls_electoral_register_will_have_voters_guard(self):
+        self.assertEqual(AutoBeforePoll.name, self.meeting.er_policy_name)
+        self.assertTrue(self.poll.polls_electoral_register_will_have_voters_guard())
+        self.meeting.remove_roles(self.moderator, ROLE_POTENTIAL_VOTER)
+        self.meeting.remove_roles(self.participant, ROLE_POTENTIAL_VOTER)
+        self.assertFalse(self.poll.polls_electoral_register_will_have_voters_guard())
 
     def test_opening_poll(self):
         self.poll.upcoming()

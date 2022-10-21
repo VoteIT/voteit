@@ -281,12 +281,14 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             return False
         return pset is None or isinstance(pset, BaseModel)
 
-    validate_settings_guard.title = "Invalid settings"
+    validate_settings_guard.title = _("Invalid settings")
 
     def electoral_register_missing_guard(self):
         if self.meeting is not None:
             return self.meeting.get_latest_er() is not None
         return True
+
+    electoral_register_missing_guard.title = _("There's no electoral register")
 
     def electoral_register_empty_guard(self):
         if self.meeting is not None:
@@ -297,8 +299,23 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             return er.voters.exists()
         return True
 
+    electoral_register_empty_guard.title = _("Electoral register is empty - no voters")
+
     def no_proposals_guard(self):
         return self.proposals.exists()
+
+    no_proposals_guard.title = _("No proposals, can't start poll")
+
+    def polls_electoral_register_will_have_voters_guard(self):
+        if self.meeting is None:
+            # We don't care about unittests :)
+            return True
+        return self.meeting.er_policy.poll_will_have_voters()
+
+    polls_electoral_register_will_have_voters_guard.title = _(
+        "The electoral register would be empty if you start the poll now. "
+        "Please check electoral register method."
+    )
 
     def method_guard(self):
         try:
@@ -309,6 +326,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             logger.exception("Poll can't start")
             return False
         return True
+
+    method_guard.title = _("Poll method settings invalid")
 
     def _lock_proposals(self):
         for proposal in self.proposals.filter(
@@ -346,6 +365,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             validate_settings_guard,
             electoral_register_missing_guard,
             electoral_register_empty_guard,
+            polls_electoral_register_will_have_voters_guard,
             no_proposals_guard,
             method_guard,
         ],

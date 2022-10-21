@@ -5,6 +5,8 @@ from rest_framework.exceptions import ValidationError
 
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 
 User = get_user_model()
 
@@ -154,11 +156,14 @@ class PollDetailSerializerTests(TestCase):
 class PollCreateSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create()
+        cls.meeting: Meeting = Meeting.objects.create(
+            er_policy_name=AutoBeforePoll.name
+        )
         cls.ai = cls.meeting.agenda_items.create(title="Hello")
         cls.prop = cls.ai.proposals.create()
         cls.er = cls.meeting.electoral_registers.create()
         cls.voter = cls.er.voters.create(username="one")
+        cls.meeting.add_roles(cls.voter, ROLE_POTENTIAL_VOTER)
         cls.moderator = cls.meeting.participants.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
 

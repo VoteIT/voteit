@@ -9,6 +9,8 @@ from typing import Type
 
 from pydantic.main import BaseModel
 
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+
 if TYPE_CHECKING:
     from voteit.poll.models import Poll
     from voteit.poll.models import ElectoralRegister
@@ -106,7 +108,7 @@ class ElectoralRegisterPolicy(ABC):
     @abstractmethod
     def get_voters(self, **kwargs) -> dict[int, int]:
         """
-        Return a dict with user PKs and vote weright as value
+        Return a dict with user PKs and vote weight as value
 
         This returns users that should (currently!) be voters according to this method.
         It doesn't mean that they are voters right now.
@@ -114,6 +116,17 @@ class ElectoralRegisterPolicy(ABC):
         It could simply be the users from potential voters for instance:
         self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
         """
+
+    def poll_will_have_voters(self, **kwargs) -> bool:
+        """
+        The method itself needs to be sure that any starting poll must have voters. For instance, if auto
+        is used there must be potential voters.
+
+        Normally this is just a quick check that get_voters() return something.
+        """
+        return self.meeting.roles.filter(
+            assigned__contains=[ROLE_POTENTIAL_VOTER]
+        ).exists()
 
     def new_er_needed(self, **kwargs) -> bool:
         """
