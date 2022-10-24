@@ -274,7 +274,9 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         self.result_data = data.dict()
 
     def validate_settings_guard(self) -> bool:
-        """Guard for transitions to upcoming or ongoing."""
+        """
+        Guard for transitions to upcoming or ongoing.
+        """
         try:
             pset = self.settings  # Will raise exceptions on bad settings
         except ValidationError:
@@ -285,10 +287,15 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
     def electoral_register_missing_guard(self):
         if self.meeting is not None:
-            return self.meeting.get_latest_er() is not None
+            return (
+                self.meeting.valid_er_policy_guard()
+                and self.meeting.get_latest_er() is not None
+            )
         return True
 
-    electoral_register_missing_guard.title = _("There's no electoral register")
+    electoral_register_missing_guard.title = _(
+        "There's no electoral register or method to create it"
+    )
 
     def electoral_register_empty_guard(self):
         if self.meeting is not None:

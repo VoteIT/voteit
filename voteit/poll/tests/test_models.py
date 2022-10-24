@@ -92,6 +92,12 @@ class PollTests(TestCase):
         self.er.delete()
         self.assertFalse(self.poll.electoral_register_missing_guard())
 
+    def test_broken_er_name_checked(self):
+        self.assertTrue(self.poll.electoral_register_missing_guard())
+        self.poll.meeting.er_policy_name = "broken"
+        self.poll.meeting.save()
+        self.assertFalse(self.poll.electoral_register_missing_guard())
+
     def test_start_check_electoral_register_empty(self):
         self.assertTrue(self.poll.electoral_register_empty_guard())
         self.er.voters.remove(self.participant, self.moderator)
