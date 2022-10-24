@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-02 08:06+0000\n"
-"PO-Revision-Date: 2022-06-02 10:07+0200\n"
+"POT-Creation-Date: 2022-10-24 16:38+0200\n"
+"PO-Revision-Date: 2022-10-24 16:41+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -51,8 +51,8 @@ msgid "Combined Simple"
 msgstr "Kombinerad enkel"
 
 #: app/polls/dutt.py:148 app/polls/dutt.py:160 app/polls/dutt.py:178
-#: app/polls/majority.py:131 app/polls/schulze.py:177
-#: app/polls/scottish_stv.py:153
+#: app/polls/majority.py:131 app/polls/schulze.py:173
+#: app/polls/scottish_stv.py:161
 msgid "Invalid vote"
 msgstr "Ogiltig röst"
 
@@ -64,7 +64,7 @@ msgstr "För få förslag valda"
 msgid "Too many proposals picked"
 msgstr "För många förslag valda"
 
-#: app/polls/dutt.py:183 app/polls/schulze.py:182 app/polls/scottish_stv.py:158
+#: app/polls/dutt.py:183 app/polls/schulze.py:178 app/polls/scottish_stv.py:166
 #, python-format
 msgid "Invalid choice, the following proposals don't exist: %s"
 msgstr "Ogiltigt val, följande förslag existerar inte: %s"
@@ -73,10 +73,14 @@ msgstr "Ogiltigt val, följande förslag existerar inte: %s"
 msgid "Instant-Runoff Voting"
 msgstr "Instant-Runoff Voting"
 
-#: app/polls/irv.py:94
+#: app/polls/irv.py:94 app/polls/irv.py:182
 #, python-format
 msgid "The method %(method)s require at least 3 proposals"
 msgstr "Metoden %(method)s kräver minst 3 förslag"
+
+#: app/polls/irv.py:156
+msgid "Repeated Instant-Runoff Voting"
+msgstr "Repeterad Instant-Runoff Voting"
 
 #: app/polls/majority.py:68
 msgid "Majority"
@@ -86,11 +90,11 @@ msgstr "Majoritet"
 msgid "Must have at least 2 proposals"
 msgstr "Metoden %(method)s kräver minst 2 förslag"
 
-#: app/polls/schulze.py:78
+#: app/polls/schulze.py:74
 msgid "Schulze"
 msgstr "Schulze"
 
-#: app/polls/schulze.py:223
+#: app/polls/schulze.py:219
 msgid "Repeated Schulze"
 msgstr "Repeterad Schulze"
 
@@ -98,12 +102,12 @@ msgstr "Repeterad Schulze"
 msgid "Scottish STV"
 msgstr "Skotsk STV"
 
-#: app/polls/scottish_stv.py:170
+#: app/polls/scottish_stv.py:178
 #, python-format
 msgid "The method %(method)s can't have as many winners as proposals"
 msgstr "Metoden %(method)s kan inte ha lika många vinnare som förslag"
 
-#: app/polls/scottish_stv.py:175
+#: app/polls/scottish_stv.py:183
 #, python-format
 msgid "The method %(method)s require at least %(min_winners)d winners"
 msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
@@ -112,31 +116,59 @@ msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
 msgid "Simple"
 msgstr "Enkel"
 
-#: models.py:317
+#: models.py:286
+msgid "Invalid settings"
+msgstr "Ogiltiga inställningar"
+
+#: models.py:297
+msgid "There's no electoral register or method to create it"
+msgstr "Det finns ingen röstlängd eller metod för att skapa en"
+
+#: models.py:309
+msgid "Electoral register is empty - no voters"
+msgstr "Röstlängden är tom - inga röstande"
+
+#: models.py:314
+msgid "No proposals, can't start poll"
+msgstr "Inga förslag, kan inte starta omröstningen"
+
+#: models.py:325
+msgid ""
+"The electoral register would be empty if you start the poll now. Please "
+"check electoral register method."
+msgstr ""
+"Röstlängden skulle vara tom om du startar en omröstning nu. Kontrollera "
+"metod för röstlängd."
+
+#: models.py:339
+msgid "Poll method settings invalid"
+msgstr "Omröstningens inställningar är fel"
+
+#: models.py:364
 msgid "Make upcoming"
 msgstr "Gör kommande"
 
-#: models.py:331
+#: models.py:382
 msgid "Start"
 msgstr "Starta"
 
-#: models.py:344
+#: models.py:396
 msgid "Close"
 msgstr "Stäng"
 
-#: models.py:359
+#: models.py:411
 msgid "Finish"
 msgstr "Avsluta"
 
-#: models.py:391
+#: models.py:443
 msgid "Cancel"
 msgstr "Avbryt"
 
-#: models.py:404
+#: models.py:454
 msgid "Revert to private"
 msgstr "Återgå till privat"
 
-#: models.py:416 workflows.py:19
+#: models.py:464 workflows.py:19
 msgid "Failed"
 msgstr "Misslyckades"
 
