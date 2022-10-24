@@ -268,7 +268,7 @@ def push_speaker_deleted(instance: Speaker, **kwargs):
 
 @receiver(post_delete, sender=Speaker)
 @disable_on_raw_save
-def push_speaker_deleted(instance: Speaker, **kwargs):
+def reorder_when_speaker_deleted(instance: Speaker, **kwargs):
     instance.speaker_list.reorder()
 
 
