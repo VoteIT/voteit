@@ -317,7 +317,9 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         if self.meeting is None:
             # We don't care about unittests :)
             return True
-        return self.meeting.er_policy.poll_will_have_voters()
+        with suppress(KeyError):
+            return self.meeting.er_policy.poll_will_have_voters()
+        return False
 
     polls_electoral_register_will_have_voters_guard.title = _(
         "The electoral register would be empty if you start the poll now. "
