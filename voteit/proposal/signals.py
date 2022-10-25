@@ -22,35 +22,55 @@ from voteit.proposal.messages import ProposalDeleted
 from voteit.proposal.messages import TextDocumentAdded
 from voteit.proposal.messages import TextDocumentChanged
 from voteit.proposal.messages import TextDocumentDeleted
+from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
 from voteit.proposal.rest_api.serializers import GenericProposalSerializer
+from voteit.proposal.rest_api.serializers import ProposalDetailSerializer
+from voteit.proposal.rest_api.serializers import DiffProposalDetailSerializer
 from voteit.proposal.rest_api.serializers import TextDocumentSerializer
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
 
+_PROP_FIELDS = set(ProposalDetailSerializer.Meta.fields)
+_PROP_FIELDS.remove("shortname")
+
+
+def attach_proposals(meeting: Meeting, app_state: AppState, include_private=False):
+    # Proposals
+    qs = Proposal.objects.filter(
+        agenda_item__meeting=meeting, diffproposal__isnull=True
+    ).prefetch_related(
+        "mentions",
+    )
+    if not include_private:
+        qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
+    for data in qs.values(*_PROP_FIELDS):
+        app_state.append(ProposalAdded(data=data, shortname=Proposal.name))
+    # DiffProposals - could be changed to values list too if the adjust the method on the serializer for diff body
+    qs = DiffProposal.objects.filter(agenda_item__meeting=meeting).prefetch_related(
+        "mentions", "paragraph"
+    )
+    if not include_private:
+        qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
+    app_state.append_from_queryset(qs, DiffProposalDetailSerializer, ProposalAdded)
+
 
 @receiver(channel_subscribed, sender=ParticipantsChannel)
 def participants_channel_subscribed(context: Meeting, app_state: AppState, **kw):
-    """Populate app_state with current proposals"""
-    app_state.append_from_queryset(
-        Proposal.objects.filter(agenda_item__meeting=context)
-        .exclude(agenda_item__state=AgendaItemWf.PRIVATE)
-        .select_subclasses(),
-        GenericProposalSerializer,
-        ProposalAdded,
-    )
+    """
+    Populate app_state with current proposals
+    """
+    attach_proposals(context, app_state, include_private=False)
 
 
 @receiver(channel_subscribed, sender=ModeratorsChannel)
 def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
-    """Populate app_state with current proposals"""
-    app_state.append_from_queryset(
-        Proposal.objects.filter(agenda_item__meeting=context).select_subclasses(),
-        GenericProposalSerializer,
-        ProposalAdded,
-    )
+    """
+    Populate app_state with current proposals
+    """
+    attach_proposals(context, app_state, include_private=True)
 
 
 @receiver_all_subclasses(post_save, sender=Proposal)

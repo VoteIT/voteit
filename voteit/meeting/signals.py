@@ -96,7 +96,9 @@ def meeting_channel_subscribed(
         app_state.append(msg)
     # Append all groups
     app_state.append_from_queryset(
-        context.groups.all(), MeetingGroupSerializer, MeetingGroupAdded
+        context.groups.all().prefetch_related("members"),
+        MeetingGroupSerializer,
+        MeetingGroupAdded,
     )
 
 

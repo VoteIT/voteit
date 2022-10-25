@@ -53,7 +53,7 @@ def moderators_channel_subscribed(
     Send all agenda items
     """
     app_state.append_from_queryset(
-        context.agenda_items.all(),
+        context.agenda_items.all().prefetch_related("mentions"),
         AgendaItemSerializer,
         AgendaAdded,
     )
