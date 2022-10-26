@@ -39,7 +39,9 @@ def participants_channel_subscribed(
     Send non-private agenda items to regular users.
     """
     app_state.append_from_queryset(
-        context.agenda_items.exclude(state=AgendaItemWf.PRIVATE),
+        context.agenda_items.exclude(state=AgendaItemWf.PRIVATE).prefetch_related(
+            "mentions"
+        ),
         AgendaItemSerializer,
         AgendaAdded,
     )
