@@ -68,10 +68,19 @@ class Command(BaseCommand):
             default=False,
             action="store_true",
         )
+        parser.add_argument(
+            "--adjust-userid",
+            help="Adjust incoming userid if it exist. ",
+            default=True,
+            action="store_true",
+        )
 
     def handle(self, *args, **options):
         rel_fn = options["filename"]
         reuse_userid = options["reuse_userid"]
+        adjust_userid = options["adjust_userid"]
+        if adjust_userid and reuse_userid:
+            raise ValueError("Reuse and adjust can't both be true.")
         merge_org = options["merge"]
         if not merge_org and reuse_userid:
             raise ValueError("reuse userid can only be specified together with merge.")
@@ -113,6 +122,16 @@ class Command(BaseCommand):
             for attr in attrs:
                 round_qs = importer.match_and_update(User, attr, exclude_qs=exclude_qs)
                 exclude_qs = round_qs | exclude_qs
+            if adjust_userid:
+                current_userids = org.users.values_list("userid", flat=True)
+                for deserialized in importer.data[User]:
+                    if deserialized.object.userid in current_userids:
+                        for i in range(5):
+                            suggestion = f"{deserialized.object.userid}-{i}"
+                            if suggestion not in current_userids:
+                                deserialized.object.userid = suggestion
+                                break
+
         try:
             with transaction.atomic(durable=True):
                 importer()
