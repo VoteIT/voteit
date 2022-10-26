@@ -185,7 +185,7 @@ class TextDocument(AgendaItemContext, MeetingContext):
     _should_refresh: bool = False
     title: str = models.CharField(max_length=100, default="")
     body: str = models.TextField(default="")
-    base_tag: str = models.CharField(max_length=30)
+    base_tag: str = models.CharField(max_length=40)
     created: datetime = models.DateTimeField(editable=False, default=now)
     modified: datetime = models.DateTimeField(editable=False, auto_now=True)
     author: User = models.ForeignKey(
