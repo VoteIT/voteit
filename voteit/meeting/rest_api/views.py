@@ -1,5 +1,6 @@
 import csv
 
+from django.db import models
 from django.db import transaction
 from django.db.models import Count
 from django.db.models import QuerySet
@@ -81,7 +82,16 @@ class MeetingViewSet(DefaultModelViewSet):
         return Response(status=201)
 
     def get_queryset(self) -> QuerySet:
-        return Meeting.objects.for_user(self.request.user)
+        # There's probably a smarter way with annotations, but it works at least
+        return Meeting.objects.for_user(self.request.user).prefetch_related(
+            models.Prefetch(
+                "roles",
+                queryset=MeetingRoles.objects.filter(
+                    user=self.request.user,
+                ),
+                to_attr="user_roles",
+            )
+        )
 
     def perform_create(self, serializer):
         instance: Meeting = serializer.save()
