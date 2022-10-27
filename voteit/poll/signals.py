@@ -73,9 +73,9 @@ def participants_subscribed(
     Populate app_state with current meeting polls, except private ones
     """
     app_state.append_from_queryset(
-        context.polls.exclude(state=PollWf.PRIVATE).exclude(
-            agenda_item__state=AgendaItemWf.PRIVATE
-        ),
+        context.polls.exclude(state=PollWf.PRIVATE)
+        .exclude(agenda_item__state=AgendaItemWf.PRIVATE)
+        .prefetch_related("proposals"),
         PollDetailSerializer,
         PollAdded,
     )
@@ -104,7 +104,11 @@ def moderators_subscribed(
     """
     Populate app_state with current meeting polls
     """
-    app_state.append_from_queryset(context.polls.all(), PollDetailSerializer, PollAdded)
+    app_state.append_from_queryset(
+        context.polls.all().prefetch_related("proposals"),
+        PollDetailSerializer,
+        PollAdded,
+    )
 
 
 @receiver(post_save, sender=Poll)
