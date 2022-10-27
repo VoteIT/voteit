@@ -23,12 +23,12 @@ class PresenceCheckSerializerTests(TestCase):
     def test_get(self):
         serializer = self._cut(self.presence_check)
         data = serializer.data
+        self.assertIsNotNone(data.pop("opened"))
         self.assertDictEqual(
             {
                 "pk": self.presence_check.pk,
                 "state": "open",
                 "meeting": self.meeting.pk,
-                "opened": self.presence_check.opened.isoformat()[:-6] + "Z",
                 "closed": None,
             },
             data,
