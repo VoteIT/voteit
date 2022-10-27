@@ -143,7 +143,7 @@ class RepeatedIRVSettings(BaseModel):
     def validate_winners(cls, v):
         """This doesn't check attached polls though!"""
         if v < RepeatedIRV.min_winners:
-            raise ValueError(f"Must have more winners than {RepeatedIRV.min_winners}")
+            raise ValueError(f"Must have at least {RepeatedIRV.min_winners} winners")
         return v
 
     class Config:
