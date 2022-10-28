@@ -83,16 +83,8 @@ class MeetingViewSet(DefaultModelViewSet):
         return Response(status=201)
 
     def get_queryset(self) -> QuerySet:
-        # There's probably a smarter way with annotations, but it works at least
-        return Meeting.objects.for_user(self.request.user).prefetch_related(
-            models.Prefetch(
-                "roles",
-                queryset=MeetingRoles.objects.filter(
-                    user=self.request.user,
-                ),
-                to_attr="user_roles",
-            )
-        )
+        # FIXME: We need to prefetch or annotate user roles here to avoid N+1-problem.
+        return Meeting.objects.for_user(self.request.user)
 
     def perform_create(self, serializer):
         instance: Meeting = serializer.save()
