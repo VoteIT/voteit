@@ -1,15 +1,22 @@
+import csv
 from logging import getLogger
 
 from django.db import models
+from django.http import Http404
+from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.mixins import DestroyModelMixin
 from rest_framework.mixins import ListModelMixin
 from rest_framework.mixins import RetrieveModelMixin
 from rest_framework.mixins import UpdateModelMixin
+from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework import exceptions
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import permissions
 
+from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
@@ -74,7 +81,7 @@ class HistoricSpeakerViewSet(
     serializer_class = serializers.HistoricSpeakerListSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = SpeakerFilterSet
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated,)
     context_lookup_kwarg = "meeting"
     context_queryset = Meeting.objects.all()
 
@@ -150,3 +157,56 @@ class SpeakerViewSet(
         ):
             return self.queryset.filter(speaker_list=speaker_list)
         return self.queryset.none()
+
+
+@router.register("export-speakers", basename="export-speakers")
+class ExportSpeakersViewSet(viewsets.GenericViewSet):
+    model = SpeakerListSystem
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = SpeakerListSystem.objects.all()
+
+    def list(self, request):
+        return Response()
+
+    def get_export_qs(self, sls: SpeakerListSystem):
+        return (
+            Speaker.objects.filter(speaker_list__speaker_system=sls)
+            .exclude(seconds__isnull=True)
+            .order_by("started")
+            .annotate(
+                first_name=models.F("user__first_name"),
+                last_name=models.F("user__last_name"),
+                email=models.F("user__email"),
+                userid=models.F("user__userid"),
+            )
+        )
+
+    @action(
+        methods=["get"],
+        detail=True,
+        serializer_class=serializers.SpeakerExportSerializer,
+    )
+    @has_perm_drf(SpeakerSystemPermissions.VIEW)
+    def csv(self, request, *args, **kwargs):
+        sls = self.get_object()
+        serializer = self.get_serializer(self.get_export_qs(sls), many=True)
+        if not serializer.data:
+            raise Http404("No data yet")
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="speaker_export.csv"'
+        writer = csv.DictWriter(response, fieldnames=serializer.data[0].keys())
+        writer.writeheader()
+        for row in serializer.data:
+            writer.writerow(row)
+        return response
+
+    @action(
+        methods=["get"],
+        detail=True,
+        serializer_class=serializers.SpeakerExportSerializer,
+    )
+    @has_perm_drf(SpeakerSystemPermissions.VIEW)
+    def json(self, request, *args, **kwargs):
+        sls = self.get_object()
+        serializer = self.get_serializer(self.get_export_qs(sls), many=True)
+        return Response(serializer.data)

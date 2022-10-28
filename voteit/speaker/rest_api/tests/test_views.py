@@ -499,3 +499,71 @@ class SpeakerViewSetTestCase(APITestCase):
         self.client.force_login(self.list_moderator)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
+
+
+class ExportParticipantsViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.int_user = cls.meeting.participants.create(
+            userid="hao", first_name="Özgür", last_name="好", email="hello@world.se"
+        )
+        cls.sls = SpeakerListSystem.objects.create(
+            method_name="simple", meeting=cls.meeting
+        )
+        cls.list_one = cls.sls.speaker_lists.create()
+        cls.list_one.speaker_items.create(
+            user=cls.int_user, seconds=12, created=now(), started=now()
+        )
+        cls.list_one.speaker_items.create(
+            user=cls.moderator, seconds=14, created=now(), started=now()
+        )
+        cls.list_one.speaker_items.create(
+            user=cls.participant, seconds=33, created=now(), started=now()
+        )
+
+    def test_not_allowed(self):
+        url = reverse("export-speakers-json", kwargs={"pk": self.sls.pk})
+        self.client.force_login(self.participant)
+        response = self.client.get(url)
+        self.assertContains(
+            response, "permission speaker.manage_speakerlistsystem", status_code=403
+        )
+
+    def test_csv_no_data(self):
+        self.sls.speaker_lists.all().delete()
+        self.client.force_login(self.moderator)
+        url = reverse("export-speakers-csv", kwargs={"pk": self.sls.pk})
+        response = self.client.get(url)
+        self.assertEqual(404, response.status_code)
+
+    def test_json(self):
+        url = reverse("export-speakers-json", kwargs={"pk": self.sls.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        data = response.json()
+        self.assertEqual(3, len(data))
+        first_speaker = data[0]
+        self.assertIsNotNone(first_speaker.pop("started"))
+        self.assertIsNotNone(first_speaker.pop("created"))
+        self.assertIsNotNone(self.list_one.pk, first_speaker.pop("speaker_list"))
+        self.assertEqual("Özgür", first_speaker.pop("first_name"))
+        self.assertEqual("好", first_speaker.pop("last_name"))
+        self.assertEqual("hello@world.se", first_speaker.pop("email"))
+        self.assertEqual("hao", first_speaker.pop("userid"))
+        self.assertEqual(12, first_speaker.pop("seconds"))
+        self.assertFalse(first_speaker.keys())
+
+    def test_csv(self):
+        url = reverse("export-speakers-csv", kwargs={"pk": self.sls.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual("text/csv", response.headers.get("Content-Type"))
+        rows = response.content.splitlines()
+        oz_row = rows[1]
+        self.assertIn(b"hello@world.se", oz_row)
+        self.assertIn(b"\xe5\xa5\xbd", oz_row)

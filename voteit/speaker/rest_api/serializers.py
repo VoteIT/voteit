@@ -89,3 +89,14 @@ class SpeakerListSystemSerializer(serializers.ModelSerializer):
             if role not in MeetingRoles.valid_roles:
                 raise exceptions.ValidationError(f"{role} is not a valid meeting role")
         return value
+
+
+class SpeakerExportSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    email = serializers.CharField()
+    userid = serializers.CharField()
+
+    class Meta:
+        model = Speaker
+        exclude = ("id", "user")
