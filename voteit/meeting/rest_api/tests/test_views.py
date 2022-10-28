@@ -408,7 +408,7 @@ class ExportParticipantsViewSetTests(APITestCase):
         self.assertIn(
             {
                 "first_name": "Participant",
-                "last_name": "Participant",
+                "last_name": "",
                 "email": "participant@voteit.se",
                 "userid": "participant",
                 "moderator": False,
@@ -426,10 +426,10 @@ class ExportParticipantsViewSetTests(APITestCase):
         self.assertEqual("text/csv", response.headers.get("Content-Type"))
         rows = response.content.splitlines()
         self.assertIn(
-            b"Moderator,Moderator,moderator@voteit.se,moderator,True,False,False,False",
+            b"Moderator,,moderator@voteit.se,moderator,True,False,False,False",
             rows,
         )
         self.assertIn(
-            b"\xc3\x96zg\xc3\xbcr,\xc3\x96zg\xc3\xbcr,,,False,False,False,False",
+            b"\xc3\x96zg\xc3\xbcr,\xe5\xa5\xbd,,,False,False,False,False",
             rows,
         )
