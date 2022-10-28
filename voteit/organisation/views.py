@@ -159,7 +159,7 @@ def finish_auth(request: WSGIRequest):
             users_qs = adapted.get_users(provider.organisation)
             if users_qs.count():
                 logger.debug("Matched %s users", users_qs.count())
-                user = users_qs.first()
+                user = users_qs.order_by("-last_login").first()
             else:
                 user = adapted.register(organisation=provider.organisation)
                 logger.debug("Creating new user: %s", user.pk)
