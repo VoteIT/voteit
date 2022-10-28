@@ -506,6 +506,7 @@ class ExportParticipantsViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
+        cls.outsider = User.objects.create(username="outsider")
         cls.meeting = Meeting.objects.get(pk=1)
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
@@ -527,11 +528,11 @@ class ExportParticipantsViewSetTests(APITestCase):
         )
 
     def test_not_allowed(self):
+        self.client.force_login(self.outsider)
         url = reverse("export-speakers-json", kwargs={"pk": self.sls.pk})
-        self.client.force_login(self.participant)
         response = self.client.get(url)
         self.assertContains(
-            response, "permission speaker.manage_speakerlistsystem", status_code=403
+            response, "permission speaker.view_speakerlistsystem", status_code=403
         )
 
     def test_csv_no_data(self):
