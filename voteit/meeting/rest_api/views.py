@@ -6,6 +6,7 @@ from django.db.models import Count
 from django.db.models import QuerySet
 from django.db.models import F
 from django.db.models import Q
+from django.http import Http404
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
@@ -174,7 +175,7 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
     def get_export_qs(self, meeting):
         return meeting.roles.all().annotate(
             first_name=F("user__first_name"),
-            last_name=F("user__first_name"),
+            last_name=F("user__last_name"),
             email=F("user__email"),
             userid=F("user__userid"),
         )
@@ -188,6 +189,8 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
     def csv(self, request, *args, **kwargs):
         meeting = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(meeting), many=True)
+        if not serializer.data:
+            raise Http404("No data yet")
         response = HttpResponse(content_type="text/csv")
         response[
             "Content-Disposition"
