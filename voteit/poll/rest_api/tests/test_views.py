@@ -244,3 +244,69 @@ class ElectoralRegisterViewSetTests(APITestCase):
             ],
             sorted(data["weights"], key=lambda x: x["user"]),
         )
+
+
+class ExportElectoralRegisterViewSetTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
+        from voteit.poll.models import ElectoralRegister
+
+        cls.meeting: Meeting = Meeting.objects.create(
+            title="Test meeting",
+        )
+        cls.participant: User = User.objects.create_user(
+            "participant", first_name="Jeff", userid="jeffrey", email="jeff@none.com"
+        )
+        cls.moderator: User = User.objects.create_user("moderator")
+        cls.outsider: User = User.objects.create_user("outsider")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.er: ElectoralRegister = cls.meeting.electoral_registers.create()
+        cls.er.set_voters_from_dict({cls.moderator.pk: 1, cls.participant.pk: 2})
+
+    def test_not_allowed(self):
+        self.client.force_login(self.outsider)
+        url = reverse("export-electoral-register-json", kwargs={"pk": self.er.pk})
+        response = self.client.get(url)
+        self.assertContains(
+            response, "permission meeting.moderate_meeting", status_code=403
+        )
+
+    def test_csv_no_data(self):
+        self.er.voterweight_set.all().delete()
+        self.client.force_login(self.moderator)
+        url = reverse("export-electoral-register-csv", kwargs={"pk": self.er.pk})
+        response = self.client.get(url)
+        self.assertEqual(404, response.status_code)
+
+    def test_json(self):
+        url = reverse("export-electoral-register-json", kwargs={"pk": self.er.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        data = response.json()
+        self.assertEqual(2, len(data))
+        self.assertEqual(
+            {
+                "first_name": "Jeff",
+                "last_name": "",
+                "email": "jeff@none.com",
+                "userid": "jeffrey",
+                "weight": 2,
+            },
+            data[1],
+        )
+
+    def test_csv(self):
+        url = reverse("export-electoral-register-csv", kwargs={"pk": self.er.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual("text/csv", response.headers.get("Content-Type"))
+        self.assertEqual(
+            f'attachment; filename="er_{self.er.pk}_export.csv"',
+            response.headers.get("Content-Disposition"),
+        )
+        rows = response.content.splitlines()
+        self.assertEqual(b"first_name,last_name,email,userid,weight", rows[0])
+        self.assertEqual(b"Jeff,,jeff@none.com,jeffrey,2", rows[2])

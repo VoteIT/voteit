@@ -1,11 +1,21 @@
+import csv
+
+from django.http import Http404
+from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import permissions
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.base import ReadonlyModelViewSet
+from voteit.meeting.permissions import MeetingPermissions
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.rest_api import serializers
@@ -55,3 +65,58 @@ class ElectoralRegisterViewSet(ReadonlyModelViewSet):
 
     def get_queryset(self):
         return ElectoralRegister.objects.for_user(self.request.user)
+
+
+@router.register("export-electoral-register", basename="export-electoral-register")
+class ExportERViewSet(viewsets.GenericViewSet):
+    model = ElectoralRegister
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = ElectoralRegister.objects.all().prefetch_related("meeting")
+    serializer_class = serializers.VoterExportSerializer
+
+    def list(self, request):
+        return Response()
+
+    def get_export_qs(self, er: ElectoralRegister):
+        return (
+            er.voterweight_set.all()
+            .prefetch_related("user")
+            .order_by("user__first_name")
+        )
+
+    def get_er(self, request):
+        er: ElectoralRegister = self.get_object()
+        if not request.user.has_perm(MeetingPermissions.MODERATE, er.meeting):
+            raise PermissionDenied(
+                f"Missing required permission {MeetingPermissions.MODERATE}"
+            )
+        return er
+
+    @action(
+        methods=["get"],
+        detail=True,
+    )
+    def csv(self, request, *args, **kwargs):
+        er = self.get_er(request)
+        if not er.voterweight_set.exists():
+            raise Http404("No data yet")
+        serializer = self.get_serializer(self.get_export_qs(er), many=True)
+        response = HttpResponse(content_type="text/csv")
+        response[
+            "Content-Disposition"
+        ] = f'attachment; filename="er_{er.pk}_export.csv"'
+        # FIXME:Get proper field headers
+        writer = csv.DictWriter(response, fieldnames=serializer.data[0].keys())
+        writer.writeheader()
+        for row in serializer.data:
+            writer.writerow(row)
+        return response
+
+    @action(
+        methods=["get"],
+        detail=True,
+    )
+    def json(self, request, *args, **kwargs):
+        er = self.get_er(request)
+        serializer = self.get_serializer(self.get_export_qs(er), many=True)
+        return Response(serializer.data)

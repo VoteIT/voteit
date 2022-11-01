@@ -380,3 +380,57 @@ class VoteSerializerTests(TestCase):
         self.assertEqual(self.vote.poll.pk, data.pop("poll"))
         self.assertEqual(self.vote.abstain, data.pop("abstain"))
         self.assertEqual({"choice": "yes"}, data.pop("vote"))
+
+
+class VoterExportSerializerTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+        cls.er = cls.meeting.electoral_registers.create()
+        cls.voter_one = cls.er.voters.create(
+            username="voter_one", userid="voter_one", first_name="One!"
+        )
+        cls.voter_two = cls.er.voters.create(
+            username="voter_two", userid="voter_two", last_name="Twoby"
+        )
+        cls.voter_three = cls.er.voters.create(
+            username="voter_three",
+            userid="voter_three",
+            first_name="Tres",
+            last_name="Treo",
+        )
+        cls.vw_one = cls.er.voterweight_set.filter(user=cls.voter_one).first()
+        cls.vw_two = cls.er.voterweight_set.filter(user=cls.voter_two).first()
+        cls.vw_three = cls.er.voterweight_set.filter(user=cls.voter_three).first()
+        cls.vw_two.weight = 2
+        cls.vw_two.save()
+        cls.vw_three.weight = 3
+        cls.vw_three.save()
+
+    @property
+    def _cut(self):
+        from voteit.poll.rest_api.serializers import VoterExportSerializer
+
+        return VoterExportSerializer
+
+    def test_serializer(self):
+        serializer = self._cut(self.er.voterweight_set.all(), many=True)
+        data = serializer.data
+        self.assertEqual(3, len(data))
+        self.assertEqual(
+            {
+                "first_name": "Tres",
+                "last_name": "Treo",
+                "email": "",
+                "userid": "voter_three",
+                "weight": 3,
+            },
+            dict(data[2]),
+        )
+
+    def test_prefetch(self):
+        with self.assertNumQueries(2):
+            serializer = self._cut(
+                self.er.voterweight_set.all().prefetch_related("user"), many=True
+            )
+            list(serializer.data)  # It's lazy!

@@ -174,7 +174,6 @@ class ElectoralRegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.ElectoralRegister
-
         fields = read_only_fields = (
             "created",
             "pk",
@@ -188,6 +187,17 @@ class ElectoralRegisterSerializer(serializers.ModelSerializer):
         for user_pk, weight in er.weight_dict.items():
             results.append({"user": user_pk, "weight": weight})
         return results
+
+
+class VoterExportSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source="user.first_name")
+    last_name = serializers.CharField(source="user.last_name")
+    email = serializers.CharField(source="user.email")
+    userid = serializers.CharField(source="user.userid")
+
+    class Meta:
+        model = models.VoterWeight
+        exclude = ("id", "register", "user")
 
 
 class VoteSerializer(serializers.ModelSerializer):
