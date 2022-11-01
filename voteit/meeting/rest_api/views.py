@@ -186,7 +186,7 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
         response = HttpResponse(content_type="text/csv")
         response[
             "Content-Disposition"
-        ] = 'attachment; filename="participants_export.csv"'
+        ] = f'attachment; filename="participants_m{meeting.pk}_export.csv"'
         writer = csv.DictWriter(response, fieldnames=serializer.data[0].keys())
         writer.writeheader()
         for row in serializer.data:

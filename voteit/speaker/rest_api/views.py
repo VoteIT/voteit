@@ -193,7 +193,9 @@ class ExportSpeakersViewSet(viewsets.GenericViewSet):
         if not serializer.data:
             raise Http404("No data yet")
         response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = 'attachment; filename="speaker_export.csv"'
+        response[
+            "Content-Disposition"
+        ] = f'attachment; filename="speakers_sls{sls.pk}_export.csv"'
         writer = csv.DictWriter(response, fieldnames=serializer.data[0].keys())
         writer.writeheader()
         for row in serializer.data:
