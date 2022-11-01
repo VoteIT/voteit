@@ -501,7 +501,7 @@ class SpeakerViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, 404)
 
 
-class ExportParticipantsViewSetTests(APITestCase):
+class ExportSpeakersViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
