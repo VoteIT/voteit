@@ -186,7 +186,7 @@ class ExportSpeakersViewSet(viewsets.GenericViewSet):
         detail=True,
         serializer_class=serializers.SpeakerExportSerializer,
     )
-    @has_perm_drf(SpeakerSystemPermissions.VIEW)
+    @has_perm_drf(SpeakerSystemPermissions.MANAGE)
     def csv(self, request, *args, **kwargs):
         sls = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(sls), many=True)
@@ -205,7 +205,7 @@ class ExportSpeakersViewSet(viewsets.GenericViewSet):
         detail=True,
         serializer_class=serializers.SpeakerExportSerializer,
     )
-    @has_perm_drf(SpeakerSystemPermissions.VIEW)
+    @has_perm_drf(SpeakerSystemPermissions.MANAGE)
     def json(self, request, *args, **kwargs):
         sls = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(sls), many=True)

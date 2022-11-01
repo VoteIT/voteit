@@ -532,7 +532,7 @@ class ExportParticipantsViewSetTests(APITestCase):
         url = reverse("export-speakers-json", kwargs={"pk": self.sls.pk})
         response = self.client.get(url)
         self.assertContains(
-            response, "permission speaker.view_speakerlistsystem", status_code=403
+            response, "permission speaker.manage_speakerlistsystem", status_code=403
         )
 
     def test_csv_no_data(self):
