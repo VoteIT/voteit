@@ -49,12 +49,15 @@ class DuttSettingsSchema(BaseModel):
         >>> DuttSettingsSchema(max=2)
         DuttSettingsSchema(max=2, min=0)
 
+        >>> DuttSettingsSchema(min=2)
+        DuttSettingsSchema(max=0, min=2)
+
         >>> DuttSettingsSchema(max=1, min=2)
         Traceback (most recent call last):
         ...
         pydantic.error_wrappers.ValidationError: 1 validation error for DuttSettingsSchema
         """
-        if values["max"] < values["min"]:
+        if values["max"] and values["max"] < values["min"]:
             raise ValueError("min value can't be higher than max")
         return values
 
