@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from typing import List
 
-from pydantic import BaseModel
 from django.utils.translation import gettext as _
+from pydantic import BaseModel
 from pydantic import root_validator
 from pydantic import validator
-from envelope.messages.errors import ValidationErrorMsg
 
+from envelope.messages.errors import ValidationErrorMsg
 from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
@@ -20,10 +19,10 @@ from voteit.poll.schemas import PollResult
 
 
 class DuttVoteSchema(BaseModel):
-    choices: List[int]
+    choices: list[int]
 
     @validator("choices")
-    def validate_choices(cls, v: List[int]):
+    def validate_choices(cls, v: list[int]):
         """
         >>> DuttVoteSchema.validate_choices([1])
         [1]
@@ -68,7 +67,7 @@ class DuttScore(BaseModel):
 
 
 class DuttResultSchema(PollResult):
-    results: List[DuttScore]
+    results: list[DuttScore]
 
 
 class AddVoteSchema(GenericAddVoteSchema):

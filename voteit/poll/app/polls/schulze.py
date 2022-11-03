@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import json
 from typing import Counter
-from typing import Optional
 
 from django.utils.translation import gettext as _
 from py3votecore.schulze_method import SchulzeMethod
 from pydantic import BaseModel
 from pydantic import validator
-from envelope.messages.errors import ValidationErrorMsg
 
+from envelope.messages.errors import ValidationErrorMsg
 from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
@@ -49,7 +48,7 @@ class SchulzePollResult(PollResult):
     candidates: list[int]
     winner: int
     strong_pairs: list[tuple[tuple[int, int], int]] = []
-    tied_winners: Optional[list[int]]
+    tied_winners: list[int] | None
 
 
 class SchulzeSettingsSchema(BaseModel):
@@ -198,7 +197,7 @@ class RepeatedSchulzeResult(PollResult):
 
 
 class RepeatedSchulzeSettingsSchema(SchulzeSettingsSchema):
-    winners: Optional[int]  # None means all
+    winners: int | None  # None means all
 
     @validator("winners")
     def validate_winners(cls, v):

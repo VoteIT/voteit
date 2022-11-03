@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from abc import abstractmethod, ABC
+from abc import ABC
+from abc import abstractmethod
 from datetime import timedelta
 from logging import getLogger
 from random import shuffle
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 from django.utils.timezone import now
 from pydantic.main import BaseModel
@@ -58,7 +59,7 @@ class ListMethod(ABC):
         """
 
     @property
-    def settings_schema(self) -> Optional[BaseModel]:
+    def settings_schema(self) -> BaseModel | None:
         """
         Possible settings schema for this speaker list method.
         Will be enforced if it exists
@@ -74,7 +75,7 @@ class ListMethod(ABC):
             seconds__isnull=False, user_id=user
         ).count()
 
-    def shuffle(self, speaker_list: SpeakerList) -> List[int]:
+    def shuffle(self, speaker_list: SpeakerList) -> list[int]:
         """
         Shuffle order - should always be handled within an atomic transaction.
         It fetches speaker objects rather than usign the cached speaker_list.order
@@ -92,7 +93,7 @@ class ListMethod(ABC):
             speaker.save()
         return new_order
 
-    def reorder(self, speaker_list: SpeakerList) -> List[int]:
+    def reorder(self, speaker_list: SpeakerList) -> list[int]:
         """
         Override this method to implement actual quotas or similar.
         The default one simply orders users according to the order they entered the list.

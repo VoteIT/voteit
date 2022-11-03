@@ -1,11 +1,9 @@
 from __future__ import annotations
-from typing import Optional
 
 from django.contrib.contenttypes.models import ContentType
 from django.utils.translation import gettext as _
 from pydantic import validator
 from pydantic.main import BaseModel
-from typing import List
 
 from envelope.core.message import Message
 from envelope.messages.common import Status
@@ -13,14 +11,14 @@ from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import websocket_send
 from voteit.core.utils import get_model_by_shortname
 from voteit.core.validators import validate_model_shortname
-from voteit.messaging.decorators import incoming
-from voteit.messaging.decorators import outgoing
 from voteit.messaging.base import BaseAddObject
 from voteit.messaging.base import BaseDeleteObject
 from voteit.messaging.base import BaseObjectAction
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
+from voteit.messaging.decorators import incoming
+from voteit.messaging.decorators import outgoing
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
 from voteit.reactions.permissions import ReactionButtonPermissions
@@ -57,13 +55,13 @@ class ReactionCountSchema(ReactionSchema):
 
 
 class ReactionUserListSchema(ReactionSchema):
-    users: List[int]
+    users: list[int]
 
 
 class UserReactionResponseSchema(ReactionSchema):
     pk: int  # The reactions pk!
     user: int
-    agenda_item: Optional[int]
+    agenda_item: int | None
 
 
 @outgoing

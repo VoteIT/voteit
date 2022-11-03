@@ -2,16 +2,14 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
-from typing import Dict
 from typing import TYPE_CHECKING
-from typing import Type
 
 from pydantic.main import BaseModel
+
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.utils import websocket_send
-
 from voteit.core.models import BaseContent
 
 if TYPE_CHECKING:
@@ -47,7 +45,7 @@ class BaseObjectDeleted(Message):
 
 class GenericObjectSchema(BaseModel):
     pk: int  # Context for where this is added
-    kwargs: Dict  # What to send to the constructor (create)
+    kwargs: dict  # What to send to the constructor (create)
 
 
 class GenericDeleteSchema(BaseModel):
@@ -64,7 +62,7 @@ class BaseAddObject(BaseObjectAction, ABC):
 
     @property
     @abstractmethod
-    def add_model(self) -> Type[Model]:
+    def add_model(self) -> type[Model]:
         """The model used for creation of the added object.
         note that cls.model is the context where it will be added.
         """

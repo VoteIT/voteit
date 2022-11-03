@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from typing import Type
 
 from django.db.models.signals import m2m_changed
 from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
+
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
-
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import disable_on_raw_save
@@ -33,7 +32,6 @@ from voteit.speaker.messages import SpeakerDeleted
 from voteit.speaker.messages import SpeakerListAdded
 from voteit.speaker.messages import SpeakerListChanged
 from voteit.speaker.messages import SpeakerListDeleted
-
 from voteit.speaker.messages import SpeakerSystemAdded
 from voteit.speaker.messages import SpeakerSystemChanged
 from voteit.speaker.messages import SpeakerSystemDeleted
@@ -65,7 +63,7 @@ def speaker_attached_through_m2m(
 
 
 @receiver(post_delete, sender=Speaker)
-def reorder_after_delete(sender: Type[Speaker], instance: Speaker, **kwargs):
+def reorder_after_delete(sender: type[Speaker], instance: Speaker, **kwargs):
     if instance.in_queue:
         instance.speaker_list.reorder()
 

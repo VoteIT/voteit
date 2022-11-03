@@ -2,11 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from logging import getLogger
-from typing import List
-from typing import Optional
 from typing import TYPE_CHECKING
-from typing import Type
-from typing import Union
 
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
@@ -15,6 +11,7 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
+
 from voteit.access_policy.models import AccessPolicy
 from voteit.access_policy.registries import access_policies
 from voteit.core.abcs import MeetingContext
@@ -72,13 +69,13 @@ class AccessRequest(MeetingContext):
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
     )
-    message: Optional[str] = models.TextField(blank=True, null=True)
-    moderator_message: Optional[str] = models.TextField(blank=True, null=True)
+    message: str | None = models.TextField(blank=True, null=True)
+    moderator_message: str | None = models.TextField(blank=True, null=True)
     created: datetime = models.DateTimeField(editable=False, default=now)
-    handled_ts: Optional[datetime] = models.DateTimeField(
+    handled_ts: datetime | None = models.DateTimeField(
         blank=True, null=True, editable=False
     )
-    handled_by: Optional[AbstractUser] = models.ForeignKey(
+    handled_by: AbstractUser | None = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="+",
@@ -86,7 +83,7 @@ class AccessRequest(MeetingContext):
         null=True,
         editable=False,
     )
-    roles_given: List = ArrayField(models.CharField(max_length=20), default=tuple)
+    roles_given: list = ArrayField(models.CharField(max_length=20), default=tuple)
 
     @property
     def meeting(self) -> Meeting:
@@ -102,7 +99,7 @@ class AccessRequest(MeetingContext):
     def accept(
         self,
         moderator_user: AbstractUser,
-        give_roles: List[Union[str, Type[Role]]],
+        give_roles: list[str | type[Role]],
         message: str = "",
     ):
         """Moderator accepts a request and sets some roles to a user."""

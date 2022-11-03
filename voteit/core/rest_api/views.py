@@ -18,10 +18,10 @@ from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.mixins import TransitionsMixin
 
 # from voteit.core.rest_api.serializers import UpdateUserSerializer
-from voteit.core.rest_api.serializers import UserSerializer, UserAndRolesSerializer
+from voteit.core.rest_api.serializers import UserAndRolesSerializer
+from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.utils import get_identity_data
 from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
 from voteit.organisation.permissions import OrgPermissions
 
 UserModel = get_user_model()
@@ -125,9 +125,9 @@ class UserView(
     @action(methods=["GET"], detail=False)
     def email_choices(self, request):
         identity_data = get_identity_data(request.user)
-        valid_emails = set(
-            [x["data"] for x in identity_data["user_data"] if x["scope"] == "email"]
-        )
+        valid_emails = {
+            x["data"] for x in identity_data["user_data"] if x["scope"] == "email"
+        }
         return Response(data={"emails": sorted(valid_emails)})
 
 

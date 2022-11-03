@@ -4,18 +4,14 @@ from abc import ABC
 from abc import ABCMeta
 from collections import UserString
 from logging import getLogger
-from typing import Optional
-from typing import Set
-from typing import Type
-from typing import Union
 
 from django.conf import settings
 from django.utils.functional import cached_property
 from rules.permissions import ObjectPermissionBackend
+
 from voteit.core.schemas import PermissionOutput
 from voteit.core.utils import get_model_shortname
 from voteit.core.utils import get_permission_registry
-
 
 logger = getLogger(__name__)
 # FIXME: context can be None later on, change when that happens
@@ -36,16 +32,16 @@ class Permission(UserString):
 
     description: str
     model: str = None
-    context: Set
+    context: set
     # Internal to make testing easier
-    perms_cls: Type[ModelPermissions] = None
+    perms_cls: type[ModelPermissions] = None
     perms_cls_attr: str = None
 
     def __init__(
         self,
         name,
-        model: Optional[str] = None,
-        context: Optional[Union[str, Set]] = None,
+        model: str | None = None,
+        context: str | set | None = None,
         description: str = "",
     ):
         super().__init__(name)

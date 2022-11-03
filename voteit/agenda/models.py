@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from datetime import timedelta
-from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.timezone import now
-from django_fsm import FSMField, transition
 from django.utils.translation import gettext_lazy as _
+from django_fsm import FSMField
+from django_fsm import transition
 
 from voteit.agenda.permissions import AgendaPermissions
 from voteit.agenda.workflows import AgendaItemWf
@@ -22,7 +22,6 @@ from voteit.core.utils import relaxed_clean_html
 from voteit.meeting.models import Meeting
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.workflows import PollWf
-
 
 __all__ = ("AgendaItem", "LastRead")
 
@@ -46,7 +45,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         verbose_name="Block new proposals", default=False
     )
     order: int = models.PositiveSmallIntegerField(default=0)
-    related_modified: Optional[datetime] = models.DateTimeField(
+    related_modified: datetime | None = models.DateTimeField(
         editable=False, null=True, blank=True
     )
 

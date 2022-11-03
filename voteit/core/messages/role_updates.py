@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from typing import List
-
 from pydantic.main import BaseModel
-from envelope.core.message import Message
 
+from envelope.core.message import Message
 from voteit.messaging.decorators import outgoing
 
 
@@ -16,7 +14,7 @@ class RolesChangeSchema(BaseModel):
     """
 
     user_pk: int
-    roles: List[str]
+    roles: list[str]
     pk: int  # context where the change happened, use together with model
     model: str  # The model shortname
 

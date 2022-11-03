@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Union
-
 import rules
 from django.contrib.auth.models import AbstractUser
 
@@ -59,7 +57,7 @@ def can_view_polls_context(user: AbstractUser, poll: Poll):
 
 @predicate
 def polls_context_not_archived(
-    user: AbstractUser, instance: Union[Poll, AgendaItem, Meeting]
+    user: AbstractUser, instance: Poll | AgendaItem | Meeting
 ):
     """This is a special case where polls without agenda items are checked against meeting instead"""
     if isinstance(instance, Poll):
@@ -72,7 +70,7 @@ def polls_context_not_archived(
 
 @predicate
 def polls_context_not_closed(
-    user: AbstractUser, instance: Union[Poll, AgendaItem, Meeting]
+    user: AbstractUser, instance: Poll | AgendaItem | Meeting
 ):
     """This is a special case where polls without agenda items are checked against meeting instead"""
     if isinstance(instance, Poll):

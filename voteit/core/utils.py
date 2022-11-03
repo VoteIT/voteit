@@ -4,10 +4,6 @@ import re
 from copy import deepcopy
 from inspect import isclass
 from random import randint
-from typing import Optional
-from typing import Set
-from typing import Type
-from typing import Union
 from typing import TYPE_CHECKING
 
 from bleach import ALLOWED_ATTRIBUTES
@@ -28,7 +24,7 @@ _tag_pattern = re.compile(r"#([\w\-]+)")
 _userid_pattern = re.compile(r"@([\w\d]+)")
 
 
-def get_tags(text: str, lower=True) -> Set[str]:
+def get_tags(text: str, lower=True) -> set[str]:
     """
     Return a set of matched tags
     >>> sorted(get_tags("#hello #world #hello"))
@@ -53,11 +49,11 @@ def get_tags(text: str, lower=True) -> Set[str]:
     ['kära', 'räck']
     """
     if lower:
-        return set([x.lower() for x in _tag_pattern.findall(text)])
+        return {x.lower() for x in _tag_pattern.findall(text)}
     return set(_tag_pattern.findall(text))
 
 
-def get_mentions(text: str) -> Set[int]:
+def get_mentions(text: str) -> set[int]:
     """
     Return a set of matched integers that (probably) corresponds to users
     >>> sorted(get_mentions("What's up @1"))
@@ -83,7 +79,7 @@ def get_mentions(text: str) -> Set[int]:
 _userid_num_match = re.compile(r"^[\d]+$")
 
 
-def get_tagged_userids(text: str) -> Set:
+def get_tagged_userids(text: str) -> set:
     """
     Userid tags look like:
     <span class="mention" data-index="0" data-denotation-char="@" data-id="${userid}" data-value="${name}">
@@ -121,7 +117,7 @@ def get_tagged_userids(text: str) -> Set:
 _single_tag_pattern = re.compile(r"^[#]?([\w\-]+)")
 
 
-def get_tagged_hashtags(text: str, lower=True) -> Set:
+def get_tagged_hashtags(text: str, lower=True) -> set:
     """
     Tags from Quills look like this:
     <span class="mention" data-index="0" data-denotation-char="#" data-id="{tag}" data-value="{tag}">
@@ -223,13 +219,13 @@ def get_permission_registry() -> PermissionRegistry:
     return permissions
 
 
-def get_model_by_shortname(name, default=None) -> Optional[Type[Model]]:
+def get_model_by_shortname(name, default=None) -> type[Model] | None:
     name = name.lower()
     reg = get_content_registry()
     return reg.get(name, default)
 
 
-def get_model_shortname(model: Union[Type[Model], Model]) -> str:
+def get_model_shortname(model: type[Model] | Model) -> str:
     """
     Fetch model shortname from class or instance
     >>> from voteit.meeting.models import Meeting
@@ -255,7 +251,7 @@ def get_model_shortname(model: Union[Type[Model], Model]) -> str:
     return model.__name__.lower()
 
 
-def get_model_by_type(value: Union[Type[Model], Model, str]) -> Set[Type[Model]]:
+def get_model_by_type(value: type[Model] | Model | str) -> set[type[Model]]:
     """
     Fetch all models that inherits from that class
     >>> from voteit.meeting.models import Meeting
@@ -308,7 +304,7 @@ def get_available_transitions() -> dict:
     return _cached_available_transitions
 
 
-def generate_valid_userid(user: AbstractUser) -> Optional[str]:
+def generate_valid_userid(user: AbstractUser) -> str | None:
     """
     Try to generate a valid userid for a specific user. In case one can't be found safely, simply return None
     """

@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from logging import getLogger
 from typing import TYPE_CHECKING
-from typing import Type
 
 from django.contrib.contenttypes.models import ContentType
 from django_fsm import FSMField
+
 from dolly.core import LiveCloner
 from dolly.utils import get_inf_collector
 from dolly.utils import get_model_formatted_dict
-
 from voteit.core.decorators import ensure_atomic
 from voteit.core.utils import get_content_registry
 from voteit.core.utils import get_model_by_shortname
@@ -22,7 +21,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-def collect_meeting(meeting: Meeting, exclude: list[Type[Model]] = ()):
+def collect_meeting(meeting: Meeting, exclude: list[type[Model]] = ()):
     content_reg = get_content_registry()
     collector = get_inf_collector()
     collector.EXCLUDE_MODELS = []
@@ -61,13 +60,13 @@ def get_default_ignored_on_clone() -> set[str]:
     }
 
 
-def get_default_models_ignored_on_clone() -> set[Type[Model]]:
+def get_default_models_ignored_on_clone() -> set[type[Model]]:
     """
     >>> items = get_default_models_ignored_on_clone()
     >>> None not in items
     True
     """
-    ignore = set(get_model_by_shortname(x) for x in get_default_ignored_on_clone())
+    ignore = {get_model_by_shortname(x) for x in get_default_ignored_on_clone()}
     ignore.add(ContentType)
     return ignore
 

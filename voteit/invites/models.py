@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Collection
 from datetime import datetime
 from logging import getLogger
-from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.conf import settings
@@ -15,14 +14,14 @@ from django.utils.timezone import now
 from django_fsm import FSMField
 from django_fsm import transition
 
-from voteit.invites.permissions import MeetingInvitePermissions
-from voteit.invites.utils import get_dispatchers_registry
-from voteit.invites.utils import get_invite_data_registry
-from voteit.invites.workflows import InviteWf
 from voteit.core.abcs import MeetingContext
 from voteit.core.fields import RichTextField
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.workflows import SendWf
+from voteit.invites.permissions import MeetingInvitePermissions
+from voteit.invites.utils import get_dispatchers_registry
+from voteit.invites.utils import get_invite_data_registry
+from voteit.invites.workflows import InviteWf
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
@@ -91,7 +90,7 @@ class MeetingInvite(MeetingContext):
     send_state: str = FSMField(
         default=SendWf.initial, choices=SendWf.choices(), editable=False
     )
-    last_sent: Optional[datetime] = models.DateTimeField(blank=True, null=True)
+    last_sent: datetime | None = models.DateTimeField(blank=True, null=True)
     created: datetime = models.DateTimeField(default=now, editable=False)
     created_by: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -152,7 +151,7 @@ class MeetingInvite(MeetingContext):
         target=InviteWf.REJECTED,
         permission=NOT_ALLOWED,  # Special view, not a normal transition
     )
-    def reject(self, user: Optional[AbstractUser]):
+    def reject(self, user: AbstractUser | None):
         if not user:
             return
         if user.pk is not None:

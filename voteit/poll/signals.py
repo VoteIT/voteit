@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from logging import getLogger
 from typing import TYPE_CHECKING
-from typing import Union
 
 from django.contrib.auth.models import AbstractUser
 from django.db import IntegrityError
@@ -13,8 +12,8 @@ from django.dispatch import Signal
 from django.dispatch import receiver
 from django_fsm import pre_transition
 from django_fsm.signals import post_transition
-from envelope.signals import channel_subscribed
 
+from envelope.signals import channel_subscribed
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.decorators import disable_on_raw_save
@@ -209,7 +208,7 @@ def er_deleted(instance: ElectoralRegister = None, **kw):
 
 @receiver(m2m_changed, sender=Poll.proposals.through)
 def validate_related_proposals(
-    instance: Union[Poll, Proposal], action, pk_set, reverse, **kw
+    instance: Poll | Proposal, action, pk_set, reverse, **kw
 ):
     if action == "pre_add":
         if reverse:

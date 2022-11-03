@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import List
 
 from django.utils.translation import gettext as _
 from pydantic import BaseModel
 from pydantic import validator
-from envelope.messages.errors import ValidationErrorMsg
 
+from envelope.messages.errors import ValidationErrorMsg
 from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
@@ -55,7 +54,7 @@ class ProposalResult(BaseModel):
 
 
 class MajorityPollResult(PollResult):
-    results: List[ProposalResult]
+    results: list[ProposalResult]
 
 
 @poll_methods

@@ -2,16 +2,15 @@
 from __future__ import annotations
 
 from typing import Callable
-from typing import Dict
 from typing import Generator
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
+from requests.exceptions import ConnectionError as RConnectionError
 from rest_framework.exceptions import APIException
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
-from requests.exceptions import ConnectionError as RConnectionError
 
 from voteit.core.permissions import NOT_ALLOWED
 
@@ -24,7 +23,7 @@ if TYPE_CHECKING:
     from django_fsm import Transition
 
 
-def get_identity_data(user: User) -> Dict:
+def get_identity_data(user: User) -> dict:
     """
     Returns users identity data from identity server
     """
@@ -99,7 +98,7 @@ def get_valid_transitions_dict(
     instance: Model,
     attr: str = "state",
 ) -> dict[str, Transition]:
-    return dict([(x.name, x) for x in get_valid_transitions(instance, attr=attr)])
+    return {x.name: x for x in get_valid_transitions(instance, attr=attr)}
 
 
 def drf_do_transition(

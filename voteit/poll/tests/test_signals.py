@@ -41,7 +41,7 @@ class PollSubscribedTests(TestCase):
             channel_type="poll",
         )
         msg = command.run_job()
-        unpacked = dict([(x.t, x.p) for x in msg.data.app_state])
+        unpacked = {x.t: x.p for x in msg.data.app_state}
         self.assertIn("poll.status", unpacked)
         self.assertEqual(self.poll.pk, unpacked["poll.status"]["pk"])
 
@@ -88,7 +88,7 @@ class MeetingSubscribedTests(TestCase):
             channel_type=ParticipantsChannel.name,
         )
         msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "poll.added"])
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "poll.added"}
         self.assertEqual({self.poll.pk}, pks)
 
     def test_app_state_sent_moderators(self):
@@ -98,7 +98,7 @@ class MeetingSubscribedTests(TestCase):
             channel_type=ModeratorsChannel.name,
         )
         msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "poll.added"])
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "poll.added"}
         self.assertEqual({self.poll.pk, self.poll_private.pk}, pks)
 
     def test_app_state_sent_votes(self):
@@ -108,7 +108,7 @@ class MeetingSubscribedTests(TestCase):
             channel_type=MeetingChannel.name,
         )
         msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "vote.added"])
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "vote.added"}
         self.assertEqual({self.vote.pk}, pks)
 
     def test_app_state_sent_latest_er(self):
@@ -118,7 +118,7 @@ class MeetingSubscribedTests(TestCase):
             channel_type=MeetingChannel.name,
         )
         msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "er.added"])
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "er.added"}
         self.assertEqual({self.er.pk}, pks)
 
     def test_app_state_doesnt_break_without_er(self):

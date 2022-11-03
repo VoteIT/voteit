@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from abc import ABC
 from datetime import datetime
-from typing import List
-from typing import Optional
 
-from auditlog.context import set_actor
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
+
+from auditlog.context import set_actor
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.common import Status
@@ -17,11 +16,10 @@ from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import NotFoundError
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import websocket_send
-
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.messaging.base import BaseObjectDeleted
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.base import BaseObjectDeleted
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.rules import not_currently_speaking
@@ -272,13 +270,13 @@ class ModeratorSpeakerListShuffle(ListMessage):
 
 
 class SpeakerListSchema(BaseModel):
-    title: Optional[str]
+    title: str | None
     pk: int
     state: str
     speaker_system: int  # pk
-    agenda_item: Optional[int]  # pk
-    queue: List[int]  # user pks, unique values
-    current: Optional[int]  # current user pk if speaker
+    agenda_item: int | None  # pk
+    queue: list[int]  # user pks, unique values
+    current: int | None  # current user pk if speaker
 
 
 @outgoing
@@ -303,13 +301,13 @@ class SpeakerListDeleted(BaseObjectDeleted):
 class SpeakerSystemSchema(BaseModel):
     pk: int
     state: str
-    title: Optional[str]
-    meeting: Optional[int]
+    title: str | None
+    meeting: int | None
     method_name: str
-    settings: Optional[dict]
-    safe_positions: Optional[int]
-    active_list: Optional[int]
-    meeting_roles_to_speaker: List[str]
+    settings: dict | None
+    safe_positions: int | None
+    active_list: int | None
+    meeting_roles_to_speaker: list[str]
 
 
 @outgoing
@@ -335,8 +333,8 @@ class SpeakerSchema(BaseModel):
     pk: int  # Speaker pk
     user: int  # User speaker
     speaker_list: int
-    started: Optional[datetime]
-    seconds: Optional[int]
+    started: datetime | None
+    seconds: int | None
 
 
 @outgoing

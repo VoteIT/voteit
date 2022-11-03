@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
 from pytz import UTC
+
 from voteit.meeting.channels import ModeratorsChannel
 
 _channel_layers_setting = {
@@ -87,7 +88,7 @@ class AgendaItemTests(TestCase):
         mock_channel.reset_mock()
         ai.proposals.create()
         ai.proposals.create()
-        messages = set([x.args[0] for x in mock_channel.mock_calls])
+        messages = {x.args[0] for x in mock_channel.mock_calls}
         agenda_messages = [x for x in messages if x.name == "agenda_item.changed"]
         self.assertEqual(1, len(agenda_messages))
 

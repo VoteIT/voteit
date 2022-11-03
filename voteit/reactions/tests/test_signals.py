@@ -1,7 +1,8 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import TestCase
+from django.test import override_settings
 
 from envelope.app.user_channel.channel import UserChannel
 from envelope.messages.channels import Subscribe
@@ -71,7 +72,7 @@ class SignalButtonTests(TestCase):
             channel_type="meeting",
         )
         msg = command.run_job()
-        unpacked = dict([(x.t, x.p) for x in msg.data.app_state])
+        unpacked = {x.t: x.p for x in msg.data.app_state}
         self.assertIn("reaction_button.added", unpacked)
         self.assertEqual(self.button.pk, unpacked["reaction_button.added"]["pk"])
 

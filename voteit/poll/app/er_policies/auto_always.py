@@ -7,15 +7,14 @@ from django.utils.translation import gettext_lazy as _
 
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
+from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.abcs import ElectoralRegisterPolicy
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.registries import er_policy
 from voteit.poll.signals import new_er_created
 from voteit.poll.workflows import PollWf
-from voteit.meeting.models import Meeting
-from voteit.meeting.models import MeetingRoles
-
 
 __all__ = ("AutoAlways",)
 logger = getLogger(__name__)
@@ -34,9 +33,7 @@ class AutoAlways(ElectoralRegisterPolicy):
     logger = logger
 
     def get_voters(self, **kwargs) -> dict[int, int]:
-        return dict(
-            (x, 1) for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
-        )
+        return {x: 1 for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)}
 
 
 def _maybe_create_and_update(instance: MeetingRoles, roles=()):

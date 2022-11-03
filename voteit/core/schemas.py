@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from typing import List
-from typing import Optional
-from typing import Set
-
 from pydantic import BaseModel
 from pydantic import validator
 
@@ -12,10 +8,10 @@ class RoleOutput(BaseModel):
     name: str
     title: str
     description: str
-    require_names: Optional[List[str]]
-    roles_cls_natural_key: Optional[str]
-    context_natural_key: Optional[str]
-    predicate_info: Optional[PredicateOutput]
+    require_names: list[str] | None
+    roles_cls_natural_key: str | None
+    context_natural_key: str | None
+    predicate_info: PredicateOutput | None
 
     class Config:
         orm_mode = True
@@ -23,11 +19,11 @@ class RoleOutput(BaseModel):
 
 class PredicateOutput(BaseModel):
     name: str
-    description: Optional[str]
+    description: str | None
     fullname: str = ""
     num_args: int
     source: str = ""
-    role_name: Optional[str]
+    role_name: str | None
 
     @validator("description")
     def clean_description(cls, v):
@@ -42,8 +38,8 @@ class PredicateOutput(BaseModel):
 class PermissionOutput(BaseModel):
     name: str
     description: str = ""
-    model: Optional[str]
-    context: Set[str]
+    model: str | None
+    context: set[str]
 
     class Config:
         orm_mode = True

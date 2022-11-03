@@ -1,12 +1,13 @@
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING, Callable
+
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
 
-from voteit.core.models import BaseContent
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
+from voteit.core.models import BaseContent
 from voteit.reactions.mixins import Reactable
 
 if TYPE_CHECKING:
@@ -52,7 +53,7 @@ class DiscussionPost(
     }
 
     @property
-    def meeting(self) -> Optional[Meeting]:
+    def meeting(self) -> Meeting | None:
         """While not directly related, it still good to be able to do lookups this way"""
         if self.agenda_item:
             return self.agenda_item.meeting

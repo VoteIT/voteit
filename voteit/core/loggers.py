@@ -1,13 +1,12 @@
 from __future__ import annotations
+
 from logging import LoggerAdapter
 from logging import getLogger
-from typing import Optional
 from typing import TYPE_CHECKING
-from typing import Union
 
 from django.core.handlers.wsgi import WSGIRequest
-from django.db.transaction import on_commit
 from django.db.models import Model
+from django.db.transaction import on_commit
 from rest_framework.request import Request
 
 from voteit.core.abcs import MeetingContext
@@ -40,7 +39,7 @@ class EventAdapterMixin:
     def process(self, msg, kwargs):
         msg, kwargs = super().process(msg, kwargs)
         if request := kwargs.pop("request", None):
-            request: Union[Request, WSGIRequest]
+            request: Request | WSGIRequest
             kwargs["extra"]["actor"] = getattr(request, "user", None)
             kwargs["extra"]["path"] = request.path
             kwargs["extra"]["method"] = request.method
@@ -122,7 +121,7 @@ auth_logger = getEventLogger("voteit.event.auth", on_commit=False)
 def log_roles_change(
     msg: str,
     *,
-    actor: Optional[UserType],
+    actor: UserType | None,
     context: Model,
     for_user: UserType,
     roles: list[Role, str],
@@ -150,8 +149,8 @@ def log_roles_change(
 def log_auth(
     msg: str,
     *,
-    request: Union[Request, WSGIRequest],
-    actor: Optional[UserType] = None,
+    request: Request | WSGIRequest,
+    actor: UserType | None = None,
     context: Model = None,
     for_user: UserType = None,
     **kwargs,

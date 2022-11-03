@@ -4,12 +4,12 @@ from abc import ABC
 
 from pydantic import validator
 from pydantic.main import BaseModel
+
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import websocket_send
-
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.messaging.base import BaseObjectAdded
@@ -182,9 +182,9 @@ class ManualCreateER(ContextAction):
         potential_voters = set(
             self.context.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
         )
-        missing_potential_voters = set(
+        missing_potential_voters = {
             x.user for x in self.data.weights if x.user not in potential_voters
-        )
+        }
         if missing_potential_voters:
             # FIXME: Error dict with pos as int
             raise ValidationErrorMsg.from_message(
@@ -192,7 +192,7 @@ class ManualCreateER(ContextAction):
                 msg=f"Got the following invalid potential voters (User PKs): {', '.join([str(x) for x in sorted(missing_potential_voters)])}",
                 errors=[],
             )
-        weight_dict = dict((wv.user, wv.weight) for wv in self.data.weights)
+        weight_dict = {wv.user: wv.weight for wv in self.data.weights}
         manual_er = Manual(self.context)
         manual_er.create_er(weight_dict=weight_dict)  # Only creates if needed
         msg = Status.from_message(self)

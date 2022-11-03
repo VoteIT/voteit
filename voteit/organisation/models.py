@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict
-from typing import List
-from typing import Optional
 from typing import TYPE_CHECKING
-from typing import Type
 
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
@@ -15,7 +11,6 @@ from django.utils.timezone import now
 from pytz import utc
 from requests_oauthlib import OAuth2Session
 
-from voteit.core.abcs import AuditLogMixin
 from voteit.core.abcs import OrganisationContext
 from voteit.core.fields import RichTextField
 from voteit.core.models import BaseContent
@@ -56,7 +51,7 @@ class OrganisationRoles(OrganisationContext, Roles):
         unique_together = (("user", "context"),)
 
     @property
-    def organisation(self) -> Optional[Organisation]:
+    def organisation(self) -> Organisation | None:
         return self.context
 
     def get_additional_data(self):
@@ -93,7 +88,7 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
         ordering = ("title",)
 
     @property
-    def organisation(self) -> Optional[Organisation]:
+    def organisation(self) -> Organisation | None:
         # For OrganisationContext
         return self
 
@@ -114,7 +109,7 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
         super().save(**kwargs)
 
     # Type annotations
-    provider: Optional[OAuth2Provider]
+    provider: OAuth2Provider | None
     objects: models.Manager
     tos: models.QuerySet
     users: models.QuerySet
@@ -131,7 +126,7 @@ class OAuth2Provider(OrganisationContext):
 
     name = "oauth2_provider"
     provider_id: str = models.CharField(max_length=30)
-    organisation: Optional[Organisation] = models.OneToOneField(
+    organisation: Organisation | None = models.OneToOneField(
         "organisation.Organisation",
         on_delete=models.CASCADE,
         related_name="provider",
@@ -185,7 +180,7 @@ class OAuth2Provider(OrganisationContext):
         verbose_name_plural = "OAuth2Providers"
 
     @property
-    def response_adapter(self) -> Type[ProviderResponseAdapter]:
+    def response_adapter(self) -> type[ProviderResponseAdapter]:
         return get_provider_response_adapters()[self.provider_id]
 
     def save(self, **kw):
@@ -212,7 +207,7 @@ class OAuth2Provider(OrganisationContext):
 class AccessTokenManager(models.Manager):
     def from_response(
         self,
-        response: Dict,
+        response: dict,
         user: AbstractUser,
         provider: OAuth2Provider,
     ) -> AccessToken:
@@ -220,7 +215,7 @@ class AccessTokenManager(models.Manager):
         Create or update an access token from response
         """
         token = OAuthTokenSchema(**response)
-        access_token: Optional[AccessToken] = AccessToken.objects.filter(
+        access_token: AccessToken | None = AccessToken.objects.filter(
             user=user,
             provider=provider,
         ).first()
@@ -269,7 +264,7 @@ class AccessToken(models.Model):
     )
     created: datetime = models.DateTimeField(auto_now_add=True)
     updated: datetime = models.DateTimeField(auto_now=True)
-    scope: List[str] = ArrayField(models.CharField(max_length=50), default=list)
+    scope: list[str] = ArrayField(models.CharField(max_length=50), default=list)
     expires_at: datetime = models.DateTimeField()
     expires_in: int = models.PositiveIntegerField()
     access_token: str = models.CharField(max_length=100)
@@ -290,7 +285,7 @@ class AccessToken(models.Model):
         self.refresh_token = token.refresh_token
         self.save()
 
-    def as_dict(self) -> Dict:
+    def as_dict(self) -> dict:
         """
         This dict is what OAuthLib expects as "token" kwarg
         """
@@ -302,7 +297,7 @@ class AccessToken(models.Model):
             refresh_token=self.refresh_token,
         ).dict()
 
-    def token_handler(self, response: Dict):
+    def token_handler(self, response: dict):
         token = OAuthTokenSchema(**response)
         self.save_from_pydantic(token)
 

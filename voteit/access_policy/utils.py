@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from logging import getLogger
-from typing import List
 from typing import TYPE_CHECKING
 
 from voteit.meeting.models import Meeting
@@ -13,7 +12,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-def get_policies(meeting: Meeting, only_active=True) -> List[AccessPolicy]:
+def get_policies(meeting: Meeting, only_active=True) -> list[AccessPolicy]:
     """
     Return meeting access policies
     """

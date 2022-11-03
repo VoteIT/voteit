@@ -4,17 +4,16 @@ from datetime import datetime
 from logging import getLogger
 from random import sample
 from string import ascii_lowercase
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
 from django.db import transaction
 from django.utils.timezone import now
+from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
-from django.utils.translation import gettext_lazy as _
 from model_utils.managers import InheritanceManager
-from typing import Optional
-from typing import TYPE_CHECKING
 
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
@@ -65,7 +64,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     )
 
     @property
-    def meeting(self) -> Optional[Meeting]:
+    def meeting(self) -> Meeting | None:
         """While not directly related, it still good to be able to do lookups this way"""
         if self.agenda_item:
             return self.agenda_item.meeting
@@ -216,7 +215,7 @@ class TextDocument(AgendaItemContext, MeetingContext):
     }
 
     @property
-    def meeting(self) -> Optional[Meeting]:
+    def meeting(self) -> Meeting | None:
         if self.agenda_item:
             return self.agenda_item.meeting
 
@@ -311,7 +310,7 @@ class TextParagraph(AgendaItemContext, MeetingContext):
         return f"{self.text_document.base_tag}-{self.paragraph_id}"
 
     @property
-    def meeting(self) -> Optional[Meeting]:
+    def meeting(self) -> Meeting | None:
         """While not directly related, it still good to be able to do lookups this way"""
         if self.agenda_item:
             return self.agenda_item.meeting

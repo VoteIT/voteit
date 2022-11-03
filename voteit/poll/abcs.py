@@ -3,9 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from abc import abstractmethod
 from logging import getLogger
-from typing import Optional
 from typing import TYPE_CHECKING
-from typing import Type
 
 from pydantic.main import BaseModel
 
@@ -28,7 +26,7 @@ class PollMethod(ABC):
     """
 
     poll: Poll
-    settings_schema: Optional[Type[BaseModel]] = None
+    settings_schema: type[BaseModel] | None = None
     historic = False
 
     def __init__(self, poll: Poll):
@@ -41,12 +39,12 @@ class PollMethod(ABC):
 
     @property
     @abstractmethod
-    def vote_schema(self) -> Type[BaseModel]:
+    def vote_schema(self) -> type[BaseModel]:
         """The pydantic schema used to serialize and validate vote data."""
 
     @property
     @abstractmethod
-    def result_schema(self) -> Type[PollResult]:
+    def result_schema(self) -> type[PollResult]:
         """Pydantic result schema."""
 
     @abstractmethod
@@ -141,7 +139,7 @@ class ElectoralRegisterPolicy(ABC):
         Some methods create ER on the fly when polls start. Use this hook for those cases.
         """
 
-    def apply(self, poll: Poll, target: Optional[str] = None):
+    def apply(self, poll: Poll, target: str | None = None):
         """
         (Maybe) apply the policy to this poll.
         Target is the workflow state the poll will soon enter, if this was triggered by workflow

@@ -6,8 +6,8 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.messages.channels import Subscribe
 
+from envelope.messages.channels import Subscribe
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
@@ -47,7 +47,7 @@ class MeetingSubscribedTests(TestCase):
             channel_type="moderators",
         )
         msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "proposal.added"])
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "proposal.added"}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_app_state_sent_private_moderators(self):
@@ -59,7 +59,7 @@ class MeetingSubscribedTests(TestCase):
             channel_type="moderators",
         )
         msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "proposal.added"])
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "proposal.added"}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_app_state_sent_participants(self):
@@ -69,7 +69,7 @@ class MeetingSubscribedTests(TestCase):
             channel_type="participants",
         )
         msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "proposal.added"])
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "proposal.added"}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_app_state_sent_private_participants(self):
@@ -84,7 +84,7 @@ class MeetingSubscribedTests(TestCase):
         app_state = msg.data.app_state
         if app_state is None:
             app_state = ()
-        pks = set([x.p["pk"] for x in app_state if x.t == "proposal.added"])
+        pks = {x.p["pk"] for x in app_state if x.t == "proposal.added"}
         self.assertEqual(set(), pks)
 
 
@@ -373,7 +373,5 @@ class AgendaItemChannelTests(TestCase):
             channel_type="agenda_item",
         )
         msg = command.run_job()
-        pks = set(
-            [x.p["pk"] for x in msg.data.app_state if x.t == "text_document.added"]
-        )
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "text_document.added"}
         self.assertEqual({self.text_document.pk}, pks)

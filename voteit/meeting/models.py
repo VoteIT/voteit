@@ -5,7 +5,6 @@ from datetime import timedelta
 from itertools import count
 from logging import getLogger
 from typing import Generator
-from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.conf import settings
@@ -101,10 +100,10 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     state: str = FSMField(
         default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False
     )
-    start_time: Optional[datetime] = models.DateTimeField(
+    start_time: datetime | None = models.DateTimeField(
         verbose_name="When the meeting starts/started.", null=True, blank=True
     )
-    end_time: Optional[datetime] = models.DateTimeField(
+    end_time: datetime | None = models.DateTimeField(
         verbose_name="When the meeting ends/ended.", null=True, blank=True
     )
     public: bool = models.BooleanField(
@@ -113,26 +112,26 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     visible_in_lists: bool = models.BooleanField(
         verbose_name="Show basic meeting details in lists?", default=False
     )
-    er_policy_name: Optional[str] = models.CharField(
+    er_policy_name: str | None = models.CharField(
         verbose_name="ID of used electoral policy",
         max_length=30,
         null=True,
         blank=True,
     )
-    proposal_id_policy_name: Optional[str] = models.CharField(
+    proposal_id_policy_name: str | None = models.CharField(
         verbose_name="Proposal ID policy name, defaults to system standard",
         max_length=30,
         null=True,
         blank=True,
     )
-    organisation: Optional[Organisation] = models.ForeignKey(
+    organisation: Organisation | None = models.ForeignKey(
         "organisation.Organisation",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name="meetings",
     )
-    archive_after: Optional[datetime] = models.DateTimeField(null=True, editable=False)
+    archive_after: datetime | None = models.DateTimeField(null=True, editable=False)
 
     roles_cls = MeetingRoles
     participants = models.ManyToManyField(
@@ -166,14 +165,14 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         return self._er_policy()
 
     @cached_property
-    def latest_er(self) -> Optional[ElectoralRegister]:
+    def latest_er(self) -> ElectoralRegister | None:
         return self.get_latest_er()
 
     def _er_policy(self):
         reg = get_electoral_policy_registry()
         return reg[self.er_policy_name](self)
 
-    def get_latest_er(self) -> Optional[ElectoralRegister]:
+    def get_latest_er(self) -> ElectoralRegister | None:
         return (
             self.electoral_registers.filter(meeting=self).order_by("-created").first()
         )
@@ -296,8 +295,8 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     electoral_registers: models.QuerySet
     agenda_items: models.QuerySet
     last_read_set: models.QuerySet
-    pn_system: Optional[PNSystem]
-    presence_system: Optional[PresenceSystem]
+    pn_system: PNSystem | None
+    presence_system: PresenceSystem | None
     presence_checks: PresenceCheck.Manager
     polls: models.QuerySet
     reaction_buttons: models.QuerySet

@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from typing import Dict
-from typing import List
 from typing import OrderedDict
 from typing import TYPE_CHECKING
 
 from pydantic.main import BaseModel
+
 from envelope.core.message import AsyncRunnable
 from envelope.core.message import Message
-
 from voteit.core.utils import get_available_transitions
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
@@ -32,7 +30,7 @@ class GetAllTransitions(AsyncRunnable):
 
 
 class TransitionsSchema(BaseModel):
-    transitions: Dict[str, List[OrderedDict]]
+    transitions: dict[str, list[OrderedDict]]
 
 
 @outgoing

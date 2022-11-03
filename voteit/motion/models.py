@@ -3,17 +3,18 @@ from __future__ import annotations
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
-from django.utils.translation import gettext_lazy as _
-from typing import List
 
-from voteit.core.models import BaseContent, Roles, RoleContextMixin
+from voteit.core.models import BaseContent
+from voteit.core.models import RoleContextMixin
+from voteit.core.models import Roles
 from voteit.meeting.models import Meeting
+from voteit.motion.permissions import MotionPermissions as MP
+from voteit.motion.permissions import MotionProcessPermissions as MPP
 from voteit.motion.workflows import MotionProcessWf
 from voteit.motion.workflows import MotionWf
-from voteit.motion.permissions import MotionProcessPermissions as MPP
-from voteit.motion.permissions import MotionPermissions as MP
 
 
 class MotionProcessRoles(Roles):
@@ -62,12 +63,12 @@ class MotionProcess(BaseContent, RoleContextMixin):
     def close(self):
         pass
 
-    def get_selected_motions_qs(self, states: List[str] = None) -> models.QuerySet:
+    def get_selected_motions_qs(self, states: list[str] = None) -> models.QuerySet:
         if states is None:
             states = [MotionWf.ACCEPTED]
         return self.motions.filter(state__in=states).order_by("created")
 
-    def populate_meeting(self, meeting: Meeting, states: List[str] = None):
+    def populate_meeting(self, meeting: Meeting, states: list[str] = None):
         """ Populate a meeting from given states. """
         # FIXME: Sorted, created etc
         # FIXME: Override author...?

@@ -5,8 +5,8 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.messages.channels import Subscribe
 
+from envelope.messages.channels import Subscribe
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 
@@ -43,7 +43,7 @@ class SignalsTests(TestCase):
             channel_type=MeetingChannel.name,
         )
         msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "pn.added"])
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "pn.added"}
         self.assertEqual({self.one.pk, self.two.pk}, pks)
 
     @patch.object(MeetingChannel, "sync_publish")

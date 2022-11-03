@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
-
-from typing import Dict
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -26,7 +24,7 @@ class ProviderResponseAdapter(ABC):
     def name(self) -> str:
         """Name of the adapter"""
 
-    def __init__(self, response: Dict):
+    def __init__(self, response: dict):
         self.response = response
 
     @property

@@ -1,25 +1,26 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Union
+
+from typing import TYPE_CHECKING
 
 import rules
 from django.contrib.auth.models import AbstractUser
 
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_not_archived
-from voteit.meeting.rules import (
-    is_moderator,
-    can_view_meeting,
-    meeting_upcoming_ongoing,
-)
-from voteit.reactions.models import ReactionButton, Reaction
-from voteit.reactions.permissions import ReactionButtonPermissions, ReactionPermissions
+from voteit.meeting.rules import can_view_meeting
+from voteit.meeting.rules import is_moderator
+from voteit.meeting.rules import meeting_upcoming_ongoing
+from voteit.reactions.models import Reaction
+from voteit.reactions.models import ReactionButton
+from voteit.reactions.permissions import ReactionButtonPermissions
+from voteit.reactions.permissions import ReactionPermissions
 
 if TYPE_CHECKING:
     pass
 
 
 @predicate
-def is_button_active(user: AbstractUser, obj: Union[Reaction, ReactionButton]) -> bool:
+def is_button_active(user: AbstractUser, obj: Reaction | ReactionButton) -> bool:
     if isinstance(obj, ReactionButton):
         button = obj
     elif isinstance(obj, Reaction):
@@ -38,7 +39,7 @@ def has_list_users_reactions_role(user: AbstractUser, obj: ReactionButton) -> bo
 
 @predicate
 def has_change_own_reaction_role(
-    user: AbstractUser, obj: Union[Reaction, ReactionButton]
+    user: AbstractUser, obj: Reaction | ReactionButton
 ) -> bool:
     # This require all reaction permissions to be exactly the same regardless of any agenda items state
     # Do we want to check permissions against the context we add the reaction on instead?

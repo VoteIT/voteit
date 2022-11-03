@@ -6,7 +6,6 @@ from inspect import isclass
 from inspect import isfunction
 from logging import Logger
 from logging import getLogger
-from typing import Optional
 
 from django.conf import settings
 from rules import Predicate as RulesPredicate
@@ -72,7 +71,7 @@ class Predicate(RulesPredicate):
     {'name': 'is_musician', 'fullname': 'voteit.core.predicate.is_musician', 'num_args': 1, 'role_name': 'musician'}
     """
 
-    role: Optional[Role] = None
+    role: Role | None = None
     logger: Logger = getLogger(__name__)  # Attached via registry or this as default
     verbose_permission_log: bool = False
     permission_log_fail_only: bool = True
@@ -82,7 +81,7 @@ class Predicate(RulesPredicate):
         return getsource(self.fn)
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         if self.__doc__:
             return self.__doc__
 
@@ -91,7 +90,7 @@ class Predicate(RulesPredicate):
         return _fullname(self)
 
     @property
-    def role_name(self) -> Optional[str]:
+    def role_name(self) -> str | None:
         return self.role and self.role.name or None
 
     def test(self, obj=NO_VALUE, target=NO_VALUE) -> bool:

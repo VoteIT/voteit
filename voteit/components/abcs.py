@@ -3,19 +3,15 @@ from __future__ import annotations
 from abc import ABC
 from abc import abstractmethod
 from contextlib import suppress
-from typing import Optional
-from typing import Type
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils.functional import cached_property
-from django_fsm import FSMField
 from pydantic import BaseModel
 from pydantic import ValidationError
 
 from voteit.core.abcs import ABCModel
 from voteit.core.component import Registry
-from voteit.core.workflows import EnabledWf
 
 
 # if TYPE_CHECKING:
@@ -23,7 +19,7 @@ from voteit.core.workflows import EnabledWf
 
 class Component(ABCModel):
     component_name: str = models.CharField(max_length=30)
-    settings_data: Optional[dict] = models.JSONField(
+    settings_data: dict | None = models.JSONField(
         verbose_name="JSON-serialized settings",
         null=True,
         blank=True,
@@ -71,7 +67,7 @@ class Component(ABCModel):
         return False
 
     @property
-    def settings(self) -> Optional[BaseModel]:
+    def settings(self) -> BaseModel | None:
         if self.is_valid:
             schema = self.adapter.schema
             if schema is not None:
@@ -122,7 +118,7 @@ class ComponentAdapter(ABC):
         If context can have multiple instances of this component.
     """
 
-    schema: Optional[Type[BaseModel]] = None
+    schema: type[BaseModel] | None = None
     # multiple: bool = False
 
     @property

@@ -1,13 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import List
-from typing import Optional
 from typing import TYPE_CHECKING
-from typing import Tuple
-from typing import Type
 
-from auditlog.context import set_actor
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.functional import cached_property
@@ -17,6 +12,7 @@ from pydantic import root_validator
 from pydantic import validator
 from pydantic.main import BaseModel
 
+from auditlog.context import set_actor
 from envelope import INTERNAL
 from envelope.core.message import AsyncRunnable
 from envelope.core.message import ContextAction
@@ -54,8 +50,8 @@ class ChangeRolesSchema(BaseModel):
     """
 
     pk: int
-    users: List[int]
-    roles: List[str]  # We have no clue of roles are valid here
+    users: list[int]
+    roles: list[str]  # We have no clue of roles are valid here
     model: str  # The short name of the model to change roles in
 
     # Validators
@@ -70,7 +66,7 @@ class BaseRoles(ContextAction, ABC):
     data: ChangeRolesSchema
 
     @property
-    def model(self) -> Type[RoleContextMixin]:
+    def model(self) -> type[RoleContextMixin]:
         return get_model_by_shortname(self.data.model)
 
     @cached_property
@@ -157,7 +153,7 @@ class RemoveRoles(BaseRoles):
 class GetRolesSchema(BaseModel):
     pk: int = Field(title="pk of context")
     model: str = Field(title="Model name, lowercased, like 'agenda_item'")
-    filter_users: Optional[List[int]] = Field(title="If set: Only check these users")
+    filter_users: list[int] | None = Field(title="If set: Only check these users")
     _validate_model = validator("model", allow_reuse=True)(validate_roles_context_model)
 
 
@@ -177,7 +173,7 @@ class GetRoles(ContextAction):
         return getattr(model_perms, "VIEW_ROLES", NOT_ALLOWED)
 
     @property
-    def model(self) -> Type[RoleContextMixin]:
+    def model(self) -> type[RoleContextMixin]:
         return get_model_by_shortname(self.data.model)
 
     def run_job(self) -> AssignedRolesResponse:
@@ -197,7 +193,7 @@ class GetRoles(ContextAction):
 class AssignedResponseSchema(BaseModel):
     """Return a dict with assigned roles where key is user_pk and value is a list of roles as strings"""
 
-    items: List[Tuple[int, List[str]]] = Field(
+    items: list[tuple[int, list[str]]] = Field(
         title="Assigned roles",
         description="Key is user_pk and value the assigned roles.",
     )
@@ -235,7 +231,7 @@ class AvailableRoles(AsyncRunnable):
 
 
 class AvailableRolesResponseSchema(BaseModel):
-    roles: List[RoleOutput]
+    roles: list[RoleOutput]
 
 
 @outgoing

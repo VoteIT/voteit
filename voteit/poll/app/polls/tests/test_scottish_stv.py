@@ -46,7 +46,7 @@ class ScottishTests(TestCase):
         vote = self.poll.votes.create(user=self.voter, vote=f"{one.pk},{two.pk}")
         vote_data = vote.vote
         self.assertIsInstance(vote_data, RankingSchema)
-        self.assertEquals(vote_data.ranking, [one.pk, two.pk])
+        self.assertEqual(vote_data.ranking, [one.pk, two.pk])
 
     def test_random_votes_result(self):
         from random import sample, randint

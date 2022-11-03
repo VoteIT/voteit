@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import itertools
-from typing import Optional
 
 from django.utils.text import slugify
+
 from voteit.proposal.abcs import ProposalIDPolicy
-from voteit.proposal.registries import proposal_id_registry
 from voteit.proposal.models import Proposal
+from voteit.proposal.registries import proposal_id_registry
 
 __all__ = ("UseridPID",)
 
@@ -15,7 +15,7 @@ __all__ = ("UseridPID",)
 class UseridPID(ProposalIDPolicy):
     name = "userid"
 
-    def __call__(self, proposal: Proposal) -> Optional[str]:
+    def __call__(self, proposal: Proposal) -> str | None:
         if proposal.meeting is None or proposal.author is None:
             return None
 
@@ -32,9 +32,11 @@ class UseridPID(ProposalIDPolicy):
             )
             matching_prop_ids = meeting_proposals.filter(
                 prop_id__startswith=base_suggestion
-            ).values_list('prop_id', flat=True)
+            ).values_list("prop_id", flat=True)
             if matching_prop_ids:
-                num_part = max(int(prop_id.rsplit("-", 1)[-1]) for prop_id in matching_prop_ids)
+                num_part = max(
+                    int(prop_id.rsplit("-", 1)[-1]) for prop_id in matching_prop_ids
+                )
             else:
                 num_part = 0
             for i in itertools.count(num_part + 1):

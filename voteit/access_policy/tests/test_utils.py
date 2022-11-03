@@ -26,9 +26,9 @@ class GetPoliciesTests(TestCase):
 
     def test_function(self):
         self.assertEqual(
-            {"moderator_approved"}, set([x.name for x in self._fut(self.meeting)])
+            {"moderator_approved"}, {x.name for x in self._fut(self.meeting)}
         )
         self.assertEqual(
             {"automatic", "moderator_approved"},
-            set([x.name for x in self._fut(self.meeting, only_active=False)]),
+            {x.name for x in self._fut(self.meeting, only_active=False)},
         )

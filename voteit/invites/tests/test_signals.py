@@ -1,13 +1,13 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import TestCase
+from django.test import override_settings
 
 from envelope.messages.channels import Subscribe
 from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.meeting.models import Meeting
-
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -80,9 +80,9 @@ class InvitesSubscribedTests(TestCase):
             channel_type="invites",
         )
         msg = command.run_job()
-        pks = set(
-            [x.p["pk"] for x in msg.data.app_state if x.t == "meeting_invite.added"]
-        )
+        pks = {
+            x.p["pk"] for x in msg.data.app_state if x.t == "meeting_invite.added"
+        }
         self.assertEqual({self.invite.pk}, pks)
 
 

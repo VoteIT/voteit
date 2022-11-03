@@ -7,7 +7,6 @@ from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
 from voteit.organisation.models import OAuth2Provider
-from voteit.core.models import User as UserType
 
 User = get_user_model()
 
@@ -79,7 +78,7 @@ class UserSearchViewSetTests(APITestCase):
         self.assertEqual(3, len(data))
         self.assertEqual(
             {self.org_manager.pk, self.participant.pk, self.moderator.pk},
-            set([x["pk"] for x in data]),
+            {x["pk"] for x in data},
         )
 
     def test_list_anon(self):

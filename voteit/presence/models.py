@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -14,8 +13,8 @@ from django_fsm import transition
 
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
-from voteit.presence.workflows import PresenceCheckWf
 from voteit.presence.permissions import PresenceCheckPermissions
+from voteit.presence.workflows import PresenceCheckWf
 
 
 class Presence(MeetingContext):
@@ -36,7 +35,7 @@ class Presence(MeetingContext):
     created: datetime = models.DateTimeField(editable=False, default=now)
 
     @property
-    def meeting(self) -> Optional[Meeting]:
+    def meeting(self) -> Meeting | None:
         """
         Find meeting from this instance
         """
@@ -83,7 +82,7 @@ class PresenceCheck(MeetingContext):
         Meeting, on_delete=models.CASCADE, related_name="presence_checks"
     )
     opened: datetime = models.DateTimeField(editable=False, default=now)
-    closed: Optional[datetime] = models.DateTimeField(
+    closed: datetime | None = models.DateTimeField(
         editable=False, null=True, blank=True
     )
 
@@ -119,7 +118,7 @@ class PresenceCheck(MeetingContext):
         def open(self) -> models.QuerySet:
             return self.get_queryset().filter(state=PresenceCheckWf.OPEN)
 
-        def latest_open(self) -> Optional[PresenceCheck]:
+        def latest_open(self) -> PresenceCheck | None:
             return self.open().latest("opened")
 
     objects = Manager()
@@ -139,7 +138,7 @@ class PresenceSystem(MeetingContext):
 
     name = "presence_system"
 
-    meeting: Optional[Meeting] = models.OneToOneField(
+    meeting: Meeting | None = models.OneToOneField(
         Meeting, on_delete=models.CASCADE, null=True, related_name="presence_system"
     )
 

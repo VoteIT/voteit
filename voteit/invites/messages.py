@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 from logging import getLogger
-from typing import Optional
 
-from auditlog.context import set_actor
 from pydantic import Field
 from pydantic import root_validator
 from pydantic import validator
 from pydantic.main import BaseModel
+
+from auditlog.context import set_actor
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
-
 from voteit.core.validators import root_validate_roles_and_model
 from voteit.core.workflows import SendWf
 from voteit.invites.exceptions import InviteError
@@ -169,7 +168,7 @@ VALID_STATES = set(SendWf.states.keys()) - {SendWf.SENDING, SendWf.SCHEDULED}
 
 class SendInvitesSchema(BaseModel):
     meeting: int
-    subject: Optional[str]  # FIXME - None means default from send dispatcher
+    subject: str | None  # FIXME - None means default from send dispatcher
     body: str  # FIXME
     states: list[str] = [SendWf.FAILED, SendWf.SENT, SendWf.CREATED]
     dispatcher_name: str = "send_email"

@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from datetime import datetime
 from logging import getLogger
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -16,9 +17,6 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
-from typing import Optional
-from typing import TYPE_CHECKING
-from typing import Union
 
 from voteit.core.abcs import ABCModel
 from voteit.core.abcs import OrganisationContext
@@ -52,21 +50,21 @@ class User(AbstractUser):
         default=UserWf.initial, choices=UserWf.choices(), editable=False
     )
     # Note that this is only null to make testing easier, it should never be null!
-    organisation: Optional[Organisation] = models.ForeignKey(
+    organisation: Organisation | None = models.ForeignKey(
         "organisation.Organisation",
         on_delete=models.CASCADE,
         null=True,
         related_name="users",
     )
     # Some meetings may require this to be set
-    userid: Optional[str] = models.CharField(
+    userid: str | None = models.CharField(
         max_length=50,
         blank=True,
         null=True,
         validators=[userid_validator],
     )
-    identity_id: Optional[str] = models.CharField(max_length=80, blank=True, null=True)
-    img_url: Optional[str] = models.URLField(
+    identity_id: str | None = models.CharField(max_length=80, blank=True, null=True)
+    img_url: str | None = models.URLField(
         "Profile image url", blank=True, null=True
     )  # FIXME Validator and scheme
 
@@ -118,7 +116,7 @@ class User(AbstractUser):
         pass
 
     def oauth_session(self) -> OAuth2Session:
-        access_token: Optional[AccessToken] = self.access_tokens.filter(
+        access_token: AccessToken | None = self.access_tokens.filter(
             provider=self.organisation.provider
         ).first()
         if access_token is None:
@@ -130,7 +128,7 @@ class User(AbstractUser):
     # Annotations
     last_read_set: models.QuerySet
     access_tokens: models.QuerySet
-    organisation_id: Optional[int]
+    organisation_id: int | None
 
 
 def real_user_only(method):
@@ -155,21 +153,21 @@ class RoleContextMixin(OrganisationContext):
         Return the Roles class that this context uses.
         """
 
-    def add_roles(self, user: User, *roles: Role) -> Optional[set[Role]]:
+    def add_roles(self, user: User, *roles: Role) -> set[Role] | None:
         assert isinstance(user, User)
         roles_model, created = self.roles_cls.objects.get_or_create(
             user=user, context=self
         )
         return roles_model.add(*roles)
 
-    def remove_roles(self, user: User, *roles: Role) -> Optional[set[Role]]:
+    def remove_roles(self, user: User, *roles: Role) -> set[Role] | None:
         assert isinstance(user, User)
         roles_model = self.roles_cls.objects.filter(user=user, context=self).first()
         if roles_model is not None:
             return roles_model.remove(*roles)
 
     @real_user_only
-    def get_roles(self, user: User) -> Optional[set[Role]]:
+    def get_roles(self, user: User) -> set[Role] | None:
         roles_model = self.roles_cls.objects.filter(user=user, context=self).first()
         if roles_model is not None:
             # Note, may raise AssertionError if some roles are invalid
@@ -218,7 +216,7 @@ class RoleContextMixin(OrganisationContext):
 
     def filter_valid_roles(self, *roles: Role | str) -> set[str]:
         items = self.roles_to_strings(*roles)
-        return set([x for x in items if x in self.roles_cls.valid_roles])
+        return {x for x in items if x in self.roles_cls.valid_roles}
 
     class Meta:
         abstract = True
@@ -248,10 +246,10 @@ class Roles(ABCModel):
         # Note: This isn't inherited to any other subclassing model!
         unique_together = (("user", "context"),)
 
-    def add(self, *roles: Role | str) -> Optional[set[Role]]:
+    def add(self, *roles: Role | str) -> set[Role] | None:
         checked = self.validate_roles(*roles)
         assigned = set(self.assigned)
-        query_add = set([x.name for x in self.get_required_roles(*checked)])
+        query_add = {x.name for x in self.get_required_roles(*checked)}
         new_roles = query_add - assigned
         if new_roles:
             self.assigned += tuple(new_roles)
@@ -261,10 +259,10 @@ class Roles(ABCModel):
             return role_objs
         return None
 
-    def remove(self, *roles: Role | str) -> Optional[set[Role]]:
+    def remove(self, *roles: Role | str) -> set[Role] | None:
         checked = self.validate_roles(*roles)
         assigned = set(self.assigned)
-        query_remove = set([x.name for x in self.get_reverse_required_roles(*checked)])
+        query_remove = {x.name for x in self.get_reverse_required_roles(*checked)}
         remove_roles = assigned & query_remove
         if remove_roles:
             self.assigned = tuple(set(self.assigned) - remove_roles)
@@ -352,7 +350,7 @@ class Roles(ABCModel):
 class BaseContent(ABCModel):
     body: str = RichTextField(blank=True, default="", html_cleaner=strict_clean_html)
     created: datetime = models.DateTimeField(editable=False, default=now)
-    author: Optional[User] = models.ForeignKey(
+    author: User | None = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         editable=False,
@@ -360,7 +358,7 @@ class BaseContent(ABCModel):
         related_name="author_%(app_label)s_%(class)s",
     )
     modified: datetime = models.DateTimeField(editable=False, auto_now=True)
-    last_modified_by: Optional[User] = models.ForeignKey(
+    last_modified_by: User | None = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         editable=False,

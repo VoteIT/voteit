@@ -6,7 +6,6 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.timezone import now
-from typing import Optional
 
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
@@ -71,13 +70,13 @@ class PNSystem(MeetingContext):
 
     name = "pnsystem"
 
-    meeting: Optional[Meeting] = models.OneToOneField(
+    meeting: Meeting | None = models.OneToOneField(
         Meeting, on_delete=models.CASCADE, null=True, related_name="pn_system"
     )
 
     importers = {"organisation": {}}
 
-    def get_user(self, pn: int, default=None) -> Optional[AbstractUser]:
+    def get_user(self, pn: int, default=None) -> AbstractUser | None:
         for pn_obj in self.numbers.filter(number=pn).all().prefetch_related("user"):
             return pn_obj.user
         return default

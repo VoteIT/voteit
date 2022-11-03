@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from abc import ABCMeta
 from abc import abstractmethod
-from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.db import models
@@ -11,7 +10,6 @@ if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
     from voteit.agenda.models import AgendaItem
     from voteit.organisation.models import Organisation
-    from voteit.core.models import User
 
 __all__ = ("ABCModel", "AgendaItemContext", "MeetingContext", "OrganisationContext")
 
@@ -45,8 +43,8 @@ class ABCModel(models.Model, metaclass=_AbstractModelMeta):
 
 
 class AuditLogMixin:
-    agenda_item: Optional[AgendaItem]
-    meeting: Optional[Meeting]
+    agenda_item: AgendaItem | None
+    meeting: Meeting | None
 
     def get_additional_data(self):
         """
@@ -74,7 +72,7 @@ class AgendaItemContext(AuditLogMixin, ABCModel):
 
     @property
     @abstractmethod
-    def agenda_item(self) -> Optional[AgendaItem]:
+    def agenda_item(self) -> AgendaItem | None:
         """
         Return the AgendaItem object. Probably a foreign key relation.
         """
@@ -90,7 +88,7 @@ class MeetingContext(AuditLogMixin, ABCModel):
 
     @property
     @abstractmethod
-    def meeting(self) -> Optional[Meeting]:
+    def meeting(self) -> Meeting | None:
         """
         Return the meeting object. It could be a ForeignKey relation or something that gets the meeting
         """
@@ -106,7 +104,7 @@ class OrganisationContext(AuditLogMixin, ABCModel):
 
     @property
     @abstractmethod
-    def organisation(self) -> Optional[Organisation]:
+    def organisation(self) -> Organisation | None:
         """
         Return the organisation object. It could be a ForeignKey relation or a property
         """

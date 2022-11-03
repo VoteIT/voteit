@@ -7,11 +7,7 @@ from datetime import datetime
 from hashlib import sha512
 from json import dumps
 from logging import getLogger
-from typing import Dict
-from typing import Optional
 from typing import TYPE_CHECKING
-from typing import Type
-from typing import Union
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -30,16 +26,15 @@ from django_fsm import post_transition
 from django_fsm import transition
 from pydantic import ValidationError
 from pydantic.main import BaseModel
+
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.meeting.models import Meeting
 from voteit.poll.exceptions import BallotChecksumError
-from voteit.poll.exceptions import ElectoralRegisterEmpty
 from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidPollMethod
-from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.exceptions import NotAllowedToVote
 from voteit.poll.exceptions import PollError
 from voteit.poll.exceptions import PollNotFinished
@@ -78,13 +73,13 @@ class VoterWeight(models.Model):
 class ElectoralRegister(MeetingContext):
     name = "electoral_register"
     created: datetime = models.DateTimeField(editable=False, default=now)
-    source: Optional[str] = models.CharField(max_length=20, null=True, blank=True)
+    source: str | None = models.CharField(max_length=20, null=True, blank=True)
     voters = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         through=VoterWeight,
         related_name="electoral_registers",
     )
-    meeting: Optional[Meeting] = models.ForeignKey(
+    meeting: Meeting | None = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="electoral_registers", null=True
     )
 
@@ -123,7 +118,7 @@ class ElectoralRegister(MeetingContext):
         even have permission to view the meeting!
         """
         self.voters.set(values.keys())
-        user_weights_to_adjust = set(k for (k, v) in values.items() if v > 1)
+        user_weights_to_adjust = {k for (k, v) in values.items() if v > 1}
         for vw in self.voterweight_set.filter(user__in=user_weights_to_adjust):
             vw.weight = values[vw.user_id]
             vw.save()
@@ -158,36 +153,36 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     )
     title: str = models.CharField(max_length=70)
     description: str = models.CharField(max_length=200)
-    meeting: Optional[Meeting] = models.ForeignKey(
+    meeting: Meeting | None = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="polls", null=True
     )
-    agenda_item: Optional[AgendaItem] = models.ForeignKey(
+    agenda_item: AgendaItem | None = models.ForeignKey(
         "agenda.AgendaItem", on_delete=models.CASCADE, null=True, related_name="polls"
     )
     proposals = models.ManyToManyField("proposal.Proposal", related_name="polls")
     method_name: str = models.CharField(max_length=20)
-    settings_data: Optional[Dict] = models.JSONField(null=True, blank=True)
+    settings_data: dict | None = models.JSONField(null=True, blank=True)
     created: datetime = models.DateTimeField(editable=False, default=now)
-    started: Optional[datetime] = models.DateTimeField(editable=False, null=True)
-    closed: Optional[datetime] = models.DateTimeField(editable=False, null=True)
-    initial_electoral_register: Optional[ElectoralRegister] = models.ForeignKey(
+    started: datetime | None = models.DateTimeField(editable=False, null=True)
+    closed: datetime | None = models.DateTimeField(editable=False, null=True)
+    initial_electoral_register: ElectoralRegister | None = models.ForeignKey(
         "ElectoralRegister",
         on_delete=models.SET_NULL,
         editable=False,
         null=True,
         related_name="polls_initial",
     )
-    electoral_register: Optional[ElectoralRegister] = models.ForeignKey(
+    electoral_register: ElectoralRegister | None = models.ForeignKey(
         "ElectoralRegister",
         on_delete=models.SET_NULL,
         editable=False,
         null=True,
         related_name="polls",
     )
-    ballot_data: Optional[str] = models.TextField(
+    ballot_data: str | None = models.TextField(
         verbose_name="JSON-serialized ballot data", editable=False, null=True
     )
-    ballot_checksum: Optional[str] = models.CharField(
+    ballot_checksum: str | None = models.CharField(
         verbose_name="SHA512 checksum of ballot data",
         max_length=128,
         editable=False,
@@ -196,7 +191,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     abstains: int = models.PositiveIntegerField(
         verbose_name="Abstentions", default=0, editable=False
     )
-    result_data: Optional[Dict] = models.JSONField(
+    result_data: dict | None = models.JSONField(
         verbose_name="JSON-serialized result data",
         editable=False,
         null=True,
@@ -216,7 +211,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         }
     }
 
-    def get_method_class(self) -> Type[PollMethod]:
+    def get_method_class(self) -> type[PollMethod]:
         """Fetch the poll method class, a django proxy model."""
         reg = get_poll_method_registry()
         if self.method_name not in reg:
@@ -239,7 +234,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             return schema(**data)
 
     @settings.setter
-    def settings(self, value: Union[Dict, BaseModel, None]) -> None:
+    def settings(self, value: dict | BaseModel | None) -> None:
         if value is None:
             self.settings_data = None
             return
@@ -255,7 +250,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         self.settings_data = data.dict()
 
     @property
-    def result(self) -> Optional[PollResult]:
+    def result(self) -> PollResult | None:
         schema = self.method.result_schema
         if schema is not None:
             result = self.result_data
@@ -263,7 +258,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
                 return schema(**self.result_data)
 
     @result.setter
-    def result(self, value: Union[Dict, PollResult]):
+    def result(self, value: dict | PollResult):
         schema = self.method.result_schema
         if isinstance(value, dict):
             data = schema(**value)
@@ -570,7 +565,7 @@ class Vote(models.Model):
     created: datetime = models.DateTimeField(editable=False, default=now)
     changed: datetime = models.DateTimeField(editable=False, auto_now=True)
     abstain: bool = models.BooleanField(default=False)
-    vote_data: Optional[str] = models.TextField(
+    vote_data: str | None = models.TextField(
         null=True, blank=True
     )  # This field should contain the value from PollMethod
 
@@ -581,7 +576,7 @@ class Vote(models.Model):
         return self.vote_data and self.poll.method.vote_to_obj(self.vote_data)
 
     @vote.setter
-    def vote(self, data: Union[BaseModel, str]):
+    def vote(self, data: BaseModel | str):
         if isinstance(data, BaseModel):
             self.vote_data = self.poll.method.vote_to_str(data)
         elif isinstance(data, str):

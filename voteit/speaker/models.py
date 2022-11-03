@@ -3,10 +3,7 @@ from __future__ import annotations
 from contextlib import suppress
 from datetime import datetime
 from datetime import timedelta
-from typing import Optional
 from typing import TYPE_CHECKING
-from typing import Type
-from typing import Union
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -23,10 +20,10 @@ from pydantic.main import BaseModel
 from voteit.agenda.models import AgendaItem
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
+from voteit.core.decorators import ensure_atomic
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.permissions import NOT_ALLOWED
-from voteit.core.decorators import ensure_atomic
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.speaker.abcs import SpeakerSystemContext
@@ -50,7 +47,7 @@ class SpeakerSystemRoles(Roles, MeetingContext):
     )
 
     @property
-    def meeting(self) -> Optional[Meeting]:
+    def meeting(self) -> Meeting | None:
         return self.context.meeting
 
     class Meta:
@@ -75,8 +72,8 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         choices=SpeakerSystemWf.choices(),
         editable=False,
     )
-    title: Optional[str] = models.CharField(max_length=200, null=True)
-    meeting: Optional[Meeting] = models.ForeignKey(
+    title: str | None = models.CharField(max_length=200, null=True)
+    meeting: Meeting | None = models.ForeignKey(
         Meeting,
         verbose_name="Related meeting",
         on_delete=models.CASCADE,
@@ -90,7 +87,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         null=True,
         encoder=DjangoJSONEncoder,
     )
-    safe_positions: Optional[int] = models.PositiveSmallIntegerField(
+    safe_positions: int | None = models.PositiveSmallIntegerField(
         verbose_name=(
             "When a list is active, mark the top X positions as safe automatically. "
             "Safe speakers will never be moved down."
@@ -99,7 +96,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         null=True,
         blank=True,
     )
-    active_list: Optional[SpeakerList] = models.OneToOneField(
+    active_list: SpeakerList | None = models.OneToOneField(
         "SpeakerList",
         verbose_name="Currently active speaker list",
         null=True,
@@ -115,7 +112,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     exporters = {"meeting": {"ignore_fields": ("active_list",)}}
     importers = {"meeting": {}, "organisation": {}}
 
-    def get_method_class(self) -> Type[ListMethod]:
+    def get_method_class(self) -> type[ListMethod]:
         """Fetch the poll method class, a django proxy model."""
         reg = get_list_method_registry()
         return reg[self.method_name]
@@ -143,7 +140,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
             return schema(**data)
 
     @settings.setter
-    def settings(self, value: Union[dict, BaseModel]):
+    def settings(self, value: dict | BaseModel):
         schema = self.method.settings_schema
         if schema is None:
             raise ValueError(f"Method {self.method.name} has no settings_schema")
@@ -216,7 +213,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
                 raise ValueError(f"{role} is not a valid meeting role")
         if self.active_list and self.active_list not in self.speaker_lists.all():
             raise IntegrityError("Active list belongs to another speaker system")
-        super(SpeakerListSystem, self).save(**kw)
+        super().save(**kw)
 
     @property
     def is_archived(self):
@@ -252,8 +249,8 @@ class Speaker(MeetingContext, SpeakerSystemContext):
     )
     # Note: Created is also needed for "historic" positions within a speaker list in case they're rearranged.
     created: datetime = models.DateTimeField(editable=False, default=now)
-    started: Optional[datetime] = models.DateTimeField(null=True)
-    seconds: Optional[int] = models.PositiveSmallIntegerField(null=True)
+    started: datetime | None = models.DateTimeField(null=True)
+    seconds: int | None = models.PositiveSmallIntegerField(null=True)
 
     importers = {"organisation": {}}
 
@@ -261,7 +258,7 @@ class Speaker(MeetingContext, SpeakerSystemContext):
         constraints = []
 
     @property
-    def ended(self) -> Optional[datetime]:
+    def ended(self) -> datetime | None:
         if self.seconds is not None and isinstance(self.started, datetime):
             return self.started + timedelta(seconds=self.seconds)
 
@@ -281,7 +278,7 @@ class Speaker(MeetingContext, SpeakerSystemContext):
         return self.started is None
 
     @property
-    def meeting(self) -> Optional[Meeting]:
+    def meeting(self) -> Meeting | None:
         return self.speaker_list.meeting
 
     @property
@@ -311,7 +308,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     state = FSMField(
         default=SpeakerListWf.initial, choices=SpeakerListWf.choices(), editable=False
     )
-    current: Optional[Speaker] = models.OneToOneField(
+    current: Speaker | None = models.OneToOneField(
         Speaker,
         verbose_name="Current speaker, if any",
         null=True,
@@ -321,7 +318,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     speaker_system: SpeakerListSystem = models.ForeignKey(
         SpeakerListSystem, on_delete=models.CASCADE, related_name="speaker_lists"
     )
-    agenda_item: Optional[AgendaItem] = models.ForeignKey(
+    agenda_item: AgendaItem | None = models.ForeignKey(
         AgendaItem, on_delete=models.CASCADE, null=True, related_name="speaker_lists"
     )
     speakers = models.ManyToManyField(
@@ -339,7 +336,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     importers = {"meeting": {}, "organisation": {}}
 
     @property
-    def meeting(self) -> Optional[Meeting]:
+    def meeting(self) -> Meeting | None:
         """
         While not directly related, it's still good to be able to do lookups this way
         """

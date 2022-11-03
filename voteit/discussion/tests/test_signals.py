@@ -1,11 +1,11 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import TestCase
+from django.test import override_settings
+
 from envelope.messages.channels import Subscribe
-
 from voteit.agenda.channels import AgendaItemChannel
-
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -34,9 +34,9 @@ class AgendaSubscribedTests(TestCase):
             channel_type="agenda_item",
         )
         msg = command.run_job()
-        pks = set(
-            [x.p["pk"] for x in msg.data.app_state if x.t == "discussion_post.added"]
-        )
+        pks = {
+            x.p["pk"] for x in msg.data.app_state if x.t == "discussion_post.added"
+        }
         self.assertEqual({self.disc1.pk, self.disc2.pk}, pks)
 
 

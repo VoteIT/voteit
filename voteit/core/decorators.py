@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import Optional
 from typing import TYPE_CHECKING
 
 from django.apps import apps
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
     from voteit.core.predicate import Predicate
 
 
-def predicate(*args, role: Optional[Role] = None, **kwargs) -> Predicate:
+def predicate(*args, role: Role | None = None, **kwargs) -> Predicate:
     """Decorate predicates with this instead of using rules.predicate
 
     The method will also add the function to the predicates-registry and wrap

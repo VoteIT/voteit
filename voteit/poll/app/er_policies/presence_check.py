@@ -39,9 +39,9 @@ class PresenceCheckPolicy(ElectoralRegisterPolicy):
         present_potential_voters = presence_check.present_users.filter(
             pk__in=potential_voters
         )
-        return dict(
-            (x, 1) for x in present_potential_voters.values_list("pk", flat=True)
-        )
+        return {
+            x: 1 for x in present_potential_voters.values_list("pk", flat=True)
+        }
 
     def poll_will_have_voters(self, **kwargs):
         """

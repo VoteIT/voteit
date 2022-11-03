@@ -2,16 +2,15 @@ from __future__ import annotations
 
 from datetime import timedelta
 from logging import getLogger
-from typing import Optional
 from typing import TYPE_CHECKING
 
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from django.core.exceptions import MultipleObjectsReturned
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils.timezone import now
-from django.utils.translation import gettext as _
 
-from voteit.invites.exceptions import InviteError
 from voteit.core.workflows import SendWf
+from voteit.invites.exceptions import InviteError
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import Meeting
 
@@ -73,7 +72,7 @@ def create_invites(created_by: User = None, **kwargs):
             invite.invite_data = row
             invite.roles = add_data.roles
             invite.last_modified_by = created_by
-            user: Optional[User] = invite.used_by
+            user: User | None = invite.used_by
             if not user and invite.state not in {InviteWf.ACCEPTED, InviteWf.OPEN}:
                 invite.state = InviteWf.OPEN
             invite.save()

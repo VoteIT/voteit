@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import List
 from typing import TYPE_CHECKING
 
 from django.conf import settings
@@ -10,6 +9,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import IntegrityError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.utils import get_model_by_shortname
@@ -64,10 +64,10 @@ class ReactionButton(MeetingContext):
         Meeting, on_delete=models.CASCADE, related_name="reaction_buttons"
     )
     order: int = models.PositiveSmallIntegerField(default=0)
-    change_roles: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
-    list_roles: List[str] = ArrayField(models.CharField(max_length=20), default=tuple)
+    change_roles: list[str] = ArrayField(models.CharField(max_length=20), default=tuple)
+    list_roles: list[str] = ArrayField(models.CharField(max_length=20), default=tuple)
     active: bool = models.BooleanField(verbose_name="Is this activated?", default=True)
-    allowed_models: List[str] = ArrayField(
+    allowed_models: list[str] = ArrayField(
         models.CharField(max_length=20),
         default=_default_allowed_models,
         blank=True,

@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
-from typing import Set
 from typing import TYPE_CHECKING
-from typing import Type
 
 from voteit.core.schemas import PredicateOutput
 from voteit.core.schemas import RoleOutput
@@ -54,17 +51,17 @@ class Role:
     """
 
     name: str
-    predicate: Optional[Predicate] = None
+    predicate: Predicate | None = None
     title: str
     description: str = ""
-    roles_cls: Type[Roles]
-    requires: Set[Role]
+    roles_cls: type[Roles]
+    requires: set[Role]
 
     def __init__(
         self,
         name,
-        predicate: Optional[Predicate] = None,
-        title: Optional[str] = None,
+        predicate: Predicate | None = None,
+        title: str | None = None,
         description: str = "",
     ):
         self.name = name
@@ -87,7 +84,7 @@ class Role:
     __repr__ = __str__
 
     @property
-    def predicate_info(self) -> Optional[PredicateOutput]:
+    def predicate_info(self) -> PredicateOutput | None:
         if self.predicate is not None:
             return self.predicate.output()  # Patched in registry
         return None
@@ -104,11 +101,11 @@ class Role:
         self.requires.add(role)
 
     @property
-    def require_names(self) -> Set[str]:
-        return set([x.name for x in self.requires])
+    def require_names(self) -> set[str]:
+        return {x.name for x in self.requires}
 
     @property
-    def roles_cls_natural_key(self) -> Optional[str]:
+    def roles_cls_natural_key(self) -> str | None:
         cls_meta = self.roles_cls._meta
         return f"{cls_meta.app_label}.{cls_meta.model_name.lower()}"
 

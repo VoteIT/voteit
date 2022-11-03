@@ -4,9 +4,7 @@ import os
 from abc import ABC
 from abc import abstractmethod
 from typing import Generator
-from typing import Optional
-from typing import Type
-from typing import Union
+from typing import TYPE_CHECKING
 
 from django.core import serializers
 from django.core.serializers.base import DeserializedObject
@@ -15,7 +13,6 @@ from django.db import DatabaseError
 from django.db import IntegrityError
 from django.db import models
 from django.db import router
-from typing import TYPE_CHECKING
 
 from voteit.core.utils import get_content_registry
 from voteit.core.utils import get_model_shortname
@@ -87,7 +84,7 @@ class BaseImport(ABC):
 class BaseImporter(ABC):
     @property
     @abstractmethod
-    def import_class(self) -> Type[BaseImport]:
+    def import_class(self) -> type[BaseImport]:
         ...
 
     def __init__(self, using=DEFAULT_DB_ALIAS, filename=None, stream=None, format=None):
@@ -98,7 +95,7 @@ class BaseImporter(ABC):
         if filename:
             if not os.path.isfile(filename):
                 ValueError(f"{filename} is not an existing file")
-            stream = open(filename, "r")
+            stream = open(filename)
             if format is None:
                 if filename.endswith("yaml") or filename.endswith("yml"):
                     format = "yaml"
@@ -143,7 +140,7 @@ class BaseImporter(ABC):
         assert isinstance(remap_to.pk, int)
         return remap_to
 
-    def add_obj_to_handle(self, obj: Union[models.Model, DeserializedObject]):
+    def add_obj_to_handle(self, obj: models.Model | DeserializedObject):
         if isinstance(obj, DeserializedObject):
             name = get_model_shortname(obj.object)
             pk = obj.object.pk
@@ -171,7 +168,7 @@ class BaseImporter(ABC):
         for deserialized in self.objs_with_deferred_fields:
             deserialized.save_deferred_fields(using=self.using)
 
-    def remap_fk_relation(self, obj, field_name, relation_model_name) -> Optional[int]:
+    def remap_fk_relation(self, obj, field_name, relation_model_name) -> int | None:
         """
         Returns int pk if relation was a pointer to superclass. In that case, use the value for pk.
         """
@@ -311,7 +308,7 @@ class BaseImporter(ABC):
                             new_val.append(remap_to.pk)
                         deserialized.m2m_data[relation_attr_name] = new_val
         unhandled_m2m = (
-            set([k for k, v in deserialized.m2m_data.items() if v]) - m2ms_handled
+            {k for k, v in deserialized.m2m_data.items() if v} - m2ms_handled
         )
         if unhandled_m2m:
             raise Exception(

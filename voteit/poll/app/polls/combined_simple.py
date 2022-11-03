@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Dict
-from typing import List
-from typing import Tuple
 
 from django.utils.translation import gettext_lazy as _
 from pydantic import BaseModel
@@ -27,12 +24,12 @@ VOTE_CHOICES = ((YES, _("Yes")), (NO, _("No")), (ABSTAIN, _("Abstain")))
 
 
 class CombinedSimpleVoteSchema(BaseModel):
-    yes: List[int] = []
-    no: List[int] = []
-    abstain: List[int] = []
+    yes: list[int] = []
+    no: list[int] = []
+    abstain: list[int] = []
 
     @validator("yes", "no", "abstain")
-    def order_choices(cls, lst: List[int]):
+    def order_choices(cls, lst: list[int]):
         return sorted(lst)
 
 
@@ -54,7 +51,7 @@ class ProposalResult(BaseModel):
 
 
 class CombinedSimplePollResult(PollResult):
-    results: Dict[int, ProposalResult]
+    results: dict[int, ProposalResult]
 
 
 @poll_methods
@@ -77,7 +74,7 @@ class CombinedSimple(PollMethod):
 
     @staticmethod
     def _count_votes(
-        pk: int, votes: List[Tuple[CombinedSimpleVoteSchema, int]]
+        pk: int, votes: list[tuple[CombinedSimpleVoteSchema, int]]
     ) -> Counter:
         count = Counter()
         for vote, ct in votes:
@@ -94,14 +91,14 @@ class CombinedSimple(PollMethod):
         Equal result means proposal is neither approved nor denied.
         """
         votes = [(self.vote_to_obj(vote), ct) for vote, ct in counter.items()]
-        results: Dict[int, Counter] = {
+        results: dict[int, Counter] = {
             pk: self._count_votes(pk, votes)
             for pk in self.poll.proposals.values_list("pk", flat=True)
         }
-        approved: List[int] = [
+        approved: list[int] = [
             pk for pk, counter in results.items() if counter[YES] > counter[NO]
         ]
-        denied: List[int] = [
+        denied: list[int] = [
             pk for pk, counter in results.items() if counter[YES] < counter[NO]
         ]
         return CombinedSimplePollResult(

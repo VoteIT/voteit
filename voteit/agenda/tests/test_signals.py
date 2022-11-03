@@ -2,14 +2,14 @@ from datetime import datetime
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import TestCase
+from django.test import override_settings
 from pytz import UTC
 
 from envelope.messages.channels import Subscribe
 from voteit.meeting.channels import MeetingChannel
-from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
-
+from voteit.meeting.channels import ParticipantsChannel
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -40,7 +40,7 @@ class SubscribedTests(TestCase):
             channel_type=ParticipantsChannel.name,
         )
         msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "agenda_item.added"])
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "agenda_item.added"}
         self.assertEqual({self.ai.pk}, pks)
 
     def test_app_state_sent_moderators(self):
@@ -50,7 +50,7 @@ class SubscribedTests(TestCase):
             channel_type=ModeratorsChannel.name,
         )
         msg = command.run_job()
-        pks = set([x.p["pk"] for x in msg.data.app_state if x.t == "agenda_item.added"])
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "agenda_item.added"}
         self.assertEqual({self.ai.pk, self.ai_private.pk}, pks)
 
     def test_app_state_last_read_sent(self):
@@ -60,13 +60,11 @@ class SubscribedTests(TestCase):
             channel_type=MeetingChannel.name,
         )
         msg = command.run_job()
-        agenda_pks = set(
-            [
+        agenda_pks = {
                 x.p["agenda_item"]
                 for x in msg.data.app_state
                 if x.t == "last_read.changed"
-            ]
-        )
+        }
         self.assertEqual({self.ai_private.pk}, agenda_pks)
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from contextlib import suppress
 from logging import getLogger
-from typing import Optional
 from typing import OrderedDict
 from typing import TYPE_CHECKING
 
@@ -40,7 +39,7 @@ logger = getLogger(__name__)
 class BaseModelSerializer(serializers.ModelSerializer):
     author_kw = "author"
 
-    def get_request_user(self) -> Optional[AbstractUser]:
+    def get_request_user(self) -> AbstractUser | None:
         # Validate user?
         request = self.context.get("request")
         if request is not None:
@@ -99,7 +98,7 @@ class BaseModelSerializer(serializers.ModelSerializer):
         attrs[self.author_kw] = author
         return attrs
 
-    def validate_meeting_group(self, value: Optional[MeetingGroup]):
+    def validate_meeting_group(self, value: MeetingGroup | None):
         """
         - None is always allowed.
         - Moderators can post as any group.
@@ -184,9 +183,9 @@ class UserSerializer(serializers.ModelSerializer):
         if user.email == value:
             return value
         identity_data = get_identity_data(user)
-        valid_emails = set(
-            [x["data"] for x in identity_data["user_data"] if x["scope"] == "email"]
-        )
+        valid_emails = {
+            x["data"] for x in identity_data["user_data"] if x["scope"] == "email"
+        }
         if value not in valid_emails:
             raise ValidationError(
                 _("Email you specified isn't validated. It must exist on your profile.")
@@ -276,7 +275,7 @@ class BaseFSMTransitonSerializer(serializers.Serializer):
     """Basic details with no checks"""
 
     name: str = serializers.CharField()
-    permission: Optional[str] = serializers.CharField(required=False)
+    permission: str | None = serializers.CharField(required=False)
     source: str = serializers.CharField(required=False)
     target: str = serializers.CharField()
     title: str = serializers.SerializerMethodField()
@@ -289,7 +288,7 @@ class BaseFSMTransitonSerializer(serializers.Serializer):
 
 
 class FSMTransitionSerializer(BaseFSMTransitonSerializer):
-    has_perm: Optional[bool] = serializers.SerializerMethodField()
+    has_perm: bool | None = serializers.SerializerMethodField()
     conditions: list[dict] = serializers.SerializerMethodField()
     allowed: bool = serializers.BooleanField(required=False)
 
@@ -300,7 +299,7 @@ class FSMTransitionSerializer(BaseFSMTransitonSerializer):
         )
         return res
 
-    def get_has_perm(self, transition: Transition) -> Optional[bool]:
+    def get_has_perm(self, transition: Transition) -> bool | None:
         return transition.has_perm(
             self.context["instance"], self.context["request"].user
         )

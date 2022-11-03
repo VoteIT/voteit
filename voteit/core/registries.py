@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from typing import Generator
 from typing import TYPE_CHECKING
-from typing import Union
 
-from rules import Predicate
-from typing import Type
 from django.db.models import Model
+from rules import Predicate
 
 from voteit.core.component import Registry
 from voteit.core.permissions import Permission
@@ -45,7 +43,7 @@ class ContentRegistry(Registry):
     True
     """
 
-    def get_natural_key(self, obj: Union[str, Model, Type[Model]]) -> str:
+    def get_natural_key(self, obj: str | Model | type[Model]) -> str:
         if isinstance(obj, str):
             obj = self[obj]
         if isinstance(obj, Model):

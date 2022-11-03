@@ -30,14 +30,14 @@ class ChangeGroup:
     def get_html(self, joiner, brief=False):
         txt = joiner.join(self.brief_parts(joiner) if brief else self.parts)
         if self.state == "insert":
-            return '<span class="text-diff-added">{0}</span>'.format(txt)
+            return '<span class="text-diff-added">{}</span>'.format(txt)
         if self.state == "delete":
-            return '<span class="text-diff-removed">{0}</span>'.format(txt)
+            return '<span class="text-diff-removed">{}</span>'.format(txt)
         return txt
 
 
 class Changes:
-    WHITESPACES = re.compile("\s+", re.UNICODE)
+    WHITESPACES = re.compile(r"\s+", re.UNICODE)
     FIRST_TAG = re.compile(r"^(#\w+)", re.UNICODE)
     BULLETS = "•*→-‐‑‒–—―‣"
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
+
 from contextlib import suppress
-from typing import Optional
-from typing import Type
 
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
@@ -22,7 +21,7 @@ from voteit.meeting.roles import ROLE_PROPOSER
 class UserRolesMixin(serializers.Serializer):
     current_user_roles = serializers.SerializerMethodField()
 
-    def get_current_user_roles(self, instance) -> Optional[list[str]]:
+    def get_current_user_roles(self, instance) -> list[str] | None:
         """
         Return current user roles, if available, for a meeting.
 
@@ -132,9 +131,9 @@ class MeetingAddParticipantSerializer(serializers.ModelSerializer):
 class RoleValidator:
     """Ensures that role name is valid for roles class provided on class instantiation."""
 
-    roles_cls: Type[Roles]
+    roles_cls: type[Roles]
 
-    def __init__(self, roles_cls: Type[Roles]):
+    def __init__(self, roles_cls: type[Roles]):
         self.roles_cls = roles_cls
 
     def __call__(self, value):

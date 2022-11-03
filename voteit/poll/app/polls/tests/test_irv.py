@@ -1,5 +1,7 @@
 from collections import Counter
-from random import sample, randint, seed
+from random import randint
+from random import sample
+from random import seed
 
 from django.test import TestCase
 from pydantic import ValidationError
@@ -37,7 +39,7 @@ class IRVTests(TestCase):
         vote = self.poll.votes.create(user=self.voter, vote=f"{one.pk},{two.pk}")
         vote_data = vote.vote
         self.assertIsInstance(vote_data, RankingSchema)
-        self.assertEquals(vote_data.ranking, [one.pk, two.pk])
+        self.assertEqual(vote_data.ranking, [one.pk, two.pk])
 
     def test_random_votes_result(self):
         from voteit.proposal.workflows import ProposalWf
@@ -181,7 +183,7 @@ class RepeatedIRVTests(TestCase):
         vote = self.poll.votes.create(user=self.voter, vote=f"{one.pk},{two.pk}")
         vote_data = vote.vote
         self.assertIsInstance(vote_data, RankingSchema)
-        self.assertEquals(vote_data.ranking, [one.pk, two.pk])
+        self.assertEqual(vote_data.ranking, [one.pk, two.pk])
 
     def test_random_votes_result(self):
         from voteit.proposal.workflows import ProposalWf

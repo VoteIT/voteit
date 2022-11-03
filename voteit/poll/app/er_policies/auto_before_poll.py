@@ -7,7 +7,6 @@ from voteit.poll.abcs import ElectoralRegisterPolicy
 from voteit.poll.models import Poll
 from voteit.poll.registries import er_policy
 
-
 __all__ = ("AutoBeforePoll",)
 logger = getLogger(__name__)
 
@@ -28,9 +27,7 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
     handles_vote_weight = False
 
     def get_voters(self, **kwargs) -> dict[int, int]:
-        return dict(
-            (x, 1) for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
-        )
+        return {x: 1 for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)}
 
     def pre_apply(self, poll: Poll, target: str):
         self.create_er()  # Won't trigger unless needed

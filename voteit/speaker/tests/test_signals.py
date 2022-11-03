@@ -5,9 +5,9 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
+
 from envelope.messages.channels import Subscribe
 from envelope.messages.channels import Subscribed
-
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
@@ -345,7 +345,7 @@ class ChannelSubscribedTests(TestCase):
         msg = self._mk_one(self.meeting.pk, "meeting")
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
-        appstates = dict((x.t, x.p) for x in response.data.app_state)
+        appstates = {x.t: x.p for x in response.data.app_state}
         self.assertIn("speaker_system.added", appstates)
         added_system_roles = [
             x
