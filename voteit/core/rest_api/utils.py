@@ -1,6 +1,7 @@
 """ REST-specific utils"""
 from __future__ import annotations
 
+import logging
 from typing import Callable
 from typing import Generator
 from typing import TYPE_CHECKING
@@ -8,6 +9,7 @@ from typing import TYPE_CHECKING
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
 from requests.exceptions import ConnectionError as RConnectionError
+from requests.exceptions import JSONDecodeError
 from rest_framework.exceptions import APIException
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
@@ -54,7 +56,12 @@ def get_identity_data(user: User) -> dict:
     # Not the correct serializer exception, but this is kind of the crash and burn...
     # FIXME: Cases to handle: Token expired, user not found etc
     if not response.ok:
-        raise ValidationError(response.json())
+        try:
+            err_data = response.json()
+        except JSONDecodeError:
+            logging.exception("Identity provider json error")
+            err_data = "Unknown error while fetching invites"
+        raise ValidationError(err_data)
     return response.json()
 
 
