@@ -9,6 +9,8 @@ from django.core.management import BaseCommand
 from django.db import DEFAULT_DB_ALIAS
 from django.db import transaction
 from django.db.models import Model
+
+from auditlog.context import disable_auditlog
 from dolly.core import Importer
 
 from voteit.discussion.models import DiscussionPost
@@ -134,7 +136,8 @@ class Command(BaseCommand):
 
         try:
             with transaction.atomic(durable=True):
-                importer()
+                with disable_auditlog():
+                    importer()
                 if dry_run:
                     print("!! DRY-RUN - nothing saved !!")
                     transaction.set_rollback(True)
