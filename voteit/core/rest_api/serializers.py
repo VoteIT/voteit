@@ -360,7 +360,7 @@ class RichTextSerializerMixin:
     # FIXME: body might contain bad tags. That will be cleaned on save, but do we want to send error messages?
     def validate(self, attrs: OrderedDict):
         """
-        We'll use this to populate attrs. Pretty silly but there's not other obvious way?
+        We'll use this to populate attrs. Pretty silly but there's no other obvious way?
         """
         if self.partial and "body" not in attrs:
             body = self.instance.body
