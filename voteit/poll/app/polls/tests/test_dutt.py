@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from envelope.messages.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.workflows import PollWf
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -73,6 +74,13 @@ class DuttTests(TestCase):
         self.prop2.refresh_from_db()
         self.assertEqual(ProposalWf.VOTING, self.prop1.state)
         self.assertEqual(ProposalWf.VOTING, self.prop2.state)
+
+    def test_close_without_votes(self):
+        self.poll.state = PollWf.ONGOING
+        self.poll.save()
+        self.poll.votes.create(user=self.voter_a, abstain=True)
+        self.poll.close()
+        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

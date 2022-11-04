@@ -4,7 +4,12 @@ from django.test import TestCase
 from django.test import override_settings
 
 from envelope.messages.errors import ValidationErrorMsg
+from voteit.poll.app.polls.schulze import RepeatedSchulze
+from voteit.poll.app.polls.schulze import RepeatedSchulzeResult
 from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.poll.workflows import PollWf
 
 _channel_layers_setting = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
@@ -33,9 +38,6 @@ def wiki_example_ballots(method) -> Counter:
 class SchulzeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-
         cls.er = ElectoralRegister.objects.create()
         cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="schulze")
         cls.poll.upcoming()
@@ -177,13 +179,16 @@ class SchulzeTests(TestCase):
         )
         self.assertSetEqual(set(result.tied_winners), {10, 20})
 
+    def test_close_without_votes(self):
+        self.poll.state = PollWf.ONGOING
+        self.poll.save()
+        self.poll.close()
+        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+
 
 class RepeatedSchulzeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-
         cls.er = ElectoralRegister.objects.create()
         cls.poll = Poll.objects.create(
             electoral_register=cls.er, method_name="repeated_schulze"
@@ -327,14 +332,17 @@ class RepeatedSchulzeTests(TestCase):
         self.assertSetEqual({1, 2, 4}, set(result.rounds[1].candidates))
         self.assertEqual(4, result.rounds[1].winner)
 
+    def test_close_without_votes(self):
+        self.poll.state = PollWf.ONGOING
+        self.poll.save()
+        self.poll.close()
+        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AddSchulzeVoteTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-
         cls.er = ElectoralRegister.objects.create()
         cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="schulze")
         cls.prop1 = cls.poll.proposals.create()
@@ -372,9 +380,6 @@ class AddSchulzeVoteTests(TestCase):
         self.assertEqual(self.prop1.pk, self.poll.result.winner)
 
     def test_add_vote_on_repeated(self):
-        from voteit.poll.app.polls.schulze import RepeatedSchulzeResult
-        from voteit.poll.app.polls.schulze import RepeatedSchulze
-
         self.poll.method_name = RepeatedSchulze.name
         self.poll.method = RepeatedSchulze(self.poll)  # Remove chached property
         self.poll.settings = {"winners": 2}

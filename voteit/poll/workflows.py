@@ -9,6 +9,7 @@ class PollWf:
     FINISHED = "finished"
     CANCELED = "canceled"
     FAILED = "failed"
+    NO_RESULT = "no_result"
     states = {
         PRIVATE: _("Private"),
         UPCOMING: _("Upcoming"),
@@ -17,6 +18,7 @@ class PollWf:
         FINISHED: _("Finished"),
         CANCELED: _("Canceled"),
         FAILED: _("Failed"),
+        NO_RESULT: _("No result"),
     }
     initial = PRIVATE
     permissive_states = {PRIVATE, UPCOMING}  # States where moderators can do changes

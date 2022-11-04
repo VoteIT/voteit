@@ -464,6 +464,19 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         """
         self._mark_closed()
 
+    @transition(
+        field=state,
+        source=PollWf.CLOSED,
+        target=PollWf.NO_RESULT,
+        permission=NOT_ALLOWED,
+        custom={"title": _("No result")},
+    )
+    def no_result(self):
+        """
+        No valid votes to calculate the result from. If there are no votes or all votes are abstentions.
+        """
+        self._mark_closed()
+
     def _mark_closed(self):
         if not self.closed:
             self.closed = now()
@@ -626,7 +639,7 @@ def finish_closed_poll(
         # Remove bad votes due to a change in electoral register during the poll.
         # This is probably not allowed in most meetings.
         instance.vote_cleanup_set().delete()
-        if instance.votes.count():
+        if instance.votes.filter(abstain=False).count():
             instance.finish()
         else:
-            instance.failed()
+            instance.no_result()

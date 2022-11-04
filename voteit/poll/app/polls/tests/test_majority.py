@@ -4,7 +4,13 @@ from django.test import override_settings
 from pydantic import ValidationError
 
 from envelope.messages.errors import ValidationErrorMsg
+from voteit.poll.app.polls.majority import MajorityVoteSchema
 from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.poll.workflows import PollWf
+from voteit.proposal.models import Proposal
+from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -38,8 +44,6 @@ class MajorityTests(TestCase):
         self.assertRaises(InvalidProposalCount, method.start_check)
 
     def test_vote_schema(self):
-        from voteit.poll.app.polls.majority import MajorityVoteSchema
-
         self.poll.upcoming()
         self.poll.ongoing()
         vote = self.poll.votes.create(
@@ -52,8 +56,6 @@ class MajorityTests(TestCase):
         MajorityVoteSchema(choice=1)
 
     def test_result_unanimous(self):
-        from voteit.proposal.workflows import ProposalWf
-
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.votes.create(user=self.voter_a, vote=f'{{"choice": {self.prop1.pk}}}')
@@ -75,8 +77,6 @@ class MajorityTests(TestCase):
         self.assertEqual(ProposalWf.DENIED, self.prop2.state)
 
     def test_result_split(self):
-        from voteit.proposal.workflows import ProposalWf
-
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.votes.create(user=self.voter_a, vote=f'{{"choice": {self.prop1.pk}}}')
@@ -100,8 +100,6 @@ class MajorityTests(TestCase):
         self.assertEqual(ProposalWf.VOTING, self.prop2.state)
 
     def test_result_clear(self):
-        from voteit.proposal.workflows import ProposalWf
-
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.votes.create(user=self.voter_a, vote=f'{{"choice": {self.prop1.pk}}}')
@@ -125,18 +123,18 @@ class MajorityTests(TestCase):
         self.assertEqual(ProposalWf.APPROVED, self.prop1.state)
         self.assertEqual(ProposalWf.DENIED, self.prop2.state)
 
+    def test_close_without_votes(self):
+        self.poll.votes.create(user=self.voter_a, abstain=True)
+        self.poll.state = PollWf.ONGOING
+        self.poll.save()
+        self.poll.close()
+        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AddMajorityVoteTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-        from voteit.poll.app.polls.majority import Majority
-        from voteit.proposal.models import Proposal
-        from voteit.poll.workflows import PollWf
-
-        cls.Majority = Majority
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter = cls.er.voters.create(username="a")
         cls.poll: Poll = Poll.objects.create(

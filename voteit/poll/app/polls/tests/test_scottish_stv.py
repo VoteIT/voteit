@@ -5,20 +5,21 @@ from django_fsm import TransitionNotAllowed
 
 from envelope.messages.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.poll.workflows import PollWf
 
 
 class ScottishTests(TestCase):
-    def setUp(self):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-
-        self.er = ElectoralRegister.objects.create()
-        self.poll = Poll.objects.create(
-            electoral_register=self.er,
+    @classmethod
+    def setUpTestData(cls):
+        cls.er = ElectoralRegister.objects.create()
+        cls.poll = Poll.objects.create(
+            electoral_register=cls.er,
             method_name="scottish_stv",
             settings={"winners": 2},
         )
-        self.voter = self.er.voters.create(username="a_voter")
+        cls.voter = cls.er.voters.create(username="a_voter")
 
     @property
     def ScottishSTV(self):
@@ -92,26 +93,30 @@ class ScottishTests(TestCase):
         self.assertEqual([one.pk, three.pk], result.approved)
         self.assertIsInstance(result.json(), str)
 
+    def test_close_without_votes(self):
+        self.poll.state = PollWf.ONGOING
+        self.poll.save()
+        self.poll.close()
+        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+
 
 class AddVoteTests(TestCase):
-    def setUp(self):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-
-        self.er = ElectoralRegister.objects.create()
-        self.voter = self.er.voters.create(username="voter")
-        self.poll = Poll.objects.create(
-            electoral_register=self.er,
+    @classmethod
+    def setUpTestData(cls):
+        cls.er = ElectoralRegister.objects.create()
+        cls.voter = cls.er.voters.create(username="voter")
+        cls.poll = Poll.objects.create(
+            electoral_register=cls.er,
             method_name="scottish_stv",
             settings={"winners": 2},
         )
-        self.prop1 = self.poll.proposals.create()
-        self.prop2 = self.poll.proposals.create()
-        self.prop3 = self.poll.proposals.create()
-        self.poll.settings = {"winners": 2}
-        self.poll.upcoming()
-        self.poll.ongoing()
-        self.poll.save()
+        cls.prop1 = cls.poll.proposals.create()
+        cls.prop2 = cls.poll.proposals.create()
+        cls.prop3 = cls.poll.proposals.create()
+        cls.poll.settings = {"winners": 2}
+        cls.poll.upcoming()
+        cls.poll.ongoing()
+        cls.poll.save()
 
     @property
     def _cut(self):

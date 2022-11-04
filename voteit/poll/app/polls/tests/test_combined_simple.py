@@ -1,19 +1,22 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.poll.app.polls.combined_simple import CombinedSimpleVoteSchema
 from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.proposal.models import Proposal
+from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
 
 
 class SimpleTests(TestCase):
-    def setUp(self):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-
-        self.er = ElectoralRegister.objects.create()
-        self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="combined_simple"
+    @classmethod
+    def setUpTestData(cls):
+        cls.er = ElectoralRegister.objects.create()
+        cls.poll = Poll.objects.create(
+            electoral_register=cls.er, method_name="combined_simple"
         )
 
     @property
@@ -23,8 +26,6 @@ class SimpleTests(TestCase):
         return CombinedSimple
 
     def test_start_check(self):
-        from voteit.proposal.models import Proposal
-
         method = self.poll.method
         self.assertRaises(InvalidProposalCount, method.start_check)
         p1 = Proposal.objects.create()
@@ -35,8 +36,6 @@ class SimpleTests(TestCase):
         self.assertIsNone(method.start_check())
 
     def test_vote_schema(self):
-        from voteit.poll.app.polls.combined_simple import CombinedSimpleVoteSchema
-
         self.poll.upcoming()
         proposal = self.poll.proposals.create()
         proposal2 = self.poll.proposals.create()
@@ -52,8 +51,6 @@ class SimpleTests(TestCase):
             CombinedSimpleVoteSchema(yes=["bad"])
 
     def test_result(self):
-        from voteit.proposal.workflows import ProposalWf
-
         self.poll.upcoming()
         prop = self.poll.proposals.create()
         prop2 = self.poll.proposals.create()

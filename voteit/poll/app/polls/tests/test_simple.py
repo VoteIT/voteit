@@ -1,19 +1,23 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.poll.app.polls.simple import SimpleVoteSchema
 from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.poll.workflows import PollWf
+from voteit.proposal.models import Proposal
+from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
 
 
 class SimpleTests(TestCase):
-    def setUp(self):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-
-        self.er = ElectoralRegister.objects.create()
-        self.poll = Poll.objects.create(
-            electoral_register=self.er, method_name="simple"
+    @classmethod
+    def setUpTestData(cls):
+        cls.er: ElectoralRegister = ElectoralRegister.objects.create()
+        cls.poll: Poll = Poll.objects.create(
+            electoral_register=cls.er, method_name="simple"
         )
 
     @property
@@ -23,8 +27,6 @@ class SimpleTests(TestCase):
         return Simple
 
     def test_start_check(self):
-        from voteit.proposal.models import Proposal
-
         method = self.poll.method
         self.assertRaises(InvalidProposalCount, method.start_check)
         p1 = Proposal.objects.create()
@@ -35,8 +37,6 @@ class SimpleTests(TestCase):
         self.assertRaises(InvalidProposalCount, method.start_check)
 
     def test_vote_schema(self):
-        from voteit.poll.app.polls.simple import SimpleVoteSchema
-
         self.poll.upcoming()
         self.poll.proposals.create()
         voter = self.er.voters.create(username="a")
@@ -48,8 +48,6 @@ class SimpleTests(TestCase):
             SimpleVoteSchema(choice="abstain")
 
     def test_result(self):
-        from voteit.proposal.workflows import ProposalWf
-
         self.poll.upcoming()
         prop = self.poll.proposals.create()
         ua = User.objects.create(username="a")
@@ -62,12 +60,20 @@ class SimpleTests(TestCase):
         self.poll.votes.create(user=uc, vote="no")
         self.poll.close()
         self.assertEqual(
-            self.poll.result, {
+            self.poll.result,
+            {
                 "yes": 2,
                 "no": 1,
                 "approved": [prop.pk],
                 "denied": [],
                 "vote_count": 3,
-            }
+            },
         )
         self.assertEqual(self.poll.proposals.get().state, ProposalWf.APPROVED)
+
+    def test_close_without_votes(self):
+        self.poll.proposals.create()
+        self.poll.state = PollWf.ONGOING
+        self.poll.save()
+        self.poll.close()
+        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
