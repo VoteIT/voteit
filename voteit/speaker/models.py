@@ -4,6 +4,7 @@ from contextlib import suppress
 from datetime import datetime
 from datetime import timedelta
 from typing import TYPE_CHECKING
+import math
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -433,7 +434,6 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         order_list.remove(speaker.user.pk)
         if speaker.started is None:
             self.stop_speaker()
-            # speaker.order = None
             speaker.started = now()
             speaker.save()
             self.current = speaker
@@ -451,7 +451,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         if speaker := self.current:
             end_td = now() - speaker.started
             speaker.seconds = min(
-                end_td.seconds or 1, 32767
+                math.ceil(end_td.total_seconds()) or 1, 32767
             )  # Max value of PosSmallIntField ~ 9 hours
             speaker.save()
             self.current = None
