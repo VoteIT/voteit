@@ -12,6 +12,7 @@ from voteit.poll.exceptions import InvalidPollMethod
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.exceptions import NotAllowedToVote
 from voteit.poll.models import ElectoralRegister
+from voteit.poll.workflows import PollWf
 from voteit.proposal.workflows import ProposalWf
 
 
@@ -155,7 +156,7 @@ class PollTests(TestCase):
         self.poll.electoral_register.voters.remove(self.participant)
         self.poll.close()
         self.assertFalse(self.poll.votes.count())
-        self.assertEqual("failed", self.poll.state)
+        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
 
     def test_votes_from_non_voters_removed_on_close(self):
         self.poll.upcoming()
