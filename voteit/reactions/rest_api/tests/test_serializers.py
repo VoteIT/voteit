@@ -34,15 +34,19 @@ class ButtonDetailSerializerTests(TestCase):
                 "list_roles": [],
                 "active": True,
                 "allowed_models": ["proposal", "discussion_post"],
+                "target": None,
             },
             data,
         )
 
     def test_patch(self):
-        serializer = self._cut(self.button, {"title": "Just thumbs"}, partial=True)
+        serializer = self._cut(
+            self.button, {"title": "Just thumbs", "target": 10}, partial=True
+        )
         self.assertTrue(serializer.is_valid())
         serializer.save()
         self.assertEqual(self.button.title, "Just thumbs")
+        self.assertEqual(self.button.target, 10)
 
 
 class ButtonCreateSerializerTests(TestCase):

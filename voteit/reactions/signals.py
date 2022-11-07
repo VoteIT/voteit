@@ -7,9 +7,9 @@ from django.db.models import Count
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
+
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.utils import get_model_shortname

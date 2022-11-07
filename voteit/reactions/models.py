@@ -8,7 +8,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
 from django.db import IntegrityError
 from django.db import models
-from django.utils.translation import gettext_lazy as _
 
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
@@ -28,37 +27,11 @@ def _default_allowed_models():
 
 class ReactionButton(MeetingContext):
     name = "reaction_button"
-    # role_set: models.QuerySet
-    ICON_CHOICES = (  # TODO, maybe use material icons? https://material.io/resources/icons/?style=baseline
-        ("mdi-thumb-up", _("Thumb up")),
-        ("mdi-thumb-down", _("Thumb down")),
-        ("mdi-check", _("Checkmark")),
-        ("mdi-cancel", _("Block")),
-        ("mdi-star", _("Star")),
-        ("mdi-wheelchair-accessibility", _("Accessible")),
-        ("mdi-heart", _("Heart")),
-        ("mdi-forum", _("Forum")),
-        ("mdi-alert", _("Alert")),
-        ("mdi-attachment", _("Attachment")),
-        ("mdi-pencil", _("Pencil")),
-        ("mdi-currency-eur", _("Currency")),
-    )
-    COLOR_CHOICES = (  # TODO, don't know how to define these. Using BS4 standard names 4 now. Should follow theme.
-        ("accent", _("Accent")),
-        ("primary", _("Primary")),
-        ("secondary", _("Secondary")),
-        ("error", _("Error")),
-        ("info", _("Info")),
-        ("success", _("Success")),
-        ("warning", _("Warning")),
-    )
-
     title: str = models.CharField(verbose_name="Display name", max_length=80)
-    icon: str = models.CharField(
-        verbose_name="Icon name", max_length=80, choices=ICON_CHOICES
-    )
-    color: str = models.CharField(
-        verbose_name="Color", max_length=80, choices=COLOR_CHOICES
+    icon: str = models.CharField(verbose_name="Icon name", max_length=30)
+    color: str = models.CharField(verbose_name="Color", max_length=15)
+    target: int | None = models.SmallIntegerField(
+        verbose_name="Required target", null=True, blank=True
     )
     meeting: Meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="reaction_buttons"
@@ -121,7 +94,8 @@ class ReactionButton(MeetingContext):
 
 
 class Reaction(AgendaItemContext):
-    """Works as a boolean true for a specific context, user and button.
+    """
+    Works as a boolean true for a specific context, user and button.
     Essentially users never have reactions if the haven't marked something.
     """
 
@@ -147,21 +121,6 @@ class Reaction(AgendaItemContext):
         verbose_name = "Reaction"
         verbose_name_plural = "Reactions"
         unique_together = [["content_type", "object_id", "button", "user"]]
-
-    # class Manager(models.Manager):
-    #     def reactions_for_ai(self, ai: AgendaItem):
-    #         from voteit.discussion.models import DiscussionPost
-    #         from voteit.proposal.models import Proposal
-    #
-    #         ctypes = ContentType.objects.get_for_models(Proposal, DiscussionPost)
-    #         ai.proposals.all() | ai.discussions.all()
-    #
-    #         return self.get_queryset().filter(
-    #             content_type__in=ctypes,
-    #             object_id__in=ai.proposals.all() | ai.discussions.all(),
-    #         )
-
-    # objects = Manager()
 
     def __str__(self):
         return f"{self.button.title} from {self.user}"

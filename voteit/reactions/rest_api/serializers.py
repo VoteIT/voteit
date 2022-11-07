@@ -20,6 +20,7 @@ class ButtonDetailSerializer(serializers.ModelSerializer):
             "list_roles",
             "active",
             "allowed_models",
+            "target",
         ]
 
 
@@ -35,11 +36,14 @@ class ButtonCreateSerializer(serializers.ModelSerializer):
             "change_roles",
             "list_roles",
             "allowed_models",
+            "target",
         )
 
 
 class ContentTypeSerializer(serializers.CharField):
-    """ Content type to natural key"""
+    """
+    Content type to natural key
+    """
 
     def to_internal_value(self, data):
         raise NotImplementedError("Shouldn't be used")
@@ -49,7 +53,9 @@ class ContentTypeSerializer(serializers.CharField):
 
 
 class ContentTypeShortnameSerializer(serializers.CharField):
-    """ Content type to model shortname. """
+    """
+    Content type to model shortname.
+    """
 
     def to_internal_value(self, data):
         raise NotImplementedError("Shouldn't be used")
