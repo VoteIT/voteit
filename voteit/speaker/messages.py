@@ -92,7 +92,7 @@ class SpeakerListLeave(ListMessage):
 @incoming
 class SetActiveList(ListMessage):
     name = "speaker_list.set_active"
-    permission = SpeakerListPermissions.ACTIVATE
+    permission = SpeakerListPermissions.CHANGE
 
     def run_job(self) -> Status:
         self.assert_perm()

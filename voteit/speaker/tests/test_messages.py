@@ -188,12 +188,6 @@ class SpeakerListSetActiveTests(TestCase):
         msg = self._mk_one()
         self.assertRaises(ValidationErrorMsg, msg.run_job)
 
-    def test_set_active_system_is_inactive(self):
-        self.system.inactivate()
-        self.system.save()
-        msg = self._mk_one()
-        self.assertRaises(UnauthorizedError, msg.run_job)
-
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class StartSpeakerInListTests(TestCase):
