@@ -8,6 +8,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
 from voteit.agenda.models import AgendaItem
@@ -115,8 +116,14 @@ class ExportERViewSet(viewsets.GenericViewSet):
     @action(
         methods=["get"],
         detail=True,
+        renderer_classes=[JSONRenderer],
     )
     def json(self, request, *args, **kwargs):
         er = self.get_er(request)
         serializer = self.get_serializer(self.get_export_qs(er), many=True)
-        return Response(serializer.data)
+        return Response(
+            serializer.data,
+            headers={
+                "Content-Disposition": f'attachment; filename="er_{er.pk}_export.json"'
+            },
+        )

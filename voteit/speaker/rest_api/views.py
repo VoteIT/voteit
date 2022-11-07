@@ -11,6 +11,7 @@ from rest_framework.mixins import DestroyModelMixin
 from rest_framework.mixins import ListModelMixin
 from rest_framework.mixins import RetrieveModelMixin
 from rest_framework.mixins import UpdateModelMixin
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework import exceptions
@@ -206,9 +207,15 @@ class ExportSpeakersViewSet(viewsets.GenericViewSet):
         methods=["get"],
         detail=True,
         serializer_class=serializers.SpeakerExportSerializer,
+        renderer_classes=[JSONRenderer],
     )
     @has_perm_drf(SpeakerSystemPermissions.MANAGE)
     def json(self, request, *args, **kwargs):
         sls = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(sls), many=True)
-        return Response(serializer.data)
+        return Response(
+            serializer.data,
+            headers={
+                "Content-Disposition": f'attachment; filename="speakers_sls{sls.pk}_export.json"'
+            },
+        )

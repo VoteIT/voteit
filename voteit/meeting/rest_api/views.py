@@ -16,6 +16,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
 from voteit.core.decorators import has_perm_drf
@@ -197,9 +198,15 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
         methods=["get"],
         detail=True,
         serializer_class=serializers.ParticipantExportSerializer,
+        renderer_classes=[JSONRenderer],
     )
     @has_perm_drf(MeetingPermissions.MODERATE)
     def json(self, request, *args, **kwargs):
         meeting = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(meeting), many=True)
-        return Response(serializer.data)
+        return Response(
+            serializer.data,
+            headers={
+                "Content-Disposition": f'attachment; filename="participants_m{meeting.pk}_export.json"'
+            },
+        )
