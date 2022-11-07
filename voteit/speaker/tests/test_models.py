@@ -10,6 +10,7 @@ from django_fsm import TransitionNotAllowed
 
 from voteit.meeting.models import Meeting
 from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema
+from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.models import SpeakerList
 
@@ -77,9 +78,15 @@ class SpeakerListTests(TestCase):
         cls.user_one = User.objects.create(username="one")
         cls.user_two = User.objects.create(username="two")
         cls.user_three = User.objects.create(username="three")
-        cls.speaker_one = cls.speaker_list.speaker_items.create(user=cls.user_one)
-        cls.speaker_two = cls.speaker_list.speaker_items.create(user=cls.user_two)
-        cls.speaker_three = cls.speaker_list.speaker_items.create(user=cls.user_three)
+        cls.speaker_one: Speaker = cls.speaker_list.speaker_items.create(
+            user=cls.user_one
+        )
+        cls.speaker_two: Speaker = cls.speaker_list.speaker_items.create(
+            user=cls.user_two
+        )
+        cls.speaker_three: Speaker = cls.speaker_list.speaker_items.create(
+            user=cls.user_three
+        )
 
     def test_order_list(self):
         self.assertEqual(
@@ -171,6 +178,23 @@ class SpeakerListTests(TestCase):
             [self.user_one.pk, self.user_two.pk, self.user_three.pk],
             self.speaker_list.order_list,
         )
+
+    def test_stop(self):
+        self.speaker_list.start_speaker(self.speaker_two)
+        self.speaker_two.started = now() - timedelta(minutes=1)
+        self.speaker_list.stop_speaker()
+        self.assertIsNotNone(self.speaker_two.seconds)
+
+    def test_stop_forgotten_speaker(self):
+        self.speaker_list.start_speaker(self.speaker_two)
+        self.assertEqual(
+            [self.user_one.pk, self.user_three.pk],
+            self.speaker_list.order_list,
+        )
+        self.speaker_list.current.started = now() - timedelta(days=999)
+        self.speaker_list.current.save()
+        self.speaker_list.stop_speaker()
+        self.assertEqual(32767, self.speaker_two.seconds)
 
 
 class SpeakerListSystemsTests(TestCase):
