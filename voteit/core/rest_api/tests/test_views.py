@@ -263,6 +263,18 @@ class UserViewSetTests(APITestCase):
             data,
         )
 
+    def test_switch_authenticated_attaches_same_auth_info(self):
+        self.assertFalse(
+            self.moderator.access_tokens.filter(access_token="abc").exists()
+        )
+        self.client.force_login(self.participant)
+        url = reverse("user-switch", kwargs={"pk": self.moderator.pk})
+        response = self.client.post(url)
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(
+            self.moderator.access_tokens.filter(access_token="abc").exists()
+        )
+
     def test_switch_authenticated_non_allowed_user(self):
         self.client.force_login(self.participant)
         url = reverse("user-switch", kwargs={"pk": 3})

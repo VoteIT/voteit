@@ -1,6 +1,10 @@
+from contextlib import suppress
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth import logout
+from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework import mixins
@@ -16,8 +20,6 @@ from voteit.core.loggers import log_auth
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.mixins import TransitionsMixin
-
-# from voteit.core.rest_api.serializers import UpdateUserSerializer
 from voteit.core.rest_api.serializers import UserAndRolesSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.utils import get_identity_data
@@ -106,8 +108,24 @@ class UserView(
         return Response()
 
     @action(methods=["POST"], detail=True)
+    @transaction.atomic
     def switch(self, request, pk):
         user = self.get_object()
+        inherit_oauth = True
+        with suppress(PermissionDenied):
+            user.oauth_session()
+            inherit_oauth = False
+        if inherit_oauth:
+            if curr_token := request.user.access_tokens.order_by("expires_at").first():
+                # We don't really know what to do if it doesn't exist, and we don't have to care
+                # since it won't happen when logged in via oauth
+                user.access_tokens.create(
+                    expires_at=curr_token.expires_at,
+                    expires_in=curr_token.expires_in,
+                    provider=curr_token.provider,
+                    access_token=curr_token.access_token,
+                    refresh_token=curr_token.refresh_token,
+                )
         log_auth("Switch user", for_user=user, request=request)
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         serializer = self.get_serializer(user)
