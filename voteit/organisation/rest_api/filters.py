@@ -1,8 +1,13 @@
+from django.contrib.auth import get_user_model
 from django_filters import rest_framework as filters
 from voteit.organisation.models import OrganisationRoles
 
 
 class NumberInFilter(filters.BaseInFilter, filters.NumberFilter):
+    pass
+
+
+class TextInFilter(filters.BaseInFilter, filters.CharFilter):
     pass
 
 
@@ -15,3 +20,13 @@ class UserPkFilter(filters.FilterSet):
     class Meta:
         model = OrganisationRoles
         fields = ("user_id_in",)
+
+
+class OrphanUserEmailFilter(filters.FilterSet):
+    # FIXME: Filtering ONLY works with ',' as separator, multiple queries with the same name will
+    # cause only the latest value to be used!
+    email_in = TextInFilter(field_name="email", lookup_expr="in", required=True)
+
+    class Meta:
+        model = get_user_model()
+        fields = ("email_in",)

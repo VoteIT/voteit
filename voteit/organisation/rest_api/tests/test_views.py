@@ -1,6 +1,10 @@
+from http import HTTPStatus
+
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
-from django.test import override_settings
+
+from voteit.organisation.models import Organisation
 
 
 class OrganisationViewSetTests(APITestCase):
@@ -198,12 +202,6 @@ class IDProxyOrganisationViewSetTests(APITestCase):
         self.assertEqual("hello", data["provider"]["scope"])
 
 
-from http import HTTPStatus
-
-from django.urls import reverse
-from rest_framework.test import APITestCase
-
-
 class OrganisationRolesTests(APITestCase):
     list_url = reverse("organisationroles-list")
 
@@ -257,4 +255,49 @@ class OrganisationRolesTests(APITestCase):
         self.assertEqual(
             response.json()[0]["user"]["pk"],
             self.manager.pk,
+        )
+
+
+@override_settings(ID_PROXY_API_KEY="xxx")
+class MatchOrphansViewSetTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.organisation = org = Organisation.objects.create(
+            title="Test me", host="betahaus.voteit.se"
+        )
+        cls.orphan = org.users.create(username="orphan", email="orphan@voteit.se")
+        cls.orphan2 = org.users.create(username="orphan2", email="oliver@voteit.se")
+        cls.claimed = org.users.create(
+            username="claimed", email="claimed@voteit.se", identity_id="abc"
+        )
+
+    def _mk_auth(self):
+        return {"HTTP_API_KEY": "xxx"}
+
+    def test_no_payload(self):
+        url = reverse("match-orphans-list")
+        response = self.client.get(url, **self._mk_auth())
+        self.assertEqual(400, response.status_code)
+        self.assertIn("email_in", response.json())
+        response = self.client.get(url, data={"email_in": ""}, **self._mk_auth())
+        self.assertEqual(400, response.status_code)
+
+    def test_no_api_key(self):
+        url = reverse("match-orphans-list")
+        response = self.client.get(url, data={"email_in": "jeff@blaha.se"})
+        self.assertEqual(401, response.status_code)
+
+    def test_several_matches(self):
+        url = reverse("match-orphans-list")
+        response = self.client.get(
+            url,
+            **self._mk_auth(),
+            data={
+                "email_in": "oliver@voteit.se,orphan@voteit.se,claimed@voteit.se",
+            },
+        )
+        data = response.json()
+        self.assertEqual(
+            {"orphan@voteit.se", "oliver@voteit.se"},
+            {x["email"] for x in data},
         )

@@ -1,24 +1,25 @@
+from django.contrib.auth import get_user_model
+from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from voteit.core.rest_api import router
-from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.mixins import SerializerClassesMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
-from voteit.organisation.models import TermsOfService
-from voteit.organisation.models import UserConsent
 from voteit.organisation.permissions import OrgPermissions
 from voteit.organisation.rest_api import serializers
+from voteit.organisation.rest_api.filters import OrphanUserEmailFilter
 from voteit.organisation.rest_api.filters import UserPkFilter
 
 
@@ -80,40 +81,40 @@ class IDProxyOrganisationViewSet(
     expected_default_http_status = 401
 
 
-@router.register("tos", basename="tos")
-class TOSViewSet(DefaultModelViewSet):
-    serializer_class = serializers.TOSSerializer
-    serializer_classes = {"create": serializers.TOSCreateSerializer}
-    context_queryset = Organisation.objects.all()
-    context_lookup_kwarg = "organisation"
-    model = TermsOfService
+# @router.register("tos", basename="tos")
+# class TOSViewSet(DefaultModelViewSet):
+#     serializer_class = serializers.TOSSerializer
+#     serializer_classes = {"create": serializers.TOSCreateSerializer}
+#     context_queryset = Organisation.objects.all()
+#     context_lookup_kwarg = "organisation"
+#     model = TermsOfService
+#
+#     def get_queryset(self):
+#         if self.request.user.is_superuser:
+#             return self.model.objects.all()
+#         if self.request.user.organisation:
+#             return self.model.objects.filter(
+#                 organisation=self.request.user.organisation
+#             )
+#         return self.model.objects.none()
 
-    def get_queryset(self):
-        if self.request.user.is_superuser:
-            return self.model.objects.all()
-        if self.request.user.organisation:
-            return self.model.objects.filter(
-                organisation=self.request.user.organisation
-            )
-        return self.model.objects.none()
 
-
-@router.register("user_consents", basename="user_consents")
-class UserConsentViewSet(DefaultModelViewSet):
-    serializer_class = serializers.UserConsentSerializer
-    serializer_classes = {"create": serializers.UserConsentCreateSerializer}
-    context_queryset = TermsOfService.objects.all()
-    context_lookup_kwarg = "tos"
-    model = UserConsent
-
-    def get_queryset(self):
-        if self.request.user.is_superuser:
-            return self.model.objects.all()
-        if self.request.user.organisation:
-            return self.model.objects.filter(
-                tos__organisation=self.request.user.organisation
-            )
-        return self.model.objects.none()
+# @router.register("user_consents", basename="user_consents")
+# class UserConsentViewSet(DefaultModelViewSet):
+#     serializer_class = serializers.UserConsentSerializer
+#     serializer_classes = {"create": serializers.UserConsentCreateSerializer}
+#     context_queryset = TermsOfService.objects.all()
+#     context_lookup_kwarg = "tos"
+#     model = UserConsent
+#
+#     def get_queryset(self):
+#         if self.request.user.is_superuser:
+#             return self.model.objects.all()
+#         if self.request.user.organisation:
+#             return self.model.objects.filter(
+#                 tos__organisation=self.request.user.organisation
+#             )
+#         return self.model.objects.none()
 
 
 @router.register("organisation-roles")
@@ -137,3 +138,27 @@ class OrganisationRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         if user.has_perm(OrgPermissions.VIEW_ROLES, user.organisation):
             return self.queryset.filter(context=user.organisation)
         return self.queryset.none()
+
+
+@router.register("match-orphans", basename="match-orphans")
+class MatchOrphansViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """
+    This view is meant as a service endpoint for matching identity data.
+    We can only match emails, so there's no need to check other things.
+
+    It needs IDProxy API key to work and the 'email_in' param
+    """
+
+    # email_in=<email1>,<email2>,...
+    filterset_class = OrphanUserEmailFilter
+    serializer_class = serializers.ExternalOrphanSerializer
+    permission_classes = (HasIDProxyAPIKey,)
+    filter_backends = (DjangoFilterBackend,)
+
+    def get_queryset(self):
+        User = get_user_model()
+        return (
+            User.objects.filter(identity_id__isnull=True)
+            .filter(organisation__isnull=False)
+            .prefetch_related("organisation")
+        )

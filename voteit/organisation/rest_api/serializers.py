@@ -1,8 +1,11 @@
+from __future__ import annotations
 from contextlib import suppress
 from typing import List
 from typing import Optional
+from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from rest_framework import serializers
@@ -18,6 +21,9 @@ from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserConsent
 from voteit.organisation.utils import get_provider_response_adapters
+
+if TYPE_CHECKING:
+    from voteit.core.models import User as UserType
 
 
 class OrganisationSerializer(serializers.ModelSerializer):
@@ -163,3 +169,18 @@ class OrganisationRolesSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrganisationRoles
         fields = read_only_fields = "pk", "user", "assigned"
+
+
+class ExternalOrphanSerializer(serializers.ModelSerializer):
+
+    """
+    Used when returning response to login service.
+    Returns information about unclaimed / orphan users that matches
+    the external users userdata.
+    """
+
+    organisation_host = serializers.CharField(source="organisation.host")
+
+    class Meta:
+        model = get_user_model()
+        fields = ["email", "organisation_host"]
