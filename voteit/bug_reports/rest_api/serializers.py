@@ -20,7 +20,9 @@ class BugReportSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         meeting: Meeting = validated_data["meeting"]
         notification_logger.warning(
-            f"Bug report in {meeting.organisation.title}/{meeting.title}:\n{validated_data['description']}"
+            f"Bug report in {meeting.organisation.title}/{meeting.title}\n"
+            f"By: {user.get_full_name()} - Email: {user.email}\n\n"
+            f"{validated_data['description']}"
         )
         return super().create(
             {
