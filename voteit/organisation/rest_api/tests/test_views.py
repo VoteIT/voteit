@@ -1,10 +1,19 @@
+from __future__ import annotations
 from http import HTTPStatus
+from typing import TYPE_CHECKING
 
 from django.test import override_settings
 from django.urls import reverse
+from django.utils.http import urlencode
+from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
+from voteit.core.loggers import notification_logger
 from voteit.organisation.models import Organisation
+from voteit.organisation.roles import ROLE_ORG_MANAGER
+
+if TYPE_CHECKING:
+    from voteit.core.models import User as UserType
 
 
 class OrganisationViewSetTests(APITestCase):
@@ -301,3 +310,150 @@ class MatchOrphansViewSetTests(APITestCase):
             {"orphan@voteit.se", "oliver@voteit.se"},
             {x["email"] for x in data},
         )
+
+
+@override_settings(ID_PROXY_API_KEY="xxx")
+class HandleIdentitiesViewSetTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.beta_organisation: Organisation = Organisation.objects.create(
+            title="Test me"
+        )
+        cls.beta_one: UserType = cls.beta_organisation.users.create(
+            username="one", identity_id="one", last_login=now()
+        )
+        cls.beta_two: UserType = cls.beta_organisation.users.create(
+            username="two", identity_id="two", last_login=now()
+        )
+        cls.other_org: Organisation = Organisation.objects.create(
+            title="Other",
+        )
+        cls.other_three: UserType = cls.other_org.users.create(
+            username="other", identity_id="other", last_login=now()
+        )
+
+    def _mk_auth(self):
+        return {"HTTP_API_KEY": "xxx"}
+
+    def _mk_query_url(self, query: dict):
+        return f"{reverse('handle-identities-query')}?{urlencode(query)}"
+
+    def _mk_merge_url(self, query: dict):
+        return f"{reverse('handle-identities-merge')}?{urlencode(query)}"
+
+    def test_no_auth(self):
+        response = self.client.get(self._mk_query_url({"identity_in": "one,two"}))
+        self.assertEqual(401, response.status_code)
+
+    def test_basic_query(self):
+        response = self.client.get(
+            self._mk_query_url({"identity_in": "one,two"}),
+            **self._mk_auth(),
+        )
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(2, len(data))
+        self.assertEqual({"one", "two"}, {x["identity_id"] for x in data})
+
+    def test_basic_merge(self):
+        response = self.client.post(
+            self._mk_merge_url({"identity_in": "one,two"}),
+            **self._mk_auth(),
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"moved": ["two"], "moved_to": "one"}, response.json())
+        self.beta_one.refresh_from_db()
+        self.beta_two.refresh_from_db()
+        self.assertEqual(self.beta_one.identity_id, self.beta_two.identity_id)
+
+    def test_merge_logged(self):
+        with self.assertLogs(logger=notification_logger, level="INFO") as cm:
+            self.client.post(
+                self._mk_merge_url({"identity_in": "one,two"}),
+                **self._mk_auth(),
+            )
+        self.assertTrue(
+            any(1 for x in cm.output if "Merged users in Organisation: Test me" in x)
+        )
+
+    def test_merge_several(self):
+        self.beta_organisation.users.create(
+            username="three", identity_id="three", last_login=now()
+        )
+        response = self.client.post(
+            self._mk_merge_url({"identity_in": "one,two,three,four,five"}),
+            **self._mk_auth(),
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            {"moved": ["two", "three"], "moved_to": "one"}, response.json()
+        )
+        self.beta_one.refresh_from_db()
+        self.beta_two.refresh_from_db()
+        self.assertEqual(self.beta_one.identity_id, self.beta_two.identity_id)
+
+    def test_merge_only_one_existed(self):
+        response = self.client.post(
+            self._mk_merge_url({"identity_in": "one,404"}),
+            **self._mk_auth(),
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"moved": [], "moved_to": None}, response.json())
+
+    def test_merge_none_existed(self):
+        response = self.client.post(
+            self._mk_merge_url({"identity_in": "404"}),
+            **self._mk_auth(),
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"moved": [], "moved_to": None}, response.json())
+
+    def test_different_orgs(self):
+        response = self.client.post(
+            self._mk_merge_url({"identity_in": "one,two,other"}),
+            **self._mk_auth(),
+        )
+        self.assertContains(response, "different organisations", status_code=400)
+
+    def test_errors_logged(self):
+        with self.assertLogs(logger=notification_logger, level="WARNING") as cm:
+            self.client.post(
+                self._mk_merge_url({"identity_in": "one,two,other"}),
+                **self._mk_auth(),
+            )
+        self.assertTrue(
+            any(1 for x in cm.output if "Identities from different organisations" in x)
+        )
+
+    def test_staff(self):
+        self.beta_one.is_staff = True
+        self.beta_one.save()
+        response = self.client.post(
+            self._mk_merge_url({"identity_in": "one,two"}),
+            **self._mk_auth(),
+        )
+        self.assertContains(response, "users with special status", status_code=400)
+
+    def test_superuser(self):
+        self.beta_one.is_superuser = True
+        self.beta_one.save()
+        response = self.client.post(
+            self._mk_merge_url({"identity_in": "one,two"}),
+            **self._mk_auth(),
+        )
+        self.assertContains(response, "users with special status", status_code=400)
+
+    def test_org_role(self):
+        self.beta_organisation.add_roles(self.beta_one, ROLE_ORG_MANAGER)
+        response = self.client.post(
+            self._mk_merge_url({"identity_in": "one,two"}),
+            **self._mk_auth(),
+        )
+        self.assertContains(response, "users with special status", status_code=400)
+
+    def test_no_payload(self):
+        response = self.client.get(
+            self._mk_query_url({"identity_in": ""}),
+            **self._mk_auth(),
+        )
+        self.assertContains(response, "required", status_code=400)

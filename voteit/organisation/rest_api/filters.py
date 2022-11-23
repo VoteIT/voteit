@@ -30,3 +30,15 @@ class OrphanUserEmailFilter(filters.FilterSet):
     class Meta:
         model = get_user_model()
         fields = ("email_in",)
+
+
+class UserIdentitiesFilter(filters.FilterSet):
+    # FIXME: Filtering ONLY works with ',' as separator, multiple queries with the same name will
+    # cause only the latest value to be used!
+    identity_in = TextInFilter(
+        field_name="identity_id", lookup_expr="in", required=True
+    )
+
+    class Meta:
+        model = get_user_model()
+        fields = ("identity_in",)
