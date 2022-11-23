@@ -163,6 +163,7 @@ class MatchOrphansViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = serializers.ExternalOrphanSerializer
     permission_classes = (HasIDProxyAPIKey,)
     filter_backends = (DjangoFilterBackend,)
+    expected_default_http_status = 401
 
     def get_queryset(self):
         User = get_user_model()
