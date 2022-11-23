@@ -17,6 +17,7 @@ class AgendaItemSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "order",
             "related_modified",
             "state",
+            "pk",
         )
         exclude = (
             "author",
