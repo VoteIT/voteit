@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from logging import getLogger
 
+from django.utils.translation import gettext as _
 from pydantic import Field
 from pydantic import root_validator
 from pydantic import validator
@@ -89,8 +90,15 @@ class AddInvitesSchema(BaseModel):
         invite_type = values["type"]
         if invite_type not in reg:
             raise ValueError("No such invite type")
+        inv_count = len(values["invite_data"])
+        if inv_count > 1000:
+            raise ValueError(
+                _(
+                    "More than 1 000 invites at once isn't allowed. You sent %(inv_count)s rows."
+                    % {"inv_count": inv_count}
+                )
+            )
         validator = reg[invite_type]
-
         results = []
         i = 1
         for v in values["invite_data"]:
@@ -120,6 +128,7 @@ class AddInvites(ContextAction):
     data: AddInvitesSchema
     model = Meeting
     context_schema_attr = "meeting"
+    job_timeout = 30
 
     def run_job(self) -> InvitesAdded:
         """
