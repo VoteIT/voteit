@@ -196,11 +196,6 @@ class UserQuerySerializer(ExternalOrphanSerializer):
         ] + ExternalOrphanSerializer.Meta.fields
 
 
-class QueryIdentitiesSerializer(serializers.Serializer):
-    move_to = serializers.CharField()
-    move = serializers.ListSerializer(child=serializers.CharField())
-
-
 class MergedIdentitiesSerializer(serializers.Serializer):
     moved_to = serializers.CharField()
     moved = serializers.ListSerializer(child=serializers.CharField())
