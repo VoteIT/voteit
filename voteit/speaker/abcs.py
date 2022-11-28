@@ -34,6 +34,8 @@ class SpeakerSystemContext(ABCModel):
 
 
 class ListMethod(ABC):
+    settings_schema: type[BaseModel] | None = None
+
     def __init__(self, speaker_system: SpeakerListSystem):
         self.speaker_system = speaker_system
 
@@ -57,14 +59,6 @@ class ListMethod(ABC):
         """
         Human-readable explanation of what this does.
         """
-
-    @property
-    def settings_schema(self) -> BaseModel | None:
-        """
-        Possible settings schema for this speaker list method.
-        Will be enforced if it exists
-        """
-        return None
 
     def get_spoken_count(
         self, speaker_list: SpeakerList, user: AbstractUser | int

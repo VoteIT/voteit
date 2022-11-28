@@ -9,6 +9,7 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
 from voteit.meeting.models import Meeting
+from voteit.speaker.app.list_methods.priority import Priority
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
@@ -194,7 +195,7 @@ class SpeakerListSystemViewTestCase(APITestCase):
         cls.system.add_roles(cls.list_moderator, ROLE_LIST_MODERATOR)
 
     def test_create(self):
-        url = reverse("speakerlistsystem-list")
+        url = reverse("speaker-list-systems-list")
         data = {"meeting": self.meeting.pk, "method_name": "simple"}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
@@ -206,7 +207,7 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.assertTrue(system.has_roles(self.moderator, ROLE_LIST_MODERATOR))
 
     def test_create_bad_users(self):
-        url = reverse("speakerlistsystem-list")
+        url = reverse("speaker-list-systems-list")
         data = {"meeting": self.meeting.pk, "method_name": "simple"}
         for user, status in (
             (None, 401),
@@ -223,7 +224,7 @@ class SpeakerListSystemViewTestCase(APITestCase):
             )
 
     def test_create_meeting_ne(self):
-        url = reverse("speakerlistsystem-list")
+        url = reverse("speaker-list-systems-list")
         data = {"meeting": -1, "method_name": "simple"}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
@@ -231,7 +232,7 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
 
     def test_list(self):
-        url = reverse("speakerlistsystem-list")
+        url = reverse("speaker-list-systems-list")
         data = {"meeting": self.meeting.pk}
         self.client.force_login(self.moderator)
         response = self.client.get(url, data)
@@ -239,8 +240,7 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.assertEqual(1, len(response.json()))
 
     def test_put(self):
-        url = reverse("speakerlistsystem-detail", kwargs={"pk": self.system.pk})
-        # url = f"/api/speaker-list-systems/{self.system.pk}/"
+        url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
         data = {"meeting": self.meeting.pk, "title": "Mkay", "method_name": "simple"}
         self.client.force_login(self.moderator)
         response = self.client.put(url, data)
@@ -252,19 +252,77 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.assertEqual("Mkay", self.system.title)
 
     def test_patch(self):
-        url = f"/api/speaker-list-systems/{self.system.pk}/"
-        data = {"title": "Mkay"}
+        # url = f"/api/speaker-list-systems/{self.system.pk}/"
+        url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
+        data = {"title": "Mkay", "very": "bogus"}
         self.client.force_login(self.moderator)
         response = self.client.patch(url, data)
         self.assertEqual(
             response.status_code,
             200,
         )
-        self.system.refresh_from_db(fields=("title",))
+        self.system.refresh_from_db()
         self.assertEqual("Mkay", self.system.title)
+        self.assertIsNone(self.system.settings)
+
+    def test_patch_with_settings_for_method_with(self):
+        self.system.method_name = Priority.name
+        self.system.save()
+        url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
+        data = {
+            "title": "Mkay",
+            "settings": {
+                "very": "bogus",
+            },
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data)
+        self.assertEqual(200, response.status_code)
+        self.system.refresh_from_db()
+        self.assertEqual({"max_times": 0}, self.system.settings.dict())
+
+    def test_method_name(self):
+        url = reverse("speaker-list-systems-list")
+        data = {
+            "method_name": "404",
+            "meeting": self.meeting.pk,
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertContains(response, "No list method_name 404", status_code=400)
+
+    def test_settings_validation_error_update(self):
+        self.system.method_name = Priority.name
+        self.system.save()
+        url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
+        data = {
+            "title": "Mkay",
+            "settings": {
+                "max_times": "bogus",
+            },
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data)
+        self.assertEqual(400, response.status_code)
+        self.assertIn("settings", response.json())
+
+    def test_settings_validation_error_create(self):
+        url = reverse("speaker-list-systems-list")
+        data = {
+            "title": "Mkay",
+            "method_name": Priority.name,
+            "meeting": self.meeting.pk,
+            "settings": {
+                "max_times": "bogus",
+            },
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual(400, response.status_code)
+        self.assertIn("settings", response.json())
 
     def test_delete(self):
-        url = f"/api/speaker-list-systems/{self.system.pk}/"
+        url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
         self.client.force_login(self.moderator)
         response = self.client.delete(url)
         self.assertEqual(
@@ -277,7 +335,7 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.system.method_name = "priority"
         self.system.settings = {"max_times": 3}
         self.system.save()
-        url = f"/api/speaker-list-systems/{self.system.pk}/"
+        url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
         self.client.force_login(self.list_moderator)
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
@@ -285,14 +343,14 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.assertEqual({"max_times": 3}, data["settings"])
 
     def test_transition_moderator(self):
-        url = f"/api/speaker-list-systems/{self.system.pk}/transitions/"
+        url = reverse("speaker-list-systems-transitions", kwargs={"pk": self.system.pk})
         self.client.force_login(self.moderator)
         data = {"transition": "activate"}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 201)
 
     def test_transition_list_moderator_not_allowed(self):
-        url = f"/api/speaker-list-systems/{self.system.pk}/transitions/"
+        url = reverse("speaker-list-systems-transitions", kwargs={"pk": self.system.pk})
         self.client.force_login(self.list_moderator)
         data = {"transition": "activate"}
         response = self.client.post(url, data)

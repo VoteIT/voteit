@@ -98,7 +98,7 @@ class HistoricSpeakerViewSet(
         return self.queryset.none()
 
 
-@router.register("speaker-list-systems")
+@router.register("speaker-list-systems", basename="speaker-list-systems")
 class SpeakerListSystemViewSet(DefaultModelViewSet):
     model = SpeakerListSystem
     queryset = SpeakerListSystem.objects.all()

@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from rest_framework import serializers
 from rest_framework import exceptions
 
@@ -6,6 +9,10 @@ from voteit.meeting.models import MeetingRoles
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.utils import get_list_method_registry
+
+if TYPE_CHECKING:
+    from voteit.speaker.abcs import ListMethod
 
 
 class SpeakerListSerializer(serializers.ModelSerializer):
@@ -83,6 +90,28 @@ class SpeakerListSystemSerializer(serializers.ModelSerializer):
             # At least right now...
             "meeting": {"required": True},
         }
+
+    def validate_method_name(self, value):
+        if value not in get_list_method_registry():
+            raise exceptions.ValidationError(f"No list method_name {value}")
+        return value
+
+    def validate(self, attrs):
+        method_name = attrs.get("method_name")
+        if not method_name:
+            # Shouldn't happen
+            method_name = self.instance.method_name
+        reg = get_list_method_registry()
+        method: ListMethod = reg[method_name]
+        if method.settings_schema is None:
+            attrs.pop("settings", None)
+        else:
+            settings = attrs.get("settings", {})
+            try:
+                method.settings_schema(**settings)
+            except ValueError as exc:
+                raise exceptions.ValidationError({"settings": [str(exc)]})
+        return super().validate(attrs)
 
     def validate_meeting_roles_to_speaker(self, value):
         for role in value:
