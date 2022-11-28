@@ -9,6 +9,7 @@ import math
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
@@ -475,14 +476,15 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     def save(self, **kw):
         if self.title is None:
             self.title = "list @ " + self.agenda_item.title
-        if (
-            self.agenda_item
-            and self.agenda_item.meeting
-            and self.speaker_system.meeting != self.agenda_item.meeting
-        ):
-            raise IntegrityError(
-                "agenda item and list system attached to different meetings"
-            )
+        with suppress(ObjectDoesNotExist):
+            if (
+                self.agenda_item_id
+                and self.agenda_item.meeting_id
+                and self.speaker_system.meeting_id != self.agenda_item.meeting_id
+            ):
+                raise IntegrityError(
+                    "agenda item and list system attached to different meetings"
+                )
         super().save(**kw)
 
     # Type hinting

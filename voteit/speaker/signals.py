@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from django.db.models.signals import m2m_changed
@@ -106,12 +107,16 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
         msg_class = SpeakerListChanged
     data = SpeakerListSerializer(instance).data
     msg = msg_class(**data)
-    if instance.agenda_item:
-        ai_channel = AgendaItemChannel.from_instance(instance.agenda_item)
-        ai_channel.sync_publish(msg)
-    if instance.is_active_list:
-        sls_channel = SpeakerListSystemChannel.from_instance(instance.speaker_system)
-        sls_channel.sync_publish(msg)
+    with suppress(AgendaItem.DoesNotExist):
+        if instance.agenda_item:
+            ai_channel = AgendaItemChannel.from_instance(instance.agenda_item)
+            ai_channel.sync_publish(msg)
+    with suppress(SpeakerListSystem.DoesNotExist):
+        if instance.is_active_list:
+            sls_channel = SpeakerListSystemChannel.from_instance(
+                instance.speaker_system
+            )
+            sls_channel.sync_publish(msg)
 
 
 #

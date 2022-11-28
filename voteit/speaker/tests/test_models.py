@@ -9,6 +9,7 @@ from django.utils.timezone import now
 from django_fsm import TransitionNotAllowed
 
 from voteit.meeting.models import Meeting
+from voteit.speaker.app.list_methods.priority import Priority
 from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerListSystem
@@ -255,3 +256,28 @@ class SpeakerListSystemsTests(TestCase):
         slist.save()
         with self.assertRaises(TransitionNotAllowed):
             self.system.inactivate()
+
+
+class DeletingMeetingTests(TestCase):
+    """
+    Deleting the whole meeting must not cause exceptions
+    """
+
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        ai = cls.meeting.agenda_items.create(title="ai one")
+        system: SpeakerListSystem = cls.meeting.speaker_systems.create(
+            method_name=Priority.name
+        )
+        sl: SpeakerList = system.speaker_lists.create(title="One list", agenda_item=ai)
+        moderator = User.objects.get(username="moderator")
+        participant = User.objects.get(username="participant")
+        sl.speaker_items.create(user=moderator)
+        sl.speaker_items.create(user=participant)
+
+    def test_delete(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.meeting.delete()
