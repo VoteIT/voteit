@@ -2,8 +2,14 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from rest_framework.test import APITestCase
-from voteit.core.testing import mk_hashtag
 
+from voteit.agenda.models import AgendaItem
+from voteit.core.testing import mk_hashtag
+from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingGroup
+from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
 
@@ -11,15 +17,6 @@ User = get_user_model()
 class DiscussionPostAPITests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
-
-        from voteit.meeting.roles import (
-            ROLE_MODERATOR,
-            ROLE_PARTICIPANT,
-            ROLE_DISCUSSER,
-        )
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
@@ -250,3 +247,88 @@ class DiscussionPostAPITests(APITestCase):
         )
         disc.refresh_from_db()
         self.assertEqual(disc.meeting_group, self.meeting_group)
+
+
+class ExportDiscussionsViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.ai = AgendaItem.objects.get(pk=1)
+        cls.participant: User = User.objects.get(
+            username="participant",
+        )
+        cls.moderator: User = User.objects.get(username="moderator")
+        cls.group: MeetingGroup = cls.meeting.groups.get(pk=1)
+        cls.disc_one = cls.ai.discussions.create(
+            body="one little piggy",
+            author=cls.participant,
+            tags=["pigs"],
+        )
+        cls.disc_two = cls.ai.discussions.create(
+            body="two little piggies",
+            author=cls.moderator,
+            meeting_group=cls.group,
+            tags=["pigs"],
+        )
+        cls.disc_three = cls.ai.discussions.create(
+            body="three little piggies",
+            meeting_group=cls.group,
+            tags=["pigs"],
+        )
+
+    def test_not_allowed(self):
+        self.client.force_login(self.participant)
+        url = reverse("export-discussion-posts-json", kwargs={"pk": self.meeting.pk})
+        response = self.client.get(url)
+        self.assertContains(
+            response, "permission meeting.moderate_meeting", status_code=403
+        )
+
+    def test_csv_no_data(self):
+        self.ai.discussions.all().delete()
+        self.client.force_login(self.moderator)
+        url = reverse("export-discussion-posts-csv", kwargs={"pk": self.meeting.pk})
+        response = self.client.get(url)
+        self.assertEqual(404, response.status_code)
+
+    def test_json(self):
+        url = reverse("export-discussion-posts-json", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        data = response.json()
+        self.assertEqual(3, len(data))
+        item_two = data[1]
+        self.assertIsNotNone(item_two.pop("created"))
+        self.assertEqual(
+            {
+                "body": "two little piggies",
+                "userid": "moderator",
+                "agenda_item": 1,
+                "group_title": "The Hellos",
+                "group_id": None,
+                "tags": "pigs",
+                "pk": self.disc_two.pk,
+                "author": 1,
+                "meeting_group": 1,
+            },
+            data[1],
+        )
+
+    def test_csv(self):
+        url = reverse("export-discussion-posts-csv", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("text/csv", response.headers.get("Content-Type"))
+        self.assertEqual(
+            f'attachment; filename="discussion_m{self.meeting.pk}_export.csv"',
+            response.headers.get("Content-Disposition"),
+        )
+        rows = response.content.splitlines()
+        self.assertEqual(
+            b"created,body,userid,agenda_item,group_title,group_id,tags,pk,author,meeting_group",
+            rows[0],
+        )
+        self.assertEqual(4, len(rows))

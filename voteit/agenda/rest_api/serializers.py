@@ -33,3 +33,20 @@ class CreateAgendaItemSerializer(AgendaItemSerializer):
             "related_modified",
             "state",
         )
+
+
+class ExportAgendaItemSerializer(serializers.ModelSerializer):
+    tags = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AgendaItem
+        fields = (
+            "state",
+            "pk",
+            "title",
+            "body",
+            "tags",
+        )
+
+    def get_tags(self, ai):
+        return ",".join(ai.tags)

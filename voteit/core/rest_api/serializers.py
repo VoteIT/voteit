@@ -397,3 +397,18 @@ class RichTextSerializerMixin:
             raise ValidationError({"mentions": msg})
         attrs["mentions"] = list(found_users_qs)
         return super().validate(attrs)
+
+
+class ExportBaseSerializerMixin(serializers.Serializer):
+    userid = serializers.CharField(source="author.userid", required=False)
+    group_title = serializers.CharField(source="meeting_group.title", required=False)
+    group_id = serializers.CharField(source="meeting_group.groupid", required=False)
+    tags = serializers.SerializerMethodField()
+
+    class Meta:
+        fields = ["userid", "group_title", "group_id", "tags"]
+
+    def get_tags(self, obj):
+        if hasattr(obj, "tags"):
+            return ",".join(obj.tags)
+        return ""

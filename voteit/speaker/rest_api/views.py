@@ -197,7 +197,7 @@ class ExportSpeakersViewSet(viewsets.GenericViewSet):
         response[
             "Content-Disposition"
         ] = f'attachment; filename="speakers_sls{sls.pk}_export.csv"'
-        writer = csv.DictWriter(response, fieldnames=serializer.data[0].keys())
+        writer = csv.DictWriter(response, fieldnames=serializer.child.fields)
         writer.writeheader()
         for row in serializer.data:
             writer.writerow(row)

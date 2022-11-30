@@ -4,9 +4,19 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from rest_framework.test import APITestCase
+
+from voteit.agenda.models import AgendaItem
 from voteit.core.testing import mk_hashtag
 from voteit.core.testing import mk_usertag
 from voteit.meeting.channels import ParticipantsChannel
+from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingGroup
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_PROPOSER
+from voteit.proposal.models import DiffProposal
+from voteit.proposal.models import TextDocument
+from voteit.proposal.models import TextParagraph
 
 User = get_user_model()
 
@@ -14,17 +24,6 @@ User = get_user_model()
 class ProposalsAPITests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
-        from voteit.proposal.models import TextParagraph
-        from voteit.proposal.models import TextDocument
-
-        from voteit.meeting.roles import (
-            ROLE_MODERATOR,
-            ROLE_PARTICIPANT,
-            ROLE_PROPOSER,
-        )
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
@@ -396,12 +395,6 @@ class TextDocumentAPITests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
-
-        # from voteit.proposal.models import TextParagraph
-        from voteit.proposal.models import TextDocument
-
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="ongoing")
         cls.ai_private: AgendaItem = cls.meeting.agenda_items.create()
@@ -506,3 +499,65 @@ class TextDocumentAPITests(APITestCase):
         )
         self.text_doc.refresh_from_db()
         self.assertEqual("World", self.text_doc.body)
+
+
+class ExportProposalsViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.ai = AgendaItem.objects.get(pk=1)
+        cls.participant: User = User.objects.get(
+            username="participant",
+        )
+        cls.moderator: User = User.objects.get(username="moderator")
+        cls.group: MeetingGroup = cls.meeting.groups.get(pk=1)
+        cls.text: TextDocument = cls.ai.text_documents.create(
+            body="I am the eggman.\n\nI am the walrus."
+        )
+        cls.para = cls.text.text_paragraphs.all().first()
+        cls.diffprop = DiffProposal.objects.create(
+            paragraph=cls.para,
+            agenda_item=cls.ai,
+            author=cls.participant,
+            meeting_group=cls.group,
+        )
+        cls.prop = cls.ai.proposals.create(body="We are Devo", author=cls.moderator)
+
+    def test_not_allowed(self):
+        self.client.force_login(self.participant)
+        url = reverse("export-proposals-json", kwargs={"pk": self.meeting.pk})
+        response = self.client.get(url)
+        self.assertContains(
+            response, "permission meeting.moderate_meeting", status_code=403
+        )
+
+    def test_csv_no_data(self):
+        self.ai.proposals.all().delete()
+        self.client.force_login(self.moderator)
+        url = reverse("export-proposals-csv", kwargs={"pk": self.meeting.pk})
+        response = self.client.get(url)
+        self.assertEqual(404, response.status_code)
+
+    def test_json(self):
+        url = reverse("export-proposals-json", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        data = response.json()
+        self.assertEqual(3, len(data))
+        self.assertEqual({"proposal", "diff_proposal"}, {x["shortname"] for x in data})
+
+    def test_csv(self):
+        url = reverse("export-proposals-csv", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("text/csv", response.headers.get("Content-Type"))
+        self.assertEqual(
+            f'attachment; filename="proposals_{self.meeting.pk}_export.csv"',
+            response.headers.get("Content-Disposition"),
+        )
+        rows = response.content.splitlines()
+        self.assertIn("body_diff", str(rows[0]))
+        self.assertEqual(4, len(rows))

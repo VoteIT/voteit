@@ -11,6 +11,7 @@ from typing import Dict
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.rest_api.serializers import BaseModelSerializer
+from voteit.core.rest_api.serializers import ExportBaseSerializerMixin
 from voteit.core.rest_api.serializers import RichTextSerializerMixin
 from voteit.core.rest_api.validators import ValidateGroupAIContext
 from voteit.core.utils import get_model_shortname
@@ -88,9 +89,9 @@ class GenericProposalSerializer(serializers.Serializer):
 
     registry = {}
 
-    def __new__(cls, instance, *args, **kwargs):
-        if isinstance(instance, QuerySet) or isinstance(instance, list):
-            return super().__new__(cls, instance=instance, *args, **kwargs)
+    def __new__(cls, instance, *args, many=False, **kwargs):
+        if many:
+            raise ValueError("Can't use many on this serializer")
         shortname = get_model_shortname(instance)
         try:
             serializer = cls.registry[shortname]
@@ -310,3 +311,76 @@ class TextDocumentSerializer(serializers.ModelSerializer):
             ):
                 raise ValidationError({"base_tag": _("Must be unique for agenda item")})
         return attrs
+
+
+class GenericExportProposalSerializer(serializers.Serializer):
+    """
+    Select serializer based on instance shortname.
+
+    Don't subclass this, but register any model serializers you'd like to use.
+
+    >>> from voteit.proposal.models import Proposal
+    >>> dummy = Proposal()
+    >>> serializer = GenericExportProposalSerializer(dummy)
+    >>> serializer.__class__.__name__
+    'ExportProposalSerializer'
+
+    >>> from voteit.proposal.models import DiffProposal
+    >>> diff_dummy = DiffProposal()
+    >>> serializer = GenericExportProposalSerializer(diff_dummy)
+    >>> serializer.__class__.__name__
+    'ExportDiffProposalSerializer'
+    """
+
+    registry = {}
+
+    def __new__(cls, instance, *args, many=False, **kwargs):
+        if many:
+            raise ValueError("Can't use many on this serializer")
+        shortname = get_model_shortname(instance)
+        try:
+            serializer = cls.registry[shortname]
+        except KeyError:
+            raise exceptions.ValidationError({"shortname": "No such type"})
+        return serializer(instance, *args, **kwargs)
+
+    @classmethod
+    def get_all_field_names(cls) -> list[str]:
+        result = list(cls.registry["proposal"].Meta.fields)
+        for serializer in [
+            serializer
+            for (name, serializer) in cls.registry.items()
+            if name != "proposal"
+        ]:
+            for fname in serializer.Meta.fields:
+                if fname not in result:
+                    result.append(fname)
+        return result
+
+
+class ExportProposalSerializer(ProposalDetailSerializer, ExportBaseSerializerMixin):
+    class Meta(DiffProposalDetailSerializer.Meta):
+        fields = (
+            list(
+                x for x in ProposalDetailSerializer.Meta.fields if x not in ["mentions"]
+            )
+            + ExportBaseSerializerMixin.Meta.fields
+        )
+
+
+class ExportDiffProposalSerializer(
+    ExportBaseSerializerMixin,DiffProposalDetailSerializer
+):
+    class Meta(DiffProposalDetailSerializer.Meta):
+        fields = (
+            list(
+                x
+                for x in DiffProposalDetailSerializer.Meta.fields
+                if x not in ["body_diff", "mentions"]
+            )
+            + ExportBaseSerializerMixin.Meta.fields
+        )
+
+
+GenericExportProposalSerializer.registry["proposal"] = ExportProposalSerializer
+GenericExportProposalSerializer.registry["diff_proposal"] = ExportDiffProposalSerializer

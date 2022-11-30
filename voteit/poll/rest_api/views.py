@@ -107,7 +107,7 @@ class ExportERViewSet(viewsets.GenericViewSet):
             "Content-Disposition"
         ] = f'attachment; filename="er_{er.pk}_export.csv"'
         # FIXME:Get proper field headers
-        writer = csv.DictWriter(response, fieldnames=serializer.data[0].keys())
+        writer = csv.DictWriter(response, fieldnames=serializer.child.fields)
         writer.writeheader()
         for row in serializer.data:
             writer.writerow(row)

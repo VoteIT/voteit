@@ -2,6 +2,9 @@ from django.contrib.auth import get_user_model
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
 
@@ -9,10 +12,6 @@ User = get_user_model()
 class AgendaItemViewTestCase(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
-        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
@@ -128,3 +127,55 @@ class AgendaItemViewTestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual([], data["tags"])
+
+
+class ExportParticipantsViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+
+    def test_not_allowed(self):
+        url = reverse("export-agenda-items-json", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.participant)
+        response = self.client.get(url)
+        self.assertContains(
+            response, "permission meeting.moderate_meeting", status_code=403
+        )
+
+    def test_json(self):
+        url = reverse("export-agenda-items-json", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(3, len(data))
+        self.assertEqual(
+            {
+                "body": "could be tasty",
+                "pk": 1,
+                "state": "upcoming",
+                "tags": "",
+                "title": "Pickles",
+            },
+            data[0],
+        )
+
+    def test_csv(self):
+        url = reverse("export-agenda-items-csv", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("text/csv", response.headers.get("Content-Type"))
+        rows = response.content.splitlines()
+        self.assertIn(
+            b"state,pk,title,body,tags",
+            rows,
+        )
+        self.assertIn(
+            b"upcoming,1,Pickles,could be tasty,",
+            rows,
+        )
