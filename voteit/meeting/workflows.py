@@ -7,12 +7,14 @@ class MeetingWf:
     CLOSED = "closed"
     ARCHIVING = "archiving"
     ARCHIVED = "archived"
+    DELETING = "deleting"
     states = {
         UPCOMING: _("Upcoming"),
         ONGOING: _("Ongoing"),
         CLOSED: _("Closed"),
         ARCHIVING: _("Archiving"),
         ARCHIVED: _("Archived"),
+        DELETING: _("Deleting"),
     }
     initial = UPCOMING
 
@@ -20,5 +22,5 @@ class MeetingWf:
     def choices(cls):
         return cls.states.items()
 
-    finished_states = {CLOSED, ARCHIVING, ARCHIVED}
-    archived_states = {ARCHIVING, ARCHIVED}
+    finished_states = {CLOSED, ARCHIVING, ARCHIVED, DELETING}
+    archived_states = {ARCHIVING, ARCHIVED, DELETING}

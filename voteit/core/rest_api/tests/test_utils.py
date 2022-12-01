@@ -22,7 +22,8 @@ class UtilsTests(TestCase):
 
     def test_valid_states_upcoming(self):
         self.assertEqual(
-            ["ongoing"], [x.name for x in get_valid_transitions(self.meeting)]
+            ["ongoing", "request_delete"],
+            [x.name for x in get_valid_transitions(self.meeting)],
         )
 
     def test_valid_states_ongoing(self):
@@ -31,6 +32,7 @@ class UtilsTests(TestCase):
         self.assertEqual(
             [
                 "close",
+                "request_delete",
                 "upcoming",
             ],
             [x.name for x in get_valid_transitions(self.meeting)],

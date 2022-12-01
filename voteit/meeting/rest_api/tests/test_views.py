@@ -126,7 +126,7 @@ class MeetingViewSetTests(APITestCase):
         moderator = User.objects.get(username="moderator")
         self.client.force_login(moderator)
         response = self.client.delete(url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 204)
 
     def test_change(self):
         url = reverse("meeting-detail", kwargs={"pk": 1})

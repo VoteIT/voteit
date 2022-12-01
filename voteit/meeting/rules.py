@@ -144,11 +144,11 @@ rules.add_perm(
     MeetingPermissions.LIST,
     is_authenticated & (visible_in_lists | is_participant | is_moderator),
 )
-rules.add_perm(MeetingPermissions.MODERATE, meeting_not_archived & is_moderator)
+rules.add_perm(MeetingPermissions.MODERATE, is_moderator)
 rules.add_perm(MeetingPermissions.ARCHIVE, meeting_not_fully_archived & is_moderator)
 # We might want to add editor role later on
 rules.add_perm(MeetingPermissions.CHANGE, meeting_not_archived & is_moderator)
-rules.add_perm(MeetingPermissions.DELETE, meeting_not_archived & is_moderator)
+rules.add_perm(MeetingPermissions.DELETE, is_moderator)
 rules.add_perm(
     MeetingPermissions.CHANGE_ROLES, meeting_not_archived & (is_moderator | is_manager)
 )

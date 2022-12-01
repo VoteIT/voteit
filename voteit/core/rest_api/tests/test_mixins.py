@@ -62,6 +62,16 @@ class TransitionsMixinTests(APITestCase):
                         }
                     ],
                 },
+                {
+                    "name": "request_delete",
+                    "permission": "meeting.delete_meeting",
+                    "source": "upcoming",
+                    "target": "deleting",
+                    "title": "Request delete...",
+                    "conditions": [],
+                    "has_perm": True,
+                    "allowed": True,
+                },
             ],
             response.json(),
         )
@@ -80,6 +90,16 @@ class TransitionsMixinTests(APITestCase):
                     "source": "ongoing",
                     "target": "closed",
                     "title": "Close",
+                    "conditions": [],
+                    "has_perm": True,
+                    "allowed": True,
+                },
+                {
+                    "name": "request_delete",
+                    "permission": "meeting.delete_meeting",
+                    "source": "ongoing",
+                    "target": "deleting",
+                    "title": "Request delete...",
                     "conditions": [],
                     "has_perm": True,
                     "allowed": True,

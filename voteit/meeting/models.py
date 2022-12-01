@@ -132,6 +132,10 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         related_name="meetings",
     )
     archive_after: datetime | None = models.DateTimeField(null=True, editable=False)
+    delete_requested: datetime | None = models.DateTimeField(null=True, editable=False)
+    pre_delete_state: str | None = models.CharField(
+        max_length=30, null=True, editable=False
+    )
 
     roles_cls = MeetingRoles
     participants = models.ManyToManyField(
@@ -257,13 +261,43 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         with transaction.atomic():
             archive_meeting.send(sender=self.__class__, meeting=self)
 
+    @transition(
+        field=state,
+        source=[
+            MeetingWf.UPCOMING,
+            MeetingWf.ONGOING,
+            MeetingWf.CLOSED,
+            MeetingWf.ARCHIVED,
+            MeetingWf.ARCHIVING,
+        ],
+        target=MeetingWf.DELETING,
+        permission=MeetingPermissions.DELETE,
+        custom={"title": _("Request delete...")},
+    )
+    def request_delete(self):
+        self.pre_delete_state = self.state
+        self.delete_requested = now()
+
+    @transition(
+        field=state,
+        source=MeetingWf.DELETING,
+        target=None,
+        permission=MeetingPermissions.DELETE,
+        custom={"title": _("Abort delete")},
+    )
+    def abort_delete(self):
+        self.state = self.pre_delete_state
+        self.delete_requested = None
+
     @property
     def is_archived(self):
         return self.state in MeetingWf.archived_states
 
     @property
     def meeting(self) -> Meeting:
-        """To fulfill the MeetingContext ABC."""
+        """
+        To fulfill the MeetingContext ABC.
+        """
         return self
 
     class QuerySet(models.QuerySet):
