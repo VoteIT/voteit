@@ -241,6 +241,7 @@ class OrganisationSendsComponentsViewSetTests(APITestCase):
         )
 
     def test_disabled_component(self):
+        self.client.force_login(self.user)
         self.message_component.disable()
         self.message_component.save()
         url = reverse("organisations-list")
@@ -252,6 +253,7 @@ class OrganisationSendsComponentsViewSetTests(APITestCase):
         self.assertEqual([], org_data.get("components"))
 
     def test_broken_component(self):
+        self.client.force_login(self.user)
         self.message_component.settings_data = ""
         self.message_component.save()
         self.assertFalse(self.message_component.is_valid)

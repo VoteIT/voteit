@@ -45,6 +45,7 @@ class OrganisationViewSet(
     queryset = Organisation.objects.all()
     serializer_class = serializers.OrganisationSerializer
     expected_default_http_status = 401
+    allow_unauthenticated = True
     # TODO: Not decided how to host multiple organisations. For now, always return a list of one.
 
     def get_queryset(self):

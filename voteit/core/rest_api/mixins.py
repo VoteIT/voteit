@@ -67,7 +67,7 @@ class AutoPermissionViewSetMixin:
         """Ensures user has permission to perform the requested action."""
         super().initial(*args, **kwargs)
 
-        if not self.request.user:
+        if not self.request.user or self.request.user.is_anonymous:
             # No user, don't check permission
             if self.allow_unauthenticated:
                 return
