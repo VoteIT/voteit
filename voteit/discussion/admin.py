@@ -1,15 +1,17 @@
 from django.contrib import admin
 
+from voteit.agenda.admin import AgendaItemAdminMixin
 from voteit.discussion.models import DiscussionPost
+from voteit.meeting.admin import MeetingAdminMixin
 
 
 @admin.register(DiscussionPost)
-class DiscussionPostAdmin(admin.ModelAdmin):
+class DiscussionPostAdmin(MeetingAdminMixin, AgendaItemAdminMixin, admin.ModelAdmin):
     list_filter = ("author__organisation",)
     list_display = (
         "__str__",
-        "meeting",
-        "agenda_item",
+        "meeting_link",
+        "agenda_item_link",
         "author",
         "meeting_group",
     )

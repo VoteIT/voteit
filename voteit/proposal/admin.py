@@ -1,19 +1,24 @@
 from django.contrib import admin
 from fsm_admin.mixins import FSMTransitionMixin
 
+from voteit.agenda.admin import AgendaItemAdminMixin
+from voteit.meeting.admin import MeetingAdminMixin
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
 
 
 @admin.register(Proposal)
-class ProposalAdmin(FSMTransitionMixin, admin.ModelAdmin):
+class ProposalAdmin(
+    AgendaItemAdminMixin, MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin
+):
     fsm_field = ["state"]
     list_display = (
         "prop_id",
         "__str__",
         "state",
-        "meeting",
+        "meeting_link",
+        "agenda_item_link",
         "author",
         "meeting_group",
     )
@@ -40,16 +45,19 @@ class ProposalAdmin(FSMTransitionMixin, admin.ModelAdmin):
     )
     exclude = ("state",)
 
+    def agenda_item(self, obj):
+        raise Exception("bla")
+
 
 @admin.register(DiffProposal)
-class DiffProposalAdmin(FSMTransitionMixin, admin.ModelAdmin):
+class DiffProposalAdmin(ProposalAdmin):
     fsm_field = ["state"]
     list_display = (
         "prop_id",
         "__str__",
         "state",
-        "meeting",
-        "agenda_item",
+        "meeting_link",
+        "agenda_item_link",
         "author",
         "meeting_group",
     )
@@ -78,11 +86,11 @@ class DiffProposalAdmin(FSMTransitionMixin, admin.ModelAdmin):
 
 
 @admin.register(TextDocument)
-class TextDocumentAdmin(admin.ModelAdmin):
+class TextDocumentAdmin(MeetingAdminMixin, AgendaItemAdminMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
-        "meeting",
-        "agenda_item",
+        "meeting_link",
+        "agenda_item_link",
         "base_tag",
     )
     list_filter = ("agenda_item__meeting__organisation",)

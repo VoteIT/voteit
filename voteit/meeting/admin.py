@@ -1,9 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from django.contrib import admin
 from django.db import transaction
 from django.http import HttpResponse
 from django.http import HttpResponseRedirect
 from django.template import loader
+from django.urls import NoReverseMatch
 from django.urls import reverse
+from django.utils.html import format_html
+
 from dolly.core import LiveCloner
 from fsm_admin.mixins import FSMTransitionMixin
 
@@ -15,6 +22,9 @@ from voteit.meeting.utils import clone_meeting
 from voteit.meeting.utils import collect_meeting
 from voteit.meeting.utils import get_default_models_ignored_on_clone
 from voteit.proposal.models import Proposal
+
+if TYPE_CHECKING:
+    from voteit.core.abcs import MeetingContext
 
 
 class AgendaItemInline(admin.TabularInline):
@@ -114,3 +124,16 @@ class MeetingGroupAdmin(admin.ModelAdmin):
 
     def member_count(self, group: MeetingGroup):
         return group.members.count()
+
+
+class MeetingAdminMixin:
+    @admin.display(description="Meeting")
+    def meeting_link(self, obj: MeetingContext):
+        if obj.meeting:
+            viewname = "admin:meeting_meeting_change"
+            try:
+                link = reverse(viewname, args=[obj.meeting.pk])
+            except NoReverseMatch:
+                return "%s" % obj.meeting
+            return format_html('<a href="{}">{}</a>', link, obj.meeting)
+        return "-"
