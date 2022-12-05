@@ -61,6 +61,9 @@ class SpeakerSystemRoles(Roles, MeetingContext):
         "organisation": {"remap_relations": {"speaker_system": "context"}},
     }
 
+    def __str__(self):
+        return f"{self.user} roles @ {self.context}"
+
 
 class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     """

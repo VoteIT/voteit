@@ -1,14 +1,15 @@
 from django.contrib import admin
 
+from voteit.meeting.admin import MeetingAdminMixin
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
 
 
 @admin.register(ReactionButton)
-class ReactionButtonAdmin(admin.ModelAdmin):
+class ReactionButtonAdmin(MeetingAdminMixin, admin.ModelAdmin):
     list_display = (
         "title",
-        "meeting",
+        "meeting_link",
         "active",
         "pk",
     )

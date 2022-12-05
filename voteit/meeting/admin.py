@@ -36,7 +36,6 @@ class AgendaItemInline(admin.TabularInline):
 @admin.register(Meeting)
 class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = ["state"]
-    # fields = ("title", )
     autocomplete_fields = ("organisation",)
     list_display = (
         "title",
@@ -52,15 +51,13 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
     actions = ["report_clone_meeting", "clone_meeting"]
     exclude = ("mentions",)
 
+    @admin.display(description="Agenda items")
     def ai_count(self, obj: Meeting):
         return obj.agenda_items.count()
 
-    ai_count.short_description = "Agenda items"
-
+    @admin.display(description="Proposals")
     def proposal_count(self, obj: Meeting):
         return Proposal.objects.filter(agenda_item__meeting=obj).count()
-
-    proposal_count.short_description = "Proposals"
 
     def report_clone_meeting(self, request, queryset):
         from voteit.speaker.models import SpeakerListSystem
@@ -101,31 +98,6 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
         return HttpResponseRedirect(url)
 
 
-@admin.register(MeetingRoles)
-class MeetingRolesAdmin(admin.ModelAdmin):
-    autocomplete_fields = "user", "context"
-    list_display = "user", "assigned", "context"
-    list_filter = ("user__organisation",)
-    search_fields = (
-        "context__title",
-        "user__last_name",
-        "user__first_name",
-        "user__userid",
-    )
-
-
-@admin.register(MeetingGroup)
-class MeetingGroupAdmin(admin.ModelAdmin):
-    autocomplete_fields = ("meeting", "members")
-    list_display = ("title", "meeting", "member_count")
-    list_filter = ("meeting", "members")
-    search_fields = ("title",)
-    exclude = ("mentions",)
-
-    def member_count(self, group: MeetingGroup):
-        return group.members.count()
-
-
 class MeetingAdminMixin:
     @admin.display(description="Meeting")
     def meeting_link(self, obj: MeetingContext):
@@ -137,3 +109,29 @@ class MeetingAdminMixin:
                 return "%s" % obj.meeting
             return format_html('<a href="{}">{}</a>', link, obj.meeting)
         return "-"
+
+
+@admin.register(MeetingRoles)
+class MeetingRolesAdmin(MeetingAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = "user", "context"
+    list_display = "user", "assigned", "meeting_link"
+    list_filter = ("user__organisation",)
+    search_fields = (
+        "context__title",
+        "user__last_name",
+        "user__first_name",
+        "user__userid",
+    )
+
+
+@admin.register(MeetingGroup)
+class MeetingGroupAdmin(MeetingAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = ("meeting", "members")
+    list_display = ("title", "meeting_link", "member_count")
+    list_filter = ("meeting__organisation",)
+    search_fields = ("title", "meeting__title")
+    exclude = ("mentions",)
+
+    @admin.display(description="Members")
+    def member_count(self, group: MeetingGroup):
+        return group.members.count()

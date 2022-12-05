@@ -54,15 +54,22 @@ __all__ = "VoterWeight", "ElectoralRegister", "Poll", "Vote"
 logger = getLogger(__name__)
 
 
-class VoterWeight(models.Model):
+class VoterWeight(MeetingContext):
     name = "voter_weight"
-    register = models.ForeignKey("ElectoralRegister", on_delete=models.CASCADE)
+    register: ElectoralRegister = models.ForeignKey(
+        "ElectoralRegister", on_delete=models.CASCADE
+    )
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    weight = models.PositiveIntegerField(default=1)
+    weight: int = models.PositiveIntegerField(default=1)
 
     importers = {
         "organisation": {"remap_relations": {"electoral_register": "register"}}
     }
+
+    @property
+    def meeting(self) -> Meeting | None:
+        return self.register.meeting
+
     # Annotations
     objects: models.Manager
 
