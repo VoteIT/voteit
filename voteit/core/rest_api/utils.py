@@ -54,7 +54,6 @@ def get_identity_data(user: User) -> dict:
         exc.status_code = 503
         raise exc
     # Not the correct serializer exception, but this is kind of the crash and burn...
-    # FIXME: Cases to handle: Token expired, user not found etc
     if not response.ok:
         try:
             err_data = response.json()
