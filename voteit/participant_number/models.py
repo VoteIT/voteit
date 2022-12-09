@@ -82,10 +82,16 @@ class PNSystem(MeetingContext):
         return default
 
     def __repr__(self):
-        return f"<{self.__class__.__name__}: {self.meeting}>"
+        try:
+            return f"<{self.__class__.__name__}: {self.meeting}>"
+        except Meeting.DoesNotExist:
+            return f"<{self.__class__.__name__} PK:{self.pk}>"
 
     def __str__(self):
-        return f"PN: {self.meeting}"
+        try:
+            return f"PN: {self.meeting}"
+        except Meeting.DoesNotExist:
+            return f"{self.__class__.__name__} PK:{self.pk}>"
 
     # Annotations
     numbers: models.QuerySet
