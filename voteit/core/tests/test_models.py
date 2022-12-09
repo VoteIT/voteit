@@ -219,7 +219,7 @@ class AuditLogTests(TestCase):
         p_logs_qs = LogEntry.objects.get_for_object(prop)
         self.assertEqual(1, p_logs_qs.count())
         first = p_logs_qs.first()
-        self.assertEqual({"m": meeting.pk, "ai": ai.pk}, first.additional_data)
+        self.assertEqual({"ai": ai.pk}, first.additional_data)
 
     def test_get_additional_data_and_delete(self):
         meeting = Meeting.objects.create()

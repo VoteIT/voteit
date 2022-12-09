@@ -54,16 +54,20 @@ class AuditLogMixin:
         data = {}
         if hasattr(self, "organisation_id") and self.organisation_id:
             data["o"] = self.organisation_id
-        if getattr(self, "name", None) == "agenda_item":
-            data.update({"ai": self.pk, "m": self.meeting_id})
-        elif getattr(self, "agenda_item_id", None) and self.agenda_item.pk:
-            data.update({"ai": self.agenda_item.pk, "m": self.agenda_item.meeting_id})
-        elif getattr(self, "meeting_id", None):
+        if hasattr(self, "meeting_id") and self.meeting_id:
             data["m"] = self.meeting_id
-        elif getattr(self, "meeting", None) and self.meeting.pk:
-            data["m"] = self.meeting.pk
-            if self.meeting.organisation_id:
-                data["o"] = self.meeting.organisation_id
+        if hasattr(self, "agenda_item_id") and self.agenda_item_id:
+            data["ai"] = self.agenda_item_id
+        # Ai specific
+        if getattr(self, "name", None) == "agenda_item":
+            data["ai"] = self.pk
+            if self.meeting_id:
+                data["m"] = self.meeting_id
+        # Meeting specific
+        if getattr(self, "name", None) == "meeting":
+            data["m"] = self.pk
+            if self.organisation_id:
+                data["o"] = self.organisation_id
         return data
 
 
