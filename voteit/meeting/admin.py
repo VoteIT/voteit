@@ -126,8 +126,15 @@ class MeetingRolesAdmin(MeetingAdminMixin, admin.ModelAdmin):
 
 @admin.register(MeetingGroup)
 class MeetingGroupAdmin(MeetingAdminMixin, admin.ModelAdmin):
-    autocomplete_fields = ("meeting", "members")
-    list_display = ("title", "meeting_link", "member_count")
+    autocomplete_fields = (
+        "meeting",
+        "members",
+    )
+    list_display = (
+        "title",
+        "meeting_link",
+        "member_count",
+    )
     list_filter = ("meeting__organisation",)
     search_fields = ("title", "meeting__title")
     exclude = ("mentions",)

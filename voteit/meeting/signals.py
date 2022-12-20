@@ -23,12 +23,15 @@ from voteit.meeting.messages import MeetingChanged
 from voteit.meeting.messages import MeetingGroupAdded
 from voteit.meeting.messages import MeetingGroupChanged
 from voteit.meeting.messages import MeetingGroupDeleted
+from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.rest_api.serializers import MeetingDetailSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
-
+from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.roles import ROLE_PROPOSER
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -160,4 +163,34 @@ def push_roles_removed(instance: MeetingRoles, roles: list[Role], **kwargs):
             model=get_model_shortname(instance.context),
             user_pk=instance.user.pk,
         ),
+    )
+
+
+def _check_roles(user, meeting, excluding_membership: int | None = None):
+    assigned = set()
+    qs = GroupMembership.objects.filter(
+        user=user, meeting_group__meeting=meeting, role__isnull=False
+    )
+    if excluding_membership:
+        qs = qs.exclude(pk=excluding_membership)
+    for membership in qs.select_related("role"):
+        assigned.update(membership.role.roles)
+    to_remove = {
+        ROLE_POTENTIAL_VOTER,
+        ROLE_DISCUSSER,
+        ROLE_PROPOSER,
+    } - assigned
+    meeting.remove_roles(user, *to_remove)
+    meeting.add_roles(user, *assigned)
+
+
+@receiver(post_save, sender=GroupMembership)
+def membership_changed(instance: GroupMembership, created: bool = None, **kwargs):
+    _check_roles(instance.user, instance.meeting_group.meeting)
+
+
+@receiver(pre_delete, sender=GroupMembership)
+def membership_deleted(instance: GroupMembership, **kwargs):
+    _check_roles(
+        instance.user, instance.meeting_group.meeting, excluding_membership=instance.pk
     )

@@ -8,6 +8,7 @@ from typing import Generator
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db import transaction
 from django.utils import timezone
@@ -346,8 +347,18 @@ class MeetingGroup(BaseContent, MeetingContext):
     meeting: Meeting = models.ForeignKey(
         "Meeting", on_delete=models.CASCADE, related_name="groups"
     )
+    # TODO: Remove 'members' after migrating existing data, and then either rename 'role_members',
+    # TODO: or add relay property.
     members = models.ManyToManyField(
-        settings.AUTH_USER_MODEL, blank=True, related_name="meeting_groups"
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="meeting_groups",
+    )
+    role_members = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        through="GroupMembership",
+        related_name="meeting_groups",
     )
 
     def save(
@@ -386,4 +397,68 @@ class MeetingGroup(BaseContent, MeetingContext):
     # Type annotations - relations
     proposals: models.QuerySet
     discussions: models.QuerySet
-    objects: models.Manager
+    objects: models.Manager[MeetingGroup]
+
+
+class GroupRole(MeetingContext):
+    """
+    Dynamic group roles for a meeting. These can be automatically created from a meeting dialect,
+    or created by a meeting moderator.
+    """
+
+    title: str = models.CharField(max_length=100)
+    meeting: Meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="group_roles"
+    )
+    can_propose_as: bool = models.BooleanField("Can propose as group", default=False)
+    can_discuss_as: bool = models.BooleanField("Can discuss as group", default=False)
+    roles: list[str] = ArrayField(
+        models.CharField(
+            max_length=20,
+        ),
+    )
+    # Groups should be able to map to a meeting dialect, which will define if they're editable, etc.
+    # dialect_group = models.CharField(null=True, blank=True, max_length=40, unique=True)
+    users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        through="GroupMembership",
+        related_name="assigned_group_roles",
+    )
+
+    class Meta:
+        ordering = ["title"]  # Should group roles have a manual order?
+        constraints = [
+            models.UniqueConstraint(
+                fields=["title", "meeting"], name="unique_meeting_grp_title"
+            ),
+        ]
+        verbose_name = "Group role"
+        verbose_name_plural = "Group roles"
+
+    def __str__(self):
+        return self.title
+
+    # Annotations
+    objects: models.Manager[GroupRole]
+
+
+class GroupMembership(models.Model):
+    """
+    Join table for users and group roles.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    meeting_group = models.ForeignKey(
+        MeetingGroup, on_delete=models.CASCADE, related_name="role_assignments"
+    )
+    role = models.ForeignKey(
+        GroupRole, on_delete=models.CASCADE, related_name="+", null=True
+    )
+
+    # Annotations
+    objects: models.Manager[GroupMembership]

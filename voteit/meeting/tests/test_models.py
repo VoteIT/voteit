@@ -2,7 +2,12 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
 
+from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.organisation.models import Organisation
 
 User = get_user_model()
@@ -161,3 +166,87 @@ class MeetingRolesTests(TestCase):
     def test_unique_constraint(self):
         with self.assertRaises(IntegrityError):
             self._cut.objects.create(user=self.moderator, context=self.meeting)
+
+
+class GroupRoleTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.moderator = User.objects.get(username="moderator")
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.group_one = cls.meeting.groups.create(title="Oners")
+        cls.group_two = cls.meeting.groups.create(title="Twoers")
+        cls.participant = User.objects.get(username="participant")
+        cls.councilor = GroupRole.objects.create(
+            meeting=cls.meeting,
+            roles=[ROLE_POTENTIAL_VOTER, ROLE_DISCUSSER, ROLE_PROPOSER],
+            title="Councilor",
+        )
+        cls.debater = GroupRole.objects.create(
+            meeting=cls.meeting, roles=[ROLE_DISCUSSER], title="Debater"
+        )
+
+    def assertRoles(self, expected: set[str] | list[str], value: set):
+        self.assertEqual({ROLE_PARTICIPANT} | set(expected), value)
+
+    def test_assign_role(self):
+        self.assertEqual(
+            {ROLE_PARTICIPANT},
+            self.meeting.get_roles(self.participant),
+        )
+        self.group_one.role_assignments.create(
+            user=self.participant, role=self.councilor
+        )
+        self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
+
+    def test_downgrade_role(self):
+        self.group_one.role_assignments.create(
+            user=self.participant, role=self.councilor
+        )
+        self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
+        assignment = self.group_one.role_assignments.filter(
+            user=self.participant
+        ).first()
+        assignment.role = self.debater
+        assignment.save()
+        self.assertRoles(self.debater.roles, self.meeting.get_roles(self.participant))
+
+    def test_remove_role(self):
+        self.group_one.role_assignments.create(
+            user=self.participant, role=self.councilor
+        )
+        self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
+        assignment = self.group_one.role_assignments.filter(
+            user=self.participant
+        ).first()
+        assignment.role = None
+        assignment.save()
+        self.assertRoles(set(), self.meeting.get_roles(self.participant))
+
+    def test_several_groups_keeps_role_intact(self):
+        self.group_one.role_assignments.create(
+            user=self.participant, role=self.councilor
+        )
+        second = self.group_two.role_assignments.create(
+            user=self.participant, role=self.councilor
+        )
+        # And deleting it keeps original
+        second.delete()
+        self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
+
+    def test_delete_group(self):
+        self.group_one.role_assignments.create(
+            user=self.participant, role=self.councilor
+        )
+        self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
+        self.group_one.delete()
+        self.assertRoles(set(), self.meeting.get_roles(self.participant))
+
+    def test_delete_role(self):
+        self.group_one.role_assignments.create(
+            user=self.participant, role=self.councilor
+        )
+        self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
+        self.councilor.delete()
+        self.assertRoles(set(), self.meeting.get_roles(self.participant))
