@@ -235,6 +235,15 @@ class GroupRoleTests(TestCase):
         second.delete()
         self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
 
+    def test_adjust_roles(self):
+        self.group_one.role_assignments.create(
+            user=self.participant, role=self.debater
+        )
+        self.assertRoles(self.debater.roles, self.meeting.get_roles(self.participant))
+        self.debater.roles = [ROLE_POTENTIAL_VOTER]
+        self.debater.save()
+        self.assertRoles(self.debater.roles, self.meeting.get_roles(self.participant))
+
     def test_delete_group(self):
         self.group_one.role_assignments.create(
             user=self.participant, role=self.councilor

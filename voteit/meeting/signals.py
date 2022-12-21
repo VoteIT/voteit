@@ -24,6 +24,7 @@ from voteit.meeting.messages import MeetingGroupAdded
 from voteit.meeting.messages import MeetingGroupChanged
 from voteit.meeting.messages import MeetingGroupDeleted
 from voteit.meeting.models import GroupMembership
+from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.models import MeetingGroup
@@ -167,6 +168,7 @@ def push_roles_removed(instance: MeetingRoles, roles: list[Role], **kwargs):
 
 
 def _check_roles(user, meeting, excluding_membership: int | None = None):
+    #FIXME: This should be optimized
     assigned = set()
     qs = GroupMembership.objects.filter(
         user=user, meeting_group__meeting=meeting, role__isnull=False
@@ -185,7 +187,7 @@ def _check_roles(user, meeting, excluding_membership: int | None = None):
 
 
 @receiver(post_save, sender=GroupMembership)
-def membership_changed(instance: GroupMembership, created: bool = None, **kwargs):
+def membership_changed(instance: GroupMembership, **kwargs):
     _check_roles(instance.user, instance.meeting_group.meeting)
 
 
@@ -194,3 +196,12 @@ def membership_deleted(instance: GroupMembership, **kwargs):
     _check_roles(
         instance.user, instance.meeting_group.meeting, excluding_membership=instance.pk
     )
+
+
+@receiver(post_save, sender=GroupRole)
+def group_role_changed(instance: GroupRole, **kwargs):
+    for gm in GroupMembership.objects.filter(role=instance).prefetch_related(
+        "user", "meeting_group", "meeting_group__meeting"
+    ):
+        #FIXME: Optimize, this will be quite slow in large meetings
+        _check_roles(gm.user, gm.meeting_group.meeting)
