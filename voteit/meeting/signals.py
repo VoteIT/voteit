@@ -168,7 +168,7 @@ def push_roles_removed(instance: MeetingRoles, roles: list[Role], **kwargs):
 
 
 def _check_roles(user, meeting, excluding_membership: int | None = None):
-    #FIXME: This should be optimized
+    # FIXME: This should be optimized
     assigned = set()
     qs = GroupMembership.objects.filter(
         user=user, meeting_group__meeting=meeting, role__isnull=False
@@ -203,5 +203,5 @@ def group_role_changed(instance: GroupRole, **kwargs):
     for gm in GroupMembership.objects.filter(role=instance).prefetch_related(
         "user", "meeting_group", "meeting_group__meeting"
     ):
-        #FIXME: Optimize, this will be quite slow in large meetings
+        # FIXME: Optimize, this will be quite slow in large meetings
         _check_roles(gm.user, gm.meeting_group.meeting)

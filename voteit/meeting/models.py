@@ -51,6 +51,8 @@ __all__ = (
     "Meeting",
     "MeetingRoles",
     "MeetingGroup",
+    "GroupRole",
+    "GroupMembership",
 )
 
 
@@ -113,6 +115,18 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     visible_in_lists: bool = models.BooleanField(
         verbose_name="Show basic meeting details in lists?", default=False
     )
+    # group_votes_policy_name: str|None = models.CharField(
+    #     verbose_name="Voting power comes from groups rather than individuals",
+    #     max_length=30,
+    #     null=True,
+    #     blank=True,
+    # )
+    # group_roles_policy_name: str|None = models.CharField(
+    #     verbose_name="System for dynamic roles within groups",
+    #     max_length=30,
+    #     null=True,
+    #     blank=True,
+    # )
     er_policy_name: str | None = models.CharField(
         verbose_name="ID of used electoral policy",
         max_length=30,
@@ -347,18 +361,14 @@ class MeetingGroup(BaseContent, MeetingContext):
     meeting: Meeting = models.ForeignKey(
         "Meeting", on_delete=models.CASCADE, related_name="groups"
     )
+    # votes: int | None = models.IntegerField(blank=True, null=True)
     # TODO: Remove 'members' after migrating existing data, and then either rename 'role_members',
     # TODO: or add relay property.
     members = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,
         related_name="meeting_groups",
-    )
-    role_members = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        blank=True,
         through="GroupMembership",
-        related_name="meeting_groups",
     )
 
     def save(
@@ -457,7 +467,7 @@ class GroupMembership(models.Model):
         MeetingGroup, on_delete=models.CASCADE, related_name="role_assignments"
     )
     role = models.ForeignKey(
-        GroupRole, on_delete=models.CASCADE, related_name="+", null=True
+        GroupRole, on_delete=models.CASCADE, related_name="+", null=True, blank=True
     )
 
     # Annotations
