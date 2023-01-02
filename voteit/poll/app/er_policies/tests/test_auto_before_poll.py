@@ -1,7 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django_fsm import TransitionNotAllowed
+
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 
 User = get_user_model()
 
@@ -9,14 +14,9 @@ User = get_user_model()
 class AutoBeforePollTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-        from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
-
-        cls.ABF = AutoBeforePoll
-
-        cls.meeting: Meeting = Meeting.objects.create(er_policy_name=cls.ABF.name)
+        cls.meeting: Meeting = Meeting.objects.create(
+            er_policy_name=AutoBeforePoll.name
+        )
         cls.ai = cls.meeting.agenda_items.create()
         cls.user1 = User.objects.create(username="one")
         cls.user2 = User.objects.create(username="two")
@@ -28,15 +28,9 @@ class AutoBeforePollTests(TestCase):
         self.meeting.refresh_from_db()
         self.poll.refresh_from_db()
 
-    @property
-    def ElectoralRegister(self):
-        from voteit.poll.models import ElectoralRegister
-
-        return ElectoralRegister
-
     def test_new_er_on_upcoming(self):
         self.poll.upcoming()
-        self.assertIsInstance(self.poll.electoral_register, self.ElectoralRegister)
+        self.assertIsInstance(self.poll.electoral_register, ElectoralRegister)
         # Why self.assertQuerysetEqual() create object strings of some kind?
         self.assertEqual(
             {self.user1, self.user2}, set(self.poll.electoral_register.voters.all())
@@ -68,7 +62,7 @@ class AutoBeforePollTests(TestCase):
         first_er = self.meeting.er_policy.create_er(self.meeting)
         self.poll.electoral_register = first_er
         user3 = User.objects.create(username="three")
-        self.meeting.add_roles(user3, "potential_voter")
+        self.meeting.add_roles(user3, ROLE_POTENTIAL_VOTER)
         self.poll.upcoming()
         self.assertNotEqual(first_er, self.poll.electoral_register)
         self.assertEqual(
@@ -94,7 +88,7 @@ class AutoBeforePollTests(TestCase):
         self.poll.upcoming()
         self.poll.proposals.create(agenda_item=self.ai)
         self.assertRaises(TransitionNotAllowed, self.poll.ongoing)
-        self.meeting.er_policy_name = self.ABF.name
+        self.meeting.er_policy_name = AutoBeforePoll.name
         self.meeting.save()
         # FIX cache
         self.meeting.er_policy = self.meeting._er_policy()
@@ -104,3 +98,16 @@ class AutoBeforePollTests(TestCase):
         self.poll.save()
         self.poll.meeting.refresh_from_db()
         self.poll.ongoing()
+
+    def test_get_voters_when_switching_to_groups(self):
+        self.assertEqual(
+            {self.user1.pk: 1, self.user2.pk: 1}, self.meeting.er_policy.get_voters()
+        )
+        self.meeting.group_votes_active = True
+        self.meeting.save()
+        self.assertEqual({}, self.meeting.er_policy.get_voters())
+        group = self.meeting.groups.create(groupid="group", votes=4)
+        group.members.add(self.user1, self.user2)
+        self.assertEqual(
+            {self.user1.pk: 2, self.user2.pk: 2}, self.meeting.er_policy.get_voters()
+        )

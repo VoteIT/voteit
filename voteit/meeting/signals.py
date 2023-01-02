@@ -169,21 +169,22 @@ def push_roles_removed(instance: MeetingRoles, roles: list[Role], **kwargs):
 
 def _check_roles(user, meeting, excluding_membership: int | None = None):
     # FIXME: This should be optimized
-    assigned = set()
-    qs = GroupMembership.objects.filter(
-        user=user, meeting_group__meeting=meeting, role__isnull=False
-    )
-    if excluding_membership:
-        qs = qs.exclude(pk=excluding_membership)
-    for membership in qs.select_related("role"):
-        assigned.update(membership.role.roles)
-    to_remove = {
-        ROLE_POTENTIAL_VOTER,
-        ROLE_DISCUSSER,
-        ROLE_PROPOSER,
-    } - assigned
-    meeting.remove_roles(user, *to_remove)
-    meeting.add_roles(user, *assigned)
+    if meeting.group_roles_active:
+        assigned = set()
+        qs = GroupMembership.objects.filter(
+            user=user, meeting_group__meeting=meeting, role__isnull=False
+        )
+        if excluding_membership:
+            qs = qs.exclude(pk=excluding_membership)
+        for membership in qs.select_related("role"):
+            assigned.update(membership.role.roles)
+        to_remove = {
+            ROLE_POTENTIAL_VOTER,
+            ROLE_DISCUSSER,
+            ROLE_PROPOSER,
+        } - assigned
+        meeting.remove_roles(user, *to_remove)
+        meeting.add_roles(user, *assigned)
 
 
 @receiver(post_save, sender=GroupMembership)

@@ -30,6 +30,7 @@ class AutoAlways(ElectoralRegisterPolicy):
     name = "auto_always"
     title = _("Demo meeting: Always update electoral register")
     handles_vote_weight = False
+    handles_personal_vote = True
     logger = logger
 
     def get_voters(self, **kwargs) -> dict[int, int]:

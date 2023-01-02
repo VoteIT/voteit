@@ -175,6 +175,8 @@ class GroupRoleTests(TestCase):
     def setUpTestData(cls):
         cls.moderator = User.objects.get(username="moderator")
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.meeting.group_roles_active = True
+        cls.meeting.save()
         cls.group_one = cls.meeting.groups.create(title="Oners")
         cls.group_two = cls.meeting.groups.create(title="Twoers")
         cls.participant = User.objects.get(username="participant")
@@ -236,9 +238,7 @@ class GroupRoleTests(TestCase):
         self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
 
     def test_adjust_roles(self):
-        self.group_one.role_assignments.create(
-            user=self.participant, role=self.debater
-        )
+        self.group_one.role_assignments.create(user=self.participant, role=self.debater)
         self.assertRoles(self.debater.roles, self.meeting.get_roles(self.participant))
         self.debater.roles = [ROLE_POTENTIAL_VOTER]
         self.debater.save()
@@ -259,3 +259,12 @@ class GroupRoleTests(TestCase):
         self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
         self.councilor.delete()
         self.assertRoles(set(), self.meeting.get_roles(self.participant))
+
+    def test_group_roles_disabled_adjust_roles(self):
+        self.group_one.role_assignments.create(user=self.participant, role=self.debater)
+        self.assertRoles(self.debater.roles, self.meeting.get_roles(self.participant))
+        self.meeting.group_roles_active = False
+        self.meeting.save()
+        self.debater.roles = [ROLE_POTENTIAL_VOTER]
+        self.debater.save()
+        self.assertRoles([ROLE_DISCUSSER], self.meeting.get_roles(self.participant))

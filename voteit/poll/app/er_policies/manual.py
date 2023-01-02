@@ -20,6 +20,7 @@ class Manual(ElectoralRegisterPolicy):
     title = _("Manual only")
     logger = logger
     handles_vote_weight = True
+    handles_personal_vote = True
 
     def get_voters(self, *, weight_dict: dict[int, int], **kwargs) -> dict[int, int]:
         """

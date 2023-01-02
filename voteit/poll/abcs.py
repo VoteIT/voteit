@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
+from collections import Counter
 from logging import getLogger
+from random import shuffle
 from typing import TYPE_CHECKING
 
 from pydantic.main import BaseModel
@@ -10,11 +12,14 @@ from pydantic.main import BaseModel
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 if TYPE_CHECKING:
+    from django.db.models import QuerySet
     from voteit.poll.models import Poll
     from voteit.poll.models import ElectoralRegister
     from voteit.meeting.models import Meeting
+    from voteit.meeting.models import MeetingGroup
     from voteit.poll.messages import VoteBase
     from voteit.poll.schemas import PollResult
+    from voteit.core.models import User as UserType
 
 logger = getLogger(__name__)
 
@@ -82,6 +87,8 @@ class ElectoralRegisterPolicy(ABC):
     """
 
     logger = logger
+    handles_group_vote = False
+    handles_personal_vote = True
 
     def __init__(self, meeting: Meeting):
         self.meeting = meeting
@@ -187,3 +194,45 @@ class ElectoralRegisterPolicy(ABC):
             new_er_created.send(instance=er, sender=er.__class__)
             return er
         return self.meeting.latest_er
+
+
+class GroupVoteElectoralRegisterPolicy(ElectoralRegisterPolicy, ABC):
+    """
+    Handles group voting, and may handle user voting too.
+    """
+
+    handles_group_vote = True
+    handles_personal_vote = False  # Defaults to false
+
+    def calc_group_votes_equal(
+        self, only_users_qs: QuerySet[UserType] | None = None
+    ) -> dict[int, int]:
+        """
+        This is equal-ish, since votes power is an integer.
+        Use random distribution for left-overs.
+        """
+        counter = Counter()
+        groups_qs = self.meeting.groups.filter(
+            votes__isnull=False, votes__gt=0
+        ).prefetch_related("members")
+        potential_voters_pks = self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
+        for group in groups_qs:
+            group: MeetingGroup
+            mqs = group.members.filter(pk__in=potential_voters_pks)
+            if only_users_qs is not None:
+                mqs = mqs & only_users_qs
+            user_pks = list(mqs.values_list("pk", flat=True))
+            if not user_pks:
+                # Avoid div 0
+                continue
+            full, rest = divmod(group.votes, len(user_pks))
+            for pk in user_pks:
+                counter[pk] += full
+            if rest:
+                shuffle(user_pks)
+                for pk in user_pks:
+                    counter[pk] += 1
+                    rest -= 1
+                    if not rest:
+                        break
+        return dict(counter)

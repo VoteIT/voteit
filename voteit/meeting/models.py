@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from voteit.components.models import MeetingComponent
     from voteit.poll.models import ElectoralRegister
     from voteit.poll.abcs import ElectoralRegisterPolicy
+    from voteit.poll.abcs import GroupVoteElectoralRegisterPolicy
     from voteit.organisation.models import Organisation
     from voteit.participant_number.models import PNSystem
     from voteit.presence.models import PresenceSystem
@@ -115,18 +116,14 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     visible_in_lists: bool = models.BooleanField(
         verbose_name="Show basic meeting details in lists?", default=False
     )
-    # group_votes_policy_name: str|None = models.CharField(
-    #     verbose_name="Voting power comes from groups rather than individuals",
-    #     max_length=30,
-    #     null=True,
-    #     blank=True,
-    # )
-    # group_roles_policy_name: str|None = models.CharField(
-    #     verbose_name="System for dynamic roles within groups",
-    #     max_length=30,
-    #     null=True,
-    #     blank=True,
-    # )
+    group_votes_active: bool = models.BooleanField(
+        verbose_name="Voting power comes from groups rather than individuals",
+        default=False,
+    )
+    group_roles_active: bool = models.BooleanField(
+        verbose_name="System for dynamic roles within groups",
+        default=False,
+    )
     er_policy_name: str | None = models.CharField(
         verbose_name="ID of used electoral policy",
         max_length=30,
@@ -180,7 +177,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         return reg[DEFAULT_PROPOSAL_ID_POLICY](self)
 
     @cached_property
-    def er_policy(self) -> ElectoralRegisterPolicy:
+    def er_policy(self) -> ElectoralRegisterPolicy | GroupVoteElectoralRegisterPolicy:
         return self._er_policy()
 
     @cached_property
@@ -359,9 +356,11 @@ class MeetingGroup(BaseContent, MeetingContext):
     title: str = models.CharField(max_length=100, default="")
     groupid: str = models.CharField(max_length=100, null=True)
     meeting: Meeting = models.ForeignKey(
-        "Meeting", on_delete=models.CASCADE, related_name="groups"
+        "Meeting",
+        on_delete=models.CASCADE,
+        related_name="groups",
     )
-    # votes: int | None = models.IntegerField(blank=True, null=True)
+    votes: int | None = models.PositiveIntegerField(blank=True, null=True)
     members = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,
@@ -387,6 +386,8 @@ class MeetingGroup(BaseContent, MeetingContext):
                     self.groupid = groupid
                     break
                 groupid = f"{base}-{i}"
+        if not self.title:
+            self.title = self.groupid
         super().save(force_insert, force_update, using, update_fields)
 
     class Meta:

@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from django_fsm import post_transition
 
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-from voteit.poll.abcs import ElectoralRegisterPolicy
+from voteit.poll.abcs import GroupVoteElectoralRegisterPolicy
 from voteit.poll.registries import er_policy
 from voteit.presence.models import PresenceCheck
 from voteit.presence.workflows import PresenceCheckWf
@@ -18,7 +18,7 @@ logger = getLogger(__name__)
 
 
 @er_policy
-class PresenceCheckPolicy(ElectoralRegisterPolicy):
+class PresenceCheckPolicy(GroupVoteElectoralRegisterPolicy):
     """
     Any completed presence check causes a new electoral register
     """
@@ -27,6 +27,7 @@ class PresenceCheckPolicy(ElectoralRegisterPolicy):
     title = _("Closing a presence check will set a new electoral register.")
     logger = logger
     handles_vote_weight = False
+    handles_personal_vote = True
 
     def get_voters(self, presence_check=None, **kwargs) -> dict[int, int]:
         if presence_check is None:
@@ -39,13 +40,17 @@ class PresenceCheckPolicy(ElectoralRegisterPolicy):
         present_potential_voters = presence_check.present_users.filter(
             pk__in=potential_voters
         )
-        return {
-            x: 1 for x in present_potential_voters.values_list("pk", flat=True)
-        }
+        if self.meeting.group_votes_active:
+            return self.meeting.er_policy.calc_group_votes_equal(
+                only_users_qs=present_potential_voters
+            )
+        else:
+            return {x: 1 for x in present_potential_voters.values_list("pk", flat=True)}
 
     def poll_will_have_voters(self, **kwargs):
         """
         Check for presence check can't be done this way, but it shouldn't block.
+        This check is run when starting the poll so other checks will block start of the ER is empty.
         """
         return True
 

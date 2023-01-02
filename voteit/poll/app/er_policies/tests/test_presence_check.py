@@ -1,7 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from voteit.poll.exceptions import ElectoralRegisterEmpty
-from voteit.poll.exceptions import ElectoralRegisterMissing
+
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.poll.app.er_policies.presence_check import PresenceCheckPolicy
+from voteit.poll.models import Poll
+from voteit.presence.models import PresenceCheck
 
 User = get_user_model()
 
@@ -11,14 +15,6 @@ class PresenceCheckPolicyTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-
-        from voteit.poll.models import Poll
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-        from voteit.poll.app.er_policies.presence_check import PresenceCheckPolicy
-        from voteit.presence.models import PresenceCheck
-
-        cls.PresenceCheckPolicy = PresenceCheckPolicy
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.meeting.er_policy_name = PresenceCheckPolicy.name
         cls.meeting.save()
@@ -55,3 +51,11 @@ class PresenceCheckPolicyTests(TestCase):
         )
         self.poll.upcoming()
         self.assertFalse(self.poll.electoral_register_empty_guard())
+
+    def test_group_votes(self):
+        group = self.meeting.groups.create(groupid="group", votes=4)
+        group.members.add(self.moderator, self.participant)
+        self.meeting.group_votes_active = True
+        self.meeting.save()
+        self.presence_check.close()
+        self.assertEqual({self.participant.pk: 4}, self.meeting.latest_er.weight_dict)
