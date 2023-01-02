@@ -136,6 +136,12 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         null=True,
         blank=True,
     )
+    installed_dialect: str | None = models.CharField(
+        verbose_name="A specific meeting configuration to run that sets up policies, groups etc.",
+        max_length=30,
+        null=True,
+        blank=True,
+    )
     organisation: Organisation | None = models.ForeignKey(
         "organisation.Organisation",
         on_delete=models.CASCADE,
