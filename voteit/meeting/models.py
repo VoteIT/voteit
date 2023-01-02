@@ -362,8 +362,6 @@ class MeetingGroup(BaseContent, MeetingContext):
         "Meeting", on_delete=models.CASCADE, related_name="groups"
     )
     # votes: int | None = models.IntegerField(blank=True, null=True)
-    # TODO: Remove 'members' after migrating existing data, and then either rename 'role_members',
-    # TODO: or add relay property.
     members = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,

@@ -5,4 +5,5 @@ from voteit.poll.abcs import PollMethod
 
 poll_methods = Registry(PollMethod)
 
+# FIXME Rename to plural
 er_policy = Registry(ElectoralRegisterPolicy)
