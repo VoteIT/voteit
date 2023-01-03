@@ -4,6 +4,8 @@ from datetime import datetime
 from datetime import timedelta
 from itertools import count
 from logging import getLogger
+from random import sample
+from string import ascii_lowercase
 from typing import Generator
 from typing import TYPE_CHECKING
 
@@ -136,9 +138,10 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         null=True,
         blank=True,
     )
-    installed_dialect: str | None = models.CharField(
-        verbose_name="A specific meeting configuration to run that sets up policies, groups etc.",
-        max_length=30,
+    installed_dialects: str | None = models.CharField(
+        verbose_name="Configuration steps for roles, groups etc. that have been run. "
+        "Comma-separated, in order of installation.",
+        max_length=300,
         null=True,
         blank=True,
     )
@@ -355,6 +358,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     speaker_systems: models.QuerySet[SpeakerListSystem]
     components: models.QuerySet[MeetingComponent]
     roles: models.QuerySet[MeetingRoles]
+    group_roles: models.QuerySet[GroupRole]
 
 
 class MeetingGroup(BaseContent, MeetingContext):
@@ -415,13 +419,22 @@ class MeetingGroup(BaseContent, MeetingContext):
     objects: models.Manager[MeetingGroup]
 
 
+def _rnd_role_id():
+    return "".join(sample(ascii_lowercase, 8))
+
+
 class GroupRole(MeetingContext):
     """
     Dynamic group roles for a meeting. These can be automatically created from a meeting dialect,
     or created by a meeting moderator.
     """
 
-    title: str = models.CharField(max_length=100)
+    title: str = models.CharField(verbose_name="Title", max_length=100)
+    role_id: str = models.CharField(
+        verbose_name="Role ID, mostly for scripting",
+        max_length=100,
+        default=_rnd_role_id,
+    )
     meeting: Meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="group_roles"
     )
@@ -445,11 +458,28 @@ class GroupRole(MeetingContext):
         ordering = ["title"]  # Should group roles have a manual order?
         constraints = [
             models.UniqueConstraint(
-                fields=["title", "meeting"], name="unique_meeting_grp_title"
+                fields=["title", "meeting"], name="unique_role_title_for_meeting"
+            ),
+            models.UniqueConstraint(
+                fields=("role_id", "meeting"), name="unique_role_id_for_meeting"
             ),
         ]
         verbose_name = "Group role"
         verbose_name_plural = "Group roles"
+
+    def save(self, **kwargs):
+        if self.role_id is None:
+            if self.title:
+                role_id = slugify(self.title)
+            else:
+                role_id = _rnd_role_id()
+            if self.meeting.group_roles.filter(role_id=role_id).exists():
+                # We don't care about more checks than this
+                role_id = role_id + "-" + "".join(sample(ascii_lowercase, 2))
+            self.role_id = role_id
+        if not self.title:
+            self.title = self.role_id
+        super().save(**kwargs)
 
     def __str__(self):
         return self.title

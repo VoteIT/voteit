@@ -1,22 +1,25 @@
 from __future__ import annotations
 
+from itertools import chain
 from logging import getLogger
 from typing import TYPE_CHECKING
 
 from django.contrib.contenttypes.models import ContentType
 from django_fsm import FSMField
-
 from dolly.core import LiveCloner
 from dolly.utils import get_inf_collector
 from dolly.utils import get_model_formatted_dict
+
 from voteit.core.decorators import ensure_atomic
 from voteit.core.utils import get_content_registry
 from voteit.core.utils import get_model_by_shortname
+from voteit.meeting.exceptions import DialectError
+from voteit.meeting.schemas import DialectSchema
 
 if TYPE_CHECKING:
+    from django.db.models import Model
     from voteit.meeting.models import Meeting
     from voteit.core.models import User
-    from django.db.models import Model
 
 logger = getLogger(__name__)
 
@@ -126,3 +129,99 @@ def clone_meeting(
             f"User {user} doesn't belong to organisation {meeting.organisation} so that user won't be added as moderator."
         )
     return meeting
+
+
+class DialectHandler:
+    data: DialectSchema
+    schema = DialectSchema
+    optional_nullable = (
+        "er_policy_name",
+        "proposal_id_policy_name",
+    )
+    optional_default_false = (
+        "group_votes_active",
+        "group_roles_active",
+    )
+
+    def __init__(self, data: DialectSchema):
+        self.data = data
+
+    @classmethod
+    def load_from_dict(cls, data: dict):
+        data = cls.schema(**data)
+        return cls(data)
+
+    @ensure_atomic
+    def install(self, meeting: Meeting):
+        # Basics
+        installed = (
+            meeting.installed_dialects and meeting.installed_dialects.split(",") or []
+        )
+        if self.data.name in installed:
+            raise DialectError(f"{self.data.name} already installed")
+        for req in self.data.requires:
+            if req not in installed:
+                raise DialectError(
+                    f"{req} must be installed before installing {self.data.name}"
+                )
+        installed.append(self.data.name)
+        meeting.installed_dialects = ",".join(installed)
+        # Optionals
+        for k in chain(self.optional_nullable, self.optional_default_false):
+            v = getattr(self.data, k)
+            if v is not None:
+                setattr(meeting, k, v)
+        meeting.save()
+        # GroupRoles
+        for gr_data in self.data.roles:
+            group_role = meeting.group_roles.filter(role_id=gr_data.role_id).first()
+            if group_role is None:
+                meeting.group_roles.create(**gr_data.dict())
+            else:
+                for k, v in gr_data.dict(exclude={"role_id"}).items():
+                    if getattr(group_role, k, object()) != v:
+                        setattr(group_role, k, v)
+                group_role.save()
+        # Groups
+        for g_data in self.data.groups:
+            group = meeting.groups.filter(groupid=g_data.groupid).first()
+            if group is None:
+                meeting.groups.create(**g_data.dict())
+            else:
+                for k, v in g_data.dict(exclude={"groupid"}).items():
+                    if getattr(group, k, object()) != v:
+                        setattr(group, k, v)
+                group.save()
+
+    @ensure_atomic
+    def remove(self, meeting: Meeting):
+        installed = (
+            meeting.installed_dialects and meeting.installed_dialects.split(",") or []
+        )
+        if self.data.name not in installed[-1:]:
+            raise DialectError("%s is not the last installed dialect" % self.data.name)
+        installed.remove(self.data.name)
+        if installed:
+            meeting.installed_dialects = ",".join(installed)
+        else:
+            meeting.installed_dialects = None
+        # Optional, only touch not none
+        # Always disable these if they had a setting
+        for k in self.optional_default_false:
+            v = getattr(self.data, k)
+            if v is not None:
+                setattr(meeting, k, False)
+        # And these should be removed if they existed
+        for k in self.optional_nullable:
+            v = getattr(self.data, k)
+            if v is not None:
+                setattr(meeting, k, None)
+        meeting.save()
+        # GroupRoles
+        meeting.group_roles.filter(
+            role_id__in=[x.role_id for x in self.data.roles]
+        ).delete()
+        # Groups
+        meeting.groups.filter(
+            groupid__in=[x.groupid for x in self.data.groups]
+        ).delete()

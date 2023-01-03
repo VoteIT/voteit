@@ -1,7 +1,11 @@
 from django.contrib.auth import get_user_model
+from django.test import TestCase
+from pydantic import ValidationError
+
 from dolly.utils import get_data_id_struct
 
 from voteit.core.utils import get_model_by_shortname
+from voteit.meeting.exceptions import DialectError
 from voteit.organisation.models import Organisation
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -17,8 +21,6 @@ from voteit.speaker.models import SpeakerList
 
 User = get_user_model()
 
-from django.test import TestCase
-
 
 class MeetingCloneTests(TestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture", "full_ai_test_fixture"]
@@ -28,9 +30,6 @@ class MeetingCloneTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.organisation: Organisation = Organisation.objects.get(pk=1)
         cls.user = User.objects.get(pk=1)
-
-    def setUp(self):
-        pass
 
     def test_collect_without_restrictions(self):
         data = collect_meeting(self.meeting)
@@ -122,3 +121,112 @@ class MeetingCloneTests(TestCase):
         with self.assertRaises(PNSystem.DoesNotExist):
             new_meeting.pn_system
         self.assertEqual(1, ParticipantNumber.objects.count())
+
+
+dialect_named_test = {
+    "title": "Test",
+    "name": "test",
+    "roles": [
+        {
+            "title": "Supervisor",
+            "role_id": "supervisor",
+            "roles": ["discusser", "proposer"],
+        }
+    ],
+    "groups": [{"title": "Board", "groupid": "board"}],
+    "er_policy_name": "auto_before_poll",
+    "group_votes_active": True,
+    "group_roles_active": True,
+}
+dialect_minimal = {"title": "Mini", "name": "mini"}
+dialect_minimal_requires_test = {"title": "Req", "name": "req", "requires": ["test"]}
+
+
+class DialectHandlerTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+
+    @property
+    def _cut(self):
+        from voteit.meeting.utils import DialectHandler
+
+        return DialectHandler
+
+    def test_load_with_bad_data(self):
+        with self.assertRaises(ValidationError):
+            self._cut.load_from_dict({})
+
+    def test_install(self):
+        handler = self._cut.load_from_dict(dialect_named_test)
+        handler.install(self.meeting)
+        self.assertEqual("test", self.meeting.installed_dialects)
+        self.assertEqual("auto_before_poll", self.meeting.er_policy_name)
+        self.assertTrue(self.meeting.group_votes_active)
+        self.assertTrue(self.meeting.group_roles_active)
+        group_role = self.meeting.group_roles.filter(role_id="supervisor").first()
+        self.assertIsNotNone(group_role)
+        self.assertEqual("Supervisor", group_role.title)
+        group = self.meeting.groups.filter(groupid="board").first()
+        self.assertIsNotNone(group)
+        self.assertEqual("Board", group.title)
+
+    def test_install_adjusts_groups_and_roles(self):
+        group_role = self.meeting.group_roles.create(
+            title="Jeff", role_id="supervisor", roles=["discusser"]
+        )
+        group = self.meeting.groups.create(title="Jane", groupid="board")
+        handler = self._cut.load_from_dict(dialect_named_test)
+        handler.install(self.meeting)
+        group_role.refresh_from_db()
+        group.refresh_from_db()
+        self.assertEqual("Supervisor", group_role.title)
+        self.assertEqual(["discusser", "proposer"], group_role.roles)
+        self.assertEqual("Board", group.title)
+
+    def test_remove(self):
+        handler = self._cut.load_from_dict(dialect_named_test)
+        handler.install(self.meeting)
+        self.assertEqual("test", self.meeting.installed_dialects)
+        handler.remove(self.meeting)
+        self.assertIsNone(self.meeting.installed_dialects)
+        self.assertIsNone(self.meeting.group_roles.filter(role_id="supervisor").first())
+        self.assertIsNone(self.meeting.groups.filter(groupid="board").first())
+        self.assertIsNone(self.meeting.er_policy_name)
+        self.assertFalse(self.meeting.group_votes_active)
+        self.assertFalse(self.meeting.group_roles_active)
+
+    def test_duplicate_install(self):
+        handler = self._cut.load_from_dict(dialect_named_test)
+        self.meeting.installed_dialects = handler.data.name
+        with self.assertRaises(DialectError):
+            handler.install(self.meeting)
+
+    def test_remove_with_none_installed(self):
+        handler = self._cut.load_from_dict(dialect_named_test)
+        with self.assertRaises(DialectError):
+            handler.remove(self.meeting)
+
+    def test_install_requires_other(self):
+        handler = self._cut.load_from_dict(dialect_named_test)
+        handler.install(self.meeting)
+        handler_req = self._cut.load_from_dict(dialect_minimal_requires_test)
+        handler_req.install(self.meeting)
+        self.assertEqual("test,req", self.meeting.installed_dialects)
+
+    def test_install_missing_required(self):
+        handler = self._cut.load_from_dict(dialect_minimal_requires_test)
+        with self.assertRaises(DialectError):
+            handler.install(self.meeting)
+
+    def test_uninstall_leaves_untouched_settings_instact(self):
+        self.meeting.group_votes_active = True
+        self.meeting.group_roles_active = True
+        self.meeting.proposal_id_policy_name = "auto_before_poll"
+        self.meeting.save()
+        handler = self._cut.load_from_dict(dialect_minimal)
+        handler.install(self.meeting)
+        handler.remove(self.meeting)
+        self.assertTrue(self.meeting.group_votes_active)
+        self.assertTrue(self.meeting.group_roles_active)
+        self.assertEqual("auto_before_poll", self.meeting.proposal_id_policy_name)
