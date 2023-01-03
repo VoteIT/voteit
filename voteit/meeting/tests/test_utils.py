@@ -1,5 +1,8 @@
+import os
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.test import override_settings
 from pydantic import ValidationError
 
 from dolly.utils import get_data_id_struct
@@ -141,6 +144,10 @@ dialect_named_test = {
 dialect_minimal = {"title": "Mini", "name": "mini"}
 dialect_minimal_requires_test = {"title": "Req", "name": "req", "requires": ["test"]}
 
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+DIALECT_FIXTURES = os.path.join(TESTS_DIR, "dialect_fixtures")
+BAD_DIALECT_FIXTURES = os.path.join(TESTS_DIR, "bad_dialect_fixtures")
+
 
 class DialectHandlerTests(TestCase):
     @classmethod
@@ -230,3 +237,29 @@ class DialectHandlerTests(TestCase):
         self.assertTrue(self.meeting.group_votes_active)
         self.assertTrue(self.meeting.group_roles_active)
         self.assertEqual("auto_before_poll", self.meeting.proposal_id_policy_name)
+
+    @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
+    def test_populate_registry(self):
+        self._cut.populate_registry()
+        self.assertIn("one", self._cut.registry)
+        self.assertTrue(os.path.isfile(self._cut.registry["one"]))
+
+    @override_settings(MEETING_DIALECTS_DIR=BAD_DIALECT_FIXTURES)
+    def test_populate_registry_bad_files(self):
+        with self.assertLogs("voteit.meeting.utils", "ERROR") as cm:
+            self._cut.populate_registry()
+        self.assertTrue(
+            any(
+                ["broken.yaml returned data that wasn't a dict" in x for x in cm.output]
+            )
+        )
+        self.assertTrue(
+            any(["bad_values.yaml caused suppressed exception" in x for x in cm.output])
+        )
+
+    @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
+    def test_install_from_reg(self):
+        self._cut.populate_registry()
+        handler = self._cut.load_from_name("one")
+        handler.install(self.meeting)
+        self.assertEqual("one", self.meeting.installed_dialects)

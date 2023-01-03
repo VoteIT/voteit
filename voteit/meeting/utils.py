@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import os
 from itertools import chain
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django_fsm import FSMField
+from yaml import safe_load
+
 from dolly.core import LiveCloner
 from dolly.utils import get_inf_collector
 from dolly.utils import get_model_formatted_dict
@@ -132,6 +136,7 @@ def clone_meeting(
 
 
 class DialectHandler:
+    registry: dict[str, str] = {}  # name as k, full filepath as v
     data: DialectSchema
     schema = DialectSchema
     optional_nullable = (
@@ -147,9 +152,52 @@ class DialectHandler:
         self.data = data
 
     @classmethod
+    def populate_registry(cls):
+        dialects_dir = getattr(settings, "MEETING_DIALECTS_DIR", None)
+        if dialects_dir is None:
+            logger.warning(
+                "Missing MEETING_DIALECTS_DIR settings, can't load dialects."
+            )
+            return
+        for root, dirs, files in os.walk(dialects_dir):
+            for fname in files:
+                parts = fname.split(".")
+                if parts[-1] not in {"yaml", "yml"}:
+                    logger.warning("Skipping dialect file %s, must be yaml", fname)
+                name = ".".join(parts[:-1])
+                fullpath = os.path.join(root, fname)
+                # Make sure data works
+                with open(fullpath, "r") as f:
+                    data = safe_load(f)
+                if not isinstance(data, dict):
+                    logger.exception(
+                        "Loading dialect file %s returned data that wasn't a dict",
+                        fname,
+                    )
+                    continue
+                data["name"] = name
+                try:
+                    cls.schema(**data)
+                except ValueError:
+                    logger.exception(
+                        "Loading dialect file %s caused suppressed exception - file skipped",
+                        fname,
+                    )
+                    continue
+                cls.registry[name] = fullpath
+
+    @classmethod
     def load_from_dict(cls, data: dict):
         data = cls.schema(**data)
         return cls(data)
+
+    @classmethod
+    def load_from_name(cls, name: str):
+        with open(cls.registry[name], "r") as f:
+            data = safe_load(f)
+        # Default to filename
+        data["name"] = name
+        return cls.load_from_dict(data)
 
     @ensure_atomic
     def install(self, meeting: Meeting):

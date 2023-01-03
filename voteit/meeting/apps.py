@@ -1,4 +1,8 @@
+from logging import getLogger
+
 from django.apps import AppConfig
+
+logger = getLogger(__name__)
 
 
 class MeetingConfig(AppConfig):
@@ -13,3 +17,6 @@ class MeetingConfig(AppConfig):
         from voteit.meeting import channels
         from voteit.meeting import messages
         from voteit.meeting import signals
+        from voteit.meeting.utils import DialectHandler
+
+        DialectHandler.populate_registry()
