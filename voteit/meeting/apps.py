@@ -17,6 +17,6 @@ class MeetingConfig(AppConfig):
         from voteit.meeting import channels
         from voteit.meeting import messages
         from voteit.meeting import signals
-        from voteit.meeting.utils import DialectHandler
+        from voteit.meeting.utils import get_named_path_dict
 
-        DialectHandler.populate_registry()
+        get_named_path_dict()  # Will issue warnings

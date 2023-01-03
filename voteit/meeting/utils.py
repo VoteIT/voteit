@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections import defaultdict
 from itertools import chain
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -135,8 +136,92 @@ def clone_meeting(
     return meeting
 
 
+# def load_from_name(cls, name: str):
+#     with open(cls.registry[name], "r") as f:
+#         data = safe_load(f)
+#     # Default to filename
+#     data["name"] = name
+#     return cls.load_from_dict(data)
+
+
+def get_named_path_dict() -> dict[str, dict]:
+    results = {}
+    intra_req_checks = defaultdict(set)
+    dialects_dir = getattr(settings, "MEETING_DIALECTS_DIR", None)
+    if dialects_dir is None:
+        logger.warning("Missing MEETING_DIALECTS_DIR settings, can't load dialects.")
+        return results
+    for root, dirs, files in os.walk(dialects_dir):
+        for fname in files:
+            parts = fname.split(".")
+            if parts[-1] not in {"yaml", "yml"}:
+                logger.warning("Skipping dialect file %s, must be yaml", fname)
+                continue
+            name = ".".join(parts[:-1])
+            fullpath = os.path.join(root, fname)
+            # Make sure data works
+            with open(fullpath, "r") as f:
+                data = safe_load(f)
+            if not isinstance(data, dict):
+                logger.exception(
+                    "Loading dialect file %s returned data that wasn't a dict",
+                    fname,
+                )
+                continue
+            data["name"] = name
+            try:
+                data_model = DialectHandler.schema(**data)
+            except ValueError:
+                logger.exception(
+                    "Loading dialect file %s caused suppressed exception - file skipped",
+                    fname,
+                )
+                continue
+            results[name] = {"path": fname, "data": data_model}
+            if data_model.requires:
+                intra_req_checks[name].update(data_model.requires)
+
+    # It doesn't check cyclic, so let's hope that doesn't happen ;)
+    for name, reqs in intra_req_checks.items():
+        for req in reqs:
+            if req not in results:
+                logger.exception(
+                    "Dialect %s specifies a requirement to '%s' but it doesn't exist.",
+                    name,
+                    req,
+                )
+                del results[name]
+                break
+    return results
+
+
+def recursive_load_handlers(
+    name: str,
+    loaded_names: list[str] | None = None,
+    named_paths: dict[str, str] | None = None,
+    handlers: list[DialectHandler] | None = None,
+) -> list[DialectHandler]:
+    if named_paths is None:
+        named_paths = get_named_path_dict()
+    if loaded_names is None:
+        loaded_names = []
+    if name in loaded_names:
+        raise DialectError(f"Cyclic dependency, dialect {name} already loaded")
+    if handlers is None:
+        handlers = []
+    if name not in named_paths:
+        raise DialectError(f"Dialect {name} doesn't exist or has invalid data")
+    handler = DialectHandler(named_paths[name]["data"])
+    handlers.insert(0, handler)
+    loaded_names.append(name)
+    for req in handler.data.requires:
+        recursive_load_handlers(
+            req, loaded_names=loaded_names, named_paths=named_paths, handlers=handlers
+        )
+    return handlers
+
+
 class DialectHandler:
-    registry: dict[str, str] = {}  # name as k, full filepath as v
     data: DialectSchema
     schema = DialectSchema
     optional_nullable = (
@@ -152,52 +237,9 @@ class DialectHandler:
         self.data = data
 
     @classmethod
-    def populate_registry(cls):
-        dialects_dir = getattr(settings, "MEETING_DIALECTS_DIR", None)
-        if dialects_dir is None:
-            logger.warning(
-                "Missing MEETING_DIALECTS_DIR settings, can't load dialects."
-            )
-            return
-        for root, dirs, files in os.walk(dialects_dir):
-            for fname in files:
-                parts = fname.split(".")
-                if parts[-1] not in {"yaml", "yml"}:
-                    logger.warning("Skipping dialect file %s, must be yaml", fname)
-                name = ".".join(parts[:-1])
-                fullpath = os.path.join(root, fname)
-                # Make sure data works
-                with open(fullpath, "r") as f:
-                    data = safe_load(f)
-                if not isinstance(data, dict):
-                    logger.exception(
-                        "Loading dialect file %s returned data that wasn't a dict",
-                        fname,
-                    )
-                    continue
-                data["name"] = name
-                try:
-                    cls.schema(**data)
-                except ValueError:
-                    logger.exception(
-                        "Loading dialect file %s caused suppressed exception - file skipped",
-                        fname,
-                    )
-                    continue
-                cls.registry[name] = fullpath
-
-    @classmethod
     def load_from_dict(cls, data: dict):
         data = cls.schema(**data)
         return cls(data)
-
-    @classmethod
-    def load_from_name(cls, name: str):
-        with open(cls.registry[name], "r") as f:
-            data = safe_load(f)
-        # Default to filename
-        data["name"] = name
-        return cls.load_from_dict(data)
 
     @ensure_atomic
     def install(self, meeting: Meeting):

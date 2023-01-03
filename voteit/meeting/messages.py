@@ -1,13 +1,23 @@
+from abc import ABC
+
 from auditlog.context import set_actor
 from pydantic import BaseModel
+from pydantic import constr
+from pydantic import validator
+
 from envelope.core.message import ContextAction
+from envelope.messages.common import ProgressNum
 from envelope.messages.common import Status
+from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
 from envelope.utils import websocket_send
+from voteit.meeting.exceptions import DialectError
 
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
+from voteit.meeting.utils import DialectHandler
 from voteit.meeting.utils import clone_meeting
+from voteit.meeting.utils import recursive_load_handlers
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.messaging.base import BaseObjectAdded
@@ -69,3 +79,97 @@ class CopyMeeting(ContextAction):
         with set_actor(self.user):
             clone_meeting(meeting, user=self.user)
         websocket_send(update, state=update.SUCCESS)
+
+
+class DialectSchema(BaseModel):
+    dialect: constr(max_length=30, to_lower=True)
+    meeting: int
+    # Don't validate dialect name, since it might be a bit slow...
+    # @validator("dialect")
+    # def validate_dialect(cls, v: str):
+    #     try:
+    #         # This might be slow, so it might be a good idea to move it to
+    #         recursive_load_handlers(v)
+    #     except DialectError:
+    #         raise ValueError(f"No dialect named {v}")
+    #     return v
+
+
+class DialectAction(ContextAction, ABC):
+    permission = MeetingPermissions.CHANGE_DIALECT
+    schema = DialectSchema
+    data: DialectSchema
+    model = Meeting
+    context: Meeting
+    context_schema_attr = "meeting"
+
+    def get_handlers(self):
+        self.assert_perm()
+        try:
+            return recursive_load_handlers(self.data.dialect)
+        except DialectError as exc:
+            # Other exc?
+            raise BadRequestError.from_message(self, msg=str(exc))
+
+
+@incoming
+class InstallDialect(DialectAction):
+    name = "meeting_dialect.install"
+
+    def run_job(self):
+        if self.context.installed_dialects is not None:
+            raise BadRequestError.from_message(
+                self, msg="This meeting already has an installed dialect"
+            )
+        #        websocket_send(update, state=update.RUNNING, on_commit=False)
+        handlers = self.get_handlers()
+        total = len(handlers)
+        i = 0
+        with set_actor(self.user):
+            for handler in handlers:
+                websocket_send(
+                    ProgressNum.from_message(self, curr=i, total=total),
+                    state=self.RUNNING,
+                    on_commit=False,
+                )
+                handler.install(self.context)
+                i += 1
+        result = ProgressNum.from_message(
+            self, curr=i, total=total, msg=f"Installed f{self.data.dialect}"
+        )
+        websocket_send(result, state=self.SUCCESS)
+        return result
+
+
+@incoming
+class RemoveDialect(DialectAction):
+    name = "meeting_dialect.remove"
+
+    def run_job(self):
+        if self.context.installed_dialects is None:
+            raise BadRequestError.from_message(self, msg="Nothing installed")
+        handlers = self.get_handlers()
+        installed = self.context.installed_dialects.split(",")
+        handler_names = [x.data.name for x in handlers]
+        if handler_names != installed:
+            raise BadRequestError.from_message(
+                self,
+                msg=f"This is not the installed dialect, or installation has changed some how. "
+                f"Installed: {','.join(installed)} Removal: {','.join(handler_names)}",
+            )
+        total = len(handlers)
+        i = 0
+        with set_actor(self.user):
+            for handler in reversed(handlers):
+                websocket_send(
+                    ProgressNum.from_message(self, curr=i, total=total),
+                    state=self.RUNNING,
+                    on_commit=False,
+                )
+                handler.remove(self.context)
+                i += 1
+        result = ProgressNum.from_message(
+            self, curr=i, total=total, msg=f"Removed f{self.data.dialect}"
+        )
+        websocket_send(result, state=self.SUCCESS)
+        return result

@@ -147,6 +147,7 @@ dialect_minimal_requires_test = {"title": "Req", "name": "req", "requires": ["te
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 DIALECT_FIXTURES = os.path.join(TESTS_DIR, "dialect_fixtures")
 BAD_DIALECT_FIXTURES = os.path.join(TESTS_DIR, "bad_dialect_fixtures")
+CYCLIC_DIALECT_FIXTURES = os.path.join(TESTS_DIR, "cyclic_dialect_fixtures")
 
 
 class DialectHandlerTests(TestCase):
@@ -226,7 +227,7 @@ class DialectHandlerTests(TestCase):
         with self.assertRaises(DialectError):
             handler.install(self.meeting)
 
-    def test_uninstall_leaves_untouched_settings_instact(self):
+    def test_uninstall_leaves_untouched_settings_intact(self):
         self.meeting.group_votes_active = True
         self.meeting.group_roles_active = True
         self.meeting.proposal_id_policy_name = "auto_before_poll"
@@ -238,28 +239,51 @@ class DialectHandlerTests(TestCase):
         self.assertTrue(self.meeting.group_roles_active)
         self.assertEqual("auto_before_poll", self.meeting.proposal_id_policy_name)
 
+    # @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
+    # def test_check(self):
+    #     self.assertTrue(self._cut.check_files())
+    #
+    # @override_settings(MEETING_DIALECTS_DIR=BAD_DIALECT_FIXTURES)
+    # def test_check_bad_files(self):
+    #     with self.assertLogs("voteit.meeting.utils", "ERROR") as cm:
+    #         self._cut.check_files()
+    #     self.assertTrue(
+    #         any(
+    #             ["broken.yaml returned data that wasn't a dict" in x for x in cm.output]
+    #         )
+    #     )
+    #     self.assertTrue(
+    #         any(["bad_values.yaml caused suppressed exception" in x for x in cm.output])
+    #     )
+    #     self.assertTrue(
+    #         any(
+    #             [
+    #                 "Dialect bad_req specifies a requirement to 'oh_no' but it doesn't exist."
+    #                 in x
+    #                 for x in cm.output
+    #             ]
+    #         )
+    #     )
+
+
+class RecursiveLoadHandlersTests(TestCase):
+    @property
+    def _fut(self):
+        from voteit.meeting.utils import recursive_load_handlers
+
+        return recursive_load_handlers
+
     @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
-    def test_populate_registry(self):
-        self._cut.populate_registry()
-        self.assertIn("one", self._cut.registry)
-        self.assertTrue(os.path.isfile(self._cut.registry["one"]))
+    def test_recursive(self):
+        result = self._fut("three")
+        self.assertEqual(["one", "two", "three"], [x.data.name for x in result])
 
     @override_settings(MEETING_DIALECTS_DIR=BAD_DIALECT_FIXTURES)
-    def test_populate_registry_bad_files(self):
-        with self.assertLogs("voteit.meeting.utils", "ERROR") as cm:
-            self._cut.populate_registry()
-        self.assertTrue(
-            any(
-                ["broken.yaml returned data that wasn't a dict" in x for x in cm.output]
-            )
-        )
-        self.assertTrue(
-            any(["bad_values.yaml caused suppressed exception" in x for x in cm.output])
-        )
+    def test_recursive_bad_req(self):
+        with self.assertRaises(DialectError):
+            self._fut("bad_req")
 
-    @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
-    def test_install_from_reg(self):
-        self._cut.populate_registry()
-        handler = self._cut.load_from_name("one")
-        handler.install(self.meeting)
-        self.assertEqual("one", self.meeting.installed_dialects)
+    @override_settings(MEETING_DIALECTS_DIR=CYCLIC_DIALECT_FIXTURES)
+    def test_recursive_cyclic(self):
+        with self.assertRaises(DialectError):
+            self._fut("one")
