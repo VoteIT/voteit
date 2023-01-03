@@ -155,6 +155,22 @@ class MeetingPermissionTests(TestCase):
         self.assertFalse(self.participant.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.org_manager.has_perm(CHANGE, self.meeting))
 
+    def test_can_change_dialect(self):
+        CHANGE_DIALECT = self.p("CHANGE_DIALECT")
+        self.assertFalse(self.anon_user.has_perm(CHANGE_DIALECT, self.meeting))
+        self.assertTrue(self.moderator.has_perm(CHANGE_DIALECT, self.meeting))
+        self.assertFalse(self.participant.has_perm(CHANGE_DIALECT, self.meeting))
+        self.assertFalse(self.org_manager.has_perm(CHANGE_DIALECT, self.meeting))
+
+    def test_can_change_dialect_ongoing(self):
+        self.meeting.state = MeetingWf.ONGOING
+        self.meeting.save()
+        CHANGE_DIALECT = self.p("CHANGE_DIALECT")
+        self.assertFalse(self.anon_user.has_perm(CHANGE_DIALECT, self.meeting))
+        self.assertFalse(self.moderator.has_perm(CHANGE_DIALECT, self.meeting))
+        self.assertFalse(self.participant.has_perm(CHANGE_DIALECT, self.meeting))
+        self.assertFalse(self.org_manager.has_perm(CHANGE_DIALECT, self.meeting))
+
     def test_can_delete_meeting(self):
         DELETE = self.p("DELETE")
         self.assertFalse(self.anon_user.has_perm(DELETE, self.meeting))

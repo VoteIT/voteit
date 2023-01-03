@@ -113,6 +113,15 @@ def meeting_upcoming_ongoing(user: AbstractUser, context: MeetingContext) -> boo
 
 
 @predicate
+def meeting_upcoming(user: AbstractUser, context: MeetingContext) -> bool:
+    return (
+        isinstance(context, MeetingContext)
+        and context.meeting is not None
+        and context.meeting.state == MeetingWf.UPCOMING
+    )
+
+
+@predicate
 def can_view_meeting(user: AbstractUser, context: MeetingContext) -> bool:
     """
     Shorthand for the combinations to allow attached meeting to be viewed.
@@ -148,6 +157,7 @@ rules.add_perm(MeetingPermissions.MODERATE, is_moderator)
 rules.add_perm(MeetingPermissions.ARCHIVE, meeting_not_fully_archived & is_moderator)
 # We might want to add editor role later on
 rules.add_perm(MeetingPermissions.CHANGE, meeting_not_archived & is_moderator)
+rules.add_perm(MeetingPermissions.CHANGE_DIALECT, meeting_upcoming & is_moderator)
 rules.add_perm(MeetingPermissions.DELETE, is_moderator)
 rules.add_perm(
     MeetingPermissions.CHANGE_ROLES, meeting_not_archived & (is_moderator | is_manager)
