@@ -102,6 +102,14 @@ class MeetingDetailSerializerTests(TestCase):
         serializer.is_valid()
         self.assertIn("er_policy_name", serializer.errors)
 
+    def test_installed_dialects(self):
+        request = self._mk_request(self.moderator)
+        serializer = self._cut(self.meeting, context={"request": request})
+        self.assertEqual(None, serializer.data["installed_dialects"])
+        self.meeting.installed_dialects = "hey,ho"
+        serializer = self._cut(self.meeting, context={"request": request})
+        self.assertEqual(["hey", "ho"], serializer.data["installed_dialects"])
+
 
 class MeetingRolesSerializerTests(TestCase):
     fixtures = ["meeting_test_fixture"]

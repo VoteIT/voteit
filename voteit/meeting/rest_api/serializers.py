@@ -67,6 +67,8 @@ class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
 
 
 class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
+    installed_dialects = serializers.SerializerMethodField()
+
     class Meta:
         model = Meeting
         read_only_fields = [
@@ -77,6 +79,9 @@ class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
             "organisation",
             "current_user_roles",
             "public",
+            "installed_dialects",
+            "group_roles_active",
+            "group_votes_active",
         ]
         fields = read_only_fields + [
             "title",
@@ -101,6 +106,10 @@ class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
                     "There are ongoing polls - close them before changing policy."
                 )
         return value
+
+    def get_installed_dialects(self, instance: Meeting):
+        if instance.installed_dialects:
+            return instance.installed_dialects.split(",")
 
 
 class AgendaOrderSerializer(serializers.Serializer):
