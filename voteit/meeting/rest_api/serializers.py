@@ -9,6 +9,8 @@ from rest_framework.exceptions import ValidationError
 from voteit.core.models import Roles
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserSerializer
+from voteit.meeting.models import GroupMembership
+from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
@@ -152,6 +154,22 @@ class MeetingGroupSerializer(BaseModelSerializer):
 
     class Meta:
         model = MeetingGroup
+        exclude = ("id", "members", "mentions")
+
+
+class GroupRoleSerializer(BaseModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = GroupRole
+        exclude = ("id", "users")
+
+
+class GroupMembershipSerializer(BaseModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = GroupMembership
         exclude = ("id",)
 
 

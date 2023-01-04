@@ -31,6 +31,11 @@ class MeetingChanged(BaseObjectChanged):
 
 
 @outgoing
+class MeetingDeleted(BaseObjectDeleted):
+    name = "meeting.deleted"
+
+
+@outgoing
 class MeetingGroupAdded(BaseObjectAdded):
     name = "meeting_group.added"
 
@@ -43,6 +48,36 @@ class MeetingGroupChanged(BaseObjectChanged):
 @outgoing
 class MeetingGroupDeleted(BaseObjectDeleted):
     name = "meeting_group.deleted"
+
+
+@outgoing
+class GroupRoleAdded(BaseObjectAdded):
+    name = "group_role.added"
+
+
+@outgoing
+class GroupRoleChanged(BaseObjectChanged):
+    name = "group_role.changed"
+
+
+@outgoing
+class GroupRoleDeleted(BaseObjectDeleted):
+    name = "group_role.deleted"
+
+
+@outgoing
+class GroupMembershipAdded(BaseObjectAdded):
+    name = "group_membership.added"
+
+
+@outgoing
+class GroupMembershipChanged(BaseObjectChanged):
+    name = "group_membership.changed"
+
+
+@outgoing
+class GroupMembershipDeleted(BaseObjectDeleted):
+    name = "group_membership.deleted"
 
 
 class CopyMeetingSchema(BaseModel):

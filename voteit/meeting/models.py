@@ -416,6 +416,7 @@ class MeetingGroup(BaseContent, MeetingContext):
     # Type annotations - relations
     proposals: models.QuerySet
     discussions: models.QuerySet
+    role_assignments: models.QuerySet[GroupMembership]
     objects: models.Manager[MeetingGroup]
 
 
@@ -428,6 +429,8 @@ class GroupRole(MeetingContext):
     Dynamic group roles for a meeting. These can be automatically created from a meeting dialect,
     or created by a meeting moderator.
     """
+
+    name = "group_role"
 
     title: str = models.CharField(verbose_name="Title", max_length=100)
     role_id: str = models.CharField(
@@ -444,6 +447,7 @@ class GroupRole(MeetingContext):
         models.CharField(
             max_length=20,
         ),
+        default=tuple,
     )
     # Groups should be able to map to a meeting dialect, which will define if they're editable, etc.
     # dialect_group = models.CharField(null=True, blank=True, max_length=40, unique=True)
@@ -488,22 +492,28 @@ class GroupRole(MeetingContext):
     objects: models.Manager[GroupRole]
 
 
-class GroupMembership(models.Model):
+class GroupMembership(MeetingContext):
     """
     Join table for users and group roles.
     """
+
+    name = "group_membership"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="+",
     )
-    meeting_group = models.ForeignKey(
+    meeting_group: MeetingGroup = models.ForeignKey(
         MeetingGroup, on_delete=models.CASCADE, related_name="role_assignments"
     )
-    role = models.ForeignKey(
+    role: GroupRole | None = models.ForeignKey(
         GroupRole, on_delete=models.CASCADE, related_name="+", null=True, blank=True
     )
+
+    @property
+    def meeting(self) -> Meeting:
+        return self.meeting_group.meeting
 
     # Annotations
     objects: models.Manager[GroupMembership]

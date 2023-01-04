@@ -8,8 +8,10 @@ from django.test import override_settings
 from envelope.messages.channels import Subscribe
 from envelope.messages.channels import Subscribed
 from voteit.core.testing import FakeCommit
+from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.models import MeetingGroup
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -84,8 +86,13 @@ class MeetingChannelSubscribedTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.create()
         cls.user: User = cls.meeting.participants.create(username="user")
         cls.meeting.add_roles(cls.user, "moderator")
-        cls.group = cls.meeting.groups.create(title="Gang")
-        cls.group.members.add(cls.user)
+        cls.group: MeetingGroup = cls.meeting.groups.create(title="Gang")
+        cls.group_role: GroupRole = cls.meeting.group_roles.create(
+            title="President", role_id="president"
+        )
+        cls.group_membership = cls.group.role_assignments.create(
+            role=cls.group_role, user=cls.user
+        )
 
     def _mk_subscribe(self):
         return Subscribe(
@@ -110,18 +117,26 @@ class MeetingChannelSubscribedTests(TestCase):
         self.assertEqual(payload["user_pk"], self.user.pk)
         self.assertEqual(payload["model"], "meeting")
 
-    def test_meeting_groups_in_app_state(self):
+    def test_meeting_groups_and_related_in_app_state(self):
         msg = self._mk_subscribe()
         msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
+        # MeetingGroup
         added = [x for x in response.data.app_state if x.t == "meeting_group.added"]
         self.assertEqual(1, len(added))
         payload = added[0].p
-        self.assertEqual(
-            set(payload["members"]),
-            {self.user.pk},
-        )
+        self.assertEqual(self.group.pk, payload["pk"])
+        # GroupRole
+        added = [x for x in response.data.app_state if x.t == "group_role.added"]
+        self.assertEqual(1, len(added))
+        payload = added[0].p
+        self.assertEqual(self.group_role.pk, payload["pk"])
+        # GroupMembership
+        added = [x for x in response.data.app_state if x.t == "group_membership.added"]
+        self.assertEqual(1, len(added))
+        payload = added[0].p
+        self.assertEqual(self.group_membership.pk, payload["pk"])
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

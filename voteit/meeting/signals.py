@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from itertools import chain
 from typing import TYPE_CHECKING
 
 from django.db import transaction
@@ -7,9 +8,9 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
-
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
+
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.core.messages.role_updates import RolesAdded
@@ -19,7 +20,13 @@ from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.messages import GroupMembershipAdded
+from voteit.meeting.messages import GroupMembershipChanged
+from voteit.meeting.messages import GroupRoleAdded
+from voteit.meeting.messages import GroupRoleChanged
+from voteit.meeting.messages import GroupRoleDeleted
 from voteit.meeting.messages import MeetingChanged
+from voteit.meeting.messages import MeetingDeleted
 from voteit.meeting.messages import MeetingGroupAdded
 from voteit.meeting.messages import MeetingGroupChanged
 from voteit.meeting.messages import MeetingGroupDeleted
@@ -28,6 +35,8 @@ from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.models import MeetingGroup
+from voteit.meeting.rest_api.serializers import GroupMembershipSerializer
+from voteit.meeting.rest_api.serializers import GroupRoleSerializer
 from voteit.meeting.rest_api.serializers import MeetingDetailSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
 from voteit.meeting.roles import ROLE_DISCUSSER
@@ -37,7 +46,11 @@ from voteit.meeting.roles import ROLE_PROPOSER
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from envelope.utils import AppState
-
+    from voteit.core.abcs import MeetingContext
+    from voteit.messaging.base import BaseObjectAdded
+    from voteit.messaging.base import BaseObjectChanged
+    from voteit.messaging.base import BaseObjectDeleted
+    from rest_framework.serializers import ModelSerializer
 
 # Signal providing an atomic transaction to do cleanup when a meeting is archived
 # Will provide argument "meeting"
@@ -49,6 +62,46 @@ archive_meeting = Signal()
 #   user
 #   meeting_roles (Meeting roles object)
 meeting_joined = Signal()
+
+
+def mk_default_changed_publisher_to_meeting(
+    *,
+    model: type[MeetingContext],
+    added_serializer: type[ModelSerializer],
+    changed_serializer: type[ModelSerializer],
+    added_msg: type[BaseObjectAdded],
+    changed_msg: type[BaseObjectChanged],
+):
+    @receiver(post_save, sender=model)
+    @disable_on_raw_save
+    def _publish_changed(*, instance: model, created: bool, **kw):
+        f"""
+        Default publish changed for {model}
+        """
+        meeting_ch = MeetingChannel.from_instance(instance.meeting)
+        if created:
+            data = added_serializer(instance).data
+            msg = added_msg(**data)
+        else:
+            data = changed_serializer(instance).data
+            msg = changed_msg(**data)
+        meeting_ch.sync_publish(msg, on_commit=True)
+
+
+def mk_default_deleted_publisher_to_meeting(
+    *,
+    model: type[MeetingContext],
+    msg_class: type[BaseObjectDeleted],
+):
+    @disable_on_raw_save
+    @receiver(pre_delete, sender=model)
+    def _publish_delete(*, instance: model, **kwargs):
+        f"""
+        Default publish deleted for {model}
+        """
+        meeting_ch = MeetingChannel.from_instance(instance.meeting)
+        msg = msg_class(pk=instance.pk)
+        meeting_ch.sync_publish(msg, on_commit=True)
 
 
 @receiver(post_save, sender=MeetingRoles)
@@ -71,7 +124,6 @@ def meeting_roles_created(instance: MeetingRoles, created: bool = None, **kw):
             )
 
 
-# FIXME: What about deleted? Some kind of crash and burn message?
 @receiver(post_save, sender=Meeting)
 @disable_on_raw_save
 def meeting_change(instance, created=None, **kw):
@@ -80,6 +132,9 @@ def meeting_change(instance, created=None, **kw):
         ch = MeetingChannel.from_instance(instance)
         msg = MeetingChanged(data=data)
         ch.sync_publish(msg)
+
+
+mk_default_deleted_publisher_to_meeting(model=Meeting, msg_class=MeetingDeleted)
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
@@ -98,37 +153,72 @@ def meeting_channel_subscribed(
             user_pk=user.pk,
         )
         app_state.append(msg)
-    # Append all groups
+    # Append all groups - members have moved to GroupMembership!
+    meeting_groups_qs = context.groups.all().prefetch_related(
+        "mentions", "role_assignments"
+    )
     app_state.append_from_queryset(
-        context.groups.all().prefetch_related("members", "mentions"),
+        meeting_groups_qs,
         MeetingGroupSerializer,
         MeetingGroupAdded,
     )
+    # GroupMemberships - these are prefetched so impact should be minimal
+    items = set()
+    for mg in meeting_groups_qs:
+        items.update(mg.role_assignments.all())
+    app_state.append_from_queryset(
+        items,
+        GroupMembershipSerializer,
+        GroupMembershipAdded,
+    )
+    # And GroupRoles
+    app_state.append_from_queryset(
+        context.group_roles.all(),
+        GroupRoleSerializer,
+        GroupRoleAdded,
+    )
 
 
-@receiver(post_save, sender=MeetingGroup)
-@disable_on_raw_save
-@on_transaction_commit
-def meeting_group_updated(instance: MeetingGroup = None, created=None, **kw):
-    """
-    Important! The serializer includes M2M-relations so the on_transaction_commit decorator must be here since
-    the relations won't exist on post_save.
-    """
-    meeting_ch = MeetingChannel.from_instance(instance.meeting)
-    data = MeetingGroupSerializer(instance).data
-    if created:
-        msg = MeetingGroupAdded(**data)
-    else:
-        msg = MeetingGroupChanged(**data)
-    meeting_ch.sync_publish(msg, on_commit=False)
+# MeetingGroup
+mk_default_changed_publisher_to_meeting(
+    model=MeetingGroup,
+    added_serializer=MeetingGroupSerializer,
+    changed_serializer=MeetingGroupSerializer,
+    added_msg=MeetingGroupAdded,
+    changed_msg=MeetingGroupChanged,
+)
+mk_default_deleted_publisher_to_meeting(
+    model=MeetingGroup,
+    msg_class=MeetingGroupDeleted,
+)
 
 
-@receiver(pre_delete, sender=MeetingGroup)
-def meeting_group_delete(instance=None, **kw):
-    meeting_ch = MeetingChannel.from_instance(instance.meeting)
-    msg = MeetingGroupDeleted(pk=instance.pk)
-    # Sent after transaction commit!
-    meeting_ch.sync_publish(msg)
+# GroupRole
+mk_default_changed_publisher_to_meeting(
+    model=GroupRole,
+    added_serializer=GroupRoleSerializer,
+    changed_serializer=GroupRoleSerializer,
+    added_msg=GroupRoleAdded,
+    changed_msg=GroupRoleChanged,
+)
+mk_default_deleted_publisher_to_meeting(
+    model=GroupRole,
+    msg_class=GroupRoleDeleted,
+)
+
+
+# GroupMembership
+mk_default_changed_publisher_to_meeting(
+    model=GroupMembership,
+    added_serializer=GroupMembershipSerializer,
+    changed_serializer=GroupMembershipSerializer,
+    added_msg=GroupMembershipAdded,
+    changed_msg=GroupMembershipChanged,
+)
+mk_default_deleted_publisher_to_meeting(
+    model=GroupMembership,
+    msg_class=MeetingGroupDeleted,
+)
 
 
 def _role_msg_publish(instance: MeetingRoles, msg):
@@ -200,7 +290,7 @@ def membership_deleted(instance: GroupMembership, **kwargs):
 
 
 @receiver(post_save, sender=GroupRole)
-def group_role_changed(instance: GroupRole, **kwargs):
+def group_role_changed_ck_roles(instance: GroupRole, **kwargs):
     for gm in GroupMembership.objects.filter(role=instance).prefetch_related(
         "user", "meeting_group", "meeting_group__meeting"
     ):
