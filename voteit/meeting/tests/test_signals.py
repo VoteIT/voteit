@@ -145,6 +145,7 @@ class MeetingGroupChangedTests(TestCase):
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create()
         cls.group = cls.meeting.groups.create()
+        cls.user = User.objects.create(username="maybe_member")
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added(self, mock_publish):
@@ -182,6 +183,55 @@ class MeetingGroupChangedTests(TestCase):
         msg.validate()
         self.assertIsInstance(msg, MeetingGroupDeleted)
         self.assertEqual(group_pk, msg.data.pk)
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_member_added_compat(self, mock_publish):
+        from voteit.meeting.messages import GroupMembershipAdded
+
+        self.group.members.add(self.user)
+        self.assertTrue(mock_publish.called)
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, GroupMembershipAdded)
+        self.assertEqual(self.group.pk, msg.data.meeting_group)
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_member_added_compat_reverse(self, mock_publish):
+        from voteit.meeting.messages import GroupMembershipAdded
+
+        self.user.meeting_groups.add(self.group)
+        self.assertTrue(mock_publish.called)
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, GroupMembershipAdded)
+        self.assertEqual(self.group.pk, msg.data.meeting_group)
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_member_removed_compat(self, mock_publish):
+        from voteit.meeting.messages import GroupMembershipDeleted
+
+        self.group.members.add(self.user)
+        mock_publish.reset_mock()
+        self.group.members.remove(self.user)
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, GroupMembershipDeleted)
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_member_removed_compat_reverse(self, mock_publish):
+        from voteit.meeting.messages import GroupMembershipDeleted
+
+        self.user.meeting_groups.add(self.group)
+        mock_publish.reset_mock()
+        self.user.meeting_groups.remove(self.group)
+        self.assertTrue(mock_publish.called)
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, GroupMembershipDeleted)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

@@ -4,6 +4,7 @@ from itertools import chain
 from typing import TYPE_CHECKING
 
 from django.db import transaction
+from django.db.models.signals import m2m_changed
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import Signal
@@ -22,6 +23,7 @@ from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.messages import GroupMembershipAdded
 from voteit.meeting.messages import GroupMembershipChanged
+from voteit.meeting.messages import GroupMembershipDeleted
 from voteit.meeting.messages import GroupRoleAdded
 from voteit.meeting.messages import GroupRoleChanged
 from voteit.meeting.messages import GroupRoleDeleted
@@ -217,7 +219,7 @@ mk_default_changed_publisher_to_meeting(
 )
 mk_default_deleted_publisher_to_meeting(
     model=GroupMembership,
-    msg_class=MeetingGroupDeleted,
+    msg_class=GroupMembershipDeleted,
 )
 
 
@@ -296,3 +298,55 @@ def group_role_changed_ck_roles(instance: GroupRole, **kwargs):
     ):
         # FIXME: Optimize, this will be quite slow in large meetings
         _check_roles(gm.user, gm.meeting_group.meeting)
+
+
+@receiver(m2m_changed, sender=MeetingGroup.members.through)
+def compat_m2m_publish_group_membership(
+    *, instance, action: str, reverse: bool, model: type, pk_set, using, **kwargs
+):
+    """
+    This little nugget delegates m2m interactions so the through model gets proper post_save / pre_delete signals since
+    we rely on them. It's probably a bad idea to handle it this way, but i see no other option.
+    """
+    through = MeetingGroup.members.through
+    if action == "post_add":
+        if reverse:
+            for obj in through.objects.filter(
+                meeting_group__pk__in=pk_set, user=instance
+            ):
+                post_save.send(
+                    sender=through,
+                    instance=obj,
+                    created=True,
+                    using=using,
+                )
+        else:
+            for obj in through.objects.filter(
+                user__pk__in=pk_set, meeting_group=instance
+            ):
+                post_save.send(
+                    sender=through,
+                    instance=obj,
+                    created=True,
+                    using=using,
+                )
+    # Remove signals are sent another way, so they're actually caught the expected way
+    # elif action == "pre_remove":
+    #     if reverse:
+    #         for obj in through.objects.filter(
+    #             meeting_group__pk__in=pk_set, user=instance
+    #         ):
+    #             pre_delete.send(
+    #                 sender=through,
+    #                 instance=obj,
+    #                 using=using,
+    #             )
+    #     else:
+    #         for obj in through.objects.filter(
+    #             user__pk__in=pk_set, meeting_group=instance
+    #         ):
+    #             pre_delete.send(
+    #                 sender=through,
+    #                 instance=obj,
+    #                 using=using,
+    #             )

@@ -162,7 +162,10 @@ class GroupRoleSerializer(BaseModelSerializer):
 
     class Meta:
         model = GroupRole
-        exclude = ("id", "users")
+        exclude = (
+            "id",
+            "users",
+        )
 
 
 class GroupMembershipSerializer(BaseModelSerializer):

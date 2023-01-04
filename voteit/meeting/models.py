@@ -449,7 +449,7 @@ class GroupRole(MeetingContext):
         ),
         default=tuple,
     )
-    # Groups should be able to map to a meeting dialect, which will define if they're editable, etc.
+    # Groups should maybe be able to map to a meeting dialect, which will define if they're editable, etc.
     # dialect_group = models.CharField(null=True, blank=True, max_length=40, unique=True)
     users = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
