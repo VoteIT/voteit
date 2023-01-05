@@ -234,8 +234,6 @@ class DialectHandler:
         )
         if self.data.name in installed:
             raise DialectError(f"{self.data.name} already installed")
-        if not self.data.installable:
-            raise DialectError(f"{self.data.name} isn't marked as installable")
         for req in self.data.requires:
             if req not in installed:
                 raise DialectError(

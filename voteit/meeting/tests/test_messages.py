@@ -1,4 +1,3 @@
-import os
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -10,6 +9,7 @@ from envelope.messages.errors import UnauthorizedError
 from envelope.utils import channel_layer
 
 from voteit.core.testing import FakeCommit
+from voteit.meeting.management.tests import DIALECT_FIXTURES
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -83,10 +83,6 @@ class CloneMeetingTests(TestCase):
             )
 
 
-TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
-DIALECT_FIXTURES = os.path.join(TESTS_DIR, "dialect_fixtures")
-
-
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
 class InstallDialectTests(TestCase):
     @classmethod
@@ -112,7 +108,6 @@ class InstallDialectTests(TestCase):
     def test_install_two(self):
         msg = self._mk_one(self.moderator, dialect="two")
         with patch.object(channel_layer, "send") as mocked_send:
-            # with FakeCommit():
             msg.run_job()
         self.meeting.refresh_from_db()
         self.assertEqual("one,two", self.meeting.installed_dialects)
@@ -122,8 +117,9 @@ class InstallDialectTests(TestCase):
         self.meeting.installed_dialects = "one"
         self.meeting.save()
         msg = self._mk_one(self.moderator, dialect="two")
-        with self.assertRaises(BadRequestError):
+        with self.assertRaises(BadRequestError) as cm:
             msg.run_job()
+        self.assertIn("meeting already has an installed dialect", cm.exception.data.msg)
 
     def test_install_bad_perm(self):
         msg = self._mk_one(self.participant, dialect="two")
@@ -132,8 +128,15 @@ class InstallDialectTests(TestCase):
 
     def test_install_bad_dialect_name(self):
         msg = self._mk_one(self.moderator, dialect="404")
-        with self.assertRaises(BadRequestError):
+        with self.assertRaises(BadRequestError) as cm:
             msg.run_job()
+        self.assertIn("Dialect 404 doesn't exist", cm.exception.data.msg)
+
+    def test_installable_respected(self):
+        msg = self._mk_one(self.moderator, dialect="one")
+        with self.assertRaises(BadRequestError) as cm:
+            msg.run_job()
+        self.assertIn("dialect isn't installable", cm.exception.data.msg)
 
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)

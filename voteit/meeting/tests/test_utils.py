@@ -9,6 +9,9 @@ from dolly.utils import get_data_id_struct
 
 from voteit.core.utils import get_model_by_shortname
 from voteit.meeting.exceptions import DialectError
+from voteit.meeting.tests.fixtures import BAD_DIALECT_FIXTURES
+from voteit.meeting.tests.fixtures import CYCLIC_DIALECT_FIXTURES
+from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 from voteit.organisation.models import Organisation
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -144,11 +147,6 @@ dialect_named_test = {
 dialect_minimal = {"title": "Mini", "name": "mini"}
 dialect_minimal_requires_test = {"title": "Req", "name": "req", "requires": ["test"]}
 
-TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
-DIALECT_FIXTURES = os.path.join(TESTS_DIR, "dialect_fixtures")
-BAD_DIALECT_FIXTURES = os.path.join(TESTS_DIR, "bad_dialect_fixtures")
-CYCLIC_DIALECT_FIXTURES = os.path.join(TESTS_DIR, "cyclic_dialect_fixtures")
-
 
 class DialectHandlerTests(TestCase):
     @classmethod
@@ -238,17 +236,6 @@ class DialectHandlerTests(TestCase):
         self.assertTrue(self.meeting.group_votes_active)
         self.assertTrue(self.meeting.group_roles_active)
         self.assertEqual("auto_before_poll", self.meeting.proposal_id_policy_name)
-
-    def test_installable_respected(self):
-        handler = self._cut.load_from_dict(
-            {
-                "name": "not_installable",
-                "title": "not_installable",
-                "installable": False,
-            }
-        )
-        with self.assertRaises(DialectError):
-            handler.install(self.meeting)
 
 
 class RecursiveLoadHandlersTests(TestCase):

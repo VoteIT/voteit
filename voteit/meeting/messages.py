@@ -158,6 +158,10 @@ class InstallDialect(DialectAction):
             )
         #        websocket_send(update, state=update.RUNNING, on_commit=False)
         handlers = self.get_handlers()
+        if not handlers[-1].data.installable:
+            raise BadRequestError.from_message(
+                self, msg="This dialect isn't installable"
+            )
         total = len(handlers)
         i = 0
         with set_actor(self.user):

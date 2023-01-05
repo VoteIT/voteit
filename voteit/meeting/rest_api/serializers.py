@@ -3,10 +3,10 @@ from __future__ import annotations
 from contextlib import suppress
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from voteit.core.models import Roles
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.meeting.models import GroupMembership
@@ -14,10 +14,14 @@ from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
+from voteit.meeting.rest_api.validators import RoleValidator
+from voteit.meeting.rest_api.validators import validate_dialect_installable
 from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
+from voteit.meeting.utils import recursive_load_handlers
+from voteit.poll.utils import get_electoral_policy_registry
 
 
 class UserRolesMixin(serializers.Serializer):
@@ -66,7 +70,46 @@ class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
         )
 
 
-class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
+class CreateMeetingSerializer(BaseModelSerializer):
+    install_dialect = serializers.CharField(
+        validators=[validate_dialect_installable],
+        required=False,
+    )
+
+    class Meta:
+        model = Meeting
+        # FIXME: Which fields do we allow changes to here?
+        read_only_fields = [
+            "pk",
+        ]
+        fields = read_only_fields + [
+            "title",
+            "body",
+            "er_policy_name",
+            "visible_in_lists",
+            "install_dialect",
+        ]
+
+    def create(self, validated_data):
+        user = self.get_request_user()
+        if user.organisation is not None:
+            validated_data["organisation"] = user.organisation
+        with transaction.atomic(durable=True):
+            install_dialect = validated_data.pop("install_dialect", None)
+            instance = super().create(validated_data)
+            if install_dialect:
+                for handler in recursive_load_handlers(install_dialect):
+                    handler.install(instance)
+            return instance
+
+    def validate_er_policy_name(self, value: str | None):
+        if value is not None:
+            if value not in get_electoral_policy_registry():
+                raise ValidationError(f"No electoral register policy named {value}")
+        return value
+
+
+class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
     installed_dialects = serializers.SerializerMethodField()
 
     class Meta:
@@ -90,21 +133,15 @@ class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
             "visible_in_lists",
         ]
 
-    def create(self, validated_data):
-        user = self.get_request_user()
-        if user.organisation is not None:
-            validated_data["organisation"] = user.organisation
-        return super().create(validated_data)
-
     def validate_er_policy_name(self, value):
         from voteit.poll.workflows import PollWf
 
-        if self.instance is not None:
-            self.instance: Meeting
-            if self.instance.polls.filter(state=PollWf.ONGOING).exists():
-                raise ValidationError(
-                    "There are ongoing polls - close them before changing policy."
-                )
+        value = super().validate_er_policy_name(value)
+        self.instance: Meeting
+        if self.instance.polls.filter(state=PollWf.ONGOING).exists():
+            raise ValidationError(
+                "There are ongoing polls - close them before changing policy."
+            )
         return value
 
     def get_installed_dialects(self, instance: Meeting):
@@ -139,19 +176,6 @@ class MeetingAddParticipantSerializer(serializers.ModelSerializer):
         fields = "user_id", "meeting_id"
 
 
-class RoleValidator:
-    """Ensures that role name is valid for roles class provided on class instantiation."""
-
-    roles_cls: type[Roles]
-
-    def __init__(self, roles_cls: type[Roles]):
-        self.roles_cls = roles_cls
-
-    def __call__(self, value):
-        if value not in self.roles_cls.valid_roles:
-            raise ValidationError(f'The role "{value}" is not valid for this context.')
-
-
 class RoleSerializer(serializers.Serializer):
     role = serializers.CharField(
         max_length=20, validators=[RoleValidator(roles_cls=MeetingRoles)]
@@ -163,7 +187,11 @@ class MeetingGroupSerializer(BaseModelSerializer):
 
     class Meta:
         model = MeetingGroup
-        exclude = ("id", "members", "mentions")
+        exclude = (
+            "id",
+            "members",
+            "mentions",
+        )
 
 
 class GroupRoleSerializer(BaseModelSerializer):

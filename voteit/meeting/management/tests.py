@@ -1,4 +1,3 @@
-import os
 from io import StringIO
 
 from django.test import override_settings
@@ -6,9 +5,8 @@ from django.test import TestCase
 from django.core.management import call_command
 from pydantic import ValidationError
 
-TESTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests")
-DIALECT_FIXTURES = os.path.join(TESTS_DIR, "dialect_fixtures")
-BAD_DIALECT_FIXTURES = os.path.join(TESTS_DIR, "bad_dialect_fixtures")
+from voteit.meeting.tests.fixtures import BAD_DIALECT_FIXTURES
+from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 
 
 class CommandsTests(TestCase):

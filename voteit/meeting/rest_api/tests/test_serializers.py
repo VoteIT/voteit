@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
+from django.test import override_settings
 from django.test import TestCase
 
 from voteit.meeting.models import Meeting
@@ -8,6 +9,7 @@ from voteit.meeting.rest_api.serializers import GroupMembershipSerializer
 from voteit.meeting.rest_api.serializers import GroupRoleSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.polls.simple import Simple
 
@@ -47,6 +49,56 @@ class MeetingSerializerTests(TestCase):
         self.assertEqual({"participant"}, set(serializer.data["current_user_roles"]))
 
 
+@override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
+class CreateMeetingSerializerTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    def setUp(self):
+        self.moderator = User.objects.get(username="moderator")
+
+    @property
+    def _cut(self):
+        from voteit.meeting.rest_api.serializers import CreateMeetingSerializer
+
+        return CreateMeetingSerializer
+
+    def _mk_one(self, **kwargs):
+        rf = RequestFactory()
+        request = rf.get("/")
+        request.user = self.moderator
+        kwargs.setdefault("title", "Hello world")
+        return self._cut(
+            data=kwargs,
+            context={"request": request},
+        )
+
+    def test_create(self):
+        serializer = self._mk_one()
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.save()
+        self.assertIsInstance(instance, Meeting)
+        self.assertEqual(self.moderator, instance.author)
+
+    def test_create_install_dialect(self):
+        serializer = self._mk_one(install_dialect="two")
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.save()
+        self.assertIsInstance(instance, Meeting)
+        self.assertEqual("one,two", instance.installed_dialects)
+
+    def test_create_install_dialect_not_installable(self):
+        serializer = self._mk_one(install_dialect="one")
+        serializer.is_valid()
+        self.assertIn("install_dialect", serializer.errors)
+
+    def test_create_install_dialect_bad_name(self):
+        serializer = self._mk_one(install_dialect="404")
+        serializer.is_valid()
+        self.assertIn("install_dialect", serializer.errors)
+
+
 class MeetingDetailSerializerTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -66,17 +118,6 @@ class MeetingDetailSerializerTests(TestCase):
         request = rf.get("/")
         request.user = user
         return request
-
-    def test_create(self):
-        request = self._mk_request(self.participant)
-        serializer = self._cut(
-            data={"title": "Hello", "er_policy_name": AutoAlways.name},
-            context={"request": request},
-        )
-        serializer.is_valid()
-        self.assertFalse(serializer.errors)
-        instance = serializer.save()
-        self.assertIsInstance(instance, Meeting)
 
     def test_update_er_policy(self):
         request = self._mk_request(self.participant)

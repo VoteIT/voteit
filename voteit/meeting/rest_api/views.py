@@ -1,11 +1,8 @@
 import csv
 
-from django.db import models
 from django.db import transaction
-from django.db.models import Count
 from django.db.models import QuerySet
 from django.db.models import F
-from django.db.models import Q
 from django.http import Http404
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -22,7 +19,6 @@ from rest_framework.response import Response
 from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
-from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.meeting import roles
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -36,6 +32,7 @@ __all__ = (
     "MeetingViewSet",
     "MeetingRolesViewSet",
     "MeetingGroupViewSet",
+    "ExportParticipantsViewSet",
 )
 
 
@@ -44,6 +41,7 @@ class MeetingViewSet(DefaultModelViewSet):
     model = Meeting
     serializer_class = serializers.MeetingDetailSerializer
     serializer_classes = {
+        "create": serializers.CreateMeetingSerializer,
         "list": serializers.MeetingSerializer,
         "set_agenda_order": serializers.AgendaOrderSerializer,
     }
