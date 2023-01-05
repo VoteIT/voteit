@@ -3,6 +3,7 @@ from django.test import RequestFactory
 from django.test import override_settings
 from django.test import TestCase
 
+from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api.serializers import GroupMembershipSerializer
@@ -214,6 +215,12 @@ class MeetingGroupRelatedSerializersTests(TestCase):
             user=cls.participant
         )
 
+    def _mk_request(self, user):
+        rf = RequestFactory()
+        request = rf.get("/")
+        request.user = user
+        return request
+
     def test_meeting_group(self):
         data = MeetingGroupSerializer(self.moderator_club).data
         self.assertEqual(self.moderator_club.pk, data.pop("pk"))
@@ -263,3 +270,51 @@ class MeetingGroupRelatedSerializersTests(TestCase):
             [self.pleb_member, self.mod_member], many=True
         ).data
         self.assertEqual(2, len(data))
+
+    def test_group_membership_create(self):
+        serializer = GroupMembershipSerializer(
+            data={"meeting_group": self.plebei_hangout.pk, "user": self.moderator.pk},
+            context={"request": self._mk_request(self.moderator)},
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.save()
+        self.assertIsInstance(instance, GroupMembership)
+
+    def test_group_membership_create_not_same_meeting(self):
+        new_meeting = Meeting.objects.create()
+        new_group = new_meeting.groups.create(title="New group", groupid="thenew")
+        serializer = GroupMembershipSerializer(
+            data={
+                "meeting_group": new_group.pk,
+                "user": self.moderator.pk,
+                "role": self.group_role.pk,
+            },
+            context={"request": self._mk_request(self.moderator)},
+        )
+        serializer.is_valid()
+        self.assertIn("role", serializer.errors)
+
+    def test_group_membership_patch_not_same_meeting(self):
+        new_meeting = Meeting.objects.create()
+        new_group = new_meeting.groups.create(title="New group", groupid="thenew")
+        serializer = GroupMembershipSerializer(
+            data={
+                "meeting_group": new_group.pk,
+                "user": self.moderator.pk,
+                # "role": self.group_role.pk,
+            },
+            context={"request": self._mk_request(self.moderator)},
+        )
+        serializer.is_valid()
+        instance = serializer.save()
+        serializer = GroupMembershipSerializer(
+            instance,
+            data={
+                "role": self.group_role.pk,
+            },
+            context={"request": self._mk_request(self.moderator)},
+            partial=True,
+        )
+        serializer.is_valid()
+        self.assertIn("role", serializer.errors)

@@ -23,6 +23,21 @@ from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.utils import recursive_load_handlers
 from voteit.poll.utils import get_electoral_policy_registry
 
+__all__ = (
+    "UserRolesMixin",
+    "MeetingSerializer",
+    "CreateMeetingSerializer",
+    "MeetingDetailSerializer",
+    "AgendaOrderSerializer",
+    "MeetingRolesSerializer",
+    "MeetingAddParticipantSerializer",
+    "RoleSerializer",
+    "MeetingGroupSerializer",
+    "GroupRoleSerializer",
+    "GroupMembershipSerializer",
+    "ParticipantExportSerializer",
+)
+
 
 class UserRolesMixin(serializers.Serializer):
     current_user_roles = serializers.SerializerMethodField()
@@ -205,12 +220,26 @@ class GroupRoleSerializer(BaseModelSerializer):
         )
 
 
-class GroupMembershipSerializer(BaseModelSerializer):
+class GroupMembershipSerializer(serializers.ModelSerializer):
     pk = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = GroupMembership
         exclude = ("id",)
+
+    def validate(self, attrs):
+        """
+        Make sure role (if it exists) is attached to same meeting as meeting_group
+        """
+        role = attrs.get("role", None)
+        if role:
+            if self.instance:
+                meeting = self.instance.meeting
+            else:
+                meeting = attrs.get("meeting_group").meeting
+            if role.meeting != meeting:
+                raise ValidationError({"role": "Role doesn't exist in this meeting"})
+        return attrs
 
 
 class ParticipantExportSerializer(serializers.ModelSerializer):
