@@ -24,3 +24,12 @@ class MeetingGroupPermissions(ModelPermissions):
     CHANGE = P("meeting.change_meetinggroup")
     DELETE = P("meeting.delete_meetinggroup")
     VIEW = P("meeting.view_meetinggroup")
+
+
+class GroupMembershipPermissions(ModelPermissions):
+    model = "group_membership"
+
+    ADD = P("meeting.add_groupmembership", context="meeting_group")
+    CHANGE = P("meeting.change_groupmembership")
+    DELETE = P("meeting.delete_groupmembership")
+    VIEW = P("meeting.view_groupmembership")
