@@ -239,31 +239,16 @@ class DialectHandlerTests(TestCase):
         self.assertTrue(self.meeting.group_roles_active)
         self.assertEqual("auto_before_poll", self.meeting.proposal_id_policy_name)
 
-    # @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
-    # def test_check(self):
-    #     self.assertTrue(self._cut.check_files())
-    #
-    # @override_settings(MEETING_DIALECTS_DIR=BAD_DIALECT_FIXTURES)
-    # def test_check_bad_files(self):
-    #     with self.assertLogs("voteit.meeting.utils", "ERROR") as cm:
-    #         self._cut.check_files()
-    #     self.assertTrue(
-    #         any(
-    #             ["broken.yaml returned data that wasn't a dict" in x for x in cm.output]
-    #         )
-    #     )
-    #     self.assertTrue(
-    #         any(["bad_values.yaml caused suppressed exception" in x for x in cm.output])
-    #     )
-    #     self.assertTrue(
-    #         any(
-    #             [
-    #                 "Dialect bad_req specifies a requirement to 'oh_no' but it doesn't exist."
-    #                 in x
-    #                 for x in cm.output
-    #             ]
-    #         )
-    #     )
+    def test_installable_respected(self):
+        handler = self._cut.load_from_dict(
+            {
+                "name": "not_installable",
+                "title": "not_installable",
+                "installable": False,
+            }
+        )
+        with self.assertRaises(DialectError):
+            handler.install(self.meeting)
 
 
 class RecursiveLoadHandlersTests(TestCase):

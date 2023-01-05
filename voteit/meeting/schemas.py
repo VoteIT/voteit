@@ -41,6 +41,7 @@ class DialectSchema(BaseModel):
 
     requires: list[str] = ()
     title: str
+    description: str = ""
     name: str
     roles: list[GroupRoleSchema] = ()
     groups: list[GroupSchema] = ()
@@ -49,4 +50,4 @@ class DialectSchema(BaseModel):
     group_roles_active: bool | None = None
     proposal_id_policy_name: str | None = None
     # restricts: list[str] = ()  FIXME: We should have a system for restrictions
-    deprecated: bool = False
+    installable: bool = True  # Deprecated or a base template? Set this to false
