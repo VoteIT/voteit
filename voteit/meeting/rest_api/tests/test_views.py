@@ -1,10 +1,12 @@
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
+from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 
 User = get_user_model()
 
@@ -531,4 +533,47 @@ class ExportParticipantsViewSetTests(APITestCase):
         self.assertIn(
             b"\xc3\x96zg\xc3\xbcr,\xe5\xa5\xbd,,,False,False,False,False",
             rows,
+        )
+
+
+@override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
+class MeetingDialectsViewSetTests(APITestCase):
+    def test_list(self):
+        user = User.objects.create(username="anon")
+        self.client.force_login(user)
+        url = reverse("meeting-dialects-list")
+        response = self.client.get(url)
+        data = response.json()
+        self.assertEqual(
+            [
+                {
+                    "requires": [],
+                    "title": "Hello",
+                    "description": "",
+                    "name": "one",
+                    "roles": [],
+                    "groups": [],
+                    "group_roles_active": True,
+                    "installable": False,
+                },
+                {
+                    "requires": ["two"],
+                    "title": "three",
+                    "description": "",
+                    "name": "three",
+                    "roles": [],
+                    "groups": [],
+                    "installable": True,
+                },
+                {
+                    "requires": ["one"],
+                    "title": "Two!",
+                    "description": "",
+                    "name": "two",
+                    "roles": [],
+                    "groups": [],
+                    "installable": True,
+                },
+            ],
+            data,
         )
