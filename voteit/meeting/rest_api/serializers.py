@@ -220,9 +220,7 @@ class GroupRoleSerializer(BaseModelSerializer):
         )
 
 
-class GroupMembershipSerializer(serializers.ModelSerializer):
-    pk = serializers.IntegerField(read_only=True)
-
+class CreateGroupMembershipSerializer(serializers.ModelSerializer):
     class Meta:
         model = GroupMembership
         exclude = ("id",)
@@ -240,6 +238,13 @@ class GroupMembershipSerializer(serializers.ModelSerializer):
             if role.meeting != meeting:
                 raise ValidationError({"role": "Role doesn't exist in this meeting"})
         return attrs
+
+
+class GroupMembershipSerializer(CreateGroupMembershipSerializer):
+    pk = serializers.IntegerField(read_only=True)
+
+    class Meta(CreateGroupMembershipSerializer.Meta):
+        read_only_fields = ["meeting_group", "user"]
 
 
 class ParticipantExportSerializer(serializers.ModelSerializer):

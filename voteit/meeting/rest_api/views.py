@@ -20,9 +20,11 @@ from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.meeting import roles
+from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
+from voteit.meeting.permissions import MeetingGroupPermissions
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.rest_api import serializers
 from voteit.meeting.rest_api.filters import MeetingRolesFilter
@@ -32,6 +34,7 @@ __all__ = (
     "MeetingViewSet",
     "MeetingRolesViewSet",
     "MeetingGroupViewSet",
+    "GroupMembershipViewSet",
     "ExportParticipantsViewSet",
 )
 
@@ -150,6 +153,46 @@ class MeetingGroupViewSet(DefaultModelViewSet):
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         return super().update(request, *args, **kwargs)
+
+
+@router.register("group-memberships", basename="group-memberships")
+class GroupMembershipViewSet(DefaultModelViewSet):
+    model = GroupMembership
+    serializer_class = serializers.GroupMembershipSerializer
+    serializer_classes = {"create": serializers.CreateGroupMembershipSerializer}
+    context_lookup_kwarg: str = "meeting_group"
+
+    @property
+    def context_queryset(self) -> QuerySet:
+        return MeetingGroup.objects.filter(
+            meeting__in=Meeting.objects.for_user(self.request.user)
+        )
+
+    def get_queryset(self):
+        if self.detail:
+            # Permission checked against object
+            return GroupMembership.objects.all()
+        try:
+            meeting_group = self.get_context(self.request)
+        except ValidationError:
+            meeting_group = None
+        if meeting_group and self.request.user.has_perm(
+            MeetingGroupPermissions.VIEW, meeting_group
+        ):
+            return GroupMembership.objects.filter(meeting_group=meeting_group)
+        return GroupMembership.objects.none()
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
 
 
 @router.register("export-participants", basename="export-participants")
