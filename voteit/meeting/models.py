@@ -499,6 +499,8 @@ class GroupMembership(MeetingContext):
 
     name = "group_membership"
 
+    # FIXME: Make sure user's part of the same org as meeting group. Possibly check role too.
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -517,3 +519,6 @@ class GroupMembership(MeetingContext):
 
     # Annotations
     objects: models.Manager[GroupMembership]
+
+    def __str__(self):
+        return f"{self.user} in {self.meeting_group.groupid} pk:{self.pk}"

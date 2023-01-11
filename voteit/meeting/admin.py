@@ -15,6 +15,8 @@ from dolly.core import LiveCloner
 from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.agenda.models import AgendaItem
+from voteit.meeting.models import GroupMembership
+from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
@@ -133,6 +135,7 @@ class MeetingGroupAdmin(MeetingAdminMixin, admin.ModelAdmin):
     list_display = (
         "title",
         "meeting_link",
+        "votes",
         "member_count",
     )
     list_filter = ("meeting__organisation",)
@@ -142,3 +145,27 @@ class MeetingGroupAdmin(MeetingAdminMixin, admin.ModelAdmin):
     @admin.display(description="Members")
     def member_count(self, group: MeetingGroup):
         return group.members.count()
+
+
+@admin.register(GroupRole)
+class GroupRoleAdmin(MeetingAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = ("meeting",)
+    list_display = (
+        "title",
+        "meeting_link",
+    )
+    list_filter = ("meeting__organisation",)
+    search_fields = ("title", "meeting__title")
+    exclude = ("mentions",)
+
+
+@admin.register(GroupMembership)
+class GroupMembershipAdmin(MeetingAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = ()
+    list_display = (
+        "__str__",
+        "meeting_link",
+    )
+    list_filter = ("meeting_group__meeting__organisation",)
+    search_fields = ("title",)
+    exclude = ("mentions",)
