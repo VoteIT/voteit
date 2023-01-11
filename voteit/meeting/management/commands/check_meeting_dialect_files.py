@@ -14,24 +14,23 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--suppress",
-            help="Print exceptions instead of raising them",
+            "--raise",
+            help="Raise exceptions instead of printing them",
             default=False,
             action="store_true",
         )
 
     def handle(self, *args, **options):
-        suppress_exc = options["suppress"]
-        results = []
+        raise_exc = options["raise"]
         try:
             dialects_dir = getattr(settings, "MEETING_DIALECTS_DIR", None)
             if dialects_dir is None:
                 raise ImproperlyConfigured("MEETING_DIALECTS_DIR missing from settings")
             results = check_dialect_files()
         except Exception as exc:
-            if suppress_exc:
-                sys.exit(str(exc))
-            raise exc
+            if raise_exc:
+                raise exc
+            sys.exit(str(exc))
         print("Everything worked as expected. Available dialects:")
         for (name, title) in results:
             print(f"{name.ljust(30)} {title}")
