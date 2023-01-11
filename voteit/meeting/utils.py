@@ -136,16 +136,20 @@ def clone_meeting(
     return meeting
 
 
-def check_dialect_files():
+def check_dialect_files() -> list[dict[str, str]]:
     """
     Check files during tests
     >>> check_dialect_files()
     """
     intra_req_checks = defaultdict(set)
     named_paths = get_named_path_dict()
+    names_titles = []
+
     for name, path in named_paths.items():
         data_model = load_dialect_file(name, path)
         intra_req_checks[name].update(data_model.data.requires)
+        names_titles.append((name, data_model.data.title))
+
     # It doesn't check cyclic, so let's hope that doesn't happen ;)
     for name, reqs in intra_req_checks.items():
         for req in reqs:
@@ -153,6 +157,7 @@ def check_dialect_files():
                 raise DialectError(
                     f"Dialect {name} specifies a requirement to 'req' but it doesn't exist."
                 )
+    return names_titles
 
 
 def get_named_path_dict() -> dict[str, str]:

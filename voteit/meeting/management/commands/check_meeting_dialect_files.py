@@ -22,12 +22,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         suppress_exc = options["suppress"]
+        results = []
         try:
             dialects_dir = getattr(settings, "MEETING_DIALECTS_DIR", None)
             if dialects_dir is None:
                 raise ImproperlyConfigured("MEETING_DIALECTS_DIR missing from settings")
-            check_dialect_files()
+            results = check_dialect_files()
         except Exception as exc:
             if suppress_exc:
                 sys.exit(str(exc))
             raise exc
+        print("Everything worked as expected. Available dialects:")
+        for (name, title) in results:
+            print(f"{name.ljust(30)} {title}")
