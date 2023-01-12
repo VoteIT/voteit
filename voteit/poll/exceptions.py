@@ -2,7 +2,15 @@
 
 
 class PollError(Exception):
-    """ There's something wrong with a poll. """
+    """
+    There's something wrong with a poll.
+    """
+
+
+class ElectoralRegisterError(Exception):
+    """
+    Base error for electoral registers.
+    """
 
 
 class ElectoralRegisterMissing(PollError):
