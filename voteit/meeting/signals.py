@@ -227,11 +227,12 @@ def adjust_membership_voting_power_when_group_changes(*, instance: MeetingGroup,
     if instance.pk:
         # We only care about updates here!
         qs = instance.memberships.filter(votes__gt=0)
-        if (
-            instance.votes
-            and qs.aggregate(Sum("votes"))["votes__sum"] > instance.votes
-            or not instance.votes
-        ):
+        must_clear = True
+        if instance.votes:
+            votesum = qs.aggregate(Sum("votes"))["votes__sum"]
+            if votesum and votesum <= instance.votes:
+                must_clear = False
+        if must_clear:
             # We only need to clear votes if their sum is higher than assigned total
             for membership in qs:
                 membership.votes = None
