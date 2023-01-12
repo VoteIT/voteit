@@ -37,7 +37,7 @@ class AutoBeforePollTests(TestCase):
         )
 
     def test_new_er_on_start_if_new_users(self):
-        first_er = self.meeting.er_policy.create_er(self.meeting)
+        first_er = self.meeting.er_policy.create_er()
         user3 = User.objects.create(username="three")
         self.meeting.add_roles(user3, ROLE_POTENTIAL_VOTER)
         self.poll.upcoming()
@@ -50,7 +50,7 @@ class AutoBeforePollTests(TestCase):
     def test_same_er_on_start_if_no_new_users(self):
         from voteit.proposal.models import Proposal
 
-        first_er = self.meeting.er_policy.create_er(self.meeting)
+        first_er = self.meeting.er_policy.create_er()
         self.poll.upcoming()
         prop = Proposal.objects.create(agenda_item=self.ai)
         self.poll.proposals.add(prop)
@@ -59,7 +59,7 @@ class AutoBeforePollTests(TestCase):
         self.assertEqual(first_er, self.meeting.get_latest_er())
 
     def test_changed_er_ref_on_poll(self):
-        first_er = self.meeting.er_policy.create_er(self.meeting)
+        first_er = self.meeting.er_policy.create_er()
         self.poll.electoral_register = first_er
         user3 = User.objects.create(username="three")
         self.meeting.add_roles(user3, ROLE_POTENTIAL_VOTER)

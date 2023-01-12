@@ -102,7 +102,6 @@ class ElectoralRegister(MeetingContext):
         return self.voterweight_set.get(user=user).weight
 
     def get_total_vote_weight(self) -> int:
-        # FIXME: Is this the correct method? :)
         return self.voterweight_set.aggregate(Sum("weight"))["weight__sum"]
 
     def get_weight_dict(self) -> dict[int, int]:
