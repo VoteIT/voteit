@@ -64,3 +64,24 @@ class VoterWeightSchema(BaseModel):
         if v > 0:
             return v
         raise ValueError("Must be positive int")
+
+
+class VotersWeightsSchema(BaseModel):
+    weights: list[VoterWeightSchema] = ()
+
+    @validator("weights")
+    def validate_weights(cls, v):
+        """
+        >>> VotersWeightsSchema( weights=[{'user': 1, 'weight': 1}])
+        VotersWeightsSchema(weights=[VoterWeightSchema(user=1, weight=1)])
+        >>> VotersWeightsSchema(weights=[{'user': 1, 'weight': 1}, {'user': 1, 'weight': 1}])
+        Traceback (most recent call last):
+        ...
+        pydantic.error_wrappers.ValidationError: 1 validation error for VotersWeightsSchema
+        """
+        found = set()
+        for vw in v:
+            if vw.user in found:
+                raise ValueError(f"Duplicate user entry: {vw.user}")
+            found.add(vw.user)
+        return v
