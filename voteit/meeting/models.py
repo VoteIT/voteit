@@ -509,8 +509,16 @@ class GroupMembership(MeetingContext):
     meeting_group: MeetingGroup = models.ForeignKey(
         MeetingGroup, on_delete=models.CASCADE, related_name="memberships"
     )
+    # We won't support keeping membership and deleting a role for now,
+    # it will have a lot of side effects we don't want to handle now.
     role: GroupRole | None = models.ForeignKey(
         GroupRole, on_delete=models.CASCADE, related_name="+", null=True, blank=True
+    )
+    # Note that this field isn't the actual votes,
+    # but the votes we expect the user to have next time the electoral register is updated!
+    # The number of assigned votes here should always match the MeetingGroups votes
+    votes: int | None = models.PositiveIntegerField(
+        verbose_name="Vote weight delegated", null=True, blank=True
     )
 
     @property

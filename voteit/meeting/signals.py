@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from itertools import chain
 from typing import TYPE_CHECKING
 
 from django.db import transaction
+from django.db.models import Sum
 from django.db.models.signals import m2m_changed
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
+from django.db.models.signals import pre_save
 from django.dispatch import Signal
 from django.dispatch import receiver
 from envelope.app.user_channel.channel import UserChannel
@@ -219,6 +220,22 @@ mk_default_deleted_publisher_to_meeting(
     model=GroupMembership,
     msg_class=GroupMembershipDeleted,
 )
+
+
+@receiver(pre_save, sender=MeetingGroup)
+def adjust_membership_voting_power_when_group_changes(*, instance: MeetingGroup, **kw):
+    if instance.pk:
+        # We only care about updates here!
+        qs = instance.memberships.filter(votes__gt=0)
+        if (
+            instance.votes
+            and qs.aggregate(Sum("votes"))["votes__sum"] > instance.votes
+            or not instance.votes
+        ):
+            # We only need to clear votes if their sum is higher than assigned total
+            for membership in qs:
+                membership.votes = None
+                membership.save()
 
 
 def _role_msg_publish(instance: MeetingRoles, msg):

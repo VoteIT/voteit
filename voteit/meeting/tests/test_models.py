@@ -148,6 +148,22 @@ class MeetingGroupTests(TestCase):
         )
         self.assertEqual(group.groupid, "kings-college-1")
 
+    def test_max_votes_and_membership(self):
+        meeting = self.meetings[0]
+        group = meeting.groups.create(title="Voters", votes=3)
+        voter_one = self.organisation.users.create(username="one")
+        voter_two = self.organisation.users.create(username="two")
+        member_one = group.memberships.create(user=voter_one, votes=1)
+        member_two = group.memberships.create(user=voter_two, votes=1)
+        group.votes = 2
+        group.save()
+        member_one.refresh_from_db()
+        self.assertEqual(1, member_one.votes)
+        group.votes = 1
+        group.save()
+        member_one.refresh_from_db()
+        self.assertIsNone(member_one.votes)
+
 
 class MeetingRolesTests(TestCase):
     fixtures = ["meeting_test_fixture"]
