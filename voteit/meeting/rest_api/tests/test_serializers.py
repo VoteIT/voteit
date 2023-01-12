@@ -208,12 +208,10 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         cls.plebei_hangout = cls.meeting.groups.create(
             title="The hangout", groupid="plebei"
         )
-        cls.mod_member = cls.moderator_club.role_assignments.create(
+        cls.mod_member = cls.moderator_club.memberships.create(
             user=cls.moderator, role=cls.group_role
         )
-        cls.pleb_member = cls.plebei_hangout.role_assignments.create(
-            user=cls.participant
-        )
+        cls.pleb_member = cls.plebei_hangout.memberships.create(user=cls.participant)
 
     def _mk_request(self, user):
         rf = RequestFactory()

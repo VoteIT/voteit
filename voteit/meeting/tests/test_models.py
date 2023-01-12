@@ -197,40 +197,28 @@ class GroupRoleTests(TestCase):
             {ROLE_PARTICIPANT},
             self.meeting.get_roles(self.participant),
         )
-        self.group_one.role_assignments.create(
-            user=self.participant, role=self.councilor
-        )
+        self.group_one.memberships.create(user=self.participant, role=self.councilor)
         self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
 
     def test_downgrade_role(self):
-        self.group_one.role_assignments.create(
-            user=self.participant, role=self.councilor
-        )
+        self.group_one.memberships.create(user=self.participant, role=self.councilor)
         self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
-        assignment = self.group_one.role_assignments.filter(
-            user=self.participant
-        ).first()
+        assignment = self.group_one.memberships.filter(user=self.participant).first()
         assignment.role = self.debater
         assignment.save()
         self.assertRoles(self.debater.roles, self.meeting.get_roles(self.participant))
 
     def test_remove_role(self):
-        self.group_one.role_assignments.create(
-            user=self.participant, role=self.councilor
-        )
+        self.group_one.memberships.create(user=self.participant, role=self.councilor)
         self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
-        assignment = self.group_one.role_assignments.filter(
-            user=self.participant
-        ).first()
+        assignment = self.group_one.memberships.filter(user=self.participant).first()
         assignment.role = None
         assignment.save()
         self.assertRoles(set(), self.meeting.get_roles(self.participant))
 
     def test_several_groups_keeps_role_intact(self):
-        self.group_one.role_assignments.create(
-            user=self.participant, role=self.councilor
-        )
-        second = self.group_two.role_assignments.create(
+        self.group_one.memberships.create(user=self.participant, role=self.councilor)
+        second = self.group_two.memberships.create(
             user=self.participant, role=self.councilor
         )
         # And deleting it keeps original
@@ -238,30 +226,26 @@ class GroupRoleTests(TestCase):
         self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
 
     def test_adjust_roles(self):
-        self.group_one.role_assignments.create(user=self.participant, role=self.debater)
+        self.group_one.memberships.create(user=self.participant, role=self.debater)
         self.assertRoles(self.debater.roles, self.meeting.get_roles(self.participant))
         self.debater.roles = [ROLE_POTENTIAL_VOTER]
         self.debater.save()
         self.assertRoles(self.debater.roles, self.meeting.get_roles(self.participant))
 
     def test_delete_group(self):
-        self.group_one.role_assignments.create(
-            user=self.participant, role=self.councilor
-        )
+        self.group_one.memberships.create(user=self.participant, role=self.councilor)
         self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
         self.group_one.delete()
         self.assertRoles(set(), self.meeting.get_roles(self.participant))
 
     def test_delete_role(self):
-        self.group_one.role_assignments.create(
-            user=self.participant, role=self.councilor
-        )
+        self.group_one.memberships.create(user=self.participant, role=self.councilor)
         self.assertRoles(self.councilor.roles, self.meeting.get_roles(self.participant))
         self.councilor.delete()
         self.assertRoles(set(), self.meeting.get_roles(self.participant))
 
     def test_group_roles_disabled_adjust_roles(self):
-        self.group_one.role_assignments.create(user=self.participant, role=self.debater)
+        self.group_one.memberships.create(user=self.participant, role=self.debater)
         self.assertRoles(self.debater.roles, self.meeting.get_roles(self.participant))
         self.meeting.group_roles_active = False
         self.meeting.save()

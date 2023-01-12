@@ -90,7 +90,7 @@ class MeetingChannelSubscribedTests(TestCase):
         cls.group_role: GroupRole = cls.meeting.group_roles.create(
             title="President", role_id="president"
         )
-        cls.group_membership = cls.group.role_assignments.create(
+        cls.group_membership = cls.group.memberships.create(
             role=cls.group_role, user=cls.user
         )
 

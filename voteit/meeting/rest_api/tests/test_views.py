@@ -287,7 +287,7 @@ class GroupMembershipViewSetTests(APITestCase):
             meeting=cls.meeting
         )
         cls.role = cls.meeting.group_roles.create(title="Wizard", role_id="wiz")
-        cls.membership: GroupMembership = cls.meeting_group.role_assignments.create(
+        cls.membership: GroupMembership = cls.meeting_group.memberships.create(
             user=cls.moderator, role=cls.role
         )
 

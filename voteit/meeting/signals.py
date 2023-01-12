@@ -156,9 +156,7 @@ def meeting_channel_subscribed(
         )
         app_state.append(msg)
     # Append all groups - members have moved to GroupMembership!
-    meeting_groups_qs = context.groups.all().prefetch_related(
-        "mentions", "role_assignments"
-    )
+    meeting_groups_qs = context.groups.all().prefetch_related("mentions", "memberships")
     app_state.append_from_queryset(
         meeting_groups_qs,
         MeetingGroupSerializer,
@@ -167,7 +165,7 @@ def meeting_channel_subscribed(
     # GroupMemberships - these are prefetched so impact should be minimal
     items = set()
     for mg in meeting_groups_qs:
-        items.update(mg.role_assignments.all())
+        items.update(mg.memberships.all())
     app_state.append_from_queryset(
         items,
         GroupMembershipSerializer,

@@ -321,8 +321,8 @@ class GroupMembershipPermissionTests(TestCase):
         cls.anon_user = User.objects.create(username="anon")
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
-        cls.group_membership: GroupMembership = (
-            cls.meeting_group.role_assignments.create(user=cls.participant)
+        cls.group_membership: GroupMembership = cls.meeting_group.memberships.create(
+            user=cls.participant
         )
 
     def setUp(self):

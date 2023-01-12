@@ -416,7 +416,7 @@ class MeetingGroup(BaseContent, MeetingContext):
     # Type annotations - relations
     proposals: models.QuerySet
     discussions: models.QuerySet
-    role_assignments: models.QuerySet[GroupMembership]
+    memberships: models.QuerySet[GroupMembership]
     objects: models.Manager[MeetingGroup]
 
 
@@ -507,7 +507,7 @@ class GroupMembership(MeetingContext):
         related_name="+",
     )
     meeting_group: MeetingGroup = models.ForeignKey(
-        MeetingGroup, on_delete=models.CASCADE, related_name="role_assignments"
+        MeetingGroup, on_delete=models.CASCADE, related_name="memberships"
     )
     role: GroupRole | None = models.ForeignKey(
         GroupRole, on_delete=models.CASCADE, related_name="+", null=True, blank=True
