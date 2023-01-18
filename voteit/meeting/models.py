@@ -39,6 +39,7 @@ from voteit.proposal.utils import get_proposal_id_registry
 
 if TYPE_CHECKING:
     from voteit.access_policy.models import AccessPolicy
+    from voteit.active.models import ActiveUser
     from voteit.components.models import MeetingComponent
     from voteit.poll.models import ElectoralRegister
     from voteit.poll.abcs import ElectoralRegisterPolicy
@@ -359,6 +360,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     components: models.QuerySet[MeetingComponent]
     roles: models.QuerySet[MeetingRoles]
     group_roles: models.QuerySet[GroupRole]
+    active_users: models.QuerySet[ActiveUser]
 
 
 class MeetingGroup(BaseContent, MeetingContext):

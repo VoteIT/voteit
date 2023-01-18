@@ -15,7 +15,6 @@ from voteit.meeting.exceptions import DialectError
 
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
-from voteit.meeting.utils import DialectHandler
 from voteit.meeting.utils import clone_meeting
 from voteit.meeting.utils import recursive_load_handlers
 from voteit.messaging.decorators import incoming
