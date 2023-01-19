@@ -6,6 +6,7 @@ from django.test import TestCase
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
+from voteit.meeting.rest_api.serializers import CreateGroupMembershipSerializer
 from voteit.meeting.rest_api.serializers import GroupMembershipSerializer
 from voteit.meeting.rest_api.serializers import GroupRoleSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
@@ -261,6 +262,7 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         self.assertEqual(self.moderator.pk, data.pop("user"))
         self.assertEqual(self.moderator_club.pk, data.pop("meeting_group"))
         self.assertEqual(self.group_role.pk, data.pop("role"))
+        self.assertIsNone(data.pop("votes"))
         self.assertFalse(data.keys())
 
     def test_group_member_many(self):
@@ -270,7 +272,7 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         self.assertEqual(2, len(data))
 
     def test_group_membership_create(self):
-        serializer = GroupMembershipSerializer(
+        serializer = CreateGroupMembershipSerializer(
             data={"meeting_group": self.plebei_hangout.pk, "user": self.moderator.pk},
             context={"request": self._mk_request(self.moderator)},
         )
@@ -282,7 +284,7 @@ class MeetingGroupRelatedSerializersTests(TestCase):
     def test_group_membership_create_not_same_meeting(self):
         new_meeting = Meeting.objects.create()
         new_group = new_meeting.groups.create(title="New group", groupid="thenew")
-        serializer = GroupMembershipSerializer(
+        serializer = CreateGroupMembershipSerializer(
             data={
                 "meeting_group": new_group.pk,
                 "user": self.moderator.pk,
@@ -296,7 +298,7 @@ class MeetingGroupRelatedSerializersTests(TestCase):
     def test_group_membership_patch_not_same_meeting(self):
         new_meeting = Meeting.objects.create()
         new_group = new_meeting.groups.create(title="New group", groupid="thenew")
-        serializer = GroupMembershipSerializer(
+        serializer = CreateGroupMembershipSerializer(
             data={
                 "meeting_group": new_group.pk,
                 "user": self.moderator.pk,
