@@ -14,14 +14,14 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--raise",
+            "--exc",
             help="Raise exceptions instead of printing them",
             default=False,
             action="store_true",
         )
 
     def handle(self, *args, **options):
-        raise_exc = options["raise"]
+        raise_exc = options["exc"]
         try:
             dialects_dir = getattr(settings, "MEETING_DIALECTS_DIR", None)
             if dialects_dir is None:

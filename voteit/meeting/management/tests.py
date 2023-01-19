@@ -28,6 +28,6 @@ class CommandsTests(TestCase):
     @override_settings(MEETING_DIALECTS_DIR=BAD_DIALECT_FIXTURES)
     def test_meeting_dialect_files_bad(self):
         with self.assertRaises(ValidationError):
-            self.call_command("check_meeting_dialect_files")
+            self.call_command("check_meeting_dialect_files", exc=True)
         with self.assertRaises(SystemExit):
-            self.call_command("check_meeting_dialect_files", suppress=True)
+            self.call_command("check_meeting_dialect_files")
