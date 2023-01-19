@@ -136,7 +136,7 @@ def clone_meeting(
     return meeting
 
 
-def check_dialect_files() -> list[dict[str, str]]:
+def check_dialect_files() -> list[tuple[str, str]]:
     """
     Check files during tests
     >>> check_dialect_files()
