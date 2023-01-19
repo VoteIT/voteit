@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from pydantic import conlist
 from pydantic import constr
 from pydantic import validator
 
@@ -31,7 +32,11 @@ class DialectSchema(BaseModel):
         'roles': [{'title': 'Supervisor', 'role_id': 'supervisor', 'roles': ['discusser', 'proposer']}],\
         'groups': [{'title': 'Board', 'groupid': 'board'}], 'er_policy_name': 'auto_before_poll',\
         'group_votes_active': True, 'group_roles_active': True}
-    >>> schema = DialectSchema(**data)
+    >>> DialectSchema(**data)
+    DialectSchema(requires=(), title='Test', description='', name='test', roles=[GroupRoleSchema(title='Supervisor', \
+    role_id='supervisor', roles=['discusser', 'proposer'], can_propose_as=False, can_discuss_as=False)],\
+    groups=[GroupSchema(title='Board', groupid='board')], er_policy_name='auto_before_poll', \
+    group_votes_active=True, group_roles_active=True, proposal_id_policy_name=None, installable=True)
     >>> data['roles'] = [{'title': 'Bad', 'roles': ['boho']}]
     >>> DialectSchema(**data)
     Traceback (most recent call last):
@@ -43,8 +48,8 @@ class DialectSchema(BaseModel):
     title: str
     description: str = ""
     name: str
-    roles: list[GroupRoleSchema] = ()
-    groups: list[GroupSchema] = ()
+    roles: conlist(GroupRoleSchema, unique_items=True) = []
+    groups: conlist(GroupSchema, unique_items=True) = []
     er_policy_name: str | None = None
     group_votes_active: bool | None = None
     group_roles_active: bool | None = None
