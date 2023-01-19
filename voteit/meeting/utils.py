@@ -9,11 +9,10 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django_fsm import FSMField
-from yaml import safe_load
-
 from dolly.core import LiveCloner
 from dolly.utils import get_inf_collector
 from dolly.utils import get_model_formatted_dict
+from yaml import safe_load
 
 from voteit.core.decorators import ensure_atomic
 from voteit.core.utils import get_content_registry
@@ -139,7 +138,7 @@ def clone_meeting(
 def check_dialect_files() -> list[tuple[str, str]]:
     """
     Check files during tests
-    >>> check_dialect_files()
+    >>> _ = check_dialect_files()
     """
     intra_req_checks = defaultdict(set)
     named_paths = get_named_path_dict()
@@ -176,6 +175,7 @@ def get_named_path_dict() -> dict[str, str]:
     return results
 
 
+# FIXME: LRU-Cache for dialects?
 def load_dialect_file(name: str, path: str) -> DialectHandler:
     with open(path, "r") as f:
         data = safe_load(f)
