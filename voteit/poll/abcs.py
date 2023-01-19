@@ -149,7 +149,8 @@ class ElectoralRegisterPolicy(ABC):
     def apply(self, poll: Poll, target: str | None = None):
         """
         (Maybe) apply the policy to this poll.
-        Target is the workflow state the poll will soon enter, if this was triggered by workflow
+        Target is the workflow state the poll will soon enter, if this was triggered by workflow.
+        Note that WF only trigger on upcoming and ongoing
         """
         self.pre_apply(poll, target)
         meeting = poll.meeting
