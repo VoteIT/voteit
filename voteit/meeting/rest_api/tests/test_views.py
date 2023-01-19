@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.dispatch import receiver
 from django.test import override_settings
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
@@ -6,6 +7,9 @@ from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.signals import group_role_added
+from voteit.meeting.signals import group_role_removed
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 
 User = get_user_model()
@@ -286,7 +290,9 @@ class GroupMembershipViewSetTests(APITestCase):
         cls.meeting_group: MeetingGroup = MeetingGroup.objects.create(
             meeting=cls.meeting
         )
-        cls.role = cls.meeting.group_roles.create(title="Wizard", role_id="wiz")
+        cls.role = cls.meeting.group_roles.create(
+            title="Wizard", role_id="wiz", roles=[ROLE_POTENTIAL_VOTER]
+        )
         cls.membership: GroupMembership = cls.meeting_group.memberships.create(
             user=cls.moderator, role=cls.role
         )
@@ -321,6 +327,7 @@ class GroupMembershipViewSetTests(APITestCase):
                 "role": self.role.pk,
                 "meeting_group": self.meeting_group.pk,
                 "pk": self.membership.pk,
+                "votes": None,
             },
             data,
         )
@@ -370,6 +377,85 @@ class GroupMembershipViewSetTests(APITestCase):
         url = reverse("group-memberships-detail", kwargs={"pk": self.membership.pk})
         response = self.client.delete(url)
         self.assertEqual(403, response.status_code)
+
+    def test_create_delegates_to_signal(self):
+        self.membership.delete()
+        L = []
+
+        @receiver(group_role_added, sender=GroupMembership)
+        def listener(instance, role, **kwargs):
+            L.append(role)
+
+        self.client.force_login(self.moderator)
+        url = reverse("group-memberships-list")
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            url,
+            data={
+                "role": self.role.pk,
+                "user": self.moderator.pk,
+                "meeting_group": self.meeting_group.pk,
+            },
+        )
+        self.assertEqual(201, response.status_code)
+        self.assertEqual([self.role], L)
+
+    def test_patch_remove_role_delegates_to_signal(self):
+        L = []
+
+        @receiver(group_role_removed, sender=GroupMembership)
+        def listener(instance, role, **kwargs):
+            L.append(role)
+
+        self.client.force_login(self.moderator)
+        url = reverse("group-memberships-detail", kwargs={"pk": self.membership.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"role": ""})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([self.role], L)
+
+    def test_patch_add_role_delegates_to_signal(self):
+        self.membership.role = None
+        self.membership.save()
+        L = []
+
+        @receiver(group_role_added, sender=GroupMembership)
+        def listener(instance, role, **kwargs):
+            L.append(role)
+
+        self.client.force_login(self.moderator)
+        url = reverse("group-memberships-detail", kwargs={"pk": self.membership.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"role": self.role.pk})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([self.role], L)
+
+    def test_patch_same_role_sends_no_signal(self):
+        L = []
+
+        @receiver(group_role_added, sender=GroupMembership)
+        def listener(instance, role, **kwargs):
+            L.append(role)
+
+        self.client.force_login(self.moderator)
+        url = reverse("group-memberships-detail", kwargs={"pk": self.membership.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"role": self.role.pk})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([], L)
+
+    def test_delete_delegates_to_signal(self):
+        L = []
+
+        @receiver(group_role_removed, sender=GroupMembership)
+        def listener(instance, role, **kwargs):
+            L.append(role)
+
+        self.client.force_login(self.moderator)
+        url = reverse("group-memberships-detail", kwargs={"pk": self.membership.pk})
+        response = self.client.delete(url)
+        self.assertEqual(204, response.status_code)
+        self.assertEqual([self.role], L)
 
 
 class MeetingRolesViewSetTests(APITestCase):

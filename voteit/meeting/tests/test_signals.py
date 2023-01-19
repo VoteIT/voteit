@@ -118,6 +118,8 @@ class MeetingChannelSubscribedTests(TestCase):
         self.assertEqual(payload["model"], "meeting")
 
     def test_meeting_groups_and_related_in_app_state(self):
+        self.meeting.group_roles_active = True
+        self.meeting.save()
         msg = self._mk_subscribe()
         msg.validate()
         response = msg.run_job()

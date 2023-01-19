@@ -188,14 +188,34 @@ class GroupMembershipViewSet(DefaultModelViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
+        # Role-signal will be delegated, see signals.py
         return super().create(request, *args, **kwargs)
 
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         return super().update(request, *args, **kwargs)
 
+    def perform_update(self, serializer: serializers.GroupMembershipSerializer):
+        # if serializer.instance.role is None:
+        role_added = None
+        role_removed = None
+        serializer.instance: GroupMembership
+        if "role" in serializer.validated_data:
+            role_added = (
+                serializer.validated_data["role"] and serializer.instance.role is None
+            )
+            role_removed = (
+                not serializer.validated_data["role"] and serializer.instance.role
+            )
+        serializer.save()
+        if role_added:
+            serializer.instance.signal_role_added()
+        if role_removed:
+            serializer.instance.signal_role_removed(role=role_removed)
+
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):
+        # Role-signal will be delegated, see signals.py
         return super().destroy(request, *args, **kwargs)
 
 

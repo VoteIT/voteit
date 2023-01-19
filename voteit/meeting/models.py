@@ -527,6 +527,26 @@ class GroupMembership(MeetingContext):
     def meeting(self) -> Meeting:
         return self.meeting_group.meeting
 
+    def signal_role_added(self):
+        from voteit.meeting.signals import group_role_added
+
+        group_role_added.send(
+            sender=self.__class__,
+            instance=self,
+            role=self.role,
+        )
+
+    def signal_role_removed(self, role=None):
+        from voteit.meeting.signals import group_role_removed
+
+        if role is None:
+            role = self.role
+        group_role_removed.send(
+            sender=self.__class__,
+            instance=self,
+            role=role,
+        )
+
     # Annotations
     objects: models.Manager[GroupMembership]
 

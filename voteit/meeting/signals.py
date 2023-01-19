@@ -36,15 +36,12 @@ from voteit.meeting.messages import MeetingGroupDeleted
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
-from voteit.meeting.models import MeetingRoles
 from voteit.meeting.models import MeetingGroup
+from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api.serializers import GroupMembershipSerializer
 from voteit.meeting.rest_api.serializers import GroupRoleSerializer
 from voteit.meeting.rest_api.serializers import MeetingDetailSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
-from voteit.meeting.roles import ROLE_DISCUSSER
-from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-from voteit.meeting.roles import ROLE_PROPOSER
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -65,6 +62,12 @@ archive_meeting = Signal()
 #   user
 #   meeting_roles (Meeting roles object)
 meeting_joined = Signal()
+
+# Signal when group role is added/removed through a GroupMembership object
+#   instance:GroupMembership
+#   role:GroupRole
+group_role_added = Signal()
+group_role_removed = Signal()
 
 
 def mk_default_changed_publisher_to_meeting(
@@ -163,8 +166,9 @@ def meeting_channel_subscribed(
         MeetingGroupSerializer,
         MeetingGroupAdded,
     )
-    # GroupMemberships - these are prefetched so impact should be minimal
+    # GroupMemberships
     items = set()
+    # FIXME: Saner format for these
     for mg in meeting_groups_qs:
         items.update(mg.memberships.all())
     app_state.append_from_queryset(
@@ -173,11 +177,12 @@ def meeting_channel_subscribed(
         GroupMembershipAdded,
     )
     # And GroupRoles
-    app_state.append_from_queryset(
-        context.group_roles.all(),
-        GroupRoleSerializer,
-        GroupRoleAdded,
-    )
+    if context.group_roles_active:
+        app_state.append_from_queryset(
+            context.group_roles.all(),
+            GroupRoleSerializer,
+            GroupRoleAdded,
+        )
 
 
 # MeetingGroup
@@ -275,45 +280,59 @@ def push_roles_removed(instance: MeetingRoles, roles: list[Role], **kwargs):
     )
 
 
-def _check_roles(user, meeting, excluding_membership: int | None = None):
-    # FIXME: This should be optimized
-    if meeting.group_roles_active:
-        assigned = set()
-        qs = GroupMembership.objects.filter(
-            user=user, meeting_group__meeting=meeting, role__isnull=False
-        )
-        if excluding_membership:
-            qs = qs.exclude(pk=excluding_membership)
-        for membership in qs.select_related("role"):
-            assigned.update(membership.role.roles)
-        to_remove = {
-            ROLE_POTENTIAL_VOTER,
-            ROLE_DISCUSSER,
-            ROLE_PROPOSER,
-        } - assigned
-        meeting.remove_roles(user, *to_remove)
-        meeting.add_roles(user, *assigned)
-
-
 @receiver(post_save, sender=GroupMembership)
-def membership_changed(instance: GroupMembership, **kwargs):
-    _check_roles(instance.user, instance.meeting_group.meeting)
+def delegate_signal_role_added(instance: GroupMembership, created: bool, **kwargs):
+    """
+    Delegate single creation to role_added. Updated GroupMembership objects should manually trigger this.
+    """
+    if created and instance.role is not None:
+        instance.signal_role_added()
 
 
 @receiver(pre_delete, sender=GroupMembership)
-def membership_deleted(instance: GroupMembership, **kwargs):
-    _check_roles(
-        instance.user, instance.meeting_group.meeting, excluding_membership=instance.pk
-    )
+def delegate_signal_role_deleted(instance: GroupMembership, **kwargs):
+    """
+    Delegate single deleted GroupMembership to signal role_removed
+    """
+    if instance.role is not None:
+        instance.signal_role_removed()
 
 
-@receiver(post_save, sender=GroupRole)
-def group_role_changed_ck_roles(instance: GroupRole, **kwargs):
-    for gm in GroupMembership.objects.filter(role=instance).prefetch_related(
-        "user", "meeting_group", "meeting_group__meeting"
-    ):
-        # FIXME: Optimize, this will be quite slow in large meetings
-        _check_roles(gm.user, gm.meeting_group.meeting)
+@receiver(group_role_added, sender=GroupMembership)
+def handle_meeting_roles_through_role_added(
+    instance: GroupMembership, role: GroupRole, **kwargs
+):
+    """
+    A user was assigned a role through group membership.
+    This simply adds meeting roles which will trigger event if needed.
+    """
+    if role.roles:
+        instance.meeting.add_roles(instance.user, *role.roles)
+
+
+@receiver(group_role_removed, sender=GroupMembership)
+def handle_meeting_roles_through_removed(
+    instance: GroupMembership, role: GroupRole, **kwargs
+):
+    """
+    This signal is triggered when a role will be removed from GroupMembership.
+    So any checks regarding role must assume the group membership object still exists.
+    """
+    maybe_remove_meeting_roles = set(role.roles)
+    if not maybe_remove_meeting_roles:
+        return  # Nothing to do
+    meeting = instance.meeting
+    meeting_group = instance.meeting_group
+    if not meeting.group_roles_active:
+        return  # Don't check for this meeting
+    memberships = GroupMembership.objects.filter(
+        user=instance.user, meeting_group__meeting=meeting, role__isnull=False
+    ).exclude(meeting_group=meeting_group)
+    for member in memberships:
+        maybe_remove_meeting_roles = maybe_remove_meeting_roles - set(member.role.roles)
+        if not maybe_remove_meeting_roles:
+            return  # Potential remove roles exhausted
+    meeting.remove_roles(instance.user, *maybe_remove_meeting_roles)
 
 
 @receiver(m2m_changed, sender=MeetingGroup.members.through)
@@ -322,14 +341,14 @@ def compat_m2m_publish_group_membership(
 ):
     """
     This little nugget delegates m2m interactions so the through model gets proper post_save / pre_delete signals since
-    we rely on them. It's probably a bad idea to handle it this way, but i see no other option.
+    we rely on them. It's probably a bad idea to handle it this way, but I see no other option.
     """
     through = MeetingGroup.members.through
     if action == "post_add":
         if reverse:
             for obj in through.objects.filter(
                 meeting_group__pk__in=pk_set, user=instance
-            ):
+            ).prefetch_related("role"):
                 post_save.send(
                     sender=through,
                     instance=obj,
@@ -339,30 +358,32 @@ def compat_m2m_publish_group_membership(
         else:
             for obj in through.objects.filter(
                 user__pk__in=pk_set, meeting_group=instance
-            ):
+            ).prefetch_related("role"):
                 post_save.send(
                     sender=through,
                     instance=obj,
                     created=True,
                     using=using,
                 )
-    # Remove signals are sent another way, so they're actually caught the expected way
-    # elif action == "pre_remove":
-    #     if reverse:
-    #         for obj in through.objects.filter(
-    #             meeting_group__pk__in=pk_set, user=instance
-    #         ):
-    #             pre_delete.send(
-    #                 sender=through,
-    #                 instance=obj,
-    #                 using=using,
-    #             )
-    #     else:
-    #         for obj in through.objects.filter(
-    #             user__pk__in=pk_set, meeting_group=instance
-    #         ):
-    #             pre_delete.send(
-    #                 sender=through,
-    #                 instance=obj,
-    #                 using=using,
-    #             )
+
+
+# Remove signals are sent another way, so they're actually caught the expected way
+# elif action == "pre_remove":
+#     if reverse:
+#         for obj in through.objects.filter(
+#             meeting_group__pk__in=pk_set, user=instance
+#         ):
+#             pre_delete.send(
+#                 sender=through,
+#                 instance=obj,
+#                 using=using,
+#             )
+#     else:
+#         for obj in through.objects.filter(
+#             user__pk__in=pk_set, meeting_group=instance
+#         ):
+#             pre_delete.send(
+#                 sender=through,
+#                 instance=obj,
+#                 using=using,
+#             )
