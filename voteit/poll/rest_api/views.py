@@ -10,6 +10,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
+from rest_framework.viewsets import ViewSet
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
@@ -20,11 +21,15 @@ from voteit.meeting.permissions import MeetingPermissions
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.rest_api import serializers
+from voteit.poll.schemas import ElectoralRegistryPolicySchema
+from voteit.poll.utils import get_electoral_policy_registry
 
-__all__ = [
+__all__ = (
     "PollViewSet",
     "ElectoralRegisterViewSet",
-]
+    "ElectoralRegisterPoliciesViewSet",
+    "ExportERViewSet",
+)
 
 
 @router.register("polls")
@@ -66,6 +71,19 @@ class ElectoralRegisterViewSet(ReadonlyModelViewSet):
 
     def get_queryset(self):
         return ElectoralRegister.objects.for_user(self.request.user)
+
+
+@router.register("electoral-register-policies", basename="electoral-register-policies")
+class ElectoralRegisterPoliciesViewSet(ViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def list(self, request):
+        reg = get_electoral_policy_registry()
+        results = []
+        for er_policy in reg.values():
+            data = ElectoralRegistryPolicySchema.from_orm(er_policy)
+            results.append(data.dict())
+        return Response(data=results)
 
 
 @router.register("export-electoral-register", basename="export-electoral-register")

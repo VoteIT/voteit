@@ -85,3 +85,21 @@ class VotersWeightsSchema(BaseModel):
                 raise ValueError(f"Duplicate user entry: {vw.user}")
             found.add(vw.user)
         return v
+
+
+class ElectoralRegistryPolicySchema(BaseModel):
+    name: str
+    title: str
+    description: str = ""
+    handles_personal_vote: bool
+    handles_group_vote: bool
+    handles_vote_weight: bool
+
+    @validator("title", "description", pre=True)
+    def translate(cls, v):
+        if not isinstance(v, str):
+            return str(v)
+        return v
+
+    class Config:
+        orm_mode = True

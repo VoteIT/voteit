@@ -310,3 +310,27 @@ class ExportElectoralRegisterViewSetTests(APITestCase):
         rows = response.content.splitlines()
         self.assertEqual(b"first_name,last_name,email,userid,weight", rows[0])
         self.assertEqual(b"Jeff,,jeff@none.com,jeffrey,2", rows[2])
+
+
+class ElectoralRegisterPolicyViewSetTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create(username="user")
+
+    def test_list(self):
+        self.client.force_login(self.user)
+        response = self.client.get("/api/electoral-register-policies/")
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        data = sorted(data, key=lambda x: x["name"])
+        self.assertEqual(
+            {
+                "description": "",
+                "handles_group_vote": True,
+                "handles_personal_vote": True,
+                "handles_vote_weight": False,
+                "name": "active_check",
+                "title": "Active users set when poll starts",
+            },
+            data[0],
+        )
