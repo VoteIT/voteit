@@ -119,8 +119,14 @@ class CreateMeetingSerializer(BaseModelSerializer):
 
     def validate_er_policy_name(self, value: str | None):
         if value is not None:
-            if value not in get_electoral_policy_registry():
+            reg = get_electoral_policy_registry()
+            if value not in reg:
                 raise ValidationError(f"No electoral register policy named {value}")
+            er_policy = reg[value]
+            if not er_policy.available:
+                raise ValidationError(
+                    f"Policy '{value}' isn't manually selectable, it must be installed via a meeting dialect"
+                )
         return value
 
 

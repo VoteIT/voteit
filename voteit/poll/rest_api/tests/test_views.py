@@ -326,6 +326,7 @@ class ElectoralRegisterPolicyViewSetTests(APITestCase):
         self.assertEqual(
             {
                 "description": "",
+                "available": True,
                 "handles_group_vote": True,
                 "handles_personal_vote": True,
                 "handles_vote_weight": False,

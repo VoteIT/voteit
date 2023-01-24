@@ -87,6 +87,7 @@ class ElectoralRegisterPolicy(ABC):
     """
 
     logger = logger
+    available: bool = True  # Is this manually selectable?
     handles_group_vote = False
     handles_personal_vote = True
 
