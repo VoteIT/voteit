@@ -213,9 +213,7 @@ class GroupVoteElectoralRegisterPolicy(ElectoralRegisterPolicy, ABC):
         Use random distribution for left-overs.
         """
         counter = Counter()
-        groups_qs = self.meeting.groups.filter(
-            votes__isnull=False, votes__gt=0
-        ).prefetch_related("members")
+        groups_qs = self.meeting.groups.filter(votes__gt=0).prefetch_related("members")
         potential_voters_pks = self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
         for group in groups_qs:
             group: MeetingGroup
