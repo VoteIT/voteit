@@ -148,10 +148,10 @@ class MeetingDetailSerializerTests(TestCase):
     def test_installed_dialects(self):
         request = self._mk_request(self.moderator)
         serializer = self._cut(self.meeting, context={"request": request})
-        self.assertEqual(None, serializer.data["installed_dialects"])
+        self.assertEqual(None, serializer.data["installed_dialect"])
         self.meeting.installed_dialects = "hey,ho"
         serializer = self._cut(self.meeting, context={"request": request})
-        self.assertEqual(["hey", "ho"], serializer.data["installed_dialects"])
+        self.assertEqual("ho", serializer.data["installed_dialect"])
 
 
 class MeetingRolesSerializerTests(TestCase):

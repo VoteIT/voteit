@@ -125,7 +125,7 @@ class CreateMeetingSerializer(BaseModelSerializer):
 
 
 class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
-    installed_dialects = serializers.SerializerMethodField()
+    installed_dialect = serializers.SerializerMethodField()
 
     class Meta:
         model = Meeting
@@ -137,7 +137,7 @@ class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
             "organisation",
             "current_user_roles",
             "public",
-            "installed_dialects",
+            "installed_dialect",
             "group_roles_active",
             "group_votes_active",
         ]
@@ -159,9 +159,13 @@ class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
             )
         return value
 
-    def get_installed_dialects(self, instance: Meeting):
+    def get_installed_dialect(self, instance: Meeting) -> str | None:
+        """
+        If a dialect is installed:
+        Returns installed dialect name, which is the last one in the chain.
+        """
         if instance.installed_dialects:
-            return instance.installed_dialects.split(",")
+            return instance.installed_dialects.split(",")[-1]
 
 
 class AgendaOrderSerializer(serializers.Serializer):
