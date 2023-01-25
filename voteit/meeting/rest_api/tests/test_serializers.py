@@ -100,6 +100,13 @@ class CreateMeetingSerializerTests(TestCase):
         serializer.is_valid()
         self.assertIn("install_dialect", serializer.errors)
 
+    def test_create_emtpy_er_name(self):
+        serializer = self._mk_one(er_policy_name="")
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.save()
+        self.assertIsNone(instance.er_policy_name)
+
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
 class MeetingDetailSerializerTests(TestCase):
