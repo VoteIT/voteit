@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
+from contextlib import suppress
 from itertools import chain
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -9,6 +10,8 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django_fsm import FSMField
+from pydantic import BaseModel
+
 from dolly.core import LiveCloner
 from dolly.utils import get_inf_collector
 from dolly.utils import get_model_formatted_dict
@@ -209,6 +212,46 @@ def recursive_load_handlers(
             req, loaded_names=loaded_names, named_paths=named_paths, handlers=handlers
         )
     return handlers
+
+
+def _get_schema_list_items(schema_cls: type[BaseModel]) -> set[str]:
+    return {
+        k
+        for k, v in schema_cls.schema()["properties"].items()
+        if v.get("type") == "array"
+    }
+
+
+_dialect_schema_list_items = _get_schema_list_items(DialectSchema)
+
+
+def get_merged_dialect_data(only=None) -> dict[str, dict]:
+    """
+    Any installable dialects that require other non-installable should contain
+    that data too, so frontend only has to care about the specific dialect in question.
+    """
+    # FIXME: This may need to be cached
+
+    dialect_handlers = {}
+    named_paths = get_named_path_dict()
+    for name in named_paths:
+        if only and name != only:
+            continue
+        handlers = recursive_load_handlers(name, named_paths=named_paths)
+        if handlers[-1].data.installable or name == only:
+            # merge data
+            data = {}
+            for handler in handlers:
+                handler_data = handler.data.dict(exclude_none=True)
+                for k in _dialect_schema_list_items:
+                    items = handler_data.pop(k, None)
+                    if items:
+                        if k not in data:
+                            data[k] = []
+                        data[k].extend(i for i in items if i not in data[k])
+                data.update(handler_data)
+            dialect_handlers[name] = data
+    return dialect_handlers
 
 
 class DialectHandler:

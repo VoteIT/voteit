@@ -101,6 +101,7 @@ class CreateMeetingSerializerTests(TestCase):
         self.assertIn("install_dialect", serializer.errors)
 
 
+@override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
 class MeetingDetailSerializerTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -145,13 +146,24 @@ class MeetingDetailSerializerTests(TestCase):
         serializer.is_valid()
         self.assertIn("er_policy_name", serializer.errors)
 
-    def test_installed_dialects(self):
+    def test_installed_dialect(self):
         request = self._mk_request(self.moderator)
         serializer = self._cut(self.meeting, context={"request": request})
         self.assertEqual(None, serializer.data["installed_dialect"])
-        self.meeting.installed_dialects = "hey,ho"
+        self.meeting.installed_dialects = "two,three"
         serializer = self._cut(self.meeting, context={"request": request})
-        self.assertEqual("ho", serializer.data["installed_dialect"])
+        self.assertEqual("three", serializer.data["installed_dialect"])
+        self.assertEqual(
+            {
+                "description": "",
+                "group_roles_active": True,
+                "installable": True,
+                "name": "three",
+                "requires": ["one", "two"],
+                "title": "three",
+            },
+            serializer.data["dialect"],
+        )
 
 
 class MeetingRolesSerializerTests(TestCase):

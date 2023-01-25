@@ -20,6 +20,7 @@ from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
+from voteit.meeting.utils import get_merged_dialect_data
 from voteit.meeting.utils import recursive_load_handlers
 from voteit.poll.utils import get_electoral_policy_registry
 
@@ -132,6 +133,7 @@ class CreateMeetingSerializer(BaseModelSerializer):
 
 class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
     installed_dialect = serializers.SerializerMethodField()
+    dialect = serializers.SerializerMethodField()
 
     class Meta:
         model = Meeting
@@ -144,6 +146,7 @@ class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
             "current_user_roles",
             "public",
             "installed_dialect",
+            "dialect",
             "group_roles_active",
             "group_votes_active",
         ]
@@ -172,6 +175,13 @@ class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
         """
         if instance.installed_dialects:
             return instance.installed_dialects.split(",")[-1]
+
+    def get_dialect(self, instance: Meeting) -> dict | None:
+        installed = self.get_installed_dialect(instance)
+        if installed:
+            # May cause key error if something's wrong. We'll probably want that.
+            data = get_merged_dialect_data(installed)
+            return data[installed]
 
 
 class AgendaOrderSerializer(serializers.Serializer):

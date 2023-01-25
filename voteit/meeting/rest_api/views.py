@@ -1,5 +1,4 @@
 import csv
-from contextlib import suppress
 
 from django.db import transaction
 from django.db.models import QuerySet
@@ -20,7 +19,6 @@ from rest_framework.response import Response
 from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
-from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.meeting import roles
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
@@ -30,8 +28,7 @@ from voteit.meeting.permissions import MeetingGroupPermissions
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.rest_api import serializers
 from voteit.meeting.rest_api.filters import MeetingRolesFilter
-from voteit.meeting.utils import get_named_path_dict
-from voteit.meeting.utils import load_dialect_file
+from voteit.meeting.utils import get_merged_dialect_data
 from voteit.organisation.models import Organisation
 
 __all__ = (
@@ -284,10 +281,7 @@ class MeetingDialectsViewSet(viewsets.ViewSet):
     """
 
     def list(self, request, *args, **kwargs):
-        result = []
-        for name, path in get_named_path_dict().items():
-            with suppress(TypeError, ValueError):
-                handler = load_dialect_file(name, path)
-                result.append(handler.data.dict(exclude_none=True))
-        result.sort(key=lambda x: x["name"])
+        result = sorted(
+            [v for k, v in get_merged_dialect_data().items()], key=lambda v: v["name"]
+        )
         return Response(data=result)
