@@ -287,6 +287,8 @@ class GroupMembershipViewSetTests(APITestCase):
         cls.participant = User.objects.get(username="participant")
         cls.anon = User.objects.create(username="anon")
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.meeting.group_roles_active = True
+        cls.meeting.save()
         cls.meeting_group: MeetingGroup = MeetingGroup.objects.create(
             meeting=cls.meeting
         )
@@ -378,6 +380,24 @@ class GroupMembershipViewSetTests(APITestCase):
         response = self.client.delete(url)
         self.assertEqual(403, response.status_code)
 
+    def test_create_with_roles_disabled(self):
+        self.membership.delete()
+        self.meeting.group_roles_active = False
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        url = reverse("group-memberships-list")
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            url,
+            data={
+                "role": self.role.pk,
+                "user": self.moderator.pk,
+                "meeting_group": self.meeting_group.pk,
+            },
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("role", response.json())
+
     def test_create_delegates_to_signal(self):
         self.membership.delete()
         L = []
@@ -443,6 +463,18 @@ class GroupMembershipViewSetTests(APITestCase):
         response = self.client.patch(url, data={"role": self.role.pk})
         self.assertEqual(200, response.status_code)
         self.assertEqual([], L)
+
+    def test_patch_add_role_with_meeting_roles_disabled(self):
+        self.membership.role = None
+        self.membership.save()
+        self.meeting.group_roles_active = False
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        url = reverse("group-memberships-detail", kwargs={"pk": self.membership.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"role": self.role.pk})
+        self.assertEqual(400, response.status_code)
+        self.assertIn("role", response.json())
 
     def test_delete_delegates_to_signal(self):
         L = []

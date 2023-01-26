@@ -129,6 +129,7 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 class MeetingGroupViewSet(DefaultModelViewSet):
     model = MeetingGroup
     serializer_class = serializers.MeetingGroupSerializer
+    serializer_classes = {"create": serializers.CreateMeetingGroupSerializer}
     context_lookup_kwarg: str = "meeting"
 
     @property

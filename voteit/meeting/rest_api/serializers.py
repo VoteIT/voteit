@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
+from logging import getLogger
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -38,6 +39,8 @@ __all__ = (
     "GroupMembershipSerializer",
     "ParticipantExportSerializer",
 )
+
+logger = getLogger(__name__)
 
 
 class UserRolesMixin(serializers.Serializer):
@@ -181,7 +184,14 @@ class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
         if installed:
             # May cause key error if something's wrong. We'll probably want that.
             data = get_merged_dialect_data(installed)
-            return data[installed]
+            try:
+                return data[installed]
+            except KeyError:
+                logger.error(
+                    "Installed meeting dialect %s doesn't exist. Meeting pk: %s",
+                    installed,
+                    instance.pk,
+                )
 
 
 class AgendaOrderSerializer(serializers.Serializer):
@@ -217,7 +227,7 @@ class RoleSerializer(serializers.Serializer):
     )
 
 
-class MeetingGroupSerializer(BaseModelSerializer):
+class CreateMeetingGroupSerializer(BaseModelSerializer):
     pk = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -227,6 +237,21 @@ class MeetingGroupSerializer(BaseModelSerializer):
             "members",
             "mentions",
         )
+
+
+class MeetingGroupSerializer(CreateMeetingGroupSerializer):
+    pk = serializers.IntegerField(read_only=True)
+
+    class Meta(CreateMeetingGroupSerializer.Meta):
+        exclude = (
+            "id",
+            "members",
+            "mentions",
+        )
+        read_only_fields = [
+            "meeting",
+            "groupid",
+        ]
 
 
 class GroupRoleSerializer(BaseModelSerializer):
@@ -241,6 +266,8 @@ class GroupRoleSerializer(BaseModelSerializer):
 
 
 class CreateGroupMembershipSerializer(serializers.ModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = GroupMembership
         exclude = ("id",)
@@ -255,16 +282,21 @@ class CreateGroupMembershipSerializer(serializers.ModelSerializer):
                 meeting = self.instance.meeting
             else:
                 meeting = attrs.get("meeting_group").meeting
+            if not meeting.group_roles_active:
+                raise ValidationError(
+                    {
+                        "role": "'group_roles_active' not set on meeting - no roles can be added to users in groups"
+                    }
+                )
+
             if role.meeting != meeting:
                 raise ValidationError({"role": "Role doesn't exist in this meeting"})
         return attrs
 
 
 class GroupMembershipSerializer(CreateGroupMembershipSerializer):
-    pk = serializers.IntegerField(read_only=True)
-
     class Meta(CreateGroupMembershipSerializer.Meta):
-        read_only_fields = ["meeting_group", "user"]
+        read_only_fields = ["meeting_group", "user", "pk"]
 
 
 class ParticipantExportSerializer(serializers.ModelSerializer):
