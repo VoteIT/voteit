@@ -237,3 +237,18 @@ def validate_related_proposals(
                 raise IntegrityError(
                     f"Proposals with pk {alien_prop_pks} aren't part of the same meeting"
                 )
+
+
+@receiver(post_save, sender=Vote)
+@disable_on_raw_save
+def vote_added(instance=None, created=None, **kw):
+    # We don't have to count updated votes!
+    if created:
+        poll = instance.poll
+        msg = PollStatus(
+            pk=poll.pk,
+            voted=poll.votes.count(),
+            total=poll.electoral_register.voters.count(),
+        )
+        ch = PollChannel.from_instance(poll)
+        ch.sync_publish(msg)
