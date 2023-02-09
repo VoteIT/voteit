@@ -323,15 +323,17 @@ class ElectoralRegisterPolicyViewSetTests(APITestCase):
         self.assertEqual(200, response.status_code)
         data = response.json()
         data = sorted(data, key=lambda x: x["name"])
+        first = data[0]
+        self.assertTrue(first.pop("description"))
         self.assertEqual(
             {
-                "description": "",
                 "available": True,
+                "allow_manual": True,
                 "handles_group_vote": True,
                 "handles_personal_vote": True,
                 "handles_vote_weight": False,
                 "name": "active_check",
-                "title": "Active users set when poll starts",
+                "title": "Active check",
             },
-            data[0],
+            first,
         )

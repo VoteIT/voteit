@@ -27,8 +27,13 @@ class ActiveCheckPolicy(GroupVoteElectoralRegisterPolicy):
     """
 
     name = "active_check"
-    title = _("Active users set when poll starts")
+    title = _("Active check")
+    description = _(
+        "All users who're registered as active and have the potential voter role will be added when a poll starts. "
+        "If group voting is used, the votes will be equally distributed among the active members of that group."
+    )
     logger = logger
+    allow_manual = True
     handles_vote_weight = False
     handles_personal_vote = True
 

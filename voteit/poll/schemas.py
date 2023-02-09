@@ -92,6 +92,7 @@ class ElectoralRegistryPolicySchema(BaseModel):
     title: str
     description: str = ""
     available: bool = True
+    allow_manual: bool = False
     handles_personal_vote: bool
     handles_group_vote: bool
     handles_vote_weight: bool

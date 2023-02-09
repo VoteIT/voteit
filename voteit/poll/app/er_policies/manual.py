@@ -18,7 +18,11 @@ class Manual(ElectoralRegisterPolicy):
 
     name = "manual"
     title = _("Manual only")
+    description = _(
+        "No electoral registers will be created at all, you have to do it yourself!"
+    )
     logger = logger
+    allow_manual = True
     handles_vote_weight = True
     handles_personal_vote = True
 

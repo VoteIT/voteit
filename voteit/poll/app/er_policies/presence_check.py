@@ -25,7 +25,12 @@ class PresenceCheckPolicy(GroupVoteElectoralRegisterPolicy):
 
     name = "presence_check"
     title = _("Closing a presence check will set a new electoral register.")
+    description = _(
+        "Any user who's both present and has the potential voter role will be added to the electoral register. "
+        "If group votes is activated, the votes will be distributed equally between present members."
+    )
     logger = logger
+    allow_manual = True
     handles_vote_weight = False
     handles_personal_vote = True
 

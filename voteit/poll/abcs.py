@@ -87,9 +87,12 @@ class ElectoralRegisterPolicy(ABC):
     """
 
     logger = logger
+    description: str = ""
     available: bool = True  # Is this manually selectable?
-    handles_group_vote = False
-    handles_personal_vote = True
+    handles_group_vote: bool = False
+    handles_personal_vote: bool = True
+    # Is this OK to use together with a manual selection of voters?
+    allow_manual: bool = False
 
     def __init__(self, meeting: Meeting):
         self.meeting = meeting

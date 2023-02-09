@@ -28,7 +28,11 @@ class AutoAlways(ElectoralRegisterPolicy):
     """
 
     name = "auto_always"
-    title = _("Demo meeting: Always update electoral register")
+    title = _("Always update and replace electoral register")
+    description = _(
+        "This method will always create a new electoral register when potential voters change. "
+        "It will even change electoral register for ongoing polls, so use this with caution!"
+    )
     handles_vote_weight = False
     handles_personal_vote = True
     logger = logger

@@ -23,6 +23,9 @@ class AutoBeforePoll(GroupVoteElectoralRegisterPolicy):
 
     name = "auto_before_poll"
     title = _("Automatic before poll")
+    description = _(
+        "Any users with potential voter status will be added to the electoral register when a poll starts."
+    )
     logger = logger
     handles_vote_weight = False
     handles_personal_vote = True
