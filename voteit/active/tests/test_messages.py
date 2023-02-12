@@ -1,9 +1,6 @@
-from unittest.mock import patch
-
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.messages.channels import Subscribe
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
 

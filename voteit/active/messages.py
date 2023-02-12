@@ -83,6 +83,7 @@ class SetActive(ContextAction):
 
 
 class ActiveUserChangedSchema(BaseModel):
+    meeting: int
     user: int
     active: bool
 
@@ -95,6 +96,7 @@ class ActiveUserChanged(Message):
 
 
 class ActiveUsersSchema(BaseModel):
+    meeting: int
     users: list[int]
 
 

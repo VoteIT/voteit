@@ -21,14 +21,16 @@ from voteit.meeting.models import Meeting
 def send_active_users_appstruct(context: Meeting, app_state: AppState, **kwargs):
     if active_enabled_for_meeting(context.meeting):
         users = list(context.active_users.values_list("user_id", flat=True))
-        msg = ActiveUsers(users=users)
+        msg = ActiveUsers(users=users, meeting=context.pk)
         app_state.append(msg)
 
 
 def _send_active_user(*, instance: ActiveUser, active: bool):
     with suppress(ObjectDoesNotExist):
         ch = MeetingChannel.from_instance(instance.meeting)
-        msg = ActiveUserChanged(user=instance.user_id, active=active)
+        msg = ActiveUserChanged(
+            user=instance.user_id, active=active, meeting=instance.meeting.pk
+        )
         ch.sync_publish(msg)
 
 

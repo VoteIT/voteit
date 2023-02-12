@@ -47,6 +47,7 @@ class SignalsTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ActiveUserChanged)
         self.assertEqual(msg.data.user, self.participant.pk)
+        self.assertEqual(msg.data.meeting, self.meeting.pk)
         self.assertTrue(msg.data.active)
         mock_publish.reset_mock()
         obj.delete()
@@ -54,6 +55,7 @@ class SignalsTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ActiveUserChanged)
         self.assertEqual(msg.data.user, self.participant.pk)
+        self.assertEqual(msg.data.meeting, self.meeting.pk)
         self.assertFalse(msg.data.active)
 
     def test_meeting_channel_subscribed(self):
