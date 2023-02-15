@@ -13,9 +13,6 @@ from envelope.utils import websocket_send
 from voteit.active.permissions import ActiveUserPermissions
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
-from voteit.messaging.base import AddedOrUpdatedSchema
-from voteit.messaging.base import BaseObjectAdded
-from voteit.messaging.base import BaseObjectDeleted
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 
@@ -69,14 +66,10 @@ class SetActive(ContextAction):
                 # Set active
                 if not existing:
                     meeting.active_users.create(user_id=self.data.user)
-                else:
-                    raise BadRequestError.from_message(self, msg="User already active")
             else:
                 # Remove active
                 if existing is not None:
                     existing.delete()
-                else:
-                    raise BadRequestError.from_message(self, msg="User isn't active")
         response = Status.from_message(self)
         websocket_send(response, state=self.SUCCESS)
         return response

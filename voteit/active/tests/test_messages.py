@@ -88,18 +88,6 @@ class SetActiveTests(TestCase):
             msg.run_job()
         self.assertEqual("active.change_activeuser", cm.exception.data.permission)
 
-    def test_already_not_active(self):
-        msg = self._mk_msg(self.moderator, active=False)
-        with self.assertRaises(BadRequestError) as cm:
-            msg.run_job()
-        self.assertEqual("User isn't active", cm.exception.data.msg)
-
-    def test_already_active(self):
-        msg = self._mk_msg(self.moderator, active=True, user=self.active_user)
-        with self.assertRaises(BadRequestError) as cm:
-            msg.run_job()
-        self.assertEqual("User already active", cm.exception.data.msg)
-
     def test_remove_active(self):
         msg = self._mk_msg(self.moderator, active=False, user=self.active_user)
         msg.run_job()
