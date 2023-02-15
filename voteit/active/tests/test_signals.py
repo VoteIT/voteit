@@ -25,13 +25,13 @@ class SignalsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.participant = User.objects.create(username="participant")
-        cls.active = User.objects.create(username="active")
+        cls.active_user = User.objects.create(username="active")
         cls.meeting: Meeting = Meeting.objects.create()
         cls.component = cls.meeting.components.create(
             component_name=ActiveUsersComponent.name, state=EnabledWf.ON
         )
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
-        cls.active = cls.meeting.active_users.create(user=cls.active)
+        cls.active = cls.meeting.active_users.create(user=cls.active_user)
 
     def _mk_msg(self):
         return Subscribe(
@@ -73,3 +73,22 @@ class SignalsTests(TestCase):
         ch = MeetingChannel.from_instance(self.meeting)
         app_state = msg.get_app_state(ch)
         self.assertEqual([], [x for x in app_state if x["t"] == ActiveUsers.name])
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_enable_disable_component(self, mock_publish):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.component.disable()
+            self.component.save()
+        messages = [x.args[0] for x in mock_publish.mock_calls]
+        self.assertEqual(1, len(messages))  # Deleted
+
+        mock_publish.reset_mock()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.component.enable()
+            self.component.save()
+
+        self.assertEqual(1, len(messages))  # Created
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, ActiveUsers)
+        self.assertEqual(msg.data.users, [self.active_user.pk])
+        self.assertEqual(msg.data.meeting, self.meeting.pk)
