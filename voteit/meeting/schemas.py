@@ -56,3 +56,4 @@ class DialectSchema(BaseModel):
     proposal_id_policy_name: str | None = None
     # restricts: list[str] = ()  FIXME: We should have a system for restrictions
     installable: bool = True  # Deprecated or a base template? Set this to false
+    view_components: dict[str, str] = {}
