@@ -30,6 +30,7 @@ class GroupVotesBeforePoll(GroupVoteElectoralRegisterPolicy):
     handles_vote_weight = True
     handles_personal_vote = False
     available = False
+    allow_trigger = True
 
     def get_voters(self, **kwargs) -> dict[int, int]:
         if self.meeting.group_votes_active:

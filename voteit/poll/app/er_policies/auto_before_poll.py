@@ -29,6 +29,7 @@ class AutoBeforePoll(GroupVoteElectoralRegisterPolicy):
     logger = logger
     handles_vote_weight = False
     handles_personal_vote = True
+    allow_trigger = True
 
     def get_voters(self, **kwargs) -> dict[int, int]:
         if self.meeting.group_votes_active:

@@ -93,6 +93,8 @@ class ElectoralRegisterPolicy(ABC):
     handles_personal_vote: bool = True
     # Is this OK to use together with a manual selection of voters?
     allow_manual: bool = False
+    # Can this method be triggered whenever the moderator likes? (In advance of polls for instance)
+    allow_trigger: bool = False
 
     def __init__(self, meeting: Meeting):
         self.meeting = meeting

@@ -3,8 +3,15 @@ from django.test import TestCase
 from django.test import override_settings
 from pydantic import ValidationError
 
+from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
+
+from voteit.meeting.models import Meeting
+from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
+from voteit.poll.app.er_policies.manual import Manual
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
 
 _channel_layers_setting = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
@@ -20,12 +27,11 @@ class AddVoteTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-
-        cls.er = ElectoralRegister.objects.create()
+        cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter = cls.er.voters.create(username="voter")
-        cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="simple")
+        cls.poll: Poll = Poll.objects.create(
+            electoral_register=cls.er, method_name="simple"
+        )
         cls.poll.proposals.create()
         cls.poll.upcoming()
         cls.poll.save()
@@ -78,12 +84,11 @@ class AddVoteTests(TestCase):
 class AbstainTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-
-        cls.er = ElectoralRegister.objects.create()
+        cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter = cls.er.voters.create(username="voter")
-        cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="simple")
+        cls.poll: Poll = Poll.objects.create(
+            electoral_register=cls.er, method_name="simple"
+        )
         cls.poll.proposals.create()
         cls.poll.upcoming()
         cls.poll.ongoing()
@@ -127,12 +132,11 @@ class ChangeVoteTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-
-        cls.er = ElectoralRegister.objects.create()
+        cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter = cls.er.voters.create(username="voter")
-        cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="simple")
+        cls.poll: Poll = Poll.objects.create(
+            electoral_register=cls.er, method_name="simple"
+        )
         cls.poll.proposals.create()
         cls.poll.upcoming()
         cls.poll.ongoing()
@@ -169,10 +173,8 @@ class ManualCreateERTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
-        cls.meeting.er_policy_name = "manual"
+        cls.meeting.er_policy_name = Manual.name
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
         cls.meeting.add_roles(cls.participant, "potential_voter")
@@ -239,3 +241,60 @@ class ManualCreateERTests(TestCase):
             ],
         )
         self.assertRaises(ValidationError, msg.run_job)
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class TriggerCreateERTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.meeting.er_policy_name = AutoBeforePoll.name
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.meeting.add_roles(cls.participant, "potential_voter")
+
+    @property
+    def _cut(self):
+        from voteit.poll.messages import TriggerCreateER
+
+        return TriggerCreateER
+
+    def _mk_one(self, user, **kw):
+        kw.setdefault("meeting", self.meeting.pk)
+        return self._cut(
+            mm={"user_pk": user.pk, "consumer_name": "abc", "id": "1"}, **kw
+        )
+
+    def test_actor_moderator(self):
+        msg = self._mk_one(self.moderator)
+        response = msg.run_job()
+        self.assertEqual(1, self.meeting.electoral_registers.count())
+        self.assertEqual(
+            ["participant"],
+            list(self.meeting.latest_er.voters.values_list("username", flat=True)),
+        )
+        self.assertEqual("1", response.mm.id)
+
+    def test_actor_participant(self):
+        msg = self._mk_one(self.participant)
+        self.assertRaises(UnauthorizedError, msg.run_job)
+
+    def test_no_valid_policy(self):
+        self.meeting.er_policy_name = None
+        self.meeting.save()
+        msg = self._mk_one(self.moderator)
+        with self.assertRaises(BadRequestError) as cm:
+            msg.run_job()
+        self.assertIn("No valid electoral registry", str(cm.exception.data.msg))
+
+    def test_trigger_not_allowed(self):
+        self.meeting.er_policy_name = Manual.name
+        self.meeting.save()
+        msg = self._mk_one(self.moderator)
+        with self.assertRaises(BadRequestError) as cm:
+            msg.run_job()
+        self.assertIn(
+            "Electoral register can't be triggered this way", str(cm.exception.data.msg)
+        )

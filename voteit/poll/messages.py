@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from abc import ABC
 
-from pydantic import validator
+from auditlog.context import set_actor
 from pydantic.main import BaseModel
 
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.messages.errors import ValidationErrorMsg
+from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
@@ -24,7 +25,6 @@ from voteit.poll.permissions import ElectoralRegisterPermissions
 from voteit.poll.permissions import VotePermissions
 from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.schemas import AddedVoteSchema
-from voteit.poll.schemas import VoterWeightSchema
 from voteit.poll.schemas import VotersWeightsSchema
 
 
@@ -180,5 +180,50 @@ class ManualCreateER(ContextAction):
         manual_er = Manual(self.context)
         manual_er.create_er(weight_dict=weight_dict)  # Only creates if needed
         msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
+        return msg
+
+
+class TriggerERResponseSchema(BaseModel):
+    created: bool
+
+
+@outgoing
+class TriggerERResponse(Message):
+    name = "er.trigger_response"
+    schema = TriggerERResponseSchema
+    data: TriggerERResponseSchema
+
+
+class TriggerCreateERSchema(BaseModel):
+    meeting: int
+
+
+@incoming
+class TriggerCreateER(ContextAction):
+    """
+    Manually trigger creation of an ER for automatic methods.
+    """
+
+    name = "er.trigger_create"
+    schema = TriggerCreateERSchema
+    data: TriggerCreateERSchema
+    model = Meeting
+    context_schema_attr = "meeting"
+    permission = ElectoralRegisterPermissions.ADD
+
+    def run_job(self) -> TriggerERResponse:
+        meeting: Meeting = self.context
+        if not meeting.valid_er_policy_guard():
+            raise BadRequestError.from_message(self, msg="No valid electoral registry")
+        if not meeting.er_policy.allow_trigger:
+            raise BadRequestError.from_message(
+                self, msg="Electoral register can't be triggered this way"
+            )
+        self.assert_perm()
+        latest_er = meeting.latest_er
+        with set_actor(self.user):
+            created = latest_er == meeting.er_policy.create_er()
+        msg = TriggerERResponse.from_message(self, created=created)
         websocket_send(msg, state=msg.SUCCESS)
         return msg
