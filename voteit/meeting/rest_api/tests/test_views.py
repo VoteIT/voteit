@@ -671,6 +671,7 @@ class MeetingDialectsViewSetTests(APITestCase):
                     "name": "three",
                     "installable": True,
                     "group_roles_active": True,
+                    "view_components": {},
                 },
                 {
                     "requires": ["one"],
@@ -679,6 +680,7 @@ class MeetingDialectsViewSetTests(APITestCase):
                     "name": "two",
                     "installable": True,
                     "group_roles_active": True,
+                    "view_components": {},
                 },
             ],
             data,

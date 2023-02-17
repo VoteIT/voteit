@@ -168,6 +168,7 @@ class MeetingDetailSerializerTests(TestCase):
                 "name": "three",
                 "requires": ["one", "two"],
                 "title": "three",
+                "view_components": {},
             },
             serializer.data["dialect"],
         )

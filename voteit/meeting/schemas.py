@@ -36,7 +36,7 @@ class DialectSchema(BaseModel):
     DialectSchema(requires=(), title='Test', description='', name='test', roles=[GroupRoleSchema(title='Supervisor', \
     role_id='supervisor', roles=['discusser', 'proposer'], can_propose_as=False, can_discuss_as=False)],\
     groups=[GroupSchema(title='Board', groupid='board')], er_policy_name='auto_before_poll', \
-    group_votes_active=True, group_roles_active=True, proposal_id_policy_name=None, installable=True)
+    group_votes_active=True, group_roles_active=True, proposal_id_policy_name=None, installable=True, view_components={})
     >>> data['roles'] = [{'title': 'Bad', 'roles': ['boho']}]
     >>> DialectSchema(**data)
     Traceback (most recent call last):
