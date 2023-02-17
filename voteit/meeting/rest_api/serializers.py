@@ -19,6 +19,7 @@ from voteit.meeting.rest_api.validators import RoleValidator
 from voteit.meeting.rest_api.validators import validate_dialect_installable
 from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.utils import get_merged_dialect_data
@@ -276,12 +277,14 @@ class CreateGroupMembershipSerializer(serializers.ModelSerializer):
         """
         Make sure role (if it exists) is attached to same meeting as meeting_group
         """
+        meeting = attrs["meeting_group"].meeting
+        user = attrs["user"]
+        if not meeting.has_roles(user, ROLE_PARTICIPANT):
+            raise ValidationError(
+                {"user": "No user with that ID exist in this meeting"}
+            )
         role = attrs.get("role", None)
         if role:
-            if self.instance:
-                meeting = self.instance.meeting
-            else:
-                meeting = attrs.get("meeting_group").meeting
             if not meeting.group_roles_active:
                 raise ValidationError(
                     {
@@ -294,9 +297,23 @@ class CreateGroupMembershipSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class GroupMembershipSerializer(CreateGroupMembershipSerializer):
-    class Meta(CreateGroupMembershipSerializer.Meta):
+class GroupMembershipSerializer(serializers.ModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = GroupMembership
+        exclude = ("id",)
         read_only_fields = ["meeting_group", "user", "pk"]
+
+    def validate_role(self, value):
+        if value:
+            if not self.instance.meeting.group_roles_active:
+                raise ValidationError(
+                    "'group_roles_active' not set on meeting - no roles can be added to users in groups"
+                )
+            if value.meeting != self.instance.meeting:
+                raise ValidationError("Role doesn't exist in this meeting")
+        return value
 
 
 class ParticipantExportSerializer(serializers.ModelSerializer):

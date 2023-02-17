@@ -300,28 +300,27 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         instance = serializer.save()
         self.assertIsInstance(instance, GroupMembership)
 
-    def test_group_membership_create_not_same_meeting(self):
+    def test_group_membership_create_role_not_same_meeting(self):
         new_meeting = Meeting.objects.create()
-        new_group = new_meeting.groups.create(title="New group", groupid="thenew")
+        new_role = new_meeting.group_roles.create(title="New role", role_id="thenew")
         serializer = CreateGroupMembershipSerializer(
             data={
-                "meeting_group": new_group.pk,
+                "meeting_group": self.plebei_hangout.pk,
                 "user": self.moderator.pk,
-                "role": self.group_role.pk,
+                "role": new_role.pk,
             },
             context={"request": self._mk_request(self.moderator)},
         )
         serializer.is_valid()
         self.assertIn("role", serializer.errors)
 
-    def test_group_membership_patch_not_same_meeting(self):
+    def test_group_membership_patch_role_not_same_meeting(self):
         new_meeting = Meeting.objects.create()
-        new_group = new_meeting.groups.create(title="New group", groupid="thenew")
+        new_role = new_meeting.group_roles.create(title="New role", role_id="thenew")
         serializer = CreateGroupMembershipSerializer(
             data={
-                "meeting_group": new_group.pk,
+                "meeting_group": self.plebei_hangout.pk,
                 "user": self.moderator.pk,
-                # "role": self.group_role.pk,
             },
             context={"request": self._mk_request(self.moderator)},
         )
@@ -329,11 +328,22 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         instance = serializer.save()
         serializer = GroupMembershipSerializer(
             instance,
-            data={
-                "role": self.group_role.pk,
-            },
+            data={"role": new_role.pk},
             context={"request": self._mk_request(self.moderator)},
             partial=True,
         )
         serializer.is_valid()
         self.assertIn("role", serializer.errors)
+
+    def test_group_membership_create_user_not_same_meeting(self):
+        new_meeting = Meeting.objects.create()
+        new_group = new_meeting.groups.create(title="New group", groupid="thenew")
+        serializer = CreateGroupMembershipSerializer(
+            data={
+                "meeting_group": new_group.pk,
+                "user": self.moderator.pk,
+            },
+            context={"request": self._mk_request(self.moderator)},
+        )
+        serializer.is_valid()
+        self.assertIn("user", serializer.errors)
