@@ -523,6 +523,15 @@ class GroupMembership(MeetingContext):
         verbose_name="Vote weight delegated", null=True, blank=True
     )
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "meeting_group"], name="unique_user_in_meeting_group"
+            ),
+        ]
+        verbose_name = "Group membership"
+        verbose_name_plural = "Group memberships"
+
     @property
     def meeting(self) -> Meeting:
         return self.meeting_group.meeting
