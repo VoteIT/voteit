@@ -34,7 +34,7 @@ class ActiveCheckPolicy(GroupVoteElectoralRegisterPolicy):
     )
     logger = logger
     allow_manual = True
-    handles_vote_weight = False
+    handles_vote_weight = True
     handles_personal_vote = True
 
     def get_voters(self, **kwargs) -> dict[int, int]:
