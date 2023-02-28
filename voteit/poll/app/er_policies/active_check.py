@@ -33,7 +33,7 @@ class ActiveCheckPolicy(GroupVoteElectoralRegisterPolicy):
         "If group voting is used, the votes will be equally distributed among the active members of that group."
     )
     logger = logger
-    allow_manual = True
+    allow_trigger = True
     handles_vote_weight = True
     handles_personal_vote = True
 
