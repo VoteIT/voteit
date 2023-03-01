@@ -33,7 +33,12 @@ class GroupVotesBeforePoll(GroupVoteElectoralRegisterPolicy):
     """
 
     name = "gv_auto_before_p"
-    title = _("Group votes automatic before poll")
+    title = _("Group votes")
+    description = _(
+        "Groups have a total vote count which can be distributed among members "
+        "that have the potential voter role. "
+        "New electoral registers will be created whenever a poll starts if needed."
+    )
     logger = logger
     handles_vote_weight = True
     handles_personal_vote = False
