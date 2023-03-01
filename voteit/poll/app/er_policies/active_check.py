@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.abcs import GroupVoteElectoralRegisterPolicy
+from voteit.poll.exceptions import ElectoralRegisterError
 from voteit.poll.registries import er_policy
 
 if TYPE_CHECKING:
@@ -40,8 +41,7 @@ class ActiveCheckPolicy(GroupVoteElectoralRegisterPolicy):
     def get_voters(self, **kwargs) -> dict[int, int]:
         potential_voters = self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
         if potential_voters is None:  # pragma: no cover
-            # FIXME: What kind of exception should we use here?
-            raise Exception("Not a single eligible voter")
+            raise ElectoralRegisterError("Not a single eligible voter")
         users_qs = User.objects.filter(pk__in=potential_voters).filter(
             pk__in=self.meeting.active_users.values_list("user_id", flat=True)
         )
