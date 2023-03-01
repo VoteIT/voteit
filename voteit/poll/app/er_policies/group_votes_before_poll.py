@@ -33,7 +33,7 @@ class GroupVotesBeforePoll(GroupVoteElectoralRegisterPolicy):
     """
 
     name = "gv_auto_before_p"
-    title = _("Group votes")
+    title = _("Votes from groups")
     description = _(
         "Groups have a total vote count which can be distributed among members "
         "that have the potential voter role. "

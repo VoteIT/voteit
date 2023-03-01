@@ -28,7 +28,7 @@ class AutoAlways(ElectoralRegisterPolicy):
     """
 
     name = "auto_always"
-    title = _("Always update and replace electoral register")
+    title = _("Automatic always")
     description = _(
         "This method will always create a new electoral register when potential voters change. "
         "It will even change electoral register for ongoing polls, so use this with caution!"

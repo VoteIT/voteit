@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-10-24 16:38+0200\n"
-"PO-Revision-Date: 2022-10-24 16:41+0200\n"
+"POT-Creation-Date: 2023-03-01 14:16+0100\n"
+"PO-Revision-Date: 2023-03-01 15:08+0100\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -16,55 +16,102 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 2.3\n"
+"X-Generator: Poedit 3.2.2\n"
 
-#: app/er_policies/auto_always.py:32
-msgid "Demo meeting: Always update electoral register"
-msgstr "Demomöte: Uppdatera alltid röstlängden"
+#: app/er_policies/active_check.py:30
+msgid "Active check"
+msgstr "Aktiv-koll"
 
-#: app/er_policies/auto_before_poll.py:26
+#: app/er_policies/active_check.py:32
+msgid ""
+"All users who're registered as active and have the potential voter role will "
+"be added when a poll starts. If group voting is used, the votes will be "
+"equally distributed among the active members of that group."
+msgstr ""
+
+#: app/er_policies/auto_always.py:31
+msgid "Automatic always"
+msgstr "Alltid automatisk"
+
+#: app/er_policies/auto_always.py:33
+msgid ""
+"This method will always create a new electoral register when potential "
+"voters change. It will even change electoral register for ongoing polls, so "
+"use this with caution!"
+msgstr ""
+
+#: app/er_policies/auto_before_poll.py:25
 msgid "Automatic before poll"
 msgstr "Automatiskt före omröstning"
 
-#: app/er_policies/manual.py:21
+#: app/er_policies/auto_before_poll.py:27
+msgid ""
+"Any users with potential voter status will be added to the electoral "
+"register when a poll starts."
+msgstr ""
+
+#: app/er_policies/group_votes_before_poll.py:36
+msgid "Votes from groups"
+msgstr "Röster från grupper"
+
+#: app/er_policies/group_votes_before_poll.py:38
+msgid ""
+"Groups have a total vote count which can be distributed among members that "
+"have the potential voter role. New electoral registers will be created "
+"whenever a poll starts if needed."
+msgstr ""
+
+#: app/er_policies/manual.py:20
 msgid "Manual only"
 msgstr "Bara manuellt"
+
+#: app/er_policies/manual.py:22
+msgid ""
+"No electoral registers will be created at all, you have to do it yourself!"
+msgstr ""
 
 #: app/er_policies/presence_check.py:27
 msgid "Closing a presence check will set a new electoral register."
 msgstr "En ny röstlängd skapas när en närvarokontroll avslutas."
 
-#: app/polls/combined_simple.py:26 app/polls/simple.py:22
+#: app/er_policies/presence_check.py:29
+msgid ""
+"Any user who's both present and has the potential voter role will be added "
+"to the electoral register. If group votes is activated, the votes will be "
+"distributed equally between present members."
+msgstr ""
+
+#: app/polls/combined_simple.py:23 app/polls/simple.py:22
 msgid "Yes"
 msgstr "Ja"
 
-#: app/polls/combined_simple.py:26 app/polls/simple.py:22
+#: app/polls/combined_simple.py:23 app/polls/simple.py:22
 msgid "No"
 msgstr "Nej"
 
-#: app/polls/combined_simple.py:26
+#: app/polls/combined_simple.py:23
 msgid "Abstain"
 msgstr "Avstå"
 
-#: app/polls/combined_simple.py:67
+#: app/polls/combined_simple.py:64
 msgid "Combined Simple"
 msgstr "Kombinerad enkel"
 
-#: app/polls/dutt.py:148 app/polls/dutt.py:160 app/polls/dutt.py:178
-#: app/polls/majority.py:131 app/polls/schulze.py:173
+#: app/polls/dutt.py:150 app/polls/dutt.py:162 app/polls/dutt.py:180
+#: app/polls/majority.py:130 app/polls/schulze.py:172
 #: app/polls/scottish_stv.py:161
 msgid "Invalid vote"
 msgstr "Ogiltig röst"
 
-#: app/polls/dutt.py:152
+#: app/polls/dutt.py:154
 msgid "Too few proposals picked"
 msgstr "För få förslag valda"
 
-#: app/polls/dutt.py:164
+#: app/polls/dutt.py:166
 msgid "Too many proposals picked"
 msgstr "För många förslag valda"
 
-#: app/polls/dutt.py:183 app/polls/schulze.py:178 app/polls/scottish_stv.py:166
+#: app/polls/dutt.py:185 app/polls/schulze.py:177 app/polls/scottish_stv.py:166
 #, python-format
 msgid "Invalid choice, the following proposals don't exist: %s"
 msgstr "Ogiltigt val, följande förslag existerar inte: %s"
@@ -82,19 +129,19 @@ msgstr "Metoden %(method)s kräver minst 3 förslag"
 msgid "Repeated Instant-Runoff Voting"
 msgstr "Repeterad Instant-Runoff Voting"
 
-#: app/polls/majority.py:68
+#: app/polls/majority.py:67
 msgid "Majority"
 msgstr "Majoritet"
 
-#: app/polls/majority.py:125
+#: app/polls/majority.py:124
 msgid "Must have at least 2 proposals"
 msgstr "Metoden %(method)s kräver minst 2 förslag"
 
-#: app/polls/schulze.py:74
+#: app/polls/schulze.py:73
 msgid "Schulze"
 msgstr "Schulze"
 
-#: app/polls/schulze.py:219
+#: app/polls/schulze.py:218
 msgid "Repeated Schulze"
 msgstr "Repeterad Schulze"
 
@@ -116,23 +163,23 @@ msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
 msgid "Simple"
 msgstr "Enkel"
 
-#: models.py:286
+#: models.py:287
 msgid "Invalid settings"
 msgstr "Ogiltiga inställningar"
 
-#: models.py:297
+#: models.py:298
 msgid "There's no electoral register or method to create it"
 msgstr "Det finns ingen röstlängd eller metod för att skapa en"
 
-#: models.py:309
+#: models.py:310
 msgid "Electoral register is empty - no voters"
 msgstr "Röstlängden är tom - inga röstande"
 
-#: models.py:314
+#: models.py:315
 msgid "No proposals, can't start poll"
 msgstr "Inga förslag, kan inte starta omröstningen"
 
-#: models.py:325
+#: models.py:326
 msgid ""
 "The electoral register would be empty if you start the poll now. Please "
 "check electoral register method."
@@ -140,58 +187,67 @@ msgstr ""
 "Röstlängden skulle vara tom om du startar en omröstning nu. Kontrollera "
 "metod för röstlängd."
 
-#: models.py:339
+#: models.py:340
 msgid "Poll method settings invalid"
 msgstr "Omröstningens inställningar är fel"
 
-#: models.py:364
+#: models.py:365
 msgid "Make upcoming"
 msgstr "Gör kommande"
 
-#: models.py:382
+#: models.py:383
 msgid "Start"
 msgstr "Starta"
 
-#: models.py:396
+#: models.py:397
 msgid "Close"
 msgstr "Stäng"
 
-#: models.py:411
+#: models.py:412
 msgid "Finish"
 msgstr "Avsluta"
 
-#: models.py:443
+#: models.py:444
 msgid "Cancel"
 msgstr "Avbryt"
 
-#: models.py:454
+#: models.py:455
 msgid "Revert to private"
 msgstr "Återgå till privat"
 
-#: models.py:464 workflows.py:19
+#: models.py:465 workflows.py:20
 msgid "Failed"
 msgstr "Misslyckades"
 
-#: workflows.py:13
+#: models.py:478 workflows.py:21
+msgid "No result"
+msgstr "Inget resultat"
+
+#: workflows.py:14
 msgid "Private"
 msgstr "Privat"
 
-#: workflows.py:14
+#: workflows.py:15
 msgid "Upcoming"
 msgstr "Kommande"
 
-#: workflows.py:15
+#: workflows.py:16
 msgid "Ongoing"
 msgstr "Pågående"
 
-#: workflows.py:16
+#: workflows.py:17
 msgid "Closed"
 msgstr "Stängd"
 
-#: workflows.py:17
+#: workflows.py:18
 msgid "Finished"
 msgstr "Avslutad"
 
-#: workflows.py:18
+#: workflows.py:19
 msgid "Canceled"
 msgstr "Avbruten"
+
+#, fuzzy
+#~| msgid "Demo meeting: Always update electoral register"
+#~ msgid "Always update and replace electoral register"
+#~ msgstr "Demomöte: Uppdatera alltid röstlängden"
