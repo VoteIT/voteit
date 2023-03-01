@@ -1,15 +1,23 @@
+from __future__ import annotations
 from collections import Counter
 from logging import getLogger
+from typing import TYPE_CHECKING
 
 from django.db.models import Sum
+from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 
+from voteit.core.signals import roles_removed
 from voteit.meeting.models import GroupMembership
+from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.abcs import GroupVoteElectoralRegisterPolicy
 from voteit.poll.exceptions import ElectoralRegisterError
 from voteit.poll.models import Poll
 from voteit.poll.registries import er_policy
+
+if TYPE_CHECKING:
+    from voteit.meeting.models import Meeting
 
 __all__ = ("GroupVotesBeforePoll",)
 logger = getLogger(__name__)
@@ -57,3 +65,15 @@ class GroupVotesBeforePoll(GroupVoteElectoralRegisterPolicy):
 
     def pre_apply(self, poll: Poll, target: str):
         self.create_er()  # Won't trigger unless needed
+
+
+@receiver(roles_removed, sender=MeetingRoles)
+def clear_gm_votes_when(instance: MeetingRoles, roles=(), **kw):
+    if ROLE_POTENTIAL_VOTER in roles:
+        meeting: Meeting = instance.context
+        if meeting.er_policy_name == GroupVotesBeforePoll.name:
+            for gm in GroupMembership.objects.filter(
+                votes__gt=0, user=instance.user, meeting_group__meeting=meeting
+            ):
+                gm.votes = None
+                gm.save()

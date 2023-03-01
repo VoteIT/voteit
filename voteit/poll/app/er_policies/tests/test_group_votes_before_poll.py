@@ -66,11 +66,16 @@ class GroupVotesBeforePollTests(TestCase):
     def test_new_er_on_upcoming(self):
         self.poll.upcoming()
         self.assertIsInstance(self.poll.electoral_register, ElectoralRegister)
-
         self.assertEqual(
             {self.user1.pk: 6, self.user2.pk: 5},
             self.poll.electoral_register.get_weight_dict(),
         )
+
+    def test_gm_votes_cleared_when_pv_role_removed(self):
+        self.assertEqual(5, self.mem_two_l.votes)
+        self.meeting.remove_roles(self.user2, ROLE_POTENTIAL_VOTER)
+        self.mem_two_l.refresh_from_db()
+        self.assertIsNone(self.mem_two_l.votes)
 
     # def test_new_er_on_start_if_new_users(self):
     #     first_er = self.meeting.er_policy.create_er(self.meeting)
