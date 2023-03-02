@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from random import seed
-
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
+from voteit.poll.app.er_policies.group_auto_rnd_before_poll import (
+    GroupAutoRandomBeforePoll,
+)
 
 
 User = get_user_model()
@@ -25,7 +25,7 @@ class GroupVoteElectoralRegisterPolicyTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create(
-            er_policy_name=AutoBeforePoll.name, group_votes_active=True
+            er_policy_name=GroupAutoRandomBeforePoll.name, group_votes_active=True
         )
         cls.one = User.objects.create(username="one")
         cls.two = User.objects.create(username="two")
@@ -56,14 +56,13 @@ class GroupVoteElectoralRegisterPolicyTests(TestCase):
         )
 
     def test_calc_group_votes_equal_unequal_votes(self):
-        seed(1337)
         self.group_one.votes = 3
         self.group_one.save()
         self.group_two.votes = 2
         self.group_two.save()
         self.assertEqual(
             {self.one.pk: 2, self.two.pk: 2, self.three.pk: 1},
-            self.meeting.er_policy.calc_group_votes_equal(),
+            self.meeting.er_policy.calc_group_votes_equal(seed=1337),
         )
 
     def test_calc_group_votes_equal_filter(self):

@@ -4,7 +4,7 @@ from abc import ABC
 from abc import abstractmethod
 from collections import Counter
 from logging import getLogger
-from random import shuffle
+from random import Random
 from typing import TYPE_CHECKING
 
 from pydantic.main import BaseModel
@@ -212,7 +212,7 @@ class GroupVoteElectoralRegisterPolicy(ElectoralRegisterPolicy, ABC):
     handles_personal_vote = False  # Defaults to false
 
     def calc_group_votes_equal(
-        self, only_users_qs: QuerySet[UserType] | None = None
+        self, only_users_qs: QuerySet[UserType] | None = None, seed=None
     ) -> dict[int, int]:
         """
         This is equal-ish, since votes power is an integer.
@@ -234,7 +234,10 @@ class GroupVoteElectoralRegisterPolicy(ElectoralRegisterPolicy, ABC):
             for pk in user_pks:
                 counter[pk] += full
             if rest:
-                shuffle(user_pks)
+                if seed is None:
+                    seed = self.meeting.pk
+                rnd = Random(seed)
+                rnd.shuffle(user_pks)
                 for pk in user_pks:
                     counter[pk] += 1
                     rest -= 1

@@ -2,17 +2,17 @@ from logging import getLogger
 
 from django.utils.translation import gettext_lazy as _
 
-from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-from voteit.poll.abcs import ElectoralRegisterPolicy
+from voteit.poll.abcs import GroupVoteElectoralRegisterPolicy
 from voteit.poll.models import Poll
 from voteit.poll.registries import er_policy
+from voteit.poll.exceptions import ElectoralRegisterError
 
-__all__ = ("AutoBeforePoll",)
+__all__ = ("GroupAutoRandomBeforePoll",)
 logger = getLogger(__name__)
 
 
 @er_policy
-class AutoBeforePoll(ElectoralRegisterPolicy):
+class GroupAutoRandomBeforePoll(GroupVoteElectoralRegisterPolicy):
     """
     Create an electoral register when a poll enters upcoming or ongoing state,
     if it's needed. Set the latest created register for that poll and any other upcoming.
@@ -21,10 +21,11 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
     is created from Meeting.potential_voters
     """
 
-    name = "auto_before_poll"
-    title = _("Automatic before poll")
+    name = "group_auto_eq_rnd_bf"
+    title = _("Equal group votes")
     description = _(
-        "Any users with potential voter status will be added to the electoral register when a poll starts."
+        "Any group members share votes within the group equally. If they can't be distributed evenly, "
+        "the rest will be randomized. Only potential voters may receive a vote."
     )
     logger = logger
     handles_vote_weight = False
@@ -32,7 +33,12 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
     allow_trigger = True
 
     def get_voters(self, **kwargs) -> dict[int, int]:
-        return {x: 1 for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)}
+        if self.meeting.group_votes_active:
+            return self.calc_group_votes_equal()
+        # pragma:no cover
+        raise ElectoralRegisterError(
+            "Group votes isn't active, invalid electoral register policy"
+        )
 
     def pre_apply(self, poll: Poll, target: str):
         self.create_er()  # Won't trigger unless needed

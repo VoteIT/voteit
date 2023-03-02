@@ -328,11 +328,11 @@ class ElectoralRegisterPolicyViewSetTests(APITestCase):
         self.assertEqual(
             {
                 "available": True,
-                "allow_manual": True,
-                "allow_trigger": False,
+                "allow_manual": False,
+                "allow_trigger": True,
                 "handles_group_vote": True,
                 "handles_personal_vote": True,
-                "handles_vote_weight": False,
+                "handles_vote_weight": True,
                 "name": "active_check",
                 "title": "Active check",
             },

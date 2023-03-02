@@ -98,16 +98,3 @@ class AutoBeforePollTests(TestCase):
         self.poll.save()
         self.poll.meeting.refresh_from_db()
         self.poll.ongoing()
-
-    def test_get_voters_when_switching_to_groups(self):
-        self.assertEqual(
-            {self.user1.pk: 1, self.user2.pk: 1}, self.meeting.er_policy.get_voters()
-        )
-        self.meeting.group_votes_active = True
-        self.meeting.save()
-        self.assertEqual({}, self.meeting.er_policy.get_voters())
-        group = self.meeting.groups.create(groupid="group", votes=4)
-        group.members.add(self.user1, self.user2)
-        self.assertEqual(
-            {self.user1.pk: 2, self.user2.pk: 2}, self.meeting.er_policy.get_voters()
-        )
