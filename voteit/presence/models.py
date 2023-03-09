@@ -27,7 +27,7 @@ class Presence(MeetingContext):
     name = "presence"
 
     user: AbstractUser = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+        settings.AUTH_USER_MODEL, on_delete=models.RESTRICT
     )
     presence_check: PresenceCheck = models.ForeignKey(
         "PresenceCheck", on_delete=models.CASCADE, related_name="presences"

@@ -25,7 +25,7 @@ class DiscussionPost(
     name = "discussion_post"
     author: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
         related_name="discussions",

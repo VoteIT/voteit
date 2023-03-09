@@ -94,13 +94,13 @@ class MeetingInvite(MeetingContext):
     created: datetime = models.DateTimeField(default=now, editable=False)
     created_by: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
+        on_delete=models.RESTRICT,
         related_name="created_invites",
     )
     modified: datetime = models.DateTimeField(auto_now=True, editable=False)
     last_modified_by: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
+        on_delete=models.RESTRICT,
         editable=False,
         null=True,
     )

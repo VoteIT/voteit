@@ -43,7 +43,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     state: str = FSMField(default=ProposalWf.initial, choices=ProposalWf.choices())
     author: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
+        on_delete=models.RESTRICT,
         blank=True,
         null=True,
         related_name="proposals",
