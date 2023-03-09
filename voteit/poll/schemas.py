@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any
 
 from django.contrib.auth.models import AbstractUser
 from pydantic import validator
@@ -20,15 +20,14 @@ class AddedVoteSchema(_GenericVoteSchema):
 
 
 class PollResult(BaseModel):
-    approved: List[int] = []
-    denied: List[int] = []
-    vote_count: Optional[
-        int
-    ]  # Optional, so that it can be populated after method calculation
+    approved: list[int] = []
+    denied: list[int] = []
+    # Optional, so that it can be populated after method calculation
+    vote_count: int | None
 
 
 class RankingSchema(BaseModel):
-    ranking: List[int]  # Validation...?
+    ranking: list[int]  # Validation...?
 
 
 class AddRankedVoteSchema(GenericAddVoteSchema):

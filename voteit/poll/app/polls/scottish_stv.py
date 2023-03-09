@@ -1,12 +1,10 @@
 from collections import Counter
 from decimal import Decimal
-from typing import List
-from typing import Tuple
-from typing import Union
 
 from django.utils.translation import gettext as _
 from pydantic import validator
 from pydantic.main import BaseModel
+from stvpoll.abcs import STVPollBase
 from stvpoll.scottish_stv import ScottishSTV as _ScottishSTV
 from envelope.messages.errors import ValidationErrorMsg
 
@@ -47,13 +45,13 @@ class AddSTVVote(AddVote):
 class STVResultRoundSchema(BaseModel):
     method: str
     status: str
-    selected: List[int]
-    vote_count: List[Tuple[int, Decimal]]
+    selected: list[int]
+    vote_count: list[tuple[int, Decimal]]
 
     @validator("vote_count", pre=True)
     def convert_vote_count(cls, v):
         """Vote count from STVPoll method looks like this:
-        >>> vote_count = [{1: Decimal(0)}, {2: Decimal(2)}]
+        >>> vote_count = {1: 0.0, 2: 2.0}
         >>> result = STVResultRoundSchema.convert_vote_count(vote_count)
         >>> sorted(result, key=lambda x:x[0])
         [(1, Decimal('0')), (2, Decimal('2'))]
@@ -61,28 +59,22 @@ class STVResultRoundSchema(BaseModel):
         Feeding it the same data again should yield the same result
         >>> result == STVResultRoundSchema.convert_vote_count(vote_count)
         True
-
         """
-        res = []
-        for x in v:
-            if isinstance(x, dict):
-                res.extend([(k, v) for k, v in x.items()])
-            else:
-                res.append(x)
-        return res
+        if isinstance(v, dict):
+            return list((k, Decimal(v)) for k, v in v.items())
+        return v
 
 
 class STVResultSchema(PollResult):
-    # winners: List
-    # candidates: List
-    approved: List[int] = []
-    denied: List[int] = []
+    approved: list[int] = []
+    denied: list[int] = []
     complete: bool
-    rounds: List[STVResultRoundSchema]
+    rounds: list[STVResultRoundSchema]
     randomized: bool
     quota: int
     runtime: float
     empty_ballot_count: int
+    random_order: None | list[int]
 
 
 @poll_methods
@@ -130,6 +122,20 @@ class ScottishSTV(PollMethod):
             ranking = []
         return self.vote_schema(ranking=ranking)
 
+    def finalize_stv_result(
+        self, counter: Counter, poll_counter: STVPollBase
+    ) -> STVResultSchema:
+        for (ballot, count) in counter.items():
+            ballot_as_list = [int(r) for r in ballot.split(",")]
+            poll_counter.add_ballot(ballot_as_list, count)
+        result_dict = poll_counter.calculate().as_dict()
+        extra_kwargs = {"approved": result_dict["winners"]}
+        if result_dict["complete"]:
+            extra_kwargs["denied"] = set(result_dict["candidates"]).difference(
+                set(result_dict["winners"])
+            )
+        return STVResultSchema(**extra_kwargs, **result_dict)
+
     def calculate_result(self, counter: Counter) -> STVResultSchema:
         settings = self.poll.settings
         poll_counter = _ScottishSTV(
@@ -137,16 +143,7 @@ class ScottishSTV(PollMethod):
             candidates=self.poll.proposals.all().values_list("id", flat=True),
             random_in_tiebreaks=settings.allow_random,
         )
-        for (ballot, count) in counter.items():
-            ballot_as_list = [int(r) for r in ballot.split(",")]
-            poll_counter.add_ballot(ballot_as_list, count)
-        result_dict = poll_counter.calculate().as_dict()
-        result_dict["approved"] = result_dict.pop("winners")
-        if result_dict["complete"]:
-            result_dict["denied"] = set(result_dict["candidates"]).difference(
-                result_dict["approved"]
-            )
-        return self.result_schema(**result_dict)
+        return self.finalize_stv_result(counter, poll_counter)
 
     def validate_vote(self, msg: AddSTVVote) -> None:
         matched_pks = set(

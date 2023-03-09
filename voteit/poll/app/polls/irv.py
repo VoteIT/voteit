@@ -1,51 +1,23 @@
 from typing import Counter
 
 from django.utils.translation import gettext_lazy as _
-from pydantic import BaseModel, validator
-from stvpoll import Candidate
-from stvpoll import ElectionRound
-from stvpoll import IncompleteResult
-from stvpoll import STVPollBase
+from pydantic import BaseModel
+from pydantic import validator
+from stvpoll.abcs import STVPollBase
+from stvpoll.irv import IRV as IRVBase
+from stvpoll.exceptions import IncompleteResult
+from stvpoll.irv import irv_quota
+from stvpoll.types import SelectionMethod
 
 from voteit.messaging.decorators import incoming
-from voteit.poll.app.polls.scottish_stv import ScottishSTV
 from voteit.poll.app.polls.scottish_stv import STVResultSchema
+from voteit.poll.app.polls.scottish_stv import ScottishSTV
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.messages import AddVote
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import AddRankedVoteSchema
 
 __all__ = ("IRV",)
-
-
-def irv_quota(poll: STVPollBase) -> int:
-    """Majority should be more than half of the votes."""
-    return ((poll.ballot_count + poll.result.empty_ballot_count) // 2) + 1
-
-
-class IRVPoll(STVPollBase):
-    """Alternative vote or Instant-Runoff Voting is a method for selecting a majority winner
-    among a set of proposals / candidates using ranked votes.
-    """
-
-    def __init__(self, candidates, quota=irv_quota, random_in_tiebreaks=True):
-        super().__init__(1, candidates, quota, random_in_tiebreaks)
-
-    def calculate_round(self) -> None:
-        # First, check if there is a winner
-        winners = [c for c in self.standing_candidates if c.votes >= self.quota]
-
-        if len(winners) == 1:
-            winner = winners[0]
-            self.select(winner, ElectionRound.SELECTION_METHOD_DIRECT)
-
-        else:
-            if len(self.standing_candidates) == 1:
-                raise IncompleteResult("No candidate can get majority.")
-
-            loser, method = self.get_candidate(most_votes=False)
-            self.select(loser, method, Candidate.EXCLUDED)
-            self.transfer_votes(loser)
 
 
 @incoming
@@ -73,20 +45,11 @@ class IRV(ScottishSTV):
 
     def calculate_result(self, counter: Counter) -> STVResultSchema:
         settings = self.poll.settings
-        poll_counter = IRVPoll(
+        poll_counter = IRVBase(
             candidates=self.poll.proposals.all().values_list("id", flat=True),
             random_in_tiebreaks=settings.allow_random,
         )
-        for (ballot, count) in counter.items():
-            ballot_as_list = [int(r) for r in ballot.split(",")]
-            poll_counter.add_ballot(ballot_as_list, count)
-        result_dict = poll_counter.calculate().as_dict()
-        result_dict["approved"] = result_dict.pop("winners")
-        if result_dict["complete"]:
-            result_dict["denied"] = set(result_dict["candidates"]).difference(
-                result_dict["approved"]
-            )
-        return STVResultSchema(**result_dict)
+        return self.finalize_stv_result(counter, poll_counter)
 
     def start_check(self):
         if self.poll.proposals.count() < 3:
@@ -105,17 +68,21 @@ class RepeatedIRVPoll(STVPollBase):
     def __init__(
         self, seats: int, candidates, quota=irv_quota, random_in_tiebreaks=True
     ):
+        self.random_in_tiebreaks = random_in_tiebreaks
         super().__init__(seats, candidates, quota, random_in_tiebreaks)
 
+    def singular_quota(self, *args):
+        return irv_quota(sum(b.count for b in self.ballots), 0)
+
     def calculate_round(self) -> None:
-        singular_irv = IRVPoll(
+        singular_irv = IRVBase(
             candidates=self.standing_candidates,
-            quota=self._quota_function,
+            quota=self.singular_quota,
             random_in_tiebreaks=self.random_in_tiebreaks,
         )
         for ballot in self.ballots:
             singular_irv.add_ballot(
-                [c for c in ballot.preferences if c in self.standing_candidates],
+                [c for c in ballot if c in self.standing_candidates],
                 ballot.count,
             )
         singular_irv.calculate()
@@ -123,9 +90,9 @@ class RepeatedIRVPoll(STVPollBase):
         if not singular_irv.result.complete:
             raise IncompleteResult("No more candidates can get majority.")
 
-        elected = singular_irv.result.elected[0]
+        elected = singular_irv.result[0]
         winner = next(c for c in self.candidates if c == elected)
-        self.select(winner, ElectionRound.SELECTION_METHOD_DIRECT)
+        self.elect(winner, SelectionMethod.Direct)
 
 
 @incoming
@@ -165,16 +132,7 @@ class RepeatedIRV(ScottishSTV):
             candidates=self.poll.proposals.all().values_list("id", flat=True),
             random_in_tiebreaks=settings.allow_random,
         )
-        for (ballot, count) in counter.items():
-            ballot_as_list = [int(r) for r in ballot.split(",")]
-            poll_counter.add_ballot(ballot_as_list, count)
-        result_dict = poll_counter.calculate().as_dict()
-        result_dict["approved"] = result_dict.pop("winners")
-        if result_dict["complete"]:
-            result_dict["denied"] = set(result_dict["candidates"]).difference(
-                result_dict["approved"]
-            )
-        return STVResultSchema(**result_dict)
+        return self.finalize_stv_result(counter, poll_counter)
 
     def start_check(self):
         if self.poll.proposals.count() < 3:
