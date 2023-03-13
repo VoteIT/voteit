@@ -39,7 +39,6 @@ class Migration(migrations.Migration):
                             "meetinggroup",
                             models.ForeignKey(
                                 on_delete=django.db.models.deletion.CASCADE,
-                                related_name="role_assignments",
                                 to="meeting.meetinggroup",
                             ),
                         ),
