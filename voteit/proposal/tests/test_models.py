@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
-from django.db.models import ProtectedError
+from django.db.models import RestrictedError
 from django.test import TestCase
 from voteit.meeting.models import Meeting
 
@@ -29,7 +29,7 @@ class ProposalTests(TestCase):
     def test_author_cant_be_deleted(self):
         user = User.objects.create(username="hi")
         self._mk_one(author=user)
-        with self.assertRaises(ProtectedError):
+        with self.assertRaises(RestrictedError):
             user.delete()
 
     def test_prop_id_in_tags(self):

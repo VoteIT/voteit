@@ -23,7 +23,7 @@ class ParticipantNumber(models.Model):
 
     number: int = models.PositiveSmallIntegerField(blank=True)
     user: AbstractUser = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+        settings.AUTH_USER_MODEL, on_delete=models.RESTRICT
     )
     pns: PNSystem = models.ForeignKey(
         "PNSystem", on_delete=models.CASCADE, related_name="numbers"

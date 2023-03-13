@@ -67,7 +67,7 @@ class AccessRequest(MeetingContext):
         related_name="access_requests",
     )
     user: AbstractUser = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+"
+        settings.AUTH_USER_MODEL, on_delete=models.RESTRICT, related_name="+"
     )
     message: str | None = models.TextField(blank=True, null=True)
     moderator_message: str | None = models.TextField(blank=True, null=True)
@@ -77,7 +77,7 @@ class AccessRequest(MeetingContext):
     )
     handled_by: AbstractUser | None = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
+        on_delete=models.RESTRICT,
         related_name="+",
         blank=True,
         null=True,

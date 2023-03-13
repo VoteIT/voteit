@@ -578,7 +578,7 @@ class Vote(models.Model):
 
     name = "vote"
     user: AbstractUser = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+        settings.AUTH_USER_MODEL, on_delete=models.RESTRICT
     )
     poll: Poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name="votes")
     created: datetime = models.DateTimeField(editable=False, default=now)

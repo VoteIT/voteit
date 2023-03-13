@@ -155,7 +155,7 @@ def get_tagged_hashtags(text: str, lower=True) -> set:
 
 _STRICT = {
     "attributes": deepcopy(ALLOWED_ATTRIBUTES),
-    "tags": ALLOWED_TAGS + ["p", "span", "br"],
+    "tags": set(ALLOWED_TAGS) | {"p", "span", "br"},
 }
 _STRICT["attributes"]["a"].extend(["data-userid", "data-tag"])
 _STRICT["attributes"].setdefault("span", []).extend(
@@ -191,7 +191,7 @@ def strict_clean_html(text: str):
 
 
 _relaxed = deepcopy(_STRICT)
-_relaxed["tags"].extend(["h2", "h3", "h4", "sup", "sub", "img", "iframe"])
+_relaxed["tags"].update(["h2", "h3", "h4", "sup", "sub", "img", "iframe"])
 for tag in "h2", "h3", "h4", "p", "blockquote":
     _relaxed["attributes"].setdefault(tag, []).append("class")
 _relaxed["attributes"].setdefault("img", []).append("src")

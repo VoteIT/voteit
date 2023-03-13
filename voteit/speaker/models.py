@@ -247,7 +247,7 @@ class Speaker(MeetingContext, SpeakerSystemContext):
     name = "speaker"
 
     user: AbstractUser = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT
+        settings.AUTH_USER_MODEL, on_delete=models.RESTRICT
     )
     speaker_list: SpeakerList = models.ForeignKey(
         "SpeakerList", on_delete=models.CASCADE, related_name="speaker_items"
