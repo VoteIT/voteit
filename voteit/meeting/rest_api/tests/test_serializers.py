@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.test import override_settings
 from django.test import TestCase
+from rest_framework.exceptions import ValidationError
 
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
@@ -348,3 +349,14 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         )
         serializer.is_valid()
         self.assertIn("user", serializer.errors)
+
+    def test_group_membership_create_duplicate(self):
+        serializer = CreateGroupMembershipSerializer(
+            data={
+                "meeting_group": self.plebei_hangout.pk,
+                "user": self.participant.pk,
+            },
+            context={"request": self._mk_request(self.moderator)},
+        )
+        serializer.is_valid()
+        self.assertTrue(serializer.errors)

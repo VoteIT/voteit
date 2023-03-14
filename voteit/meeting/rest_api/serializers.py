@@ -7,6 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from rest_framework.validators import UniqueTogetherValidator
 
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserSerializer
@@ -272,6 +273,11 @@ class CreateGroupMembershipSerializer(serializers.ModelSerializer):
     class Meta:
         model = GroupMembership
         exclude = ("id",)
+        validators = [
+            UniqueTogetherValidator(
+                queryset=GroupMembership.objects.all(), fields=["meeting_group", "user"]
+            )
+        ]
 
     def validate(self, attrs):
         """
