@@ -34,6 +34,11 @@ class ActiveUser(MeetingContext):
             ),
         ]
 
+    def __str__(self):
+        if self.user.userid:
+            return f"ActiveUser ({self.user.userid})"
+        return f"ActiveUser [{self.user.username}]"
+
     # annotations
     user_id: int
     meeting_id: int

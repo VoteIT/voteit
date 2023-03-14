@@ -1,32 +1,25 @@
 from django.contrib import admin
-from fsm_admin.mixins import FSMTransitionMixin
 
+from voteit.active.models import ActiveUser
 from voteit.meeting.admin import MeetingAdminMixin
 
 
-# @admin.register(PresenceSystem)
-# class PresenceSystemAdmin(MeetingAdminMixin, admin.ModelAdmin):
-#     list_display = ("meeting_link",)
-#     search_fields = ("meeting__title",)
-#     list_filter = ("meeting__organisation",)
-#
-#
-# @admin.register(PresenceCheck)
-# class PresenceCheckAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
-#     fsm_field = ["state"]
-#     list_display = "state", "meeting_link", "presence_system", "opened", "closed"
-#     list_filter = ("state", "meeting__organisation")
-#     exclude = ("state",)
-#     search_fields = ("meeting__title",)
-#
-#
-# @admin.register(Presence)
-# class PresenceAdmin(admin.ModelAdmin):
-#     list_filter = ("user__organisation", "presence_check__state")
-#     list_display = "user", "presence_check", "created", "meeting"
-#     autocomplete_fields = ("user", "presence_check")
-#     search_fields = (
-#         "user__last_name",
-#         "user__first_name",
-#         "user__userid",
-#     )
+@admin.register(ActiveUser)
+class ActiveUserAdmin(MeetingAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "__str__",
+        "user",
+        "meeting_link",
+        "created",
+    )
+    search_fields = (
+        "meeting__title",
+        "user__first_name",
+        "user__last_nam",
+        "user__userid",
+    )
+    autocomplete_fields = (
+        "meeting",
+        "user",
+    )
+    list_filter = ("meeting__organisation",)
