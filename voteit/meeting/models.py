@@ -505,7 +505,7 @@ class GroupMembership(MeetingContext):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
+        on_delete=models.RESTRICT,
         related_name="+",
     )
     meeting_group: MeetingGroup = models.ForeignKey(
