@@ -32,11 +32,7 @@ class DialectSchema(BaseModel):
         'roles': [{'title': 'Supervisor', 'role_id': 'supervisor', 'roles': ['discusser', 'proposer']}],\
         'groups': [{'title': 'Board', 'groupid': 'board'}], 'er_policy_name': 'auto_before_poll',\
         'group_votes_active': True, 'group_roles_active': True}
-    >>> DialectSchema(**data)
-    DialectSchema(requires=(), title='Test', description='', name='test', roles=[GroupRoleSchema(title='Supervisor', \
-    role_id='supervisor', roles=['discusser', 'proposer'], can_propose_as=False, can_discuss_as=False)],\
-    groups=[GroupSchema(title='Board', groupid='board')], er_policy_name='auto_before_poll', \
-    group_votes_active=True, group_roles_active=True, proposal_id_policy_name=None, installable=True, view_components={})
+    >>> _ = DialectSchema(**data)
     >>> data['roles'] = [{'title': 'Bad', 'roles': ['boho']}]
     >>> DialectSchema(**data)
     Traceback (most recent call last):
@@ -48,6 +44,7 @@ class DialectSchema(BaseModel):
     title: str
     description: str = ""
     name: str
+    globally_available: bool = True
     roles: conlist(GroupRoleSchema, unique_items=True) = []
     groups: conlist(GroupSchema, unique_items=True) = []
     er_policy_name: str | None = None

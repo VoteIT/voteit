@@ -165,6 +165,7 @@ class MeetingDetailSerializerTests(TestCase):
             {
                 "description": "",
                 "group_roles_active": True,
+                "globally_available": True,
                 "installable": True,
                 "name": "three",
                 "requires": ["one", "two"],
