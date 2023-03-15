@@ -78,8 +78,14 @@ class DialectSchema(BaseModel):
         'groups': [{'title': 'Board', 'groupid': 'board'}], 'er_policy_name': 'auto_before_poll',\
         'group_votes_active': True, 'group_roles_active': True}
     >>> _ = DialectSchema(**data)
-    >>> data['roles'] = [{'title': 'Bad', 'roles': ['boho']}]
-    >>> DialectSchema(**data)
+    >>> bad_roles=data.copy()
+    >>> bad_roles['roles'] = [{'title': 'Bad', 'roles': ['boho']}]
+    >>> DialectSchema(**bad_roles)
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError:
+    >>> _ = DialectSchema(block_roles=[], **data)
+    >>> DialectSchema(block_roles=['jeff'], **data)
     Traceback (most recent call last):
     ...
     pydantic.error_wrappers.ValidationError:
@@ -104,3 +110,13 @@ class DialectSchema(BaseModel):
         constr(to_lower=True, strip_whitespace=True),
         unique_items=True,
     ) = []
+    block_roles: conlist(
+        constr(to_lower=True, strip_whitespace=True),
+        unique_items=True,
+    ) = []
+
+    @validator("block_roles")
+    def validate_roles(cls, v):
+        if v:
+            root_validate_roles_and_model(cls, {"model": "meeting", "roles": v})
+        return v
