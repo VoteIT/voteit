@@ -113,12 +113,16 @@ class ComponentAdapter(ABC):
     schema
         A Pydantic schema for validation. If it's none, this component has no data.
 
+    disable_on_close
+        Disable component when meeting closes
+
     Not implemented yet:
     multiple
         If context can have multiple instances of this component.
     """
 
     schema: type[BaseModel] | None = None
+    disable_on_close: bool = False
     # multiple: bool = False
 
     @property

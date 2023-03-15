@@ -6,6 +6,7 @@ from django.test import override_settings
 
 from envelope.messages.channels import Subscribe
 from envelope.messages.channels import Subscribed
+from voteit.active.components import ActiveUsersComponent
 from voteit.core.testing import FakeCommit
 from voteit.core.workflows import EnabledWf
 from voteit.components.app.components.message import FlashMessage
@@ -180,3 +181,27 @@ class MeetingComponentChangedTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingComponentDeleted)
         self.assertEqual(component_pk, msg.data.pk)
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class MeetingComponentsDisabledWhenMeetingClosesTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create(state="ongoing")
+        cls.msg: MeetingComponent = cls.meeting.components.create(
+            component_name=FlashMessage.name,
+            settings={"msg": "Hello"},
+            state=EnabledWf.ON,
+        )
+        cls.active: MeetingComponent = cls.meeting.components.create(
+            component_name=ActiveUsersComponent.name,
+            state=EnabledWf.ON,
+        )
+
+    def test_close_meeting(self):
+        self.meeting.close()
+        self.meeting.save()
+        self.msg.refresh_from_db()
+        self.active.refresh_from_db()
+        self.assertEqual(EnabledWf.ON, self.msg.state)
+        self.assertEqual(EnabledWf.OFF, self.active.state)

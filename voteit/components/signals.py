@@ -5,18 +5,21 @@ from typing import TYPE_CHECKING
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
+from django_fsm import post_transition
 from envelope.signals import channel_subscribed
 
 from voteit.components.messages import MeetingComponentAdded
 from voteit.components.messages import MeetingComponentChanged
 from voteit.components.messages import MeetingComponentDeleted
 from voteit.components.rest_api.serializers import MeetingComponentSerializer
+from voteit.components.utils import get_meeting_component_adapters
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.components.models import MeetingComponent
+from voteit.meeting.workflows import MeetingWf
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -73,3 +76,20 @@ def meeting_component_delete(instance=None, **kw):
     msg = MeetingComponentDeleted(pk=instance.pk)
     # Sent after transaction commit!
     meeting_ch.sync_publish(msg)
+
+
+@receiver(post_transition, sender=Meeting)
+def disable_components_when_meeting_closes(
+    instance: Meeting, source: str, target: str, **kw
+):
+    if target == MeetingWf.CLOSED:
+        disable_names = [
+            k
+            for (k, v) in get_meeting_component_adapters().items()
+            if v.disable_on_close
+        ]
+        for component in instance.meeting.components.filter(
+            component_name__in=disable_names, state=EnabledWf.ON
+        ):
+            component.disable()
+            component.save()

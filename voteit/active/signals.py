@@ -6,8 +6,8 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from envelope.signals import channel_subscribed
 from envelope.utils import AppState
-from voteit.active.components import ActiveUsersComponent
 
+from voteit.active.components import ActiveUsersComponent
 from voteit.active.messages import ActiveUserChanged
 from voteit.active.messages import ActiveUsers
 from voteit.active.models import ActiveUser

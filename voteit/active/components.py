@@ -8,3 +8,4 @@ __all__ = ("ActiveUsersComponent",)
 class ActiveUsersComponent(ComponentAdapter):
     name = "active_users"
     title = "Active users"  # naming?
+    disable_on_close = True

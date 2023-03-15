@@ -8,3 +8,4 @@ __all__ = ("PresenceCheckComponent",)
 class PresenceCheckComponent(ComponentAdapter):
     name = "presence_check"
     title = "Presence heck"
+    disable_on_close = True
