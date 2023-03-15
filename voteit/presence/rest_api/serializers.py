@@ -34,22 +34,3 @@ class PresenceCheckDetailSerializer(PresenceCheckCreateSerializer):
             "meeting",
         ]
         fields = read_only_fields
-
-
-class PresenceSystemDetailSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = models.PresenceSystem
-        read_only_fields = [
-            "meeting",
-            "pk",
-        ]
-        fields = read_only_fields
-
-
-class PresenceSystemCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = models.PresenceSystem
-        fields = ("meeting",)
-        extra_kwargs = {
-            "meeting": {"required": True},
-        }

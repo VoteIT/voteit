@@ -8,7 +8,6 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.presence.models import Presence
 from voteit.presence.models import PresenceCheck
-from voteit.presence.models import PresenceSystem
 from voteit.presence.permissions import PresenceCheckPermissions
 from voteit.presence.rest_api import serializers
 
@@ -25,20 +24,6 @@ class _MeetingContextViewPerm(DefaultModelViewSet):
             else:
                 return self.queryset.none()
         return self.queryset
-
-
-@router.register("presence-systems", basename="presence-systems")
-class PresenceSystemViewSet(_MeetingContextViewPerm):
-    serializer_class = serializers.PresenceSystemDetailSerializer
-    serializer_classes = {
-        "create": serializers.PresenceSystemCreateSerializer,
-    }
-    context_queryset = Meeting.objects.all()
-    context_lookup_kwarg = "meeting"
-    model = PresenceSystem
-    queryset = PresenceSystem.objects.all()
-    filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ("meeting",)
 
 
 @router.register("presence-checks", basename="presence-checks")

@@ -57,7 +57,6 @@ def get_default_ignored_on_clone() -> set[str]:
         "pnsystem",
         "presence",
         "presence_check",
-        "presence_system",
         "reaction",
         "speaker",
         "speaker_list",

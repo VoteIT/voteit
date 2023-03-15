@@ -1,16 +1,12 @@
 from django.test import TestCase
 
+from voteit.meeting.models import Meeting
+
 
 class PresenceCheckSerializerTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-        from voteit.presence.models import PresenceSystem
-
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
-        )
-        self.system: PresenceSystem = PresenceSystem.objects.create(
-            meeting=self.meeting
         )
         self.presence_check = self.meeting.presence_checks.create()
 
@@ -43,14 +39,8 @@ class PresenceCheckSerializerTests(TestCase):
 
 class PresenceCheckCreateSerializerTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-        from voteit.presence.models import PresenceSystem
-
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
-        )
-        self.system: PresenceSystem = PresenceSystem.objects.create(
-            meeting=self.meeting
         )
 
     @property
@@ -67,66 +57,3 @@ class PresenceCheckCreateSerializerTests(TestCase):
         instance = serializer.save()
         self.assertIsInstance(instance, PresenceCheck)
         self.assertEqual(instance.meeting, self.meeting)
-
-
-class PresenceSystemSerializerTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-        from voteit.presence.models import PresenceSystem
-
-        self.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
-        self.system: PresenceSystem = PresenceSystem.objects.create(
-            meeting=self.meeting
-        )
-
-    @property
-    def _cut(self):
-        from voteit.presence.rest_api.serializers import PresenceSystemDetailSerializer
-
-        return PresenceSystemDetailSerializer
-
-    def test_get(self):
-        # Queue is not part of this
-        serializer = self._cut(self.system)
-        data = serializer.data
-        self.assertEqual(
-            {"pk": self.system.pk, "meeting": self.meeting.pk},
-            data,
-        )
-
-    def test_patch(self):
-        serializer = self._cut(
-            self.system,
-            {"meeting": -1},
-            partial=True,
-        )
-        self.assertTrue(serializer.is_valid())  # Since DRF throws away meeting...
-        serializer.save()
-        self.system.refresh_from_db(fields=["meeting"])
-        self.assertEqual(self.meeting, self.system.meeting)
-
-
-class PresenceSystemCreateSerializer(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-
-        self.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
-
-    @property
-    def _cut(self):
-        from voteit.presence.rest_api.serializers import PresenceSystemCreateSerializer
-
-        return PresenceSystemCreateSerializer
-
-    def test_create(self):
-        from voteit.presence.models import PresenceSystem
-
-        serializer = self._cut(data={"meeting": self.meeting.pk})
-        self.assertTrue(serializer.is_valid())
-        instance = serializer.save()
-        self.assertIsInstance(instance, PresenceSystem)
-        self.assertEqual(self.meeting, instance.meeting)

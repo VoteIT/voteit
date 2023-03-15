@@ -9,8 +9,12 @@ from envelope.messages.channels import Subscribed
 from envelope.utils import channel_layer
 
 from voteit.core.testing import FakeCommit
+from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.models import Meeting
 from voteit.presence.channels import PresenceCheckChannel
+from voteit.presence.components import PresenceCheckComponent
+from voteit.presence.models import PresenceCheck
 
 User = get_user_model()
 
@@ -23,16 +27,14 @@ _channel_layers_setting = {
 class SignalsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.presence.models import PresenceSystem
-        from voteit.presence.models import PresenceCheck
-        from voteit.meeting.models import Meeting
-
         cls.user = User.objects.create(username="creeper")
         cls.moderator = User.objects.create(username="moderator")
         cls.meeting = Meeting.objects.create()
+        cls.component = cls.meeting.components.create(
+            component_name=PresenceCheckComponent.name, state=EnabledWf.ON
+        )
         cls.meeting.add_roles(cls.user, "participant")
         cls.meeting.add_roles(cls.moderator, "moderator")
-        cls.system = PresenceSystem.objects.create(meeting=cls.meeting)
         cls.check = PresenceCheck.objects.create(meeting=cls.meeting)
 
     def setUp(self):

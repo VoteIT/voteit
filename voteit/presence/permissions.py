@@ -2,14 +2,6 @@ from voteit.core.permissions import ModelPermissions
 from voteit.core.permissions import Permission as P
 
 
-class PresenceSystemPermissions(ModelPermissions):
-    model = "presence_system"
-    ADD = P("presence.add_presencesystem", context="meeting")
-    CHANGE = P("presence.change_presencesystem")
-    DELETE = P("presence.delete_presencesystem")
-    VIEW = P("presence.view_presencesystem")
-
-
 class PresenceCheckPermissions(ModelPermissions):
     model = "presence_check"
     ADD = P("presence.add_presencecheck", context="meeting")

@@ -352,7 +352,6 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     agenda_items: models.QuerySet
     last_read_set: models.QuerySet
     pn_system: PNSystem | None
-    presence_system: PresenceSystem | None
     presence_checks: PresenceCheck.Manager
     polls: models.QuerySet
     reaction_buttons: models.QuerySet

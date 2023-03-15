@@ -6,7 +6,6 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import IntegrityError
 from django.db import models
-from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django_fsm import FSMField
 from django_fsm import transition
@@ -95,10 +94,6 @@ class PresenceCheck(MeetingContext):
     def close(self) -> None:
         self.closed = now()
 
-    @cached_property
-    def presence_system(self):
-        return PresenceSystem.objects.get_or_create(meeting=self.meeting)
-
     def present_user_pks(self) -> list[int]:
         return list(self.presences.values_list("user_id"))
 
@@ -123,31 +118,3 @@ class PresenceCheck(MeetingContext):
 
     objects = Manager()
     presences: models.QuerySet
-
-
-class PresenceSystem(MeetingContext):
-    """
-    The presence system has a 1-1 relation to a meeting.
-    It acts as a container for all other objects.
-    It should be possible to safely delete it and thus
-    remove all data related to presence for the related meeting.
-
-    Most of the permission checks for this system is delegated to the related meeting,
-    so there's no separate role to run presence checks.
-    """
-
-    name = "presence_system"
-
-    meeting: Meeting | None = models.OneToOneField(
-        Meeting, on_delete=models.CASCADE, null=True, related_name="presence_system"
-    )
-
-    exporters = {"meeting": {}}
-    importers = {"meeting": {}, "organisation": {}}
-
-    def __str__(self):
-        return f"Presence system ({self.pk})"
-
-    # Type hinting
-    objects: models.Manager
-    presence_checks: models.QuerySet

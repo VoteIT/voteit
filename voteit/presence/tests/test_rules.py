@@ -1,64 +1,22 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.core.workflows import EnabledWf
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.presence.components import PresenceCheckComponent
+
 User = get_user_model()
-
-
-class PresenceSystemTests(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        from voteit.presence.models import PresenceSystem
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
-
-        cls.meeting = Meeting.objects.create()
-        cls.system = PresenceSystem.objects.create(meeting=cls.meeting)
-        cls.moderator = User.objects.create(username="moderator")
-        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
-        cls.participant = User.objects.create(username="participant")
-        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
-        cls.anon_user = User.objects.create(username="anon")
-
-    @property
-    def P(self):
-        from voteit.presence.permissions import PresenceSystemPermissions
-
-        return PresenceSystemPermissions
-
-    def test_add(self):
-        ADD = self.P.ADD
-        self.assertTrue(self.moderator.has_perm(ADD, self.meeting))
-        self.assertFalse(self.participant.has_perm(ADD, self.meeting))
-        self.assertFalse(self.anon_user.has_perm(ADD, self.meeting))
-
-    def test_change(self):
-        CHANGE = self.P.CHANGE
-        self.assertTrue(self.moderator.has_perm(CHANGE, self.system))
-        self.assertFalse(self.participant.has_perm(CHANGE, self.system))
-        self.assertFalse(self.anon_user.has_perm(CHANGE, self.system))
-
-    def test_delete(self):
-        DELETE = self.P.DELETE
-        self.assertTrue(self.moderator.has_perm(DELETE, self.system))
-        self.assertFalse(self.participant.has_perm(DELETE, self.system))
-        self.assertFalse(self.anon_user.has_perm(DELETE, self.system))
-
-    def test_view(self):
-        VIEW = self.P.VIEW
-        self.assertTrue(self.moderator.has_perm(VIEW, self.system))
-        self.assertTrue(self.participant.has_perm(VIEW, self.system))
-        self.assertFalse(self.anon_user.has_perm(VIEW, self.system))
 
 
 class PresenceCheckTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.presence.models import PresenceSystem
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
-
         cls.meeting = Meeting.objects.create()
-        cls.system = PresenceSystem.objects.create(meeting=cls.meeting)
+        cls.component = cls.meeting.components.create(
+            component_name=PresenceCheckComponent.name, state=EnabledWf.ON
+        )
         cls.presence_check = cls.meeting.presence_checks.create()
         cls.moderator = User.objects.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
@@ -122,12 +80,10 @@ class PresenceCheckTests(TestCase):
 class PresenceTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.presence.models import PresenceSystem
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
-
         cls.meeting = Meeting.objects.create()
-        cls.system = PresenceSystem.objects.create(meeting=cls.meeting)
+        cls.component = cls.meeting.components.create(
+            component_name=PresenceCheckComponent.name, state=EnabledWf.ON
+        )
         cls.presence_check = cls.meeting.presence_checks.create()
         cls.moderator = User.objects.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)

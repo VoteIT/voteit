@@ -2,7 +2,10 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
-
+from voteit.core.workflows import EnabledWf
+from voteit.meeting.models import Meeting
+from voteit.presence.components import PresenceCheckComponent
+from voteit.presence.models import PresenceCheck
 
 User = get_user_model()
 
@@ -12,15 +15,13 @@ class ChangePresenceTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.presence.models import PresenceSystem
-        from voteit.presence.models import PresenceCheck
-        from voteit.meeting.models import Meeting
-
         cls.outsider = User.objects.create(username="outsider")
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.component = cls.meeting.components.create(
+            component_name=PresenceCheckComponent.name, state=EnabledWf.ON
+        )
         cls.participant = User.objects.get(username="participant")
         cls.moderator = User.objects.get(username="moderator")
-        cls.system = PresenceSystem.objects.create(meeting=cls.meeting)
         cls.check = PresenceCheck.objects.create(meeting=cls.meeting)
 
     @property
@@ -44,6 +45,11 @@ class ChangePresenceTests(TestCase):
         self.assertTrue(self.check.present_users.count())
         # Make sure duplicate doesn't kill it
         msg.run_job()
+
+    def test_add_component_disabled(self):
+        self.component.delete()
+        msg = self._mk_one(user=self.participant, check=self.check, present=True)
+        self.assertRaises(UnauthorizedError, msg.run_job)
 
     def test_add_closed_check(self):
         self.check.close()
