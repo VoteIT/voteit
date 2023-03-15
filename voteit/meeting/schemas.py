@@ -3,6 +3,7 @@ from pydantic import conlist
 from pydantic import constr
 from pydantic import validator
 
+from voteit.components.utils import get_meeting_component_adapters
 from voteit.core.validators import root_validate_roles_and_model
 
 
@@ -21,13 +22,57 @@ class GroupRoleSchema(BaseModel):
 
 class GroupSchema(BaseModel):
     title: constr(max_length=100)
-    groupid: constr(max_length=100, to_lower=True)
+    groupid: constr(max_length=100, to_lower=True, strip_whitespace=True)
+
+
+class ComponentSettings(BaseModel):
+    """
+    >>> ComponentSettings(name='404')
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 1 validation error for ComponentSettings
+    >>> from voteit.components.app.components.proposal_print import ProposalPrint
+    >>> ComponentSettings(name=ProposalPrint.name)
+    ComponentSettings(name='proposal_print', settings=None)
+    >>> from voteit.components.app.components.message import FlashMessage
+    >>> ComponentSettings(name=FlashMessage.name, settings={'msg': 'Hello'})
+    ComponentSettings(name='flash_message', settings={'msg': 'Hello'})
+    >>> ComponentSettings(name=FlashMessage.name)
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 1 validation error for ComponentSettings
+    >>> ComponentSettings(name=FlashMessage.name, settings={'just': 'wrong'})
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 1 validation error for ComponentSettings
+    """
+
+    name: constr(strip_whitespace=True, to_lower=True)
+    settings: dict | None = None
+
+    @validator("name")
+    def validate_name(cls, v: str):
+        if v not in get_meeting_component_adapters():
+            raise ValueError(f"{v} is not a meeting component name")
+        return v
+
+    @validator("settings", always=True)
+    def validate_settings(cls, v, values):
+        try:
+            adapter = get_meeting_component_adapters()[values["name"]]
+        except KeyError:
+            return  # Will be caught by other validator
+        if adapter.schema is not None:
+            if not isinstance(v, dict):
+                raise ValueError("missing or isn't a dict")
+            adapter.schema(**v)
+        return v
 
 
 class DialectSchema(BaseModel):
     """
     Settings for a meeting dialect
-    
+
     >>> data={'title': 'Test', 'name': 'test',\
         'roles': [{'title': 'Supervisor', 'role_id': 'supervisor', 'roles': ['discusser', 'proposer']}],\
         'groups': [{'title': 'Board', 'groupid': 'board'}], 'er_policy_name': 'auto_before_poll',\
@@ -54,3 +99,12 @@ class DialectSchema(BaseModel):
     # restricts: list[str] = ()  FIXME: We should have a system for restrictions
     installable: bool = True  # Deprecated or a base template? Set this to false
     view_components: dict[str, str] = {}
+    configure_components: list[ComponentSettings] = []
+    block_components: conlist(
+        constr(to_lower=True, strip_whitespace=True),
+        unique_items=True,
+    ) = []
+    lock_components: conlist(
+        constr(to_lower=True, strip_whitespace=True),
+        unique_items=True,
+    ) = []

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from collections import defaultdict
-from contextlib import suppress
 from itertools import chain
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -11,7 +10,6 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django_fsm import FSMField
 from pydantic import BaseModel
-
 from dolly.core import LiveCloner
 from dolly.utils import get_inf_collector
 from dolly.utils import get_model_formatted_dict
@@ -20,6 +18,7 @@ from yaml import safe_load
 from voteit.core.decorators import ensure_atomic
 from voteit.core.utils import get_content_registry
 from voteit.core.utils import get_model_by_shortname
+from voteit.core.workflows import EnabledWf
 from voteit.meeting.exceptions import DialectError
 from voteit.meeting.schemas import DialectSchema
 
@@ -295,6 +294,23 @@ class DialectHandler:
             if v is not None:
                 setattr(meeting, k, v)
         meeting.save()
+        # Block components
+        if self.data.block_components:
+            for component in meeting.components.filter(
+                component_name__in=self.data.block_components,
+                state=EnabledWf.ON,
+            ):
+                component.disable()
+                component.save()
+        # Configure components
+        for cs in self.data.configure_components:
+            # Reset component to trigger validation on state change
+            component, _ = meeting.components.update_or_create(
+                component_name=cs.name,
+                defaults={"settings_data": cs.settings, "state": EnabledWf.OFF},
+            )
+            component.enable()
+            component.save()
         # GroupRoles
         for gr_data in self.data.roles:
             group_role = meeting.group_roles.filter(role_id=gr_data.role_id).first()

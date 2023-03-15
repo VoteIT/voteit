@@ -1,17 +1,20 @@
-import os
+from copy import deepcopy
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from pydantic import ValidationError
-
 from dolly.utils import get_data_id_struct
+from voteit.active.components import ActiveUsersComponent
 
 from voteit.core.utils import get_model_by_shortname
+from voteit.components.app.components.message import FlashMessage
+from voteit.core.workflows import EnabledWf
 from voteit.meeting.exceptions import DialectError
 from voteit.meeting.tests.fixtures import BAD_DIALECT_FIXTURES
 from voteit.meeting.tests.fixtures import CYCLIC_DIALECT_FIXTURES
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
+from voteit.meeting.utils import get_merged_dialect_data
 from voteit.organisation.models import Organisation
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -144,6 +147,15 @@ dialect_named_test = {
     "group_votes_active": True,
     "group_roles_active": True,
 }
+dialect_with_component = {**dialect_named_test}
+dialect_with_component.update(
+    {
+        "block_components": ["repeated_irv"],
+        "configure_components": [
+            {"name": FlashMessage.name, "settings": {"msg": "Hello!"}}
+        ],
+    }
+)
 dialect_minimal = {"title": "Mini", "name": "mini"}
 dialect_minimal_requires_test = {"title": "Req", "name": "req", "requires": ["test"]}
 
@@ -236,6 +248,26 @@ class DialectHandlerTests(TestCase):
         self.assertTrue(self.meeting.group_votes_active)
         self.assertTrue(self.meeting.group_roles_active)
         self.assertEqual("auto_before_poll", self.meeting.proposal_id_policy_name)
+
+    def test_install_with_component(self):
+        handler = self._cut.load_from_dict(dialect_with_component)
+        handler.install(self.meeting)
+        component = self.meeting.components.filter(
+            component_name=FlashMessage.name
+        ).first()
+        self.assertEqual({"msg": "Hello!"}, component.settings_data)
+        self.assertEqual(EnabledWf.ON, component.state)
+
+    @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
+    def test_install_fixture_with_component(self):
+        handlers = get_merged_dialect_data(only="main_subst")
+        handler = self._cut.load_from_dict(handlers["main_subst"])
+        handler.install(self.meeting)
+        component = self.meeting.components.filter(
+            component_name=ActiveUsersComponent.name
+        ).first()
+        self.failUnless(component)
+        self.assertEqual(EnabledWf.ON, component.state)
 
 
 class RecursiveLoadHandlersTests(TestCase):

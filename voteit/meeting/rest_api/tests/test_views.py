@@ -662,28 +662,21 @@ class MeetingDialectsViewSetTests(APITestCase):
         url = reverse("meeting-dialects-list")
         response = self.client.get(url)
         data = response.json()
+        three = None
+        for v in data:
+            if v["name"] == "three":
+                three = v
+                break
         self.assertEqual(
-            [
-                {
-                    "requires": ["one", "two"],
-                    "title": "three",
-                    "description": "",
-                    "name": "three",
-                    "installable": True,
-                    "globally_available": True,
-                    "group_roles_active": True,
-                    "view_components": {},
-                },
-                {
-                    "requires": ["one"],
-                    "title": "Two!",
-                    "description": "",
-                    "name": "two",
-                    "globally_available": True,
-                    "installable": True,
-                    "group_roles_active": True,
-                    "view_components": {},
-                },
-            ],
-            data,
+            {
+                "requires": ["one", "two"],
+                "title": "three",
+                "description": "",
+                "name": "three",
+                "installable": True,
+                "globally_available": True,
+                "group_roles_active": True,
+                "view_components": {},
+            },
+            three,
         )
