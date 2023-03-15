@@ -104,7 +104,3 @@ class DialectSchema(BaseModel):
         constr(to_lower=True, strip_whitespace=True),
         unique_items=True,
     ) = []
-    lock_components: conlist(
-        constr(to_lower=True, strip_whitespace=True),
-        unique_items=True,
-    ) = []

@@ -21,5 +21,5 @@ group_roles_active: true
 group_votes_active: true
 configure_components:
   - name: active_users
-lock_components:
-  - active_users
+block_components:
+  - presence_check
