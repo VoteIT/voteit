@@ -88,3 +88,8 @@ class GroupVotesBeforePollTests(TestCase):
             {self.user1.pk: 5, self.user2.pk: 5},
             self.poll.electoral_register.get_weight_dict(),
         )
+
+    def test_no_groups(self):
+        self.meeting.groups.all().delete()
+        er = self.meeting.er_policy.create_er()
+        self.assertEqual({}, er.get_weight_dict())

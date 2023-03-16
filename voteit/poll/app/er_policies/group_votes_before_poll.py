@@ -57,6 +57,8 @@ class GroupVotesBeforePoll(GroupVoteElectoralRegisterPolicy):
                 counter[item["user"]] += item["votes"]
             member_total = counter.total()
             group_total = groups_qs.aggregate(Sum("votes"))["votes__sum"]
+            if group_total is None:
+                group_total = 0
             if member_total > group_total:
                 raise ElectoralRegisterError(
                     f"get_voters returned more vote weight ({member_total}) "
