@@ -11,20 +11,19 @@ from rest_framework.validators import UniqueTogetherValidator
 
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserSerializer
+from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api.validators import RoleValidator
-from voteit.meeting.rest_api.validators import validate_dialect_installable
+from voteit.meeting.rest_api.validators import DialectInstallableValidator
 from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
-from voteit.meeting.utils import get_merged_dialect_data
-from voteit.meeting.utils import recursive_load_handlers
 from voteit.poll.utils import get_electoral_policy_registry
 
 __all__ = (
@@ -93,7 +92,7 @@ class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
 
 class CreateMeetingSerializer(BaseModelSerializer):
     install_dialect = serializers.CharField(
-        validators=[validate_dialect_installable],
+        validators=[DialectInstallableValidator()],
         required=False,
     )
 
@@ -119,7 +118,9 @@ class CreateMeetingSerializer(BaseModelSerializer):
             install_dialect = validated_data.pop("install_dialect", None)
             instance = super().create(validated_data)
             if install_dialect:
-                for handler in recursive_load_handlers(install_dialect):
+                for handler in reversed(
+                    dialect_registry.get_dependent_dialects(install_dialect)
+                ):
                     handler.install(instance)
             return instance
 
@@ -185,15 +186,16 @@ class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
         installed = self.get_installed_dialect(instance)
         if installed:
             # May cause key error if something's wrong. We'll probably want that.
-            data = get_merged_dialect_data(installed)
             try:
-                return data[installed]
+                handler = dialect_registry.get_merged_handler(installed)
             except KeyError:
                 logger.error(
                     "Installed meeting dialect %s doesn't exist. Meeting pk: %s",
                     installed,
                     instance.pk,
                 )
+            else:
+                return handler.data.dict(exclude_unset=True)
 
 
 class AgendaOrderSerializer(serializers.Serializer):

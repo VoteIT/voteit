@@ -9,11 +9,12 @@ from envelope.messages.errors import UnauthorizedError
 from envelope.utils import channel_layer
 
 from voteit.core.testing import FakeCommit
+from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.management.tests import DIALECT_FIXTURES
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
-from voteit.meeting.utils import recursive_load_handlers
+
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -126,12 +127,6 @@ class InstallDialectTests(TestCase):
         with self.assertRaises(UnauthorizedError):
             msg.run_job()
 
-    def test_install_bad_dialect_name(self):
-        msg = self._mk_one(self.moderator, dialect="404")
-        with self.assertRaises(BadRequestError) as cm:
-            msg.run_job()
-        self.assertIn("Dialect 404 doesn't exist", cm.exception.data.msg)
-
     def test_installable_respected(self):
         msg = self._mk_one(self.moderator, dialect="one")
         with self.assertRaises(BadRequestError) as cm:
@@ -148,7 +143,7 @@ class RemoveDialectTests(TestCase):
         cls.participant = User.objects.create(username="participant")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
-        for handler in recursive_load_handlers("two"):
+        for handler in reversed(dialect_registry.get_dependent_dialects("two")):
             handler.install(cls.meeting)
 
     @property
@@ -188,9 +183,4 @@ class RemoveDialectTests(TestCase):
     def test_remove_bad_perm(self):
         msg = self._mk_one(self.participant, dialect="two")
         with self.assertRaises(UnauthorizedError):
-            msg.run_job()
-
-    def test_remove_bad_dialect_name(self):
-        msg = self._mk_one(self.moderator, dialect="404")
-        with self.assertRaises(BadRequestError):
             msg.run_job()

@@ -1,11 +1,11 @@
 from pydantic import BaseModel
-from pydantic import conset
+from pydantic import conlist
 from pydantic import constr
 from pydantic import validator
 
 from voteit.components.abcs import ComponentAdapter
 from voteit.components.registries import organisation_components
-from voteit.meeting.utils import get_named_path_dict
+
 
 __all__ = (
     "DialectsFilterSchema",
@@ -14,13 +14,19 @@ __all__ = (
 
 
 class DialectsFilterSchema(BaseModel):
-    include: conset(constr(strip_whitespace=True, to_lower=True)) = []
-    exclude: conset(constr(strip_whitespace=True, to_lower=True)) = []
+    include: conlist(
+        constr(strip_whitespace=True, to_lower=True), unique_items=True
+    ) = []
+    exclude: conlist(
+        constr(strip_whitespace=True, to_lower=True), unique_items=True
+    ) = []
 
     @validator("include", "exclude")
-    def validate_dialect_name(cls, v: set[str]):
+    def validate_dialect_name(cls, v: list[str]):
+        from voteit.meeting.dialects import get_named_path_dict  # Avoid circular
+
         valid_names = set(get_named_path_dict())
-        invalid = v - valid_names
+        invalid = set(v) - valid_names
         if invalid:
             raise ValueError(f"Doesn't match known dialects: {', '.join(invalid)}")
         return v

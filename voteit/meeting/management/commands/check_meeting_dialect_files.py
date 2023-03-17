@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
 
-from voteit.meeting.utils import check_dialect_files
+from voteit.meeting.dialects import check_dialect_files
 
 
 class Command(BaseCommand):

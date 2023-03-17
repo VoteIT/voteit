@@ -20,6 +20,7 @@ from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.meeting import roles
+from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -28,7 +29,6 @@ from voteit.meeting.permissions import MeetingGroupPermissions
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.rest_api import serializers
 from voteit.meeting.rest_api.filters import MeetingRolesFilter
-from voteit.meeting.utils import get_merged_dialect_data
 from voteit.organisation.models import Organisation
 
 __all__ = (
@@ -281,8 +281,10 @@ class MeetingDialectsViewSet(viewsets.ViewSet):
     Endpoint for installable meeting dialects
     """
 
+    permission_classes = [permissions.IsAuthenticated]
+
     def list(self, request, *args, **kwargs):
-        result = sorted(
-            [v for k, v in get_merged_dialect_data().items()], key=lambda v: v["name"]
+        org_installable = dialect_registry.get_org_installable(
+            organisation=request.user.organisation
         )
-        return Response(data=result)
+        return Response(data=sorted(org_installable.items()))

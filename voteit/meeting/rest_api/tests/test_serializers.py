@@ -165,12 +165,16 @@ class MeetingDetailSerializerTests(TestCase):
             {
                 "description": "",
                 "group_roles_active": True,
-                "globally_available": True,
                 "installable": True,
                 "name": "three",
                 "requires": ["one", "two"],
-                "title": "three",
+                "title": "Three",
                 "view_components": {},
+                "groups": [
+                    {"groupid": "pirates"},
+                    {"groupid": "swashbucklers"},
+                    {"groupid": "shiphands"},
+                ],
             },
             serializer.data["dialect"],
         )

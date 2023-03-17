@@ -3,7 +3,9 @@ from django.dispatch import receiver
 from django.test import override_settings
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
+
 from voteit.agenda.models import AgendaItem
+from voteit.components.app.components.dialects import DialectsFilter
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -11,6 +13,7 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.signals import group_role_added
 from voteit.meeting.signals import group_role_removed
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
+from voteit.organisation.models import Organisation
 
 User = get_user_model()
 
@@ -656,27 +659,26 @@ class ExportParticipantsViewSetTests(APITestCase):
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
 class MeetingDialectsViewSetTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+        cls.user = cls.org.users.create(username="user")
+
     def test_list(self):
-        user = User.objects.create(username="anon")
-        self.client.force_login(user)
+        self.client.force_login(self.user)
         url = reverse("meeting-dialects-list")
         response = self.client.get(url)
-        data = response.json()
-        three = None
-        for v in data:
-            if v["name"] == "three":
-                three = v
-                break
         self.assertEqual(
-            {
-                "requires": ["one", "two"],
-                "title": "three",
-                "description": "",
-                "name": "three",
-                "installable": True,
-                "globally_available": True,
-                "group_roles_active": True,
-                "view_components": {},
-            },
-            three,
+            [["main_subst", "Main/subst"], ["three", "Three"], ["two", "Two!"]],
+            response.json(),
         )
+
+    def test_list_with_org_filter(self):
+        self.org.components.create(
+            component_name=DialectsFilter.name,
+            settings={"include": ["one"], "exclude": ["main_subst", "three"]},
+        )
+        self.client.force_login(self.user)
+        url = reverse("meeting-dialects-list")
+        response = self.client.get(url)
+        self.assertEqual([["one", "Hello"], ["two", "Two!"]], response.json())

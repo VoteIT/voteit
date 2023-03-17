@@ -1,3 +1,6 @@
 title: Hello
 group_roles_active: true
 installable: false
+groups:
+  - groupid: pirates
+  - groupid: swashbucklers

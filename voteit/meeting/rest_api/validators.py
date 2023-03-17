@@ -3,11 +3,13 @@ from typing import TYPE_CHECKING
 
 from rest_framework.exceptions import ValidationError
 
-from voteit.meeting.utils import get_named_path_dict
-from voteit.meeting.utils import load_dialect_file
+from voteit.meeting.dialects import dialect_registry
+from voteit.meeting.dialects import get_named_path_dict
+
 
 if TYPE_CHECKING:
     from voteit.core.models import Roles
+    from rest_framework.serializers import Serializer
 
 
 class RoleValidator:
@@ -25,11 +27,16 @@ class RoleValidator:
             raise ValidationError(f'The role "{value}" is not valid for this context.')
 
 
-def validate_dialect_installable(value):
-    named_paths = get_named_path_dict()
-    if value not in named_paths:
-        raise ValidationError(f"No meeting dialect named {value}")
-    # May raise exceptions, but we'll want to get those
-    dialect = load_dialect_file(value, named_paths[value])
-    if not dialect.data.installable:
-        raise ValidationError(f"Meeting dialect named {value} isn't installable")
+class DialectInstallableValidator:
+    requires_context = True
+
+    def __call__(self, value, serializer: Serializer):
+        named_paths = get_named_path_dict()
+        if value not in named_paths:
+            raise ValidationError(f"No meeting dialect named {value}")
+        request = serializer.context.get("request")
+        org_installable = dialect_registry.get_org_installable(
+            organisation=request.user.organisation
+        )
+        if value not in org_installable:
+            raise ValidationError(f"Meeting dialect named {value} isn't installable")

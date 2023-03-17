@@ -4,19 +4,20 @@ from auditlog.context import set_actor
 from pydantic import BaseModel
 from pydantic import constr
 from pydantic import validator
-
 from envelope.core.message import ContextAction
 from envelope.messages.common import ProgressNum
 from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
 from envelope.utils import websocket_send
-from voteit.meeting.exceptions import DialectError
 
+from voteit.meeting.dialects import DialectHandler
+from voteit.meeting.dialects import dialect_registry
+from voteit.meeting.dialects import get_named_path_dict
+from voteit.meeting.exceptions import DialectError
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.utils import clone_meeting
-from voteit.meeting.utils import recursive_load_handlers
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.messaging.base import BaseObjectAdded
@@ -118,15 +119,13 @@ class CopyMeeting(ContextAction):
 class DialectSchema(BaseModel):
     dialect: constr(max_length=30, to_lower=True)
     meeting: int
-    # Don't validate dialect name, since it might be a bit slow...
-    # @validator("dialect")
-    # def validate_dialect(cls, v: str):
-    #     try:
-    #         # This might be slow, so it might be a good idea to move it to
-    #         recursive_load_handlers(v)
-    #     except DialectError:
-    #         raise ValueError(f"No dialect named {v}")
-    #     return v
+
+    @validator("dialect")
+    def validate_dialect(cls, v: str):
+        """Very basic validation, we only check existing filename"""
+        if v and v not in get_named_path_dict():
+            raise ValueError(f"{v} is not a known meeting dialect name")
+        return v
 
 
 class DialectAction(ContextAction, ABC):
@@ -137,10 +136,10 @@ class DialectAction(ContextAction, ABC):
     context: Meeting
     context_schema_attr = "meeting"
 
-    def get_handlers(self):
+    def get_handlers(self) -> list[DialectHandler]:
         self.assert_perm()
         try:
-            return recursive_load_handlers(self.data.dialect)
+            return dialect_registry.get_dependent_dialects(self.data.dialect)
         except DialectError as exc:
             # Other exc?
             raise BadRequestError.from_message(self, msg=str(exc))
@@ -157,14 +156,16 @@ class InstallDialect(DialectAction):
             )
         #        websocket_send(update, state=update.RUNNING, on_commit=False)
         handlers = self.get_handlers()
-        if not handlers[-1].data.installable:
+        if not handlers[0].data.installable:
             raise BadRequestError.from_message(
                 self, msg="This dialect isn't installable"
             )
-        total = len(handlers)
         i = 0
+        total = len(handlers)
         with set_actor(self.user):
-            for handler in handlers:
+            for handler in reversed(
+                handlers
+            ):  # <- required dialects must be installed first
                 websocket_send(
                     ProgressNum.from_message(self, curr=i, total=total),
                     state=self.RUNNING,
@@ -188,7 +189,7 @@ class RemoveDialect(DialectAction):
             raise BadRequestError.from_message(self, msg="Nothing installed")
         handlers = self.get_handlers()
         installed = self.context.installed_dialects.split(",")
-        handler_names = [x.data.name for x in handlers]
+        handler_names = [x.data.name for x in reversed(handlers)]
         if handler_names != installed:
             raise BadRequestError.from_message(
                 self,
@@ -198,7 +199,7 @@ class RemoveDialect(DialectAction):
         total = len(handlers)
         i = 0
         with set_actor(self.user):
-            for handler in reversed(handlers):
+            for handler in handlers:
                 websocket_send(
                     ProgressNum.from_message(self, curr=i, total=total),
                     state=self.RUNNING,

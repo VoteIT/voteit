@@ -21,7 +21,7 @@ class GroupRoleSchema(BaseModel):
 
 
 class GroupSchema(BaseModel):
-    title: constr(max_length=100)
+    title: constr(max_length=100) | None
     groupid: constr(max_length=100, to_lower=True, strip_whitespace=True)
 
 
@@ -91,19 +91,20 @@ class DialectSchema(BaseModel):
     pydantic.error_wrappers.ValidationError:
     """
 
-    requires: list[str] = ()
     title: str
     description: str = ""
     name: str
-    globally_available: bool = True
     roles: conlist(GroupRoleSchema, unique_items=True) = []
     groups: conlist(GroupSchema, unique_items=True) = []
     er_policy_name: str | None = None
     group_votes_active: bool | None = None
     group_roles_active: bool | None = None
     proposal_id_policy_name: str | None = None
-    # restricts: list[str] = ()  FIXME: We should have a system for restrictions
-    installable: bool = True  # Deprecated or a base template? Set this to false
+    installable: bool = True  # Offer as selection for all organisations?
+    requires: conlist(
+        constr(to_lower=True, strip_whitespace=True),
+        unique_items=True,
+    ) = []
     view_components: dict[str, str] = {}
     configure_components: list[ComponentSettings] = []
     block_components: conlist(
