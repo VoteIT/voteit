@@ -4,11 +4,15 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
+from envelope.app.user_channel.channel import UserChannel
 from envelope.messages.channels import Subscribe
-from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
+from voteit.meeting.models import Meeting
+from voteit.poll.app.er_policies.auto_always import AutoAlways
+from voteit.poll.channels import PollChannel
+from voteit.poll.models import ElectoralRegister
 
 User = get_user_model()
 
@@ -21,9 +25,6 @@ _channel_layers_setting = {
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class PollSubscribedTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-        from voteit.poll.models import ElectoralRegister
-
         er = ElectoralRegister.objects.create()
         self.meeting = Meeting.objects.create()
         self.poll = self.meeting.polls.create(
@@ -52,9 +53,6 @@ class MeetingSubscribedTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.poll.models import ElectoralRegister
-
         cls.meeting = Meeting.objects.get(pk=1)
         cls.meeting.er_policy_name = None
         cls.ai = cls.meeting.agenda_items.create()
@@ -136,9 +134,6 @@ class MeetingSubscribedTests(TestCase):
 class PollChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.poll.models import ElectoralRegister
-
         cls.er = ElectoralRegister.objects.create()
         cls.meeting = Meeting.objects.create()
         cls.ai = cls.meeting.agenda_items.create()
@@ -165,7 +160,7 @@ class PollChangedTests(TestCase):
         from voteit.poll.messages import PollAdded
 
         self.assertFalse(mock_publish.called)
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             poll = self.meeting.polls.create(
                 method_name="simple", electoral_register=self.er
             )
@@ -182,7 +177,7 @@ class PollChangedTests(TestCase):
         from voteit.poll.messages import PollDeleted
 
         self.assertFalse(mock_publish.called)
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             self.poll.title = "Hello"
             self.poll.save()
         self.assertTrue(mock_publish.called)
@@ -190,7 +185,7 @@ class PollChangedTests(TestCase):
         self.assertIsInstance(msg, PollChanged)
         self.assertEqual(self.poll.pk, msg.data.pk)
         mock_publish.reset_mock()
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             self.poll.unpublish()
             self.poll.save()
         self.assertTrue(mock_publish.called)
@@ -234,9 +229,6 @@ class PollChangedTests(TestCase):
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class PrivateAIPublishedTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-        from voteit.poll.models import ElectoralRegister
-
         self.er = ElectoralRegister.objects.create()
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create()
@@ -279,8 +271,6 @@ class PrivateAIPublishedTests(TestCase):
 class NewERSentToMeetingTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting = Meeting.objects.create(er_policy_name="manual")
         cls.user = User.objects.create(username="user")
         cls.meeting.add_roles(cls.user, "participant", "potential_voter")
@@ -300,3 +290,74 @@ class NewERSentToMeetingTests(TestCase):
         msg = messages[0]
         self.assertEqual(er.pk, msg.data.pk)
         self.assertEqual([{"user": self.user.pk, "weight": 5}], msg.data.weights)
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class VoteSignalsTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create(er_policy_name=AutoAlways.name)
+        cls.user = User.objects.create(username="user")
+        cls.meeting.add_roles(cls.user, "participant", "potential_voter")
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.prop = cls.ai.proposals.create()
+        cls.poll = cls.meeting.polls.create(method_name="simple")
+        cls.poll.proposals.add(cls.prop)
+        cls.poll.upcoming()
+        cls.poll.ongoing()
+        cls.poll.save()
+
+    @patch.object(UserChannel, "sync_publish")
+    def test_added(self, mock_publish):
+        from voteit.poll.messages import GenericVoteResponse
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.poll.votes.create(user=self.user, vote="yes")
+
+        self.assertTrue(mock_publish.called)
+        messages = [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if isinstance(x.args[0], GenericVoteResponse)
+        ]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertEqual({"choice": "yes"}, msg.data.vote)
+
+    @patch.object(UserChannel, "sync_publish")
+    def test_changed(self, mock_publish):
+        from voteit.poll.messages import GenericVoteResponse
+
+        with self.captureOnCommitCallbacks(execute=True):
+            vote = self.poll.votes.create(user=self.user, vote="yes")
+        mock_publish.reset_mock()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            vote.vote = "no"
+            vote.save()
+
+        self.assertTrue(mock_publish.called)
+        messages = [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if isinstance(x.args[0], GenericVoteResponse)
+        ]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertEqual({"choice": "no"}, msg.data.vote)
+
+    @patch.object(PollChannel, "sync_publish")
+    def test_count_sent_to_poll_ch(self, mock_publish):
+        from voteit.poll.messages import PollStatus
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.poll.votes.create(user=self.user, vote="yes")
+        self.assertTrue(mock_publish.called)
+        messages = [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if isinstance(x.args[0], PollStatus)
+        ]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertEqual(1, msg.data.voted)

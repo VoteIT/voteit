@@ -13,6 +13,7 @@ from django.dispatch import receiver
 from django_fsm import pre_transition
 from django_fsm.signals import post_transition
 
+from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
@@ -241,7 +242,7 @@ def validate_related_proposals(
 
 @receiver(post_save, sender=Vote)
 @disable_on_raw_save
-def vote_added(instance=None, created=None, **kw):
+def vote_added(instance: Vote, *, created: bool, **kw):
     # We don't have to count updated votes!
     if created:
         poll = instance.poll
@@ -252,3 +253,8 @@ def vote_added(instance=None, created=None, **kw):
         )
         ch = PollChannel.from_instance(poll)
         ch.sync_publish(msg)
+    # We need to send the vote to the user too, so they have access to their own data in case they're using several tabs
+    user_ch = UserChannel.from_instance(instance.user)
+    serializer = VoteSerializer(instance)
+    msg = GenericVoteResponse(**serializer.data)
+    user_ch.sync_publish(msg)
