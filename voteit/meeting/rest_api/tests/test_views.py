@@ -669,7 +669,11 @@ class MeetingDialectsViewSetTests(APITestCase):
         url = reverse("meeting-dialects-list")
         response = self.client.get(url)
         self.assertEqual(
-            [["main_subst", "Main/subst"], ["three", "Three"], ["two", "Two!"]],
+            [
+                {"name": "main_subst", "title": "Main/subst"},
+                {"name": "three", "title": "Three"},
+                {"name": "two", "title": "Two!"},
+            ],
             response.json(),
         )
 
@@ -681,4 +685,7 @@ class MeetingDialectsViewSetTests(APITestCase):
         self.client.force_login(self.user)
         url = reverse("meeting-dialects-list")
         response = self.client.get(url)
-        self.assertEqual([["one", "Hello"], ["two", "Two!"]], response.json())
+        self.assertEqual(
+            [{"name": "one", "title": "Hello"}, {"name": "two", "title": "Two!"}],
+            response.json(),
+        )

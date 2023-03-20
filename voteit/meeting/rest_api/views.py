@@ -287,4 +287,8 @@ class MeetingDialectsViewSet(viewsets.ViewSet):
         org_installable = dialect_registry.get_org_installable(
             organisation=request.user.organisation
         )
-        return Response(data=sorted(org_installable.items()))
+        return Response(
+            data=[
+                {"name": x[0], "title": x[1]} for x in sorted(org_installable.items())
+            ]
+        )
