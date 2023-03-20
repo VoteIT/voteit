@@ -47,10 +47,6 @@ if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from envelope.utils import AppState
     from voteit.core.abcs import MeetingContext
-    from voteit.messaging.base import BaseObjectAdded
-    from voteit.messaging.base import BaseObjectChanged
-    from voteit.messaging.base import BaseObjectDeleted
-    from rest_framework.serializers import ModelSerializer
 
 # Signal providing an atomic transaction to do cleanup when a meeting is archived
 # Will provide argument "meeting"
@@ -70,44 +66,32 @@ group_role_added = Signal()
 group_role_removed = Signal()
 
 
-def mk_default_changed_publisher_to_meeting(
-    *,
-    model: type[MeetingContext],
-    added_serializer: type[ModelSerializer],
-    changed_serializer: type[ModelSerializer],
-    added_msg: type[BaseObjectAdded],
-    changed_msg: type[BaseObjectChanged],
-):
-    @receiver(post_save, sender=model)
-    @disable_on_raw_save
-    def _publish_changed(*, instance: model, created: bool, **kw):
-        f"""
-        Default publish changed for {model}
-        """
-        meeting_ch = MeetingChannel.from_instance(instance.meeting)
-        if created:
-            data = added_serializer(instance).data
-            msg = added_msg(**data)
-        else:
-            data = changed_serializer(instance).data
-            msg = changed_msg(**data)
-        meeting_ch.sync_publish(msg, on_commit=True)
-
-
-def mk_default_deleted_publisher_to_meeting(
-    *,
-    model: type[MeetingContext],
-    msg_class: type[BaseObjectDeleted],
-):
-    @disable_on_raw_save
-    @receiver(pre_delete, sender=model)
-    def _publish_delete(*, instance: model, **kwargs):
-        f"""
-        Default publish deleted for {model}
-        """
-        meeting_ch = MeetingChannel.from_instance(instance.meeting)
-        msg = msg_class(pk=instance.pk)
-        meeting_ch.sync_publish(msg, on_commit=True)
+_del_msg_class = {
+    Meeting: MeetingDeleted,
+    MeetingGroup: MeetingGroupDeleted,
+    GroupRole: GroupRoleDeleted,
+    GroupMembership: GroupMembershipDeleted,
+}
+_added_serializer_class = {
+    MeetingGroup: MeetingGroupSerializer,
+    GroupRole: GroupRoleSerializer,
+    GroupMembership: GroupMembershipSerializer,
+}
+_added_msg_class = {
+    MeetingGroup: MeetingGroupAdded,
+    GroupRole: GroupRoleAdded,
+    GroupMembership: GroupMembershipAdded,
+}
+_changed_serializer_class = {
+    MeetingGroup: MeetingGroupSerializer,
+    GroupRole: GroupRoleSerializer,
+    GroupMembership: GroupMembershipSerializer,
+}
+_changed_msg_class = {
+    MeetingGroup: MeetingGroupChanged,
+    GroupRole: GroupRoleChanged,
+    GroupMembership: GroupMembershipChanged,
+}
 
 
 @receiver(post_save, sender=MeetingRoles)
@@ -140,7 +124,16 @@ def meeting_change(instance, created=None, **kw):
         ch.sync_publish(msg)
 
 
-mk_default_deleted_publisher_to_meeting(model=Meeting, msg_class=MeetingDeleted)
+@receiver(pre_delete, sender=Meeting)
+@receiver(pre_delete, sender=MeetingGroup)
+@receiver(pre_delete, sender=GroupRole)
+@receiver(pre_delete, sender=GroupMembership)
+def publish_deleted_to_meeting_ch(instance: MeetingContext, *, sender, **kwargs):
+    if instance.meeting and instance.pk is not None:
+        meeting_ch = MeetingChannel.from_instance(instance.meeting)
+        msg_class = _del_msg_class.get(sender)
+        msg = msg_class(pk=instance.pk)
+        meeting_ch.sync_publish(msg, on_commit=True)
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
@@ -185,46 +178,24 @@ def meeting_channel_subscribed(
         )
 
 
-# MeetingGroup
-mk_default_changed_publisher_to_meeting(
-    model=MeetingGroup,
-    added_serializer=MeetingGroupSerializer,
-    changed_serializer=MeetingGroupSerializer,
-    added_msg=MeetingGroupAdded,
-    changed_msg=MeetingGroupChanged,
-)
-mk_default_deleted_publisher_to_meeting(
-    model=MeetingGroup,
-    msg_class=MeetingGroupDeleted,
-)
+@receiver(post_save, sender=MeetingGroup)
+@receiver(post_save, sender=GroupMembership)
+@receiver(post_save, sender=GroupRole)
+@disable_on_raw_save
+def context_changed_publish_to_meeting(instance, *, sender, created, **kwargs):
+    meeting_ch = MeetingChannel.from_instance(instance.meeting)
+    if created:
+        serializer = _added_serializer_class[sender]
+        data = serializer(instance).data
+        added_msg = _added_msg_class[sender]
+        msg = added_msg(**data)
+    else:
+        serializer = _changed_serializer_class[sender]
 
-
-# GroupRole
-mk_default_changed_publisher_to_meeting(
-    model=GroupRole,
-    added_serializer=GroupRoleSerializer,
-    changed_serializer=GroupRoleSerializer,
-    added_msg=GroupRoleAdded,
-    changed_msg=GroupRoleChanged,
-)
-mk_default_deleted_publisher_to_meeting(
-    model=GroupRole,
-    msg_class=GroupRoleDeleted,
-)
-
-
-# GroupMembership
-mk_default_changed_publisher_to_meeting(
-    model=GroupMembership,
-    added_serializer=GroupMembershipSerializer,
-    changed_serializer=GroupMembershipSerializer,
-    added_msg=GroupMembershipAdded,
-    changed_msg=GroupMembershipChanged,
-)
-mk_default_deleted_publisher_to_meeting(
-    model=GroupMembership,
-    msg_class=GroupMembershipDeleted,
-)
+        data = serializer(instance).data
+        changed_msg = _changed_msg_class[sender]
+        msg = changed_msg(**data)
+    meeting_ch.sync_publish(msg, on_commit=True)
 
 
 @receiver(pre_save, sender=MeetingGroup)
