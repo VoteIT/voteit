@@ -38,10 +38,10 @@ def begin_auth(request):
         organisation = Organisation.objects.get(host=hostname)
     except Organisation.DoesNotExist:
         raise Http404("No organisation with host %s" % hostname)
-
-    provider = organisation.provider
-    if not provider:
-        raise Http404("No provider for organisation")
+    try:
+        provider = organisation.provider
+    except Organisation.provider.RelatedObjectDoesNotExist as exc:
+        raise Http404("No login method for organisation") from exc
     log_auth("Begin auth", request=request, context=organisation)
     # Get scopes from organisation or provider?
     # Note: This is not for security, only to make sure a cookie has been set for the same domain
