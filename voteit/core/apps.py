@@ -15,7 +15,8 @@ class CoreConfig(AppConfig):
 
         while models_to_register:
             model = models_to_register.pop()
-            register_model(model, content_types)
+            if not model._meta.proxy:
+                register_model(model, content_types)
 
         # Make sure linked permissions make sense
         permissions.validate_registry()
