@@ -48,6 +48,10 @@ class DialectRegistry(UserDict):
     data: dict[str, DialectHandler]
 
     @refresh
+    def load(self):
+        ...
+
+    @refresh
     def get_installable(self, include=tuple(), exclude=tuple()) -> dict[str, str]:
         """
         Return installable dialects
@@ -81,6 +85,11 @@ class DialectRegistry(UserDict):
             if handler.data.requires:
                 return_names.extend(handler.data.requires)
         return results
+
+    def get_title(self, name: str, default=None) -> str | None:
+        if name in self:
+            return self[name].data.title or name
+        return default
 
     def get_merged_handler(self, name) -> DialectHandler:
         """

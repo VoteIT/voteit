@@ -15,6 +15,7 @@ from dolly.core import LiveCloner
 from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.agenda.models import AgendaItem
+from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
@@ -98,6 +99,75 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
             "admin:meeting_meeting_change", kwargs={"object_id": cloned_meeting.pk}
         )
         return HttpResponseRedirect(url)
+
+
+class DialectFilter(admin.SimpleListFilter):
+    title = "Dialect"
+
+    # Parameter for the filter that will be used in the URL query.
+    parameter_name = "dialect"
+    # Constants
+    VANILLA = "0"
+
+    def lookups(self, request, model_admin):
+        """
+        Returns a list of tuples. The first element in each
+        tuple is the coded value for the option that will
+        appear in the URL query. The second element is the
+        human-readable name for the option that will appear
+        in the right sidebar.
+        """
+        items = [(self.VANILLA, "None (vanilla)")]
+        dialect_registry.load()
+        items.extend((k, v.data.title or k) for k, v in dialect_registry.items())
+        return items
+
+    def queryset(self, request, queryset):
+        """
+        Returns the filtered queryset based on the value
+        provided in the query string and retrievable via
+        `self.value()`.
+        """
+        # decide how to filter the queryset.
+        v = self.value()
+        if v == self.VANILLA:
+            return queryset.filter(installed_dialect__isnull=True)
+        elif v:
+            return queryset.filter(installed_dialect=v)
+        return queryset
+
+
+class MeetingDialectProxy(Meeting):
+    class Meta:
+        proxy = True
+
+
+@admin.register(MeetingDialectProxy)
+class MeetingDialectProxyAdmin(MeetingAdmin):
+    list_display = (
+        "title",
+        "installed_dialect_title",
+        "state",
+        "start_time",
+        "end_time",
+    )
+    list_filter = (
+        "organisation",
+        "state",
+        DialectFilter,
+    )
+    search_fields = ("title", "installed_dialect")
+    # actions = ["", "clone_meeting"]
+    exclude = ("mentions",)
+
+    @admin.display(description="Dialect")
+    def installed_dialect_title(self, instance: Meeting):
+        if instance.installed_dialect:
+            # We don't want None here even if the dialect doesn't exist!
+            return dialect_registry.get_title(
+                instance.installed_dialect,
+                default=f"Broken:{instance.installed_dialect}",
+            )
 
 
 class MeetingAdminMixin:
