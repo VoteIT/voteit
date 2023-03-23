@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.contrib import messages
 from typing import TYPE_CHECKING
 
 from django.contrib import admin
@@ -69,8 +70,9 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
             self.message_user(
                 request,
                 "Select exactly 1 to report",
-                self.ERROR,
+                messages.ERROR,
             )
+            return
         exclude_models = get_default_models_ignored_on_clone()
         meeting = queryset.first()
         data = collect_meeting(meeting, exclude=exclude_models)
@@ -90,8 +92,9 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
             self.message_user(
                 request,
                 "Select exactly 1 to clone",
-                self.ERROR,
+                messages.ERROR,
             )
+            return
         meeting = queryset.first()
         with transaction.atomic(durable=True):
             cloned_meeting = clone_meeting(meeting, user=request.user)
@@ -157,8 +160,9 @@ class MeetingDialectProxyAdmin(MeetingAdmin):
         DialectFilter,
     )
     search_fields = ("title", "installed_dialect")
-    # actions = ["", "clone_meeting"]
-    exclude = ("mentions",)
+    actions = ["uninstall_dialect"]
+    fields = ("installed_dialect",)
+    inlines = []
 
     @admin.display(description="Dialect")
     def installed_dialect_title(self, instance: Meeting):
@@ -168,6 +172,19 @@ class MeetingDialectProxyAdmin(MeetingAdmin):
                 instance.installed_dialect,
                 default=f"Broken:{instance.installed_dialect}",
             )
+
+    @admin.action(description="Uninstall dialect")
+    def uninstall_dialect(self, request, queryset):
+        queryset = queryset.exclude(installed_dialect__isnull=True)
+        with transaction.atomic(durable=True):
+            for m in queryset:
+                handler = dialect_registry.get_merged_handler(m.installed_dialect)
+                handler.remove(m)
+        self.message_user(
+            request,
+            f"Uninstalled {queryset.count()}",
+            messages.SUCCESS,
+        )
 
 
 class MeetingAdminMixin:
