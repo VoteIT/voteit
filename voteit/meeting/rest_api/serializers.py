@@ -118,10 +118,8 @@ class CreateMeetingSerializer(BaseModelSerializer):
             install_dialect = validated_data.pop("install_dialect", None)
             instance = super().create(validated_data)
             if install_dialect:
-                for handler in reversed(
-                    dialect_registry.get_dependent_dialects(install_dialect)
-                ):
-                    handler.install(instance)
+                handler = dialect_registry.get_merged_handler(install_dialect)
+                handler.install(instance)
             return instance
 
     def validate_er_policy_name(self, value: str | None):
@@ -138,7 +136,6 @@ class CreateMeetingSerializer(BaseModelSerializer):
 
 
 class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
-    installed_dialect = serializers.SerializerMethodField()
     dialect = serializers.SerializerMethodField()
 
     class Meta:
@@ -174,24 +171,17 @@ class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
             )
         return value
 
-    def get_installed_dialect(self, instance: Meeting) -> str | None:
-        """
-        If a dialect is installed:
-        Returns installed dialect name, which is the last one in the chain.
-        """
-        if instance.installed_dialects:
-            return instance.installed_dialects.split(",")[-1]
-
     def get_dialect(self, instance: Meeting) -> dict | None:
-        installed = self.get_installed_dialect(instance)
-        if installed:
+        if instance.installed_dialect:
             # May cause key error if something's wrong. We'll probably want that.
             try:
-                handler = dialect_registry.get_merged_handler(installed)
+                handler = dialect_registry.get_merged_handler(
+                    instance.installed_dialect
+                )
             except KeyError:
                 logger.error(
                     "Installed meeting dialect %s doesn't exist. Meeting pk: %s",
-                    installed,
+                    instance.installed_dialect,
                     instance.pk,
                 )
             else:

@@ -167,18 +167,9 @@ class DialectHandler:
     @ensure_atomic
     def install(self, meeting: Meeting):
         # Basics
-        installed = (
-            meeting.installed_dialects and meeting.installed_dialects.split(",") or []
-        )
-        if self.data.name in installed:
-            raise DialectError(f"{self.data.name} already installed")
-        for req in self.data.requires:
-            if req not in installed:
-                raise DialectError(
-                    f"{req} must be installed before installing {self.data.name}"
-                )
-        installed.append(self.data.name)
-        meeting.installed_dialects = ",".join(installed)
+        if meeting.installed_dialect:
+            raise DialectError(f"Meeting already has an installed dialect")
+        meeting.installed_dialect = self.data.name
         # Optionals
         for k in chain(self.optional_nullable, self.optional_default_false):
             v = getattr(self.data, k)
@@ -224,17 +215,10 @@ class DialectHandler:
                 group.save()
 
     @ensure_atomic
-    def remove(self, meeting: Meeting):
-        installed = (
-            meeting.installed_dialects and meeting.installed_dialects.split(",") or []
-        )
-        if self.data.name not in installed[-1:]:
-            raise DialectError("%s is not the last installed dialect" % self.data.name)
-        installed.remove(self.data.name)
-        if installed:
-            meeting.installed_dialects = ",".join(installed)
-        else:
-            meeting.installed_dialects = None
+    def remove(self, meeting: Meeting, groups: bool = False):
+        if self.data.name != meeting.installed_dialect:
+            raise DialectError("%s is not installed" % self.data.name)
+        meeting.installed_dialect = None
         # Optional, only touch not none
         # Always disable these if they had a setting
         for k in self.optional_default_false:
@@ -251,10 +235,10 @@ class DialectHandler:
         meeting.group_roles.filter(
             role_id__in=[x.role_id for x in self.data.roles]
         ).delete()
-        # Groups - should we really remove them...?
-        meeting.groups.filter(
-            groupid__in=[x.groupid for x in self.data.groups]
-        ).delete()
+        if groups:
+            meeting.groups.filter(
+                groupid__in=[x.groupid for x in self.data.groups]
+            ).delete()
 
 
 def check_dialect_files() -> list[tuple[str, str]]:

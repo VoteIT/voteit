@@ -139,10 +139,9 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         null=True,
         blank=True,
     )
-    installed_dialects: str | None = models.CharField(
-        verbose_name="Configuration steps for roles, groups etc. that have been run. "
-        "Comma-separated, in order of installation.",
-        max_length=300,
+    installed_dialect: str | None = models.CharField(
+        verbose_name="Configuration steps for roles, groups or similar + possible restrictions.",
+        max_length=60,
         null=True,
         blank=True,
     )

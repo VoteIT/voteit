@@ -3,11 +3,16 @@ from django.test import TestCase
 from django.test import override_settings
 from pydantic import ValidationError
 
+from voteit.components.app.components.dialects import DialectsFilter
+from voteit.components.app.components.irv import RepeatedIRV
 from voteit.components.app.components.message import FlashMessage
 from voteit.core.workflows import EnabledWf
+from voteit.meeting.dialects import get_named_path_dict
 from voteit.meeting.exceptions import DialectError
 from voteit.meeting.models import Meeting
+from voteit.meeting.tests.fixtures import CYCLIC_DIALECT_FIXTURES
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
+from voteit.organisation.models import Organisation
 
 User = get_user_model()
 
@@ -30,7 +35,7 @@ dialect_named_test = {
 dialect_with_component = {**dialect_named_test}
 dialect_with_component.update(
     {
-        "block_components": ["repeated_irv"],
+        "block_components": [RepeatedIRV.name],
         "configure_components": [
             {"name": FlashMessage.name, "settings": {"msg": "Hello!"}}
         ],
@@ -58,7 +63,7 @@ class DialectHandlerTests(TestCase):
     def test_install(self):
         handler = self._cut.load_from_dict(dialect_named_test)
         handler.install(self.meeting)
-        self.assertEqual("test", self.meeting.installed_dialects)
+        self.assertEqual("test", self.meeting.installed_dialect)
         self.assertEqual("auto_before_poll", self.meeting.er_policy_name)
         self.assertTrue(self.meeting.group_votes_active)
         self.assertTrue(self.meeting.group_roles_active)
@@ -85,9 +90,21 @@ class DialectHandlerTests(TestCase):
     def test_remove(self):
         handler = self._cut.load_from_dict(dialect_named_test)
         handler.install(self.meeting)
-        self.assertEqual("test", self.meeting.installed_dialects)
+        self.assertEqual("test", self.meeting.installed_dialect)
         handler.remove(self.meeting)
-        self.assertIsNone(self.meeting.installed_dialects)
+        self.assertIsNone(self.meeting.installed_dialect)
+        self.assertIsNone(self.meeting.group_roles.filter(role_id="supervisor").first())
+        self.assertTrue(self.meeting.groups.filter(groupid="board").exists())
+        self.assertIsNone(self.meeting.er_policy_name)
+        self.assertFalse(self.meeting.group_votes_active)
+        self.assertFalse(self.meeting.group_roles_active)
+
+    def test_remove_and_clear_groups(self):
+        handler = self._cut.load_from_dict(dialect_named_test)
+        handler.install(self.meeting)
+        self.assertEqual("test", self.meeting.installed_dialect)
+        handler.remove(self.meeting, groups=True)
+        self.assertIsNone(self.meeting.installed_dialect)
         self.assertIsNone(self.meeting.group_roles.filter(role_id="supervisor").first())
         self.assertIsNone(self.meeting.groups.filter(groupid="board").first())
         self.assertIsNone(self.meeting.er_policy_name)
@@ -96,7 +113,7 @@ class DialectHandlerTests(TestCase):
 
     def test_duplicate_install(self):
         handler = self._cut.load_from_dict(dialect_named_test)
-        self.meeting.installed_dialects = handler.data.name
+        self.meeting.installed_dialect = handler.data.name
         with self.assertRaises(DialectError):
             handler.install(self.meeting)
 
@@ -104,18 +121,6 @@ class DialectHandlerTests(TestCase):
         handler = self._cut.load_from_dict(dialect_named_test)
         with self.assertRaises(DialectError):
             handler.remove(self.meeting)
-
-    def test_install_requires_other(self):
-        handler = self._cut.load_from_dict(dialect_named_test)
-        handler.install(self.meeting)
-        handler_req = self._cut.load_from_dict(dialect_minimal_requires_test)
-        handler_req.install(self.meeting)
-        self.assertEqual("test,req", self.meeting.installed_dialects)
-
-    def test_install_missing_required(self):
-        handler = self._cut.load_from_dict(dialect_minimal_requires_test)
-        with self.assertRaises(DialectError):
-            handler.install(self.meeting)
 
     def test_uninstall_leaves_untouched_settings_intact(self):
         self.meeting.group_votes_active = True
@@ -129,7 +134,10 @@ class DialectHandlerTests(TestCase):
         self.assertTrue(self.meeting.group_roles_active)
         self.assertEqual("auto_before_poll", self.meeting.proposal_id_policy_name)
 
-    def test_install_with_component(self):
+    def test_install_with_component_and_block(self):
+        component_to_block = self.meeting.components.create(
+            component_name=RepeatedIRV.name, state=EnabledWf.ON
+        )
         handler = self._cut.load_from_dict(dialect_with_component)
         handler.install(self.meeting)
         component = self.meeting.components.filter(
@@ -137,6 +145,8 @@ class DialectHandlerTests(TestCase):
         ).first()
         self.assertEqual({"msg": "Hello!"}, component.settings_data)
         self.assertEqual(EnabledWf.ON, component.state)
+        component_to_block.refresh_from_db()
+        self.assertEqual(EnabledWf.OFF, component_to_block.state)
 
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
@@ -186,6 +196,30 @@ class DialectRegistryTests(TestCase):
             handler.data.dict(exclude_none=True, skip_defaults=True),
         )
 
+    @override_settings(MEETING_DIALECTS_DIR=CYCLIC_DIALECT_FIXTURES)
+    def test_cyclic_dependency(self):
+        with self.assertRaises(DialectError):
+            self.registry.get_dependent_dialects("one")
+
+    def test_get_org_installable(self):
+        org = Organisation.objects.create()
+        self.assertEqual(
+            {"main_subst": "Main/subst", "three": "Three", "two": "Two!"},
+            self.registry.get_org_installable(org),
+        )
+        org.components.create(
+            component_name=DialectsFilter.name,
+            settings_data={
+                "exclude": ["main_subst", "three", "two"],
+                "include": ["one"],
+            },
+            state=EnabledWf.ON,
+        )
+        self.assertEqual(
+            {"one": "Hello"},
+            self.registry.get_org_installable(org),
+        )
+
     #
     # @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
     # def test_install_fixture_with_component(self):
@@ -221,3 +255,15 @@ class DialectRegistryTests(TestCase):
 #     def test_recursive_cyclic(self):
 #         with self.assertRaises(DialectError):
 #             self._fut("one")
+
+
+class UtilsTests(TestCase):
+    @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
+    def test_get_named_path_dict(self):
+        results = get_named_path_dict()
+        self.assertEqual({"two", "one", "three", "main_subst"}, set(results))
+
+    @override_settings(MEETING_DIALECTS_DIR=None)
+    def test_get_named_path_dict_not_set(self):
+        results = get_named_path_dict()
+        self.assertEqual(set(), set(results))

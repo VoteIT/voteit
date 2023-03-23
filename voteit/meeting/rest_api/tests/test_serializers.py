@@ -89,7 +89,7 @@ class CreateMeetingSerializerTests(TestCase):
         self.assertFalse(serializer.errors)
         instance = serializer.save()
         self.assertIsInstance(instance, Meeting)
-        self.assertEqual("one,two", instance.installed_dialects)
+        self.assertEqual("two", instance.installed_dialect)
 
     def test_create_install_dialect_not_installable(self):
         serializer = self._mk_one(install_dialect="one")
@@ -158,7 +158,7 @@ class MeetingDetailSerializerTests(TestCase):
         request = self._mk_request(self.moderator)
         serializer = self._cut(self.meeting, context={"request": request})
         self.assertEqual(None, serializer.data["installed_dialect"])
-        self.meeting.installed_dialects = "two,three"
+        self.meeting.installed_dialect = "three"
         serializer = self._cut(self.meeting, context={"request": request})
         self.assertEqual("three", serializer.data["installed_dialect"])
         self.assertEqual(
