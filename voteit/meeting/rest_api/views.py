@@ -275,6 +275,65 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
         )
 
 
+@router.register("export-meeting-groups", basename="export-meeting-groups")
+class ExportMeetingGroupsViewSet(viewsets.GenericViewSet):
+    model = Meeting
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self) -> QuerySet:
+        return Meeting.objects.for_user(self.request.user)
+
+    def list(self, request):  # To avoid errors
+        return Response()
+
+    # def get_export_qs(self, meeting):
+    #     MeetingGroupSerializer
+    #     return meeting.groups.all().annotate(
+    #         first_name=F("user__first_name"),
+    #         last_name=F("user__last_name"),
+    #         email=F("user__email"),
+    #         userid=F("user__userid"),
+    #     )
+
+    @action(
+        methods=["get"],
+        detail=True,
+        serializer_class=serializers.MeetingGroupExportSerializer,
+    )
+    @has_perm_drf(MeetingPermissions.MODERATE)
+    def csv(self, request, *args, **kwargs):
+        meeting = self.get_object()
+        serializer = self.get_serializer(meeting.groups.all(), many=True)
+        if not serializer.data:
+            raise Http404("No data yet")
+        response = HttpResponse(content_type="text/csv")
+        response[
+            "Content-Disposition"
+        ] = f'attachment; filename="meting_groups_m{meeting.pk}_export.csv"'
+        writer = csv.DictWriter(response, fieldnames=serializer.child.fields)
+        writer.writeheader()
+        for row in serializer.data:
+            writer.writerow(row)
+        return response
+
+    @action(
+        methods=["get"],
+        detail=True,
+        serializer_class=serializers.MeetingGroupExportSerializer,
+        renderer_classes=[JSONRenderer],
+    )
+    @has_perm_drf(MeetingPermissions.MODERATE)
+    def json(self, request, *args, **kwargs):
+        meeting = self.get_object()
+        serializer = self.get_serializer(meeting.groups.all(), many=True)
+        return Response(
+            serializer.data,
+            headers={
+                "Content-Disposition": f'attachment; filename="meting_groups_m{meeting.pk}_export.json"'
+            },
+        )
+
+
 @router.register("meeting-dialects", basename="meeting-dialects")
 class MeetingDialectsViewSet(viewsets.ViewSet):
     """

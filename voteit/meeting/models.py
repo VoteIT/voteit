@@ -378,10 +378,8 @@ class MeetingGroup(BaseContent, MeetingContext):
         through="GroupMembership",
     )
 
-    def save(
-        self, force_insert=False, force_update=False, using=None, update_fields=None
-    ):
-        if self.groupid is None:
+    def save(self, **kwargs):
+        if not self.groupid:
             if self.meeting.organisation is None:  # For testing
                 user_qs = User.objects.all()
             else:
@@ -398,7 +396,7 @@ class MeetingGroup(BaseContent, MeetingContext):
                 groupid = f"{base}-{i}"
         if not self.title:
             self.title = self.groupid
-        super().save(force_insert, force_update, using, update_fields)
+        super().save(**kwargs)
 
     class Meta:
         constraints = (

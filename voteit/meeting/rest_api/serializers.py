@@ -314,6 +314,19 @@ class GroupMembershipSerializer(serializers.ModelSerializer):
         return value
 
 
+class MeetingGroupExportSerializer(serializers.ModelSerializer):
+    pk = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = MeetingGroup
+        fields = [
+            "pk",
+            "title",
+            "groupid",
+            "votes",
+        ]
+
+
 class ParticipantExportSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField()
     last_name = serializers.CharField()

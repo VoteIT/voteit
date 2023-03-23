@@ -602,6 +602,67 @@ class MeetingRolesViewSetTests(APITestCase):
         self.assertEqual(len(response.json()), 5, "Should match all users")
 
 
+class ExportMeetingGroupsViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.turkish = cls.meeting.groups.create(title="Özgür", votes=5)
+        cls.chineese = cls.meeting.groups.create(title="好", votes=8)
+        cls.swedish = cls.meeting.groups.create(title="Fika nu kör vi")
+
+    def test_not_allowed(self):
+        url = reverse("export-meeting-groups-json", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.participant)
+        response = self.client.get(url)
+        self.assertContains(
+            response, "permission meeting.moderate_meeting", status_code=403
+        )
+
+    def test_json(self):
+        url = reverse("export-meeting-groups-json", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        data = response.json()
+        self.assertEqual(
+            [
+                {
+                    "pk": self.turkish.pk,
+                    "title": "Özgür",
+                    "groupid": "ozgur",
+                    "votes": 5,
+                },
+                {"pk": self.chineese.pk, "title": "好", "groupid": "", "votes": 8},
+                {
+                    "pk": self.swedish.pk,
+                    "title": "Fika nu kör vi",
+                    "groupid": "fika-nu-kor-vi",
+                    "votes": None,
+                },
+            ],
+            data,
+        )
+
+    def test_csv(self):
+        url = reverse("export-meeting-groups-csv", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual("text/csv", response.headers.get("Content-Type"))
+        rows = {x.decode() for x in response.content.splitlines()}
+        self.assertEqual(
+            {
+                f"pk,title,groupid,votes",
+                f"{self.turkish.pk},Özgür,ozgur,5",
+                f"{self.chineese.pk},好,,8",
+                f"{self.swedish.pk},Fika nu kör vi,fika-nu-kor-vi,",
+            },
+            set(rows),
+        )
+
+
 class ExportParticipantsViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 
