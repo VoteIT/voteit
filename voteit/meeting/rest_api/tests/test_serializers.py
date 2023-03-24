@@ -8,6 +8,7 @@ from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api.serializers import CreateGroupMembershipSerializer
+from voteit.meeting.rest_api.serializers import CreateMeetingGroupSerializer
 from voteit.meeting.rest_api.serializers import GroupMembershipSerializer
 from voteit.meeting.rest_api.serializers import GroupRoleSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
@@ -266,6 +267,19 @@ class MeetingGroupRelatedSerializersTests(TestCase):
             [self.moderator_club, self.plebei_hangout], many=True
         ).data
         self.assertEqual(2, len(data))
+
+    def test_create_meeting_group_many(self):
+        counted = self.meeting.groups.count()
+        serializer = CreateMeetingGroupSerializer(
+            data=[
+                {"title": "One", "votes": "1", "meeting": self.meeting.pk},
+                {"title": "Two", "meeting": self.meeting.pk},
+            ],
+            many=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        self.assertEqual(counted + 2, self.meeting.groups.count())
 
     def test_group_role(self):
         data = GroupRoleSerializer(self.group_role).data
