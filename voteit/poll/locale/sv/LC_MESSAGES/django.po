@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-03-01 14:16+0100\n"
-"PO-Revision-Date: 2023-03-01 15:08+0100\n"
+"POT-Creation-Date: 2023-03-27 10:43+0200\n"
+"PO-Revision-Date: 2023-03-27 10:51+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -18,16 +18,19 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 3.2.2\n"
 
-#: app/er_policies/active_check.py:30
+#: app/er_policies/active_check.py:31
 msgid "Active check"
 msgstr "Aktiv-koll"
 
-#: app/er_policies/active_check.py:32
+#: app/er_policies/active_check.py:33
 msgid ""
 "All users who're registered as active and have the potential voter role will "
 "be added when a poll starts. If group voting is used, the votes will be "
 "equally distributed among the active members of that group."
 msgstr ""
+"Alla användare som registreras som aktiva och har rollen potentiell rösträtt "
+"läggs till en röstlängd när en omröstning startar. Om gruppröster används så "
+"kommer rösterna fördelas jämt mellan aktiva medlemmar i gruppen."
 
 #: app/er_policies/auto_always.py:31
 msgid "Automatic always"
@@ -39,6 +42,9 @@ msgid ""
 "voters change. It will even change electoral register for ongoing polls, so "
 "use this with caution!"
 msgstr ""
+"Denna metod skapar alltid nya röstlängder när potentiellt röstande ändras. "
+"Den kommer även byta ut röstlängder för pågående omröstningar så använd med "
+"försiktighet!"
 
 #: app/er_policies/auto_before_poll.py:25
 msgid "Automatic before poll"
@@ -49,6 +55,21 @@ msgid ""
 "Any users with potential voter status will be added to the electoral "
 "register when a poll starts."
 msgstr ""
+"Användare med potentiell rösträtt kommer läggas till röstlängden när en "
+"omröstning startar."
+
+#: app/er_policies/group_auto_rnd_before_poll.py:25
+msgid "Equal group votes"
+msgstr "Jämt fördelade gruppröster"
+
+#: app/er_policies/group_auto_rnd_before_poll.py:27
+msgid ""
+"Any group members share votes within the group equally. If they can't be "
+"distributed evenly, the rest will be randomized. Only potential voters may "
+"receive a vote."
+msgstr ""
+"Gruppmedlemmar delar på gruppens röstvikt. Om de inte kan distribueras jämt, "
+"så kommer resten slumpas. Bara potentiellt röstande kan få röster."
 
 #: app/er_policies/group_votes_before_poll.py:36
 msgid "Votes from groups"
@@ -68,7 +89,7 @@ msgstr "Bara manuellt"
 #: app/er_policies/manual.py:22
 msgid ""
 "No electoral registers will be created at all, you have to do it yourself!"
-msgstr ""
+msgstr "Inga röstlängder skapas alls, du måste göra det själv!"
 
 #: app/er_policies/presence_check.py:27
 msgid "Closing a presence check will set a new electoral register."
@@ -80,6 +101,9 @@ msgid ""
 "to the electoral register. If group votes is activated, the votes will be "
 "distributed equally between present members."
 msgstr ""
+"Användare som är närvarande och har rollen potentiell rösträtt kommer läggas "
+"till i röstlängden. Om gruppröster är aktivt så kommer rösterna fördelas "
+"jämt mellan närvarande."
 
 #: app/polls/combined_simple.py:23 app/polls/simple.py:22
 msgid "Yes"
@@ -99,7 +123,7 @@ msgstr "Kombinerad enkel"
 
 #: app/polls/dutt.py:150 app/polls/dutt.py:162 app/polls/dutt.py:180
 #: app/polls/majority.py:130 app/polls/schulze.py:172
-#: app/polls/scottish_stv.py:161
+#: app/polls/scottish_stv.py:158
 msgid "Invalid vote"
 msgstr "Ogiltig röst"
 
@@ -111,21 +135,21 @@ msgstr "För få förslag valda"
 msgid "Too many proposals picked"
 msgstr "För många förslag valda"
 
-#: app/polls/dutt.py:185 app/polls/schulze.py:177 app/polls/scottish_stv.py:166
+#: app/polls/dutt.py:185 app/polls/schulze.py:177 app/polls/scottish_stv.py:163
 #, python-format
 msgid "Invalid choice, the following proposals don't exist: %s"
 msgstr "Ogiltigt val, följande förslag existerar inte: %s"
 
-#: app/polls/irv.py:68
+#: app/polls/irv.py:40
 msgid "Instant-Runoff Voting"
 msgstr "Instant-Runoff Voting"
 
-#: app/polls/irv.py:94 app/polls/irv.py:182
+#: app/polls/irv.py:57 app/polls/irv.py:140
 #, python-format
 msgid "The method %(method)s require at least 3 proposals"
 msgstr "Metoden %(method)s kräver minst 3 förslag"
 
-#: app/polls/irv.py:156
+#: app/polls/irv.py:123
 msgid "Repeated Instant-Runoff Voting"
 msgstr "Repeterad Instant-Runoff Voting"
 
@@ -145,16 +169,16 @@ msgstr "Schulze"
 msgid "Repeated Schulze"
 msgstr "Repeterad Schulze"
 
-#: app/polls/scottish_stv.py:97
+#: app/polls/scottish_stv.py:89
 msgid "Scottish STV"
 msgstr "Skotsk STV"
 
-#: app/polls/scottish_stv.py:178
+#: app/polls/scottish_stv.py:175
 #, python-format
 msgid "The method %(method)s can't have as many winners as proposals"
 msgstr "Metoden %(method)s kan inte ha lika många vinnare som förslag"
 
-#: app/polls/scottish_stv.py:183
+#: app/polls/scottish_stv.py:180
 #, python-format
 msgid "The method %(method)s require at least %(min_winners)d winners"
 msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
