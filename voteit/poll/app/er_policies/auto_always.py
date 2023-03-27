@@ -47,7 +47,8 @@ def _maybe_create_and_update(instance: MeetingRoles, roles=()):
         if meeting.er_policy_name == AutoAlways.name:
             current_er = meeting.latest_er
             # Possibly create a new electoral register
-            if current_er != meeting.er_policy.create_er():
+            new_er = meeting.er_policy.create_er()
+            if new_er and current_er != new_er:
                 for poll in meeting.polls.filter(state=PollWf.ONGOING):
                     # This will duplicate searches and checks over polls,
                     # but since this is only a demo we don't need to optimize for speed

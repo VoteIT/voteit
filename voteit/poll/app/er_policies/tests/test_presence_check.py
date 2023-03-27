@@ -45,10 +45,7 @@ class PresenceCheckPolicyTests(TestCase):
     def test_with_no_present(self):
         self.presence_check.present_users.remove(self.participant)
         self.presence_check.close()
-        self.assertEqual(
-            set(),
-            set(self.meeting.latest_er.voters.all()),
-        )
+        self.assertIsNone(self.meeting.latest_er)
         self.poll.upcoming()
         self.assertFalse(self.poll.electoral_register_empty_guard())
 

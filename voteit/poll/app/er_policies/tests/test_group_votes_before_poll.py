@@ -91,5 +91,4 @@ class GroupVotesBeforePollTests(TestCase):
 
     def test_no_groups(self):
         self.meeting.groups.all().delete()
-        er = self.meeting.er_policy.create_er()
-        self.assertEqual({}, er.get_weight_dict())
+        self.assertIsNone(self.meeting.er_policy.create_er())

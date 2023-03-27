@@ -223,7 +223,8 @@ class TriggerCreateER(ContextAction):
         self.assert_perm()
         latest_er = meeting.latest_er
         with set_actor(self.user):
-            created = latest_er != meeting.er_policy.create_er()
+            new_er = meeting.er_policy.create_er()
+            created = new_er and latest_er != new_er
         msg = TriggerERResponse.from_message(self, created=created)
         websocket_send(msg, state=msg.SUCCESS)
         return msg

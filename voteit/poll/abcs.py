@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from pydantic.main import BaseModel
 
+from voteit.core.decorators import ensure_atomic
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 if TYPE_CHECKING:
@@ -183,7 +184,8 @@ class ElectoralRegisterPolicy(ABC):
             # FIXME: This should probably be wrapped in a transaction
             poll.save()
 
-    def create_er(self, force=False, **kwargs) -> ElectoralRegister:
+    @ensure_atomic
+    def create_er(self, force=False, **kwargs) -> ElectoralRegister | None:
         """
         A default method to create electoral registers.
         There's no need to use this for the policy.
@@ -194,12 +196,13 @@ class ElectoralRegisterPolicy(ABC):
             # Avoid circular import
             from voteit.poll.signals import new_er_created
 
-            # FIXME: Atomics?
-            er = self.meeting.electoral_registers.create(source=self.name)
-            er.set_voters_from_dict(self.get_voters(**kwargs))
-            self.meeting.latest_er = er  # Clear cached
-            new_er_created.send(instance=er, sender=er.__class__)
-            return er
+            voters = self.get_voters(**kwargs)
+            if voters:
+                er = self.meeting.electoral_registers.create(source=self.name)
+                er.set_voters_from_dict(voters)
+                self.meeting.latest_er = er  # Clear cached
+                new_er_created.send(instance=er, sender=er.__class__)
+                return er
         return self.meeting.latest_er
 
 
