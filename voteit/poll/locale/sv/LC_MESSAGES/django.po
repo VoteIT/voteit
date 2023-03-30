@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-03-27 10:43+0200\n"
-"PO-Revision-Date: 2023-03-27 10:51+0200\n"
+"POT-Creation-Date: 2023-03-30 11:35+0200\n"
+"PO-Revision-Date: 2023-03-30 11:36+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -17,20 +17,6 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 3.2.2\n"
-
-#: app/er_policies/active_check.py:31
-msgid "Active check"
-msgstr "Aktiv-koll"
-
-#: app/er_policies/active_check.py:33
-msgid ""
-"All users who're registered as active and have the potential voter role will "
-"be added when a poll starts. If group voting is used, the votes will be "
-"equally distributed among the active members of that group."
-msgstr ""
-"Alla användare som registreras som aktiva och har rollen potentiell rösträtt "
-"läggs till en röstlängd när en omröstning startar. Om gruppröster används så "
-"kommer rösterna fördelas jämt mellan aktiva medlemmar i gruppen."
 
 #: app/er_policies/auto_always.py:31
 msgid "Automatic always"
@@ -46,11 +32,11 @@ msgstr ""
 "Den kommer även byta ut röstlängder för pågående omröstningar så använd med "
 "försiktighet!"
 
-#: app/er_policies/auto_before_poll.py:25
+#: app/er_policies/auto_before_poll.py:26
 msgid "Automatic before poll"
 msgstr "Automatiskt före omröstning"
 
-#: app/er_policies/auto_before_poll.py:27
+#: app/er_policies/auto_before_poll.py:28
 msgid ""
 "Any users with potential voter status will be added to the electoral "
 "register when a poll starts."
@@ -58,11 +44,11 @@ msgstr ""
 "Användare med potentiell rösträtt kommer läggas till röstlängden när en "
 "omröstning startar."
 
-#: app/er_policies/group_auto_rnd_before_poll.py:25
-msgid "Equal group votes"
-msgstr "Jämt fördelade gruppröster"
+#: app/er_policies/group_auto_rnd_before_poll.py:28
+msgid "Equal weighted group votes"
+msgstr "Jämt fördelade viktade gruppröster"
 
-#: app/er_policies/group_auto_rnd_before_poll.py:27
+#: app/er_policies/group_auto_rnd_before_poll.py:30
 msgid ""
 "Any group members share votes within the group equally. If they can't be "
 "distributed evenly, the rest will be randomized. Only potential voters may "
@@ -72,8 +58,8 @@ msgstr ""
 "så kommer resten slumpas. Bara potentiellt röstande kan få röster."
 
 #: app/er_policies/group_votes_before_poll.py:36
-msgid "Votes from groups"
-msgstr "Röster från grupper"
+msgid "Weighted votes from group settings"
+msgstr "Viktade röster från gruppers inställningar"
 
 #: app/er_policies/group_votes_before_poll.py:38
 msgid ""
@@ -81,6 +67,9 @@ msgid ""
 "have the potential voter role. New electoral registers will be created "
 "whenever a poll starts if needed."
 msgstr ""
+"Grupperna har en röstmängd som kan fördelas mellan medlemmar som har "
+"potentiell rösträtt. Nya röstlängder skapas när en omröstning startar om det "
+"behövs."
 
 #: app/er_policies/manual.py:20
 msgid "Manual only"
@@ -91,11 +80,11 @@ msgid ""
 "No electoral registers will be created at all, you have to do it yourself!"
 msgstr "Inga röstlängder skapas alls, du måste göra det själv!"
 
-#: app/er_policies/presence_check.py:27
+#: app/er_policies/presence_check.py:29
 msgid "Closing a presence check will set a new electoral register."
 msgstr "En ny röstlängd skapas när en närvarokontroll avslutas."
 
-#: app/er_policies/presence_check.py:29
+#: app/er_policies/presence_check.py:31
 msgid ""
 "Any user who's both present and has the potential voter role will be added "
 "to the electoral register. If group votes is activated, the votes will be "
@@ -270,6 +259,19 @@ msgstr "Avslutad"
 #: workflows.py:19
 msgid "Canceled"
 msgstr "Avbruten"
+
+#~ msgid "Active check"
+#~ msgstr "Aktiv-koll"
+
+#~ msgid ""
+#~ "All users who're registered as active and have the potential voter role "
+#~ "will be added when a poll starts. If group voting is used, the votes will "
+#~ "be equally distributed among the active members of that group."
+#~ msgstr ""
+#~ "Alla användare som registreras som aktiva och har rollen potentiell "
+#~ "rösträtt läggs till en röstlängd när en omröstning startar. Om "
+#~ "gruppröster används så kommer rösterna fördelas jämt mellan aktiva "
+#~ "medlemmar i gruppen."
 
 #, fuzzy
 #~| msgid "Demo meeting: Always update electoral register"
