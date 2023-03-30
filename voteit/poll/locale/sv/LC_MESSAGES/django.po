@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-03-30 11:35+0200\n"
-"PO-Revision-Date: 2023-03-30 11:36+0200\n"
+"POT-Creation-Date: 2023-03-30 13:02+0200\n"
+"PO-Revision-Date: 2023-03-30 13:02+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -81,18 +81,18 @@ msgid ""
 msgstr "Inga röstlängder skapas alls, du måste göra det själv!"
 
 #: app/er_policies/presence_check.py:29
-msgid "Closing a presence check will set a new electoral register."
-msgstr "En ny röstlängd skapas när en närvarokontroll avslutas."
+msgid "Presence check"
+msgstr "Närvarokontroll"
 
 #: app/er_policies/presence_check.py:31
 msgid ""
 "Any user who's both present and has the potential voter role will be added "
-"to the electoral register. If group votes is activated, the votes will be "
-"distributed equally between present members."
+"to the electoral register when it closes. If group votes is activated, the "
+"votes will be distributed equally between present members."
 msgstr ""
 "Användare som är närvarande och har rollen potentiell rösträtt kommer läggas "
-"till i röstlängden. Om gruppröster är aktivt så kommer rösterna fördelas "
-"jämt mellan närvarande."
+"till i röstlängden när närvarokontrollen stängs. Om gruppröster är aktivt så "
+"kommer rösterna fördelas jämt mellan närvarande."
 
 #: app/polls/combined_simple.py:23 app/polls/simple.py:22
 msgid "Yes"
@@ -259,6 +259,9 @@ msgstr "Avslutad"
 #: workflows.py:19
 msgid "Canceled"
 msgstr "Avbruten"
+
+#~ msgid "Closing a presence check will set a new electoral register."
+#~ msgstr "En ny röstlängd skapas när en närvarokontroll avslutas."
 
 #~ msgid "Active check"
 #~ msgstr "Aktiv-koll"

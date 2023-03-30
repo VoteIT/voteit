@@ -26,9 +26,10 @@ class PresenceCheckPolicy(ElectoralRegisterPolicy):
     """
 
     name = "presence_check"
-    title = _("Closing a presence check will set a new electoral register.")
+    title = _("Presence check")
     description = _(
-        "Any user who's both present and has the potential voter role will be added to the electoral register. "
+        "Any user who's both present and has the potential voter role will be added to the electoral "
+        "register when it closes. "
         "If group votes is activated, the votes will be distributed equally between present members."
     )
     logger = logger
