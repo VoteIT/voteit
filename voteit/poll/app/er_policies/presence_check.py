@@ -7,7 +7,9 @@ from django.utils.translation import gettext_lazy as _
 from django_fsm import post_transition
 
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-from voteit.poll.abcs import GroupVoteElectoralRegisterPolicy
+from voteit.poll.abcs import ElectoralRegisterPolicy
+from voteit.poll.app.er_policies.utils import calc_group_votes_equal
+from voteit.poll.exceptions import ElectoralRegisterError
 from voteit.poll.registries import er_policy
 from voteit.presence.models import PresenceCheck
 from voteit.presence.workflows import PresenceCheckWf
@@ -18,7 +20,7 @@ logger = getLogger(__name__)
 
 
 @er_policy
-class PresenceCheckPolicy(GroupVoteElectoralRegisterPolicy):
+class PresenceCheckPolicy(ElectoralRegisterPolicy):
     """
     Any completed presence check causes a new electoral register
     """
@@ -32,32 +34,22 @@ class PresenceCheckPolicy(GroupVoteElectoralRegisterPolicy):
     logger = logger
     allow_manual = True
     handles_vote_weight = True
-    handles_personal_vote = True
 
     def get_voters(self, presence_check=None, **kwargs) -> dict[int, int]:
-        if presence_check is None:
-            # FIXME: What kind of exception here?
-            raise Exception("No presence check exists")
+        if presence_check is None:  # pragma: no coverage
+            raise ElectoralRegisterError("No presence check exists")
         potential_voters = self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
-        if potential_voters is None:
-            # FIXME: What kind of exception should we use here?
-            raise Exception("Not a single eligible voter")
+        if not potential_voters.exists():
+            raise ElectoralRegisterError("Not a single eligible voter")
         present_potential_voters = presence_check.present_users.filter(
             pk__in=potential_voters
         )
         if self.meeting.group_votes_active:
-            return self.meeting.er_policy.calc_group_votes_equal(
-                only_users_qs=present_potential_voters
+            return calc_group_votes_equal(
+                meeting=self.meeting, only_users_qs=present_potential_voters
             )
         else:
             return {x: 1 for x in present_potential_voters.values_list("pk", flat=True)}
-
-    def poll_will_have_voters(self, **kwargs):
-        """
-        Check for presence check can't be done this way, but it shouldn't block.
-        This check is run when starting the poll so other checks will block start of the ER is empty.
-        """
-        return True
 
 
 @receiver(post_transition, sender=PresenceCheck)

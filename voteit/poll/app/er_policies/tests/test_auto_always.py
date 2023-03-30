@@ -1,6 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+
+from voteit.poll.models import Poll
+from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.poll.app.er_policies.auto_always import AutoAlways
+from voteit.poll.models import ElectoralRegister
 
 User = get_user_model()
 
@@ -8,15 +13,6 @@ User = get_user_model()
 class AutoAlwaysTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-        from voteit.poll.app.er_policies.auto_always import AutoAlways
-        from voteit.poll.models import ElectoralRegister
-
-        cls.AutoAlways = AutoAlways
-        cls.ElectoralRegister = ElectoralRegister
-
         cls.meeting = Meeting.objects.create(er_policy_name=AutoAlways.name)
         cls.ai = cls.meeting.agenda_items.create()
         cls.user1 = User.objects.create(username="one")
@@ -31,7 +27,7 @@ class AutoAlwaysTests(TestCase):
 
     def test_new_er_on_upcoming(self):
         self.poll.upcoming()
-        self.assertIsInstance(self.poll.electoral_register, self.ElectoralRegister)
+        self.assertIsInstance(self.poll.electoral_register, ElectoralRegister)
         self.assertEqual(
             {self.user1, self.user2}, set(self.poll.electoral_register.voters.all())
         )
@@ -78,7 +74,7 @@ class AutoAlwaysTests(TestCase):
         self.assertEqual(third_er, self.poll.electoral_register)
 
     def test_cleanup_unused_ers(self):
-        one = self.meeting.electoral_registers.create(source=self.AutoAlways.name)
+        one = self.meeting.electoral_registers.create(source=AutoAlways.name)
         self.assertEqual(2, self.meeting.electoral_registers.count())
         self.meeting.remove_roles(self.user2, ROLE_POTENTIAL_VOTER)
         # First one deleted

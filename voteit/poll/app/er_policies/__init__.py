@@ -1,5 +1,4 @@
 def register():
-    from .active_check import ActiveCheckPolicy
     from .auto_always import AutoAlways
     from .auto_before_poll import AutoBeforePoll
     from .group_auto_rnd_before_poll import GroupAutoRandomBeforePoll

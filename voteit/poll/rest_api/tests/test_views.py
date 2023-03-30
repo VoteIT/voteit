@@ -329,12 +329,12 @@ class ElectoralRegisterPolicyViewSetTests(APITestCase):
             {
                 "available": True,
                 "allow_manual": False,
-                "allow_trigger": True,
-                "handles_group_vote": True,
-                "handles_personal_vote": True,
-                "handles_vote_weight": True,
-                "name": "active_check",
-                "title": "Active check",
+                "allow_trigger": False,
+                "group_votes_active": False,
+                "handles_vote_weight": False,
+                "handles_active_check": False,
+                "name": "auto_always",
+                "title": "Automatic always",
             },
             first,
         )

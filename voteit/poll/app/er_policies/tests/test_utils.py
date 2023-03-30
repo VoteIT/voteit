@@ -13,18 +13,14 @@ from voteit.poll.app.er_policies.group_auto_rnd_before_poll import (
 User = get_user_model()
 
 
-class ElectoralRegisterPolicyTests(TestCase):
-    ...
-
-
-class GroupVoteElectoralRegisterPolicyTests(TestCase):
+class CalcGroupVotesEqualTests(TestCase):
     """
     We'll use the auto before poll method to test the abstract methods
     """
 
     @classmethod
     def setUpTestData(cls):
-        cls.meeting = Meeting.objects.create(
+        cls.meeting: Meeting = Meeting.objects.create(
             er_policy_name=GroupAutoRandomBeforePoll.name, group_votes_active=True
         )
         cls.one = User.objects.create(username="one")
@@ -38,12 +34,18 @@ class GroupVoteElectoralRegisterPolicyTests(TestCase):
         cls.group_one.members.add(cls.one, cls.two, cls.three)
         cls.group_two.members.add(cls.one, cls.two, cls.three)
 
+    @property
+    def _fut(self):
+        from voteit.poll.app.er_policies.utils import calc_group_votes_equal
+
+        return calc_group_votes_equal
+
     def test_calc_group_votes_equal_one_group_with_votes(self):
         self.group_one.votes = 6
         self.group_one.save()
         self.assertEqual(
             {self.one.pk: 2, self.two.pk: 2, self.three.pk: 2},
-            self.meeting.er_policy.calc_group_votes_equal(),
+            self._fut(meeting=self.meeting),
         )
 
     def test_calc_group_votes_equal_potential_voters_respected(self):
@@ -52,7 +54,7 @@ class GroupVoteElectoralRegisterPolicyTests(TestCase):
         self.meeting.remove_roles(self.one, ROLE_POTENTIAL_VOTER)
         self.assertEqual(
             {self.two.pk: 3, self.three.pk: 3},
-            self.meeting.er_policy.calc_group_votes_equal(),
+            self._fut(meeting=self.meeting),
         )
 
     def test_calc_group_votes_equal_unequal_votes(self):
@@ -62,7 +64,7 @@ class GroupVoteElectoralRegisterPolicyTests(TestCase):
         self.group_two.save()
         self.assertEqual(
             {self.one.pk: 2, self.two.pk: 2, self.three.pk: 1},
-            self.meeting.er_policy.calc_group_votes_equal(seed=1337),
+            self._fut(meeting=self.meeting, seed=1337),
         )
 
     def test_calc_group_votes_equal_filter(self):
@@ -71,7 +73,7 @@ class GroupVoteElectoralRegisterPolicyTests(TestCase):
         users_qs = User.objects.filter(pk=self.one.pk)
         self.assertEqual(
             {self.one.pk: 2},
-            self.meeting.er_policy.calc_group_votes_equal(only_users_qs=users_qs),
+            self._fut(meeting=self.meeting, only_users_qs=users_qs),
         )
 
     def test_calc_group_votes_equal_singular_groups(self):
@@ -83,7 +85,7 @@ class GroupVoteElectoralRegisterPolicyTests(TestCase):
         self.group_two.members.set([self.two])
         self.assertEqual(
             {self.one.pk: 3, self.two.pk: 2},
-            self.meeting.er_policy.calc_group_votes_equal(),
+            self._fut(meeting=self.meeting),
         )
 
     def test_calc_group_votes_equal_no_intersections(self):
@@ -96,7 +98,7 @@ class GroupVoteElectoralRegisterPolicyTests(TestCase):
         users_qs = User.objects.filter(pk=self.three.pk)
         self.assertEqual(
             {},
-            self.meeting.er_policy.calc_group_votes_equal(only_users_qs=users_qs),
+            self._fut(meeting=self.meeting, only_users_qs=users_qs),
         )
 
     def test_new_er_needed_when_groups_change(self):

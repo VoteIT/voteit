@@ -1,7 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django_fsm import TransitionNotAllowed
+
+from voteit.poll.models import Poll
+from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.poll.app.er_policies.manual import Manual
 
 User = get_user_model()
 
@@ -9,14 +13,7 @@ User = get_user_model()
 class ManualERTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-        from voteit.poll.app.er_policies.manual import Manual
-
-        cls.Manual = Manual
-
-        cls.meeting: Meeting = Meeting.objects.create(er_policy_name=cls.Manual.name)
+        cls.meeting: Meeting = Meeting.objects.create(er_policy_name=Manual.name)
         cls.user1 = User.objects.create(username="one")
         cls.user2 = User.objects.create(username="two")
         cls.meeting.add_roles(cls.user1, ROLE_POTENTIAL_VOTER)

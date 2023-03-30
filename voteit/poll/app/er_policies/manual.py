@@ -24,7 +24,7 @@ class Manual(ElectoralRegisterPolicy):
     logger = logger
     allow_manual = True
     handles_vote_weight = True
-    handles_personal_vote = True
+    group_votes_active = False
 
     def get_voters(self, *, weight_dict: dict[int, int], **kwargs) -> dict[int, int]:
         """
@@ -36,9 +36,3 @@ class Manual(ElectoralRegisterPolicy):
             for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
             if x in weight_dict
         }
-
-    def poll_will_have_voters(self, **kwargs):
-        """
-        Check for manual can't be done this way, but it shouldn't block.
-        """
-        return True

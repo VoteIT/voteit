@@ -2,6 +2,7 @@ from logging import getLogger
 
 from django.utils.translation import gettext_lazy as _
 
+from voteit.active.utils import active_enabled_for_meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.abcs import ElectoralRegisterPolicy
 from voteit.poll.models import Poll
@@ -28,11 +29,17 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
     )
     logger = logger
     handles_vote_weight = False
-    handles_personal_vote = True
     allow_trigger = True
+    handles_active_check = True
+    group_votes_active = False
 
     def get_voters(self, **kwargs) -> dict[int, int]:
-        return {x: 1 for x in self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)}
+        voters = self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
+        if active_enabled_for_meeting(self.meeting):
+            voters = self.meeting.active_users.filter(user_id__in=voters).values_list(
+                "user_id", flat=True
+            )
+        return {x: 1 for x in voters}
 
     def pre_apply(self, poll: Poll, target: str):
         self.create_er()  # Won't trigger unless needed

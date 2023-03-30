@@ -33,8 +33,8 @@ class AutoAlways(ElectoralRegisterPolicy):
         "This method will always create a new electoral register when potential voters change. "
         "It will even change electoral register for ongoing polls, so use this with caution!"
     )
-    handles_vote_weight = False
-    handles_personal_vote = True
+    group_votes_active = False
+
     logger = logger
 
     def get_voters(self, **kwargs) -> dict[int, int]:

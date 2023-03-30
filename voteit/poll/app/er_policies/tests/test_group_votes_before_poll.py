@@ -61,7 +61,7 @@ class GroupVotesBeforePollTests(TestCase):
         self.meeting.group_votes_active = False
         self.meeting.save()
         with self.assertRaises(ElectoralRegisterError):
-            self.meeting.er_policy.get_voters()
+            self.meeting.er_policy.create_er()
 
     def test_new_er_on_upcoming(self):
         self.poll.upcoming()

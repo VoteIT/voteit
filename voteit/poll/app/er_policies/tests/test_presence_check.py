@@ -4,6 +4,7 @@ from django.test import TestCase
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.app.er_policies.presence_check import PresenceCheckPolicy
+from voteit.poll.exceptions import ElectoralRegisterError
 from voteit.poll.models import Poll
 from voteit.presence.models import PresenceCheck
 
@@ -56,3 +57,10 @@ class PresenceCheckPolicyTests(TestCase):
         self.meeting.save()
         self.presence_check.close()
         self.assertEqual({self.participant.pk: 4}, self.meeting.latest_er.weight_dict)
+
+    def test_no_potential_voters(self):
+        self.meeting.remove_roles(self.moderator, ROLE_POTENTIAL_VOTER)
+        self.meeting.remove_roles(self.participant, ROLE_POTENTIAL_VOTER)
+        with self.assertRaises(ElectoralRegisterError) as cm:
+            self.presence_check.close()
+        self.assertEqual("Not a single eligible voter", str(cm.exception))

@@ -90,12 +90,14 @@ class ElectoralRegistryPolicySchema(BaseModel):
     name: str
     title: str
     description: str = ""
-    available: bool = True
-    allow_manual: bool = False
-    allow_trigger: bool = False
-    handles_personal_vote: bool
-    handles_group_vote: bool
+    available: bool
+    allow_manual: bool
+    allow_trigger: bool
+    # handles_personal_vote: bool
+    # handles_group_vote: bool
     handles_vote_weight: bool
+    handles_active_check: bool
+    group_votes_active: bool | None
 
     @validator("title", "description", pre=True)
     def translate(cls, v):

@@ -1,18 +1,21 @@
 from logging import getLogger
 
+from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
-from voteit.poll.abcs import GroupVoteElectoralRegisterPolicy
+from voteit.active.utils import active_enabled_for_meeting
+from voteit.poll.abcs import ElectoralRegisterPolicy
+from voteit.poll.app.er_policies.utils import calc_group_votes_equal
 from voteit.poll.models import Poll
 from voteit.poll.registries import er_policy
-from voteit.poll.exceptions import ElectoralRegisterError
 
 __all__ = ("GroupAutoRandomBeforePoll",)
 logger = getLogger(__name__)
+User = get_user_model()
 
 
 @er_policy
-class GroupAutoRandomBeforePoll(GroupVoteElectoralRegisterPolicy):
+class GroupAutoRandomBeforePoll(ElectoralRegisterPolicy):
     """
     Create an electoral register when a poll enters upcoming or ongoing state,
     if it's needed. Set the latest created register for that poll and any other upcoming.
@@ -22,23 +25,26 @@ class GroupAutoRandomBeforePoll(GroupVoteElectoralRegisterPolicy):
     """
 
     name = "group_auto_eq_rnd_bf"
-    title = _("Equal group votes")
+    title = _("Equal weighted group votes")
     description = _(
         "Any group members share votes within the group equally. If they can't be distributed evenly, "
         "the rest will be randomized. Only potential voters may receive a vote."
     )
     logger = logger
-    handles_vote_weight = False
-    handles_personal_vote = True
+    handles_vote_weight = True
+    group_votes_active = True
     allow_trigger = True
+    handles_active_check = True
 
     def get_voters(self, **kwargs) -> dict[int, int]:
-        if self.meeting.group_votes_active:
-            return self.calc_group_votes_equal()
-        # pragma:no cover
-        raise ElectoralRegisterError(
-            "Group votes isn't active, invalid electoral register policy"
-        )
+        if active_enabled_for_meeting(self.meeting):
+            return calc_group_votes_equal(
+                meeting=self.meeting,
+                only_users_qs=User.objects.filter(
+                    pk__in=self.meeting.active_users.values_list("user_id", flat=True)
+                ),
+            )
+        return calc_group_votes_equal(meeting=self.meeting)
 
     def pre_apply(self, poll: Poll, target: str):
         self.create_er()  # Won't trigger unless needed

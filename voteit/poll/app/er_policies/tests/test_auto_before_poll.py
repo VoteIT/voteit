@@ -2,6 +2,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django_fsm import TransitionNotAllowed
 
+from voteit.active.components import ActiveUsersComponent
+from voteit.core.workflows import EnabledWf
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.meeting.models import Meeting
@@ -98,3 +100,14 @@ class AutoBeforePollTests(TestCase):
         self.poll.save()
         self.poll.meeting.refresh_from_db()
         self.poll.ongoing()
+
+    def test_active_users_resprected(self):
+        self.meeting.components.create(
+            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+        )
+        self.meeting.active_users.create(user=self.user1)
+        self.poll.upcoming()
+        self.assertEqual(
+            {self.user1},
+            set(self.poll.electoral_register.voters.all()),
+        )
