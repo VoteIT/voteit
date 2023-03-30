@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -126,10 +127,18 @@ class PurgeInactiveUsersTests(TestCase):
             hours=hours,
         )
 
-    def test_purge(self):
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_purge(self, mock_publish):
         msg = self._mk_msg(self.moderator)
-        msg.run_job()
+        with self.captureOnCommitCallbacks(execute=True):
+            msg.run_job()
         self.assertEqual(1, self.meeting.active_users.count())
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertEqual(
+            {"active": False, "meeting": self.meeting.pk, "user": self.participant.pk},
+            msg.data.dict(),
+        )
 
     def test_participant_perm(self):
         msg = self._mk_msg(self.participant)
