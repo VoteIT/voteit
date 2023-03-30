@@ -1,10 +1,14 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+from django.utils.timezone import now
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
 
 from voteit.active.components import ActiveUsersComponent
+from voteit.active.messages import PurgeInactiveUsers
 from voteit.active.messages import SetActive
 from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
@@ -94,3 +98,46 @@ class SetActiveTests(TestCase):
         self.assertFalse(
             self.meeting.active_users.filter(user=self.active_user).exists()
         )
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class PurgeInactiveUsersTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.participant = User.objects.create(username="participant")
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.component = cls.meeting.components.create(
+            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+        )
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.active_participant = cls.meeting.active_users.create(user=cls.participant)
+        cls.active_moderator = cls.meeting.active_users.create(user=cls.moderator)
+        cls.mod_con = cls.moderator.connections.create(last_action=now())
+        cls.participant_con = cls.participant.connections.create(
+            last_action=now() - timedelta(days=1)
+        )
+
+    def _mk_msg(self, actor, hours: int = 1):
+        return PurgeInactiveUsers(
+            mm={"user_pk": actor.pk, "consumer_name": "abc"},
+            meeting=self.meeting.pk,
+            hours=hours,
+        )
+
+    def test_purge(self):
+        msg = self._mk_msg(self.moderator)
+        msg.run_job()
+        self.assertEqual(1, self.meeting.active_users.count())
+
+    def test_participant_perm(self):
+        msg = self._mk_msg(self.participant)
+        with self.assertRaises(UnauthorizedError) as cm:
+            msg.run_job()
+        self.assertEqual("meeting.change_meeting", cm.exception.data.permission)
+
+    def test_purge_higher_number(self):
+        msg = self._mk_msg(self.moderator, hours=48)
+        msg.run_job()
+        self.assertEqual(2, self.meeting.active_users.count())

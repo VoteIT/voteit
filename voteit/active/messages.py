@@ -1,6 +1,10 @@
+from datetime import timedelta
+
 from auditlog.context import set_actor
 from django.contrib.auth import get_user_model
+from django.utils.timezone import now
 from pydantic import BaseModel
+from pydantic import conint
 from pydantic import validator
 
 from envelope.core.message import ContextAction
@@ -8,6 +12,7 @@ from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
+from envelope.models import Connection
 from envelope.utils import websocket_send
 
 from voteit.active.permissions import ActiveUserPermissions
@@ -18,7 +23,7 @@ from voteit.messaging.decorators import outgoing
 
 
 class SetActiveSchema(BaseModel):
-    meeting: int
+    meeting: conint(ge=1)
     user: int | None
     active: bool
 
@@ -98,3 +103,44 @@ class ActiveUsers(Message):
     name = "active_user.all"
     schema = ActiveUsersSchema
     data: ActiveUsersSchema
+
+
+class PurgeInactiveUsersSchema(BaseModel):
+    meeting: conint(ge=1)
+    hours: conint(ge=1)
+
+
+@incoming
+class PurgeInactiveUsers(ContextAction):
+    name = "active_user.purge"
+    schema = PurgeInactiveUsersSchema
+    data: PurgeInactiveUsersSchema
+    permission = MeetingPermissions.CHANGE
+    model = Meeting
+    context_schema_attr = "meeting"
+
+    def run_job(self):
+        self.assert_perm()
+        recent_enough_connections_qs = Connection.objects.filter(
+            last_action__gt=now() - timedelta(hours=self.data.hours),
+        )
+        older_active_users = self.context.active_users.exclude(
+            user_id__in=recent_enough_connections_qs.values_list("user_id")
+        )
+        response = PurgeInactiveResponse.from_message(
+            self, count=older_active_users.count()
+        )
+        older_active_users.delete()
+        websocket_send(response, state=self.SUCCESS)
+        return response
+
+
+class PurgeInactiveResponseSchema(BaseModel):
+    count: int
+
+
+@outgoing
+class PurgeInactiveResponse(Message):
+    name = "active_user.purge"
+    schema = PurgeInactiveResponseSchema
+    data: PurgeInactiveResponseSchema
