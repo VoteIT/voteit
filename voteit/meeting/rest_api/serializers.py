@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from logging import getLogger
+from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -25,6 +26,9 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.poll.utils import get_electoral_policy_registry
+
+if TYPE_CHECKING:
+    from voteit.poll.abcs import ElectoralRegisterPolicy
 
 __all__ = (
     "UserRolesMixin",
@@ -127,11 +131,23 @@ class CreateMeetingSerializer(BaseModelSerializer):
             reg = get_electoral_policy_registry()
             if value not in reg:
                 raise ValidationError(f"No electoral register policy named {value}")
-            er_policy = reg[value]
-            if not er_policy.available:
+            er_policy: ElectoralRegisterPolicy = reg[value]
+            if not er_policy.available or (
+                not self.instance and er_policy.group_votes_active
+            ):
                 raise ValidationError(
                     f"Policy '{value}' isn't manually selectable, it must be installed via a meeting dialect"
                 )
+            # This is only valid for subclasses so maybe move later
+            if (
+                self.instance
+                and er_policy.group_votes_active is not None
+                and self.instance.group_votes_active != er_policy.group_votes_active
+            ):
+                raise ValidationError(
+                    f"Policy '{value}' is not compatible with the meetings group votes setting"
+                )
+
             return value
 
 
