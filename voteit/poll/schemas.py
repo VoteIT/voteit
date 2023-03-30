@@ -93,8 +93,6 @@ class ElectoralRegistryPolicySchema(BaseModel):
     available: bool
     allow_manual: bool
     allow_trigger: bool
-    # handles_personal_vote: bool
-    # handles_group_vote: bool
     handles_vote_weight: bool
     handles_active_check: bool
     group_votes_active: bool | None
