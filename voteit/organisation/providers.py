@@ -1,12 +1,18 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
+
 from voteit.core.utils import generate_valid_userid
 from voteit.organisation.abcs import ProviderResponseAdapter
 from voteit.organisation.registries import provider_response_adapters
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from voteit.organisation.models import Organisation
 
 _allowed_url_schemes = ["https"]
 if settings.DEBUG:
@@ -49,3 +55,21 @@ class IDProxy(ProviderResponseAdapter):
         if is_superuser and user.organisation is not None:
             user.organisation.add_roles(user, ROLE_ORG_MANAGER)
         user.save()
+
+    def get_inheritable_users(self, organisation: Organisation) -> QuerySet:
+        """
+        Attach any users who have the identity_id present in extra_identity_ids, they should be moved to the
+        primary identity_id. This is for users who've registered several times and then
+        after they've started to use their accounts, they've merged their identity provider account.
+        """
+        qs = super().get_inheritable_users(organisation)
+        extra_identity_ids = self.response.get("extra_identity_ids")
+        if extra_identity_ids:
+            qs = qs.union(
+                self.User.objects.filter(
+                    identity_id__in=extra_identity_ids,
+                    is_active=True,
+                    organisation=organisation,
+                )
+            )
+        return qs
