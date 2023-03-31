@@ -247,30 +247,3 @@ class HandleIdentitiesViewSet(viewsets.GenericViewSet):
         queryset = self.get_prepped_qs(raise_exc=False, notification_log=False)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
-
-    @action(
-        methods=["post"],
-        detail=False,
-        serializer_class=serializers.MergedIdentitiesSerializer,
-    )
-    def merge(self, request):
-        queryset = self.get_prepped_qs(raise_exc=True, notification_log=True)
-        users = list(queryset.order_by("last_login"))
-        data = {"moved_to": None, "moved": []}
-        if users:
-            first = users.pop(0)
-            moved_ids = []
-            if users:
-                for user in users:
-                    moved_ids.append(user.identity_id)
-                    user.identity_id = first.identity_id
-                    user.save()
-                data = {"moved_to": first.identity_id, "moved": moved_ids}
-                notification_logger.info(
-                    f"Merged users in Organisation: {users[0].organisation}\n"
-                    f"Target: {first}\n"
-                    f"Moved users: {', '.join(str(x) for x in users)}"
-                )
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid()
-        return Response(data=serializer.data, status=200)
