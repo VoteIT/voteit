@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin
+from django.db import models
 from django.urls import NoReverseMatch
 from django.urls import reverse
 from django.utils.html import format_html
@@ -80,8 +81,10 @@ class LinkedFilter(admin.SimpleListFilter):
     # Parameter for the filter that will be used in the URL query.
     parameter_name = "linked"
     # Constants
-    YES = "1"
-    NO = "0"
+    YES = "y"
+    NO = "n"
+    DUPLICATES = "d"
+    MAYBE_CLEARABLE = "c"
 
     def lookups(self, request, model_admin):
         """
@@ -94,6 +97,16 @@ class LinkedFilter(admin.SimpleListFilter):
         return (
             (self.YES, "Yes"),
             (self.NO, "No"),
+            (self.DUPLICATES, "Duplicates"),
+            (self.MAYBE_CLEARABLE, "Maybe clearable"),
+        )
+
+    def _dupes_qs(self) -> models.QuerySet:
+        return (
+            User.objects.values("identity_id")
+            .annotate(ident_count=models.Count("identity_id"))
+            .filter(ident_count__gt=1)
+            .values_list("identity_id", flat=True)
         )
 
     def queryset(self, request, queryset):
@@ -112,6 +125,12 @@ class LinkedFilter(admin.SimpleListFilter):
                 return queryset.filter(
                     identity_id__isnull=True,
                 ).distinct()
+            elif self.value() == self.DUPLICATES:
+                return queryset.filter(identity_id__in=self._dupes_qs())
+            elif self.value() == self.MAYBE_CLEARABLE:
+                return queryset.filter(
+                    identity_id__in=self._dupes_qs(), meeting_roles__isnull=True
+                )
 
 
 @admin.register(User)
