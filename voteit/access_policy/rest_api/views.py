@@ -1,5 +1,6 @@
 from logging import getLogger
 
+from django.db import transaction
 from django.db.models import QuerySet
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -63,5 +64,6 @@ class AutomaticAccessViewSet(DefaultModelViewSet):
         aa: AutomaticAccess = self.get_object()
         if not aa.active:
             raise ValidationError("Not enabled")
-        aa.assign(request.user)
+        with transaction.atomic(durable=True):
+            aa.assign(request.user)
         return Response(status=204)
