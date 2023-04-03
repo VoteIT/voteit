@@ -7,7 +7,6 @@ from django.dispatch import receiver
 
 from envelope.signals import channel_subscribed
 from voteit.core.decorators import disable_on_raw_save
-from voteit.core.decorators import on_transaction_commit
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteAdded
 from voteit.invites.messages import MeetingInviteChanged

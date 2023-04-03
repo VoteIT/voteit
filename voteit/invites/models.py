@@ -15,18 +15,13 @@ from django_fsm import FSMField
 from django_fsm import transition
 
 from voteit.core.abcs import MeetingContext
-from voteit.core.fields import RichTextField
 from voteit.core.permissions import NOT_ALLOWED
-from voteit.core.workflows import SendWf
 from voteit.invites.permissions import MeetingInvitePermissions
-from voteit.invites.utils import get_dispatchers_registry
 from voteit.invites.utils import get_invite_data_registry
 from voteit.invites.workflows import InviteWf
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
-    from voteit.invites.abcs import InviteDispatcher
-
 
 logger = getLogger(__name__)
 
@@ -87,10 +82,10 @@ class MeetingInvite(MeetingContext):
     state: str = FSMField(
         default=InviteWf.initial, choices=InviteWf.choices(), editable=False
     )
-    send_state: str = FSMField(
-        default=SendWf.initial, choices=SendWf.choices(), editable=False
-    )
-    last_sent: datetime | None = models.DateTimeField(blank=True, null=True)
+    # send_state: str = FSMField(
+    #     default=SendWf.initial, choices=SendWf.choices(), editable=False
+    # )
+    # last_sent: datetime | None = models.DateTimeField(blank=True, null=True)
     created: datetime = models.DateTimeField(default=now, editable=False)
     created_by: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -124,6 +119,7 @@ class MeetingInvite(MeetingContext):
     )
     # This must match real invite data
     invite_data: str = models.CharField(max_length=200)
+    # data: dict = models.JSONField(encoder=DjangoJSONEncoder)
 
     def validate(self):
         reg = get_invite_data_registry()
@@ -168,14 +164,14 @@ class MeetingInvite(MeetingContext):
         pass
 
     # SEND STATE TRANSITIONS
-    @transition(
-        field=send_state,
-        source=[x for x in SendWf.states.keys() if x != SendWf.SCHEDULED],
-        target=SendWf.SCHEDULED,
-        permission=NOT_ALLOWED,  # Special view, not a normal transition
-    )
-    def schedule(self):
-        pass
+    # @transition(
+    #     field=send_state,
+    #     source=[x for x in SendWf.states.keys() if x != SendWf.SCHEDULED],
+    #     target=SendWf.SCHEDULED,
+    #     permission=NOT_ALLOWED,  # Special view, not a normal transition
+    # )
+    # def schedule(self):
+    #     pass
 
     objects = MeetingInviteManager()
 
@@ -186,62 +182,62 @@ class MeetingInvite(MeetingContext):
         return f"invite:{self.pk}"
 
 
-class InviteDispatch(models.Model):
-    name = "invite_dispatch"
-    invites = models.ManyToManyField(MeetingInvite)
-    subject: str = models.CharField(max_length=100, default="")
-    body: str = RichTextField(verbose_name="Message body", default="")
-    dispatcher_name: str = models.CharField(max_length=30, default="send_email")
-    created: datetime = models.DateTimeField(default=now, editable=False)
-    created_by: AbstractUser = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-    )
-    meeting: Meeting = models.ForeignKey(
-        "meeting.Meeting",
-        on_delete=models.CASCADE,
-        related_name="invite_dispatches",
-    )
-
-    @cached_property
-    def dispatcher(self) -> InviteDispatcher:
-        reg = get_dispatchers_registry()
-        return reg[self.dispatcher_name](self)
-
-    def send(self, invite: MeetingInvite) -> bool:
-        if invite.type != self.dispatcher.type:
-            raise TypeError(
-                f"Dispatch {self.dispatcher.type} called with {invite} that requires {invite.type}"
-            )
-        return self.dispatcher.send(invite)
-
-    def send_scheduled(self):
-        sent = 0
-        failed = 0
-        skipped = self.invites.exclude(send_state=SendWf.SCHEDULED).count()
-        for invite in self.invites.filter(send_state=SendWf.SCHEDULED):
-            invite: MeetingInvite
-            invite.send_state = SendWf.SENDING
-            invite.save()
-            try:
-                invite.validate()
-                self.send(invite)
-            except Exception as exc:
-                invite.send_state = SendWf.FAILED
-                logger.exception("Invite %s failed while sending", invite.pk)
-                failed += 1
-            else:
-                invite.send_state = SendWf.SENT
-                invite.last_sent = now()
-                sent += 1
-            invite.save()
-        return sent, failed, skipped
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}: {self}>"
-
-    def __str__(self):
-        v = getattr(self, "subject", None)
-        if not v:
-            v = f"Dispatch:{self.pk}"
-        return v
+# class InviteDispatch(models.Model):
+#     name = "invite_dispatch"
+#     invites = models.ManyToManyField(MeetingInvite)
+#     subject: str = models.CharField(max_length=100, default="")
+#     body: str = RichTextField(verbose_name="Message body", default="")
+#     dispatcher_name: str = models.CharField(max_length=30, default="send_email")
+#     created: datetime = models.DateTimeField(default=now, editable=False)
+#     created_by: AbstractUser = models.ForeignKey(
+#         settings.AUTH_USER_MODEL,
+#         on_delete=models.CASCADE,
+#     )
+#     meeting: Meeting = models.ForeignKey(
+#         "meeting.Meeting",
+#         on_delete=models.CASCADE,
+#         related_name="invite_dispatches",
+#     )
+#
+#     @cached_property
+#     def dispatcher(self) -> InviteDispatcher:
+#         reg = get_dispatchers_registry()
+#         return reg[self.dispatcher_name](self)
+#
+#     def send(self, invite: MeetingInvite) -> bool:
+#         if invite.type != self.dispatcher.type:
+#             raise TypeError(
+#                 f"Dispatch {self.dispatcher.type} called with {invite} that requires {invite.type}"
+#             )
+#         return self.dispatcher.send(invite)
+#
+#     def send_scheduled(self):
+#         sent = 0
+#         failed = 0
+#         skipped = self.invites.exclude(send_state=SendWf.SCHEDULED).count()
+#         for invite in self.invites.filter(send_state=SendWf.SCHEDULED):
+#             invite: MeetingInvite
+#             invite.send_state = SendWf.SENDING
+#             invite.save()
+#             try:
+#                 invite.validate()
+#                 self.send(invite)
+#             except Exception as exc:
+#                 invite.send_state = SendWf.FAILED
+#                 logger.exception("Invite %s failed while sending", invite.pk)
+#                 failed += 1
+#             else:
+#                 invite.send_state = SendWf.SENT
+#                 invite.last_sent = now()
+#                 sent += 1
+#             invite.save()
+#         return sent, failed, skipped
+#
+#     def __repr__(self):
+#         return f"<{self.__class__.__name__}: {self}>"
+#
+#     def __str__(self):
+#         v = getattr(self, "subject", None)
+#         if not v:
+#             v = f"Dispatch:{self.pk}"
+#         return v

@@ -14,12 +14,9 @@ from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
 
 from voteit.core.validators import root_validate_roles_and_model
-from voteit.core.workflows import SendWf
 from voteit.invites.exceptions import InviteError
 from voteit.invites.permissions import MeetingInvitePermissions
-from voteit.invites.utils import create_dispatch_and_schedule_invites
 from voteit.invites.utils import create_invites
-from voteit.invites.utils import get_dispatchers_registry
 from voteit.invites.utils import get_invite_data_registry
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import Meeting
@@ -172,71 +169,71 @@ class InvitesAdded(Message):
     data: InvitesAddedSchema
 
 
-VALID_STATES = set(SendWf.states.keys()) - {SendWf.SENDING, SendWf.SCHEDULED}
-
-
-class SendInvitesSchema(BaseModel):
-    meeting: int
-    subject: str | None  # FIXME - None means default from send dispatcher
-    body: str  # FIXME
-    states: list[str] = [SendWf.FAILED, SendWf.SENT, SendWf.CREATED]
-    dispatcher_name: str = "send_email"
-    resend_minimum: int = 24  # Don't resend before this
-
-    @validator("states")
-    def validate_states(cls, v: list[str]):
-        """
-        >>> SendInvitesSchema.validate_states(['hello'])
-        Traceback (most recent call last):
-        ...
-        ValueError:
-
-        >>> SendInvitesSchema.validate_states([SendWf.SENT, SendWf.CREATED])
-        ['sent', 'created']
-
-        """
-        specified = set(v)
-        invalid = specified - VALID_STATES
-        if invalid:
-            raise ValueError(
-                f"The following invite send states aren't valid: '{', '.join(invalid)}'"
-            )
-        return v
-
-    @validator("dispatcher_name")
-    def validate_dispatcher_name(cls, v: str):
-        """
-        >>> SendInvitesSchema.validate_dispatcher_name('hello')
-        Traceback (most recent call last):
-        ...
-        ValueError:
-
-        >>> SendInvitesSchema.validate_dispatcher_name('send_email')
-        'send_email'
-
-        """
-        reg = get_dispatchers_registry()
-        if v not in reg:
-            raise ValueError(f"No invite dispatcher with the name '{v}'")
-        return v
-
-
-@incoming
-class SendInvites(ContextAction):
-    name = "invites.send"
-    permission = MeetingInvitePermissions.ADD
-    schema = SendInvitesSchema
-    data: SendInvitesSchema
-    model = Meeting
-    context_schema_attr = "meeting"
-    job_atomic = False
-
-    def run_job(self):
-        self.assert_perm()
-        invite_dispatch = create_dispatch_and_schedule_invites(
-            created_by=self.user, **self.data.dict()
-        )
-        invite_dispatch.send_scheduled()
+# VALID_STATES = set(SendWf.states.keys()) - {SendWf.SENDING, SendWf.SCHEDULED}
+#
+#
+# class SendInvitesSchema(BaseModel):
+#     meeting: int
+#     subject: str | None  # FIXME - None means default from send dispatcher
+#     body: str  # FIXME
+#     states: list[str] = [SendWf.FAILED, SendWf.SENT, SendWf.CREATED]
+#     dispatcher_name: str = "send_email"
+#     resend_minimum: int = 24  # Don't resend before this
+#
+#     @validator("states")
+#     def validate_states(cls, v: list[str]):
+#         """
+#         >>> SendInvitesSchema.validate_states(['hello'])
+#         Traceback (most recent call last):
+#         ...
+#         ValueError:
+#
+#         >>> SendInvitesSchema.validate_states([SendWf.SENT, SendWf.CREATED])
+#         ['sent', 'created']
+#
+#         """
+#         specified = set(v)
+#         invalid = specified - VALID_STATES
+#         if invalid:
+#             raise ValueError(
+#                 f"The following invite send states aren't valid: '{', '.join(invalid)}'"
+#             )
+#         return v
+#
+#     @validator("dispatcher_name")
+#     def validate_dispatcher_name(cls, v: str):
+#         """
+#         >>> SendInvitesSchema.validate_dispatcher_name('hello')
+#         Traceback (most recent call last):
+#         ...
+#         ValueError:
+#
+#         >>> SendInvitesSchema.validate_dispatcher_name('send_email')
+#         'send_email'
+#
+#         """
+#         reg = get_dispatchers_registry()
+#         if v not in reg:
+#             raise ValueError(f"No invite dispatcher with the name '{v}'")
+#         return v
+#
+#
+# @incoming
+# class SendInvites(ContextAction):
+#     name = "invites.send"
+#     permission = MeetingInvitePermissions.ADD
+#     schema = SendInvitesSchema
+#     data: SendInvitesSchema
+#     model = Meeting
+#     context_schema_attr = "meeting"
+#     job_atomic = False
+#
+#     def run_job(self):
+#         self.assert_perm()
+#         invite_dispatch = create_dispatch_and_schedule_invites(
+#             created_by=self.user, **self.data.dict()
+#         )
+#         invite_dispatch.send_scheduled()
 
 
 @outgoing

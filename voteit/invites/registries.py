@@ -1,6 +1,5 @@
 from pydantic.main import BaseModel
 
-from voteit.invites.abcs import InviteDispatcher
 from voteit.core.component import Registry
 
 
@@ -51,4 +50,4 @@ class InviteDataRegistry(Registry):
 
 
 invite_data = InviteDataRegistry(BaseModel)
-invite_dispatchers = Registry(InviteDispatcher)
+# invite_dispatchers = Registry(InviteDispatcher)

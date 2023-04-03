@@ -1,25 +1,18 @@
 from __future__ import annotations
 
-from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import MultipleObjectsReturned
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import transaction
-from django.utils.timezone import now
 
-from voteit.core.workflows import SendWf
 from voteit.invites.exceptions import InviteError
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
     from voteit.core.models import User
-    from voteit.core.component import Registry
     from voteit.invites.registries import InviteDataRegistry
-    from voteit.invites.messages import SendInvitesSchema
-    from voteit.invites.models import InviteDispatch
     from voteit.invites.models import MeetingInvite
 
 
@@ -32,10 +25,10 @@ def get_invite_data_registry() -> InviteDataRegistry:
     return invite_data
 
 
-def get_dispatchers_registry() -> Registry:
-    from .registries import invite_dispatchers
-
-    return invite_dispatchers
+# def get_dispatchers_registry() -> Registry:
+#     from .registries import invite_dispatchers
+#
+#     return invite_dispatchers
 
 
 def create_invites(created_by: User = None, **kwargs):
@@ -99,24 +92,24 @@ def create_invites(created_by: User = None, **kwargs):
     return added, changed, skipped_count
 
 
-def create_dispatch_and_schedule_invites(
-    created_by: User = None, **kwargs
-) -> InviteDispatch:
-    from voteit.invites.messages import SendInvitesSchema
-
-    send_data = SendInvitesSchema(**kwargs)
-    meeting: Meeting = Meeting.objects.get(pk=send_data.meeting)
-    send_exclude_ts = now() - timedelta(hours=send_data.resend_minimum)
-    invites_qs = meeting.invites.filter(send_state__in=send_data.states).exclude(
-        last_sent__gt=send_exclude_ts
-    )
-    with transaction.atomic(durable=True):
-        invite_dispatch: InviteDispatch = meeting.invite_dispatches.create(
-            subject=send_data.subject,
-            body=send_data.body,
-            dispatcher_name=send_data.dispatcher_name,
-            created_by=created_by,
-        )
-        invite_dispatch.invites.set(invites_qs)
-        invites_qs.update(send_state=SendWf.SCHEDULED)
-    return invite_dispatch
+# def create_dispatch_and_schedule_invites(
+#     created_by: User = None, **kwargs
+# ) -> InviteDispatch:
+#     from voteit.invites.messages import SendInvitesSchema
+#
+#     send_data = SendInvitesSchema(**kwargs)
+#     meeting: Meeting = Meeting.objects.get(pk=send_data.meeting)
+#     send_exclude_ts = now() - timedelta(hours=send_data.resend_minimum)
+#     invites_qs = meeting.invites.filter(send_state__in=send_data.states).exclude(
+#         last_sent__gt=send_exclude_ts
+#     )
+#     with transaction.atomic(durable=True):
+#         invite_dispatch: InviteDispatch = meeting.invite_dispatches.create(
+#             subject=send_data.subject,
+#             body=send_data.body,
+#             dispatcher_name=send_data.dispatcher_name,
+#             created_by=created_by,
+#         )
+#         invite_dispatch.invites.set(invites_qs)
+#         invites_qs.update(send_state=SendWf.SCHEDULED)
+#     return invite_dispatch
