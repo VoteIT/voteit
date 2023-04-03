@@ -118,7 +118,7 @@ class CopyMeeting(ContextAction):
 
 class MeetingGroupSchema(BaseModel):
     title: constr(strip_whitespace=True, max_length=100)
-    groupid: constr(to_lower=True, max_length=100, strip_whitespace=True)
+    groupid: constr(to_lower=True, min_length=1, max_length=100, strip_whitespace=True)
     votes: int | None
 
     @validator("groupid", pre=True)
