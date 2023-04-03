@@ -213,7 +213,7 @@ class CreateMeetingGroupsSchema(BaseModel):
 
 @incoming
 class CreateMeetingGroups(ContextAction):
-    name = "meeting_groups.create"
+    name = "meeting_group.bulk_create"
     permission = MeetingPermissions.CHANGE
     schema = CreateMeetingGroupsSchema
     data: CreateMeetingGroupsSchema
