@@ -1,4 +1,4 @@
-from datetime import UTC
+from datetime import timezone
 from datetime import datetime
 from datetime import timedelta
 
@@ -50,7 +50,7 @@ class AccessTokenTests(TestCase):
             example_response, self.user, self.provider
         )
         self.assertEqual(
-            datetime(2021, 4, 13, 6, 39, 40, 748264, tzinfo=UTC),
+            datetime(2021, 4, 13, 6, 39, 40, 748264, tzinfo=timezone.utc),
             access_token.expires_at,
         )
 
