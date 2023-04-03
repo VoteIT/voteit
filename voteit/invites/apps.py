@@ -9,6 +9,6 @@ class InvitesConfig(AppConfig):
         from .rest_api import views
         from voteit.invites import rules
         from voteit.invites import signals
-        from voteit.invites.app.invites import register
+        from voteit.invites.app import invites
 
-        register()
+        invites.register()

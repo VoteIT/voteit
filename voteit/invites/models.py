@@ -143,6 +143,7 @@ class MeetingInvite(MeetingContext):
         Important! Must always run within an atomic block!
         """
         self.used_by = user
+        self.used_at = now()
         self.meeting.add_roles(user, *self.roles)
 
     @transition(

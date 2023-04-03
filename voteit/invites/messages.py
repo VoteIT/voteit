@@ -7,12 +7,12 @@ from pydantic import Field
 from pydantic import root_validator
 from pydantic import validator
 from pydantic.main import BaseModel
-
 from auditlog.context import set_actor
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
+
 from voteit.core.validators import root_validate_roles_and_model
 from voteit.core.workflows import SendWf
 from voteit.invites.exceptions import InviteError
