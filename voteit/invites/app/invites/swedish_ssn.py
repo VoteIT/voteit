@@ -2,7 +2,9 @@ from contextlib import suppress
 
 from pydantic import BaseModel
 from pydantic import validator
-
+from django.utils.translation import gettext_lazy as _
+from voteit.invites.abcs import InviteDataAdapter
+from voteit.invites.registries import invite_adapter_registry
 from voteit.invites.registries import invite_data
 
 
@@ -39,3 +41,18 @@ with suppress(ImportError):
             with suppress(PersonnummerException):
                 return Personnummer(v.strip()).format(long_format=True)
             raise ValueError("Incorrect swedish personnummer")
+
+    @invite_adapter_registry
+    class InviteSweSSN(InviteDataAdapter):
+        """
+        >>> InviteSweSSN.from_cols("121212-1212")
+        SwedishSSN(swedish_ssn='201212121212')
+        >>> InviteSweSSN.many
+        False
+        >>> InviteSweSSN.columns
+        ['swedish_ssn']
+        """
+
+        name = "swedish_ssn"
+        title = _("Swedish social security number")
+        schema = SwedishSSN

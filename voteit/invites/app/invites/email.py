@@ -3,14 +3,34 @@ from typing import TYPE_CHECKING
 
 from django.utils.translation import gettext_lazy as _
 from pydantic import EmailStr
+from pydantic import conlist
 from pydantic import validator
 from pydantic.main import BaseModel
 
+from voteit.invites.abcs import InviteDataAdapter
+from voteit.invites.registries import invite_adapter_registry
 from voteit.invites.registries import invite_data
-
 
 if TYPE_CHECKING:
     from voteit.invites.models import MeetingInvite
+
+
+class EmailsSchema(BaseModel):
+    email: conlist(EmailStr, unique_items=True)
+
+
+@invite_adapter_registry
+class InviteEmail(InviteDataAdapter):
+    """
+    >>> InviteEmail.many
+    True
+    >>> InviteEmail.columns
+    ['email']
+    """
+
+    name = "email"
+    schema = EmailsSchema
+    title = _("Email")
 
 
 @invite_data
