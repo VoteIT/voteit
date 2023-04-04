@@ -11,6 +11,7 @@ from voteit.meeting.workflows import MeetingWf
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from voteit.agenda.models import AgendaItem
+    from voteit.meeting.models import MeetingGroup
     from voteit.meeting.models import Meeting
     from voteit.poll.models import Poll
 
@@ -20,13 +21,29 @@ _MARKER = object()
 
 @predicate
 def is_author(user: AbstractUser, instance: Model) -> bool:
-    """ Check against any generic object with the author attribute. """
+    """
+    Check against any generic object with the author attribute.
+    """
     return getattr(instance, "author", _MARKER) == user
 
 
 @predicate
+def is_author_or_group_author_member(user: AbstractUser, instance: Model) -> bool:
+    """
+    Generic check against object with author and meeting_group attribute.
+    If user isn't an author, it needs to be within the meeting group that's the author.
+    """
+    if is_author(user, instance):
+        return True
+    meeting_group: MeetingGroup | None = getattr(instance, "meeting_group", None)
+    return meeting_group and user in meeting_group.members.all()
+
+
+@predicate
 def is_user(user: AbstractUser, instance: Model) -> bool:
-    """ Check against any generic object with the user attribute. """
+    """
+    Check against any generic object with the user attribute.
+    """
     return getattr(instance, "user", _MARKER) == user
 
 
@@ -35,7 +52,8 @@ _ARCHIVED_STATES = MeetingWf.archived_states | AgendaItemWf.archived_states
 
 @predicate
 def is_not_archived(user: AbstractUser, instance: Meeting | AgendaItem) -> bool:
-    """Generic check for archived state.
+    """
+    Generic check for archived state.
     Keep this as a negated state since check for is not None will return a false positive otherwise!
     """
     state = getattr(instance, "state", None)
@@ -47,7 +65,8 @@ _FINISHED_STATES = MeetingWf.finished_states | AgendaItemWf.finished_states
 
 @predicate
 def is_not_finished(user: AbstractUser, instance: Meeting | AgendaItem) -> bool:
-    """The meeting/agenda item is not closed, archived etc.
+    """
+    The meeting/agenda item is not closed, archived etc.
     Agenda items may be private too
     """
     state = getattr(instance, "state", None)
@@ -56,6 +75,8 @@ def is_not_finished(user: AbstractUser, instance: Meeting | AgendaItem) -> bool:
 
 @predicate
 def is_not_private(user: AbstractUser, instance: AgendaItem | Poll) -> bool:
-    """ Checked against any object that has a state."""
+    """
+    Checked against any object that has a state.
+    """
     state = getattr(instance, "state", None)
     return state not in [None, "private"]

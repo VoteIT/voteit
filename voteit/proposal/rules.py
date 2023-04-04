@@ -8,7 +8,7 @@ from voteit.agenda.rules import can_view_ai
 from voteit.agenda.rules import upcoming_ongoing_or_private_ai
 from voteit.agenda.rules import upcoming_or_ongoing_ai
 from voteit.core.decorators import predicate
-from voteit.core.rules import is_author
+from voteit.core.rules import is_author_or_group_author_member
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import is_proposer
 from voteit.proposal.models import Proposal
@@ -64,7 +64,11 @@ for perm in (ProposalPermissions.RETRACT, DiffProposalPermissions.RETRACT):
         perm,
         (is_moderator & upcoming_ongoing_or_private_ai)
         | (
-            upcoming_or_ongoing_ai & is_published & is_author & ai_proposals_not_blocked
+            upcoming_or_ongoing_ai
+            & is_published
+            & is_author_or_group_author_member
+            & is_proposer
+            & ai_proposals_not_blocked
         ),
     )
 
