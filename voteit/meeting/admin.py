@@ -160,7 +160,7 @@ class MeetingDialectProxyAdmin(MeetingAdmin):
         DialectFilter,
     )
     search_fields = ("title", "installed_dialect")
-    actions = ["uninstall_dialect"]
+    actions = ["uninstall_dialect", "trigger_reinstall_dialect"]
     fields = ("installed_dialect",)
     inlines = []
 
@@ -183,6 +183,21 @@ class MeetingDialectProxyAdmin(MeetingAdmin):
         self.message_user(
             request,
             f"Uninstalled {queryset.count()}",
+            messages.SUCCESS,
+        )
+
+    @admin.action(description="Trigger install dialect")
+    def trigger_reinstall_dialect(self, request, queryset):
+        queryset = queryset.exclude(installed_dialect__isnull=True)
+        with transaction.atomic(durable=True):
+            for m in queryset:
+                handler = dialect_registry.get_merged_handler(m.installed_dialect)
+                m.installed_dialect = None
+                m.save()
+                handler.install(m)
+        self.message_user(
+            request,
+            f"Reinstalled {queryset.count()}",
             messages.SUCCESS,
         )
 
