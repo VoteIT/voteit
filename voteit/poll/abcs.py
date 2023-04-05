@@ -9,6 +9,7 @@ from pydantic.main import BaseModel
 
 from voteit.core.decorators import ensure_atomic
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.workflows import MeetingWf
 from voteit.poll.exceptions import ElectoralRegisterError
 
 if TYPE_CHECKING:
@@ -137,6 +138,8 @@ class ElectoralRegisterPolicy(ABC):
         """
         Is a new ER needed?
         """
+        if self.meeting.state not in (MeetingWf.ONGOING, MeetingWf.UPCOMING):
+            return False
         if self.meeting.latest_er is None:
             return True
         return self.get_voters(**kwargs) != self.meeting.latest_er.weight_dict

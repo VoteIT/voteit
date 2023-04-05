@@ -4,15 +4,20 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
 
+from voteit.agenda.models import AgendaItem
+from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.workflows import MeetingWf
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
-from voteit.poll.exceptions import ElectoralRegisterEmpty
+from voteit.poll.app.polls.simple import Simple
 from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidPollMethod
-from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.exceptions import NotAllowedToVote
 from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.poll.models import VoterWeight
 from voteit.poll.workflows import PollWf
+from voteit.proposal.models import Proposal
 from voteit.proposal.workflows import ProposalWf
 
 
@@ -58,12 +63,6 @@ class PollTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.agenda.models import AgendaItem
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai: AgendaItem = cls.meeting.agenda_items.create()
         cls.poll: Poll = cls.ai.polls.create(method_name="simple")
@@ -216,8 +215,6 @@ class PollTests(TestCase):
         self.assertTrue(self.poll.verify_checksum())
 
     def test_proposal_state_exceptions(self):
-        from voteit.proposal.workflows import ProposalWf
-
         self.prop.unhandled()
         self.prop.save()
         # Must not cause exception
@@ -258,55 +255,28 @@ class PollTests(TestCase):
         self.assertEqual(ProposalWf.PUBLISHED, self.prop.state)
 
     def test_proposal_from_another_meeting(self):
-        from voteit.proposal.models import Proposal
-
         other_prop = Proposal.objects.create()
         with self.assertRaises(IntegrityError):
             self.poll.proposals.add(other_prop)
 
     def test_poll_from_another_meeting(self):
-        from voteit.proposal.models import Proposal
-
         other_prop = Proposal.objects.create()
         with self.assertRaises(IntegrityError):
             other_prop.polls.add(self.poll)
 
 
 class VoteWeightTests(TestCase):
-    @property
-    def Poll(self):
-        from voteit.poll.models import Poll
-
-        return Poll
-
-    @property
-    def ElectoralRegister(self):
-        from voteit.poll.models import ElectoralRegister
-
-        return ElectoralRegister
-
-    @property
-    def VoterWeight(self):
-        from voteit.poll.models import VoterWeight
-
-        return VoterWeight
-
-    def setUp(self):
-        self.er = self.ElectoralRegister.objects.create()
-        self.poll = self.Poll.objects.create(
-            method_name="simple", electoral_register=self.er
-        )
-        self.user1 = User.objects.create(username="1")
-        self.user2 = User.objects.create(username="2")
-        self.user3 = User.objects.create(username="3")
-        self.VoterWeight.objects.create(
-            register=self.poll.electoral_register, user=self.user1
-        )
-        self.VoterWeight.objects.create(
-            register=self.poll.electoral_register, user=self.user2
-        )
-        self.VoterWeight.objects.create(
-            register=self.poll.electoral_register, user=self.user3, weight=3
+    @classmethod
+    def setUpTestData(cls):
+        cls.er = ElectoralRegister.objects.create()
+        cls.poll = Poll.objects.create(method_name="simple", electoral_register=cls.er)
+        cls.user1 = User.objects.create(username="1")
+        cls.user2 = User.objects.create(username="2")
+        cls.user3 = User.objects.create(username="3")
+        VoterWeight.objects.create(register=cls.poll.electoral_register, user=cls.user1)
+        VoterWeight.objects.create(register=cls.poll.electoral_register, user=cls.user2)
+        VoterWeight.objects.create(
+            register=cls.poll.electoral_register, user=cls.user3, weight=3
         )
 
     def test_poll_result(self):
@@ -341,10 +311,7 @@ class ElectoralRegisterTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting = Meeting.objects.get(pk=1)
-        # cls.meeting.save()
         cls.participant = User.objects.get(username="participant")
         cls.moderator = User.objects.get(username="moderator")
         cls.meeting.add_roles(cls.participant, "potential_voter")
@@ -377,14 +344,17 @@ class ElectoralRegisterTests(TestCase):
         self.er.set_voters_from_dict({self.moderator.pk: 3})
         self.assertEqual({self.moderator.pk: 3}, self.er.weight_dict)
 
+    def test_create_er_on_closed_meeting(self):
+
+        self.meeting.state = MeetingWf.CLOSED
+        self.meeting.save()
+        self.meeting.remove_roles(self.participant, ROLE_POTENTIAL_VOTER)
+        self.assertFalse(self.meeting.er_policy.new_er_needed())
+        self.assertEqual(self.er, self.meeting.er_policy.create_er())
+
 
 class ElectoralRegisterManagerTests(TestCase):
     def _mk_meeting_user(self, _id: int):
-        from voteit.meeting.models import Meeting
-        from voteit.meeting import roles
-        from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
-        from voteit.poll.app.polls.simple import Simple
-
         meeting = Meeting.objects.create(
             title="Test meeting",
             er_policy_name=AutoBeforePoll.name,
@@ -392,7 +362,7 @@ class ElectoralRegisterManagerTests(TestCase):
         meeting.ongoing()
         meeting.save()
         user = User.objects.create(username=f"user-{_id}")
-        meeting.add_roles(user, roles.ROLE_POTENTIAL_VOTER)
+        meeting.add_roles(user, ROLE_POTENTIAL_VOTER)
 
         ai = meeting.agenda_items.create(title="Test agenda item")
         ai.ongoing()
@@ -427,13 +397,6 @@ class VoteTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.agenda.models import AgendaItem
-        from voteit.poll.models import Poll
-
-        # from voteit.poll.models import ElectoralRegister
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai: AgendaItem = cls.meeting.agenda_items.create()
         cls.poll: Poll = cls.ai.polls.create(method_name="simple")
