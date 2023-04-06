@@ -630,14 +630,12 @@ class ExportMeetingGroupsViewSetTests(APITestCase):
         self.assertEqual(
             [
                 {
-                    "pk": self.turkish.pk,
                     "title": "Özgür",
                     "groupid": "ozgur",
                     "votes": 5,
                 },
-                {"pk": self.chineese.pk, "title": "好", "groupid": "", "votes": 8},
+                {"title": "好", "groupid": "", "votes": 8},
                 {
-                    "pk": self.swedish.pk,
                     "title": "Fika nu kör vi",
                     "groupid": "fika-nu-kor-vi",
                     "votes": None,
@@ -654,10 +652,10 @@ class ExportMeetingGroupsViewSetTests(APITestCase):
         rows = {x.decode() for x in response.content.splitlines()}
         self.assertEqual(
             {
-                f"pk,title,groupid,votes",
-                f"{self.turkish.pk},Özgür,ozgur,5",
-                f"{self.chineese.pk},好,,8",
-                f"{self.swedish.pk},Fika nu kör vi,fika-nu-kor-vi,",
+                f"title,groupid,votes",
+                f"Özgür,ozgur,5",
+                f"好,,8",
+                f"Fika nu kör vi,fika-nu-kor-vi,",
             },
             set(rows),
         )
