@@ -14,6 +14,9 @@ from auditlog.context import disable_auditlog
 from dolly.core import Importer
 
 from voteit.discussion.models import DiscussionPost
+from voteit.meeting.models import GroupMembership
+from voteit.meeting.models import GroupRole
+from voteit.meeting.models import MeetingRoles
 from voteit.organisation.models import Organisation
 from voteit.poll.app.polls.combined_simple import CombinedSimplePollResult
 from voteit.poll.app.polls.combined_simple import CombinedSimpleVoteSchema
@@ -104,6 +107,9 @@ class Command(BaseCommand):
         importer.add_pre_commit(update_all_votes)
         importer.add_pre_commit(verify_json_attrs)
         importer.add_explicit_dependency(Reaction, Proposal, DiscussionPost)
+        importer.add_explicit_dependency(GroupMembership, MeetingRoles)
+        importer.add_explicit_dependency(GroupRole, MeetingRoles)
+
         if merge_org:
             assert len(importer.data.get(Organisation, [])) == 1
             deserialized_org = next(iter(importer.data[Organisation]))
