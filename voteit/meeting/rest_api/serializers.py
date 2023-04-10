@@ -331,12 +331,9 @@ class GroupMembershipSerializer(serializers.ModelSerializer):
 
 
 class MeetingGroupExportSerializer(serializers.ModelSerializer):
-    pk = serializers.IntegerField(read_only=True)
-
     class Meta:
         model = MeetingGroup
         fields = [
-            "pk",
             "title",
             "groupid",
             "votes",

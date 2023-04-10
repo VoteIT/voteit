@@ -15,6 +15,10 @@ class RulesTests(TestCase):
         cls.anon_user = User.objects.create(username="anon")
         cls.participant = User.objects.create(username="participant")
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.group_proposer = User.objects.create(username="group_proposer")
+        cls.meeting.add_roles(cls.group_proposer, ROLE_PARTICIPANT, ROLE_PROPOSER)
+        cls.group_participant = User.objects.create(username="group_participant")
+        cls.meeting.add_roles(cls.group_participant, ROLE_PARTICIPANT)
         cls.moderator = User.objects.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.proposer = User.objects.create(username="proposer")
@@ -24,7 +28,11 @@ class RulesTests(TestCase):
         cls.ai = cls.meeting.agenda_items.create()
         cls.ai.upcoming()
         cls.ai.save()
-        cls.proposal = cls.ai.proposals.create(author=cls.proposer_author)
+        cls.group = cls.meeting.groups.create()
+        cls.group.members.add(cls.group_proposer, cls.group_participant)
+        cls.proposal = cls.ai.proposals.create(
+            author=cls.proposer_author, meeting_group=cls.group
+        )
 
     def setUp(self):
         self.ai.refresh_from_db()
@@ -49,6 +57,8 @@ class RulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(VIEW, self.proposal))
         self.assertFalse(self.proposer.has_perm(VIEW, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(VIEW, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(VIEW, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(VIEW, self.proposal))
 
     def test_view_upcoming(self):
         VIEW = self.p("VIEW")
@@ -57,6 +67,8 @@ class RulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(VIEW, self.proposal))
         self.assertTrue(self.proposer.has_perm(VIEW, self.proposal))
         self.assertTrue(self.proposer_author.has_perm(VIEW, self.proposal))
+        self.assertTrue(self.group_proposer.has_perm(VIEW, self.proposal))
+        self.assertTrue(self.group_participant.has_perm(VIEW, self.proposal))
 
     def test_view_public_meeting_private_ai(self):
         self.ai.unpublish()
@@ -69,6 +81,8 @@ class RulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(VIEW, self.proposal))
         self.assertFalse(self.proposer.has_perm(VIEW, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(VIEW, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(VIEW, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(VIEW, self.proposal))
 
     def test_view_public_meeting(self):
         self.meeting.public = True
@@ -79,6 +93,8 @@ class RulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(VIEW, self.proposal))
         self.assertTrue(self.proposer.has_perm(VIEW, self.proposal))
         self.assertTrue(self.proposer_author.has_perm(VIEW, self.proposal))
+        self.assertTrue(self.group_proposer.has_perm(VIEW, self.proposal))
+        self.assertTrue(self.group_participant.has_perm(VIEW, self.proposal))
 
     def test_add(self):
         ADD = self.p("ADD")
@@ -86,6 +102,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertTrue(self.moderator.has_perm(ADD, self.ai))
         self.assertTrue(self.proposer.has_perm(ADD, self.ai))
+        self.assertTrue(self.group_proposer.has_perm(ADD, self.ai))
+        self.assertFalse(self.group_participant.has_perm(ADD, self.ai))
 
     def test_add_with_block(self):
         self.ai.block_proposals = True
@@ -95,6 +113,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertTrue(self.moderator.has_perm(ADD, self.ai))
         self.assertFalse(self.proposer.has_perm(ADD, self.ai))
+        self.assertFalse(self.group_proposer.has_perm(ADD, self.ai))
+        self.assertFalse(self.group_participant.has_perm(ADD, self.ai))
 
     def test_add_closed_ai_ongoing_meeting(self):
         self.ai.close()
@@ -103,6 +123,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertFalse(self.moderator.has_perm(ADD, self.ai))
         self.assertFalse(self.proposer.has_perm(ADD, self.ai))
+        self.assertFalse(self.group_proposer.has_perm(ADD, self.ai))
+        self.assertFalse(self.group_participant.has_perm(ADD, self.ai))
 
     def test_add_closed_meeting_closed_ai(self):
         # Note: Meetings shouldn't be able to close without closing the AIs
@@ -114,6 +136,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertFalse(self.moderator.has_perm(ADD, self.ai))
         self.assertFalse(self.proposer.has_perm(ADD, self.ai))
+        self.assertFalse(self.group_proposer.has_perm(ADD, self.ai))
+        self.assertFalse(self.group_participant.has_perm(ADD, self.ai))
 
     def test_add_archived_meeting(self):
         self._archive()
@@ -122,6 +146,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertFalse(self.moderator.has_perm(ADD, self.ai))
         self.assertFalse(self.proposer.has_perm(ADD, self.ai))
+        self.assertFalse(self.group_proposer.has_perm(ADD, self.ai))
+        self.assertFalse(self.group_participant.has_perm(ADD, self.ai))
 
     def test_change(self):
         CHANGE = self.p("CHANGE")
@@ -131,6 +157,8 @@ class RulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(CHANGE, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(CHANGE, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(CHANGE, self.proposal))
 
     def test_change_closed_ai_ongoing_meeting(self):
         self.meeting.ongoing()
@@ -143,6 +171,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(CHANGE, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(CHANGE, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(CHANGE, self.proposal))
 
     def test_change_closed_meeting_closed_ai(self):
         self.meeting.ongoing()
@@ -156,6 +186,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(CHANGE, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(CHANGE, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(CHANGE, self.proposal))
 
     def test_change_archived_meeting(self):
         self._archive()
@@ -165,6 +197,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(CHANGE, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(CHANGE, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(CHANGE, self.proposal))
 
     def test_delete(self):
         DELETE = self.p("DELETE")
@@ -173,6 +207,8 @@ class RulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(DELETE, self.proposal))
         self.assertFalse(self.proposer.has_perm(DELETE, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(DELETE, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(DELETE, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(DELETE, self.proposal))
 
     def test_delete_closed_ai_ongoing_meeting(self):
         self.meeting.ongoing()
@@ -185,6 +221,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(DELETE, self.proposal))
         self.assertFalse(self.proposer.has_perm(DELETE, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(DELETE, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(DELETE, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(DELETE, self.proposal))
 
     def test_delete_closed_meeting_closed_ai(self):
         self.meeting.ongoing()
@@ -198,6 +236,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(DELETE, self.proposal))
         self.assertFalse(self.proposer.has_perm(DELETE, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(DELETE, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(DELETE, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(DELETE, self.proposal))
 
     def test_delete_archived_meeting(self):
         self._archive()
@@ -207,6 +247,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(DELETE, self.proposal))
         self.assertFalse(self.proposer.has_perm(DELETE, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(DELETE, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(DELETE, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(DELETE, self.proposal))
 
     def test_retract(self):
         RETRACT = self.p("RETRACT")
@@ -215,6 +257,8 @@ class RulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer.has_perm(RETRACT, self.proposal))
         self.assertTrue(self.proposer_author.has_perm(RETRACT, self.proposal))
+        self.assertTrue(self.group_proposer.has_perm(RETRACT, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(RETRACT, self.proposal))
 
     def test_retract_archived_meeting(self):
         self._archive()
@@ -224,6 +268,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(RETRACT, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(RETRACT, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(RETRACT, self.proposal))
 
     def test_retract_private_ai(self):
         self.ai.unpublish()
@@ -234,6 +280,8 @@ class RulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(RETRACT, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(RETRACT, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(RETRACT, self.proposal))
 
     def test_retract_closed_ai_ongoing_meeting(self):
         self.ai.close()
@@ -244,6 +292,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(RETRACT, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(RETRACT, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(RETRACT, self.proposal))
 
     def test_retract_closed_meeting_closed_ai(self):
         self.ai.close()
@@ -255,6 +305,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(RETRACT, self.proposal))
+        self.assertFalse(self.group_proposer.has_perm(RETRACT, self.proposal))
+        self.assertFalse(self.group_participant.has_perm(RETRACT, self.proposal))
 
 
 TEXT = """

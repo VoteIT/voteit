@@ -199,6 +199,7 @@ def context_changed_publish_to_meeting(instance, *, sender, created, **kwargs):
 
 
 @receiver(pre_save, sender=MeetingGroup)
+@disable_on_raw_save
 def adjust_membership_voting_power_when_group_changes(*, instance: MeetingGroup, **kw):
     if instance.pk:
         # We only care about updates here!
@@ -270,6 +271,7 @@ def delegate_signal_role_deleted(instance: GroupMembership, **kwargs):
 
 
 @receiver(group_role_added, sender=GroupMembership)
+@disable_on_raw_save  # Imports will contain rolemap already
 def handle_meeting_roles_through_role_added(
     instance: GroupMembership, role: GroupRole, **kwargs
 ):
