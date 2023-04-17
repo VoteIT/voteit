@@ -4,6 +4,7 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 from django.apps import apps
+from django.db import IntegrityError
 from django.db.transaction import get_connection
 from django.db.transaction import on_commit
 from rest_framework.exceptions import PermissionDenied
@@ -11,6 +12,7 @@ from rest_framework.exceptions import PermissionDenied
 from voteit.core.permissions import Permission
 
 if TYPE_CHECKING:
+    from django.db.models import Manager
     from rest_framework.viewsets import GenericAPIView
     from voteit.core.role import Role
     from voteit.core.predicate import Predicate
@@ -163,3 +165,31 @@ def has_perm_drf(permission):
         return wrapped
 
     return wrapper
+
+
+# Never used, but might be needed later
+# def has_exact_filter(*names: str):
+#     """
+#     Check that a models.Manager has a specific exact filter applied
+#     """
+#     for name in names:
+#         assert isinstance(name, str)
+#
+#     def wrapper(f):
+#         @wraps(f)
+#         def wrapped(inst: Manager, *args, **kwargs):
+#             required = set(names)
+#             qs = inst.get_queryset()
+#             filters = qs.query.has_filters()
+#             for ch in filters.children:
+#                 if ch.lookup_name != "exact":
+#                     continue
+#                 if ch.lhs.field.name in required:
+#                     required.discard(ch.lhs.field.name)
+#                     if not required:
+#                         return f(inst, *args, **kwargs)
+#             raise IntegrityError(f"Queryset doesn't contain {name} filter")
+#
+#         return wrapped
+#
+#     return wrapper

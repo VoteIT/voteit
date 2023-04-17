@@ -1,7 +1,9 @@
 """ Testing helpers"""
 from __future__ import annotations
 import doctest
+from contextlib import contextmanager
 from pkgutil import walk_packages
+from time import perf_counter
 
 from django.contrib.auth import get_user_model
 from django.db.transaction import get_connection
@@ -87,3 +89,9 @@ class FakeCommit:
         while current_run_on_commit:
             sids, func = current_run_on_commit.pop(0)
             func()
+
+
+@contextmanager
+def exectime() -> float:
+    start = perf_counter()
+    yield lambda: perf_counter() - start

@@ -3,16 +3,16 @@ from contextlib import suppress
 from pydantic import BaseModel
 from pydantic import validator
 from django.utils.translation import gettext_lazy as _
+
 from voteit.invites.abcs import InviteDataAdapter
 from voteit.invites.registries import invite_adapter_registry
-from voteit.invites.registries import invite_data
 
 
 with suppress(ImportError):
     from personnummer.personnummer import Personnummer
     from personnummer.personnummer import PersonnummerException
 
-    @invite_data
+    # @invite_data
     class SwedishSSN(BaseModel):
         """
         Handles invites to Swedish social security numbers (personnummer)
@@ -34,7 +34,7 @@ with suppress(ImportError):
         pydantic.error_wrappers.ValidationError:
         """
 
-        swedish_ssn: str
+        swedish_ssn: str | None
 
         @validator("swedish_ssn")
         def validate_ssn(cls, v: str) -> str:
@@ -47,8 +47,7 @@ with suppress(ImportError):
         """
         >>> InviteSweSSN.from_cols("121212-1212")
         SwedishSSN(swedish_ssn='201212121212')
-        >>> InviteSweSSN.many
-        False
+
         >>> InviteSweSSN.columns
         ['swedish_ssn']
         """

@@ -1,15 +1,16 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.invites.models import MeetingInvite
+from voteit.invites.workflows import InviteWf
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
+
 
 class MeetingInvitePermissionsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
-        from voteit.invites.models import MeetingInvite
-        from voteit.invites.workflows import InviteWf
-
         cls.meeting = Meeting.objects.create(er_policy_name="auto_always")
         User = get_user_model()
         cls.anon_user = User.objects.create(username="anon")
@@ -19,10 +20,8 @@ class MeetingInvitePermissionsTests(TestCase):
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.invite = MeetingInvite.objects.create(
             meeting=cls.meeting,
-            created_by=cls.moderator,
-            invite_data="yeah@betahaus.net",
+            user_data={"email": "yeah@betahaus.net"},
         )
-        cls.wf = InviteWf
 
     def setUp(self):
         self.meeting.refresh_from_db()
@@ -73,7 +72,7 @@ class MeetingInvitePermissionsTests(TestCase):
         self.assertFalse(self.moderator.has_perm(PERM, self.invite))
 
     def test_change_used_invite(self):
-        self.invite.state = self.wf.ACCEPTED
+        self.invite.state = InviteWf.ACCEPTED
         PERM = self.p("CHANGE")
         self.assertFalse(self.anon_user.has_perm(PERM, self.invite))
         self.assertFalse(self.participant.has_perm(PERM, self.invite))
@@ -93,7 +92,7 @@ class MeetingInvitePermissionsTests(TestCase):
         self.assertFalse(self.moderator.has_perm(PERM, self.invite))
 
     def test_delete_used_invite(self):
-        self.invite.state = self.wf.ACCEPTED
+        self.invite.state = InviteWf.ACCEPTED
         PERM = self.p("DELETE")
         self.assertFalse(self.anon_user.has_perm(PERM, self.invite))
         self.assertFalse(self.participant.has_perm(PERM, self.invite))

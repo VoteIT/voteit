@@ -19,16 +19,14 @@ class MeetingInviteAdmin(FSMTransitionMixin, admin.ModelAdmin):
     list_display = (
         "meeting",
         "state",
-        "created_by",
         "used_by",
-        "type",
         "roles",
     )
     list_filter = (
         "meeting__organisation",
         "state",
-        "type",
     )
+    # FIXME: Filter type
 
 
 # @admin.register(InviteDispatch)

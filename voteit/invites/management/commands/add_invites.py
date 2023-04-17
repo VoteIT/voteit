@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import sys
+from pprint import pprint
 from typing import TYPE_CHECKING
 
-from django.contrib.auth import get_user_model
 from django.core.management import BaseCommand
 from django.db import transaction
+from django.db.transaction import get_connection
+from django.test.utils import CaptureQueriesContext
 
-from voteit.invites.utils import create_invites
+from voteit.core.testing import exectime
+from voteit.invites.messages import AddInvites
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -30,8 +33,22 @@ class Command(BaseCommand):
     help = "Create meeting invites. Note! This command only works with piped data."
 
     def add_arguments(self, parser):
-        parser.add_argument("-m", help="Meeting pk")
-        parser.add_argument("-u", help="Creating user pk")
+        parser.add_argument("-m", help="Meeting pk", required=True)
+        parser.add_argument("-u", help="Creating user pk", required=True)
+        parser.add_argument("-t", help="Invite type", default="email")
+        parser.add_argument(
+            "--dry-run",
+            help="Don't save anything, just report",
+            action="store_true",
+            default=False,
+        )
+        parser.add_argument(
+            "--queries",
+            help="Report exec time, queries etc",
+            action="store_true",
+            default=False,
+        )
+        # parser.add_argument("-f", help="From file instead of stdin")
         parser.add_argument(
             "-P", help="Add proposer role", action="store_true", default=False
         )
@@ -43,8 +60,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        User: UserType = get_user_model()
-        created_by: UserType = User.objects.get(pk=options.get("u"))
         meeting: Meeting = Meeting.objects.get(pk=options.get("m"))
         roles = {str(ROLE_PARTICIPANT)}
         for (k, role) in _ROLES.items():
@@ -56,20 +71,28 @@ class Command(BaseCommand):
             )
         )
         print(
-            "Note! This command will freeze if you haven't piped any data to STDIN. Exit in case you didn't."
+            "Note! This command will freeze if you haven't piped any data to STDIN or specified a file. Exit in that case."
         )
-        emails = set()
-        for row in sys.stdin:
-            row = row.strip()
-            if row:
-                emails.add(row)
-        with transaction.atomic():
-            added, changed, skipped_count = create_invites(
-                created_by=created_by,
-                meeting=meeting.pk,
-                roles=roles,
-                invite_data=emails,
-            )
+        user_data = sys.stdin.readlines()
+        command = AddInvites(
+            mm={"user_pk": options.get("u")},
+            meeting=meeting.pk,
+            roles=roles,
+            user_data=user_data,
+        )
+        command.context = meeting
+        with transaction.atomic(durable=True):
+            conn = get_connection()
+            with CaptureQueriesContext(connection=conn) as cqc:
+                with exectime() as et:
+                    result = command.run_job()
+                if options.get("queries"):
+                    pprint(cqc.captured_queries)
+                    print("-" * 80)
+                    print(f"Execution time: {et():.4f} secs - queries: {len(cqc)}")
+            if options.get("dry_run"):
+                print("-- DRY RUN - aborting save")
+                transaction.set_rollback(True)
         print(
-            f"Added: {len(added)} \nChanged: {len(changed)} \nSkipped: {skipped_count}"
+            f"Added: {result.data.added} \nChanged: {result.data.changed} \nSkipped: {result.data.skipped}"
         )

@@ -11,7 +11,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from voteit.core.rest_api import router
-from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.base import TransitionsMixin
+from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.utils import get_identity_data
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.invites.models import MeetingInvite
@@ -26,11 +27,13 @@ logger = getLogger(__name__)
 
 
 @router.register("meeting-invites", basename="meeting-invites")
-class MeetingInviteViewSet(DefaultModelViewSet):
-    serializer_class = serializers.MeetingInviteSerializer
-    serializer_classes = {
-        "create": serializers.CreateMeetingInviteSerializer,
-    }
+class MeetingInviteViewSet(
+    AutoPermissionViewSetMixin,
+    TransitionsMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    # serializer_class = Ser
     context_queryset = Meeting.objects.all()
     context_lookup_kwarg = "meeting"
     model = MeetingInvite
@@ -42,16 +45,10 @@ class MeetingInviteViewSet(DefaultModelViewSet):
         if self.detail:
             # Permission checked against obj
             return MeetingInvite.objects.all()
-        try:
-            meeting: Meeting = self.get_context(self.request)
-        except ValidationError:
-            meeting = None
-        # This permission can be checked against meetings too
-        if meeting and self.request.user.has_perm(
-            MeetingInvitePermissions.VIEW, meeting
-        ):
-            return meeting.invites
         return MeetingInvite.objects.none()
+
+    def list(self, *args, **kwargs):
+        return Response([])
 
 
 @router.register("match-invites", basename="match-invites")
@@ -145,12 +142,9 @@ class HandleMatchedInvitesViewSet(
         for item in self.identity_data["user_data"]:
             values = sdata.setdefault(item["scope"], set())
             values.add(item["data"])
-        return MeetingInvite.objects.find_open_invites(organisation, **sdata)
-
-    def get_matching(self, instance: MeetingInvite):
-        for item in self.identity_data["user_data"]:
-            if instance.type == item["scope"] and instance.invite_data == item["data"]:
-                yield item
+        return MeetingInvite.objects.find_open_invites(
+            organisation=organisation, **sdata
+        )
 
     @action(
         methods=["post"],
@@ -159,13 +153,8 @@ class HandleMatchedInvitesViewSet(
     def accept(self, request, pk):
         # Note: Permissions doesn't apply here since it's handled by the queryset
         instance: MeetingInvite = self.get_object()
-        matched = list(self.get_matching(instance))
-        if not matched:
-            # Since queryset has already evaluated this, it shouldn't happen
-            raise ValidationError("Couldn't find matching invite")
         with transaction.atomic():
             instance.accept(request.user)
-            instance.matched = matched
             instance.save()
         return Response(status=200, data=self.serializer_class(instance).data)
 
@@ -176,12 +165,7 @@ class HandleMatchedInvitesViewSet(
     def reject(self, request, pk):
         # Note: Permissions doesn't apply here since it's handled by the queryset
         instance: MeetingInvite = self.get_object()
-        matched = list(self.get_matching(instance))
-        if not matched:
-            # Since queryset has already evaluated this, it shouldn't happen
-            raise ValidationError("Couldn't find matching invite")
         with transaction.atomic():
             instance.reject(request.user)
-            instance.matched = matched
             instance.save()
         return Response(status=200, data=self.serializer_class(instance).data)

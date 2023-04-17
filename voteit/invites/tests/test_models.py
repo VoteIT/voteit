@@ -1,100 +1,152 @@
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.test import TestCase
-from pydantic import BaseModel
-from typing import Dict
+
 from voteit.meeting.models import Meeting
+from voteit.invites.models import MeetingInvite
+from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_PROPOSER
+from voteit.organisation.models import Organisation
 
 User = get_user_model()
 
 
-# class MeetingInviteManagerTests(TestCase):
-#     @classmethod
-#     def setUpTestData(cls):
-#         from voteit.invites.models import MeetingInvite
-#         from voteit.invites.registries import invite_data
-#
-#         @invite_data
-#         class DummySchema(BaseModel):
-#             dummy: int
-#
-#         cls.MeetingInvite = MeetingInvite
-#         cls.manager = MeetingInvite.objects
-#         cls.meeting = Meeting.objects.create()
-#         cls.user = User.objects.create(username="someone")
-#
-#         cls.inv1 = MeetingInvite.objects.create(
-#             meeting=cls.meeting,
-#             created_by=cls.user,
-#             invite_data={"email": "a@betahaus.net", "dummy": 1},
-#         )
-#         cls.inv2 = MeetingInvite.objects.create(
-#             meeting=cls.meeting,
-#             created_by=cls.user,
-#             invite_data={"email": "b@betahaus.net"},
-#         )
-#
-#     @classmethod
-#     def tearDownClass(cls):
-#         from voteit.invites.registries import invite_data
-#
-#         del invite_data["dummy"]
-#         super().tearDownClass()
-#
-#     def test_query_email(self):
-#         self.assertEqual(
-#             {self.inv1}, set(self.manager.find_invites(email="a@betahaus.net"))
-#         )
-#         self.assertEqual(
-#             set(), set(self.manager.find_invites(email="None@betahaus.net"))
-#         )
-#
-#     def test_bad_query(self):
-#         self.assertEqual(set(), set(self.manager.find_invites()))
-#         self.assertEqual(set(), set(self.manager.find_invites(hello="world")))
-#         self.assertEqual(
-#             set(), set(self.manager.find_invites(email=None))
-#         )  # None is always skipped
-#
-#     def test_multiple_emails(self):
-#         self.assertEqual(
-#             {self.inv1}, set(self.manager.find_invites(email={"a@betahaus.net"}))
-#         )
-#         self.assertEqual(
-#             {self.inv1, self.inv2},
-#             set(self.manager.find_invites(email={"a@betahaus.net", "b@betahaus.net"})),
-#         )
-#         self.assertEqual(
-#             {self.inv1, self.inv2},
-#             set(self.manager.find_invites(email=["a@betahaus.net", "b@betahaus.net"])),
-#         )
-#         self.assertEqual(
-#             set(),
-#             set(self.manager.find_invites(email=[])),
-#         )
-#
-#     def test_multiple_queries(self):
-#         self.assertEqual(
-#             {self.inv1, self.inv2},
-#             set(self.manager.find_invites(email=["b@betahaus.net"], dummy=1)),
-#         )
-#
-#     def test_bad_query_type(self):
-#         self.assertRaises(ValueError, self.manager.find_invites, email=123)
-#         self.assertRaises(ValueError, self.manager.find_invites, dummy="abc")
+class MeetingInviteManagerTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org: Organisation = Organisation.objects.create()
+        cls.manager = MeetingInvite.objects
+        cls.meeting: Meeting = cls.org.meetings.create()
+        cls.user = cls.org.users.create(username="someone")
+        cls.inv1: MeetingInvite = MeetingInvite.objects.create(
+            meeting=cls.meeting,
+            roles=[ROLE_PARTICIPANT],
+            user_data={"email": "a@betahaus.net", "swedish_ssn": "121212-1212"},
+        )
+        cls.inv2: MeetingInvite = MeetingInvite.objects.create(
+            meeting=cls.meeting,
+            roles=[ROLE_PARTICIPANT],
+            user_data={"email": "b@betahaus.net"},
+        )
+
+    def test_query_email(self):
+        self.assertEqual(
+            {self.inv1},
+            set(
+                self.manager.find_invites(organisation=self.org, email="a@betahaus.net")
+            ),
+        )
+        self.assertEqual(
+            {self.inv2},
+            set(
+                self.manager.find_invites(organisation=self.org, email="b@betahaus.net")
+            ),
+        )
+        self.assertEqual(
+            {self.inv2},
+            set(
+                self.manager.find_invites(
+                    organisation=self.org, email=["b@betahaus.net"]
+                )
+            ),
+        )
+        self.assertEqual(
+            {self.inv1, self.inv2},
+            set(
+                self.manager.find_invites(
+                    organisation=self.org,
+                    email=["a@betahaus.net", "b@betahaus.net", "none@betahaus.net"],
+                )
+            ),
+        )
+        self.assertEqual(
+            set(),
+            set(
+                self.manager.find_invites(
+                    organisation=self.org, email="None@betahaus.net"
+                )
+            ),
+        )
+
+    def test_query_swedish_ssn(self):
+        self.assertEqual(
+            {self.inv1},
+            set(
+                self.manager.find_invites(
+                    organisation=self.org, swedish_ssn="121212-1212"
+                )
+            ),
+        )
+        self.assertEqual(
+            {self.inv1},
+            set(
+                self.manager.find_invites(
+                    organisation=self.org, swedish_ssn=["121212-1212", "121212-1313"]
+                )
+            ),
+        )
+
+    def test_query_combined(self):
+        self.assertEqual(
+            {self.inv1, self.inv2},
+            set(
+                self.manager.find_invites(
+                    organisation=self.org,
+                    swedish_ssn=["121212-1212"],
+                    email=["b@betahaus.net"],
+                )
+            ),
+        )
+
+    def test_bad_query_empyty(self):
+        self.assertEqual(set(), set(self.manager.find_invites(organisation=self.org)))
+
+    def test_bad_query_no_such_kw(self):
+        self.assertEqual(
+            set(), set(self.manager.find_invites(organisation=self.org, hello="world"))
+        )
+
+    def test_bad_query_empty(self):
+        self.assertEqual(
+            set(), set(self.manager.find_invites(organisation=self.org, email=None))
+        )  # None is always skipped
+
+    def test_create_or_update_typed(self):
+        self.inv1.roles = [ROLE_PARTICIPANT, ROLE_DISCUSSER]
+        self.inv1.save()
+        result = self.meeting.invites.create_or_update_typed(
+            invite_type="email",
+            meeting=self.meeting,
+            values=["a@betahaus.net", "b@betahaus.net", "c@betahaus.net"],
+            roles=[ROLE_PARTICIPANT, ROLE_DISCUSSER],
+        )
+        self.assertEqual((1, 1, 1), result)
+
+    def test_create_or_update_typed_updates_roles(self):
+        self.inv1.used_by = self.user
+        self.inv1.roles = [ROLE_PARTICIPANT, ROLE_PROPOSER]
+        self.inv1.save()
+        result = self.meeting.invites.create_or_update_typed(
+            invite_type="email",
+            meeting=self.meeting,
+            values=["a@betahaus.net", "b@betahaus.net", "c@betahaus.net"],
+            roles=[ROLE_PARTICIPANT, ROLE_DISCUSSER],
+        )
+        self.assertEqual((1, 2, 0), result)
+        self.assertEqual(
+            {ROLE_PARTICIPANT, ROLE_DISCUSSER}, self.meeting.get_roles(self.user)
+        )
 
 
 class MeetingInviteTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.invites.models import MeetingInvite
-
-        cls.meeting = Meeting.objects.create()
+        cls.meeting: Meeting = Meeting.objects.create()
         cls.user = User.objects.create(username="someone")
-
         cls.invite: MeetingInvite = MeetingInvite.objects.create(
             meeting=cls.meeting,
-            created_by=cls.user,
-            invite_data="a@betahaus.net",
+            user_data={"email": "a@betahaus.net"},
             roles=["participant"],
         )
 

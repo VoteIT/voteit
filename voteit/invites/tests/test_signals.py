@@ -7,6 +7,7 @@ from django.test import override_settings
 from envelope.messages.channels import Subscribe
 from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
+from voteit.invites.models import MeetingInvite
 from voteit.meeting.models import Meeting
 
 User = get_user_model()
@@ -17,14 +18,11 @@ _channel_layers_setting = {
 
 class AutoUseInviteTests(TestCase):
     def setUp(self):
-        from voteit.invites.models import MeetingInvite
-
         self.meeting = Meeting.objects.create()
         self.user = User.objects.create(username="a", email="a@betahaus.net")
-        self.inv1 = MeetingInvite.objects.create(
+        self.inv1: MeetingInvite = MeetingInvite.objects.create(
             meeting=self.meeting,
-            created_by=self.user,
-            invite_data="a@betahaus.net",
+            user_data={"email": "a@betahaus.net"},
             roles=["discusser", "potential_voter"],
         )
 
@@ -39,15 +37,11 @@ class AutoUseInviteTests(TestCase):
 
 class InvitesExpireWhenMeetingArchivedTests(TestCase):
     def setUp(self):
-        from voteit.invites.models import MeetingInvite
-
         self.meeting = Meeting.objects.create()
         self.user = User.objects.create(username="a")
-
         self.inv1 = MeetingInvite.objects.create(
             meeting=self.meeting,
-            created_by=self.user,
-            invite_data="a@betahaus.net",
+            user_data={"email": "a@betahaus.net"},
         )
 
     def test_expire(self):
@@ -63,14 +57,11 @@ class InvitesExpireWhenMeetingArchivedTests(TestCase):
 class InvitesSubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.invites.models import MeetingInvite
-
         cls.meeting: Meeting = Meeting.objects.create()
         cls.moderator = User.objects.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, "moderator")
         cls.invite: MeetingInvite = cls.meeting.invites.create(
-            invite_data="hello@betahaus.net", created_by=cls.moderator
+            user_data={"email": "hello@betahaus.net"}
         )
 
     def test_app_state_sent(self):
@@ -80,9 +71,7 @@ class InvitesSubscribedTests(TestCase):
             channel_type="invites",
         )
         msg = command.run_job()
-        pks = {
-            x.p["pk"] for x in msg.data.app_state if x.t == "meeting_invite.added"
-        }
+        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "meeting_invite.added"}
         self.assertEqual({self.invite.pk}, pks)
 
 
@@ -90,15 +79,11 @@ class InvitesSubscribedTests(TestCase):
 class MeetingInviteSignalTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.invites.models import MeetingInvite
-
         cls.meeting: Meeting = Meeting.objects.create()
         cls.moderator = User.objects.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, "moderator")
         cls.invite: MeetingInvite = cls.meeting.invites.create(
-            invite_data="hello@betahaus.net",
-            created_by=cls.moderator,
+            user_data={"email": "hello@betahaus.net"},
         )
 
     def setUp(self):
@@ -111,7 +96,7 @@ class MeetingInviteSignalTests(TestCase):
         self.assertFalse(mock_publish.called)
         with FakeCommit():
             invite = self.meeting.invites.create(
-                invite_data="hello@betahaus.net", created_by=self.moderator
+                user_data={"email": "hello@betahaus.net"}
             )
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]

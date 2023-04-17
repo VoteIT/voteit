@@ -2,23 +2,16 @@ from __future__ import annotations
 
 from logging import getLogger
 
-from django.utils.translation import gettext as _
-from pydantic import Field
-from pydantic import root_validator
-from pydantic import validator
-from pydantic.main import BaseModel
 from auditlog.context import set_actor
+from pydantic.main import BaseModel
+
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
-
-from voteit.core.validators import root_validate_roles_and_model
 from voteit.invites.exceptions import InviteError
 from voteit.invites.permissions import MeetingInvitePermissions
-from voteit.invites.utils import create_invites
-from voteit.invites.utils import get_invite_data_registry
-from voteit.invites.workflows import InviteWf
+from voteit.invites.schemas import AddTypedInvitesSchema
 from voteit.meeting.models import Meeting
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
@@ -29,103 +22,15 @@ from voteit.messaging.decorators import outgoing
 logger = getLogger(__name__)
 
 
-class AddInvitesSchema(BaseModel):
-    roles: list[str]
-    model: str = Field("meeting", const=True)  # Constant
-    skip_states: set[str] = {InviteWf.REJECTED}
-    invite_data: list[str]
-    type: str
-    meeting: int
-
-    # Validators
-    _check_roles = root_validator(skip_on_failure=True, allow_reuse=True)(
-        root_validate_roles_and_model
-    )
-
-    @validator("type")
-    def validate_type(cls, v):
-        if v not in get_invite_data_registry():
-            raise ValueError(f"{v} is not a valid type")
-        return v
-
-    @root_validator(skip_on_failure=True)
-    def validate_invite_data(cls, values):
-        """
-        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['hello@betahaus.net'], meeting=1)
-        AddInvitesSchema(roles=['participant'], model='meeting', skip_states={'rejected'}, invite_data=['hello@betahaus.net'], type='email', meeting=1)
-
-        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['HELLO@betahaus.net'], meeting=1)
-        AddInvitesSchema(roles=['participant'], model='meeting', skip_states={'rejected'}, invite_data=['hello@betahaus.net'], type='email', meeting=1)
-
-        Blankspace should be skipped or trimmed
-        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['', '    WoHo@betahaus.net', ' '], meeting=1)
-        AddInvitesSchema(roles=['participant'], model='meeting', skip_states={'rejected'}, invite_data=['woho@betahaus.net'], type='email', meeting=1)
-
-        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['bad_email'], meeting=1)
-        Traceback (most recent call last):
-        ...
-        pydantic.error_wrappers.ValidationError:
-
-        No real data
-        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['  ', ''], meeting=1)
-        Traceback (most recent call last):
-        ...
-        pydantic.error_wrappers.ValidationError:
-
-        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=['something'], meeting=1)
-        Traceback (most recent call last):
-        ...
-        pydantic.error_wrappers.ValidationError:
-
-        >>> AddInvitesSchema(roles=['participant'], type="email", invite_data=None, meeting=1)
-        Traceback (most recent call last):
-        ...
-        pydantic.error_wrappers.ValidationError:
-        """
-        reg = get_invite_data_registry()
-        # Delegate all validation to the registry
-        invite_type = values["type"]
-        if invite_type not in reg:
-            raise ValueError("No such invite type")
-        inv_count = len(values["invite_data"])
-        if inv_count > 1000:
-            raise ValueError(
-                _(
-                    "More than 1 000 invites at once isn't allowed. You sent %(inv_count)s rows."
-                    % {"inv_count": inv_count}
-                )
-            )
-        validator = reg[invite_type]
-        results = []
-        i = 1
-        for v in values["invite_data"]:
-            v = v.strip()
-            if v:
-                try:
-                    inst = validator(
-                        **{invite_type: v}
-                    )  # Might raise pydantics ValidationError
-                except ValueError:
-                    raise ValueError(
-                        f"Row {i} contains invite data that doesn't match type '{invite_type}'"
-                    )
-                results.append(getattr(inst, invite_type))
-            i += 1
-        if not results:
-            raise ValueError("invite_data required")
-        values["invite_data"] = results
-        return values
-
-
 @incoming
 class AddInvites(ContextAction):
     name = "invites.add"
     permission = MeetingInvitePermissions.ADD
-    schema = AddInvitesSchema
-    data: AddInvitesSchema
+    schema = AddTypedInvitesSchema
+    data: AddTypedInvitesSchema
     model = Meeting
     context_schema_attr = "meeting"
-    job_timeout = 30
+    job_timeout = 40
 
     def run_job(self) -> InvitesAdded:
         """
@@ -135,11 +40,18 @@ class AddInvites(ContextAction):
 
         """
         self.assert_perm()
-
         try:
             with set_actor(self.user):
-                added, changed, skipped_count = create_invites(
-                    created_by=self.user, **self.data.dict()
+                (
+                    added,
+                    changed,
+                    skipped,
+                ) = self.context.invites.create_or_update_typed(
+                    meeting=self.context,
+                    roles=self.data.roles,
+                    values=self.data.user_data,
+                    exclude_states=self.data.skip_states,
+                    invite_type=self.data.type,
                 )
         except InviteError as exc:
             raise BadRequestError.from_message(
@@ -150,16 +62,17 @@ class AddInvites(ContextAction):
             self,
             added=added,
             changed=changed,
-            skipped_count=skipped_count,
+            skipped=skipped,
         )
-        websocket_send(response, state=response.SUCCESS)
+        if response.mm.consumer_name:  # In case it was run by a script
+            websocket_send(response, state=response.SUCCESS)
         return response
 
 
 class InvitesAddedSchema(BaseModel):
-    added: list[int]
-    changed: list[int]
-    skipped_count: int = 0
+    added: int = 0
+    changed: int = 0
+    skipped: int = 0
 
 
 @outgoing

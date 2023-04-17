@@ -12,6 +12,12 @@ from django.utils.timezone import now
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
+from voteit.invites.models import MeetingInvite
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.organisation.models import OAuth2Provider
+from voteit.organisation.models import Organisation
 from voteit.organisation.schemas import OAuthTokenSchema
 
 if TYPE_CHECKING:
@@ -23,14 +29,7 @@ User: UserType = get_user_model()
 class MeetingInviteViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.invites.models import MeetingInvite
-        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
-        from voteit.organisation.models import Organisation
-
-        cls.MeetingInvite = MeetingInvite
-
-        cls.organisation = Organisation.objects.create()
+        cls.organisation: Organisation = Organisation.objects.create()
         cls.meeting: Meeting = cls.organisation.meetings.create(
             title="Test meeting", state="ongoing"
         )
@@ -40,53 +39,54 @@ class MeetingInviteViewSetTests(APITestCase):
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.invite: MeetingInvite = cls.meeting.invites.create(
-            invite_data="hello@betahaus.net", created_by=cls.moderator
+            user_data={"email": "hello@betahaus.net"},
         )
 
     def setUp(self):
         self.invite.refresh_from_db()
         self.participant.refresh_from_db()
 
-    def test_create(self):
-        url = reverse("meeting-invites-list")
-        data = {
-            "meeting": self.meeting.pk,
-            "invite_data": "hello@betahaus.net",
-        }
-        for user, status in (
-            (None, 401),
-            (self.participant, 403),
-            (self.moderator, 201),
-        ):
-            if user:
-                self.client.force_login(user)
-            response = self.client.post(url, data)
-            self.assertEqual(
-                response.status_code,
-                status,
-                f"{user} action returned wrong response code",
-            )
+    #
+    # def test_create(self):
+    #     url = reverse("meeting-invites-list")
+    #     data = {
+    #         "meeting": self.meeting.pk,
+    #         "invite_data": "hello@betahaus.net",
+    #     }
+    #     for user, status in (
+    #         (None, 401),
+    #         (self.participant, 403),
+    #         (self.moderator, 201),
+    #     ):
+    #         if user:
+    #             self.client.force_login(user)
+    #         response = self.client.post(url, data)
+    #         self.assertEqual(
+    #             response.status_code,
+    #             status,
+    #             f"{user} action returned wrong response code",
+    #         )
 
-    def test_create_meeting_ne(self):
-        url = reverse("meeting-invites-list")
-        data = {
-            "title": "Stuff",
-            "meeting": -1,
-        }
-        self.client.force_login(self.moderator)
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
+    # def test_create_meeting_ne(self):
+    #     url = reverse("meeting-invites-list")
+    #     data = {
+    #         "title": "Stuff",
+    #         "meeting": -1,
+    #     }
+    #     self.client.force_login(self.moderator)
+    #     response = self.client.post(url, data)
+    #     self.assertEqual(response.status_code, 404)
+    #     self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
 
-    def test_get(self):
-        url = reverse("meeting-invites-list")
-        data = {
-            "meeting": self.meeting.pk,
-        }
-        self.client.force_login(self.moderator)
-        response = self.client.get(url, data)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(1, len(response.json()))
+    # def test_get(self):
+    #     url = reverse("meeting-invites-list")
+    #     data = {
+    #         "meeting": self.meeting.pk,
+    #     }
+    #     self.client.force_login(self.moderator)
+    #     response = self.client.get(url, data)
+    #     self.assertEqual(response.status_code, 200)
+    #     self.assertEqual(1, len(response.json()))
 
     def test_transition_moderator(self):
         url = f"/api/meeting-invites/{self.invite.pk}/transitions/"
@@ -138,30 +138,23 @@ class MeetingInviteViewSetTests(APITestCase):
         url = reverse("meeting-invites-detail", kwargs={"pk": self.invite.pk})
         self.client.force_login(self.moderator)
         response = self.client.patch(url, {"roles": ["participant"]})
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 405)
 
-    def test_change_used_invite(self):
-        self.invite.accept(self.participant)
-        self.invite.save()
-        url = reverse("meeting-invites-detail", kwargs={"pk": self.invite.pk})
-        self.client.force_login(self.moderator)
-        response = self.client.patch(url, {"roles": ["participant"]})
-        self.assertEqual(response.status_code, 403)
+    # def test_change_used_invite(self):
+    #     self.invite.accept(self.participant)
+    #     self.invite.save()
+    #     url = reverse("meeting-invites-detail", kwargs={"pk": self.invite.pk})
+    #     self.client.force_login(self.moderator)
+    #     response = self.client.patch(url, {"roles": ["participant"]})
+    #     self.assertEqual(response.status_code, 403)
 
 
 @override_settings(ID_PROXY_API_KEY="xxx")
 class MatchInvitesViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.invites.models import MeetingInvite
-        from voteit.organisation.models import Organisation
-
-        cls.MeetingInvite = MeetingInvite
-
         cls.organisation = Organisation.objects.create()
         User.objects.create_user(username="invite_service", password="secret")
-
         cls.meeting: Meeting = cls.organisation.meetings.create(
             title="Test meeting",
             state="ongoing",  # organisation=cls.organisation
@@ -170,10 +163,10 @@ class MatchInvitesViewSetTests(APITestCase):
             "moderator",  # organisation=cls.organisation
         )
         cls.invite: MeetingInvite = cls.meeting.invites.create(
-            invite_data="hello@betahaus.net", created_by=cls.moderator
+            user_data={"email": "hello@betahaus.net"},
         )
         cls.invite2: MeetingInvite = cls.meeting.invites.create(
-            invite_data="goodbye@betahaus.net", created_by=cls.moderator
+            user_data={"email": "goodbye@betahaus.net"},
         )
 
     def setUp(self):
@@ -254,22 +247,12 @@ class MatchInvitesViewSetTests(APITestCase):
 class UserMatchedInviteViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.invites.models import MeetingInvite
-        from voteit.meeting.roles import ROLE_MODERATOR
-        from voteit.organisation.models import OAuth2Provider
-        from voteit.organisation.models import Organisation
-
-        cls.organisation = Organisation.objects.create()
+        cls.organisation: Organisation = Organisation.objects.create()
         cls.provider = OAuth2Provider.objects.create(
             provider_id="idproxy",
             organisation=cls.organisation,
             client_id="client_id",
             client_secret="client_secret",
-            # redirect_url="https://voteit.se/dummy",
-            # auth_url="https://voteit.se/dummy",
-            # token_url="https://voteit.se/dummy",
-            # identity_url="https://voteit.se/dummy",
         )
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing", organisation=cls.organisation
@@ -299,10 +282,10 @@ class UserMatchedInviteViewSetTests(APITestCase):
         )
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.invite: MeetingInvite = cls.meeting.invites.create(
-            invite_data="hello@betahaus.net", created_by=cls.moderator
+            user_data={"email": "hello@betahaus.net"},
         )
         cls.invite2: MeetingInvite = cls.meeting.invites.create(
-            invite_data="goodbye@betahaus.net", created_by=cls.moderator
+            user_data={"email": "goodbye@betahaus.net"},
         )
 
         cls.mock_api_return = {
@@ -395,14 +378,11 @@ class UserMatchedInviteViewSetTests(APITestCase):
         self.assertEqual(404, response.status_code)
 
     def test_match_organisation(self):
-        from voteit.organisation.models import Organisation
-
         org = Organisation.objects.create()
         meeting = org.meetings.create()
         meeting.invites.create(
-            invite_data="hello@betahaus.net", created_by=self.moderator
+            user_data={"email": "hello@betahaus.net"},
         )
-
         self.client.force_login(self.outsider)
         url = reverse("handle-matched-invites-list")
         response = self.client.get(url)
@@ -412,7 +392,7 @@ class UserMatchedInviteViewSetTests(APITestCase):
         self.assertEqual(self.invite.pk, data[0]["pk"])
 
     def test_no_organisation(self):
-        self.client.force_login(User.objects.create_user('virginia'))
+        self.client.force_login(User.objects.create_user("virginia"))
         url = reverse("handle-matched-invites-list")
         response = self.client.get(url)
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)

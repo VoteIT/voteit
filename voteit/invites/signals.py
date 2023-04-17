@@ -32,9 +32,7 @@ def expire_unused_invites(meeting, **kw):
 @receiver(meeting_joined)
 def auto_use_invite(meeting, user, **kw):
     if user.email:
-        invite = meeting.invites.filter(
-            state=InviteWf.OPEN, type="email", invite_data=user.email
-        ).first()
+        invite = meeting.invites.find_open_invites(email=[user.email]).first()
         if invite is not None:
             invite.accept(user)
             invite.save()

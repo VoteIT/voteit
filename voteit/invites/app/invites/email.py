@@ -3,61 +3,35 @@ from typing import TYPE_CHECKING
 
 from django.utils.translation import gettext_lazy as _
 from pydantic import EmailStr
-from pydantic import conlist
 from pydantic import validator
 from pydantic.main import BaseModel
 
 from voteit.invites.abcs import InviteDataAdapter
 from voteit.invites.registries import invite_adapter_registry
-from voteit.invites.registries import invite_data
+
 
 if TYPE_CHECKING:
     from voteit.invites.models import MeetingInvite
 
 
-class EmailsSchema(BaseModel):
-    email: conlist(EmailStr, unique_items=True)
+class EmailSchema(BaseModel):
+    email: EmailStr | None
+
+    @validator("email")
+    def transform_email(cls, v: str):
+        return v.lower().strip()
 
 
 @invite_adapter_registry
 class InviteEmail(InviteDataAdapter):
     """
-    >>> InviteEmail.many
-    True
     >>> InviteEmail.columns
     ['email']
     """
 
     name = "email"
-    schema = EmailsSchema
+    schema = EmailSchema
     title = _("Email")
-
-
-@invite_data
-class Email(BaseModel):
-    """
-    Email handles quite differently now...
-
-    >>> Email(email="  bjÖRn@hej.se")
-    Email(email='björn@hej.se')
-
-    >>> Email(email="  bjÖRn@åhlens.nu")
-    Email(email='björn@åhlens.nu')
-
-    >>> Email(email=" Björn <bjÖRn@åhlens.nu>")
-    Email(email='björn@åhlens.nu')
-
-    >>> Email(email="  bjÖRn@hej£.nu")
-    Traceback (most recent call last):
-    ...
-    pydantic.error_wrappers.ValidationError:
-    """
-
-    email: EmailStr
-
-    @validator("email")
-    def transform_email(cls, v: str):
-        return v.lower()
 
 
 # @invite_dispatchers

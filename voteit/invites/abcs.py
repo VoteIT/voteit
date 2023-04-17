@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
-from contextlib import suppress
 from typing import TYPE_CHECKING
 from django.utils.translation import gettext_lazy as _
 from django.utils.functional import classproperty
 from pydantic import BaseModel
+from django.db import models
 
 if TYPE_CHECKING:
     from voteit.invites.models import MeetingInvite
@@ -38,18 +38,6 @@ class InviteDataAdapter(ABC):
         """
         return [cls.name]
 
-    @classproperty
-    def many(cls) -> bool:
-        """
-        Does this store a list-like value? Override for more complex forms
-        """
-        props = cls.schema.schema()["properties"]
-        if len(props) == 1:
-            for v in props.values():
-                return v.get("type") == "array"
-        return False
-
-    # many-prop from schema?
     # @classproperty
     @property
     @abstractmethod
@@ -57,12 +45,16 @@ class InviteDataAdapter(ABC):
         ...
 
     @classmethod
-    def from_cols(cls, *cols: list[str]):
+    def from_cols(cls, *cols: str) -> BaseModel:
         if len(cols) != len(cls.columns):
             raise ValueError(
                 f"Must have exactly {len(cls.columns)} positional arguments"
             )
         return cls.schema(**dict(zip(cls.columns, cols)))
+
+    @classmethod
+    def query(cls, *values) -> models.Q:
+        return models.Q(**{f"user_data__{cls.name}__in": values})
 
 
 # class InviteDispatcher(ABC):

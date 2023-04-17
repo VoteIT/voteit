@@ -11,10 +11,14 @@ from django.utils.timezone import now
 from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.core.workflows import SendWf
+from voteit.invites.messages import MeetingInviteAdded
+from voteit.invites.messages import MeetingInviteChanged
+from voteit.invites.models import MeetingInvite
+from voteit.invites.workflows import InviteWf
+from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
     from voteit.invites.messages import AddInvites
-    from voteit.invites.messages import SendInvites
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -40,57 +44,46 @@ class AddInvitesTests(TestCase):
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_add(self, mock_publish):
-        from voteit.invites.messages import MeetingInviteAdded
-
         data = []
         for name in ["one", "two", "three"]:
             data.append(f"{name}@betahaus.net")
-        msg = self._mk_one(invite_data=data, type="email", roles=["participant"])
+        msg = self._mk_one(user_data=data, type="email", roles=["participant"])
         with FakeCommit():
             response = msg.run_job()
-        self.assertEqual(3, len(response.data.added))
-        self.assertEqual(0, len(response.data.changed))
-        self.assertEqual(0, response.data.skipped_count)
+        self.assertEqual({"added": 3, "changed": 0, "skipped": 0}, response.data.dict())
         # Check pushes
         self.assertTrue(mock_publish.called)
         self.assertEqual(3, len(mock_publish.mock_calls))
-        msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, MeetingInviteAdded)
-        self.assertEqual("one@betahaus.net", msg.data.invite_data)
+        emails = {
+            x.args[0].data.user_data.get("email") for x in mock_publish.mock_calls
+        }
+        self.assertEqual(
+            {"one@betahaus.net", "two@betahaus.net", "three@betahaus.net"}, emails
+        )
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_add_modifies_already_existing_invites(self, mock_publish):
-        from voteit.meeting.models import Meeting
-        from voteit.invites.messages import MeetingInviteAdded
-        from voteit.invites.messages import MeetingInviteChanged
-        from voteit.invites.models import MeetingInvite
-        from voteit.invites.workflows import InviteWf
-
         meeting: Meeting = Meeting.objects.get(pk=1)  # From fixture
         moderator = User.objects.get(username="moderator")
         diffing_data_invite: MeetingInvite = meeting.invites.create(
-            invite_data="one@betahaus.net",
+            user_data={"email": "one@betahaus.net"},
             roles=["voter"],
-            created_by=moderator,
         )
         rejected_invite: MeetingInvite = meeting.invites.create(
-            invite_data="two@betahaus.net",
+            user_data={"email": "two@betahaus.net"},
             roles=["participant", "voter"],
             state=InviteWf.REJECTED,
-            created_by=moderator,
         )
         mock_publish.reset_mock()
         data = []
         for name in ["one", "two", "three"]:
             data.append(f"{name}@betahaus.net")
         msg = self._mk_one(
-            user_pk=moderator.pk, invite_data=data, type="email", roles=["participant"]
+            user_pk=moderator.pk, user_data=data, type="email", roles=["participant"]
         )
         with FakeCommit():
             response = msg.run_job()
-        self.assertEqual(1, len(response.data.added))
-        self.assertEqual(1, len(response.data.changed))
-        self.assertEqual(1, response.data.skipped_count)
+        self.assertEqual({"added": 1, "changed": 1, "skipped": 1}, response.data.dict())
         # Check pushes
         self.assertTrue(mock_publish.called)
         self.assertEqual(2, len(mock_publish.mock_calls))
