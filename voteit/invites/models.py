@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Collection
 from collections.abc import Sequence
 from datetime import datetime
@@ -21,6 +22,7 @@ from django_fsm import transition
 
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import ensure_atomic
+from voteit.core.decorators import has_exact_filter
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.registries import invite_adapter_registry
@@ -64,9 +66,13 @@ class MeetingInviteManager(models.Manager):
             if k not in reg:
                 logger.warning("Invite search with indexes that doesn't exist: %s", k)
                 continue
+            adapter = reg[k]
+            if not adapter.user_data:
+                logger.warning("Invite search with indexes that isn't user_data: %s", k)
+                continue
             if isinstance(values, str) or not isinstance(values, Collection):
                 values = [values]
-            queries.append(reg[k].query(*values))
+            queries.append(adapter.query(*values))
         if queries:
             or_queries = reduce(or_, queries)
             qs = self.get_queryset().filter(or_queries)
@@ -100,6 +106,91 @@ class MeetingInviteManager(models.Manager):
         *,
         invite_type,
         values: list[str],
+        roles: list[str],
+        exclude_states: set[str] = (InviteWf.REJECTED,),
+        meeting: Meeting,
+    ) -> Sequence[int, int, int]:
+        """
+        returns created, updated, existed
+        """
+        existing_qs = self.find_invites(**{invite_type: values}).filter(meeting=meeting)
+        # skip_vals = existing_qs.exclude(state__in=exclude_states).values_list(
+        #     f"user_data__{invite_type}", flat=True
+        # )
+        roles = sorted(str(x) for x in roles)
+        total_existing = existing_qs.count()
+        # This prefetch and the role update is very inefficient. It should be refactored when we have time.
+        needs_role_update_qs = (
+            existing_qs.exclude(roles=roles)
+            .exclude(state__in=exclude_states)
+            .prefetch_related("used_by")
+        )
+        # We may want to bulk this later on
+        # needs_role_update_qs.update(roles=roles)
+        for invite in needs_role_update_qs:
+            invite.roles = roles
+            # We've already excluded var exclude_states
+            if invite.state not in (InviteWf.OPEN, InviteWf.ACCEPTED):
+                invite.state = InviteWf.OPEN
+            invite.save()
+        self._update_assigned_roles(meeting, needs_role_update_qs)
+        already_correct_count = total_existing - needs_role_update_qs.count()
+        # Filter out values we've already touched
+        needs_new = set(values) - set(
+            existing_qs.values_list(f"user_data__{invite_type}", flat=True)
+        )
+        # As above, maybe bulk later on
+        for value in needs_new:
+            self.create(
+                roles=roles,
+                user_data={invite_type: value},
+            )
+        # New, updated, untouched (skipped - either existed and matched exactly or in exclude_states)
+        return len(needs_new), needs_role_update_qs.count(), already_correct_count
+
+    def _build_user_data_query_dict(
+        self, *items: dict[str, str]
+    ) -> dict[str, set[str]]:
+        result = defaultdict(set)
+        for item in items:
+            for k, v in item.items():
+                result[k].add(v)
+        return result
+
+    @has_exact_filter("meeting")
+    def find_multi_user_data(
+        self, *items: dict[str, str]
+    ) -> Sequence[
+        models.QuerySet[MeetingInvite],
+        dict[str, models.QuerySet[MeetingInvite]],
+    ]:
+        """
+        Queries db and checks for intersecting data between different types.
+        It's only relevant for data that has several user_data types.
+
+        Returns a sequence with exact matches first, and then the items that might match just one contained in a dict where key is the user data matched.
+        """
+        # Let's check exact matches first.
+        or_queries = reduce(or_, [models.Q(user_data__contains=x) for x in items])
+        exact_qs = self.get_queryset().filter(or_queries)
+        # And any values reused in other invites, which could be problematic
+        conflicting_single_match = {}
+        user_data_query_dict = self._build_user_data_query_dict(*items)
+        for user_data_type, values in user_data_query_dict.items():
+            single_type_qs = self.find_invites(**{user_data_type: values}).exclude(
+                pk__in=exact_qs
+            )
+            if single_type_qs.exists():
+                conflicting_single_match[user_data_type] = single_type_qs
+        return exact_qs, conflicting_single_match
+
+    @ensure_atomic
+    def create_or_update_mixed(
+        self,
+        *,
+        # invite_type,
+        # values: list[str],
+        data: list[dict[str, str]],
         roles: list[str],
         exclude_states: set[str] = (InviteWf.REJECTED,),
         meeting: Meeting,

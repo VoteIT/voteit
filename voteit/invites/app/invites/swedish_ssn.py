@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from pydantic import validator
 from django.utils.translation import gettext_lazy as _
 
-from voteit.invites.abcs import InviteDataAdapter
+from voteit.invites.abcs import InviteUserDataAdapter
 from voteit.invites.registries import invite_adapter_registry
 
 
@@ -34,7 +34,7 @@ with suppress(ImportError):
         pydantic.error_wrappers.ValidationError:
         """
 
-        swedish_ssn: str | None
+        swedish_ssn: str
 
         @validator("swedish_ssn")
         def validate_ssn(cls, v: str) -> str:
@@ -43,13 +43,17 @@ with suppress(ImportError):
             raise ValueError("Incorrect swedish personnummer")
 
     @invite_adapter_registry
-    class InviteSweSSN(InviteDataAdapter):
+    class InviteSweSSN(InviteUserDataAdapter):
         """
-        >>> InviteSweSSN.from_cols("121212-1212")
-        SwedishSSN(swedish_ssn='201212121212')
+        >>> rows = [['121212-1212    ']]
+        >>> InviteSweSSN.preflight([InviteSweSSN.name], rows)
+        >>> rows
+        [['201212121212']]
 
-        >>> InviteSweSSN.columns
-        ['swedish_ssn']
+        >>> InviteSweSSN.preflight([InviteSweSSN.name], [['boho']])
+        Traceback (most recent call last):
+        ...
+        voteit.invites.exceptions.DataColValidationError: Column swedish_ssn (1) validation failed at rows: [1]
         """
 
         name = "swedish_ssn"

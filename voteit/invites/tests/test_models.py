@@ -138,6 +138,43 @@ class MeetingInviteManagerTests(TestCase):
             {ROLE_PARTICIPANT, ROLE_DISCUSSER}, self.meeting.get_roles(self.user)
         )
 
+    def test_find_multi_user_data_exact(self):
+        exact, bogus = self.meeting.invites.find_multi_user_data(
+            {"email": "a@betahaus.net", "swedish_ssn": "121212-1212"}
+        )
+        self.assertEqual({self.inv1}, set(exact))
+        self.assertEqual({}, bogus)
+
+    def test_find_multi_user_data_problematic_clash(self):
+        exact, bogus = self.meeting.invites.find_multi_user_data(
+            {"email": "a@betahaus.net", "swedish_ssn": "abc-404"}
+        )
+        self.assertEqual(set(), set(exact))
+        self.assertEqual({self.inv1}, set(bogus.get("email", [])))
+
+    def test_find_multi_user_data_has_more_data_we_dont_query(self):
+        exact, bogus = self.meeting.invites.find_multi_user_data(
+            {"email": "a@betahaus.net"}
+        )
+        self.assertEqual({self.inv1}, set(exact))
+        self.assertEqual({}, bogus)
+
+    def test_find_multi_user_data_odd_intersection(self):
+        # Note: This should never be saved in the database
+        self.inv2.user_data["swedish_ssn"] = "121212-1212"
+        self.inv2.save()
+        exact, bogus = self.meeting.invites.find_multi_user_data(
+            {"email": "a@betahaus.net", "swedish_ssn": "121212-1212"},
+            {"email": "b@betahaus.net", "swedish_ssn": "121212-1212"},
+        )
+        self.assertEqual({self.inv1, self.inv2}, set(exact))
+        self.assertEqual({}, bogus)
+
+    def test_test_find_multi_user_data_meeting_filter_not_applied(self):
+        with self.assertRaises(IntegrityError) as cm:
+            MeetingInvite.objects.find_multi_user_data({"email": "jeff@barnes.com"})
+        self.assertEqual("Queryset doesn't contain meeting filter", str(cm.exception))
+
 
 class MeetingInviteTests(TestCase):
     @classmethod

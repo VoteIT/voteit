@@ -167,29 +167,28 @@ def has_perm_drf(permission):
     return wrapper
 
 
-# Never used, but might be needed later
-# def has_exact_filter(*names: str):
-#     """
-#     Check that a models.Manager has a specific exact filter applied
-#     """
-#     for name in names:
-#         assert isinstance(name, str)
-#
-#     def wrapper(f):
-#         @wraps(f)
-#         def wrapped(inst: Manager, *args, **kwargs):
-#             required = set(names)
-#             qs = inst.get_queryset()
-#             filters = qs.query.has_filters()
-#             for ch in filters.children:
-#                 if ch.lookup_name != "exact":
-#                     continue
-#                 if ch.lhs.field.name in required:
-#                     required.discard(ch.lhs.field.name)
-#                     if not required:
-#                         return f(inst, *args, **kwargs)
-#             raise IntegrityError(f"Queryset doesn't contain {name} filter")
-#
-#         return wrapped
-#
-#     return wrapper
+def has_exact_filter(*names: str):
+    """
+    Check that a models.Manager has a specific exact filter applied
+    """
+    for name in names:
+        assert isinstance(name, str)
+
+    def wrapper(f):
+        @wraps(f)
+        def wrapped(inst: Manager, *args, **kwargs):
+            required = set(names)
+            qs = inst.get_queryset()
+            filters = qs.query.has_filters()
+            for ch in filters.children:
+                if ch.lookup_name != "exact":
+                    continue
+                if ch.lhs.field.name in required:
+                    required.discard(ch.lhs.field.name)
+                    if not required:
+                        return f(inst, *args, **kwargs)
+            raise IntegrityError(f"Queryset doesn't contain {name} filter")
+
+        return wrapped
+
+    return wrapper

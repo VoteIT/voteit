@@ -11,6 +11,7 @@ from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
 from voteit.invites.exceptions import InviteError
 from voteit.invites.permissions import MeetingInvitePermissions
+from voteit.invites.schemas import AddAnnotatedInvitesSchema
 from voteit.invites.schemas import AddTypedInvitesSchema
 from voteit.meeting.models import Meeting
 from voteit.messaging.base import BaseObjectAdded
@@ -67,6 +68,53 @@ class AddInvites(ContextAction):
         if response.mm.consumer_name:  # In case it was run by a script
             websocket_send(response, state=response.SUCCESS)
         return response
+
+
+# @incoming
+# class AddAnnotatedInvites(ContextAction):
+#     name = "invites.add_annotated"
+#     permission = MeetingInvitePermissions.ADD
+#     schema = AddAnnotatedInvitesSchema
+#     data: AddAnnotatedInvitesSchema
+#     model = Meeting
+#     context_schema_attr = "meeting"
+#     job_timeout = 40
+#
+#     def run_job(self) -> InvitesAdded:
+#         """
+#         Bulk create invites. If an invite already exist for that data,
+#         update the invite and make sure the user has those roles. Think of the new invite as a desired state.
+#         If a role is added or removed, that should be reflected back on that user.
+#
+#         """
+#         self.assert_perm()
+#         try:
+#             with set_actor(self.user):
+#                 (
+#                     added,
+#                     changed,
+#                     skipped,
+#                 ) = self.context.invites.create_or_update_typed(
+#                     meeting=self.context,
+#                     roles=self.data.roles,
+#                     values=self.data.user_data,
+#                     exclude_states=self.data.skip_states,
+#                     invite_type=self.data.type,
+#                 )
+#         except InviteError as exc:
+#             raise BadRequestError.from_message(
+#                 self,
+#                 msg=exc.message,
+#             )
+#         response = InvitesAdded.from_message(
+#             self,
+#             added=added,
+#             changed=changed,
+#             skipped=skipped,
+#         )
+#         if response.mm.consumer_name:  # In case it was run by a script
+#             websocket_send(response, state=response.SUCCESS)
+#         return response
 
 
 class InvitesAddedSchema(BaseModel):

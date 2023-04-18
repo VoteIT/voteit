@@ -6,7 +6,7 @@ from pydantic import EmailStr
 from pydantic import validator
 from pydantic.main import BaseModel
 
-from voteit.invites.abcs import InviteDataAdapter
+from voteit.invites.abcs import InviteUserDataAdapter
 from voteit.invites.registries import invite_adapter_registry
 
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 class EmailSchema(BaseModel):
-    email: EmailStr | None
+    email: EmailStr
 
     @validator("email")
     def transform_email(cls, v: str):
@@ -23,10 +23,18 @@ class EmailSchema(BaseModel):
 
 
 @invite_adapter_registry
-class InviteEmail(InviteDataAdapter):
+class InviteEmail(InviteUserDataAdapter):
+
     """
-    >>> InviteEmail.columns
-    ['email']
+    >>> rows = [['HI@betahaus.net']]
+    >>> InviteEmail.preflight(['email'], rows)
+    >>> rows
+    [['hi@betahaus.net']]
+
+    >>> InviteEmail.preflight(['email'], [['boho']])
+    Traceback (most recent call last):
+    ...
+    voteit.invites.exceptions.DataColValidationError: Column email (1) validation failed at rows: [1]
     """
 
     name = "email"
