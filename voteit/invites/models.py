@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Collection
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from functools import reduce
 from logging import getLogger
@@ -10,12 +11,10 @@ from operator import or_
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser
 from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
-from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django_fsm import FSMField
 from django_fsm import transition
@@ -25,25 +24,32 @@ from voteit.core.decorators import ensure_atomic
 from voteit.core.decorators import has_exact_filter
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.invites.permissions import MeetingInvitePermissions
-from voteit.invites.registries import invite_adapter_registry
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.workflows import InviteWf
+from voteit.meeting.models import GroupRole
+from voteit.meeting.models import MeetingGroup
 
 if TYPE_CHECKING:
+    from voteit.core.models import User as UserType
     from voteit.meeting.models import Meeting
     from voteit.organisation.models import Organisation
 
 logger = getLogger(__name__)
 
 
+@dataclass
+class InviteResult:
+
+    pks: set[str]
+    added: int
+    changed: int
+    existed: int
+
+
 class MeetingInviteManager(models.Manager):
     """
     Helper to find invites matching a specific user's data.
     """
-
-    @cached_property
-    def invite_adapter_registry(self):
-        return invite_adapter_registry()
 
     def find_open_invites(
         self, *, organisation: Organisation | None = None, **kw
@@ -67,7 +73,7 @@ class MeetingInviteManager(models.Manager):
                 logger.warning("Invite search with indexes that doesn't exist: %s", k)
                 continue
             adapter = reg[k]
-            if not adapter.user_data:
+            if not adapter.is_user_data:
                 logger.warning("Invite search with indexes that isn't user_data: %s", k)
                 continue
             if isinstance(values, str) or not isinstance(values, Collection):
@@ -107,46 +113,10 @@ class MeetingInviteManager(models.Manager):
         invite_type,
         values: list[str],
         roles: list[str],
-        exclude_states: set[str] = (InviteWf.REJECTED,),
         meeting: Meeting,
-    ) -> Sequence[int, int, int]:
-        """
-        returns created, updated, existed
-        """
-        existing_qs = self.find_invites(**{invite_type: values}).filter(meeting=meeting)
-        # skip_vals = existing_qs.exclude(state__in=exclude_states).values_list(
-        #     f"user_data__{invite_type}", flat=True
-        # )
-        roles = sorted(str(x) for x in roles)
-        total_existing = existing_qs.count()
-        # This prefetch and the role update is very inefficient. It should be refactored when we have time.
-        needs_role_update_qs = (
-            existing_qs.exclude(roles=roles)
-            .exclude(state__in=exclude_states)
-            .prefetch_related("used_by")
-        )
-        # We may want to bulk this later on
-        # needs_role_update_qs.update(roles=roles)
-        for invite in needs_role_update_qs:
-            invite.roles = roles
-            # We've already excluded var exclude_states
-            if invite.state not in (InviteWf.OPEN, InviteWf.ACCEPTED):
-                invite.state = InviteWf.OPEN
-            invite.save()
-        self._update_assigned_roles(meeting, needs_role_update_qs)
-        already_correct_count = total_existing - needs_role_update_qs.count()
-        # Filter out values we've already touched
-        needs_new = set(values) - set(
-            existing_qs.values_list(f"user_data__{invite_type}", flat=True)
-        )
-        # As above, maybe bulk later on
-        for value in needs_new:
-            self.create(
-                roles=roles,
-                user_data={invite_type: value},
-            )
-        # New, updated, untouched (skipped - either existed and matched exactly or in exclude_states)
-        return len(needs_new), needs_role_update_qs.count(), already_correct_count
+    ) -> InviteResult:
+        data = [{invite_type: x} for x in values]
+        return self.create_or_update_mixed(data=data, roles=roles, meeting=meeting)
 
     def _build_user_data_query_dict(
         self, *items: dict[str, str]
@@ -171,47 +141,43 @@ class MeetingInviteManager(models.Manager):
         Returns a sequence with exact matches first, and then the items that might match just one contained in a dict where key is the user data matched.
         """
         # Let's check exact matches first.
+        if not items:
+            return self.get_queryset().none(), {}
         or_queries = reduce(or_, [models.Q(user_data__contains=x) for x in items])
         exact_qs = self.get_queryset().filter(or_queries)
         # And any values reused in other invites, which could be problematic
         conflicting_single_match = {}
         user_data_query_dict = self._build_user_data_query_dict(*items)
-        for user_data_type, values in user_data_query_dict.items():
-            single_type_qs = self.find_invites(**{user_data_type: values}).exclude(
-                pk__in=exact_qs
-            )
-            if single_type_qs.exists():
-                conflicting_single_match[user_data_type] = single_type_qs
+        if len(user_data_query_dict) > 1:
+            # No point in doing queries if there was only one query type
+            for user_data_type, values in user_data_query_dict.items():
+                single_type_qs = self.find_invites(**{user_data_type: values}).exclude(
+                    pk__in=exact_qs
+                )
+                if single_type_qs.exists():
+                    conflicting_single_match[user_data_type] = single_type_qs
         return exact_qs, conflicting_single_match
 
     @ensure_atomic
     def create_or_update_mixed(
         self,
         *,
-        # invite_type,
-        # values: list[str],
         data: list[dict[str, str]],
         roles: list[str],
-        exclude_states: set[str] = (InviteWf.REJECTED,),
         meeting: Meeting,
-    ) -> Sequence[int, int, int]:
+    ) -> InviteResult:
         """
-        returns created, updated, existed
+        Create invites with mixed data
         """
-        existing_qs = self.find_invites(**{invite_type: values}).filter(meeting=meeting)
-        # skip_vals = existing_qs.exclude(state__in=exclude_states).values_list(
-        #     f"user_data__{invite_type}", flat=True
-        # )
+        exact_qs, conflicting_single_match = self.find_multi_user_data(*data)
+        if conflicting_single_match:
+            # FIXME: How do we handle this?
+            raise IntegrityError("Partial invites found")
         roles = sorted(str(x) for x in roles)
-        total_existing = existing_qs.count()
+        total_existing = exact_qs.count()
         # This prefetch and the role update is very inefficient. It should be refactored when we have time.
-        needs_role_update_qs = (
-            existing_qs.exclude(roles=roles)
-            .exclude(state__in=exclude_states)
-            .prefetch_related("used_by")
-        )
-        # We may want to bulk this later on
-        # needs_role_update_qs.update(roles=roles)
+        invite_pks = set(exact_qs.values_list("pk", flat=True))
+        needs_role_update_qs = exact_qs.exclude(roles=roles).prefetch_related("used_by")
         for invite in needs_role_update_qs:
             invite.roles = roles
             # We've already excluded var exclude_states
@@ -220,18 +186,34 @@ class MeetingInviteManager(models.Manager):
             invite.save()
         self._update_assigned_roles(meeting, needs_role_update_qs)
         already_correct_count = total_existing - needs_role_update_qs.count()
-        # Filter out values we've already touched
-        needs_new = set(values) - set(
-            existing_qs.values_list(f"user_data__{invite_type}", flat=True)
-        )
-        # As above, maybe bulk later on
-        for value in needs_new:
-            self.create(
-                roles=roles,
-                user_data={invite_type: value},
+        already_handled_user_data = list(exact_qs.values_list("user_data", flat=True))
+        # Filter any intersecting user_data,
+        # ie {'email': 'boo@bees.com'} in {'email': 'boo@bees.com', 'something': 'blabla'} is a match
+        add_data = []
+        for item in data:
+            items = item.items()
+            # Is this a subset of any handled data?
+            if any(items <= x.items() for x in already_handled_user_data):
+                continue
+            if item not in add_data:  # Avoid duplicate
+                add_data.append(item)
+        new_invites = []
+        # Bulk create instead? We miss signals but that might not be a problem
+        for value in add_data:
+            new_invites.append(
+                self.create(
+                    roles=roles,
+                    user_data=value,
+                )
             )
         # New, updated, untouched (skipped - either existed and matched exactly or in exclude_states)
-        return len(needs_new), needs_role_update_qs.count(), already_correct_count
+        invite_pks.update({x.pk for x in new_invites})
+        return InviteResult(
+            pks=invite_pks,
+            added=len(new_invites),
+            changed=needs_role_update_qs.count(),
+            existed=already_correct_count,
+        )
 
 
 class MeetingInvite(MeetingContext):
@@ -242,7 +224,7 @@ class MeetingInvite(MeetingContext):
     created: datetime = models.DateTimeField(default=now, editable=False)
     modified: datetime = models.DateTimeField(auto_now=True, editable=False)
     used_at: datetime = models.DateTimeField(null=True, blank=True)
-    used_by: AbstractUser = models.ForeignKey(
+    used_by: UserType = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="used_invites",
@@ -260,20 +242,30 @@ class MeetingInvite(MeetingContext):
         encoder=DjangoJSONEncoder,
     )
 
-    # INVITE STATE TRANSITIONS
+    class Meta:
+        constraints = (
+            models.UniqueConstraint(
+                fields=["meeting", "user_data"],
+                name="unique_meeting_invite_user_data",
+            ),
+        )
+
     @transition(
         field=state,
         source=InviteWf.OPEN,
         target=InviteWf.ACCEPTED,
         permission=NOT_ALLOWED,  # Special view, not a normal transition
     )
-    def accept(self, user: AbstractUser):
+    @ensure_atomic
+    def accept(self, user: UserType):
         """
         Important! Must always run within an atomic block!
         """
         self.used_by = user
         self.used_at = now()
         self.meeting.add_roles(user, *self.roles)
+        reg = get_invite_adapter_registry()
+        reg.run_accepted(self)
 
     @transition(
         field=state,
@@ -281,7 +273,7 @@ class MeetingInvite(MeetingContext):
         target=InviteWf.REJECTED,
         permission=NOT_ALLOWED,  # Special view, not a normal transition
     )
-    def reject(self, user: AbstractUser | None):
+    def reject(self, user: UserType | None):
         if not user:
             return
         if user.pk is not None:
@@ -318,6 +310,39 @@ class MeetingInvite(MeetingContext):
             # Make sure they're in the same order all the time
             self.roles = sorted(str(x) for x in self.roles)
         super().save(**kwargs)
+
+    # annotations
+    group_annotations: models.QuerySet[MeetingGroupAnnotation]
+
+
+class MeetingGroupAnnotation(models.Model):
+    meeting_group: MeetingGroup = models.ForeignKey(
+        MeetingGroup,
+        on_delete=models.CASCADE,
+        related_name="invite_annotations",
+    )
+    meeting_invite: MeetingInvite = models.ForeignKey(
+        MeetingInvite,
+        on_delete=models.CASCADE,
+        related_name="group_annotations",
+    )
+    group_role: GroupRole = models.ForeignKey(
+        GroupRole,
+        on_delete=models.CASCADE,
+        related_name="+",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = (
+            models.UniqueConstraint(
+                fields=["meeting_group", "meeting_invite"],
+                name="unique_invite_group_annotation",
+            ),
+        )
+
+    objects: models.Manager
 
 
 # class InviteDispatch(models.Model):

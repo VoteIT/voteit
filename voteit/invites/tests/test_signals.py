@@ -96,7 +96,7 @@ class MeetingInviteSignalTests(TestCase):
         self.assertFalse(mock_publish.called)
         with FakeCommit():
             invite = self.meeting.invites.create(
-                user_data={"email": "hello@betahaus.net"}
+                user_data={"email": "bye@betahaus.net"}
             )
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]

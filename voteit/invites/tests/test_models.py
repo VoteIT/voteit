@@ -121,7 +121,10 @@ class MeetingInviteManagerTests(TestCase):
             values=["a@betahaus.net", "b@betahaus.net", "c@betahaus.net"],
             roles=[ROLE_PARTICIPANT, ROLE_DISCUSSER],
         )
-        self.assertEqual((1, 1, 1), result)
+        self.assertEqual(3, len(result.pks))
+        self.assertEqual(1, result.added)
+        self.assertEqual(1, result.changed)
+        self.assertEqual(1, result.existed)
 
     def test_create_or_update_typed_updates_roles(self):
         self.inv1.used_by = self.user
@@ -133,7 +136,10 @@ class MeetingInviteManagerTests(TestCase):
             values=["a@betahaus.net", "b@betahaus.net", "c@betahaus.net"],
             roles=[ROLE_PARTICIPANT, ROLE_DISCUSSER],
         )
-        self.assertEqual((1, 2, 0), result)
+        self.assertEqual(3, len(result.pks))
+        self.assertEqual(1, result.added)
+        self.assertEqual(2, result.changed)
+        self.assertEqual(0, result.existed)
         self.assertEqual(
             {ROLE_PARTICIPANT, ROLE_DISCUSSER}, self.meeting.get_roles(self.user)
         )
@@ -170,10 +176,45 @@ class MeetingInviteManagerTests(TestCase):
         self.assertEqual({self.inv1, self.inv2}, set(exact))
         self.assertEqual({}, bogus)
 
+    def test_find_multi_user_data_meeting_filter_not_applied(self):
+        with self.assertRaises(IntegrityError) as cm:
+            MeetingInvite.objects.find_multi_user_data({"email": "jeff@barnes.com"})
+        self.assertEqual("Queryset doesn't contain meeting filter", str(cm.exception))
+
     def test_test_find_multi_user_data_meeting_filter_not_applied(self):
         with self.assertRaises(IntegrityError) as cm:
             MeetingInvite.objects.find_multi_user_data({"email": "jeff@barnes.com"})
         self.assertEqual("Queryset doesn't contain meeting filter", str(cm.exception))
+
+    def test_create_or_update_mixed(self):
+        self.meeting.invites.create_or_update_mixed(
+            meeting=self.meeting,
+            data=[
+                {"email": "a@betahaus.net", "swedish_ssn": "121212-1212"},
+                {"email": "jeff@betahaus.net"},
+                {
+                    "email": "new@betahaus.net",
+                    "swedish_ssn": "123",  # Data isn't validated here
+                },
+            ],
+            roles=[ROLE_PARTICIPANT, ROLE_DISCUSSER],
+        )
+
+    def test_create_or_update_mixed_problematic_clash(self):
+        with self.assertRaises(IntegrityError) as cm:
+            self.meeting.invites.create_or_update_mixed(
+                meeting=self.meeting,
+                data=[
+                    {"email": "jeff@betahaus.net", "swedish_ssn": "121212-1212"},
+                    {
+                        "email": "new@betahaus.net",
+                        "swedish_ssn": "123",  # Data isn't validated here
+                    },
+                ],
+                roles=[ROLE_PARTICIPANT, ROLE_DISCUSSER],
+            )
+        # for now we'll simply block this behaviour
+        self.assertEqual("Partial invites found", str(cm.exception))
 
 
 class MeetingInviteTests(TestCase):

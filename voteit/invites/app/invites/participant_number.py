@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from django.utils.translation import gettext_lazy as _
 from pydantic import conint
 from pydantic import validator
 from pydantic.main import BaseModel
 
-from voteit.invites.abcs import InviteDataAdapter
+from voteit.invites.abcs import AnnotationDataAdapter
 from voteit.invites.registries import invite_adapter_registry
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from voteit.invites.models import MeetingInvite
 
 
 class ParticipantNumberSchema(BaseModel):
@@ -20,7 +26,7 @@ class ParticipantNumberSchema(BaseModel):
 
 
 @invite_adapter_registry
-class ParticipantNumber(InviteDataAdapter):
+class ParticipantNumber(AnnotationDataAdapter):
     """
     >>> data = [['1'], [' '], [2]]
     >>> ParticipantNumber.preflight([ParticipantNumber.name], data)
@@ -31,3 +37,17 @@ class ParticipantNumber(InviteDataAdapter):
     name = "pn"
     schema = ParticipantNumberSchema
     title = _("Participant number")
+
+    def accepted(self):
+        ...
+
+    @classmethod
+    def annotate(
+        cls,
+        **kwargs
+        # *,
+        # invites_qs: QuerySet[MeetingInvite],
+        # columns: list[str],
+        # rows: list[list[str | None | int]],
+    ):
+        ...

@@ -2,39 +2,15 @@ from typing import TYPE_CHECKING
 
 from django.utils.translation import gettext as _
 from pydantic import BaseModel
-from pydantic import Field
 from pydantic import conlist
 from pydantic import constr
-from pydantic import root_validator
 from pydantic import validator
 
 from voteit.core.validators import root_validate_roles_and_model
 from voteit.invites.utils import get_invite_adapter_registry
-from voteit.invites.workflows import InviteWf
 
 if TYPE_CHECKING:
     from voteit.invites.abcs import InviteDataAdapter
-
-
-# class CombinedInviteSchema(BaseModel):
-#     """
-#     This will be combined with other validation schemas. But they must exist.
-#     >>> CombinedInviteSchema(one=1)
-#     Traceback (most recent call last):
-#     ...
-#     pydantic.error_wrappers.ValidationError: 1 validation error for CombinedInviteSchema
-#     __root__
-#       At least one value required (type=value_error)
-#     """
-#
-#     @root_validator
-#     def at_least_one(cls, values: dict):
-#         reg = get_invite_adapter_registry()
-#         ud_keys = reg.user_data_keys
-#         for k, v in values.items():
-#             if v and k in ud_keys:
-#                 return values
-#         raise ValueError("At least one user_data value required")
 
 
 class InvitesMetaMixinSchema(BaseModel):
@@ -46,14 +22,6 @@ class InvitesMetaMixinSchema(BaseModel):
         unique_items=True,
         max_items=5,
     )
-    skip_states: conlist(
-        constr(
-            strip_whitespace=True,
-            to_lower=True,
-        ),
-        unique_items=True,
-        max_items=5,
-    ) = [InviteWf.REJECTED]
     meeting: int
 
     @validator("roles")
@@ -61,21 +29,12 @@ class InvitesMetaMixinSchema(BaseModel):
         root_validate_roles_and_model(cls, {"model": "meeting", "roles": v})
         return v
 
-    @validator("skip_states")
-    def validate_skip_states(cls, v: list[str]):
-        for item in v:
-            if item not in InviteWf.states:
-                raise ValueError(
-                    f"{item} is not a valid workflow state for MeetingInvite"
-                )
-        return v
-
 
 class AddTypedInvitesSchema(InvitesMetaMixinSchema):
     r"""<- Note raw string for doctests here!
 
     >>> AddTypedInvitesSchema.__fields__.keys()
-    dict_keys(['roles', 'skip_states', 'meeting', 'type', 'user_data'])
+    dict_keys(['roles', 'meeting', 'type', 'user_data'])
 
     Single line
     >>> AddTypedInvitesSchema(roles=['participant'], user_data=['hello@betahaus.net'], meeting=1).dict(exclude_unset=True, exclude={'meeting', 'roles'})
@@ -188,9 +147,9 @@ class AddAnnotatedInvitesSchema(InvitesMetaMixinSchema):
     >>> AddAnnotatedInvitesSchema(columns=['email'], rows=[["one@betahaus.net"], ["two@betahaus.net"]], **base_qs).dict(exclude_unset=True, exclude={'meeting', 'roles'})
     {'columns': ['email'], 'rows': [['one@betahaus.net'], ['two@betahaus.net']]}
 
-    Strip whitespace - but we don't convert caps
+    Strip whitespace - preflight handles other conversions
     >>> AddAnnotatedInvitesSchema(columns=['email'], rows="one@betahaus.net   \n   tWo@betahaus.net", **base_qs).dict(exclude_unset=True, exclude={'meeting', 'roles'})
-    {'columns': ['email'], 'rows': [['one@betahaus.net'], ['tWo@betahaus.net']]}
+    {'columns': ['email'], 'rows': [['one@betahaus.net'], ['two@betahaus.net']]}
 
     Strip shouldn't mess up validators
     >>> AddAnnotatedInvitesSchema(columns=['email'], rows="one@betahaus.net   \n   one@betahaus.net", **base_qs)
@@ -212,7 +171,7 @@ class AddAnnotatedInvitesSchema(InvitesMetaMixinSchema):
     # Important note! unique_items doesn't work when constr changes data. Rows must be altered before
     rows: conlist(
         conlist(
-            str,
+            str | None | int,
             unique_items=True,
             max_items=30,
         ),
@@ -223,27 +182,28 @@ class AddAnnotatedInvitesSchema(InvitesMetaMixinSchema):
     @validator("rows", pre=True)
     def convert_rows(cls, v):
         if isinstance(v, str):
-            result = []
-            for row in v.splitlines():
-                result.append(row.split("\t"))
-            v = result
+            v = v.splitlines()
         if isinstance(v, list):
             result = []
-            for row in v:
-                result.append([x.strip() for x in row])
+            for i, row in enumerate(v):
+                if isinstance(row, str):
+                    result.append([x.strip() for x in row.split("\t")])
+                elif isinstance(row, list):
+                    result.append([x.strip() if isinstance(x, str) else x for x in row])
+                else:
+                    raise ValueError(f"Got bogus value on row {i}: {row}")
             return result
         return v
 
-    @validator("columns", each_item=True)
-    def validate_columns(cls, v: str):
+    @validator("columns")
+    def validate_columns(cls, v: list[str]):
         reg = get_invite_adapter_registry()
-        if v in reg:
-            return v
-        raise ValueError(f"{v} is not a valid column name")
+        reg.check_column_req(v)
+        return v
 
     @validator("rows")
     def check_row_len(cls, v: list[list[str]], values: dict):
-        col_len = len(values["columns"])
+        col_len = len(values.get("columns", []))
         i = 1
         too_long = []
         for row in v:
@@ -254,4 +214,10 @@ class AddAnnotatedInvitesSchema(InvitesMetaMixinSchema):
             raise ValueError(
                 f"The following rows have more columns than they should have: {too_long[:10]}"
             )
+        return v
+
+    @validator("rows")
+    def preflight_checks(cls, v: list[list[str]], values: dict):
+        reg = get_invite_adapter_registry()
+        reg.preflight(values["columns"], v)
         return v

@@ -50,7 +50,7 @@ class AddInvitesTests(TestCase):
         msg = self._mk_one(user_data=data, type="email", roles=["participant"])
         with FakeCommit():
             response = msg.run_job()
-        self.assertEqual({"added": 3, "changed": 0, "skipped": 0}, response.data.dict())
+        self.assertEqual({"added": 3, "changed": 0, "existed": 0}, response.data.dict())
         # Check pushes
         self.assertTrue(mock_publish.called)
         self.assertEqual(3, len(mock_publish.mock_calls))
@@ -69,6 +69,7 @@ class AddInvitesTests(TestCase):
             user_data={"email": "one@betahaus.net"},
             roles=["voter"],
         )
+        # Will be changed too
         rejected_invite: MeetingInvite = meeting.invites.create(
             user_data={"email": "two@betahaus.net"},
             roles=["participant", "voter"],
@@ -83,14 +84,14 @@ class AddInvitesTests(TestCase):
         )
         with FakeCommit():
             response = msg.run_job()
-        self.assertEqual({"added": 1, "changed": 1, "skipped": 1}, response.data.dict())
+        self.assertEqual({"added": 1, "changed": 2, "existed": 0}, response.data.dict())
         # Check pushes
         self.assertTrue(mock_publish.called)
-        self.assertEqual(2, len(mock_publish.mock_calls))
+        self.assertEqual(3, len(mock_publish.mock_calls))
         changed_msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(changed_msg, MeetingInviteChanged)
         self.assertEqual(["participant"], changed_msg.data.roles)
-        added_msg = mock_publish.mock_calls[1].args[0]
+        added_msg = mock_publish.mock_calls[2].args[0]
         self.assertIsInstance(added_msg, MeetingInviteAdded)
 
 

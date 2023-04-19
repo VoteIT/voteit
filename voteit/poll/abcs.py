@@ -195,7 +195,7 @@ class ElectoralRegisterPolicy(ABC):
             if self.group_votes_active is not None:
                 if self.group_votes_active != self.meeting.group_votes_active:
                     raise ElectoralRegisterError(
-                        "Incompatible electoral register method. Group votes must be %s."
+                        "Incompatible electoral register method. InviteGroup votes must be %s."
                         % self.group_votes_active
                         and "active"
                         or "inactive"

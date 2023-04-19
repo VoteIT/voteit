@@ -12,9 +12,14 @@ from voteit.invites.exceptions import DataColValidationError
 
 if TYPE_CHECKING:
     from voteit.invites.models import MeetingInvite
+    from voteit.meeting.models import Meeting
+    from voteit.invites.registries import InviteAdapterRegistry
 
 
 class InviteDataAdapter(ABC):
+    def __init__(self, invite: MeetingInvite):
+        self.invite = invite
+
     @property
     @abstractmethod
     def name(cls) -> str:
@@ -60,9 +65,13 @@ class InviteDataAdapter(ABC):
         for i in cls.get_colidx(columns):
             bad_rows = []
             for num, row in enumerate(rows, 1):
-                if row[i]:
+                try:
+                    rval = row[i]
+                except IndexError:
+                    continue
+                if rval:
                     try:
-                        data = cls.schema(**{cls.name: row[i]})
+                        data = cls.schema(**{cls.name: rval})
                     except ValueError as exc:
                         bad_rows.append(num)
                         continue
@@ -70,23 +79,82 @@ class InviteDataAdapter(ABC):
             if bad_rows:
                 raise DataColValidationError(name=cls.name, index=i + 1, rows=bad_rows)
 
+    @classproperty
+    def is_user_data(cls) -> bool:
+        return issubclass(cls, InviteUserDataAdapter)
+
+    @classproperty
+    def is_annotation(cls) -> bool:
+        return issubclass(cls, AnnotationDataAdapter)
+
+    @classmethod
+    def get_row_values(
+        cls, columns: list[str], rows: list[list[str, None, int]]
+    ) -> set[str]:
+        """
+        >>> class Dummy(InviteDataAdapter):
+        ...     name='dummy'
+        ...
+        >>> sorted(Dummy.get_row_values(['wo', 'dummy'], [[1,'boo'], ["", ""], [None, 'me']]))
+        ['boo', 'me']
+        """
+        vals = set()
+        for i in cls.get_colidx(columns):
+            for num, row in enumerate(rows, 1):
+                try:
+                    rval = row[i]
+                except IndexError:
+                    continue
+                if rval:
+                    vals.add(rval)
+        return vals
+
+
+class AnnotationDataAdapter(InviteDataAdapter, ABC):
+    @abstractmethod
+    def accepted(self):
+        """
+        The wrapped invite was accepted.
+        This should be wrapped in a transaction.
+        Any used invitation should clean up its data.
+        """
+
+    @classmethod
+    def validate(
+        cls, *, columns: list[str], rows: list[list[str | None | int]], meeting: Meeting
+    ):
+        """
+        Perform more complex validation suitable for checks when running within a worker,
+        before doing any heavy lifting.
+
+        raise DataColValidationError if something goes wrong
+        """
+
+    @classmethod
+    @abstractmethod
+    def annotate(
+        cls,
+        *,
+        invites_qs: models.QuerySet[MeetingInvite],
+        columns: list[str],
+        rows: list[list[str | None | int]],
+        registry: InviteAdapterRegistry,
+        annotations_formatted,
+        meeting: Meeting,
+        **kwargs,
+    ):
+        """
+        Annotate invites if they should have other effects, for instance assigning participant numbers.
+        Also take care of existing state, if users have already accepted an invitation.
+        Note! This method will probably be extremely slow!
+
+        """
+
 
 class InviteUserDataAdapter(InviteDataAdapter, ABC):
     @classmethod
-    def schema_keys(cls) -> set[str]:
-        return set(cls.schema.schema()["properties"].keys())
-
-    @classmethod
     def query(cls, *values) -> models.Q:
         return models.Q(**{f"user_data__{cls.name}__in": values})
-
-    # @classmethod
-    # def from_cols(cls, *cols: str) -> BaseModel:
-    #     if len(cols) != len(cls.columns):
-    #         raise ValueError(
-    #             f"Must have exactly {len(cls.columns)} positional arguments"
-    #         )
-    #     return cls.schema(**dict(zip(cls.columns, cols)))
 
 
 # class InviteDispatcher(ABC):

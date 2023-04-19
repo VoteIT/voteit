@@ -1,67 +1,36 @@
+from __future__ import annotations
 from contextlib import suppress
+from typing import TYPE_CHECKING
 from typing import TypeVar
 
-from pydantic import validator
 from pydantic.main import BaseModel
+from django.db import models
+from typing import Generator
 
 from voteit.core.component import Registry
+from voteit.core.decorators import ensure_atomic
+from voteit.invites.abcs import AnnotationDataAdapter
 from voteit.invites.abcs import InviteDataAdapter
 from voteit.invites.abcs import InviteUserDataAdapter
+
+if TYPE_CHECKING:
+    from voteit.invites.models import MeetingInvite
+    from voteit.meeting.models import Meeting
 
 T = TypeVar("T")
 
 
-class InviteAdapterRegistry(Registry):
+class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapter]):
+    def get_user_data_idx(self, columns: list[str]):
+        colidx = []
+        for i, colname in enumerate(columns):
+            if colname in self.user_data_keys:
+                colidx.append(i)
+        return colidx
 
-    # def get_user_data_schema(self) -> type[BaseModel]:
-    #     from voteit.invites.schemas import CombinedInviteSchema as Base
-    #
-    #     class UserDataSchema(Base, *[x.schema for x in self.values() if x.user_data]):
-    #         ...
-    #
-    #     return UserDataSchema
-    #
-    # def get_annotations_schema(self) -> type[BaseModel]:
-    #     class AnnotationsSchema(*[x.schema for x in self.values() if not x.user_data]):
-    #         class Config:
-    #             frozen = True
-    #
-    #     return AnnotationsSchema
-    #
-    # def get_combined_schema(self) -> type[BaseModel]:
-    #     """
-    #     >>> Schema = invite_adapter_registry.get_combined_schema()
-    #     >>> breakpoint()
-    #     >>> data = Schema(items={('email', 'jeff@betahaus.net'): [('group', 'abc')]})
-    #     >>> data.dict(exclude_unset=True)
-    #     """
-    #     annotations = self.get_annotations_schema()
-    #     ud = self.get_user_data_schema()
-    #
-    #     class CombinedSchema(BaseModel):
-    #         items: dict[tuple[str, str], list[tuple[str, str]]]
-    #
-    #         @validator("items", pre=True)
-    #         def validate_ud_tuple_keys(cls, v: dict[tuple[str, str]]):
-    #             for k in v.keys():
-    #                 if len(k) != 2:
-    #                     raise ValueError("Tuple must have 2 items")
-    #                 if k[0] not in self.user_data_keys:
-    #                     raise ValueError(f"{k[0]} is not a valid user_data key")
-    #             return v
-    #
-    #         @validator("items")
-    #         def validate_ud_tuple_values(cls, v: dict):
-    #             bad_row = []
-    #             i = 1
-    #             for keys in v.keys():
-    #                 ud(keys)
-    #
-    #             return v
-    #
-    #     return CombinedSchema
-
-    def __setitem__(self, key: str, factory: type[InviteDataAdapter]):
+    def __setitem__(
+        self, key: str, factory: type[InviteUserDataAdapter | AnnotationDataAdapter]
+    ):
         """
         >>> testing_reg = InviteAdapterRegistry(InviteDataAdapter)
 
@@ -93,15 +62,11 @@ class InviteAdapterRegistry(Registry):
                     )
             if hasattr(self, "_user_data_keys"):
                 delattr(self, "_user_data_keys")
-        # if hasattr(self, "_column_names"):
-        #     delattr(self, "_column_names")
         super().__setitem__(key, factory)
 
     def __delattr__(self, key: str):
         if hasattr(self, "_user_data_keys"):
             delattr(self, "_user_data_keys")
-        # if hasattr(self, "_column_names"):
-        #     delattr(self, "_column_names")
         super().__delattr__(key)
 
     @property
@@ -111,19 +76,133 @@ class InviteAdapterRegistry(Registry):
         keys = set()
         for v in self.values():
             if issubclass(v, InviteUserDataAdapter):
-                keys.update(v.schema_keys())
+                keys.add(v.name)
+                # keys.update(v.schema_keys())
         self._user_data_keys = keys
         return keys
 
-    # @property
-    # def column_names(self) -> set[str]:
-    #     with suppress(AttributeError):
-    #         return self._column_names
-    #     names = set()
-    #     for v in self.values():
-    #         names.update(v.columns)
-    #     self._column_names = names
-    #     return names
+    def check_column_req(self, columns: list[str]):
+        """
+        >>> from voteit.invites.app.invites.email import InviteEmail
+        >>> from voteit.invites.app.invites.group import InviteGroup
+        >>> from voteit.invites.app.invites.grouprole import InviteGroupRole
+        >>> from voteit.invites.abcs import InviteDataAdapter
+        >>> testing_reg = InviteAdapterRegistry(InviteDataAdapter)
+        >>> _ = testing_reg(InviteGroup)
+        >>> _ = testing_reg(InviteGroupRole)
+        >>> _ = testing_reg(InviteEmail)
+        >>> testing_reg.check_column_req(['group'])
+        >>> testing_reg.check_column_req(['group', 'grouprole'])
+        >>> testing_reg.check_column_req(['booo'])
+        Traceback (most recent call last):
+        ...
+        ValueError: booo is not a valid column
+        >>> testing_reg.check_column_req(['grouprole'])
+        Traceback (most recent call last):
+        ...
+        ValueError: GroupRole requires the column left of it to be group
+        >>> testing_reg.check_column_req(['email'])
+        >>> testing_reg.check_column_req(['email', 'email'])
+        Traceback (most recent call last):
+        ...
+        ValueError: User data can't have duplicate columns. Found several email
+        """
+        for k in columns:
+            try:
+                self[k].check_column_req(columns)
+            except KeyError:
+                raise ValueError(f"{k} is not a valid column")
+            if columns.count(k) > 1:
+                raise ValueError(f"Duplicate columns. Found several {k}")
+
+    def preflight(self, columns: list[str], rows: list[list[str]]) -> None:
+        """
+        Execute preflight for all relevant columns. It only needs to run once.
+        """
+        for k in set(columns):
+            self[k].preflight(columns, rows)
+
+    def build_ud_query_seq(
+        self, columns: list[str], rows: list[list[str]]
+    ) -> Generator[dict[str, str]]:
+        """
+        >>> from voteit.invites.app.invites.email import InviteEmail
+        >>> from voteit.invites.app.invites.group import InviteGroup
+        >>> from voteit.invites.abcs import InviteDataAdapter
+        >>> testing_reg = InviteAdapterRegistry(InviteDataAdapter)
+        >>> _ = testing_reg(InviteEmail)
+        >>> _ = testing_reg(InviteGroup)
+        >>> out = testing_reg.build_ud_query_seq(['email', 'group'], [['jeff@betahaus.net', '123'], ['jane@betahaus.net', '123']])
+        >>> list(out)
+        [{'email': 'jeff@betahaus.net'}, {'email': 'jane@betahaus.net'}]
+        """
+        idx = self.get_user_data_idx(columns)
+        for row in rows:
+            yield {columns[i]: row[i] for i in idx}
+
+    def format_for_annotations(
+        self, columns: list[str], rows: list[list[str | None | int]]
+    ):
+        """
+        >>> from voteit.invites.app.invites.email import InviteEmail
+        >>> from voteit.invites.app.invites.group import InviteGroup
+        >>> from voteit.invites.abcs import InviteDataAdapter
+        >>> testing_reg = InviteAdapterRegistry(InviteDataAdapter)
+        >>> _ = testing_reg(InviteEmail)
+        >>> _ = testing_reg(InviteGroup)
+        >>> out = testing_reg.format_for_annotations(['email', 'group'], [['jeff@betahaus.net', '123'], ['jane@betahaus.net', '123']])
+        >>> list(out)
+        [(dict_items([('email', 'jeff@betahaus.net')]), {'email': 'jeff@betahaus.net', 'group': '123'}), (dict_items([('email', 'jane@betahaus.net')]), {'email': 'jane@betahaus.net', 'group': '123'})]
+        """
+        for row in rows:
+            yield {
+                columns[i]: x
+                for i, x in enumerate(row)
+                if columns[i] in self.user_data_keys
+            }.items(), {columns[i]: x for i, x in enumerate(row)}
+
+    def get_annotations(self, columns: list[str]) -> set[type[AnnotationDataAdapter]]:
+        result = set()
+        annotation_keys = set(columns) - self.user_data_keys
+        for k in annotation_keys:
+            v = self[k]
+            if v.is_annotation:
+                result.add(v)
+        return result
+
+    def run_validators(
+        self, columns: list[str], rows: list[list[str]], *, meeting: Meeting
+    ):
+        for adapter in self.get_annotations(columns):
+            adapter.validate(columns=columns, rows=rows, meeting=meeting)
+
+    @ensure_atomic
+    def run_annotations(
+        self,
+        *,
+        columns: list[str],
+        rows: list[list[str]],
+        invites_qs: models.QuerySet[MeetingInvite],
+        meeting: Meeting,
+    ):
+        annotations_formatted = list(self.format_for_annotations(columns, rows))
+        for adapter in self.get_annotations(columns):
+            # Yield results, display progress etc?
+            adapter.annotate(
+                columns=columns,
+                rows=rows,
+                invites_qs=invites_qs,
+                registry=self,
+                meeting=meeting,
+                annotations_formatted=annotations_formatted,
+            )
+
+    def run_accepted(self, invite: MeetingInvite):
+        for adapter in self.values():
+            adapter: type[AnnotationDataAdapter]
+            if adapter.is_annotation:
+                adapted = adapter(invite)
+                adapted.accepted()
 
 
 invite_adapter_registry = InviteAdapterRegistry(InviteDataAdapter)
