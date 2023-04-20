@@ -46,48 +46,6 @@ class MeetingInviteViewSetTests(APITestCase):
         self.invite.refresh_from_db()
         self.participant.refresh_from_db()
 
-    #
-    # def test_create(self):
-    #     url = reverse("meeting-invites-list")
-    #     data = {
-    #         "meeting": self.meeting.pk,
-    #         "invite_data": "hello@betahaus.net",
-    #     }
-    #     for user, status in (
-    #         (None, 401),
-    #         (self.participant, 403),
-    #         (self.moderator, 201),
-    #     ):
-    #         if user:
-    #             self.client.force_login(user)
-    #         response = self.client.post(url, data)
-    #         self.assertEqual(
-    #             response.status_code,
-    #             status,
-    #             f"{user} action returned wrong response code",
-    #         )
-
-    # def test_create_meeting_ne(self):
-    #     url = reverse("meeting-invites-list")
-    #     data = {
-    #         "title": "Stuff",
-    #         "meeting": -1,
-    #     }
-    #     self.client.force_login(self.moderator)
-    #     response = self.client.post(url, data)
-    #     self.assertEqual(response.status_code, 404)
-    #     self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
-
-    # def test_get(self):
-    #     url = reverse("meeting-invites-list")
-    #     data = {
-    #         "meeting": self.meeting.pk,
-    #     }
-    #     self.client.force_login(self.moderator)
-    #     response = self.client.get(url, data)
-    #     self.assertEqual(response.status_code, 200)
-    #     self.assertEqual(1, len(response.json()))
-
     def test_transition_moderator(self):
         url = f"/api/meeting-invites/{self.invite.pk}/transitions/"
         data = {"transition": "revoke"}
@@ -139,14 +97,6 @@ class MeetingInviteViewSetTests(APITestCase):
         self.client.force_login(self.moderator)
         response = self.client.patch(url, {"roles": ["participant"]})
         self.assertEqual(response.status_code, 405)
-
-    # def test_change_used_invite(self):
-    #     self.invite.accept(self.participant)
-    #     self.invite.save()
-    #     url = reverse("meeting-invites-detail", kwargs={"pk": self.invite.pk})
-    #     self.client.force_login(self.moderator)
-    #     response = self.client.patch(url, {"roles": ["participant"]})
-    #     self.assertEqual(response.status_code, 403)
 
 
 @override_settings(ID_PROXY_API_KEY="xxx")
