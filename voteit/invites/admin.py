@@ -12,9 +12,8 @@ logger = getLogger(__name__)
 
 @admin.register(MeetingInvite)
 class MeetingInviteAdmin(FSMTransitionMixin, admin.ModelAdmin):
-    fsm_field = [
-        "state",
-    ]
+    fsm_field = ("state",)
+    search_fields = ("user_data__email", "user_data__swedish_ssn", "meeting__title")
     readonly_fields = ("state",)
     list_display = (
         "meeting",
@@ -25,6 +24,10 @@ class MeetingInviteAdmin(FSMTransitionMixin, admin.ModelAdmin):
     list_filter = (
         "meeting__organisation",
         "state",
+    )
+    autocomplete_fields = (
+        "meeting",
+        "used_by",
     )
     # FIXME: Filter type
 
