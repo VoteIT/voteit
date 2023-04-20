@@ -17,6 +17,8 @@ class InviteAnnotationsIntegrationTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        import voteit.invites.tests
+
         cls.meeting = Meeting.objects.get(pk=1)
         cls.org = Organisation.objects.get(pk=1)
         cls.group_sw = cls.meeting.groups.create(groupid="sw")
@@ -24,16 +26,16 @@ class InviteAnnotationsIntegrationTests(TestCase):
         cls.role_jedi = cls.meeting.group_roles.create(role_id="jedi")
         cls.role_sith = cls.meeting.group_roles.create(role_id="sith")
         cls.vader = cls.org.users.create(username="vader")
+        cls.fixtures_dir = os.path.join(
+            os.path.dirname(os.path.abspath(voteit.invites.tests.__file__)), "fixtures"
+        )
 
     def fixture_file(self, filename):
-        return os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "fixtures",
-            filename,
-        )
+        return os.path.join(self.fixtures_dir, filename)
 
     def call_command(self, *args, **kwargs):
         out = StringIO()
+        kwargs.setdefault("q", True)
         call_command(
             "add_annotated_invites",
             *args,
@@ -73,11 +75,11 @@ class InviteAnnotationsIntegrationTests(TestCase):
     def test_blank_roles_afterwards(self):
         self.call_command(m=self.meeting.pk, u=1, f=self.fixture_file("grouprole.csv"))
         self.assertEqual(
-            [self.role_sith.pk, self.role_jedi.pk, None],
-            [
+            {self.role_sith.pk, self.role_jedi.pk, None},
+            set(
                 x["group_role_id"]
                 for x in self.group_sw.invite_annotations.all().values()
-            ],
+            ),
         )
 
         self.call_command(

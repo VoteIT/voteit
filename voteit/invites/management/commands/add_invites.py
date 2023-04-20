@@ -10,6 +10,7 @@ from django.db.transaction import get_connection
 from django.test.utils import CaptureQueriesContext
 
 from voteit.core.testing import exectime
+from voteit.invites.management.commands.base import BaseInvitesCommandMixin
 from voteit.invites.messages import AddInvites
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_DISCUSSER
@@ -22,58 +23,26 @@ if TYPE_CHECKING:
     from voteit.core.models import User as UserType
 
 
-_ROLES = {
-    "P": str(ROLE_PROPOSER),
-    "D": str(ROLE_DISCUSSER),
-    "V": str(ROLE_POTENTIAL_VOTER),
-}
-
-
-class Command(BaseCommand):
-    help = "Create meeting invites. Note! This command only works with piped data."
+class Command(BaseCommand, BaseInvitesCommandMixin):
+    help = "Create meeting invites. Either piped data or from file."
 
     def add_arguments(self, parser):
-        parser.add_argument("-m", help="Meeting pk", required=True)
-        parser.add_argument("-u", help="Creating user pk", required=True)
+        self.add_base_arguments(parser)
         parser.add_argument("-t", help="Invite type", default="email")
-        parser.add_argument(
-            "--dry-run",
-            help="Don't save anything, just report",
-            action="store_true",
-            default=False,
-        )
-        parser.add_argument(
-            "--queries",
-            help="Report exec time, queries etc",
-            action="store_true",
-            default=False,
-        )
-        # parser.add_argument("-f", help="From file instead of stdin")
-        parser.add_argument(
-            "-P", help="Add proposer role", action="store_true", default=False
-        )
-        parser.add_argument(
-            "-D", help="Add discusser role", action="store_true", default=False
-        )
-        parser.add_argument(
-            "-V", help="Add potential voter role", action="store_true", default=False
-        )
 
     def handle(self, *args, **options):
+        self.quiet = options.get("q")
         meeting: Meeting = Meeting.objects.get(pk=options.get("m"))
-        roles = {str(ROLE_PARTICIPANT)}
-        for (k, role) in _ROLES.items():
-            if options.get(k):
-                roles.add(role)
-        print(
-            "Adding invites with roles: {roles} to meeting {meeting}".format(
-                roles=", ".join(roles), meeting=meeting.title
-            )
+        roles = self.get_roles(options)
+        self.report(
+            "Adding invites with roles: {roles} to meeting {meeting}",
+            roles=", ".join(roles),
+            meeting=meeting.title,
         )
-        print(
+        self.report(
             "Note! This command will freeze if you haven't piped any data to STDIN or specified a file. Exit in that case."
         )
-        user_data = sys.stdin.readlines()
+        user_data = self.get_data(options)
         command = AddInvites(
             mm={"user_pk": options.get("u")},
             meeting=meeting.pk,
@@ -81,18 +50,4 @@ class Command(BaseCommand):
             user_data=user_data,
         )
         command.context = meeting
-        with transaction.atomic(durable=True):
-            conn = get_connection()
-            with CaptureQueriesContext(connection=conn) as cqc:
-                with exectime() as et:
-                    result = command.run_job()
-                if options.get("queries"):
-                    pprint(cqc.captured_queries)
-                    print("-" * 80)
-                    print(f"Execution time: {et():.4f} secs - queries: {len(cqc)}")
-            if options.get("dry_run"):
-                print("-- DRY RUN - aborting save")
-                transaction.set_rollback(True)
-        print(
-            f"Added: {result.data.added} \nChanged: {result.data.changed} \nSkipped: {result.data.skipped}"
-        )
+        self.run_cmd(command, options)

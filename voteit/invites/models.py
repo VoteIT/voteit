@@ -93,10 +93,10 @@ class MeetingInviteManager(models.Manager):
         invites = {x for x in invites if x.used_by_id}
         assigned_user_pks = {x.used_by_id for x in invites if x.used_by_id}
         meeting_roles_dict = {
-            x.user_id: x.assigned
-            for x in meeting.roles.filter(user_id__in=assigned_user_pks).values_list(
-                "user_id", "assigned"
-            )
+            user_id: assigned
+            for user_id, assigned in meeting.roles.filter(
+                user_id__in=assigned_user_pks
+            ).values_list("user_id", "assigned")
         }
         for invite in invites:
             current_roles = set(meeting_roles_dict.get(invite.used_by_id, set()))
@@ -183,6 +183,12 @@ class MeetingInviteManager(models.Manager):
             # We've already excluded var exclude_states
             if invite.state not in (InviteWf.OPEN, InviteWf.ACCEPTED):
                 invite.state = InviteWf.OPEN
+            invite.save()
+        # Change state of other invites that haven't been touched
+        for invite in exact_qs.exclude(
+            state__in={InviteWf.OPEN, InviteWf.ACCEPTED}
+        ).exclude(pk__in=needs_role_update_qs):
+            invite.state = InviteWf.OPEN
             invite.save()
         self._update_assigned_roles(meeting, needs_role_update_qs)
         already_correct_count = total_existing - needs_role_update_qs.count()
