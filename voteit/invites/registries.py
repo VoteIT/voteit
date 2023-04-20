@@ -122,23 +122,55 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
         for k in set(columns):
             self[k].preflight(columns, rows)
 
+    def check_intersections(self, columns: list[str], rows: list[list[str]]) -> None:
+        """
+        Make sure no intersections exist within the data.
+        """
+
+        cmpvals = []
+        checked = []
+        queryseq = list(self.build_ud_query_seq(columns, rows))
+        for ud in queryseq:
+            items = ud.items()
+            if items not in cmpvals:
+                cmpvals.append(items)
+        for i, ud in enumerate(queryseq, 1):
+            items = ud.items()
+            if items in checked:  # Exact match ok
+                continue
+            for k, v in items:
+                di = {k: v}.items()
+                if any(di <= x for x in cmpvals if di != x):
+                    raise ValueError(
+                        f"The value {k}={v} is used within different subsets of user data. Offending row: {i}"
+                    )
+            checked.append(items)
+
     def build_ud_query_seq(
         self, columns: list[str], rows: list[list[str]]
     ) -> Generator[dict[str, str]]:
         """
         >>> from voteit.invites.app.invites.email import InviteEmail
+        >>> from voteit.invites.app.invites.swedish_ssn import InviteSweSSN
         >>> from voteit.invites.app.invites.group import InviteGroup
         >>> from voteit.invites.abcs import InviteDataAdapter
         >>> testing_reg = InviteAdapterRegistry(InviteDataAdapter)
         >>> _ = testing_reg(InviteEmail)
         >>> _ = testing_reg(InviteGroup)
+        >>> _ = testing_reg(InviteSweSSN)
         >>> out = testing_reg.build_ud_query_seq(['email', 'group'], [['jeff@betahaus.net', '123'], ['jane@betahaus.net', '123']])
         >>> list(out)
         [{'email': 'jeff@betahaus.net'}, {'email': 'jane@betahaus.net'}]
+
+        Falsy vals excluded
+        >>> out = testing_reg.build_ud_query_seq(['email', 'swedish_ssn'], [['jeff@betahaus.net', None], [None, '123']])
+        >>> list(out)
+        [{'email': 'jeff@betahaus.net'}, {'swedish_ssn': '123'}]
         """
         idx = self.get_user_data_idx(columns)
         for row in rows:
-            yield {columns[i]: row[i] for i in idx}
+            l = len(row)
+            yield {columns[i]: row[i] for i in idx if i < l and row[i]}
 
     def format_for_annotations(
         self, columns: list[str], rows: list[list[str | None | int]]

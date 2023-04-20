@@ -158,8 +158,23 @@ class AddAnnotatedInvitesSchema(InvitesMetaMixinSchema):
     pydantic.error_wrappers.ValidationError: 1 validation error for AddAnnotatedInvitesSchema
     rows
       the list has duplicated items (type=value_error.list.unique_items)
-    """
 
+    Invites with intersections are problematic too, so we'll block those
+    >>> AddAnnotatedInvitesSchema(columns=['email', 'swedish_ssn'], rows=[['a@boo.com', '121212-1212'],['a@boo.com']], **base_qs)
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 1 validation error for AddAnnotatedInvitesSchema
+    rows
+      The value email=a@boo.com is used within different subsets of user data. Offending row: 1 (type=value_error)
+
+    And a problematic mix
+    >>> AddAnnotatedInvitesSchema(columns=['email', 'swedish_ssn'], rows=[['a@boo.com', '121212-1212'],['a@boo.com', '20200101-2398']], **base_qs)
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 1 validation error for AddAnnotatedInvitesSchema
+    rows
+      The value email=a@boo.com is used within different subsets of user data. Offending row: 1 (type=value_error)
+    """
     columns: conlist(
         constr(
             strip_whitespace=True,
@@ -220,4 +235,10 @@ class AddAnnotatedInvitesSchema(InvitesMetaMixinSchema):
     def preflight_checks(cls, v: list[list[str]], values: dict):
         reg = get_invite_adapter_registry()
         reg.preflight(values["columns"], v)
+        return v
+
+    @validator("rows")
+    def check_user_data_intersections(cls, v: list[list[str]], values: dict):
+        reg = get_invite_adapter_registry()
+        reg.check_intersections(values["columns"], v)
         return v
