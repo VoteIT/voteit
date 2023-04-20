@@ -51,20 +51,13 @@ class AddInvites(ContextAction):
 
         """
         self.assert_perm()
-        # try:
         with set_actor(self.user):
             result = self.context.invites.create_or_update_typed(
                 meeting=self.context,
                 roles=self.data.roles,
                 values=self.data.user_data,
-                # exclude_states=self.data.skip_states,
                 invite_type=self.data.type,
             )
-        # except InviteError as exc:
-        #     raise BadRequestError.from_message(
-        #         self,
-        #         msg=exc.message,
-        #     )
         response = InvitesAdded.from_message(
             self,
             added=result.added,

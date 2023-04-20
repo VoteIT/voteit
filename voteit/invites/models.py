@@ -242,7 +242,6 @@ class MeetingInvite(MeetingContext):
         on_delete=models.CASCADE,
         related_name="invites",
     )
-    # FIXME: Validate roles - ValueError
     roles: list[str] = ArrayField(models.CharField(max_length=20), default=tuple)
     user_data: dict = models.JSONField(
         encoder=DjangoJSONEncoder,
