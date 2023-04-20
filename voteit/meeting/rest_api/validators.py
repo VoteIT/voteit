@@ -31,6 +31,8 @@ class DialectInstallableValidator:
     requires_context = True
 
     def __call__(self, value, serializer: Serializer):
+        if not value:
+            return
         named_paths = get_named_path_dict()
         if value not in named_paths:
             raise ValidationError(f"No meeting dialect named {value}")
