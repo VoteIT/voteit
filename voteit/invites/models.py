@@ -255,13 +255,13 @@ class MeetingInvite(MeetingContext):
             ),
         )
 
+    @ensure_atomic
     @transition(
         field=state,
         source=InviteWf.OPEN,
         target=InviteWf.ACCEPTED,
         permission=NOT_ALLOWED,  # Special view, not a normal transition
     )
-    @ensure_atomic
     def accept(self, user: UserType):
         """
         Important! Must always run within an atomic block!
