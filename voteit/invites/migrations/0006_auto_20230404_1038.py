@@ -14,7 +14,7 @@ def move_invite_data(apps, *args):
             obj.user_data = {"swedish_ssn": obj.invite_data}
         else:
             raise ValueError(f"{obj} contained value {obj.type} as type")
-        obj.save()
+        obj.save_base(raw=True)
 
 
 def reverse_move_invite_data(apps, *args):
@@ -27,7 +27,7 @@ def reverse_move_invite_data(apps, *args):
         for (k, v) in obj.user_data.items():
             obj.type = k
             obj.invite_data = v
-            obj.save()
+            obj.save_base(raw=True)
 
 
 class Migration(migrations.Migration):
