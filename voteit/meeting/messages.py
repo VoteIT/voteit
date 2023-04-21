@@ -140,7 +140,7 @@ class CreateMeetingGroupsSchema(BaseModel):
     """
 
     meeting: conint(ge=1)
-    groups: conlist(MeetingGroupSchema, unique_items=True, max_items=50, min_items=1)
+    groups: conlist(MeetingGroupSchema, unique_items=True, max_items=250, min_items=1)
 
     @validator("groups", pre=True)
     def transform_to_groups(cls, v: str | list):
