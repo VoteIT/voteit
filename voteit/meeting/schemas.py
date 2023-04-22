@@ -115,6 +115,10 @@ class DialectSchema(BaseModel):
         constr(to_lower=True, strip_whitespace=True),
         unique_items=True,
     ) = []
+    run_scripts: conlist(
+        constr(strip_whitespace=True),
+        unique_items=True,
+    ) = []
 
     @validator("block_roles")
     def validate_roles(cls, v):
