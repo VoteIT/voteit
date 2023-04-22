@@ -228,11 +228,27 @@ class MeetingInvite(MeetingContext):
         default=InviteWf.initial, choices=InviteWf.choices(), editable=False
     )
     created: datetime = models.DateTimeField(default=now, editable=False)
+    # Warning! We want to drop this later on!
+    created_by: UserType | None = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="created_invites",
+        blank=True,
+        null=True,
+    )
+    # Warning! We want to drop this later on!
+    last_modified_by: UserType | None = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        editable=False,
+        blank=True,
+        null=True,
+    )
     modified: datetime = models.DateTimeField(auto_now=True, editable=False)
     used_at: datetime = models.DateTimeField(null=True, blank=True)
     used_by: UserType = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.RESTRICT,
         related_name="used_invites",
         null=True,
         blank=True,
