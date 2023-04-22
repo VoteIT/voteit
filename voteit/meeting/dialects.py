@@ -8,6 +8,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.utils.module_loading import import_string
 from pydantic import BaseModel
 from yaml import safe_load
 
@@ -222,6 +223,9 @@ class DialectHandler:
                     if getattr(group, k, object()) != v:
                         setattr(group, k, v)
                 group.save()
+        # And install scripts
+        for script in self.load_dialect_scripts():
+            script.install(meeting)
 
     @ensure_atomic
     def remove(self, meeting: Meeting, groups: bool = False):
@@ -248,6 +252,27 @@ class DialectHandler:
             meeting.groups.filter(
                 groupid__in=[x.groupid for x in self.data.groups]
             ).delete()
+        # Any remove or cleanup?
+        for script in self.load_dialect_scripts():
+            script.remove(meeting)
+
+    def load_dialect_scripts(self) -> list[DialectScript]:
+        # This could've been a generator, but we want to validate all before running
+        results = []
+        for mod_path in self.data.run_scripts:
+            try:
+                klass = import_string(mod_path)
+            except ImportError as exc:
+                raise ValueError(
+                    f"Error when processing meeting dialect {self.data.name} run_scripts: {str(exc)}"
+                )
+            if not isinstance(klass, type) or not issubclass(klass, DialectScript):
+                raise TypeError(
+                    f"Error when processing meeting dialect {self.data.name} "
+                    f"run_scripts: {mod_path} is not a subclass of DialectScript"
+                )
+            results.append(klass(self))
+        return results
 
 
 def check_dialect_files() -> list[tuple[str, str]]:
@@ -258,12 +283,12 @@ def check_dialect_files() -> list[tuple[str, str]]:
     intra_req_checks = defaultdict(set)
     named_paths = get_named_path_dict()
     names_titles = []
-
     for name, path in named_paths.items():
         handler = DialectHandler.load_from_file(name, path)
         intra_req_checks[name].update(handler.data.requires)
         names_titles.append((name, handler.data.title))
-
+        # Validate, we don't need to do anything
+        handler.load_dialect_scripts()
     # It doesn't check cyclic, so let's hope that doesn't happen ;)
     for name, reqs in intra_req_checks.items():
         for req in reqs:
@@ -283,3 +308,14 @@ def _get_schema_list_items(schema_cls: type[BaseModel]) -> set[str]:
 
 
 _dialect_schema_list_items = _get_schema_list_items(DialectSchema)
+
+
+class DialectScript:
+    def __init__(self, handler: DialectHandler):
+        self.handler = handler
+
+    def install(self, meeting: Meeting):
+        ...
+
+    def remove(self, meeting: Meeting):
+        ...

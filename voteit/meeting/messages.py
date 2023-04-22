@@ -128,19 +128,19 @@ class MeetingGroupSchema(BaseModel):
 
 class CreateMeetingGroupsSchema(BaseModel):
     r"""
-    >>> groups = [MeetingGroupSchema(title=x, groupid=x) for x in range(51)]
+    >>> groups = [MeetingGroupSchema(title=x, groupid=x) for x in range(251)]
     >>> CreateMeetingGroupsSchema(meeting=1, groups=groups)
     Traceback (most recent call last):
     ...
     pydantic.error_wrappers.ValidationError: 1 validation error for CreateMeetingGroupsSchema
     groups
-      ensure this value has at most 50 items (type=value_error.list.max_items; limit_value=50)
+      ensure this value has at most 250 items (type=value_error.list.max_items; limit_value=250)
     >>> CreateMeetingGroupsSchema(groups="a\tA\t\nB\tB\t1", meeting=1)
     CreateMeetingGroupsSchema(meeting=1, groups=[MeetingGroupSchema(title='a', groupid='a', votes=None), MeetingGroupSchema(title='B', groupid='b', votes=1)])
     """
 
     meeting: conint(ge=1)
-    groups: conlist(MeetingGroupSchema, unique_items=True, max_items=50, min_items=1)
+    groups: conlist(MeetingGroupSchema, unique_items=True, max_items=250, min_items=1)
 
     @validator("groups", pre=True)
     def transform_to_groups(cls, v: str | list):

@@ -87,6 +87,14 @@ class DialectHandlerTests(TestCase):
         self.assertEqual(["discusser", "proposer"], group_role.roles)
         self.assertEqual("Board", group.title)
 
+    def test_install_with_script(self):
+        handler = self._cut.load_from_dict(dialect_named_test)
+        handler.data.run_scripts.append(
+            "voteit.meeting.tests.fixtures.DialectScriptTitleChanger"
+        )
+        handler.install(self.meeting)
+        self.assertEqual("I did stuff", self.meeting.title)
+
     def test_remove(self):
         handler = self._cut.load_from_dict(dialect_named_test)
         handler.install(self.meeting)
@@ -110,6 +118,15 @@ class DialectHandlerTests(TestCase):
         self.assertIsNone(self.meeting.er_policy_name)
         self.assertFalse(self.meeting.group_votes_active)
         self.assertFalse(self.meeting.group_roles_active)
+
+    def test_remove_with_script(self):
+        handler = self._cut.load_from_dict(dialect_named_test)
+        handler.install(self.meeting)
+        handler.data.run_scripts.append(
+            "voteit.meeting.tests.fixtures.DialectScriptTitleChanger"
+        )
+        handler.remove(self.meeting)
+        self.assertEqual("Gone again", self.meeting.title)
 
     def test_duplicate_install(self):
         handler = self._cut.load_from_dict(dialect_named_test)

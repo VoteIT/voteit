@@ -16,6 +16,7 @@ from envelope.models import Connection
 from envelope.utils import websocket_send
 
 from voteit.active.permissions import ActiveUserPermissions
+from voteit.active.utils import get_inactive_qs
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.messaging.decorators import incoming
@@ -121,12 +122,7 @@ class PurgeInactiveUsers(ContextAction):
 
     def run_job(self):
         self.assert_perm()
-        recent_enough_connections_qs = Connection.objects.filter(
-            last_action__gt=now() - timedelta(hours=self.data.hours),
-        )
-        older_active_users = self.context.active_users.exclude(
-            user_id__in=recent_enough_connections_qs.values_list("user_id")
-        )
+        older_active_users = get_inactive_qs(self.context, hours=self.data.hours)
         response = PurgeInactiveResponse.from_message(
             self, count=older_active_users.count()
         )
