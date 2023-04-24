@@ -16,7 +16,6 @@ from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.utils import get_identity_data
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.invites.models import MeetingInvite
-from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.rest_api import serializers
 from voteit.meeting.models import Meeting
 
@@ -33,7 +32,6 @@ class MeetingInviteViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    # serializer_class = Ser
     context_queryset = Meeting.objects.all()
     context_lookup_kwarg = "meeting"
     model = MeetingInvite

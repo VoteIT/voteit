@@ -5,7 +5,6 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from auditlog.context import set_actor
-from django.db import IntegrityError
 from django.db import transaction
 from pydantic.main import BaseModel
 
@@ -13,9 +12,7 @@ from envelope.core.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
-from voteit.invites.exceptions import DataColValidationError
 
-# from voteit.invites.exceptions import InviteError
 from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.schemas import AddAnnotatedInvitesSchema
 from voteit.invites.schemas import AddTypedInvitesSchema
