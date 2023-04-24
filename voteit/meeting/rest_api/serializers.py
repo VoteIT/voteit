@@ -247,6 +247,9 @@ class CreateMeetingGroupSerializer(BaseModelSerializer):
             "members",
             "mentions",
         )
+        extra_kwargs = {
+            "groupid": {"required": False},
+        }
 
 
 class MeetingGroupSerializer(CreateMeetingGroupSerializer):

@@ -141,7 +141,6 @@ class MeetingDetailSerializerTests(TestCase):
         serializer.is_valid()
         self.assertFalse(serializer.errors)
         serializer.save()
-        # breakpoint()
         self.assertEqual(AutoAlways.name, self.meeting.er_policy_name)
 
     def test_update_er_policy_ongoing_polls(self):

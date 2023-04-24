@@ -307,7 +307,7 @@ class ExportDiscussionsViewSetTests(APITestCase):
                 "userid": "moderator",
                 "agenda_item": 1,
                 "group_title": "The Hellos",
-                "group_id": None,
+                "group_id": "the-hellos",
                 "tags": "pigs",
                 "pk": self.disc_two.pk,
                 "author": 1,

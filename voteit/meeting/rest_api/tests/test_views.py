@@ -611,7 +611,7 @@ class ExportMeetingGroupsViewSetTests(APITestCase):
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
         cls.turkish = cls.meeting.groups.create(title="Özgür", votes=5)
-        cls.chineese = cls.meeting.groups.create(title="好", votes=8)
+        cls.chineese = cls.meeting.groups.create(title="好", groupid="ni-hao", votes=8)
         cls.swedish = cls.meeting.groups.create(title="Fika nu kör vi")
 
     def test_not_allowed(self):
@@ -634,7 +634,7 @@ class ExportMeetingGroupsViewSetTests(APITestCase):
                     "groupid": "ozgur",
                     "votes": 5,
                 },
-                {"title": "好", "groupid": "", "votes": 8},
+                {"title": "好", "groupid": "ni-hao", "votes": 8},
                 {
                     "title": "Fika nu kör vi",
                     "groupid": "fika-nu-kor-vi",
@@ -654,7 +654,7 @@ class ExportMeetingGroupsViewSetTests(APITestCase):
             {
                 f"title,groupid,votes",
                 f"Özgür,ozgur,5",
-                f"好,,8",
+                f"好,ni-hao,8",
                 f"Fika nu kör vi,fika-nu-kor-vi,",
             },
             set(rows),

@@ -63,6 +63,10 @@ __all__ = (
 logger = getLogger(__name__)
 
 
+def _rnd_role_id():
+    return "".join(sample(ascii_lowercase, 8))
+
+
 class MeetingRoles(Roles, MeetingContext):
     """Contains assigned meeting roles for a specific meeting and user"""
 
@@ -380,20 +384,15 @@ class MeetingGroup(BaseContent, MeetingContext):
 
     def save(self, **kwargs):
         if not self.groupid:
-            if self.meeting.organisation is None:  # For testing
-                user_qs = User.objects.all()
-            else:
-                user_qs = self.meeting.organisation.users.all()
-            group_qs = self.meeting.groups.all()
-            base = groupid = slugify(self.title)
-            for i in count(1):
-                if not (
-                    user_qs.filter(userid=groupid).exists()
-                    or group_qs.filter(groupid=groupid).exists()
-                ):
+            existing_groupids = self.meeting.groups.all().values_list(
+                "groupid", flat=True
+            )
+            base = groupid = slugify(self.title) or _rnd_role_id()
+            for i in range(5):
+                if groupid not in existing_groupids:
                     self.groupid = groupid
                     break
-                groupid = f"{base}-{i}"
+                groupid = f"{base}-{i+1}"
         if not self.title:
             self.title = self.groupid
         super().save(**kwargs)
@@ -416,10 +415,6 @@ class MeetingGroup(BaseContent, MeetingContext):
     discussions: models.QuerySet
     memberships: models.QuerySet[GroupMembership]
     objects: models.Manager[MeetingGroup]
-
-
-def _rnd_role_id():
-    return "".join(sample(ascii_lowercase, 8))
 
 
 class GroupRole(MeetingContext):

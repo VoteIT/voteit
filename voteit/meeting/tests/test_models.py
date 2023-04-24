@@ -136,18 +136,6 @@ class MeetingGroupTests(TestCase):
         self.assertEqual(group2.groupid, "kings-college")
         self.assertEqual(group3.groupid, "kings-college-1")
 
-    def test_unique_with_userid(self):
-        self.organisation.users.create(
-            first_name="King's",
-            last_name="College",
-            username="the-kings",
-            userid="kings-college",
-        )
-        group = self.MeetingGroup.objects.create(
-            title="King's College", meeting=self.meetings[0]
-        )
-        self.assertEqual(group.groupid, "kings-college-1")
-
     def test_max_votes_and_membership(self):
         meeting = self.meetings[0]
         group = meeting.groups.create(title="Voters", votes=3)

@@ -50,10 +50,10 @@ class MeetingJoinedSignalTests(TestCase):
     def test_signal_send_after_invite_used(self):
         @receiver(self._fut)
         def my_listener(user, **kw):
-            one = self.meeting.invites.filter(invite_data="blaha").first()
+            one = self.meeting.invites.filter(user_data={"boo": "Hoo"}).first()
             self.assertEqual(one.state, "accepted")
 
-        invite = self.meeting.invites.create(invite_data="blaha", created_by=self.user)
+        invite = self.meeting.invites.create(user_data={"boo": "Hoo"})
         with FakeCommit():
             invite.accept(self.user)
             invite.save()

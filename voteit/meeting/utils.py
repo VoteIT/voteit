@@ -21,12 +21,15 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-def collect_meeting(meeting: Meeting, exclude: list[type[Model]] = ()):
+def collect_meeting(meeting: Meeting, *, exclude: list[type[Model]] = ()):
     content_reg = get_content_registry()
     collector = get_inf_collector()
     collector.EXCLUDE_MODELS = []
     for m in exclude:
-        collector.EXCLUDE_MODELS.append(content_reg.get_natural_key(m))
+        nat_key = content_reg.get_natural_key(m)
+        if not nat_key:
+            raise ValueError(f"{m} got bad natural key")
+        collector.EXCLUDE_MODELS.append(nat_key)
     collector.collect(meeting)
     related_objects = collector.get_collected_objects()
     return get_model_formatted_dict(related_objects)
@@ -65,7 +68,13 @@ def get_default_models_ignored_on_clone() -> set[type[Model]]:
     >>> None not in items
     True
     """
-    ignore = {get_model_by_shortname(x) for x in get_default_ignored_on_clone()}
+    ignore = set()
+    for shortname in get_default_ignored_on_clone():
+        model = get_model_by_shortname(shortname)
+        if model:
+            ignore.add(model)
+        else:
+            logger.warning(f"{shortname} returned no model")
     ignore.add(ContentType)
     return ignore
 
