@@ -7,17 +7,9 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        # ('meeting', '0018_meetingdialectproxy'),
         ("invites", "0007_auto_20230422_1730"),
     ]
 
     operations = [
-        # We'll keep this in its own migration to be able to manually muck about with invites that
-        # won't work
-        migrations.AddConstraint(
-            model_name="meetinginvite",
-            constraint=models.UniqueConstraint(
-                fields=("meeting", "user_data"), name="unique_meeting_invite_user_data"
-            ),
-        ),
+        # Blanked this migration so constraint end up last
     ]

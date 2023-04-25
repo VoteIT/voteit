@@ -7,7 +7,6 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        # ('meeting', '0018_meetingdialectproxy'),
         ("invites", "0008_auto_20230422_1734"),
     ]
 
@@ -51,12 +50,5 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-        ),
-        migrations.AddConstraint(
-            model_name="meetinggroupannotation",
-            constraint=models.UniqueConstraint(
-                fields=("meeting_group", "meeting_invite"),
-                name="unique_invite_group_annotation",
-            ),
         ),
     ]
