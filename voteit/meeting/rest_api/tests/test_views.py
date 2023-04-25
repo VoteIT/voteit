@@ -272,6 +272,17 @@ class MeetingGroupViewSetTests(APITestCase):
         response = self.client.delete(url)
         self.assertEqual(204, response.status_code)
 
+    def test_delete_with_related_proposal(self):
+        prop = self.meeting_group.proposals.create()
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.delete(url)
+        self.assertEqual(403, response.status_code)
+        self.assertEqual(
+            {"detail": "Meeting group us author of proposals and/or discussion posts"},
+            response.json(),
+        )
+
     def test_delete_archived_meeting(self):
         self.meeting.archive()
         self.meeting.save()

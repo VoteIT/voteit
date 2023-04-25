@@ -3,6 +3,7 @@ import csv
 from django.db import transaction
 from django.db.models import QuerySet
 from django.db.models import F
+from django.db.models import RestrictedError
 from django.http import Http404
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -155,6 +156,15 @@ class MeetingGroupViewSet(DefaultModelViewSet):
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         return super().update(request, *args, **kwargs)
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except RestrictedError as exc:
+            raise PermissionDenied(
+                "Meeting group us author of proposals and/or discussion posts"
+            ) from exc
 
 
 @router.register("group-memberships", basename="group-memberships")

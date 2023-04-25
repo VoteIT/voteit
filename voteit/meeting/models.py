@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from voteit.poll.abcs import GroupVoteElectoralRegisterPolicy
     from voteit.organisation.models import Organisation
     from voteit.participant_number.models import PNSystem
-    from voteit.presence.models import PresenceSystem
+    from voteit.proposal.models import Proposal
     from voteit.presence.models import PresenceCheck
     from voteit.speaker.models import SpeakerListSystem
     from voteit.proposal.abcs import ProposalIDPolicy
@@ -410,7 +410,7 @@ class MeetingGroup(BaseContent, MeetingContext):
     }
 
     # Type annotations - relations
-    proposals: models.QuerySet
+    proposals: models.QuerySet[Proposal]
     discussions: models.QuerySet
     memberships: models.QuerySet[GroupMembership]
     objects: models.Manager[MeetingGroup]
