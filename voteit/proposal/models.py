@@ -50,7 +50,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     )
     meeting_group: MeetingGroup = models.ForeignKey(
         "meeting.MeetingGroup",
-        on_delete=models.SET_NULL,
+        on_delete=models.RESTRICT,
         null=True,
         blank=True,
         related_name="proposals",
