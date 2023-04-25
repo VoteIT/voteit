@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from contextlib import suppress
+
 from django.contrib import messages
 from typing import TYPE_CHECKING
 
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db import models
 from django.http import HttpResponse
 from django.http import HttpResponseRedirect
 from django.template import loader
@@ -102,6 +106,38 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
             "admin:meeting_meeting_change", kwargs={"object_id": cloned_meeting.pk}
         )
         return HttpResponseRedirect(url)
+
+
+class MeetingFilter(admin.SimpleListFilter):
+    title = "Meeting"
+    parameter_name = "meeting"
+    search_param = "meeting"
+
+    def lookups(self, request, model_admin):
+        """
+        URL query str + Human-readable
+        """
+        val = request.GET.get("meeting", None)
+        if val:
+            return ((val, "Specific meeting"),)
+
+    def queryset(self, request, queryset):
+        """
+        Returns the filtered queryset based on the value
+        provided in the query string and retrievable via
+        `self.value()`.
+        """
+        v = self.value()
+        if v:
+            with suppress(TypeError, ValueError):
+                pk = int(v)
+                return queryset.filter(**{self.search_param: pk})
+            messages.add_message(request, messages.ERROR, "Not a valid meeting filter")
+        return queryset
+
+
+class MeetingViaAIFilter(MeetingFilter):
+    search_param = "agenda_item__meeting"
 
 
 class DialectFilter(admin.SimpleListFilter):
@@ -205,14 +241,31 @@ class MeetingDialectProxyAdmin(MeetingAdmin):
 class MeetingAdminMixin:
     @admin.display(description="Meeting")
     def meeting_link(self, obj: MeetingContext):
-        if obj.meeting:
-            viewname = "admin:meeting_meeting_change"
+        viewname = "admin:meeting_meeting_change"
+        meeting_pk = getattr(obj, "meeting_id", obj.meeting.pk)
+        if meeting_pk:
             try:
-                link = reverse(viewname, args=[obj.meeting.pk])
+                link = reverse(viewname, args=[meeting_pk])
             except NoReverseMatch:
-                return "%s" % obj.meeting
-            return format_html('<a href="{}">{}</a>', link, obj.meeting)
+                return "%s" % meeting_pk
+            return format_html(
+                '<a href="{}">{}</a>',
+                link,
+                getattr(obj, "m_title", meeting_pk),
+            )
         return "-"
+
+    def annotate_meeting(
+        self, qs: models.QuerySet, title_attr="meeting__title", pk_attr=None
+    ):
+        """
+        Add meeting pk with same attr as other fields will have meeting relation to qs in case of no direct relation.
+
+        """
+        qs = qs.annotate(m_title=models.F(title_attr))
+        if pk_attr:
+            qs = qs.annotate(meeting_id=models.F(title_attr))
+        return qs
 
 
 @admin.register(MeetingRoles)

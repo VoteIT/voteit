@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db import models
 from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.meeting.admin import MeetingAdminMixin
@@ -18,6 +19,10 @@ class SLSystemAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
         "title",
         "meeting",
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return self.annotate_meeting(qs)
 
 
 @admin.register(SpeakerList)
@@ -40,6 +45,14 @@ class SLAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
         "meeting__title",
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return self.annotate_meeting(
+            qs,
+            title_attr="speaker_system__meeting__title",
+            pk_attr="speaker_system__meeting_id",
+        )
+
     @admin.display(description="Current", boolean=True)
     def is_current(self, sl: SpeakerList):
         return bool(sl.current)
@@ -60,3 +73,9 @@ class SpeakerSystemRolesAdmin(MeetingAdminMixin, admin.ModelAdmin):
         "user__first_name",
         "user__userid",
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return self.annotate_meeting(
+            qs, title_attr="context__meeting__title", pk_attr="context__meeting_id"
+        )

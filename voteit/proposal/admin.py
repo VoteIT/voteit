@@ -3,6 +3,7 @@ from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.agenda.admin import AgendaItemAdminMixin
 from voteit.meeting.admin import MeetingAdminMixin
+from voteit.meeting.admin import MeetingViaAIFilter
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
@@ -24,6 +25,7 @@ class ProposalAdmin(
     )
     list_filter = (
         "state",
+        MeetingViaAIFilter,
         "author__organisation",
     )
     search_fields = (
@@ -45,8 +47,15 @@ class ProposalAdmin(
     )
     exclude = ("state",)
 
-    def agenda_item(self, obj):
-        raise Exception("bla")
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = self.annotate_meeting(
+            qs,
+            title_attr="agenda_item__meeting__title",
+            pk_attr="agenda_item__meeting_id",
+        )
+        qs = self.annotate_ai(qs)
+        return qs.prefetch_related("author")
 
 
 @admin.register(DiffProposal)
@@ -63,6 +72,7 @@ class DiffProposalAdmin(ProposalAdmin):
     )
     list_filter = (
         "state",
+        MeetingViaAIFilter,
         "author__organisation",
     )
     search_fields = (
@@ -84,6 +94,16 @@ class DiffProposalAdmin(ProposalAdmin):
     )
     exclude = ("state",)
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = self.annotate_meeting(
+            qs,
+            title_attr="agenda_item__meeting__title",
+            pk_attr="agenda_item__meeting_id",
+        )
+        qs = self.annotate_ai(qs)
+        return qs.prefetch_related("author")
+
 
 @admin.register(TextDocument)
 class TextDocumentAdmin(MeetingAdminMixin, AgendaItemAdminMixin, admin.ModelAdmin):
@@ -93,7 +113,10 @@ class TextDocumentAdmin(MeetingAdminMixin, AgendaItemAdminMixin, admin.ModelAdmi
         "agenda_item_link",
         "base_tag",
     )
-    list_filter = ("agenda_item__meeting__organisation",)
+    list_filter = (
+        MeetingViaAIFilter,
+        "agenda_item__meeting__organisation",
+    )
     search_fields = (
         "body",
         "base_tag",
@@ -101,3 +124,12 @@ class TextDocumentAdmin(MeetingAdminMixin, AgendaItemAdminMixin, admin.ModelAdmi
         "agenda_item__meeting__title",
     )
     autocomplete_fields = ("agenda_item",)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = self.annotate_meeting(
+            qs,
+            title_attr="agenda_item__meeting__title",
+            pk_attr="agenda_item__meeting_id",
+        )
+        return self.annotate_ai(qs)

@@ -19,6 +19,10 @@ class ReactionButtonAdmin(MeetingAdminMixin, admin.ModelAdmin):
         "title",
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return self.annotate_meeting(qs)
+
 
 @admin.register(Reaction)
 class ReactionAdmin(admin.ModelAdmin):
