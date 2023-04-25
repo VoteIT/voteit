@@ -350,7 +350,6 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     objects = Manager()
     groups: models.QuerySet
     invites: models.QuerySet
-    invite_dispatches: models.QuerySet
     electoral_registers: models.QuerySet
     agenda_items: models.QuerySet
     last_read_set: models.QuerySet

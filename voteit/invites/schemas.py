@@ -135,46 +135,8 @@ class AddTypedInvitesSchema(InvitesMetaMixinSchema):
         return results
 
 
-class AddAnnotatedInvitesSchema(InvitesMetaMixinSchema):
-    r"""<- Note raw string for doctests here!
+class RowColInvitesBaseSchema(BaseModel):
 
-    Initial validation before touching the db. Very basic checks.
-    The structure will be transformed later on to relevant data structure.
-
-    >>> base_qs = {'meeting': 1, 'roles': ['participant']}
-
-    Single line
-    >>> AddAnnotatedInvitesSchema(columns=['email'], rows=[["one@betahaus.net"], ["two@betahaus.net"]], **base_qs).dict(exclude_unset=True, exclude={'meeting', 'roles'})
-    {'columns': ['email'], 'rows': [['one@betahaus.net'], ['two@betahaus.net']]}
-
-    Strip whitespace - preflight handles other conversions
-    >>> AddAnnotatedInvitesSchema(columns=['email'], rows="one@betahaus.net   \n   tWo@betahaus.net", **base_qs).dict(exclude_unset=True, exclude={'meeting', 'roles'})
-    {'columns': ['email'], 'rows': [['one@betahaus.net'], ['two@betahaus.net']]}
-
-    Strip shouldn't mess up validators
-    >>> AddAnnotatedInvitesSchema(columns=['email'], rows="one@betahaus.net   \n   one@betahaus.net", **base_qs)
-    Traceback (most recent call last):
-    ...
-    pydantic.error_wrappers.ValidationError: 1 validation error for AddAnnotatedInvitesSchema
-    rows
-      the list has duplicated items (type=value_error.list.unique_items)
-
-    Invites with intersections are problematic too, so we'll block those
-    >>> AddAnnotatedInvitesSchema(columns=['email', 'swedish_ssn'], rows=[['a@boo.com', '121212-1212'],['a@boo.com']], **base_qs)
-    Traceback (most recent call last):
-    ...
-    pydantic.error_wrappers.ValidationError: 1 validation error for AddAnnotatedInvitesSchema
-    rows
-      The value email=a@boo.com is used within different subsets of user data. Offending row: 1 (type=value_error)
-
-    And a problematic mix
-    >>> AddAnnotatedInvitesSchema(columns=['email', 'swedish_ssn'], rows=[['a@boo.com', '121212-1212'],['a@boo.com', '20200101-2398']], **base_qs)
-    Traceback (most recent call last):
-    ...
-    pydantic.error_wrappers.ValidationError: 1 validation error for AddAnnotatedInvitesSchema
-    rows
-      The value email=a@boo.com is used within different subsets of user data. Offending row: 1 (type=value_error)
-    """
     columns: conlist(
         constr(
             strip_whitespace=True,
@@ -211,24 +173,9 @@ class AddAnnotatedInvitesSchema(InvitesMetaMixinSchema):
         return v
 
     @validator("columns")
-    def validate_columns(cls, v: list[str]):
+    def validate_columns_requirements(cls, v: list[str]):
         reg = get_invite_adapter_registry()
         reg.check_column_req(v)
-        return v
-
-    @validator("rows")
-    def check_row_len(cls, v: list[list[str]], values: dict):
-        col_len = len(values.get("columns", []))
-        i = 1
-        too_long = []
-        for row in v:
-            if len(row) > col_len:
-                too_long.append(i)
-            i += 1
-        if too_long:
-            raise ValueError(
-                f"The following rows have more columns than they should have: {too_long[:10]}"
-            )
         return v
 
     @validator("rows")
@@ -242,3 +189,60 @@ class AddAnnotatedInvitesSchema(InvitesMetaMixinSchema):
         reg = get_invite_adapter_registry()
         reg.check_intersections(values["columns"], v)
         return v
+
+
+class AddMixedUserDataInvitesSchema(RowColInvitesBaseSchema, InvitesMetaMixinSchema):
+    r"""<- Note raw string for doctests here!
+
+    Initial validation before touching the db. Very basic checks.
+    The structure will be transformed later on to relevant data structure.
+
+    >>> base_qs = {'meeting': 1, 'roles': ['participant']}
+
+    Single line
+    >>> AddMixedUserDataInvitesSchema(columns=['email'], rows=[["one@betahaus.net"], ["two@betahaus.net"]], **base_qs).dict(exclude_unset=True, exclude={'meeting', 'roles'})
+    {'columns': ['email'], 'rows': [['one@betahaus.net'], ['two@betahaus.net']]}
+
+    Strip whitespace - preflight handles other conversions
+    >>> AddMixedUserDataInvitesSchema(columns=['email'], rows="one@betahaus.net   \n   tWo@betahaus.net", **base_qs).dict(exclude_unset=True, exclude={'meeting', 'roles'})
+    {'columns': ['email'], 'rows': [['one@betahaus.net'], ['two@betahaus.net']]}
+
+    Strip shouldn't mess up validators
+    >>> AddMixedUserDataInvitesSchema(columns=['email'], rows="one@betahaus.net   \n   one@betahaus.net", **base_qs)
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 1 validation error for AddAnnotatedInvitesSchema
+    rows
+      the list has duplicated items (type=value_error.list.unique_items)
+
+    Invites with intersections are problematic too, so we'll block those
+    >>> AddMixedUserDataInvitesSchema(columns=['email', 'swedish_ssn'], rows=[['a@boo.com', '121212-1212'],['a@boo.com']], **base_qs)
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 1 validation error for AddAnnotatedInvitesSchema
+    rows
+      The value email=a@boo.com is used within different subsets of user data. Offending row: 1 (type=value_error)
+
+    And a problematic mix
+    >>> AddMixedUserDataInvitesSchema(columns=['email', 'swedish_ssn'], rows=[['a@boo.com', '121212-1212'],['a@boo.com', '20200101-2398']], **base_qs)
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 1 validation error for AddAnnotatedInvitesSchema
+    rows
+      The value email=a@boo.com is used within different subsets of user data. Offending row: 1 (type=value_error)
+    """
+
+
+class AddInviteAnnotationsSchema(RowColInvitesBaseSchema):
+    meeting: int
+
+
+class InvitesResultSchema(BaseModel):
+    added: int = 0
+    changed: int = 0
+    existed: int = 0
+
+
+class AnnotationResultSchema(InvitesResultSchema):
+    name: str
+    msg: str | None

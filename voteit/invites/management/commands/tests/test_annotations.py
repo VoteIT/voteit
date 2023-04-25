@@ -29,15 +29,22 @@ class InviteAnnotationsIntegrationTests(TestCase):
         cls.fixtures_dir = os.path.join(
             os.path.dirname(os.path.abspath(voteit.invites.tests.__file__)), "fixtures"
         )
+        call_command(
+            "add_mixed_invites",
+            m=cls.meeting.pk,
+            u=1,
+            f=cls.fixture_file("grouprole.csv"),
+        )
 
-    def fixture_file(self, filename):
-        return os.path.join(self.fixtures_dir, filename)
+    @classmethod
+    def fixture_file(cls, filename):
+        return os.path.join(cls.fixtures_dir, filename)
 
     def call_command(self, *args, **kwargs):
         out = StringIO()
         kwargs.setdefault("q", True)
         call_command(
-            "add_annotated_invites",
+            "add_annotations",
             *args,
             stdout=out,
             **kwargs,

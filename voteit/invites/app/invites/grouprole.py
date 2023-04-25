@@ -8,6 +8,7 @@ from pydantic import constr
 from voteit.invites.abcs import AnnotationDataAdapter
 from voteit.invites.app.invites.group import InviteGroup
 from voteit.invites.registries import invite_adapter_registry
+from voteit.invites.schemas import AnnotationResultSchema
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet

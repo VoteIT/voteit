@@ -15,6 +15,7 @@ from voteit.invites.abcs import InviteUserDataAdapter
 
 if TYPE_CHECKING:
     from voteit.invites.models import MeetingInvite
+    from voteit.invites.schemas import AnnotationResultSchema
     from voteit.meeting.models import Meeting
 
 T = TypeVar("T")
@@ -193,13 +194,12 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
                 if columns[i] in self.user_data_keys
             }.items(), {columns[i]: x for i, x in enumerate(row)}
 
-    def get_annotations(self, columns: list[str]) -> set[type[AnnotationDataAdapter]]:
-        result = set()
-        annotation_keys = set(columns) - self.user_data_keys
-        for k in annotation_keys:
+    def get_annotations(self, columns: list[str]) -> list[type[AnnotationDataAdapter]]:
+        result = []
+        for k in columns:
             v = self[k]
-            if v.is_annotation:
-                result.add(v)
+            if v.is_annotation and k not in result:
+                result.append(v)
         return result
 
     def run_validators(
@@ -216,11 +216,11 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
         rows: list[list[str]],
         invites_qs: models.QuerySet[MeetingInvite],
         meeting: Meeting,
-    ):
+    ) -> Generator[AnnotationResultSchema, None]:
         annotations_formatted = list(self.format_for_annotations(columns, rows))
         for adapter in self.get_annotations(columns):
             # Yield results, display progress etc?
-            adapter.annotate(
+            yield adapter.annotate(
                 columns=columns,
                 rows=rows,
                 invites_qs=invites_qs,

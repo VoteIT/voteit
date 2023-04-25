@@ -3,21 +3,25 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.core.management import BaseCommand
+
 from voteit.invites.management.commands.base import BaseInvitesCommandMixin
-from voteit.invites.messages import AddInvites
+from voteit.invites.messages import AddInviteAnnotations
 from voteit.meeting.models import Meeting
 
-
 if TYPE_CHECKING:
-    from voteit.core.models import User as UserType
+    ...
+    # from voteit.core.models import User as UserType
 
 
 class Command(BaseCommand, BaseInvitesCommandMixin):
-    help = "Create meeting invites. Either piped data or from file."
+    help = "Create meeting invites with different user data types. Either piped data or from file."
 
     def add_arguments(self, parser):
         self.add_base_arguments(parser)
-        parser.add_argument("-t", help="Invite type", default="email")
+        parser.add_argument(
+            "--cols",
+            help="Columns, comma separated. Must be specified unless first line is cols",
+        )
 
     def handle(self, *args, **options):
         self.quiet = options.get("q")
@@ -31,15 +35,22 @@ class Command(BaseCommand, BaseInvitesCommandMixin):
         self.report(
             "Note! This command will freeze if you haven't piped any data to STDIN or specified a file. Exit in that case."
         )
-        user_data = self.get_data(options)
-        command = AddInvites(
+        rows = self.get_data(options)
+        cols = options.get("cols")
+        if cols:
+            cols = cols.split(",")
+        else:
+            cols = rows.pop(0).split("\t")
+        command = AddInviteAnnotations(
             mm={"user_pk": options.get("u")},
             meeting=meeting.pk,
-            roles=roles,
-            user_data=user_data,
+            rows=rows,
+            columns=cols,
         )
         command.context = meeting
-        result = self.run_cmd(command, options)
-        self.report(
-            f"Added: {result.data.added} \nChanged: {result.data.changed} \nExisted: {result.data.existed}"
-        )
+        for result in self.run_cmd(command, options):
+            if result:
+                self.report(
+                    f"Annotation {result.name}\n"
+                    f"Added: {result.data.added} \nChanged: {result.data.changed} \nExisted: {result.data.existed}"
+                )

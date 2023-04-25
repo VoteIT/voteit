@@ -144,46 +144,46 @@ class MeetingInviteManagerTests(TestCase):
             {ROLE_PARTICIPANT, ROLE_DISCUSSER}, self.meeting.get_roles(self.user)
         )
 
-    def test_find_multi_user_data_exact(self):
-        exact, bogus = self.meeting.invites.find_multi_user_data(
+    def test_find_mixed_user_data_exact(self):
+        exact, bogus = self.meeting.invites.find_mixed_user_data(
             {"email": "a@betahaus.net", "swedish_ssn": "121212-1212"}
         )
         self.assertEqual({self.inv1}, set(exact))
         self.assertEqual({}, bogus)
 
-    def test_find_multi_user_data_problematic_clash(self):
-        exact, bogus = self.meeting.invites.find_multi_user_data(
+    def test_find_mixed_user_data_problematic_clash(self):
+        exact, bogus = self.meeting.invites.find_mixed_user_data(
             {"email": "a@betahaus.net", "swedish_ssn": "abc-404"}
         )
         self.assertEqual(set(), set(exact))
         self.assertEqual({self.inv1}, set(bogus.get("email", [])))
 
-    def test_find_multi_user_data_has_more_data_we_dont_query(self):
-        exact, bogus = self.meeting.invites.find_multi_user_data(
+    def test_find_mixed_user_data_has_more_data_we_dont_query(self):
+        exact, bogus = self.meeting.invites.find_mixed_user_data(
             {"email": "a@betahaus.net"}
         )
         self.assertEqual({self.inv1}, set(exact))
         self.assertEqual({}, bogus)
 
-    def test_find_multi_user_data_odd_intersection(self):
+    def test_find_mixed_user_data_odd_intersection(self):
         # Note: This should never be saved in the database
         self.inv2.user_data["swedish_ssn"] = "121212-1212"
         self.inv2.save()
-        exact, bogus = self.meeting.invites.find_multi_user_data(
+        exact, bogus = self.meeting.invites.find_mixed_user_data(
             {"email": "a@betahaus.net", "swedish_ssn": "121212-1212"},
             {"email": "b@betahaus.net", "swedish_ssn": "121212-1212"},
         )
         self.assertEqual({self.inv1, self.inv2}, set(exact))
         self.assertEqual({}, bogus)
 
-    def test_find_multi_user_data_meeting_filter_not_applied(self):
+    def test_find_mixed_user_data_meeting_filter_not_applied(self):
         with self.assertRaises(IntegrityError) as cm:
-            MeetingInvite.objects.find_multi_user_data({"email": "jeff@barnes.com"})
+            MeetingInvite.objects.find_mixed_user_data({"email": "jeff@barnes.com"})
         self.assertEqual("Queryset doesn't contain meeting filter", str(cm.exception))
 
-    def test_test_find_multi_user_data_meeting_filter_not_applied(self):
+    def test_test_find_mixed_user_data_meeting_filter_not_applied(self):
         with self.assertRaises(IntegrityError) as cm:
-            MeetingInvite.objects.find_multi_user_data({"email": "jeff@barnes.com"})
+            MeetingInvite.objects.find_mixed_user_data({"email": "jeff@barnes.com"})
         self.assertEqual("Queryset doesn't contain meeting filter", str(cm.exception))
 
     def test_create_or_update_mixed(self):
@@ -199,6 +199,28 @@ class MeetingInviteManagerTests(TestCase):
             ],
             roles=[ROLE_PARTICIPANT, ROLE_DISCUSSER],
         )
+
+    def test_create_or_update_mixed_removes_role(self):
+        self.inv1.roles = [ROLE_PARTICIPANT, ROLE_DISCUSSER, ROLE_PROPOSER]
+        self.inv1.accept(self.user)
+        self.inv1.save()
+        self.assertEqual(
+            {ROLE_PARTICIPANT, ROLE_DISCUSSER, ROLE_PROPOSER},
+            self.meeting.get_roles(self.user),
+        )
+        self.meeting.invites.create_or_update_mixed(
+            meeting=self.meeting,
+            data=[
+                {"email": "a@betahaus.net", "swedish_ssn": "121212-1212"},
+                {"email": "jeff@betahaus.net"},
+                {
+                    "email": "new@betahaus.net",
+                    "swedish_ssn": "123",  # Data isn't validated here
+                },
+            ],
+            roles=[ROLE_PARTICIPANT],
+        )
+        self.assertEqual({ROLE_PARTICIPANT}, self.meeting.get_roles(self.user))
 
     def test_create_or_update_mixed_problematic_clash(self):
         with self.assertRaises(IntegrityError) as cm:

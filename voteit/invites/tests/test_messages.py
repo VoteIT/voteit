@@ -16,6 +16,8 @@ from voteit.invites.messages import MeetingInviteChanged
 from voteit.invites.models import MeetingInvite
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 if TYPE_CHECKING:
     from voteit.invites.messages import AddInvites
@@ -29,6 +31,10 @@ _channel_layers_setting = {
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AddInvitesTests(TestCase):
     fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
 
     @property
     def _cut(self):
@@ -63,7 +69,7 @@ class AddInvitesTests(TestCase):
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_add_modifies_already_existing_invites(self, mock_publish):
-        meeting: Meeting = Meeting.objects.get(pk=1)  # From fixture
+        meeting = self.meeting
         moderator = User.objects.get(username="moderator")
         diffing_data_invite: MeetingInvite = meeting.invites.create(
             user_data={"email": "one@betahaus.net"},
@@ -93,6 +99,32 @@ class AddInvitesTests(TestCase):
         self.assertEqual(["participant"], changed_msg.data.roles)
         added_msg = mock_publish.mock_calls[2].args[0]
         self.assertIsInstance(added_msg, MeetingInviteAdded)
+
+    @patch.object(MeetingInvitesChannel, "sync_publish")
+    def test_add_partial_match(self, mock_publish):
+        moderator = User.objects.get(username="moderator")
+        multi_invite: MeetingInvite = self.meeting.invites.create(
+            user_data={"email": "one@betahaus.net", "swedish_ssn": "121212-1212"},
+            roles=[ROLE_POTENTIAL_VOTER],  # This will change
+        )
+        mock_publish.reset_mock()
+        data = []
+        for name in ["one", "two", "three"]:
+            data.append(f"{name}@betahaus.net")
+        msg = self._mk_one(
+            user_pk=moderator.pk,
+            user_data=data,
+            type="email",
+            roles=[str(ROLE_PARTICIPANT)],
+        )
+        with FakeCommit():
+            response = msg.run_job()
+        self.assertEqual({"added": 2, "changed": 1, "existed": 0}, response.data.dict())
+        # Check pushes
+        self.assertTrue(mock_publish.called)
+        self.assertEqual(3, len(mock_publish.mock_calls))
+        multi_invite.refresh_from_db()
+        self.assertEqual([ROLE_PARTICIPANT], multi_invite.roles)
 
 
 # @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

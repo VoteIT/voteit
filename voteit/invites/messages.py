@@ -6,16 +6,18 @@ from typing import TYPE_CHECKING
 
 from auditlog.context import set_actor
 from django.db import transaction
-from pydantic.main import BaseModel
-
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
+from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
 
 from voteit.invites.permissions import MeetingInvitePermissions
-from voteit.invites.schemas import AddAnnotatedInvitesSchema
+from voteit.invites.schemas import AddMixedUserDataInvitesSchema
 from voteit.invites.schemas import AddTypedInvitesSchema
+from voteit.invites.schemas import AddInviteAnnotationsSchema
+from voteit.invites.schemas import AnnotationResultSchema
+from voteit.invites.schemas import InvitesResultSchema
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.meeting.models import Meeting
 from voteit.messaging.base import BaseObjectAdded
@@ -67,11 +69,11 @@ class AddInvites(ContextAction):
 
 
 @incoming
-class AddAnnotatedInvites(ContextAction):
-    name = "invites.add_annotated"
+class AddMixedInvites(ContextAction):
+    name = "invites.add_mixed"
     permission = MeetingInvitePermissions.ADD
-    schema = AddAnnotatedInvitesSchema
-    data: AddAnnotatedInvitesSchema
+    schema = AddMixedUserDataInvitesSchema
+    data: AddMixedUserDataInvitesSchema
     model = Meeting
     context_schema_attr = "meeting"
     job_timeout = 40
@@ -87,7 +89,54 @@ class AddAnnotatedInvites(ContextAction):
         items = list(
             self.invite_data_reg.build_ud_query_seq(self.data.columns, self.data.rows)
         )
-        existing_qs, partial = self.context.invites.find_multi_user_data(*items)
+        existing_qs, partial = self.context.invites.find_mixed_user_data(*items)
+        if partial:
+            msg = "Found partial matches, aborting. Matched types:\n"
+            for k, v in partial:
+                msg += f"{k}: {v.count()}\n"
+            raise BadRequestError.from_message(
+                self,
+                msg=msg,
+            )
+        # FIXME: How do we handle longer rows? Do we need to kill msg because of it?
+        with set_actor(self.user):
+            with transaction.atomic(durable=True):
+                result = self.context.invites.create_or_update_mixed(
+                    data=items, roles=self.data.roles, meeting=self.context
+                )
+        response = InvitesAdded.from_message(
+            self,
+            added=result.added,
+            changed=result.changed,
+            existed=result.existed,
+        )
+        if response.mm.consumer_name:  # In case it was run by a script
+            websocket_send(response, state=response.SUCCESS)
+        return response
+
+
+@incoming
+class AddInviteAnnotations(ContextAction):
+    name = "invites.add_annotations"
+    permission = MeetingInvitePermissions.ADD
+    schema = AddInviteAnnotationsSchema
+    data: AddInviteAnnotationsSchema
+    model = Meeting
+    context_schema_attr = "meeting"
+    job_timeout = 40
+    atomic = False
+
+    @cached_property
+    def invite_data_reg(self) -> InviteAdapterRegistry:
+        return get_invite_adapter_registry()
+
+    def run_job(self) -> list[AnnotationResult, None]:
+        self.assert_perm()
+        self.validate()  # FIXME
+        items = list(
+            self.invite_data_reg.build_ud_query_seq(self.data.columns, self.data.rows)
+        )
+        existing_qs, partial = self.context.invites.find_mixed_user_data(*items)
         if partial:
             msg = "Found partial matches, aborting. Matched types:\n"
             for k, v in partial:
@@ -105,40 +154,42 @@ class AddAnnotatedInvites(ContextAction):
                 self,
                 msg=str(exc),
             )
+        results = []
         with set_actor(self.user):
             with transaction.atomic(durable=True):
-                result = self.context.invites.create_or_update_mixed(
-                    data=items, roles=self.data.roles, meeting=self.context
-                )
-                invites_qs = self.context.invites.filter(pk__in=result.pks)
-                self.invite_data_reg.run_annotations(
+                for annotation_result in self.invite_data_reg.run_annotations(
                     columns=self.data.columns,
                     rows=self.data.rows,
-                    invites_qs=invites_qs,
+                    invites_qs=existing_qs,
                     meeting=self.context,
-                )
-        response = InvitesAdded.from_message(
-            self,
-            added=result.added,
-            changed=result.changed,
-            existed=result.existed,
-        )
+                ):
+                    if annotation_result is None:
+                        results.append(None)
+                    else:
+                        msg = AnnotationResult.from_message(
+                            self, data=annotation_result.dict()
+                        )
+                        results.append(msg)
+                        if msg.mm.consumer_name:  # In case it was run by a script
+                            websocket_send(msg, state=self.RUNNING, on_commit=False)
+        response = Status.from_message(self)
         if response.mm.consumer_name:  # In case it was run by a script
             websocket_send(response, state=response.SUCCESS)
-        return response
-
-
-class InvitesAddedSchema(BaseModel):
-    added: int = 0
-    changed: int = 0
-    existed: int = 0
+        return results
 
 
 @outgoing
 class InvitesAdded(Message):
     name = "invites.added"
-    schema = InvitesAddedSchema
-    data: InvitesAddedSchema
+    schema = InvitesResultSchema
+    data: InvitesResultSchema
+
+
+@outgoing
+class AnnotationResult(Message):
+    name = "invites.annotation"
+    schema = AnnotationResultSchema
+    data: AnnotationResultSchema
 
 
 # VALID_STATES = set(SendWf.states.keys()) - {SendWf.SENDING, SendWf.SCHEDULED}

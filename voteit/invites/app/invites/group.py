@@ -9,6 +9,7 @@ from typing import ItemsView
 
 from voteit.invites.abcs import AnnotationDataAdapter
 from voteit.invites.registries import invite_adapter_registry
+from voteit.invites.schemas import AnnotationResultSchema
 from voteit.meeting.models import GroupMembership
 
 if TYPE_CHECKING:
@@ -111,3 +112,5 @@ class InviteGroup(AnnotationDataAdapter):
                             )
             for i in reversed(popthis):
                 local_data.pop(i)
+        # FIXME: Counts
+        return AnnotationResultSchema(name=cls.name)

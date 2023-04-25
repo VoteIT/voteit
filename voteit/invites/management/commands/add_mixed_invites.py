@@ -1,20 +1,12 @@
 from __future__ import annotations
 
-import os
-import sys
-from pprint import pprint
 from typing import TYPE_CHECKING
 
 from django.core.management import BaseCommand
-from django.db import transaction
-from django.db.transaction import get_connection
-from django.test.utils import CaptureQueriesContext
 
-from voteit.core.testing import exectime
 from voteit.invites.management.commands.base import BaseInvitesCommandMixin
-from voteit.invites.messages import AddAnnotatedInvites
+from voteit.invites.messages import AddMixedInvites
 from voteit.meeting.models import Meeting
-
 
 if TYPE_CHECKING:
     ...
@@ -22,7 +14,7 @@ if TYPE_CHECKING:
 
 
 class Command(BaseCommand, BaseInvitesCommandMixin):
-    help = "Create meeting invites with annotations. Either piped data or from file."
+    help = "Create meeting invites with different user data types. Either piped data or from file."
 
     def add_arguments(self, parser):
         self.add_base_arguments(parser)
@@ -49,7 +41,7 @@ class Command(BaseCommand, BaseInvitesCommandMixin):
             cols = cols.split(",")
         else:
             cols = rows.pop(0).split("\t")
-        command = AddAnnotatedInvites(
+        command = AddMixedInvites(
             mm={"user_pk": options.get("u")},
             meeting=meeting.pk,
             roles=roles,

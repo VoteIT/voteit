@@ -128,7 +128,7 @@ class MeetingInviteManager(models.Manager):
         return result
 
     @has_exact_filter("meeting")
-    def find_multi_user_data(
+    def find_mixed_user_data(
         self, *items: dict[str, str]
     ) -> Sequence[
         models.QuerySet[MeetingInvite],
@@ -169,7 +169,7 @@ class MeetingInviteManager(models.Manager):
         """
         Create invites with mixed data
         """
-        exact_qs, conflicting_single_match = self.find_multi_user_data(*data)
+        exact_qs, conflicting_single_match = self.find_mixed_user_data(*data)
         if conflicting_single_match:
             # FIXME: How do we handle this?
             raise IntegrityError("Partial invites found")

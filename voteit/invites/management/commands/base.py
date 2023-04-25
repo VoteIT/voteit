@@ -96,6 +96,4 @@ class BaseInvitesCommandMixin:
             if options.get("dry_run"):
                 self.report("-- DRY RUN - aborting save")
                 transaction.set_rollback(True)
-        self.report(
-            f"Added: {result.data.added} \nChanged: {result.data.changed} \nExisted: {result.data.existed}"
-        )
+        return result

@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from voteit.invites.models import MeetingInvite
     from voteit.meeting.models import Meeting
     from voteit.invites.registries import InviteAdapterRegistry
+    from voteit.invites.schemas import AnnotationResultSchema
 
 
 class InviteDataAdapter(ABC):
@@ -142,7 +143,7 @@ class AnnotationDataAdapter(InviteDataAdapter, ABC):
         annotations_formatted,
         meeting: Meeting,
         **kwargs,
-    ):
+    ) -> AnnotationResultSchema | None:
         """
         Annotate invites if they should have other effects, for instance assigning participant numbers.
         Also take care of existing state, if users have already accepted an invitation.
