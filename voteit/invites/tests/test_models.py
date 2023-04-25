@@ -186,6 +186,12 @@ class MeetingInviteManagerTests(TestCase):
             MeetingInvite.objects.find_mixed_user_data({"email": "jeff@barnes.com"})
         self.assertEqual("Queryset doesn't contain meeting filter", str(cm.exception))
 
+    def test_find_mixed_user_data_without_values(self):
+        with self.assertNumQueries(0):
+            qs, partial = self.meeting.invites.find_mixed_user_data()
+        self.assertFalse(qs.exists())
+        self.assertFalse(partial)
+
     def test_create_or_update_mixed(self):
         self.meeting.invites.create_or_update_mixed(
             meeting=self.meeting,
