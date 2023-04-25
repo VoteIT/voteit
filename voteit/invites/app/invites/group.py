@@ -13,7 +13,6 @@ from voteit.invites.schemas import AnnotationResultSchema
 from voteit.meeting.models import GroupMembership
 
 if TYPE_CHECKING:
-    # from typing.collections import ItemsView
     from django.db.models import QuerySet
     from voteit.invites.models import MeetingInvite
     from voteit.invites.registries import InviteAdapterRegistry
@@ -41,11 +40,46 @@ class InviteGroup(AnnotationDataAdapter):
         """
         Take care of role too since it might be in the dataset
         """
-        annotations = self.invite.group_annotations.all()
+        annotations = self.invite.group_annotations.all().prefetch_related(
+            "meeting_group",
+        )
         for gr in annotations:
-            gr.meeting_group.memberships.update_or_create(
-                user=self.invite.used_by, defaults={"role": gr.group_role}
-            )
+            # FIXME refactor so it's reusable
+            membership = gr.meeting_group.memberships.filter(
+                user=self.invite.used_by
+            ).first()
+            if not membership:
+                # Create, will also signal for role so no problem
+                GroupMembership.objects.create(
+                    user=self.invite.used_by,
+                    meeting_group=gr.meeting_group,
+                    role_id=gr.group_role_id,
+                )
+            else:
+                if membership.role_id and not gr.group_role_id:
+                    # Role removed
+                    old_role = membership.role
+                    membership.role = None
+                    membership.save()
+                    membership.signal_role_removed(role=old_role)
+                elif not membership.role_id and gr.group_role_id:
+                    # Role added
+                    membership.role_id = gr.group_role_id
+                    membership.save()
+                    membership.signal_role_added()
+                elif (
+                    membership.role_id
+                    and gr.group_role_id
+                    and membership.role_id != gr.group_role_id
+                ):
+                    # Changed
+                    old_role = membership.role
+                    membership.role = None
+                    membership.save()
+                    membership.signal_role_removed(role=old_role)
+                    membership.role_id = gr.group_role_id
+                    membership.save()
+                    membership.signal_role_added()
         annotations.delete()
 
     @classmethod
