@@ -65,20 +65,38 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
                 delattr(self, "_user_data_keys")
         super().__setitem__(key, factory)
 
-    def __delattr__(self, key: str):
+    def __delitem__(self, key: str):
         if hasattr(self, "_user_data_keys"):
             delattr(self, "_user_data_keys")
-        super().__delattr__(key)
+        super().__delitem__(key)
 
     @property
     def user_data_keys(self) -> set[str]:
+        """
+        Cached user_data_keys
+        >>> from voteit.invites.app.invites.email import InviteEmail
+        >>> from voteit.invites.app.invites.group import InviteGroup
+        >>> from voteit.invites.app.invites.grouprole import InviteGroupRole
+        >>> from voteit.invites.abcs import InviteDataAdapter
+        >>> testing_reg = InviteAdapterRegistry(InviteDataAdapter)
+        >>> testing_reg.user_data_keys
+        set()
+        >>> _ = testing_reg(InviteGroup)
+        >>> testing_reg.user_data_keys
+        set()
+        >>> _ = testing_reg(InviteEmail)
+        >>> testing_reg.user_data_keys
+        {'email'}
+        >>> del testing_reg[InviteEmail.name]
+        >>> testing_reg.user_data_keys
+        set()
+        """
         with suppress(AttributeError):
             return self._user_data_keys
         keys = set()
         for v in self.values():
             if issubclass(v, InviteUserDataAdapter):
                 keys.add(v.name)
-                # keys.update(v.schema_keys())
         self._user_data_keys = keys
         return keys
 
