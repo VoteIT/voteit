@@ -19,7 +19,7 @@ logger = getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Create meeting invites. Either piped data or from file."
+    help = "Update group memberships from file or piped data."
 
     def get_data(self, options: dict) -> Generator[list[str]]:
         filename = options.get("f")
