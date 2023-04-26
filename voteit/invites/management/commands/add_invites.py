@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.core.management import BaseCommand
+from django.db import transaction
+
 from voteit.invites.management.commands.base import BaseInvitesCommandMixin
 from voteit.invites.messages import AddInvites
 from voteit.meeting.models import Meeting
@@ -39,7 +41,8 @@ class Command(BaseCommand, BaseInvitesCommandMixin):
             user_data=user_data,
         )
         command.context = meeting
-        result = self.run_cmd(command, options)
+        with transaction.atomic(durable=True):
+            result = self.run_cmd(command, options)
         self.report(
             f"Added: {result.data.added} \nChanged: {result.data.changed} \nExisted: {result.data.existed}"
         )

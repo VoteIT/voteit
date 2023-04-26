@@ -1,7 +1,6 @@
 import os
 import sys
 from logging import getLogger
-from pprint import pprint
 
 from django.db import transaction
 from django.db.transaction import get_connection
@@ -82,18 +81,15 @@ class BaseInvitesCommandMixin:
         return data
 
     def run_cmd(self, cmd, options: dict):
-        with transaction.atomic(durable=True):
-            conn = get_connection()
-            with CaptureQueriesContext(connection=conn) as cqc:
-                with exectime() as et:
-                    result = cmd.run_job()
-                if options.get("queries"):
-                    # pprint(cqc.captured_queries)
+        conn = get_connection()
+        with CaptureQueriesContext(connection=conn) as cqc:
+            with exectime() as et:
+                result = cmd.run_job()
+            if options.get("queries"):
+                # pprint(cqc.captured_queries)
 
-                    self.report(
-                        f"Execution time: {et():.4f} secs - queries: {len(cqc)}"
-                    )
-            if options.get("dry_run"):
-                self.report("-- DRY RUN - aborting save")
-                transaction.set_rollback(True)
+                self.report(f"Execution time: {et():.4f} secs - queries: {len(cqc)}")
+        if options.get("dry_run"):
+            self.report("-- DRY RUN - aborting save")
+            transaction.set_rollback(True)
         return result
