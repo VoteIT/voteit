@@ -180,7 +180,10 @@ class MeetingGroupViewSetTests(APITestCase):
         cls.anon = User.objects.create(username="anon")
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.meeting_group: MeetingGroup = MeetingGroup.objects.create(
-            meeting=cls.meeting
+            meeting=cls.meeting, title="one"
+        )
+        cls.meeting_group_two: MeetingGroup = MeetingGroup.objects.create(
+            meeting=cls.meeting, title="two"
         )
 
     def setUp(self):
@@ -247,7 +250,7 @@ class MeetingGroupViewSetTests(APITestCase):
         response = self.client.get(url, data={"meeting": self.meeting.pk})
         self.assertEqual(200, response.status_code)
         data = response.json()
-        self.assertEqual(1, len(data))
+        self.assertEqual(2, len(data))
         self.assertEqual(self.meeting_group.pk, data[0]["pk"])
 
     def test_change(self):
@@ -297,6 +300,70 @@ class MeetingGroupViewSetTests(APITestCase):
         url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
         response = self.client.delete(url)
         self.assertEqual(403, response.status_code)
+
+    def test_delegate_to(self):
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.patch(
+            url, data={"delegate_to": self.meeting_group_two.pk}
+        )
+        self.assertEqual(200, response.status_code)
+        self.meeting_group.refresh_from_db()
+        self.assertEqual(self.meeting_group.delegate_to_id, self.meeting_group_two.pk)
+        # And set null
+        response = self.client.patch(url, data={"delegate_to": None})
+        self.assertEqual(200, response.status_code)
+        self.meeting_group.refresh_from_db()
+        self.assertIsNone(self.meeting_group.delegate_to)
+
+    def test_delegate_to_self(self):
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.patch(url, data={"delegate_to": self.meeting_group.pk})
+        self.assertContains(response, "Delegate to yourself", status_code=400)
+
+    def test_delegate_to_group_with_delegation(self):
+        self.meeting_group_two.delegate_to = self.meeting_group
+        self.meeting_group_two.save()
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.patch(
+            url, data={"delegate_to": self.meeting_group_two.pk}
+        )
+        self.assertContains(
+            response, "Already delegates to another group", status_code=400
+        )
+
+    def test_delegate_from_group_with_delegation(self):
+        self.meeting.groups.create(title="new", delegate_to=self.meeting_group)
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.patch(
+            url, data={"delegate_to": self.meeting_group_two.pk}
+        )
+        self.assertContains(
+            response, "Other groups delegates to your group", status_code=400
+        )
+
+    # FIXME: These constraints don't exist yet
+    # def test_relation_delegate_when_already_delegated_to(self):
+    #     delegator = self.meetings[0].groups.create(title="delegator")
+    #     receiver = self.meetings[0].groups.create(title="receiver")
+    #     receiver.delegate_to = delegator
+    #     receiver.save()
+    #     delegator.delegate_to = receiver
+    #     with self.assertRaises(IntegrityError):
+    #         delegator.save()
+    #
+    # def test_relation_delegate_when_receiver_delegates(self):
+    #     receiver = self.meetings[0].groups.create(title="Receiver")
+    #     first_delegator = self.meetings[0].groups.create(title="First")
+    #     second_delegator = self.meetings[0].groups.create(title="Second")
+    #     first_delegator.delegate_to = receiver
+    #     first_delegator.save()
+    #     second_delegator.delegate_to = first_delegator
+    #     with self.assertRaises(IntegrityError):
+    #         second_delegator.save()
 
 
 class GroupMembershipViewSetTests(APITestCase):

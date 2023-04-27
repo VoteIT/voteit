@@ -267,6 +267,20 @@ class MeetingGroupSerializer(CreateMeetingGroupSerializer):
             "groupid",
         ]
 
+    def validate_delegate_to(self, value: MeetingGroup | None):
+        if value:
+            if not isinstance(value, MeetingGroup):
+                raise ValidationError("Not a meeting group")
+            if self.instance == value:
+                raise ValidationError("Delegate to yourself? No.")
+            if value.delegate_to_id:
+                raise ValidationError("Already delegates to another group.")
+            if self.instance.delegations_from.exists():
+                raise ValidationError(
+                    "Other groups delegates to your group already, clear them first."
+                )
+        return value
+
 
 class GroupRoleSerializer(BaseModelSerializer):
     pk = serializers.IntegerField(read_only=True)
