@@ -199,6 +199,7 @@ class DialectRegistryTests(TestCase):
             {
                 "description": "",
                 "group_roles_active": True,
+                "groups_can_delegate": False,
                 "groups": [
                     {"groupid": "pirates"},
                     {"groupid": "swashbucklers"},

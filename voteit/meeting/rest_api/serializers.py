@@ -245,6 +245,7 @@ class CreateMeetingGroupSerializer(BaseModelSerializer):
         exclude = (
             "id",
             "members",
+            "delegate_to",
             "mentions",
         )
         extra_kwargs = {

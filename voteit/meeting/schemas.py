@@ -99,6 +99,9 @@ class DialectSchema(BaseModel):
     er_policy_name: str | None = None
     group_votes_active: bool | None = None
     group_roles_active: bool | None = None
+    groups_can_delegate: bool = (
+        False  # Can groups delegate their vote to another group?
+    )
     proposal_id_policy_name: str | None = None
     installable: bool = True  # Offer as selection for all organisations?
     requires: conlist(

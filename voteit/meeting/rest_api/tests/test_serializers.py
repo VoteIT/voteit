@@ -170,6 +170,7 @@ class MeetingDetailSerializerTests(TestCase):
                 "requires": ["one", "two"],
                 "title": "Three",
                 "view_components": {},
+                "groups_can_delegate": False,
                 "groups": [
                     {"groupid": "pirates"},
                     {"groupid": "swashbucklers"},
