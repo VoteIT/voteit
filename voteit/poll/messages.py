@@ -225,6 +225,6 @@ class TriggerCreateER(ContextAction):
         with set_actor(self.user):
             new_er = meeting.er_policy.create_er()
             created = new_er and latest_er != new_er
-        msg = TriggerERResponse.from_message(self, created=created)
+        msg = TriggerERResponse.from_message(self, created=bool(created))
         websocket_send(msg, state=msg.SUCCESS)
         return msg
