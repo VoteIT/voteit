@@ -43,7 +43,7 @@ def get_default_ignored_on_clone() -> set[str]:
         "bug_report",
         "electoral_register",
         "last_read",
-        "invite_dispatch",
+        # "invite_dispatch",
         "meeting_invite",
         "meeting_roles",
         "organisation",

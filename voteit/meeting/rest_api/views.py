@@ -163,7 +163,8 @@ class MeetingGroupViewSet(DefaultModelViewSet):
             return super().destroy(request, *args, **kwargs)
         except RestrictedError as exc:
             raise PermissionDenied(
-                "Meeting group us author of proposals and/or discussion posts"
+                "Meeting group is author of proposals and/or discussion posts or "
+                "has a relation to another group. Clear that first."
             ) from exc
 
 

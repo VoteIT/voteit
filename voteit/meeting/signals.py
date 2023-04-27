@@ -153,7 +153,9 @@ def meeting_channel_subscribed(
         )
         app_state.append(msg)
     # Append all groups - members have moved to GroupMembership!
-    meeting_groups_qs = context.groups.all().prefetch_related("mentions", "memberships")
+    meeting_groups_qs = context.groups.all().prefetch_related(
+        "mentions", "memberships", "delegate_to"
+    )
     app_state.append_from_queryset(
         meeting_groups_qs,
         MeetingGroupSerializer,

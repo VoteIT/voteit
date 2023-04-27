@@ -259,6 +259,7 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         self.assertEqual(None, data.pop("author"))
         self.assertEqual(None, data.pop("last_modified_by"))
         self.assertEqual(self.meeting.pk, data.pop("meeting"))
+        self.assertEqual(None, data.pop("delegate_to"))
         self.assertFalse(data.keys())
 
     def test_meeting_group_many(self):

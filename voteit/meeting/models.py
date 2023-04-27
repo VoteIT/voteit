@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from datetime import timedelta
-from itertools import count
 from logging import getLogger
 from random import sample
 from string import ascii_lowercase
@@ -41,15 +40,17 @@ if TYPE_CHECKING:
     from voteit.access_policy.models import AccessPolicy
     from voteit.active.models import ActiveUser
     from voteit.components.models import MeetingComponent
+    from voteit.discussion.models import DiscussionPost
+    from voteit.organisation.models import Organisation
     from voteit.poll.models import ElectoralRegister
     from voteit.poll.abcs import ElectoralRegisterPolicy
     from voteit.poll.abcs import GroupVoteElectoralRegisterPolicy
-    from voteit.organisation.models import Organisation
     from voteit.participant_number.models import PNSystem
     from voteit.proposal.models import Proposal
     from voteit.presence.models import PresenceCheck
-    from voteit.speaker.models import SpeakerListSystem
     from voteit.proposal.abcs import ProposalIDPolicy
+    from voteit.proposal.models import Proposal
+    from voteit.speaker.models import SpeakerListSystem
 
 __all__ = (
     "Meeting",
@@ -380,6 +381,15 @@ class MeetingGroup(BaseContent, MeetingContext):
         related_name="meeting_groups",
         through="GroupMembership",
     )
+    # We may want validators for this later on
+    # The actual effect of this field us up to other parts of voteit, mostly group voting
+    delegate_to = models.ForeignKey(
+        "self",
+        on_delete=models.RESTRICT,  # Must be blanked first!
+        blank=True,
+        null=True,
+        related_name="delegations_from",
+    )
 
     def save(self, **kwargs):
         if not self.groupid:
@@ -401,6 +411,17 @@ class MeetingGroup(BaseContent, MeetingContext):
             models.UniqueConstraint(
                 fields=("groupid", "meeting"), name="unique_meeting_id"
             ),
+            models.CheckConstraint(
+                name="prevent_delegate_to_self",
+                check=~models.Q(pk=models.F("delegate_to_id")),
+            ),
+            # delegations_from won't work due to db restrictions. FIXME
+            # models.CheckConstraint(
+            #     name="prevent_delegate_when_receiving",
+            #     check=models.Q(
+            #         delegations_from__isnull=False, delegate_to__isnull=False
+            #     ),
+            # ),
         )
 
     exporters = {"meeting": {}}
@@ -411,8 +432,9 @@ class MeetingGroup(BaseContent, MeetingContext):
 
     # Type annotations - relations
     proposals: models.QuerySet[Proposal]
-    discussions: models.QuerySet
+    discussions: models.QuerySet[DiscussionPost]
     memberships: models.QuerySet[GroupMembership]
+    delegations_from: models.QuerySet[MeetingGroup]
     objects: models.Manager[MeetingGroup]
 
 

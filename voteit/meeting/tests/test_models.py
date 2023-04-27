@@ -152,6 +152,32 @@ class MeetingGroupTests(TestCase):
         member_one.refresh_from_db()
         self.assertIsNone(member_one.votes)
 
+    def test_relation_to_self(self):
+        group = self.meetings[0].groups.create(title="One")
+        group.delegate_to = group
+        with self.assertRaises(IntegrityError):
+            group.save()
+
+    # FIXME: These constraints don't exist yet
+    # def test_relation_delegate_when_already_delegated_to(self):
+    #     delegator = self.meetings[0].groups.create(title="delegator")
+    #     receiver = self.meetings[0].groups.create(title="receiver")
+    #     receiver.delegate_to = delegator
+    #     receiver.save()
+    #     delegator.delegate_to = receiver
+    #     with self.assertRaises(IntegrityError):
+    #         delegator.save()
+    #
+    # def test_relation_delegate_when_receiver_delegates(self):
+    #     receiver = self.meetings[0].groups.create(title="Receiver")
+    #     first_delegator = self.meetings[0].groups.create(title="First")
+    #     second_delegator = self.meetings[0].groups.create(title="Second")
+    #     first_delegator.delegate_to = receiver
+    #     first_delegator.save()
+    #     second_delegator.delegate_to = first_delegator
+    #     with self.assertRaises(IntegrityError):
+    #         second_delegator.save()
+
 
 class MeetingRolesTests(TestCase):
     fixtures = ["meeting_test_fixture"]
