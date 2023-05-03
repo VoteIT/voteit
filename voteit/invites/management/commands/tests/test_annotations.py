@@ -116,3 +116,9 @@ class InviteAnnotationsIntegrationTests(TestCase):
             [None],
             [x["role_id"] for x in self.group_sw.memberships.all().values()],
         )
+
+    def test_dryrun(self):
+        self.call_command(
+            m=self.meeting.pk, u=1, f=self.fixture_file("grouprole.csv"), dry_run=True
+        )
+        self.assertEqual(0, self.group_sw.invite_annotations.count())

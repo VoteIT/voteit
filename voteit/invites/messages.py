@@ -104,6 +104,8 @@ class AddMixedInvites(ContextAction):
                 result = self.context.invites.create_or_update_mixed(
                     data=items, roles=self.data.roles, meeting=self.context
                 )
+                if self.data.dryrun:
+                    transaction.set_rollback(True)
         response = InvitesAdded.from_message(
             self,
             added=result.added,
@@ -172,6 +174,8 @@ class AddInviteAnnotations(ContextAction):
                         results.append(msg)
                         if msg.mm.consumer_name:  # In case it was run by a script
                             websocket_send(msg, state=self.RUNNING, on_commit=False)
+                if self.data.dryrun:
+                    transaction.set_rollback(True)
         response = Status.from_message(self)
         if response.mm.consumer_name:  # In case it was run by a script
             websocket_send(response, state=response.SUCCESS)

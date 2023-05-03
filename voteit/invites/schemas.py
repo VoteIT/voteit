@@ -155,6 +155,7 @@ class RowColInvitesBaseSchema(BaseModel):
         unique_items=True,
         max_items=1000,
     )
+    dryrun: bool = False  # Abort transaction when complete!
 
     @validator("rows", pre=True)
     def convert_rows(cls, v):

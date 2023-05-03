@@ -46,6 +46,7 @@ class Command(BaseCommand, BaseInvitesCommandMixin):
             meeting=meeting.pk,
             rows=rows,
             columns=cols,
+            dryrun=options.get("dry_run"),
         )
         command.context = meeting
         for result in self.run_cmd(command, options):

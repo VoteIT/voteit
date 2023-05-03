@@ -87,9 +87,7 @@ class BaseInvitesCommandMixin:
                 result = cmd.run_job()
             if options.get("queries"):
                 # pprint(cqc.captured_queries)
-
                 self.report(f"Execution time: {et():.4f} secs - queries: {len(cqc)}")
         if options.get("dry_run"):
-            self.report("-- DRY RUN - aborting save")
-            transaction.set_rollback(True)
+            self.report("-- DRY RUN - save was aborted")
         return result
