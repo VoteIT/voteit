@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from typing import Generator
+from typing import ItemsView
 
+from django.db.models import Exists
 from django.utils.translation import gettext_lazy as _
 from pydantic import constr
 from pydantic.main import BaseModel
-from typing import ItemsView
 
 from voteit.invites.abcs import AnnotationDataAdapter
 from voteit.invites.registries import invite_adapter_registry
@@ -101,7 +103,6 @@ class InviteGroup(AnnotationDataAdapter):
         *,
         invites_qs: QuerySet[MeetingInvite],
         columns: list[str],
-        # rows: list[list[str]],
         registry: InviteAdapterRegistry,
         annotations_formatted: list[ItemsView[str, str], dict],
         meeting: Meeting,
@@ -117,6 +118,9 @@ class InviteGroup(AnnotationDataAdapter):
             role_mapping.update(meeting.group_roles.all().values_list("role_id", "pk"))
         group_mapping = dict(meeting.groups.all().values_list("groupid", "pk"))
         local_data = annotations_formatted.copy()
+        result = AnnotationResultSchema(name=cls.name)
+        # FIXME: This can be rewritten as a joined OR query with exact matches for each item.
+        # That way we can eliminate exact matches and make thinks a lot faster.
         for invite in invites_qs:
             user_data_items = invite.user_data.items()
             popthis = []
@@ -126,25 +130,46 @@ class InviteGroup(AnnotationDataAdapter):
                     popthis.append(i)
                     if meeting_group := data.get(cls.name):
                         mg_id = group_mapping[meeting_group]
-
                         if role_id := data.get(InviteGroupRole.name):
                             role_pk = role_mapping[role_id]
                         else:
                             role_pk = None
                         # Invite might be accepted!
-                        if invite.used_by:
-                            GroupMembership.objects.update_or_create(
+                        if invite.used_by_id:
+                            # Exact match - nothing modified
+                            if GroupMembership.objects.filter(
                                 meeting_group_id=mg_id,
-                                user=invite.used_by,
-                                defaults={"role_id": role_pk},
-                            )
+                                user_id=invite.used_by_id,
+                                role_id=role_pk,
+                            ).exists():
+                                result.existed += 1
+                            else:
+                                _, created = GroupMembership.objects.update_or_create(
+                                    meeting_group_id=mg_id,
+                                    user=invite.used_by,
+                                    defaults={"role_id": role_pk},
+                                )
+                                if created:
+                                    result.added += 1
+                                else:
+                                    result.changed += 1
                         else:
-                            invite.group_annotations.update_or_create(
-                                meeting_invite=invite,
+                            # Invite isn't used - does an annotation exist?
+                            if invite.group_annotations.filter(
                                 meeting_group_id=mg_id,
-                                defaults={"group_role_id": role_pk},
-                            )
+                                group_role_id=role_pk,
+                            ).exists():
+                                result.existed += 1
+                            else:
+                                # Create or update annotation
+                                _, created = invite.group_annotations.update_or_create(
+                                    meeting_group_id=mg_id,
+                                    defaults={"group_role_id": role_pk},
+                                )
+                                if created:
+                                    result.added += 1
+                                else:
+                                    result.changed += 1
             for i in reversed(popthis):
                 local_data.pop(i)
-        # FIXME: Counts
-        return AnnotationResultSchema(name=cls.name)
+        return result

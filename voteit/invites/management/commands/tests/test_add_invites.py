@@ -4,6 +4,7 @@ from io import StringIO
 from django.core.management import call_command
 from django.test import TestCase
 
+from voteit.invites.testing import fixture_file
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -21,16 +22,8 @@ class InviteAnnotationsIntegrationTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        import voteit.invites.tests
-
         cls.meeting = Meeting.objects.get(pk=1)
         cls.org = Organisation.objects.get(pk=1)
-        cls.fixtures_dir = os.path.join(
-            os.path.dirname(os.path.abspath(voteit.invites.tests.__file__)), "fixtures"
-        )
-
-    def fixture_file(self, filename):
-        return os.path.join(self.fixtures_dir, filename)
 
     def call_command(self, *args, **kwargs):
         out = StringIO()
@@ -44,9 +37,7 @@ class InviteAnnotationsIntegrationTests(TestCase):
         return out.getvalue()
 
     def test_add(self):
-        self.call_command(
-            m=self.meeting.pk, u=1, f=self.fixture_file("emails.txt"), D=True
-        )
+        self.call_command(m=self.meeting.pk, u=1, f=fixture_file("emails.txt"), D=True)
         inv = self.meeting.invites.find_invites(email="a@betahaus.net").first()
         self.assertTrue(inv)
         self.assertEqual([ROLE_DISCUSSER, ROLE_PARTICIPANT], inv.roles)
@@ -62,7 +53,7 @@ class InviteAnnotationsIntegrationTests(TestCase):
         self.call_command(
             m=self.meeting.pk,
             u=1,
-            f=self.fixture_file("emails.txt"),
+            f=fixture_file("emails.txt"),
             P=True,
             V=True,
         )
@@ -82,7 +73,7 @@ class InviteAnnotationsIntegrationTests(TestCase):
         self.call_command(
             m=self.meeting.pk,
             u=1,
-            f=self.fixture_file("emails.txt"),
+            f=fixture_file("emails.txt"),
         )
         invite.refresh_from_db()
         self.assertEqual("open", invite.state)
