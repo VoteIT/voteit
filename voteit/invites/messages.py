@@ -92,7 +92,7 @@ class AddMixedInvites(ContextAction):
         existing_qs, partial = self.context.invites.find_mixed_user_data(*items)
         if partial:
             msg = "Found partial matches, aborting. Matched types:\n"
-            for k, v in partial:
+            for k, v in partial.items():
                 msg += f"{k}: {v.count()}\n"
             raise BadRequestError.from_message(
                 self,
