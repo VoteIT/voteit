@@ -208,6 +208,10 @@ class AddMixedUserDataInvitesSchema(RowColInvitesBaseSchema, InvitesMetaMixinSch
     >>> AddMixedUserDataInvitesSchema(columns=['email'], rows="one@betahaus.net   \n   tWo@betahaus.net", **base_qs).dict(exclude_unset=True, exclude={'meeting', 'roles'})
     {'columns': ['email'], 'rows': [['one@betahaus.net'], ['two@betahaus.net']]}
 
+    Multivals
+    >>> AddMixedUserDataInvitesSchema(columns=['email', 'swedish_ssn'], rows=[['a@boo.com', '121212-1212'],['b@boo.com', '20200101-2398']], **base_qs).dict(exclude_unset=True, exclude={'meeting', 'roles'})
+    {'columns': ['email', 'swedish_ssn'], 'rows': [['a@boo.com', '201212121212'], ['b@boo.com', '202001012398']]}
+
     Strip shouldn't mess up validators
     >>> AddMixedUserDataInvitesSchema(columns=['email'], rows="one@betahaus.net   \n   one@betahaus.net", **base_qs)
     Traceback (most recent call last):
@@ -247,3 +251,5 @@ class InvitesResultSchema(BaseModel):
 class AnnotationResultSchema(InvitesResultSchema):
     name: str
     msg: str | None
+    # added, changed and existed should be used equally for registered
+    # users and users who haven't used an invitation yet.

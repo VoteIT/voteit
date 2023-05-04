@@ -145,7 +145,6 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
         """
         Make sure no intersections exist within the data.
         """
-
         cmpvals = []
         checked = []
         queryseq = list(self.build_ud_query_seq(columns, rows))
@@ -159,7 +158,7 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
                 continue
             for k, v in items:
                 di = {k: v}.items()
-                if any(di <= x for x in cmpvals if di != x):
+                if any(di <= x for x in cmpvals if items != x):
                     raise ValueError(
                         f"The value {k}={v} is used within different subsets of user data. Offending row: {i}"
                     )
