@@ -178,6 +178,9 @@ class AnnotationDataAdapter(InviteDataAdapter, ABC):
         Return any present annotations for a specific invite.
         It should be in the format of a json-ready dict.
         """
+        # Kind of dumb but works :P
+        if False:
+            yield
 
 
 class InviteUserDataAdapter(InviteDataAdapter, ABC):

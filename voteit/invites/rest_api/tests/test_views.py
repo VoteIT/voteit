@@ -98,6 +98,22 @@ class MeetingInviteViewSetTests(APITestCase):
         response = self.client.patch(url, {"roles": ["participant"]})
         self.assertEqual(response.status_code, 405)
 
+    def test_annotations(self):
+        grp = self.meeting.groups.create()
+        self.invite.group_annotations.create(meeting_group=grp)
+        url = reverse("meeting-invites-detail", kwargs={"pk": self.invite.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(
+            {
+                "pk": self.invite.pk,
+                "annotations": [{"meeting_group": grp.pk, "role": None}],
+            },
+            data,
+        )
+
 
 @override_settings(ID_PROXY_API_KEY="xxx")
 class MatchInvitesViewSetTests(APITestCase):

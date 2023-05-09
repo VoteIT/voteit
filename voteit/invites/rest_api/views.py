@@ -17,6 +17,7 @@ from voteit.core.rest_api.utils import get_identity_data
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api import serializers
+from voteit.invites.utils import get_invite_adapter_registry
 from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
@@ -44,6 +45,20 @@ class MeetingInviteViewSet(
             # Permission checked against obj
             return MeetingInvite.objects.all()
         return MeetingInvite.objects.none()
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Returns a list of any annotation data related to a specific invite.
+        """
+        instance = self.get_object()
+        reg = get_invite_adapter_registry()
+        data = {"pk": instance.pk}
+        annotations = data["annotations"] = []
+        for adapter in reg.values():
+            if adapter.is_annotation:
+                adapted = adapter(instance)
+                annotations.extend(adapted.get_annotations())
+        return Response(data)
 
     def list(self, *args, **kwargs):
         return Response([])
