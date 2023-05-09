@@ -252,7 +252,7 @@ class Roles(ABCModel):
         query_add = {x.name for x in self.get_required_roles(*checked)}
         new_roles = query_add - assigned
         if new_roles:
-            self.assigned += tuple(new_roles)
+            self.assigned = sorted(set(self.assigned) | new_roles)
             self.save()
             role_objs = [self.valid_roles[x] for x in new_roles]
             roles_added.send(sender=self.__class__, instance=self, roles=role_objs)
@@ -265,7 +265,7 @@ class Roles(ABCModel):
         query_remove = {x.name for x in self.get_reverse_required_roles(*checked)}
         remove_roles = assigned & query_remove
         if remove_roles:
-            self.assigned = tuple(set(self.assigned) - remove_roles)
+            self.assigned = sorted(set(self.assigned) - remove_roles)
             self.save()
             role_objs = [self.valid_roles[x] for x in remove_roles]
             roles_removed.send(sender=self.__class__, instance=self, roles=role_objs)
