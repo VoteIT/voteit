@@ -14,7 +14,6 @@ from envelope.utils import websocket_send
 
 from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.schemas import AddMixedUserDataInvitesSchema
-from voteit.invites.schemas import AddTypedInvitesSchema
 from voteit.invites.schemas import AddInviteAnnotationsSchema
 from voteit.invites.schemas import AnnotationResultSchema
 from voteit.invites.schemas import InvitesResultSchema
@@ -35,42 +34,6 @@ logger = getLogger(__name__)
 @incoming
 class AddInvites(ContextAction):
     name = "invites.add"
-    permission = MeetingInvitePermissions.ADD
-    schema = AddTypedInvitesSchema
-    data: AddTypedInvitesSchema
-    model = Meeting
-    context_schema_attr = "meeting"
-    job_timeout = 40
-
-    def run_job(self) -> InvitesAdded:
-        """
-        Bulk create invites. If an invite already exist for that data,
-        update the invite and make sure the user has those roles. Think of the new invite as a desired state.
-        If a role is added or removed, that should be reflected back on that user.
-
-        """
-        self.assert_perm()
-        with set_actor(self.user):
-            result = self.context.invites.create_or_update_typed(
-                meeting=self.context,
-                roles=self.data.roles,
-                values=self.data.user_data,
-                invite_type=self.data.type,
-            )
-        response = InvitesAdded.from_message(
-            self,
-            added=result.added,
-            changed=result.changed,
-            existed=result.existed,
-        )
-        if response.mm.consumer_name:  # In case it was run by a script
-            websocket_send(response, state=response.SUCCESS)
-        return response
-
-
-@incoming
-class AddMixedInvites(ContextAction):
-    name = "invites.add_mixed"
     permission = MeetingInvitePermissions.ADD
     schema = AddMixedUserDataInvitesSchema
     data: AddMixedUserDataInvitesSchema

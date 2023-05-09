@@ -38,13 +38,9 @@ class Command(BaseCommand, BaseInvitesCommandMixin):
             mm={"user_pk": options.get("u")},
             meeting=meeting.pk,
             roles=roles,
-            user_data=user_data,
+            rows=user_data,
+            columns=["email"],
+            dryrun=options.get("dry_run"),
         )
         command.context = meeting
-        with transaction.atomic(durable=True):
-            result = self.run_cmd(command, options)
-            if options.get("dry_run"):
-                transaction.set_rollback(True)
-        self.report(
-            f"Added: {result.data.added} \nChanged: {result.data.changed} \nExisted: {result.data.existed}"
-        )
+        self.run_cmd(command, options)
