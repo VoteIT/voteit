@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from typing import Generator
 from typing import ItemsView
 
-from django.db.models import Exists
+from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 from pydantic import constr
 from pydantic.main import BaseModel
@@ -173,3 +173,27 @@ class InviteGroup(AnnotationDataAdapter):
             for i in reversed(popthis):
                 local_data.pop(i)
         return result
+
+    @classmethod
+    def prep_invites_qs_for_subscribe(
+        cls, invites_qs: QuerySet[MeetingInvite]
+    ) -> QuerySet[MeetingInvite]:
+        """
+        Attach information about annotations on the queryset itself in advance of serialization.
+        Information should be passed along to method 'has_annotations' and doesn't need to result
+        in anything else than a bool value.
+        """
+        # FIXME: This should probably be Exist instead
+        return invites_qs.annotate(
+            **{cls.invite_qs_annotation_name: Count("group_annotations")}
+        )
+
+    def get_annotations(self) -> Generator[dict]:
+        """
+        Return any present annotations for a specific invite.
+        It should be in the format of a json-ready dict.
+        """
+        for val in self.invite.group_annotations.values_list(
+            "meeting_group", "group_role"
+        ):
+            yield dict(zip(["meeting_group", "role"], val))

@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.functional import classproperty
 from pydantic import BaseModel
 from django.db import models
+from typing import Generator
 
 from voteit.invites.exceptions import DataColValidationError
 
@@ -148,7 +149,34 @@ class AnnotationDataAdapter(InviteDataAdapter, ABC):
         Annotate invites if they should have other effects, for instance assigning participant numbers.
         Also take care of existing state, if users have already accepted an invitation.
         Note! This method will probably be extremely slow!
+        """
 
+    @classproperty
+    def invite_qs_annotation_name(cls):
+        return f"has_{cls.name}_ann"
+
+    @classmethod
+    def prep_invites_qs_for_subscribe(
+        cls, invites_qs: models.QuerySet[MeetingInvite]
+    ) -> models.QuerySet[MeetingInvite]:
+        """
+        Attach information about annotations on the queryset itself in advance of serialization.
+        Information should be passed along to method 'has_annotations' and doesn't need to result
+        in anything else than a bool value.
+        Must return updated queryset!
+        """
+        return invites_qs
+
+    def has_annotations(self) -> bool | None | int:
+        """
+        Does this method have any annotations?
+        """
+        return getattr(self.invite, self.invite_qs_annotation_name, None)
+
+    def get_annotations(self) -> Generator[dict]:
+        """
+        Return any present annotations for a specific invite.
+        It should be in the format of a json-ready dict.
         """
 
 

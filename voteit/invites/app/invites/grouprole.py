@@ -73,7 +73,6 @@ class InviteGroupRole(AnnotationDataAdapter):
 
     @classmethod
     def annotate(cls, **kwargs):
-
         """
         Delegated to group since it handles the same data
         """

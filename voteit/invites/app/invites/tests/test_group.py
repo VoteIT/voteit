@@ -35,6 +35,11 @@ class GroupAnnotationTests(TestCase):
         cls.inv_luke: MeetingInvite = MeetingInvite.objects.get(
             user_data={"email": "luke@betahaus.net"}
         )
+        # A very unrelated invite
+        cls.unrelated_inv = cls.meeting.invites.create(
+            user_data={"email": "hello@world.com"}
+        )
+        # Groups
         cls.group_sabreclub = cls.meeting.groups.create(groupid="sabreclub")
         cls.group_sw = cls.meeting.groups.create(groupid="sw")
         cls.role_sith = cls.meeting.group_roles.create(role_id="sith")
@@ -184,4 +189,50 @@ class GroupAnnotationTests(TestCase):
                 "msg": None,
             },
             result.dict(),
+        )
+
+    def test_prep_invites_qs_for_subscribe(self):
+        columns, rows = get_unvalidated_fixture_content("grouprole.csv")
+        annotations_formatted = list(
+            self.registry.format_for_annotations(columns, rows)
+        )
+        invites_qs = self.meeting.invites.all()
+        self._cut.annotate(
+            invites_qs=invites_qs,
+            columns=columns,
+            annotations_formatted=annotations_formatted,
+            meeting=self.meeting,
+            registry=self.registry,
+        )
+        annotated_invites_qs = self._cut.prep_invites_qs_for_subscribe(invites_qs)
+        self.assertEqual(
+            [2, 2, 1, 0],
+            [
+                self._cut(x).has_annotations()
+                for x in annotated_invites_qs.order_by("pk")
+            ],
+        )
+
+    def test_get_annotations(self):
+        columns, rows = get_unvalidated_fixture_content("grouprole.csv")
+        annotations_formatted = list(
+            self.registry.format_for_annotations(columns, rows)
+        )
+        invites_qs = self.meeting.invites.all()
+        self._cut.annotate(
+            invites_qs=invites_qs,
+            columns=columns,
+            annotations_formatted=annotations_formatted,
+            meeting=self.meeting,
+            registry=self.registry,
+        )
+        unrelated = self._cut(self.unrelated_inv)
+        self.assertEqual([], list(unrelated.get_annotations()))
+        luke = self._cut(self.inv_luke)
+        self.assertEqual(
+            [
+                {"meeting_group": self.group_sw.pk, "role": self.role_jedi.pk},
+                {"meeting_group": self.group_sabreclub.pk, "role": None},
+            ],
+            list(luke.get_annotations()),
         )
