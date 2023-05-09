@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from django.core.management import BaseCommand
 
 from voteit.invites.management.commands.base import BaseInvitesCommandMixin
-from voteit.invites.messages import AddMixedInvites
+from voteit.invites.messages import AddInvites
 from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
@@ -41,7 +41,7 @@ class Command(BaseCommand, BaseInvitesCommandMixin):
             cols = cols.split(",")
         else:
             cols = rows.pop(0).split("\t")
-        command = AddMixedInvites(
+        command = AddInvites(
             mm={"user_pk": options.get("u")},
             meeting=meeting.pk,
             roles=roles,
