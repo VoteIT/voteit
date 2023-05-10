@@ -100,6 +100,12 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
         self._user_data_keys = keys
         return keys
 
+    @property
+    def annotation_adapters(self) -> Generator[type[AnnotationDataAdapter]]:
+        for v in self.values():
+            if v.is_annotation:
+                yield v
+
     def check_column_req(self, columns: list[str]):
         """
         >>> from voteit.invites.app.invites.email import InviteEmail
@@ -252,6 +258,20 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
             if adapter.is_annotation:
                 adapted = adapter(invite)
                 adapted.accepted()
+
+    def prep_invites_qs_for_subscribe(
+        self, invites_qs: models.QuerySet[MeetingInvite]
+    ) -> models.QuerySet[MeetingInvite]:
+        for adapter in self.annotation_adapters:
+            invites_qs = adapter.prep_invites_qs_for_subscribe(invites_qs)
+        return invites_qs
+
+    def has_annotations(self, invite: MeetingInvite, from_qs: bool = True) -> bool:
+        for adapter in self.annotation_adapters:
+            adapted = adapter(invite)
+            if adapted.has_annotations(from_qs=from_qs):
+                return True
+        return False
 
 
 invite_adapter_registry = InviteAdapterRegistry(InviteDataAdapter)

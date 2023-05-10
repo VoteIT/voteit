@@ -7,12 +7,14 @@ from django.dispatch import receiver
 
 from envelope.signals import channel_subscribed
 from voteit.core.decorators import disable_on_raw_save
+from voteit.core.decorators import on_transaction_commit
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteAdded
 from voteit.invites.messages import MeetingInviteChanged
 from voteit.invites.messages import MeetingInviteDeleted
 from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api.serializers import MeetingInviteSerializer
+from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.signals import archive_meeting
 from voteit.meeting.signals import meeting_joined
@@ -43,8 +45,10 @@ def invites_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
     # FIXME: We may not want to load all invites unless they're needed
+    reg = get_invite_adapter_registry()
+    invites_qs = reg.prep_invites_qs_for_subscribe(context.invites.all())
     app_state.append_from_queryset(
-        context.invites.all(),
+        invites_qs,
         MeetingInviteSerializer,
         MeetingInviteAdded,
     )
@@ -52,6 +56,7 @@ def invites_channel_subscribed(
 
 @receiver(post_save, sender=MeetingInvite)
 @disable_on_raw_save
+@on_transaction_commit
 def meeting_invite_changed(instance: MeetingInvite = None, created=None, **kw):
     ch = MeetingInvitesChannel.from_instance(instance.meeting)
     data = MeetingInviteSerializer(instance).data
@@ -59,7 +64,7 @@ def meeting_invite_changed(instance: MeetingInvite = None, created=None, **kw):
         msg = MeetingInviteAdded(data=data)
     else:
         msg = MeetingInviteChanged(data=data)
-    ch.sync_publish(msg)
+    ch.sync_publish(msg, on_commit=False)  # No need
 
 
 @receiver(pre_delete, sender=MeetingInvite)

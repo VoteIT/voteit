@@ -1,5 +1,6 @@
 from logging import getLogger
 
+from django.utils.functional import cached_property
 from rest_framework import serializers
 
 from voteit.invites.models import MeetingInvite
@@ -17,7 +18,10 @@ class InviteQuerySerializer(serializers.Serializer):
 
     def validate_scope(self, value):
         if value not in get_invite_adapter_registry():
-            logger.warning(f"No invite scope {value}")
+            # Note: This is since we don't want endpoints do die then there's a missmatch
+            # between keywords and scopes. That's okay as long as we don't use this serializer
+            # for external endpoints.
+            logger.warning("No invite scope %s", value)
         return value
 
 
@@ -27,6 +31,7 @@ class MeetingInviteSerializer(BaseModelSerializer):
     """
 
     meeting_title = serializers.SerializerMethodField()
+    has_annotations = serializers.SerializerMethodField()
 
     class Meta:
         model = MeetingInvite
@@ -41,11 +46,25 @@ class MeetingInviteSerializer(BaseModelSerializer):
             "used_by",
             "user_data",
             "roles",
+            "has_annotations",
         ]
         fields = read_only_fields
 
+    @cached_property
+    def registry(self):
+        return get_invite_adapter_registry()
+
     def get_meeting_title(self, instance: MeetingInvite) -> str:
         return instance.meeting.title
+
+    def get_has_annotations(self, instance: MeetingInvite) -> bool:
+        """
+        If the qs was passed as initial data ("instance") expect an annotated qs, else fetch.
+        The odd arguments with both instance and self.instance is due to that.
+        """
+        return self.registry.has_annotations(
+            instance, from_qs=not isinstance(self.instance, MeetingInvite)
+        )
 
 
 class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
@@ -74,7 +93,7 @@ class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
     def get_organisation_host(self, instance: MeetingInvite) -> str:
         try:
             return instance.meeting.organisation.host
-        except AttributeError:
+        except AttributeError:  # pragma: no coverage
             # Only unittests!
             pass
 

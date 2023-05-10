@@ -3,10 +3,13 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-
 from envelope.messages.channels import Subscribe
+
 from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
+from voteit.invites.messages import MeetingInviteAdded
+from voteit.invites.messages import MeetingInviteChanged
+from voteit.invites.messages import MeetingInviteDeleted
 from voteit.invites.models import MeetingInvite
 from voteit.meeting.models import Meeting
 
@@ -60,9 +63,14 @@ class InvitesSubscribedTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.create()
         cls.moderator = User.objects.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.group = cls.meeting.groups.create()
         cls.invite: MeetingInvite = cls.meeting.invites.create(
             user_data={"email": "hello@betahaus.net"}
         )
+        cls.invite2: MeetingInvite = cls.meeting.invites.create(
+            user_data={"email": "bye@betahaus.net"}
+        )
+        cls.invite.group_annotations.create(meeting_group=cls.group)
 
     def test_app_state_sent(self):
         command = Subscribe(
@@ -71,8 +79,12 @@ class InvitesSubscribedTests(TestCase):
             channel_type="invites",
         )
         msg = command.run_job()
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "meeting_invite.added"}
-        self.assertEqual({self.invite.pk}, pks)
+        payloads = sorted(
+            [x.p for x in msg.data.app_state if x.t == "meeting_invite.added"],
+            key=lambda x: x["pk"],
+        )
+        self.assertEqual([self.invite.pk, self.invite2.pk], [x["pk"] for x in payloads])
+        self.assertEqual([True, False], [x["has_annotations"] for x in payloads])
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -82,17 +94,17 @@ class MeetingInviteSignalTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.create()
         cls.moderator = User.objects.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.group = cls.meeting.groups.create()
         cls.invite: MeetingInvite = cls.meeting.invites.create(
             user_data={"email": "hello@betahaus.net"},
         )
+        cls.invite.group_annotations.create(meeting_group=cls.group)
 
     def setUp(self):
         self.invite.refresh_from_db()
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_added(self, mock_publish):
-        from voteit.invites.messages import MeetingInviteAdded
-
         self.assertFalse(mock_publish.called)
         with FakeCommit():
             invite = self.meeting.invites.create(
@@ -102,11 +114,10 @@ class MeetingInviteSignalTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingInviteAdded)
         self.assertEqual(invite.pk, msg.data.pk)
+        self.assertEqual(False, msg.data.has_annotations)
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_changed(self, mock_publish):
-        from voteit.invites.messages import MeetingInviteChanged
-
         self.assertFalse(mock_publish.called)
         with FakeCommit():
             self.invite.roles = ["participant", "moderator"]
@@ -116,11 +127,10 @@ class MeetingInviteSignalTests(TestCase):
         self.assertIsInstance(msg, MeetingInviteChanged)
         self.assertEqual(self.invite.pk, msg.data.pk)
         self.assertEqual(self.invite.roles, msg.data.roles)
+        self.assertEqual(True, msg.data.has_annotations)
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_deleted_diff_participants(self, mock_publish):
-        from voteit.invites.messages import MeetingInviteDeleted
-
         self.assertFalse(mock_publish.called)
         invite_pk = self.invite.pk
         self.invite.delete()
@@ -128,3 +138,13 @@ class MeetingInviteSignalTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingInviteDeleted)
         self.assertEqual(invite_pk, msg.data.pk)
+
+    @patch.object(MeetingInvitesChannel, "sync_publish")
+    def test_accepted_removes_annotation(self, mock_publish):
+        user = User.objects.create(username="accepter")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.invite.accept(user)
+            self.invite.save()
+        msg = mock_publish.mock_calls[0].args[0]
+        self.assertIsInstance(msg, MeetingInviteChanged)
+        self.assertEqual(False, msg.data.has_annotations)

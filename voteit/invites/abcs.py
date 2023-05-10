@@ -167,20 +167,24 @@ class AnnotationDataAdapter(InviteDataAdapter, ABC):
         """
         return invites_qs
 
-    def has_annotations(self) -> bool | None | int:
+    def has_annotations(self, from_qs: bool = True) -> bool | None | int:
         """
         Does this method have any annotations?
         """
-        return getattr(self.invite, self.invite_qs_annotation_name, None)
+        if from_qs:
+            return getattr(self.invite, self.invite_qs_annotation_name, None)
+        else:
+            for val in self.get_annotations():
+                if val:
+                    return True
+            return False
 
     def get_annotations(self) -> Generator[dict]:
         """
         Return any present annotations for a specific invite.
         It should be in the format of a json-ready dict.
         """
-        # Kind of dumb but works :P
-        if False:
-            yield
+        yield from []
 
 
 class InviteUserDataAdapter(InviteDataAdapter, ABC):
