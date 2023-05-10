@@ -25,29 +25,32 @@ class ParticipantNumberSchema(BaseModel):
         return v
 
 
-@invite_adapter_registry
-class ParticipantNumber(AnnotationDataAdapter):
-    """
-    >>> data = [['1'], [' '], [2]]
-    >>> ParticipantNumber.preflight([ParticipantNumber.name], data)
-    >>> data
-    [[1], [None], [2]]
-    """
-
-    name = "pn"
-    schema = ParticipantNumberSchema
-    title = _("Participant number")
-
-    def accepted(self):
-        ...
-
-    @classmethod
-    def annotate(
-        cls,
-        **kwargs
-        # *,
-        # invites_qs: QuerySet[MeetingInvite],
-        # columns: list[str],
-        # rows: list[list[str | None | int]],
-    ):
-        ...
+# @invite_adapter_registry
+# class ParticipantNumber(AnnotationDataAdapter):
+#     """
+#     >>> data = [['1'], [' '], [2]]
+#     >>> ParticipantNumber.preflight([ParticipantNumber.name], data)
+#     >>> data
+#     [[1], [None], [2]]
+#     """
+#
+#     name = "pn"
+#     schema = ParticipantNumberSchema
+#     title = _("Participant number")
+#
+#     def accepted(self):
+#         ...
+#
+#     @classmethod
+#     def annotate(
+#         cls,
+#         **kwargs
+#         # *,
+#         # invites_qs: QuerySet[MeetingInvite],
+#         # columns: list[str],
+#         # rows: list[list[str | None | int]],
+#     ):
+#         ...
+#
+#     @classmethod
+#     def clear(cls, meeting: Meeting) -> models.QuerySet[MeetingInvite]:
