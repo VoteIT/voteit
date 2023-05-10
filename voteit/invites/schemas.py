@@ -152,3 +152,19 @@ class AnnotationResultSchema(InvitesResultSchema):
     msg: str | None
     # added, changed and existed should be used equally for registered
     # users and users who haven't used an invitation yet.
+
+
+class InviteDataTypesSchema(BaseModel):
+    name: str
+    title: str
+    is_user_data: bool
+    is_annotation: bool
+
+    @validator("title", pre=True)
+    def translate(cls, v):
+        if not isinstance(v, str):
+            return str(v)
+        return v
+
+    class Config:
+        orm_mode = True

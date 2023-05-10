@@ -362,3 +362,41 @@ class UserMatchedInviteViewSetTests(APITestCase):
         url = reverse("handle-matched-invites-list")
         response = self.client.get(url)
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+
+class InviteDataTypesViewSetTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create(username="user")
+
+    def test_basics(self):
+        self.client.force_login(self.user)
+        url = reverse("invite-data-types-list")
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        email_data = [x for x in data if x["name"] == "email"][0]
+        self.assertEqual(
+            {
+                "is_annotation": False,
+                "is_user_data": True,
+                "name": "email",
+                "title": "Email",
+            },
+            email_data,
+        )
+        group_data = [x for x in data if x["name"] == "group"][0]
+        self.assertEqual(
+            {
+                "is_annotation": True,
+                "is_user_data": False,
+                "name": "group",
+                "title": "GroupID",
+            },
+            group_data,
+        )
+
+    def test_auth_required(self):
+        url = reverse("invite-data-types-list")
+        response = self.client.get(url)
+        self.assertEqual(401, response.status_code)

@@ -9,6 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.viewsets import ViewSet
 
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import TransitionsMixin
@@ -17,6 +18,7 @@ from voteit.core.rest_api.utils import get_identity_data
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api import serializers
+from voteit.invites.schemas import InviteDataTypesSchema
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.meeting.models import Meeting
 
@@ -182,3 +184,16 @@ class HandleMatchedInvitesViewSet(
             instance.reject(request.user)
             instance.save()
         return Response(status=200, data=self.serializer_class(instance).data)
+
+
+@router.register("invite-data-types", basename="invite-data-types")
+class InviteDataTypesViewSet(ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        reg = get_invite_adapter_registry()
+        results = []
+        for v in reg.values():
+            data = InviteDataTypesSchema.from_orm(v)
+            results.append(data.dict())
+        return Response(data=results)
