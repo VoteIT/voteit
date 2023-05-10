@@ -8,10 +8,8 @@ from pydantic import constr
 from voteit.invites.abcs import AnnotationDataAdapter
 from voteit.invites.app.invites.group import InviteGroup
 from voteit.invites.registries import invite_adapter_registry
-from voteit.invites.schemas import AnnotationResultSchema
 
 if TYPE_CHECKING:
-    from django.db.models import QuerySet
     from voteit.invites.models import MeetingInvite
     from voteit.meeting.models import Meeting
 
@@ -76,3 +74,10 @@ class InviteGroupRole(AnnotationDataAdapter):
         """
         Delegated to group since it handles the same data
         """
+
+    @classmethod
+    def clear(cls, meeting):
+        """
+        Handled by GroupID
+        """
+        return MeetingInvite.objects.none()

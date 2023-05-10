@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 
 
 class InviteDataAdapter(ABC):
+    is_clearable: bool = False  # This is information to frontend that clear can be run
+
     def __init__(self, invite: MeetingInvite):
         self.invite = invite
 
@@ -185,6 +187,13 @@ class AnnotationDataAdapter(InviteDataAdapter, ABC):
         It should be in the format of a json-ready dict.
         """
         yield from []
+
+    @classmethod
+    @abstractmethod
+    def clear(cls, meeting: Meeting) -> models.QuerySet[MeetingInvite]:
+        """
+        Clear annotations of this kind. Return invites that were affected by the clear operation.
+        """
 
 
 class InviteUserDataAdapter(InviteDataAdapter, ABC):

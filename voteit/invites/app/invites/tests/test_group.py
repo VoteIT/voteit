@@ -236,3 +236,10 @@ class GroupAnnotationTests(TestCase):
             ],
             list(luke.get_annotations()),
         )
+
+    def test_clear(self):
+        qs = self._cut.clear(self.meeting)
+        self.assertEqual(0, qs.count())
+        self.inv_luke.group_annotations.create(meeting_group=self.group_sabreclub)
+        qs = self._cut.clear(self.meeting)
+        self.assertEqual({self.inv_luke}, set(qs))

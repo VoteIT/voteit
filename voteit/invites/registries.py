@@ -273,5 +273,12 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
                 return True
         return False
 
+    @ensure_atomic
+    def clear(self, meeting: Meeting, *names) -> models.QuerySet[MeetingInvite]:
+        invites_qs = meeting.invites.none()
+        for k in names:
+            invites_qs |= self[k].clear(meeting)
+        return invites_qs.distinct()
+
 
 invite_adapter_registry = InviteAdapterRegistry(InviteDataAdapter)

@@ -159,6 +159,7 @@ class InviteDataTypesSchema(BaseModel):
     title: str
     is_user_data: bool
     is_annotation: bool
+    is_clearable: bool
 
     @validator("title", pre=True)
     def translate(cls, v):
@@ -168,3 +169,39 @@ class InviteDataTypesSchema(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class ClearInviteAnnotationsSchema(BaseModel):
+    """
+    >>> ClearInviteAnnotationsSchema(meeting=1, types=['group'])
+    ClearInviteAnnotationsSchema(meeting=1, types=['group'])
+    >>> ClearInviteAnnotationsSchema(meeting=1, types=['404'])
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 1 validation error for ClearInviteAnnotationsSchema
+    types
+      404 is not an invite annotation adapter (type=value_error)
+    >>> ClearInviteAnnotationsSchema(meeting=1, types=['grouprole'])
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 1 validation error for ClearInviteAnnotationsSchema
+    types
+      grouprole can not be cleared (type=value_error)
+    """
+
+    meeting: int
+    types: conlist(
+        constr(strip_whitespace=True, to_lower=True), unique_items=True, min_items=1
+    )
+
+    @validator("types")
+    def validate_types(cls, v: list[str]):
+        reg = get_invite_adapter_registry()
+        for k in v:
+            if k not in reg:
+                raise ValueError("No such invite adapter")
+            if not reg[k].is_annotation:
+                raise ValueError(f"{k} is not an invite annotation adapter")
+            if not reg[k].is_clearable:
+                raise ValueError(f"{k} can not be cleared")
+        return v

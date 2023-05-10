@@ -10,6 +10,7 @@ from pydantic import constr
 from pydantic.main import BaseModel
 
 from voteit.invites.abcs import AnnotationDataAdapter
+from voteit.invites.models import MeetingGroupAnnotation
 from voteit.invites.registries import invite_adapter_registry
 from voteit.invites.schemas import AnnotationResultSchema
 from voteit.meeting.models import GroupMembership
@@ -37,6 +38,7 @@ class InviteGroup(AnnotationDataAdapter):
     name = "group"
     schema = GroupSchema
     title = _("GroupID")
+    is_clearable = True
 
     def accepted(self):
         """
@@ -197,3 +199,15 @@ class InviteGroup(AnnotationDataAdapter):
             "meeting_group", "group_role"
         ):
             yield dict(zip(["meeting_group", "role"], val))
+
+    @classmethod
+    def clear(cls, meeting: Meeting):
+        annotations_qs = MeetingGroupAnnotation.objects.filter(
+            meeting_group__meeting=meeting
+        )
+        invites_qs = meeting.invites.filter(
+            # Do the search with something that isn't lazy, so it doesn't return none when we clear annotations!
+            pk__in=set(annotations_qs.values_list("meeting_invite_id", flat=True))
+        )
+        annotations_qs.delete()
+        return invites_qs

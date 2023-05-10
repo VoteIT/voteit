@@ -16,8 +16,10 @@ from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.schemas import AddMixedUserDataInvitesSchema
 from voteit.invites.schemas import AddInviteAnnotationsSchema
 from voteit.invites.schemas import AnnotationResultSchema
+from voteit.invites.schemas import ClearInviteAnnotationsSchema
 from voteit.invites.schemas import InvitesResultSchema
 from voteit.invites.utils import get_invite_adapter_registry
+from voteit.invites.utils import send_updated_invites
 from voteit.meeting.models import Meeting
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
@@ -122,6 +124,7 @@ class AddInviteAnnotations(ContextAction):
         results = []
         with set_actor(self.user):
             with transaction.atomic(durable=True):
+                # FIXME: We need to send signal for annotated invites too
                 for annotation_result in self.invite_data_reg.run_annotations(
                     columns=self.data.columns,
                     rows=self.data.rows,
@@ -139,10 +142,37 @@ class AddInviteAnnotations(ContextAction):
                             websocket_send(msg, state=self.RUNNING, on_commit=False)
                 if self.data.dryrun:
                     transaction.set_rollback(True)
+            # FIXME Send signal in case of commit
         response = Status.from_message(self)
         if response.mm.consumer_name:  # In case it was run by a script
             websocket_send(response, state=response.SUCCESS)
         return results
+
+
+@incoming
+class ClearInviteAnnotations(ContextAction):
+    name = "invites.clear_annotations"
+    permission = MeetingInvitePermissions.ADD
+    schema = ClearInviteAnnotationsSchema
+    data: ClearInviteAnnotationsSchema
+    model = Meeting
+    context_schema_attr = "meeting"
+    job_timeout = 30
+    atomic = True
+
+    @cached_property
+    def invite_data_reg(self) -> InviteAdapterRegistry:
+        return get_invite_adapter_registry()
+
+    def run_job(self):
+        self.assert_perm()
+        with set_actor(self.user):
+            invites_qs = self.invite_data_reg.clear(self.context, *self.data.types)
+            send_updated_invites(self.context, invites_qs, annotate=False)
+        response = Status.from_message(self)
+        if response.mm.consumer_name:  # In case it was run by a script
+            websocket_send(response, state=response.SUCCESS)
+        return invites_qs
 
 
 @outgoing

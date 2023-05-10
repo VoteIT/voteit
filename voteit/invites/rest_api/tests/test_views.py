@@ -380,6 +380,7 @@ class InviteDataTypesViewSetTests(APITestCase):
             {
                 "is_annotation": False,
                 "is_user_data": True,
+                "is_clearable": False,
                 "name": "email",
                 "title": "Email",
             },
@@ -390,6 +391,7 @@ class InviteDataTypesViewSetTests(APITestCase):
             {
                 "is_annotation": True,
                 "is_user_data": False,
+                "is_clearable": True,
                 "name": "group",
                 "title": "GroupID",
             },
