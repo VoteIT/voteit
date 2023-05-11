@@ -18,8 +18,6 @@ class InviteAnnotationsIntegrationTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        import voteit.invites.tests
-
         cls.meeting = Meeting.objects.get(pk=1)
         cls.org = Organisation.objects.get(pk=1)
         cls.group_sw = cls.meeting.groups.create(groupid="sw")
@@ -36,7 +34,6 @@ class InviteAnnotationsIntegrationTests(TestCase):
 
     def call_command(self, *args, **kwargs):
         out = StringIO()
-        kwargs.setdefault("q", True)
         call_command(
             "add_annotations",
             *args,

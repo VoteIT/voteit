@@ -1,8 +1,10 @@
 import os
+import select
 import sys
 from logging import getLogger
 
-from django.db import transaction
+from django.core.management import BaseCommand
+from django.core.management import CommandError
 from django.db.transaction import get_connection
 from django.test.utils import CaptureQueriesContext
 
@@ -21,9 +23,7 @@ _ROLES = {
 logger = getLogger(__name__)
 
 
-class BaseInvitesCommandMixin:
-    quiet = False
-
+class BaseInvitesCommand(BaseCommand):
     def add_base_arguments(self, parser):
         parser.add_argument("-m", help="Meeting pk", required=True)
         parser.add_argument("-u", help="Creating user pk", required=True)
@@ -40,7 +40,8 @@ class BaseInvitesCommandMixin:
             default=False,
         )
         parser.add_argument("-f", help="From file instead of stdin")
-        parser.add_argument("-q", help="Quiet")
+
+    def add_role_arguments(self, parser):
         parser.add_argument(
             "-P", help="Add proposer role", action="store_true", default=False
         )
@@ -50,11 +51,6 @@ class BaseInvitesCommandMixin:
         parser.add_argument(
             "-V", help="Add potential voter role", action="store_true", default=False
         )
-
-    def report(self, txt, lvl="debug", **kwargs):
-        if not self.quiet:
-            method = getattr(logger, lvl)
-            method(txt.format(**kwargs))
 
     def get_roles(self, options: dict) -> set[str]:
         roles = {str(ROLE_PARTICIPANT)}
@@ -71,13 +67,18 @@ class BaseInvitesCommandMixin:
             else:
                 cwd = os.getcwd()
                 filepath = os.path.join(cwd, filename)
-            self.report("Loading data from file: {filepath}", filepath=filepath)
+
+            self.stdout.write(f"Loading data from file: {filepath}")
             with open(filepath, "r") as f:
                 data = f.readlines()
+            if not data:
+                raise CommandError("Specified file empty")
         else:
-            data = sys.stdin.readlines()
-        if not data:
-            raise SystemExit("No data to work with")
+            data = None
+            if select.select([sys.stdin], [], [], 1.0)[0]:
+                data = sys.stdin.readlines()
+            if not data:
+                raise CommandError("No data received from STDIN")
         return data
 
     def run_cmd(self, cmd, options: dict):
@@ -87,7 +88,9 @@ class BaseInvitesCommandMixin:
                 result = cmd.run_job()
             if options.get("queries"):
                 # pprint(cqc.captured_queries)
-                self.report(f"Execution time: {et():.4f} secs - queries: {len(cqc)}")
+                self.stdout.write(
+                    f"Execution time: {et():.4f} secs - queries: {len(cqc)}"
+                )
         if options.get("dry_run"):
-            self.report("-- DRY RUN - save was aborted")
+            self.stdout.write(self.style.WARNING("-- DRY RUN - save was aborted"))
         return result

@@ -1,23 +1,17 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 
-from django.core.management import BaseCommand
-
-from voteit.invites.management.commands.base import BaseInvitesCommandMixin
+from voteit.invites.management.base import BaseInvitesCommand
 from voteit.invites.messages import AddInvites
 from voteit.meeting.models import Meeting
 
-if TYPE_CHECKING:
-    ...
-    # from voteit.core.models import User as UserType
 
-
-class Command(BaseCommand, BaseInvitesCommandMixin):
+class Command(BaseInvitesCommand):
     help = "Create meeting invites with different user data types. Either piped data or from file."
 
     def add_arguments(self, parser):
         self.add_base_arguments(parser)
+        self.add_role_arguments(parser)
         parser.add_argument(
             "--cols",
             help="Columns, comma separated. Must be specified unless first line is cols",
@@ -27,13 +21,11 @@ class Command(BaseCommand, BaseInvitesCommandMixin):
         self.quiet = options.get("q")
         meeting: Meeting = Meeting.objects.get(pk=options.get("m"))
         roles = self.get_roles(options)
-        self.report(
-            "Adding invites with roles: {roles} to meeting {meeting}",
-            roles=", ".join(roles),
-            meeting=meeting.title,
-        )
-        self.report(
-            "Note! This command will freeze if you haven't piped any data to STDIN or specified a file. Exit in that case."
+        self.stdout.write(
+            "Adding invites with roles: {roles} to meeting {meeting}".format(
+                roles=", ".join(roles),
+                meeting=meeting.title,
+            )
         )
         rows = self.get_data(options)
         cols = options.get("cols")

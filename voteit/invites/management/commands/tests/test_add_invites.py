@@ -27,7 +27,6 @@ class InviteAnnotationsIntegrationTests(TestCase):
 
     def call_command(self, *args, **kwargs):
         out = StringIO()
-        kwargs.setdefault("q", True)
         call_command(
             "add_invites",
             *args,

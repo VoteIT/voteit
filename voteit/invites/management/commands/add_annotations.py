@@ -1,19 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 
-from django.core.management import BaseCommand
-
-from voteit.invites.management.commands.base import BaseInvitesCommandMixin
+from voteit.invites.management.base import BaseInvitesCommand
 from voteit.invites.messages import AddInviteAnnotations
 from voteit.meeting.models import Meeting
 
-if TYPE_CHECKING:
-    ...
-    # from voteit.core.models import User as UserType
 
-
-class Command(BaseCommand, BaseInvitesCommandMixin):
+class Command(BaseInvitesCommand):
     help = "Create meeting invites with different user data types. Either piped data or from file."
 
     def add_arguments(self, parser):
@@ -27,13 +20,11 @@ class Command(BaseCommand, BaseInvitesCommandMixin):
         self.quiet = options.get("q")
         meeting: Meeting = Meeting.objects.get(pk=options.get("m"))
         roles = self.get_roles(options)
-        self.report(
-            "Adding invites with roles: {roles} to meeting {meeting}",
-            roles=", ".join(roles),
-            meeting=meeting.title,
-        )
-        self.report(
-            "Note! This command will freeze if you haven't piped any data to STDIN or specified a file. Exit in that case."
+        self.stdout.write(
+            "Adding invites with roles: {roles} to meeting {meeting}".format(
+                roles=", ".join(roles),
+                meeting=meeting.title,
+            )
         )
         rows = self.get_data(options)
         cols = options.get("cols")
@@ -51,7 +42,9 @@ class Command(BaseCommand, BaseInvitesCommandMixin):
         command.context = meeting
         for result in self.run_cmd(command, options):
             if result:
-                self.report(
-                    f"Annotation {result.name}\n"
-                    f"Added: {result.data.added} \nChanged: {result.data.changed} \nExisted: {result.data.existed}"
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"Annotation {result.name}\n"
+                        f"Added: {result.data.added} \nChanged: {result.data.changed} \nExisted: {result.data.existed}"
+                    )
                 )
