@@ -170,6 +170,9 @@ class InviteGroup(AnnotationDataAdapter):
                                 )
                                 if created:
                                     result.added += 1
+                                    # Only case were we need to add invite pk, since an annotation was created!
+                                    if invite.pk not in result.newly_annotated_invites:
+                                        result.newly_annotated_invites.append(invite.pk)
                                 else:
                                     result.changed += 1
             for i in reversed(popthis):

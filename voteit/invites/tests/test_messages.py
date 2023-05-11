@@ -198,6 +198,96 @@ class ClearInviteAnnotationsTests(TestCase):
         self.assertEqual({self.inv_din.pk, self.inv_luke.pk, self.inv_vader.pk}, pks)
 
 
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class AddInviteAnnotationsTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.org = Organisation.objects.get(pk=1)
+        cls.din = cls.org.users.create(username="din", email="vader@betahaus.net")
+        cls.luke = cls.org.users.create(username="luke", email="luke@betahaus.net")
+        cls.vader = cls.org.users.create(username="vader", email="vader@betahaus.net")
+        # Invite fixture
+        columns, rows = get_unvalidated_fixture_content("grouprole.csv")
+        cls.registry = get_invite_adapter_registry()
+        invite_data = list(cls.registry.build_ud_query_seq(columns, rows))
+        cls.meeting.invites.create_or_update_mixed(
+            data=invite_data, roles=[ROLE_PARTICIPANT], meeting=cls.meeting
+        )
+        cls.inv_din: MeetingInvite = MeetingInvite.objects.get(
+            user_data={"email": "din@betahaus.net"}
+        )
+        cls.inv_vader: MeetingInvite = MeetingInvite.objects.get(
+            user_data={"email": "vader@betahaus.net"}
+        )
+        cls.inv_luke: MeetingInvite = MeetingInvite.objects.get(
+            user_data={"email": "luke@betahaus.net"}
+        )
+        # A very unrelated invite
+        cls.unrelated_inv = cls.meeting.invites.create(
+            user_data={"email": "hello@world.com"}
+        )
+        # Groups
+        cls.group_sabreclub = cls.meeting.groups.create(groupid="sabreclub")
+        cls.group_sw = cls.meeting.groups.create(groupid="sw")
+        cls.role_sith = cls.meeting.group_roles.create(role_id="sith")
+        cls.role_jedi = cls.meeting.group_roles.create(role_id="jedi")
+
+    @property
+    def _cut(self):
+        from voteit.invites.messages import AddInviteAnnotations
+
+        return AddInviteAnnotations
+
+    def _mk_one(self, user_pk: int = 1, **kw):
+        kw.setdefault("meeting", 1)  # from fixture
+        return self._cut(mm={"consumer_name": "abc", "user_pk": user_pk}, **kw)
+
+    @patch.object(MeetingInvitesChannel, "sync_publish")
+    def test_invite_updated_msg_sent(self, mock_publish):
+        columns, rows = get_unvalidated_fixture_content("grouprole.csv")
+        msg = self._mk_one(rows=rows, columns=columns)
+        with self.captureOnCommitCallbacks(execute=True):
+            msg.run_job()
+
+        self.assertTrue(mock_publish.called)
+        messages = [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if x.args[0].name == MeetingInviteChanged.name
+        ]
+        pks = {x.data.pk for x in messages}
+        # Unrelated invite must not be here
+        self.assertEqual({self.inv_din.pk, self.inv_luke.pk, self.inv_vader.pk}, pks)
+        self.assertEqual({True}, {x.data.has_annotations for x in messages})
+
+    @patch.object(MeetingInvitesChannel, "sync_publish")
+    def test_invite_updated_msg_not_sent_if_not_new(self, mock_publish):
+        columns, rows = get_unvalidated_fixture_content("grouprole.csv")
+        msg = self._mk_one(rows=rows, columns=columns)
+        with self.captureOnCommitCallbacks(execute=True):
+            msg.run_job()
+        mock_publish.reset_mock()
+
+        # Only vader updated this time
+        self.inv_vader.group_annotations.all().delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            msg.run_job()
+
+        self.assertTrue(mock_publish.called)
+        messages = [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if x.args[0].name == MeetingInviteChanged.name
+        ]
+        pks = {x.data.pk for x in messages}
+        # Unrelated invite must not be here
+        self.assertEqual({self.inv_vader.pk}, pks)
+        self.assertEqual({True}, {x.data.has_annotations for x in messages})
+
+
 # @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 # class SendInvitesTests(TestCase):
 #     fixtures = ["meeting_test_fixture"]

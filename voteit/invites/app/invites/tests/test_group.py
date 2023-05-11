@@ -86,6 +86,11 @@ class GroupAnnotationTests(TestCase):
                 "existed": 0,
                 "name": self._cut.name,
                 "msg": None,
+                "newly_annotated_invites": [
+                    self.inv_vader.pk,
+                    self.inv_luke.pk,
+                    self.inv_din.pk,
+                ],
             },
             result.dict(),
         )
@@ -118,6 +123,10 @@ class GroupAnnotationTests(TestCase):
                 "existed": 3,
                 "name": self._cut.name,
                 "msg": None,
+                "newly_annotated_invites": [
+                    self.inv_vader.pk,
+                    self.inv_luke.pk,
+                ],
             },
             result.dict(),
         )
@@ -150,6 +159,10 @@ class GroupAnnotationTests(TestCase):
                 "existed": 3,
                 "name": self._cut.name,
                 "msg": None,
+                "newly_annotated_invites": [
+                    self.inv_vader.pk,
+                    self.inv_luke.pk,
+                ],
             },
             result.dict(),
         )
@@ -187,6 +200,7 @@ class GroupAnnotationTests(TestCase):
                 "existed": 4,
                 "name": self._cut.name,
                 "msg": None,
+                "newly_annotated_invites": [],
             },
             result.dict(),
         )

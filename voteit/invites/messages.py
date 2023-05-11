@@ -124,6 +124,7 @@ class AddInviteAnnotations(ContextAction):
         results = []
         with set_actor(self.user):
             with transaction.atomic(durable=True):
+                invite_pks_to_signal = set()
                 # FIXME: We need to send signal for annotated invites too
                 for annotation_result in self.invite_data_reg.run_annotations(
                     columns=self.data.columns,
@@ -140,8 +141,18 @@ class AddInviteAnnotations(ContextAction):
                         results.append(msg)
                         if msg.mm.consumer_name:  # In case it was run by a script
                             websocket_send(msg, state=self.RUNNING, on_commit=False)
+                        if annotation_result.newly_annotated_invites:
+                            invite_pks_to_signal.update(
+                                annotation_result.newly_annotated_invites
+                            )
                 if self.data.dryrun:
                     transaction.set_rollback(True)
+                else:
+                    send_updated_invites(
+                        self.context,
+                        self.context.invites.filter(pk__in=invite_pks_to_signal),
+                        annotate=True,
+                    )
             # FIXME Send signal in case of commit
         response = Status.from_message(self)
         if response.mm.consumer_name:  # In case it was run by a script

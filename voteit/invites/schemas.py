@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 from django.utils.translation import gettext as _
 from pydantic import BaseModel
+from pydantic import Field
 from pydantic import conlist
 from pydantic import constr
 from pydantic import validator
@@ -148,10 +149,12 @@ class InvitesResultSchema(BaseModel):
 
 
 class AnnotationResultSchema(InvitesResultSchema):
-    name: str
-    msg: str | None
     # added, changed and existed should be used equally for registered
     # users and users who haven't used an invitation yet.
+    name: str
+    msg: str | None
+    # Any invite that got a new annotation - ie we might want to send InviteChanged message with has_annotations
+    newly_annotated_invites: list[int] = Field(default_factory=list)
 
 
 class InviteDataTypesSchema(BaseModel):
