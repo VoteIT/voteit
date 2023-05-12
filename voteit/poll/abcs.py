@@ -97,6 +97,8 @@ class ElectoralRegisterPolicy(ABC):
     handles_active_check: bool = False
     # Does this method require group votes to be disabled or enabled?
     group_votes_active: bool | None = None
+    # Can this method handle group votes delegated to other groups?
+    handles_delegate_to: bool = False
 
     def __init__(self, meeting: Meeting):
         self.meeting = meeting

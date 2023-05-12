@@ -333,6 +333,7 @@ class ElectoralRegisterPolicyViewSetTests(APITestCase):
                 "group_votes_active": False,
                 "handles_vote_weight": False,
                 "handles_active_check": False,
+                "handles_delegate_to": False,
                 "name": "auto_always",
                 "title": "Automatic always",
             },

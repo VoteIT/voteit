@@ -4,10 +4,10 @@ from collections import Counter
 from random import Random
 from typing import TYPE_CHECKING
 
+from django.db import models
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 if TYPE_CHECKING:
-    from django.db.models import QuerySet
     from voteit.meeting.models import MeetingGroup
     from voteit.core.models import User as UserType
     from voteit.meeting.models import Meeting
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def calc_group_votes_equal(
     *,
     meeting: Meeting,
-    only_users_qs: QuerySet[UserType] | None = None,
+    only_users_qs: models.QuerySet[UserType] | None = None,
     seed: int | None = None,
 ) -> dict[int, int]:
     """
@@ -24,24 +24,32 @@ def calc_group_votes_equal(
     Use random distribution for left-overs.
     """
     counter = Counter()
-    groups_qs = meeting.groups.filter(votes__gt=0).prefetch_related("members")
+    # Remove groups that have delegated their vote somewhere
+    groups_qs = meeting.groups.filter(delegate_to__isnull=True)
+    # Sum actual vote weight
+    groups_qs = groups_qs.annotate(
+        delegated_sum=models.Sum("delegations_from__votes")
+    ).filter(models.Q(votes__gt=0) | models.Q(delegated_sum__gt=0))
+    groups_qs = groups_qs.prefetch_related("members")
     potential_voters_pks = meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
+    if seed is None:
+        seed = meeting.pk
+    rnd = Random(seed)
     for group in groups_qs:
         group: MeetingGroup
         mqs = group.members.filter(pk__in=potential_voters_pks)
         if only_users_qs is not None:
             mqs = mqs & only_users_qs
-        user_pks = list(mqs.values_list("pk", flat=True))
+        user_pks = sorted(mqs.values_list("pk", flat=True))
         if not user_pks:
             # Avoid div 0
             continue
-        full, rest = divmod(group.votes, len(user_pks))
+        # Annotated instance, but MyPy will complain
+        votes_sum = sum(x for x in [group.votes, group.delegated_sum] if x)
+        full, rest = divmod(votes_sum, len(user_pks))
         for pk in user_pks:
             counter[pk] += full
         if rest:
-            if seed is None:
-                seed = meeting.pk
-            rnd = Random(seed)
             rnd.shuffle(user_pks)
             for pk in user_pks:
                 counter[pk] += 1

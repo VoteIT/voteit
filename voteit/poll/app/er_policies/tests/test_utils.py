@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.test import TestCase
 
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingGroup
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.app.er_policies.group_auto_rnd_before_poll import (
     GroupAutoRandomBeforePoll,
@@ -29,8 +31,8 @@ class CalcGroupVotesEqualTests(TestCase):
         cls.meeting.add_roles(cls.one, ROLE_POTENTIAL_VOTER)
         cls.meeting.add_roles(cls.two, ROLE_POTENTIAL_VOTER)
         cls.meeting.add_roles(cls.three, ROLE_POTENTIAL_VOTER)
-        cls.group_one = cls.meeting.groups.create(groupid="one")
-        cls.group_two = cls.meeting.groups.create(groupid="two")
+        cls.group_one: MeetingGroup = cls.meeting.groups.create(groupid="one")
+        cls.group_two: MeetingGroup = cls.meeting.groups.create(groupid="two")
         cls.group_one.members.add(cls.one, cls.two, cls.three)
         cls.group_two.members.add(cls.one, cls.two, cls.three)
 
@@ -112,3 +114,42 @@ class CalcGroupVotesEqualTests(TestCase):
         self.group_two.save()
         er_two = self.meeting.er_policy.create_er()
         self.assertNotEqual(er_one, er_two)
+
+    def test_delegated(self):
+        self.group_one.votes = 6
+        self.group_one.members.set([self.one])
+        self.group_one.save()
+        self.group_two.votes = 6
+        self.group_two.members.set([self.two, self.three])
+        self.group_two.delegate_to = self.group_one
+        self.group_two.save()
+        self.assertEqual(
+            {self.one.pk: 12},
+            self._fut(meeting=self.meeting),
+        )
+
+    def test_delegate_with_votes_none(self):
+        self.group_one.votes = 6
+        self.group_one.members.set([self.one])
+        self.group_one.save()
+        self.group_two.votes = None
+        self.group_two.members.set([self.two, self.three])
+        self.group_two.delegate_to = self.group_one
+        self.group_two.save()
+        self.assertEqual(
+            {self.one.pk: 6},
+            self._fut(meeting=self.meeting),
+        )
+
+    def test_delegate_with_votes_receving_none(self):
+        self.group_one.votes = None
+        self.group_one.members.set([self.one])
+        self.group_one.save()
+        self.group_two.votes = 3
+        self.group_two.members.set([self.two, self.three])
+        self.group_two.delegate_to = self.group_one
+        self.group_two.save()
+        self.assertEqual(
+            {self.one.pk: 3},
+            self._fut(meeting=self.meeting),
+        )
