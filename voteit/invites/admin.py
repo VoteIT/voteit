@@ -14,14 +14,25 @@ logger = getLogger(__name__)
 class MeetingGroupAnnotationInline(admin.TabularInline):
     model = MeetingGroupAnnotation
     fields = "meeting_group", "group_role"
+    autocomplete_fields = (
+        "meeting_group",
+        "group_role",
+    )
     extra = 1
 
 
 @admin.register(MeetingInvite)
 class MeetingInviteAdmin(FSMTransitionMixin, MeetingAdminMixin, admin.ModelAdmin):
     fsm_field = ("state",)
-    search_fields = ("user_data__email", "user_data__swedish_ssn", "meeting__title")
-    readonly_fields = ("state",)
+    search_fields = (
+        "user_data__email",
+        "user_data__swedish_ssn",
+        "meeting__title",
+    )
+    readonly_fields = (
+        "state",
+        "created_by",
+    )
     list_display = (
         "__str__",
         "meeting_link",
@@ -37,6 +48,7 @@ class MeetingInviteAdmin(FSMTransitionMixin, MeetingAdminMixin, admin.ModelAdmin
     autocomplete_fields = (
         "meeting",
         "used_by",
+        "created_by",
     )
     inlines = (MeetingGroupAnnotationInline,)
 
