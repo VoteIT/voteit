@@ -141,7 +141,7 @@ class CalcGroupVotesEqualTests(TestCase):
             self._fut(meeting=self.meeting),
         )
 
-    def test_delegate_with_votes_receving_none(self):
+    def test_delegate_with_votes_receiving_none(self):
         self.group_one.votes = None
         self.group_one.members.set([self.one])
         self.group_one.save()
