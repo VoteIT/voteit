@@ -33,9 +33,6 @@ from voteit.proposal.rest_api.serializers import TextDocumentSerializer
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
 
-_PROP_FIELDS = set(ProposalDetailSerializer.Meta.fields)
-_PROP_FIELDS.remove("shortname")
-
 
 def attach_proposals(meeting: Meeting, app_state: AppState, include_private=False):
     # Proposals
@@ -46,9 +43,8 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
     )
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
-    for data in qs.values(*_PROP_FIELDS):
-        app_state.append(ProposalAdded(data=data, shortname=Proposal.name))
-    # DiffProposals - could be changed to values list too if the adjust the method on the serializer for diff body
+    app_state.append_from_queryset(qs, ProposalDetailSerializer, ProposalAdded)
+    # DiffProposals - could be changed to values list too if they adjust the method on the serializer for diff body
     qs = DiffProposal.objects.filter(agenda_item__meeting=meeting).prefetch_related(
         "mentions", "paragraph"
     )
