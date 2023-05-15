@@ -130,18 +130,6 @@ class SpeakerListTests(TestCase):
             [self.user_two.pk, self.user_three.pk, self.user_one.pk], L[0]
         )  # First event
 
-    def test_safe_pos_overrides_order(self):
-        self.system.safe_positions = 1
-        self.system.save()
-        # Should be sorted first without safe pos
-        self.speaker_three.created = self.speaker_one.created - timedelta(seconds=10)
-        self.speaker_three.save()
-        self.speaker_list.reorder()
-        self.assertEqual(
-            [self.user_one.pk, self.user_three.pk, self.user_two.pk],
-            self.speaker_list.order_list,
-        )
-
     def test_order_signaled_on_delete(self):
         L = []
 

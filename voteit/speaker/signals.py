@@ -171,12 +171,6 @@ def speaker_attached_through_m2m(
         instance.reorder()
 
 
-@receiver(post_delete, sender=Speaker)
-def reorder_after_delete(sender: type[Speaker], instance: Speaker, **kwargs):
-    if instance.in_queue:
-        instance.speaker_list.reorder()
-
-
 # Channels
 @receiver(channel_subscribed, sender=MeetingChannel)
 def meeting_channel_subscribed(
