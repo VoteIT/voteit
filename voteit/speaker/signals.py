@@ -8,9 +8,9 @@ from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
+
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import disable_on_raw_save
@@ -50,88 +50,7 @@ if TYPE_CHECKING:
     from envelope.utils import AppState
 
 
-@receiver(m2m_changed, sender=Speaker)
-def speaker_attached_through_m2m(
-    instance, reverse: bool, pk_set: set[int], action: str, **kwargs
-):
-    if (
-        action == "post_add"
-        and isinstance(instance, SpeakerList)
-        and not pk_set.issubset(instance.order_list)
-    ):
-
-        instance.reorder()
-
-
-@receiver(post_delete, sender=Speaker)
-def reorder_after_delete(sender: type[Speaker], instance: Speaker, **kwargs):
-    if instance.in_queue:
-        instance.speaker_list.reorder()
-
-
-@receiver(channel_subscribed, sender=MeetingChannel)
-def meeting_channel_subscribed(
-    context: Meeting, app_state: AppState, user: AbstractUser, **kw
-):
-    """
-    Send current state to meeting channel.
-    - Speaker systems
-    - User roles within speaker systems
-    """
-    systems_qs = context.speaker_systems.all()
-    app_state.append_from_queryset(
-        systems_qs, SpeakerListSystemSerializer, SpeakerSystemAdded
-    )
-    for system in systems_qs:
-        # Roles
-        roles = system.get_roles(user)
-        if roles:
-            msg = RolesAdded(
-                roles=system.roles_to_strings(*roles),
-                pk=system.pk,
-                model=get_model_shortname(system),
-                user_pk=user.pk,
-            )
-            app_state.append(msg)
-
-
-@receiver(post_save, sender=SpeakerList)
-@disable_on_raw_save
-def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **kw):
-    """
-    Send to Agenda or meeting channel depending on if it's the active list.
-    """
-    if created:
-        msg_class = SpeakerListAdded
-    else:
-        msg_class = SpeakerListChanged
-    data = SpeakerListSerializer(instance).data
-    msg = msg_class(**data)
-    with suppress(AgendaItem.DoesNotExist):
-        if instance.agenda_item:
-            ai_channel = AgendaItemChannel.from_instance(instance.agenda_item)
-            ai_channel.sync_publish(msg)
-    with suppress(SpeakerListSystem.DoesNotExist):
-        if instance.is_active_list:
-            sls_channel = SpeakerListSystemChannel.from_instance(
-                instance.speaker_system
-            )
-            sls_channel.sync_publish(msg)
-
-
-#
-@receiver(pre_delete, sender=SpeakerList)
-@disable_on_raw_save
-def notify_deleted_speaker_list(instance: SpeakerList, **kw):
-    """
-    We'll send deleted speaker lists to the meeting so they'll always get picked up.
-    """
-    if instance.meeting:
-        msg = SpeakerListDeleted(pk=instance.pk)
-        ch = MeetingChannel.from_instance(instance.meeting)
-        ch.sync_publish(msg)
-
-
+# System signals
 @receiver(post_save, sender=SpeakerListSystem)
 @disable_on_raw_save
 def notify_added_or_changed_speaker_system(
@@ -167,6 +86,124 @@ def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
         ch.sync_publish(msg)
 
 
+# List signals
+@receiver(post_save, sender=SpeakerList)
+@disable_on_raw_save
+def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **kw):
+    """
+    Send to Agenda or meeting channel depending on if it's the active list.
+    """
+    if created:
+        msg_class = SpeakerListAdded
+    else:
+        msg_class = SpeakerListChanged
+    data = SpeakerListSerializer(instance).data
+    msg = msg_class(**data)
+    with suppress(AgendaItem.DoesNotExist):
+        if instance.agenda_item:
+            ai_channel = AgendaItemChannel.from_instance(instance.agenda_item)
+            ai_channel.sync_publish(msg)
+    with suppress(SpeakerListSystem.DoesNotExist):
+        if instance.is_active_list:
+            sls_channel = SpeakerListSystemChannel.from_instance(
+                instance.speaker_system
+            )
+            sls_channel.sync_publish(msg)
+
+
+@receiver(pre_delete, sender=SpeakerList)
+@disable_on_raw_save
+def notify_deleted_speaker_list(instance: SpeakerList, **kw):
+    """
+    We'll send deleted speaker lists to the meeting so they'll always get picked up.
+    """
+    if instance.meeting:
+        msg = SpeakerListDeleted(pk=instance.pk)
+        ch = MeetingChannel.from_instance(instance.meeting)
+        ch.sync_publish(msg)
+
+
+# Speaker signals
+@receiver(pre_delete, sender=Speaker)
+@disable_on_raw_save
+def push_speaker_deleted(instance: Speaker, **kwargs):
+    if instance.speaker_list.is_active_list:
+        msg = SpeakerDeleted(pk=instance.pk)
+        ch = SpeakerListSystemChannel.from_instance(instance.speaker_system)
+        ch.sync_publish(msg)
+
+
+@receiver(post_delete, sender=Speaker)
+@disable_on_raw_save
+def reorder_when_speaker_deleted(instance: Speaker, **kwargs):
+    instance.speaker_list.reorder()
+
+
+@receiver(post_save, sender=Speaker)
+@disable_on_raw_save
+@on_transaction_commit
+def push_speaker_changed(instance: Speaker, created=False, **kwargs):
+    """
+    We mostly care about currently speaking, stopped + historic speakers here,
+    since other items are part of the speaker list. But since speakers who've started speaking
+    and then pushed back to queue via undo will be reset, this should be sent on every change.
+    """
+    if created:
+        # Speakers in the queue are sent as order instead. We only care about started or historic speakers
+        return
+    if instance.speaker_list.is_active_list:
+        if instance.speaker_list.speaker_system is not None:
+            data = SpeakerSerializer(instance).data
+            msg = SpeakerChanged(data=data)
+            ch = SpeakerListSystemChannel.from_instance(instance.speaker_system)
+            ch.sync_publish(msg, on_commit=False)  # Already post transaction
+
+
+@receiver(m2m_changed, sender=Speaker)
+def speaker_attached_through_m2m(
+    instance, reverse: bool, pk_set: set[int], action: str, **kwargs
+):
+    if (
+        action == "post_add"
+        and isinstance(instance, SpeakerList)
+        and not pk_set.issubset(instance.order_list)
+    ):
+        instance.reorder()
+
+
+@receiver(post_delete, sender=Speaker)
+def reorder_after_delete(sender: type[Speaker], instance: Speaker, **kwargs):
+    if instance.in_queue:
+        instance.speaker_list.reorder()
+
+
+# Channels
+@receiver(channel_subscribed, sender=MeetingChannel)
+def meeting_channel_subscribed(
+    context: Meeting, app_state: AppState, user: AbstractUser, **kw
+):
+    """
+    Send current state to meeting channel.
+    - Speaker systems
+    - User roles within speaker systems
+    """
+    systems_qs = context.speaker_systems.all()
+    app_state.append_from_queryset(
+        systems_qs, SpeakerListSystemSerializer, SpeakerSystemAdded
+    )
+    for system in systems_qs:
+        # Roles
+        roles = system.get_roles(user)
+        if roles:
+            msg = RolesAdded(
+                roles=system.roles_to_strings(*roles),
+                pk=system.pk,
+                model=get_model_shortname(system),
+                user_pk=user.pk,
+            )
+            app_state.append(msg)
+
+
 @receiver(channel_subscribed, sender=SpeakerListSystemChannel)
 def list_system_channel_subscribed(
     context: SpeakerListSystem, app_state: AppState, **kw
@@ -194,12 +231,14 @@ def ai_channel_subscribed(
     app_state.append_from_queryset(lists_qs, SpeakerListSerializer, SpeakerListAdded)
 
 
+# Archiving
 @receiver(archive_meeting)
 def close_and_cleanup(meeting, **kw):
     for system in meeting.speaker_systems.all():
         system.archive()
 
 
+# Roles
 @receiver(roles_added, sender=SpeakerSystemRoles)
 def make_speaker_system_users_participants(instance: SpeakerSystemRoles, **kw):
     """
@@ -258,38 +297,3 @@ def push_roles_removed(instance: SpeakerSystemRoles, roles: list[Role], **kwargs
             user_pk=instance.user.pk,
         ),
     )
-
-
-@receiver(pre_delete, sender=Speaker)
-@disable_on_raw_save
-def push_speaker_deleted(instance: Speaker, **kwargs):
-    if instance.speaker_list.is_active_list:
-        msg = SpeakerDeleted(pk=instance.pk)
-        ch = SpeakerListSystemChannel.from_instance(instance.speaker_system)
-        ch.sync_publish(msg)
-
-
-@receiver(post_delete, sender=Speaker)
-@disable_on_raw_save
-def reorder_when_speaker_deleted(instance: Speaker, **kwargs):
-    instance.speaker_list.reorder()
-
-
-@receiver(post_save, sender=Speaker)
-@disable_on_raw_save
-@on_transaction_commit
-def push_speaker_changed(instance: Speaker, created=False, **kwargs):
-    """
-    We mostly care about currently speaking, stopped + historic speakers here,
-    since other items are part of the speaker list. But since speakers who've started speaking
-    and then pushed back to queue via undo will be reset, this should be sent on every change.
-    """
-    if created:
-        # Speakers in the queue are sent as order instead. We only care about started or historic speakers
-        return
-    if instance.speaker_list.is_active_list:
-        if instance.speaker_list.speaker_system is not None:
-            data = SpeakerSerializer(instance).data
-            msg = SpeakerChanged(data=data)
-            ch = SpeakerListSystemChannel.from_instance(instance.speaker_system)
-            ch.sync_publish(msg, on_commit=False)  # Already post transaction
