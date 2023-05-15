@@ -61,11 +61,13 @@ class SubscribedTests(TestCase):
         )
         msg = command.run_job()
         agenda_pks = {
-                x.p["agenda_item"]
-                for x in msg.data.app_state
-                if x.t == "last_read.changed"
+            x.p["agenda_item"] for x in msg.data.app_state if x.t == "last_read.changed"
         }
         self.assertEqual({self.ai_private.pk}, agenda_pks)
+        timestamps = {
+            x.p["timestamp"] for x in msg.data.app_state if x.t == "last_read.changed"
+        }
+        self.assertIsInstance(timestamps.pop(), str)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

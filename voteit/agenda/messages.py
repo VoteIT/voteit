@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 
 from pydantic import BaseModel
+from pydantic import validator
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
 from envelope.utils import websocket_send
+from django.utils import timezone
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
@@ -84,8 +86,23 @@ class AgendaDeleted(BaseObjectDeleted):
 
 
 class LastReadChangedSchema(BaseModel):
-    timestamp: datetime
+    """
+    >>> from django.utils.timezone import now
+    >>> one=LastReadChangedSchema(agenda_item=1, timestamp=now())
+    >>> isinstance(one.timestamp, str)
+    True
+    """
+
+    timestamp: str
     agenda_item: int
+
+    @validator("timestamp", pre=True)
+    def convert_dt(cls, v):
+        if isinstance(v, datetime):
+            tz = timezone.get_current_timezone()
+            v = v.astimezone(tz)
+            return v.isoformat()
+        return v
 
 
 @outgoing
