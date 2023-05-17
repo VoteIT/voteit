@@ -19,7 +19,10 @@ if TYPE_CHECKING:
 
 
 class InviteDataAdapter(ABC):
-    is_clearable: bool = False  # This is information to frontend that clear can be run
+    # This is information to frontend that clear can be run
+    is_clearable: bool = False
+    # Some adapters are just markers that don't process the data themselves
+    is_runnable: bool = True
 
     def __init__(self, invite: MeetingInvite):
         self.invite = invite

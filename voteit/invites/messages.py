@@ -8,6 +8,8 @@ from auditlog.context import set_actor
 from django.db import transaction
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
+from envelope.messages.common import ProgressNum
+from envelope.messages.common import ProgressSchema
 from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
@@ -126,15 +128,33 @@ class AddInviteAnnotations(ContextAction):
             with transaction.atomic(durable=True):
                 invite_pks_to_signal = set()
                 # FIXME: We need to send signal for annotated invites too
-                for annotation_result in self.invite_data_reg.run_annotations(
-                    columns=self.data.columns,
-                    rows=self.data.rows,
-                    invites_qs=existing_qs,
-                    meeting=self.context,
+                total_ann_count = sum(
+                    x.is_runnable
+                    for x in self.invite_data_reg.get_annotations(
+                        columns=self.data.columns
+                    )
+                )
+                initial_msg = ProgressNum.from_message(
+                    self, curr=0, total=total_ann_count
+                )
+                if initial_msg.mm.consumer_name:  # In case it was run by a script
+                    websocket_send(
+                        initial_msg, state=initial_msg.RUNNING, on_commit=False
+                    )
+                for i, annotation_result in enumerate(
+                    self.invite_data_reg.run_annotations(
+                        columns=self.data.columns,
+                        rows=self.data.rows,
+                        invites_qs=existing_qs,
+                        meeting=self.context,
+                    ),
+                    1,
                 ):
                     if annotation_result is None:
                         results.append(None)
                     else:
+                        annotation_result.curr = i
+                        annotation_result.total = total_ann_count
                         msg = AnnotationResult.from_message(
                             self, data=annotation_result.dict()
                         )

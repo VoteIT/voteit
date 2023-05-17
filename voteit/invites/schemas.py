@@ -166,6 +166,9 @@ class AnnotationResultSchema(InvitesResultSchema):
     # users and users who haven't used an invitation yet.
     name: str
     msg: str | None
+    # Progress
+    curr: int | None
+    total: int | None
     # Any invite that got a new annotation - ie we might want to send InviteChanged message with has_annotations
     newly_annotated_invites: list[int] = Field(default_factory=list)
 
@@ -176,6 +179,7 @@ class InviteDataTypesSchema(BaseModel):
     is_user_data: bool
     is_annotation: bool
     is_clearable: bool
+    is_runnable: bool
 
     @validator("title", pre=True)
     def translate(cls, v):

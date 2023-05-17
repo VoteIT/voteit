@@ -63,7 +63,7 @@ class GroupAnnotationTests(TestCase):
         with self.assertRaises(ValueError) as cm:
             self._cut.validate(columns=columns, rows=rows, meeting=self.meeting)
         self.assertEqual(
-            "The following groupids don't exist: sabreclub", str(cm.exception)
+            "The following groupids doesn't exist: sabreclub", str(cm.exception)
         )
 
     def test_annotate(self):
@@ -79,6 +79,11 @@ class GroupAnnotationTests(TestCase):
             meeting=self.meeting,
             registry=self.registry,
         )
+        data = result.dict()
+        self.assertEqual(
+            {self.inv_vader.pk, self.inv_luke.pk, self.inv_din.pk},
+            set(data.pop("newly_annotated_invites")),
+        )
         self.assertEqual(
             {
                 "added": 5,
@@ -86,13 +91,10 @@ class GroupAnnotationTests(TestCase):
                 "existed": 0,
                 "name": self._cut.name,
                 "msg": None,
-                "newly_annotated_invites": [
-                    self.inv_vader.pk,
-                    self.inv_luke.pk,
-                    self.inv_din.pk,
-                ],
+                "curr": None,
+                "total": None,
             },
-            result.dict(),
+            data,
         )
 
     def test_annotate_some_existed(self):
@@ -121,6 +123,8 @@ class GroupAnnotationTests(TestCase):
                 "added": 2,
                 "changed": 0,
                 "existed": 3,
+                "curr": None,
+                "total": None,
                 "name": self._cut.name,
                 "msg": None,
                 "newly_annotated_invites": [
@@ -159,6 +163,8 @@ class GroupAnnotationTests(TestCase):
                 "existed": 3,
                 "name": self._cut.name,
                 "msg": None,
+                "curr": None,
+                "total": None,
                 "newly_annotated_invites": [
                     self.inv_vader.pk,
                     self.inv_luke.pk,
@@ -200,6 +206,8 @@ class GroupAnnotationTests(TestCase):
                 "existed": 4,
                 "name": self._cut.name,
                 "msg": None,
+                "curr": None,
+                "total": None,
                 "newly_annotated_invites": [],
             },
             result.dict(),

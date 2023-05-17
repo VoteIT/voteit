@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from json import loads
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
@@ -7,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
+from envelope.utils import channel_layer
 from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteAdded
@@ -287,3 +289,18 @@ class AddInviteAnnotationsTests(TestCase):
         # Unrelated invite must not be here
         self.assertEqual({self.inv_vader.pk}, pks)
         self.assertEqual({True}, {x.data.has_annotations for x in messages})
+
+    @patch.object(channel_layer, "send")  # Probably better to patch elsewhere later on
+    def test_progress_messages_sent(self, mock_send):
+        columns, rows = get_unvalidated_fixture_content("grouprole.csv")
+        msg = self._mk_one(rows=rows, columns=columns)
+        with self.captureOnCommitCallbacks(execute=True):
+            msg.run_job()
+
+        self.assertTrue(mock_send.called)
+        messages = [loads(x.args[1]["text_data"]) for x in mock_send.mock_calls]
+        self.assertEqual(2, len(messages))
+        self.assertEqual({"curr": 0, "total": 1, "msg": None}, messages[0]["p"])
+        ann_data = messages[1]["p"]
+        self.assertEqual(1, ann_data["curr"])
+        self.assertEqual(1, ann_data["total"])

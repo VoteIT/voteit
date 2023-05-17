@@ -30,6 +30,7 @@ class InviteGroupRole(AnnotationDataAdapter):
     name = "grouprole"
     schema = GroupRoleSchema
     title = _("Group role")
+    is_runnable = False
 
     @classmethod
     def check_column_req(cls, columns: list[str]):
