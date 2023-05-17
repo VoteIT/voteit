@@ -31,7 +31,6 @@ class InvitesMetaMixinSchema(BaseModel):
 
 
 class RowColInvitesBaseSchema(BaseModel):
-
     columns: conlist(
         constr(
             strip_whitespace=True,
@@ -52,6 +51,12 @@ class RowColInvitesBaseSchema(BaseModel):
     )
     dryrun: bool = False  # Abort transaction when complete!
 
+    @validator("columns")
+    def validate_columns_requirements(cls, v: list[str]):
+        reg = get_invite_adapter_registry()
+        reg.check_column_req(v)
+        return v
+
     @validator("rows", pre=True)
     def convert_rows(cls, v, values: dict):
         if isinstance(v, str):
@@ -65,16 +70,14 @@ class RowColInvitesBaseSchema(BaseModel):
                     result.append([x.strip() if isinstance(x, str) else x for x in row])
                 else:
                     raise ValueError(f"Got bogus value on row {i}: {row}")
+            if "columns" not in values:
+                raise ValueError(
+                    "Couldn't validate rows because of invalid column names"
+                )
             reg = get_invite_adapter_registry()
             reg.preflight(values["columns"], result)
             return result
         raise ValueError("Initial value of rows must be either string or list")
-
-    @validator("columns")
-    def validate_columns_requirements(cls, v: list[str]):
-        reg = get_invite_adapter_registry()
-        reg.check_column_req(v)
-        return v
 
     @validator("rows")
     def check_user_data_intersections(cls, v: list[list[str]], values: dict):
@@ -131,9 +134,19 @@ class AddMixedUserDataInvitesSchema(RowColInvitesBaseSchema, InvitesMetaMixinSch
     >>> AddMixedUserDataInvitesSchema(columns=['email', 'swedish_ssn'], rows=[['a@boo.com', '121212-1212'],['a@boo.com', '20200101-2398']], **base_qs)
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError: 1 validation error for AddAnnotatedInvitesSchema
+    pydantic.error_wrappers.ValidationError: 2 validation error for AddAnnotatedInvitesSchema
     rows
       The value email=a@boo.com is used within different subsets of user data. Offending row: 1 (type=value_error)
+
+    Bad column name
+    >>> AddMixedUserDataInvitesSchema(columns=['bad'], rows=[['123']], **base_qs)
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 2 validation errors for AddMixedUserDataInvitesSchema
+    columns
+      bad is not a valid column (type=value_error)
+    rows
+      Couldn't validate rows because of invalid column names (type=value_error)
     """
 
 
