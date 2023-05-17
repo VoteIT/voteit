@@ -60,19 +60,12 @@ class ListMethod(ABC):
         Human-readable explanation of what this does.
         """
 
-    def get_spoken_count(
-        self, speaker_list: SpeakerList, user: AbstractUser | int
-    ) -> int:
-        if not isinstance(user, int):
-            user = user.pk
-        return speaker_list.speaker_items.filter(
-            seconds__isnull=False, user_id=user
-        ).count()
-
     def shuffle(self, speaker_list: SpeakerList) -> list[int]:
         """
         Shuffle order - should always be handled within an atomic transaction.
-        It fetches speaker objects rather than usign the cached speaker_list.order
+        It fetches speaker objects rather than using the cached speaker_list.order.
+
+        The reason for this somewhat odd solution: Keep order even when other methods may reorder later on.
         """
         speaker_qs = speaker_list.speakers_in_queue()
         new_order = list(
@@ -87,6 +80,7 @@ class ListMethod(ABC):
             speaker.save()
         return new_order
 
+    @abstractmethod
     def reorder(self, speaker_list: SpeakerList) -> list[int]:
         """
         Override this method to implement actual quotas or similar.
@@ -97,13 +91,3 @@ class ListMethod(ABC):
 
         Handle within an atomic transaction.
         """
-        resorted_queue = speaker_list.get_user_pk_in_queue_created_order()
-        if speaker_list.speaker_system.safe_positions:
-            safe_in_queue = speaker_list.order_list[
-                : speaker_list.speaker_system.safe_positions
-            ]
-            for pk in reversed(safe_in_queue):
-                if pk in resorted_queue:
-                    resorted_queue.remove(pk)
-                    resorted_queue.insert(0, pk)
-        return resorted_queue

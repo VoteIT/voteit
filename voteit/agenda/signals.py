@@ -16,6 +16,7 @@ from voteit.agenda.messages import AgendaDeleted
 from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import AgendaItemSerializer
+from voteit.agenda.rest_api.serializers import LastReadSerializer
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.decorators import disable_on_raw_save
@@ -65,14 +66,12 @@ def moderators_channel_subscribed(
 def meeting_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    for last_read in context.last_read_set.filter(user=user):
+    # lr_qs = context.last_read_set.filter(user=user).values("timestamp", "agenda_item")
+    serializer = LastReadSerializer(context.last_read_set.filter(user=user), many=True)
+    for data in serializer.data:
         # This will cause last read to be sent for private agenda items that the user has visited,
         # but that shouldn't be a problem.
-        app_state.append(
-            LastReadChanged(
-                timestamp=last_read.timestamp, agenda_item=last_read.agenda_item_id
-            )
-        )
+        app_state.append(LastReadChanged(**data))
 
 
 @receiver(post_save, sender=AgendaItem)
