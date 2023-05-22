@@ -59,7 +59,8 @@ class MeetingInviteViewSet(
         for adapter in reg.values():
             if adapter.is_annotation:
                 adapted = adapter(instance)
-                annotations.extend(adapted.get_annotations())
+                for adata in adapted.get_annotations():
+                    annotations.append({'name': adapter.name, **adata})
         return Response(data)
 
     def list(self, *args, **kwargs):

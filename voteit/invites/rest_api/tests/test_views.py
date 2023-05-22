@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from base64 import b64encode
 from datetime import timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING
@@ -109,7 +108,9 @@ class MeetingInviteViewSetTests(APITestCase):
         self.assertEqual(
             {
                 "pk": self.invite.pk,
-                "annotations": [{"meeting_group": grp.pk, "role": None}],
+                "annotations": [
+                    {"meeting_group": grp.pk, "role": None, "name": "group"}
+                ],
             },
             data,
         )
