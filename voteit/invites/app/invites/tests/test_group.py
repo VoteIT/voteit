@@ -58,7 +58,7 @@ class GroupAnnotationTests(TestCase):
         with self.assertRaises(ValueError) as cm:
             self._cut.validate(columns=columns, rows=rows, meeting=self.meeting)
         self.assertEqual(
-            "The following groupids don't exist: sabreclub", str(cm.exception)
+            "The following groupids doesn't exist: sabreclub", str(cm.exception)
         )
 
     def test_annotate(self):
