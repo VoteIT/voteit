@@ -1,6 +1,8 @@
+from contextlib import suppress
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils.functional import cached_property
 from rest_framework import mixins
@@ -60,7 +62,7 @@ class MeetingInviteViewSet(
             if adapter.is_annotation:
                 adapted = adapter(instance)
                 for adata in adapted.get_annotations():
-                    annotations.append({'name': adapter.name, **adata})
+                    annotations.append({"name": adapter.name, **adata})
         return Response(data)
 
     def list(self, *args, **kwargs):
@@ -192,9 +194,15 @@ class InviteDataTypesViewSet(ViewSet):
     permission_classes = [IsAuthenticated]
 
     def list(self, request):
+        scopes = ["email"]
+        with suppress(ObjectDoesNotExist, AttributeError):
+            scope = request.user.organisation.provider.scope
+            scopes = scope.split()
         reg = get_invite_adapter_registry()
         results = []
         for v in reg.values():
+            if v.is_user_data and v.name not in scopes:
+                continue
             data = InviteDataTypesSchema.from_orm(v)
             results.append(data.dict())
         return Response(data=results)
