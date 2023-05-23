@@ -31,6 +31,7 @@ class SignalsTests(TestCase):
             component_name=ActiveUsersComponent.name, state=EnabledWf.ON
         )
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.active_user, ROLE_PARTICIPANT)
         cls.active = cls.meeting.active_users.create(user=cls.active_user)
 
     def _mk_msg(self):
@@ -92,3 +93,8 @@ class SignalsTests(TestCase):
         self.assertIsInstance(msg, ActiveUsers)
         self.assertEqual(msg.data.users, [self.active_user.pk])
         self.assertEqual(msg.data.meeting, self.meeting.pk)
+
+    def test_removing_user_from_meeting_removes_active(self):
+        self.meeting.remove_roles(self.active_user, ROLE_PARTICIPANT)
+        with self.assertRaises(self.active.DoesNotExist):
+            self.active.refresh_from_db()

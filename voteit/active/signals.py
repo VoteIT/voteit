@@ -18,6 +18,7 @@ from voteit.core.decorators import on_transaction_commit
 from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingRoles
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
@@ -60,3 +61,8 @@ def _send_active_user_created(*, instance: ActiveUser, created, **kwargs):
 @receiver(pre_delete, sender=ActiveUser)
 def _send_active_user_deleted(*, instance: ActiveUser, **kwargs):
     _send_active_user(instance=instance, active=False)
+
+
+@receiver(pre_delete, sender=MeetingRoles)
+def remove_active_user(instance: MeetingRoles, **kwargs):
+    instance.context.active_users.filter(user=instance.user).delete()
