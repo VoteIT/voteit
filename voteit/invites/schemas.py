@@ -68,7 +68,9 @@ class RowColInvitesBaseSchema(BaseModel):
                 if isinstance(row, str):
                     result.append([x.strip() for x in row.split("\t")])
                 elif isinstance(row, list):
-                    result.append([x.strip() if isinstance(x, str) else x for x in row])
+                    row = [x.strip() if isinstance(x, str) else x for x in row]
+                    if any(row):
+                        result.append(row)
                 else:
                     raise ValueError(f"Got bogus value on row {i}: {row}")
             if "columns" not in values:
@@ -148,6 +150,10 @@ class AddMixedUserDataInvitesSchema(RowColInvitesBaseSchema, InvitesMetaMixinSch
       bad is not a valid column (type=value_error)
     rows
       Couldn't validate rows because of invalid column names (type=value_error)
+
+    Cleanup empty rows
+    >>> AddMixedUserDataInvitesSchema(columns=['email'], rows=[['a@boo.com'], [' ', ''], [], ['b@boo.com']], **base_qs).dict(exclude_unset=True, exclude={'meeting', 'roles'})
+    {'columns': ['email'], 'rows': [['a@boo.com'], ['b@boo.com']]}
     """
 
 
