@@ -242,7 +242,6 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
     ) -> Generator[AnnotationResultSchema, None]:
         annotations_formatted = list(self.format_for_annotations(columns, rows))
         for adapter in self.get_annotations(columns):
-            # Yield results, display progress etc?
             yield adapter.annotate(
                 columns=columns,
                 rows=rows,

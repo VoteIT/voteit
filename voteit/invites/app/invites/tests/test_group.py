@@ -173,6 +173,23 @@ class GroupAnnotationTests(TestCase):
             result.dict(),
         )
 
+    def test_annotate_mixed(self):
+        self.inv_vader.user_data["swedish_ssn"] = "121212-1212"
+        self.inv_vader.save()
+        columns, rows = get_unvalidated_fixture_content("mixed_and_group.csv")
+        annotations_formatted = list(
+            self.registry.format_for_annotations(columns, rows)
+        )
+        invites_qs = self.meeting.invites.all()
+        result = self._cut.annotate(
+            invites_qs=invites_qs,
+            columns=columns,
+            annotations_formatted=annotations_formatted,
+            meeting=self.meeting,
+            registry=self.registry,
+        )
+        self.assertEqual(5, result.added)
+
     def test_annotate_some_used_one_used_wrong_state(self):
         columns, rows = get_unvalidated_fixture_content("grouprole.csv")
         annotations_formatted = list(
