@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api.serializers import CreateGroupMembershipSerializer
 from voteit.meeting.rest_api.serializers import CreateMeetingGroupSerializer
@@ -281,6 +282,101 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         self.assertEqual(counted + 2, self.meeting.groups.count())
+
+    def test_create_meeting_group(self):
+        serializer = CreateMeetingGroupSerializer(
+            data={
+                "title": "New",
+                "groupid": "new_id",
+                "votes": "1",
+                "meeting": self.meeting.pk,
+            }
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.save()
+        self.assertIsInstance(instance, MeetingGroup)
+        self.assertEqual("new_id", instance.groupid)
+
+    def test_patch_meeting_group(self):
+        serializer = MeetingGroupSerializer(
+            self.plebei_hangout,
+            data={
+                "groupid": "new_id",
+            },
+            partial=True,
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        serializer.save()
+        self.assertEqual("new_id", self.plebei_hangout.groupid)
+
+    def test_create_meeting_group_existing_groupid(self):
+        serializer = CreateMeetingGroupSerializer(
+            data={
+                "title": "New",
+                "groupid": self.plebei_hangout.groupid,
+                "votes": "1",
+                "meeting": self.meeting.pk,
+            }
+        )
+        serializer.is_valid()
+        self.assertIn("groupid", serializer.errors)
+
+    def test_create_meeting_group_bad_groupid(self):
+        serializer = CreateMeetingGroupSerializer(
+            data={
+                "title": "New",
+                "groupid": "Äöl",
+                "votes": "1",
+                "meeting": self.meeting.pk,
+            }
+        )
+        serializer.is_valid()
+        self.assertIn("groupid", serializer.errors)
+        serializer = CreateMeetingGroupSerializer(
+            data={
+                "title": "New",
+                "groupid": " A ",
+                "votes": "1",
+                "meeting": self.meeting.pk,
+            }
+        )
+        serializer.is_valid()
+        self.assertIn("groupid", serializer.errors)
+
+    def test_patch_meeting_group_existing_groupid(self):
+        serializer = MeetingGroupSerializer(
+            self.plebei_hangout,
+            data={"groupid": self.moderator_club.groupid},
+            partial=True,
+        )
+        serializer.is_valid()
+        self.assertIn("groupid", serializer.errors)
+        # Same ok
+        serializer = MeetingGroupSerializer(
+            self.plebei_hangout,
+            data={"groupid": self.plebei_hangout.groupid},
+            partial=True,
+        )
+        serializer.is_valid()
+        self.assertNotIn("groupid", serializer.errors)
+
+    def test_patch_meeting_group_bad_groupid(self):
+        serializer = MeetingGroupSerializer(
+            self.plebei_hangout,
+            data={"groupid": "ö"},
+            partial=True,
+        )
+        serializer.is_valid()
+        self.assertIn("groupid", serializer.errors)
+        serializer = MeetingGroupSerializer(
+            self.plebei_hangout,
+            data={"groupid": " A"},
+            partial=True,
+        )
+        serializer.is_valid()
+        self.assertIn("groupid", serializer.errors)
 
     def test_group_role(self):
         data = GroupRoleSerializer(self.group_role).data
