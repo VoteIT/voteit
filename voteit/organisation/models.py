@@ -17,6 +17,7 @@ from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.utils import relaxed_clean_html
+from voteit.core.utils import strict_clean_html
 from voteit.core.workflows import EnabledWf
 from voteit.organisation.schemas import OAuthTokenSchema
 from voteit.organisation.utils import get_provider_response_adapters
@@ -80,6 +81,16 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
         blank=True,
         null=True,
         unique=True,
+    )
+    active: bool = models.BooleanField(
+        verbose_name="Is this organisation active? Disables login if not.",
+        default=True,
+    )
+    help_info: str = RichTextField(
+        verbose_name="Where to get help for users",
+        blank=True,
+        default="",
+        html_cleaner=relaxed_clean_html,
     )
 
     class Meta:

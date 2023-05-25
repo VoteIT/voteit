@@ -36,8 +36,20 @@ class OrganisationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Organisation
-        read_only_fields = ["pk", "login_url", "scope", "id_host", "title"]
-        fields = read_only_fields + ["page_title", "body", "components"]
+        read_only_fields = [
+            "active",
+            "components",
+            "id_host",
+            "login_url",
+            "pk",
+            "scope",
+            "title",
+        ]
+        fields = read_only_fields + [
+            "body",
+            "help_info",
+            "page_title",
+        ]
 
     def get_login_url(self, instance: Organisation) -> Optional[str]:
         with suppress(ObjectDoesNotExist):
