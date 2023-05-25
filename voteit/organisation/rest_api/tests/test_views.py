@@ -150,65 +150,65 @@ class OrganisationViewSetTests(APITestCase):
         self.assertEqual(1, len(data))
 
 
-@override_settings(ID_PROXY_API_KEY="secret")
-class IDProxyOrganisationViewSetTests(APITestCase):
-    fixtures = ["meeting_test_fixture"]
-
-    @classmethod
-    def setUpTestData(cls):
-        from voteit.organisation.models import Organisation
-
-        cls.org = Organisation.objects.get(pk=1)
-
-    def test_create(self):
-        url = reverse("id-organisations-list")
-        data = {
-            "title": "Item no 2?",
-            "provider": {
-                "title": "Hello",
-                "client_id": "client",
-                "client_secret": "don't tell",
-            },
-        }
-        response = self.client.post(url, data, HTTP_API_KEY="secret")
-        self.assertEqual(201, response.status_code)
-
-    def test_get(self):
-        url = reverse("id-organisations-detail", kwargs={"pk": self.org.pk})
-        response = self.client.get(url, HTTP_API_KEY="secret")
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(self.org.pk, data["pk"])
-
-    def test_list(self):
-        url = reverse("id-organisations-list")
-        response = self.client.get(url, HTTP_API_KEY=f"secret")
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(1, len(data))
-
-    def test_bad_auth(self):
-        url = reverse("id-organisations-list")
-        response = self.client.get(url, HTTP_API_KEY=f"not working")
-        self.assertEqual(response.status_code, 401)
-
-    def test_patch(self):
-        url = reverse("id-organisations-detail", kwargs={"pk": self.org.pk})
-        data = {
-            "title": "Item no 1",
-            "provider": {
-                "scope": "hello",
-            },
-        }
-        response = self.client.patch(url, data, HTTP_API_KEY="secret")
-        self.assertEqual(200, response.status_code)
-        data = response.json()
-        self.org.refresh_from_db()
-        self.org.provider.refresh_from_db()
-        self.assertEqual("Item no 1", self.org.title)
-        self.assertEqual("Item no 1", data["title"])
-        self.assertEqual("hello", self.org.provider.scope)
-        self.assertEqual("hello", data["provider"]["scope"])
+# @override_settings(ID_PROXY_API_KEY="secret")
+# class IDProxyOrganisationViewSetTests(APITestCase):
+#     fixtures = ["meeting_test_fixture"]
+#
+#     @classmethod
+#     def setUpTestData(cls):
+#         from voteit.organisation.models import Organisation
+#
+#         cls.org = Organisation.objects.get(pk=1)
+#
+#     def test_create(self):
+#         url = reverse("id-organisations-list")
+#         data = {
+#             "title": "Item no 2?",
+#             "provider": {
+#                 "title": "Hello",
+#                 "client_id": "client",
+#                 "client_secret": "don't tell",
+#             },
+#         }
+#         response = self.client.post(url, data, HTTP_API_KEY="secret")
+#         self.assertEqual(201, response.status_code)
+#
+#     def test_get(self):
+#         url = reverse("id-organisations-detail", kwargs={"pk": self.org.pk})
+#         response = self.client.get(url, HTTP_API_KEY="secret")
+#         self.assertEqual(response.status_code, 200)
+#         data = response.json()
+#         self.assertEqual(self.org.pk, data["pk"])
+#
+#     def test_list(self):
+#         url = reverse("id-organisations-list")
+#         response = self.client.get(url, HTTP_API_KEY=f"secret")
+#         self.assertEqual(response.status_code, 200)
+#         data = response.json()
+#         self.assertEqual(1, len(data))
+#
+#     def test_bad_auth(self):
+#         url = reverse("id-organisations-list")
+#         response = self.client.get(url, HTTP_API_KEY=f"not working")
+#         self.assertEqual(response.status_code, 401)
+#
+#     def test_patch(self):
+#         url = reverse("id-organisations-detail", kwargs={"pk": self.org.pk})
+#         data = {
+#             "title": "Item no 1",
+#             "provider": {
+#                 "scope": "hello",
+#             },
+#         }
+#         response = self.client.patch(url, data, HTTP_API_KEY="secret")
+#         self.assertEqual(200, response.status_code)
+#         data = response.json()
+#         self.org.refresh_from_db()
+#         self.org.provider.refresh_from_db()
+#         self.assertEqual("Item no 1", self.org.title)
+#         self.assertEqual("Item no 1", data["title"])
+#         self.assertEqual("hello", self.org.provider.scope)
+#         self.assertEqual("hello", data["provider"]["scope"])
 
 
 class OrganisationRolesTests(APITestCase):

@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
@@ -70,25 +69,25 @@ class OrganisationViewSet(
         return Response(serializer.data)
 
 
-@router.register("id-organisations", basename="id-organisations")
-class IDProxyOrganisationViewSet(
-    SerializerClassesMixin,
-    mixins.CreateModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.UpdateModelMixin,
-    mixins.ListModelMixin,
-    GenericViewSet,
-):
-    serializer_class = serializers.IDOrganisationSerializer
-    serializer_classes = {
-        "create": serializers.IDOrganisationUpdateSerializer,
-        "update": serializers.IDOrganisationUpdateSerializer,
-        "partial_update": serializers.IDOrganisationUpdateSerializer,
-    }
-    permission_classes = (HasIDProxyAPIKey,)
-    model = Organisation
-    queryset = Organisation.objects.all()
-    expected_default_http_status = 401
+# @router.register("id-organisations", basename="id-organisations")
+# class IDProxyOrganisationViewSet(
+#     SerializerClassesMixin,
+#     mixins.CreateModelMixin,
+#     mixins.RetrieveModelMixin,
+#     mixins.UpdateModelMixin,
+#     mixins.ListModelMixin,
+#     GenericViewSet,
+# ):
+#     serializer_class = serializers.IDOrganisationSerializer
+#     serializer_classes = {
+#         "create": serializers.IDOrganisationUpdateSerializer,
+#         "update": serializers.IDOrganisationUpdateSerializer,
+#         "partial_update": serializers.IDOrganisationUpdateSerializer,
+#     }
+#     permission_classes = (HasIDProxyAPIKey,)
+#     model = Organisation
+#     queryset = Organisation.objects.all()
+#     expected_default_http_status = 401
 
 
 # @router.register("tos", basename="tos")
