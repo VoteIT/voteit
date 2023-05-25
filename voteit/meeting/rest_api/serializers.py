@@ -6,12 +6,14 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.utils.text import slugify
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator
 
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserSerializer
+from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
@@ -252,6 +254,22 @@ class CreateMeetingGroupSerializer(BaseModelSerializer):
             "groupid": {"required": False},
         }
 
+    def validate_groupid(self, value: str | None):
+        if value:
+            slug = slugify(value)
+            if value != slug:
+                raise ValidationError("Must be lowercase URL-friendly")
+            exclude_pks = []
+            if self.instance is not None:
+                meeting = self.instance.meeting
+                exclude_pks.append(self.instance.pk)
+            else:
+                meeting = meeting_from_unsafe_data(self)
+            if meeting.groups.exclude(pk__in=exclude_pks).filter(groupid=slug).exists():
+                raise ValidationError(f"GroupID {slug} already exists")
+            return slug
+        return value
+
 
 class MeetingGroupSerializer(CreateMeetingGroupSerializer):
     pk = serializers.IntegerField(read_only=True)
@@ -264,7 +282,6 @@ class MeetingGroupSerializer(CreateMeetingGroupSerializer):
         )
         read_only_fields = [
             "meeting",
-            "groupid",
         ]
 
     def validate_delegate_to(self, value: MeetingGroup | None):
