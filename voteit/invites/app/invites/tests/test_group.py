@@ -118,6 +118,15 @@ class GroupAnnotationTests(TestCase):
             meeting=self.meeting,
             registry=self.registry,
         )
+        data = result.dict()
+        newly_annotated_invites = set(data.pop("newly_annotated_invites"))
+        self.assertEqual(
+            {
+                self.inv_vader.pk,
+                self.inv_luke.pk,
+            },
+            newly_annotated_invites,
+        )
         self.assertEqual(
             {
                 "added": 2,
@@ -127,12 +136,8 @@ class GroupAnnotationTests(TestCase):
                 "total": None,
                 "name": self._cut.name,
                 "msg": None,
-                "newly_annotated_invites": [
-                    self.inv_vader.pk,
-                    self.inv_luke.pk,
-                ],
             },
-            result.dict(),
+            data,
         )
 
     def test_annotate_some_existed_with_wrong_role(self):
@@ -156,6 +161,15 @@ class GroupAnnotationTests(TestCase):
             meeting=self.meeting,
             registry=self.registry,
         )
+        data = result.dict()
+        newly_annotated_invites = set(data.pop("newly_annotated_invites"))
+        self.assertEqual(
+            {
+                self.inv_vader.pk,
+                self.inv_luke.pk,
+            },
+            newly_annotated_invites,
+        )
         self.assertEqual(
             {
                 "added": 2,
@@ -165,12 +179,8 @@ class GroupAnnotationTests(TestCase):
                 "msg": None,
                 "curr": None,
                 "total": None,
-                "newly_annotated_invites": [
-                    self.inv_vader.pk,
-                    self.inv_luke.pk,
-                ],
             },
-            result.dict(),
+            data,
         )
 
     def test_annotate_mixed(self):
