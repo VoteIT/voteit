@@ -40,6 +40,7 @@ class PollDetailSerializer(serializers.ModelSerializer):
             "method_name",
             "pk",
             "proposals",
+            "p_ord",
             "result",
             "settings",
             "started",
@@ -162,6 +163,7 @@ class PollCreateSerializer(serializers.ModelSerializer):
             "settings",
             "start",
             "title",
+            "p_ord",
         ]
         extra_kwargs = {
             "agenda_item": {"required": True},

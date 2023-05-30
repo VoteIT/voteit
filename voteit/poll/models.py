@@ -153,6 +153,8 @@ class ElectoralRegister(MeetingContext):
 
 
 class Poll(BaseContent, MeetingContext, AgendaItemContext):
+    P_ORD_CHOICES = (("c", "Chronological"), ("a", "Alphabetical"), ("r", "Random"))
+
     name = "poll"
     state: str = FSMField(
         default=PollWf.initial, choices=PollWf.choices(), editable=False
@@ -195,13 +197,21 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         null=True,
     )
     abstains: int = models.PositiveIntegerField(
-        verbose_name="Abstentions", default=0, editable=False
+        verbose_name="Abstentions",
+        default=0,
+        editable=False,
     )
     result_data: dict | None = models.JSONField(
         verbose_name="JSON-serialized result data",
         editable=False,
         null=True,
         encoder=DjangoJSONEncoder,
+    )
+    p_ord: str = models.CharField(
+        verbose_name="Proposal ordering",
+        default="c",
+        choices=P_ORD_CHOICES,
+        max_length=1,
     )
 
     importers = {

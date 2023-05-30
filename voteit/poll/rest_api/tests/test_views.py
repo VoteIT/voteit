@@ -33,10 +33,13 @@ class PollViewSetTests(APITestCase):
             "method_name": "simple",
             "agenda_item": self.ai.pk,
             "proposals": [self.prop.pk],
+            "p_ord": "a",
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual("a", data["p_ord"])
 
     def test_create_very_long_title(self):
         url = reverse("poll-list")

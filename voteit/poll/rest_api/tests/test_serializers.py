@@ -70,6 +70,7 @@ class PollDetailSerializerTests(TestCase):
                 "state": "private",
                 "url": None,
                 "abstain_count": None,
+                "p_ord": "c",
             },
             data,
         )
@@ -98,6 +99,7 @@ class PollDetailSerializerTests(TestCase):
                 "state": "finished",
                 "url": None,
                 "abstain_count": 5,
+                "p_ord": "c",
             },
             data,
         )
