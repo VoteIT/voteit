@@ -67,7 +67,7 @@ class GroupAutoRandomBeforePollTests(TestCase):
         first_er = self.meeting.er_policy.create_er()
         self.assertEqual({self.user2.pk: 10}, first_er.weight_dict)
 
-    def test_active_users_resprected(self):
+    def test_active_users_respected(self):
         self.meeting.components.create(
             component_name=ActiveUsersComponent.name, state=EnabledWf.ON
         )
@@ -78,5 +78,12 @@ class GroupAutoRandomBeforePollTests(TestCase):
             set(self.poll.electoral_register.voters.all()),
         )
 
-
-1
+    def test_delegate_to(self):
+        self.meeting.components.create(
+            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+        )
+        self.meeting.active_users.create(user=self.user2)
+        self.group_s.delegate_to = self.group_l
+        self.group_s.save()
+        er = self.meeting.er_policy.create_er()
+        self.assertEqual({self.user2.pk: 11}, er.weight_dict)
