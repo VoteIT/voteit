@@ -90,6 +90,11 @@ class MeetingViewSet(DefaultModelViewSet):
         # FIXME: We need to prefetch or annotate user roles here to avoid N+1-problem.
         return Meeting.objects.for_user(self.request.user)
 
+    # Note: Create already has an atomic block within the serializer
+    @transaction.atomic(durable=True)
+    def update(self, *args, **kwargs):
+        return super().update(*args, **kwargs)
+
     def perform_create(self, serializer):
         instance: Meeting = serializer.save()
         instance.add_roles(self.request.user, roles.ROLE_MODERATOR)
