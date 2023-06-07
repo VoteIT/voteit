@@ -12,6 +12,8 @@ from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import MeetingGroup
+from voteit.organisation.models import Organisation
+from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -240,11 +242,7 @@ class MeetingGroupChangedTests(TestCase):
 class RoleChangesPublishedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.organisation.models import Organisation
-
         org: Organisation = Organisation.objects.create()
-
         cls.meeting: Meeting = org.meetings.create()
         cls.user = cls.meeting.participants.create(username="user", organisation=org)
         cls.meeting.add_roles(cls.user, "participant")
@@ -272,3 +270,47 @@ class RoleChangesPublishedTests(TestCase):
         self.assertIsInstance(msg, RolesRemoved)
         self.assertEqual(self.meeting.pk, msg.data.pk)
         self.assertEqual({"participant"}, set(msg.data.roles))
+
+
+class MeetingERChangedTests(TestCase):
+    @property
+    def _fut(self):
+        from voteit.meeting.signals import er_policy_changed
+
+        return er_policy_changed
+
+    def test_er_changed_not_sent_when_added(self):
+        L = []
+
+        @receiver(self._fut)
+        def my_listener(**kw):
+            L.append(kw)
+
+        Meeting.objects.create(er_policy_name=AutoBeforePoll.name)
+        self.assertEqual([], L)
+
+    def test_er_changed_to_none(self):
+        L = []
+
+        @receiver(self._fut)
+        def my_listener(**kw):
+            L.append(kw)
+
+        m = Meeting.objects.create(er_policy_name=AutoBeforePoll.name)
+        m.er_policy_name = None
+        m.save()
+        self.assertEqual([], L)
+
+    def test_er_changed(self):
+        L = []
+
+        @receiver(self._fut)
+        def my_listener(**kw):
+            L.append(kw)
+
+        m = Meeting.objects.create()
+        m.er_policy_name = AutoBeforePoll.name
+        m.save()
+        self.assertEqual(1, len(L))
+        kwargs = L[0]
+        self.assertEqual(AutoBeforePoll, kwargs["sender"])
