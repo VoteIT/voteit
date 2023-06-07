@@ -35,7 +35,7 @@ class AutoAlways(ElectoralRegisterPolicy):
         "It will even change electoral register for ongoing polls, so use this with caution!"
     )
     group_votes_active = False
-
+    allow_poll_er_change = True
     logger = logger
 
     def get_voters(self, **kwargs) -> dict[int, int]:

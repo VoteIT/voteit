@@ -93,6 +93,9 @@ class ElectoralRegisterPolicy(ABC):
     allow_manual: bool = False
     # Can this method be triggered whenever the moderator likes? (In advance of polls for instance)
     allow_trigger: bool = False
+    # Will this method update ER for ongoing polls? It will also have the effect
+    # that polls can be started with an empty ER.
+    allow_poll_er_change = bool = False
     # Is this compatible with active_check?
     handles_active_check: bool = False
     # Does this method require group votes to be disabled or enabled?
@@ -143,7 +146,11 @@ class ElectoralRegisterPolicy(ABC):
         if self.meeting.state not in (MeetingWf.ONGOING, MeetingWf.UPCOMING):
             return False
         if self.meeting.latest_er is None:
-            return True
+            if self.allow_poll_er_change:
+                return True  # We need one regardless of voters
+            # No reason to create empty
+            return bool(self.get_voters(**kwargs))
+        # Create empty is okay if it differs from last ER
         return self.get_voters(**kwargs) != self.meeting.latest_er.weight_dict
 
     def pre_apply(self, poll: Poll, target: str):
@@ -203,10 +210,9 @@ class ElectoralRegisterPolicy(ABC):
                         or "inactive"
                     )
             voters = self.get_voters(**kwargs)
-            if voters:
-                er = self.meeting.electoral_registers.create(source=self.name)
-                er.set_voters_from_dict(voters)
-                self.meeting.latest_er = er  # Clear cached
-                new_er_created.send(instance=er, sender=er.__class__)
-                return er
+            er = self.meeting.electoral_registers.create(source=self.name)
+            er.set_voters_from_dict(voters)
+            self.meeting.latest_er = er  # Clear cached
+            new_er_created.send(instance=er, sender=er.__class__)
+            return er
         return self.meeting.latest_er

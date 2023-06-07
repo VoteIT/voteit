@@ -332,6 +332,7 @@ class ElectoralRegisterPolicyViewSetTests(APITestCase):
             {
                 "available": True,
                 "allow_manual": False,
+                "allow_poll_er_change": True,
                 "allow_trigger": False,
                 "group_votes_active": False,
                 "handles_vote_weight": False,

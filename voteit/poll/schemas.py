@@ -93,6 +93,7 @@ class ElectoralRegistryPolicySchema(BaseModel):
     available: bool
     allow_manual: bool
     allow_trigger: bool
+    allow_poll_er_change: bool
     handles_vote_weight: bool
     handles_active_check: bool
     group_votes_active: bool | None
