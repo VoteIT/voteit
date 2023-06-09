@@ -200,7 +200,7 @@ class DiffProposalDetailSerializerTests(TestCase):
         self.assertEqual(self.diff_prop.body, data["body"])
         self.assertEqual(
             'I am the eggman <br/> I am <span class="text-diff-removed">the walrus</span> <span class="text-diff-added">some kind of mamal</span>',
-            data["body_diff"],
+            data["body_diff_brief"],
         )
 
     def test_patch(self):

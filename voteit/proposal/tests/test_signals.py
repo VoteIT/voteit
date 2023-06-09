@@ -47,7 +47,10 @@ class MeetingSubscribedTests(TestCase):
             channel_type="moderators",
         )
         msg = command.run_job()
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "proposal.added"}
+        pks = set()
+        for msg in msg.data.app_state:
+            if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
+                pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_app_state_sent_private_moderators(self):
@@ -59,7 +62,10 @@ class MeetingSubscribedTests(TestCase):
             channel_type="moderators",
         )
         msg = command.run_job()
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "proposal.added"}
+        pks = set()
+        for msg in msg.data.app_state:
+            if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
+                pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_app_state_sent_participants(self):
@@ -69,7 +75,10 @@ class MeetingSubscribedTests(TestCase):
             channel_type="participants",
         )
         msg = command.run_job()
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "proposal.added"}
+        pks = set()
+        for msg in msg.data.app_state:
+            if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
+                pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_app_state_sent_private_participants(self):
@@ -84,7 +93,10 @@ class MeetingSubscribedTests(TestCase):
         app_state = msg.data.app_state
         if app_state is None:
             app_state = ()
-        pks = {x.p["pk"] for x in app_state if x.t == "proposal.added"}
+        pks = set()
+        for msg in msg.data.app_state:
+            if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
+                pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual(set(), pks)
 
 

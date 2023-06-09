@@ -1,13 +1,10 @@
 from typing import OrderedDict
-from typing import Union
 
-from django.db.models import QuerySet
 from django.utils.text import slugify
 from django.utils.translation import gettext as _
 from rest_framework import exceptions
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from typing import Dict
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.rest_api.serializers import BaseModelSerializer
@@ -18,6 +15,8 @@ from voteit.core.utils import get_model_shortname
 from voteit.proposal.diff import Changes
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
+from voteit.proposal.models import TextDocument
+from voteit.proposal.models import TextParagraph
 
 __all__ = (
     "GenericCreateProposalSerializer",
@@ -29,10 +28,6 @@ __all__ = (
     "TextParagraphSerializer",
     "TextDocumentSerializer",
 )
-
-from voteit.proposal.models import TextDocument
-
-from voteit.proposal.models import TextParagraph
 
 
 class GenericCreateProposalSerializer(serializers.Serializer):
@@ -170,7 +165,7 @@ class DiffProposalCreateSerializer(ProposalCreateSerializer):
         ] + ProposalCreateSerializer.Meta.fields
 
     def get_body_diff(
-        self, instance: Union[OrderedDict, DiffProposal], brief: bool = False
+        self, instance: OrderedDict | DiffProposal, brief: bool = False
     ) -> str:
         if isinstance(instance, DiffProposal):
             ch = Changes(instance.paragraph.body, instance.body)
@@ -184,7 +179,7 @@ class DiffProposalCreateSerializer(ProposalCreateSerializer):
             raise TypeError("Not a diff proposal or a dict")
         return ch.get_html(brief=brief)
 
-    def get_body_diff_brief(self, instance: Union[OrderedDict, DiffProposal]) -> str:
+    def get_body_diff_brief(self, instance: OrderedDict | DiffProposal) -> str:
         return self.get_body_diff(instance, brief=True)
 
     def validate(self, attrs: OrderedDict):
@@ -198,14 +193,14 @@ class DiffProposalCreateSerializer(ProposalCreateSerializer):
 
 
 class DiffProposalDetailSerializer(ProposalDetailSerializer):
-    body_diff = serializers.SerializerMethodField()
+    # body_diff = serializers.SerializerMethodField()
     body_diff_brief = serializers.SerializerMethodField()
 
     class Meta(ProposalDetailSerializer.Meta):
         model = DiffProposal
         read_only_fields = [
             "paragraph",
-            "body_diff",
+            # "body_diff",
             "body_diff_brief",
         ] + ProposalDetailSerializer.Meta.read_only_fields
         fields = read_only_fields + ProposalDetailSerializer.Meta.fields
@@ -264,7 +259,7 @@ class CreateTextDocumentSerializer(BaseModelSerializer):
             "agenda_item": {"required": True},
         }
 
-    def validate(self, attrs: Dict) -> Dict:
+    def validate(self, attrs: dict) -> dict:
         attrs = super().validate(attrs)
         attrs["base_tag"] = base_tag = adjust_tag(attrs["base_tag"])
         ai = attrs["agenda_item"]
@@ -300,7 +295,7 @@ class TextDocumentSerializer(serializers.ModelSerializer):
         # FIXME: This is probably NOT the correct way to handle the serialized data
         return [dict(x) for x in data]
 
-    def validate(self, attrs: Dict) -> Dict:
+    def validate(self, attrs: dict) -> dict:
         attrs = super().validate(attrs)
         if "base_tag" in attrs:
             attrs["base_tag"] = base_tag = adjust_tag(attrs["base_tag"])
@@ -369,7 +364,7 @@ class ExportProposalSerializer(ProposalDetailSerializer, ExportBaseSerializerMix
 
 
 class ExportDiffProposalSerializer(
-    ExportBaseSerializerMixin,DiffProposalDetailSerializer
+    ExportBaseSerializerMixin, DiffProposalDetailSerializer
 ):
     class Meta(DiffProposalDetailSerializer.Meta):
         fields = (

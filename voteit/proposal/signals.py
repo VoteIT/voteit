@@ -6,9 +6,10 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django_fsm import post_transition
-
+from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
 from envelope.utils import AppState
+
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
@@ -43,14 +44,19 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
     )
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
-    app_state.append_from_queryset(qs, ProposalDetailSerializer, ProposalAdded)
-    # DiffProposals - could be changed to values list too if they adjust the method on the serializer for diff body
+    batch = Batch(t=ProposalAdded.name, payloads=[])
+    serializer = ProposalDetailSerializer(qs, many=True)
+    for item in serializer.data:
+        batch.append(ProposalAdded(data=item))
     qs = DiffProposal.objects.filter(agenda_item__meeting=meeting).prefetch_related(
         "mentions", "paragraph"
     )
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
-    app_state.append_from_queryset(qs, DiffProposalDetailSerializer, ProposalAdded)
+    serializer = DiffProposalDetailSerializer(qs, many=True)
+    for item in serializer.data:
+        batch.append(ProposalAdded(data=item))
+    app_state.append(batch)
 
 
 @receiver(channel_subscribed, sender=ParticipantsChannel)
