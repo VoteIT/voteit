@@ -180,7 +180,11 @@ class OrganisationRolesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrganisationRoles
-        fields = read_only_fields = "pk", "user", "assigned"
+        fields = read_only_fields = (
+            "pk",
+            "user",
+            "assigned",
+        )
 
 
 class ExternalOrphanSerializer(serializers.ModelSerializer):

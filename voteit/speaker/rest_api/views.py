@@ -167,7 +167,7 @@ class ExportSpeakersViewSet(viewsets.GenericViewSet):
     queryset = SpeakerListSystem.objects.all()
 
     def list(self, request):
-        return Response()
+        return Response(data=[])
 
     def get_export_qs(self, sls: SpeakerListSystem):
         return (

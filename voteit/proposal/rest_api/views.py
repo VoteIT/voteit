@@ -20,10 +20,13 @@ from voteit.meeting.permissions import MeetingPermissions
 from voteit.proposal.models import TextDocument
 from voteit.proposal.models import Proposal
 from voteit.proposal.rest_api import serializers
-
-__all__ = ["ProposalViewSet"]
-
 from voteit.proposal.rest_api.serializers import GenericExportProposalSerializer
+
+__all__ = [
+    "ProposalViewSet",
+    "TextDocumentViewSet",
+    "ExportProposalsViewSet",
+]
 
 
 @router.register("proposals", basename="proposal")
@@ -101,7 +104,7 @@ class ExportProposalsViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.GenericExportProposalSerializer  # Morphic
 
     def list(self, request):
-        return Response()
+        return Response(data=[])
 
     def get_export_qs(self, meeting: Meeting):
         return (

@@ -94,7 +94,7 @@ class ExportERViewSet(viewsets.GenericViewSet):
     serializer_class = serializers.VoterExportSerializer
 
     def list(self, request):
-        return Response()
+        return Response(data=[])
 
     def get_export_qs(self, er: ElectoralRegister):
         return (

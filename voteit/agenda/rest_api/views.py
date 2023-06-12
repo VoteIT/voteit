@@ -55,7 +55,7 @@ class ExportAgendaItemsViewSet(viewsets.GenericViewSet):
         return Meeting.objects.for_user(self.request.user)
 
     def list(self, request):
-        return Response()
+        return Response(data=[])
 
     def get_export_qs(self, meeting):
         return meeting.agenda_items.order_by("order")

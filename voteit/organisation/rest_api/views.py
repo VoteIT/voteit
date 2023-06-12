@@ -145,7 +145,9 @@ class OrganisationRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.has_perm(OrgPermissions.VIEW_ROLES, user.organisation):
-            return self.queryset.filter(context=user.organisation)
+            return self.queryset.filter(context=user.organisation).prefetch_related(
+                "user",
+            )
         return self.queryset.none()
 
 

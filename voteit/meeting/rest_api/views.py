@@ -242,7 +242,7 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
         return Meeting.objects.for_user(self.request.user)
 
     def list(self, request):
-        return Response()
+        return Response(data=[])
 
     def get_export_qs(self, meeting):
         return meeting.roles.all().annotate(
@@ -300,16 +300,7 @@ class ExportMeetingGroupsViewSet(viewsets.GenericViewSet):
         return Meeting.objects.for_user(self.request.user)
 
     def list(self, request):  # To avoid errors
-        return Response()
-
-    # def get_export_qs(self, meeting):
-    #     MeetingGroupSerializer
-    #     return meeting.groups.all().annotate(
-    #         first_name=F("user__first_name"),
-    #         last_name=F("user__last_name"),
-    #         email=F("user__email"),
-    #         userid=F("user__userid"),
-    #     )
+        return Response(data=[])
 
     @action(
         methods=["get"],
