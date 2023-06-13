@@ -1,5 +1,6 @@
 import csv
 
+from django.db import models
 from django.db import transaction
 from django.db.models import QuerySet
 from django.db.models import F
@@ -87,8 +88,14 @@ class MeetingViewSet(DefaultModelViewSet):
         return Response(status=201)
 
     def get_queryset(self) -> QuerySet:
-        # FIXME: We need to prefetch or annotate user roles here to avoid N+1-problem.
-        return Meeting.objects.for_user(self.request.user)
+        qs = Meeting.objects.for_user(self.request.user)
+        if self.action == "list":
+            meeting_roles_q = MeetingRoles.objects.filter(
+                context_id=models.OuterRef("pk"),
+                user=self.request.user,
+            ).values("assigned")
+            qs = qs.annotate(user_roles=models.Subquery(meeting_roles_q))
+        return qs
 
     # Note: Create already has an atomic block within the serializer
     @transaction.atomic(durable=True)
