@@ -97,6 +97,7 @@ class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
 
 
 class CreateMeetingSerializer(BaseModelSerializer):
+    instance: Meeting | None
     install_dialect = serializers.CharField(
         validators=[DialectInstallableValidator()],
         required=False,
@@ -128,18 +129,31 @@ class CreateMeetingSerializer(BaseModelSerializer):
                 handler.install(instance)
             return instance
 
+    @staticmethod
+    def _dialect_only(value: str):
+        raise ValidationError(
+            f"Policy '{value}' isn't manually selectable, it must be installed via a meeting dialect"
+        )
+
     def validate_er_policy_name(self, value: str | None):
         if value:
             reg = get_electoral_policy_registry()
             if value not in reg:
                 raise ValidationError(f"No electoral register policy named {value}")
             er_policy: ElectoralRegisterPolicy = reg[value]
-            if not er_policy.available or (
-                not self.instance and er_policy.group_votes_active
-            ):
-                raise ValidationError(
-                    f"Policy '{value}' isn't manually selectable, it must be installed via a meeting dialect"
+            if not er_policy.available:
+                # If meeting has no dialect, ER policy isn't available
+                if self.instance is None or self.instance.installed_dialect is None:
+                    self._dialect_only(value)
+                handler = dialect_registry.get_merged_handler(
+                    self.instance.installed_dialect
                 )
+                # Check if meeting dialect suggests selected ER policy
+                if handler.data.er_policy_name != value:
+                    self._dialect_only(value)
+            # ER policy requiring group_votes_active must have a meeting
+            if er_policy.group_votes_active and self.instance is None:
+                self._dialect_only(value)
             # This is only valid for subclasses so maybe move later
             if (
                 self.instance
