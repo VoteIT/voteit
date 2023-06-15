@@ -24,7 +24,6 @@ class Manual(ElectoralRegisterPolicy):
     logger = logger
     allow_manual = True
     handles_vote_weight = True
-    group_votes_active = False
 
     def get_voters(self, *, weight_dict: dict[int, int], **kwargs) -> dict[int, int]:
         """
