@@ -26,7 +26,7 @@ logger = getLogger(__name__)
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
-def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
+def meeting_channel_subscribed(context: Meeting, app_state: AppState, **kw):
     """
     Populate app_state with participant numbers
     """

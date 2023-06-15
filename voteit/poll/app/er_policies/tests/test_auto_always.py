@@ -92,3 +92,13 @@ class AutoAlwaysTests(TestCase):
         self.assertEqual(two, self.poll.electoral_register)
         # So one more kept
         self.assertEqual(2, self.meeting.electoral_registers.count())
+
+    def test_er_created_when_set(self):
+        self.meeting.er_policy_name = None
+        self.meeting.save()
+        self.meeting.electoral_registers.all().delete()
+        # Cleanup cache attrs.
+        self.meeting = Meeting.objects.get(pk=self.meeting.pk)
+        self.meeting.er_policy_name = AutoAlways.name
+        self.meeting.save()
+        self.assertEqual(1, self.meeting.electoral_registers.all().count())

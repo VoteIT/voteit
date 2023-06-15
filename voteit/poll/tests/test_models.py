@@ -8,6 +8,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.workflows import MeetingWf
+from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 from voteit.poll.app.polls.simple import Simple
 from voteit.poll.exceptions import ElectoralRegisterMissing
@@ -92,6 +93,12 @@ class PollTests(TestCase):
         self.er.delete()
         self.assertFalse(self.poll.electoral_register_missing_guard())
 
+    def test_start_check_no_electoral_register_permissive_er_method(self):
+        self.meeting.er_policy_name = AutoAlways.name
+        self.meeting.save()
+        self.er.delete()
+        self.assertTrue(self.poll.electoral_register_missing_guard())
+
     def test_broken_er_name_checked(self):
         self.assertTrue(self.poll.electoral_register_missing_guard())
         self.poll.meeting.er_policy_name = "broken"
@@ -102,6 +109,12 @@ class PollTests(TestCase):
         self.assertTrue(self.poll.electoral_register_empty_guard())
         self.er.voters.remove(self.participant, self.moderator)
         self.assertFalse(self.poll.electoral_register_empty_guard())
+
+    def test_start_check_electoral_register_empty_permissive_er_method(self):
+        self.er.voters.remove(self.participant, self.moderator)
+        self.meeting.er_policy_name = AutoAlways.name
+        self.meeting.save()
+        self.assertTrue(self.poll.electoral_register_empty_guard())
 
     def test_start_check_no_proposals(self):
         self.assertTrue(self.poll.no_proposals_guard())
@@ -114,6 +127,13 @@ class PollTests(TestCase):
         self.meeting.remove_roles(self.moderator, ROLE_POTENTIAL_VOTER)
         self.meeting.remove_roles(self.participant, ROLE_POTENTIAL_VOTER)
         self.assertFalse(self.poll.polls_electoral_register_will_have_voters_guard())
+
+    def test_polls_electoral_register_will_have_voters_guard_permissive_er_method(self):
+        self.meeting.er_policy_name = AutoAlways.name
+        self.meeting.save()
+        self.meeting.remove_roles(self.moderator, ROLE_POTENTIAL_VOTER)
+        self.meeting.remove_roles(self.participant, ROLE_POTENTIAL_VOTER)
+        self.assertTrue(self.poll.polls_electoral_register_will_have_voters_guard())
 
     def test_opening_poll(self):
         self.poll.upcoming()
@@ -345,12 +365,32 @@ class ElectoralRegisterTests(TestCase):
         self.assertEqual({self.moderator.pk: 3}, self.er.weight_dict)
 
     def test_create_er_on_closed_meeting(self):
-
         self.meeting.state = MeetingWf.CLOSED
         self.meeting.save()
         self.meeting.remove_roles(self.participant, ROLE_POTENTIAL_VOTER)
         self.assertFalse(self.meeting.er_policy.new_er_needed())
         self.assertEqual(self.er, self.meeting.er_policy.create_er())
+
+    def test_create_empty_er_on_blank_meeting(self):
+        self.meeting.electoral_registers.all().delete()
+        self.meeting.roles.all().delete()
+        self.assertIsNone(None, self.meeting.latest_er)
+        self.assertIsNone(None, self.meeting.er_policy.create_er())
+
+    def test_create_empty_er_on_blank_meeting_er_method_poll_change(self):
+        self.meeting.electoral_registers.all().delete()
+        self.meeting.roles.all().delete()
+        self.meeting.er_policy_name = AutoAlways.name
+        self.meeting.save()
+        self.assertIsNone(None, self.meeting.latest_er)
+        er = self.meeting.er_policy.create_er()
+        self.assertIsInstance(er, ElectoralRegister)
+        self.assertEqual({}, er.weight_dict)
+
+    def test_create_empty_er_when_last_has_voters(self):
+        self.meeting.roles.all().delete()
+        er = self.meeting.er_policy.create_er()
+        self.assertEqual({}, er.weight_dict)
 
 
 class ElectoralRegisterManagerTests(TestCase):

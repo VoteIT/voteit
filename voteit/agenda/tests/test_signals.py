@@ -50,7 +50,10 @@ class SubscribedTests(TestCase):
             channel_type=ModeratorsChannel.name,
         )
         msg = command.run_job()
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "agenda_item.added"}
+        pks = set()
+        for msg in msg.data.app_state:
+            if msg.t == "s.batch" and msg.p["t"] == "agenda_item.added":
+                pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual({self.ai.pk, self.ai_private.pk}, pks)
 
     def test_app_state_last_read_sent(self):

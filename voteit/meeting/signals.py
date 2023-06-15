@@ -51,6 +51,7 @@ if TYPE_CHECKING:
 # Signal providing an atomic transaction to do cleanup when a meeting is archived
 # Will provide argument "meeting"
 archive_meeting = Signal()
+
 # Meeting joined signal, whenever a user gets roles within a meeting
 # hook this up to other things that needs to be checked, for instance if there's an unused invite
 # Arguments
@@ -58,6 +59,14 @@ archive_meeting = Signal()
 #   user
 #   meeting_roles (Meeting roles object)
 meeting_joined = Signal()
+
+# When electoral register changes for an existing meeting, we sometimes need to do other updates.
+# This should be handled within a transaction.
+er_policy_changed = Signal()
+# Arguments
+#   instance: ElectoralRegisterPolicy
+#   sender: type[ElectoralRegisterPolicy]
+
 
 # Signal when group role is added/removed through a GroupMembership object
 #   instance:GroupMembership

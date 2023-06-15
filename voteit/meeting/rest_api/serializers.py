@@ -56,24 +56,11 @@ class UserRolesMixin(serializers.Serializer):
     def get_current_user_roles(self, instance) -> list[str] | None:
         """
         Return current user roles, if available, for a meeting.
-
-        To cache, use:
-        <meeting qs>.prefetch_related(
-            models.Prefetch(
-                "roles",
-                queryset=MeetingRoles.objects.filter(
-                    user=self.request.user,
-                ),
-                to_attr="user_roles",
-            )
-        )
-
-        Or annotate properly :)
+        user_roles should be annotated as 'assigned' from MeetingRoles
         """
         if hasattr(instance, "user_roles"):
-            if len(instance.user_roles):
-                return instance.user_roles[0].assigned
-            return []
+            # Empty arrays in JS is true...
+            return instance.user_roles or None
         if self.context:
             user = self.context["request"].user
             with suppress(ObjectDoesNotExist):

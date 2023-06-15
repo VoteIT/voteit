@@ -10,6 +10,7 @@ from voteit.core.signals import roles_removed
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.signals import er_policy_changed
 from voteit.poll.abcs import ElectoralRegisterPolicy
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.registries import er_policy
@@ -34,7 +35,7 @@ class AutoAlways(ElectoralRegisterPolicy):
         "It will even change electoral register for ongoing polls, so use this with caution!"
     )
     group_votes_active = False
-
+    allow_poll_er_change = True
     logger = logger
 
     def get_voters(self, **kwargs) -> dict[int, int]:
@@ -63,6 +64,11 @@ def new_er_voter_added(instance: MeetingRoles, roles=(), **kw):
 @receiver(roles_removed, sender=MeetingRoles)
 def new_er_voter_removed(instance: MeetingRoles, roles=(), **kw):
     _maybe_create_and_update(instance, roles=roles)
+
+
+@receiver(er_policy_changed, sender=AutoAlways)
+def create_when_set(instance: AutoAlways, **kwargs):
+    instance.create_er()
 
 
 @receiver(new_er_created)

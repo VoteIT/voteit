@@ -44,7 +44,6 @@ if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
     from voteit.poll.models import ElectoralRegister
     from voteit.poll.abcs import ElectoralRegisterPolicy
-    from voteit.poll.abcs import GroupVoteElectoralRegisterPolicy
     from voteit.participant_number.models import PNSystem
     from voteit.proposal.models import Proposal
     from voteit.presence.models import PresenceCheck
@@ -107,6 +106,7 @@ class MeetingRoles(Roles, MeetingContext):
 
 class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext):
     name = "meeting"
+    _er_policy_name = None
     title: str = models.CharField(max_length=100)
     body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
     state: str = FSMField(
@@ -183,6 +183,11 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}},
     }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Keep track of original value
+        self._er_policy_name = self.er_policy_name
+
     @cached_property
     def pid_policy(self) -> ProposalIDPolicy:
         reg = get_proposal_id_registry()
@@ -191,7 +196,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         return reg[DEFAULT_PROPOSAL_ID_POLICY](self)
 
     @cached_property
-    def er_policy(self) -> ElectoralRegisterPolicy | GroupVoteElectoralRegisterPolicy:
+    def er_policy(self) -> ElectoralRegisterPolicy:
         return self._er_policy()
 
     @cached_property
@@ -206,6 +211,19 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         return (
             self.electoral_registers.filter(meeting=self).order_by("-created").first()
         )
+
+    def signal_er_policy_changed(self):
+        """
+        Method should never signal unless it has a valid ER policy
+        """
+        try:
+            self.er_policy = self._er_policy()  # In case it was cached
+        except KeyError:  # We don't want to check those kinds of errors here
+            self.er_policy = None
+            return
+        from voteit.meeting.signals import er_policy_changed
+
+        er_policy_changed.send(sender=self.er_policy.__class__, instance=self.er_policy)
 
     def get_access_policies(self, only_active=True) -> Generator[AccessPolicy]:
         from voteit.access_policy.registries import access_policies
@@ -325,6 +343,16 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         To fulfill the MeetingContext ABC.
         """
         return self
+
+    def save(self, **kwargs):
+        send_er_changed = (
+            bool(self.pk)
+            and self.er_policy_name
+            and self._er_policy_name != self.er_policy_name
+        )
+        super().save(**kwargs)
+        if send_er_changed:
+            self.signal_er_policy_changed()
 
     class QuerySet(models.QuerySet):
         def for_user(self, user: User):

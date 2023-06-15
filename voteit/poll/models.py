@@ -123,6 +123,7 @@ class ElectoralRegister(MeetingContext):
         Note that this is a low-lever function that does very little validation. It won't check that set users
         even have permission to view the meeting!
         """
+        # FIXME: This touches models several times, fix this
         self.voters.set(values.keys())
         user_weights_to_adjust = {k for (k, v) in values.items() if v > 1}
         for vw in self.voterweight_set.filter(user__in=user_weights_to_adjust):
@@ -297,12 +298,14 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     validate_settings_guard.title = _("Invalid settings")
 
     def electoral_register_missing_guard(self):
-        if self.meeting is not None:
-            return (
-                self.meeting.valid_er_policy_guard()
-                and self.meeting.get_latest_er() is not None
-            )
-        return True
+        if self.meeting is None:
+            return True  # Skip for unittests
+        if not self.meeting.valid_er_policy_guard():
+            return False
+        with suppress(KeyError):
+            if self.meeting.er_policy.allow_poll_er_change:
+                return True  # Skip check, ER might change regardless
+        return bool(self.meeting.get_latest_er())
 
     electoral_register_missing_guard.title = _(
         "There's no electoral register or method to create it"
@@ -310,6 +313,9 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
     def electoral_register_empty_guard(self):
         if self.meeting is not None:
+            with suppress(KeyError):
+                if self.meeting.er_policy.allow_poll_er_change:
+                    return True  # Skip check, ER might change regardless
             er = self.meeting.get_latest_er()
             if er is None:
                 # All guards seem to fire even if previous guards fail.
@@ -329,6 +335,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             # We don't care about unittests :)
             return True
         with suppress(KeyError):
+            if self.meeting.er_policy.allow_poll_er_change:
+                return True  # Skip check, ER might change regardless
             return self.meeting.er_policy.poll_will_have_voters()
         return False
 

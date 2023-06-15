@@ -1,5 +1,6 @@
 import csv
 
+from django.db import models
 from django.db import transaction
 from django.db.models import QuerySet
 from django.db.models import F
@@ -87,8 +88,19 @@ class MeetingViewSet(DefaultModelViewSet):
         return Response(status=201)
 
     def get_queryset(self) -> QuerySet:
-        # FIXME: We need to prefetch or annotate user roles here to avoid N+1-problem.
-        return Meeting.objects.for_user(self.request.user)
+        qs = Meeting.objects.for_user(self.request.user)
+        if self.action == "list":
+            meeting_roles_q = MeetingRoles.objects.filter(
+                context_id=models.OuterRef("pk"),
+                user=self.request.user,
+            ).values("assigned")
+            qs = qs.annotate(user_roles=models.Subquery(meeting_roles_q))
+        return qs
+
+    # Note: Create already has an atomic block within the serializer
+    @transaction.atomic(durable=True)
+    def update(self, *args, **kwargs):
+        return super().update(*args, **kwargs)
 
     def perform_create(self, serializer):
         instance: Meeting = serializer.save()
@@ -237,7 +249,7 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
         return Meeting.objects.for_user(self.request.user)
 
     def list(self, request):
-        return Response()
+        return Response(data=[])
 
     def get_export_qs(self, meeting):
         return meeting.roles.all().annotate(
@@ -295,16 +307,7 @@ class ExportMeetingGroupsViewSet(viewsets.GenericViewSet):
         return Meeting.objects.for_user(self.request.user)
 
     def list(self, request):  # To avoid errors
-        return Response()
-
-    # def get_export_qs(self, meeting):
-    #     MeetingGroupSerializer
-    #     return meeting.groups.all().annotate(
-    #         first_name=F("user__first_name"),
-    #         last_name=F("user__last_name"),
-    #         email=F("user__email"),
-    #         userid=F("user__userid"),
-    #     )
+        return Response(data=[])
 
     @action(
         methods=["get"],

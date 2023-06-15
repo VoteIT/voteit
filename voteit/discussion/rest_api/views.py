@@ -18,12 +18,11 @@ from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.discussion.models import DiscussionPost
 from voteit.discussion.rest_api import serializers
-
-
-__all__ = ["DiscussionPostViewSet"]
-
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
+
+
+__all__ = ["DiscussionPostViewSet", "ExportDiscussionPostsViewSet"]
 
 
 @router.register("discussion-posts", basename="discussion-posts")
@@ -55,14 +54,14 @@ class DiscussionPostViewSet(DefaultModelViewSet):
 
 
 @router.register("export-discussion-posts", basename="export-discussion-posts")
-class ExportSpeakersViewSet(viewsets.GenericViewSet):
+class ExportDiscussionPostsViewSet(viewsets.GenericViewSet):
     model = DiscussionPost
     queryset = Meeting.objects.all()
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = serializers.DiscussionPostExportSerializer
 
     def list(self, request):
-        return Response()
+        return Response(data=[])
 
     def get_export_qs(self, meeting: Meeting) -> models.QuerySet[DiscussionPost]:
         return (

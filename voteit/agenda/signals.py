@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.contrib.auth.models import AbstractUser
 from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django_fsm import post_transition
+from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
 
 from voteit.agenda.messages import AgendaAdded
@@ -29,6 +29,7 @@ from voteit.meeting.signals import archive_meeting
 from voteit.proposal.models import Proposal
 
 if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractUser
     from envelope.utils import AppState
 
 
@@ -55,11 +56,14 @@ def moderators_channel_subscribed(
     """
     Send all agenda items
     """
-    app_state.append_from_queryset(
-        context.agenda_items.all().prefetch_related("mentions"),
-        AgendaItemSerializer,
-        AgendaAdded,
+    serializer = AgendaItemSerializer(
+        context.agenda_items.all().prefetch_related("mentions"), many=True
     )
+    if serializer.data:
+        batch = Batch(t=AgendaAdded.name, payloads=[])
+        for item in serializer.data:
+            batch.append(AgendaAdded(data=item))
+        app_state.append(batch)
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)

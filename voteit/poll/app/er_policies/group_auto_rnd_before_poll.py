@@ -35,6 +35,7 @@ class GroupAutoRandomBeforePoll(ElectoralRegisterPolicy):
     group_votes_active = True
     allow_trigger = True
     handles_active_check = True
+    handles_delegate_to = True
 
     def get_voters(self, **kwargs) -> dict[int, int]:
         if active_enabled_for_meeting(self.meeting):
