@@ -19,9 +19,11 @@ from rest_framework.viewsets import GenericViewSet
 from voteit.core.loggers import log_auth
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import ModelContextMixin
+from voteit.core.rest_api.mixins import SerializerClassesMixin
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.serializers import UserAndRolesSerializer
 from voteit.core.rest_api.serializers import UserSerializer
+from voteit.core.rest_api.serializers import UserListSerializer
 from voteit.core.rest_api.utils import get_identity_data
 from voteit.meeting.models import Meeting
 from voteit.organisation.permissions import OrgPermissions
@@ -30,12 +32,15 @@ UserModel = get_user_model()
 
 
 @router.register("users", "users")
-class UserSearchViewSet(ModelContextMixin, viewsets.ReadOnlyModelViewSet):
+class UserSearchViewSet(
+    SerializerClassesMixin, ModelContextMixin, viewsets.ReadOnlyModelViewSet
+):
     model = UserModel
     permission_classes = (
         permissions.IsAuthenticated,
     )  # Permissions checked in queryset!
     serializer_class = UserSerializer
+    serializer_classes = {"list": UserListSerializer}
     filter_backends = (
         DjangoFilterBackend,
         filters.SearchFilter,

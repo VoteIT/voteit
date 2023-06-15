@@ -202,11 +202,8 @@ class MeetingRolesSerializerTests(TestCase):
                 "userid": "moderator",
                 "email": "moderator@voteit.se",
                 "first_name": "Moderator",
-                "full_name": "Moderator",
                 "last_name": "",
                 "img_url": None,
-                "organisation": 1,
-                "state": "incomplete",
             },
             dict(data["user"]),
         )

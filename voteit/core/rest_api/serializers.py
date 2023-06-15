@@ -141,18 +141,25 @@ class OptionalHyperlinkedIdentityField(serializers.HyperlinkedIdentityField):
         return super().to_representation(value)
 
 
+class UserListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = get_user_model()
+        fields = read_only_fields = (
+            "pk",
+            "email",
+            "img_url",
+            "userid",
+            "first_name",
+            "last_name",
+        )
+
+
 class UserSerializer(serializers.ModelSerializer):
-    full_name = serializers.SerializerMethodField()
-
-    def get_full_name(self, instance: AbstractUser):
-        return instance.get_full_name()
-
     class Meta:
         model = get_user_model()
         read_only_fields = (
             "pk",
             "state",
-            "full_name",
             "img_url",
             "organisation",
         )

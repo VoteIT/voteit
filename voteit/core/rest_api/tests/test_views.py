@@ -225,7 +225,6 @@ class UserViewSetTests(APITestCase):
                 "pk": 1,
                 "state": "incomplete",
                 "userid": "moderator",
-                "full_name": "Moderator",
                 "first_name": "Moderator",
                 "last_name": "",
                 "img_url": None,
@@ -250,7 +249,6 @@ class UserViewSetTests(APITestCase):
         self.assertEqual(
             {
                 "first_name": "Moderator",
-                "full_name": "Moderator",
                 "img_url": None,
                 "last_name": "",
                 "organisation": 1,

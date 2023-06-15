@@ -12,6 +12,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator
 
 from voteit.core.rest_api.serializers import BaseModelSerializer
+from voteit.core.rest_api.serializers import UserListSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.meeting.dialects import dialect_registry
@@ -213,7 +214,7 @@ class AgendaOrderSerializer(serializers.Serializer):
 
 class MeetingRolesSerializer(serializers.ModelSerializer):
     meeting = serializers.IntegerField(source="context_id", read_only=True)
-    user = UserSerializer(read_only=True)
+    user = UserListSerializer(read_only=True)
 
     class Meta:
         model = MeetingRoles
