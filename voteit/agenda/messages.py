@@ -85,6 +85,21 @@ class AgendaDeleted(BaseObjectDeleted):
     name = "agenda_item.deleted"
 
 
+@outgoing
+class AgendaBodyAdded(BaseObjectAdded):
+    name = "agenda_body.added"
+
+
+@outgoing
+class AgendaBodyChanged(BaseObjectChanged):
+    name = "agenda_body.changed"
+
+
+@outgoing
+class AgendaBodyDeleted(BaseObjectDeleted):
+    name = "agenda_body.deleted"
+
+
 class LastReadChangedSchema(BaseModel):
     """
     >>> from django.utils.timezone import now

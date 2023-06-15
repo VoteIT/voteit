@@ -6,33 +6,45 @@ from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import RichTextSerializerMixin
 
 
-class AgendaItemSerializer(RichTextSerializerMixin, BaseModelSerializer):
+class AgendaItemSerializer(BaseModelSerializer):
     pk = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = AgendaItem
         read_only_fields = (
-            "author",
             "meeting",
-            "mentions",
             "order",
             "related_modified",
             "state",
             "pk",
         )
         exclude = (
+            "id",
             "author",
+            "body",  # Sent as another type!
+            "mentions",
             "last_modified_by",
         )
 
 
-class CreateAgendaItemSerializer(AgendaItemSerializer):
+class AgendaItemBodySerializer(AgendaItemSerializer):
+    class Meta:
+        model = AgendaItem
+        fields = read_only_fields = (
+            "body",
+            "pk",
+        )
+
+
+class CreateAgendaItemSerializer(RichTextSerializerMixin, AgendaItemSerializer):
     class Meta(AgendaItemSerializer.Meta):
-        read_only_fields = (
-            "mentions",
-            "order",
+        read_only_fields = []
+        exclude = (
+            "author",
             "related_modified",
+            "mentions",
             "state",
+            "last_modified_by",
         )
 
 

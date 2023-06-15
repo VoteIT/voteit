@@ -7,9 +7,13 @@ from django.test import override_settings
 from pytz import UTC
 
 from envelope.messages.channels import Subscribe
+from voteit.agenda.channels import AgendaItemChannel
+from voteit.agenda.messages import AgendaBodyAdded
+from voteit.agenda.models import AgendaItem
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
+from voteit.meeting.models import Meeting
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -21,11 +25,8 @@ _channel_layers_setting = {
 class SubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
-
         cls.meeting: Meeting = Meeting.objects.create()
-        cls.ai: AgendaItem = cls.meeting.agenda_items.create()
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(body="Hello world")
         cls.ai.upcoming()
         cls.ai.save()
         cls.ai_private: AgendaItem = cls.meeting.agenda_items.create()
@@ -40,7 +41,10 @@ class SubscribedTests(TestCase):
             channel_type=ParticipantsChannel.name,
         )
         msg = command.run_job()
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "agenda_item.added"}
+        pks = set()
+        for msg in msg.data.app_state:
+            if msg.t == "s.batch" and msg.p["t"] == "agenda_item.added":
+                pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual({self.ai.pk}, pks)
 
     def test_app_state_sent_moderators(self):
@@ -72,13 +76,23 @@ class SubscribedTests(TestCase):
         }
         self.assertIsInstance(timestamps.pop(), str)
 
+    def test_app_state_sends_body(self):
+        command = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.ai.pk,
+            channel_type=AgendaItemChannel.name,
+        )
+        response = command.run_job()
+        messages = [x for x in response.data.app_state if x.t == AgendaBodyAdded.name]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertEqual({"pk": self.ai.pk, "body": "Hello world"}, msg.p)
+
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AgendaChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting = Meeting.objects.create()
         cls.ai = cls.meeting.agenda_items.create()
         cls.ai_pk = cls.ai.pk
@@ -120,41 +134,27 @@ class AgendaChangedTests(TestCase):
         self.assertIsInstance(msg, AgendaChanged)
         self.assertEqual(self.ai.pk, msg.data.pk)
 
-    @patch.object(ParticipantsChannel, "sync_publish")
-    def test_deleted_participants(self, mock_publish):
-        from voteit.agenda.messages import AgendaDeleted
-
-        self.ai.delete()
-        self.assertFalse(mock_publish.called)
-        # Create a new item
-        ai = self.meeting.agenda_items.create()
-        ai.upcoming()
-        ai.save()
-        mock_publish.reset_mock()
-        ai_pk = ai.pk
-        ai.delete()
-        self.assertTrue(mock_publish.called)
-        msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, AgendaDeleted)
-        self.assertEqual(ai_pk, msg.data.pk)
-
-    @patch.object(ModeratorsChannel, "sync_publish")
+    @patch.object(MeetingChannel, "sync_publish")
     def test_deleted_moderators(self, mock_publish):
         from voteit.agenda.messages import AgendaDeleted
+        from voteit.agenda.messages import AgendaBodyDeleted
 
         self.assertFalse(mock_publish.called)
         ai_pk = self.ai.pk
         self.ai.delete()
         self.assertTrue(mock_publish.called)
+        # Agenda
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, AgendaDeleted)
+        self.assertEqual(ai_pk, msg.data.pk)
+        # Body
+        msg = mock_publish.mock_calls[1].args[0]
+        self.assertIsInstance(msg, AgendaBodyDeleted)
         self.assertEqual(ai_pk, msg.data.pk)
 
 
 class ArchiveAgendaTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-
         self.meeting = Meeting.objects.create()
         self.meeting.agenda_items.create()
 
@@ -168,9 +168,6 @@ class ArchiveAgendaTests(TestCase):
 class RelatedItemsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
-
         cls.meeting: Meeting = Meeting.objects.create()
         cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="upcoming")
         cls.prop = cls.ai.proposals.create()
