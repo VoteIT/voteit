@@ -21,13 +21,33 @@ class AgendaItemSerializer(BaseModelSerializer):
         exclude = (
             "id",
             "author",
-            "body",  # Sent as another type!
+            # "body",  # Sent as another type!
             "mentions",
             "last_modified_by",
         )
 
 
+class AgendaItemListSerializer(AgendaItemSerializer):
+    """Serializer for meeting app_state"""
+
+    class Meta:
+        model = AgendaItem
+        fields = read_only_fields = (
+            "block_discussion",
+            "block_proposals",
+            "meeting",
+            "order",
+            "pk",
+            "related_modified",
+            "state",
+            "tags",
+            "title",
+        )
+
+
 class AgendaItemBodySerializer(AgendaItemSerializer):
+    """Serializer for agenda_item app_state"""
+
     class Meta:
         model = AgendaItem
         fields = read_only_fields = (

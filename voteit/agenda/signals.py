@@ -20,7 +20,7 @@ from voteit.agenda.messages import AgendaDeleted
 from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import AgendaItemBodySerializer
-from voteit.agenda.rest_api.serializers import AgendaItemSerializer
+from voteit.agenda.rest_api.serializers import AgendaItemListSerializer
 from voteit.agenda.rest_api.serializers import LastReadSerializer
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.abcs import AgendaItemContext
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
 
 def _attach_agenda_items(qs: models.QuerySet[AgendaItem], app_state: AppState):
-    serializer = AgendaItemSerializer(qs, many=True)
+    serializer = AgendaItemListSerializer(qs, many=True)
     if serializer.data:
         batch = Batch(t=AgendaAdded.name, payloads=[])
         for item in serializer.data:
@@ -95,7 +95,7 @@ def ai_channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
 def agenda_change(instance: AgendaItem = None, created=None, **kw):
     participants_ch = ParticipantsChannel.from_instance(instance.meeting)
     moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
-    data = AgendaItemSerializer(instance).data
+    data = AgendaItemListSerializer(instance).data
     # Base message that might only get sent to moderators
     if created:
         msg = AgendaAdded(data=data)
