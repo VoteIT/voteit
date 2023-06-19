@@ -15,17 +15,47 @@ class AgendaItemSerializerTests(TestCase):
             body="Hello world", tags=["hello"]
         )
 
-    @property
-    def _cut(self):
+    def test_agenda_item(self):
         from voteit.agenda.rest_api.serializers import AgendaItemSerializer
 
-        return AgendaItemSerializer
-
-    def test_serialize(self):
-        serializer = self._cut(self.ai)
+        serializer = AgendaItemSerializer(self.ai)
         data = dict(serializer.data)
         self.assertTrue(data.pop("created"))
         self.assertTrue(data.pop("modified"))
+        self.assertEqual(
+            {
+                "pk": self.ai.pk,
+                "related_modified": None,
+                "state": "private",
+                "tags": ["hello"],
+                "title": "",
+                "body": "Hello world",
+                "block_discussion": False,
+                "block_proposals": False,
+                "meeting": self.meeting.pk,
+                "order": 0,
+            },
+            data,
+        )
+
+    def test_agenda_item_body(self):
+        from voteit.agenda.rest_api.serializers import AgendaItemBodySerializer
+
+        serializer = AgendaItemBodySerializer(self.ai)
+        data = dict(serializer.data)
+        self.assertEqual(
+            {
+                "pk": self.ai.pk,
+                "body": "Hello world",
+            },
+            data,
+        )
+
+    def test_agenda_item_list(self):
+        from voteit.agenda.rest_api.serializers import AgendaItemListSerializer
+
+        serializer = AgendaItemListSerializer(self.ai)
+        data = dict(serializer.data)
         self.assertEqual(
             {
                 "pk": self.ai.pk,
@@ -37,34 +67,6 @@ class AgendaItemSerializerTests(TestCase):
                 "block_proposals": False,
                 "meeting": self.meeting.pk,
                 "order": 0,
-            },
-            data,
-        )
-
-
-class AgendaItemDetailSerializerTests(TestCase):
-    fixtures = ["meeting_test_fixture"]
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.get(pk=1)
-        cls.ai: AgendaItem = cls.meeting.agenda_items.create(
-            body="Hello world", tags=["hello"]
-        )
-
-    @property
-    def _cut(self):
-        from voteit.agenda.rest_api.serializers import AgendaItemBodySerializer
-
-        return AgendaItemBodySerializer
-
-    def test_serialize(self):
-        serializer = self._cut(self.ai)
-        data = dict(serializer.data)
-        self.assertEqual(
-            {
-                "pk": self.ai.pk,
-                "body": "Hello world",
             },
             data,
         )

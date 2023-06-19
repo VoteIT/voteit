@@ -6,7 +6,7 @@ from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import RichTextSerializerMixin
 
 
-class AgendaItemSerializer(BaseModelSerializer):
+class AgendaItemSerializer(RichTextSerializerMixin, BaseModelSerializer):
     pk = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -21,14 +21,15 @@ class AgendaItemSerializer(BaseModelSerializer):
         exclude = (
             "id",
             "author",
-            # "body",  # Sent as another type!
             "mentions",
             "last_modified_by",
         )
 
 
 class AgendaItemListSerializer(AgendaItemSerializer):
-    """Serializer for meeting app_state"""
+    """
+    Serializer for meeting app_state - excludes body
+    """
 
     class Meta:
         model = AgendaItem
@@ -46,7 +47,9 @@ class AgendaItemListSerializer(AgendaItemSerializer):
 
 
 class AgendaItemBodySerializer(AgendaItemSerializer):
-    """Serializer for agenda_item app_state"""
+    """
+    Serializer for agenda_item app_state
+    """
 
     class Meta:
         model = AgendaItem
@@ -56,7 +59,7 @@ class AgendaItemBodySerializer(AgendaItemSerializer):
         )
 
 
-class CreateAgendaItemSerializer(RichTextSerializerMixin, AgendaItemSerializer):
+class CreateAgendaItemSerializer(AgendaItemSerializer):
     class Meta(AgendaItemSerializer.Meta):
         read_only_fields = []
         exclude = (
