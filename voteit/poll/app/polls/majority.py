@@ -108,7 +108,7 @@ class Majority(PollMethod):
         majority_result = MajorityPollResult(results=results)
         res_len = len(results)
         if res_len > 2:  # pragma: no cover
-            raise Exception("Counter returned more than 2 distrinct vote types")
+            raise Exception("Counter returned more than 2 distinct vote types")
         if res_len == 1 and results[0].votes:
             pks = set(self.poll.proposals.values_list("pk", flat=True))
             majority_result.approved = [results[0].proposal]
