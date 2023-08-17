@@ -6,6 +6,7 @@ from django.test import override_settings
 
 from envelope.app.user_channel.channel import UserChannel
 from envelope.messages.channels import Subscribe
+from envelope.utils import AppState
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
@@ -58,26 +59,36 @@ class MeetingSubscribedTests(TestCase):
         cls.ai = cls.meeting.agenda_items.create()
         cls.er = ElectoralRegister.objects.create(meeting=cls.meeting)
         cls.poll = cls.meeting.polls.create(
-            method_name="simple", electoral_register=cls.er
+            method_name="simple", electoral_register=cls.er, state="upcoming"
         )
-        cls.poll.upcoming()
-        cls.poll.save()
+        cls.poll2 = cls.meeting.polls.create(
+            method_name="simple", electoral_register=cls.er, state="upcoming"
+        )
         cls.poll_private = cls.meeting.polls.create(
             method_name="simple", electoral_register=cls.er
         )
         cls.user = cls.er.voters.create(username="user")
         cls.meeting.add_roles(cls.user, "moderator")
-        # Create a vote
+        # Props
         cls.poll.proposals.create(agenda_item=cls.ai)
+        cls.poll2.proposals.create(agenda_item=cls.ai)
+        cls.poll_private.proposals.create(agenda_item=cls.ai)
+        # Create votes
         cls.vote = cls.poll.votes.create(user=cls.user, vote="yes")
+        cls.vote2 = cls.poll2.votes.create(user=cls.user, vote="yes")
+        cls.vote_private = cls.poll_private.votes.create(user=cls.user, vote="yes")
 
     def setUp(self):
-        from voteit.meeting.models import Meeting
-
         # Clear cached stuff
         self.meeting = Meeting.objects.get(pk=1)
         self.er.refresh_from_db()
         self.poll.refresh_from_db()
+
+    @property
+    def _fut(self):
+        from voteit.poll.signals import meeting_subscribed
+
+        return meeting_subscribed
 
     def test_app_state_sent_participants_poll_added(self):
         command = Subscribe(
@@ -87,7 +98,7 @@ class MeetingSubscribedTests(TestCase):
         )
         msg = command.run_job()
         pks = {x.p["pk"] for x in msg.data.app_state if x.t == "poll.added"}
-        self.assertEqual({self.poll.pk}, pks)
+        self.assertEqual({self.poll.pk, self.poll2.pk}, pks)
 
     def test_app_state_sent_moderators(self):
         command = Subscribe(
@@ -97,7 +108,7 @@ class MeetingSubscribedTests(TestCase):
         )
         msg = command.run_job()
         pks = {x.p["pk"] for x in msg.data.app_state if x.t == "poll.added"}
-        self.assertEqual({self.poll.pk, self.poll_private.pk}, pks)
+        self.assertEqual({self.poll.pk, self.poll_private.pk, self.poll2.pk}, pks)
 
     def test_app_state_sent_votes(self):
         command = Subscribe(
@@ -107,7 +118,7 @@ class MeetingSubscribedTests(TestCase):
         )
         msg = command.run_job()
         pks = {x.p["pk"] for x in msg.data.app_state if x.t == "vote.added"}
-        self.assertEqual({self.vote.pk}, pks)
+        self.assertEqual({self.vote.pk, self.vote2.pk, self.vote_private.pk}, pks)
 
     def test_app_state_sent_latest_er(self):
         command = Subscribe(
@@ -128,6 +139,11 @@ class MeetingSubscribedTests(TestCase):
         )
         msg = command.run_job()
         self.assertFalse([x for x in msg.data.app_state if x.t == "er.added"])
+
+    def test_n1_problem(self):
+        app_state = AppState()
+        with self.assertNumQueries(4):
+            self._fut(self.meeting, app_state, self.user)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
