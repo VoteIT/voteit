@@ -168,7 +168,8 @@ def finish_auth(request: WSGIRequest):
                 adapted.update(user)
                 AccessToken.objects.from_response(token_response, user, provider)
             request.session.pop("oauth_state", None)
-            request.session.save()
+            if request.session.modified:
+                request.session.save()
     except DatabaseError:
         # Catch all exceptions here?
         # FIXME: Sane redirect url
