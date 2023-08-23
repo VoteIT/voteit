@@ -211,6 +211,7 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
         [(dict_items([('email', 'jeff@betahaus.net')]), {'email': 'jeff@betahaus.net', 'group': '123'}), (dict_items([('email', 'jane@betahaus.net')]), {'email': 'jane@betahaus.net', 'group': '123'})]
         """
         for row in rows:
+            row = row[: len(columns)]
             yield {
                 columns[i]: x
                 for i, x in enumerate(row)

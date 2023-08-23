@@ -7,9 +7,8 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-
 from envelope.utils import channel_layer
-from voteit.core.testing import FakeCommit
+
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteAdded
 from voteit.invites.messages import MeetingInviteChanged
@@ -57,7 +56,7 @@ class AddInvitesTests(TestCase):
         for name in ["one", "two", "three"]:
             data.append(f"{name}@betahaus.net")
         msg = self._mk_one(rows=data, columns=["email"], roles=["participant"])
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             response = msg.run_job()
         self.assertEqual({"added": 3, "changed": 0, "existed": 0}, response.data.dict())
         # Check pushes
@@ -91,7 +90,7 @@ class AddInvitesTests(TestCase):
         msg = self._mk_one(
             user_pk=moderator.pk, rows=data, columns=["email"], roles=["participant"]
         )
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             response = msg.run_job()
         self.assertEqual({"added": 1, "changed": 2, "existed": 0}, response.data.dict())
         # Check pushes
@@ -120,7 +119,7 @@ class AddInvitesTests(TestCase):
             columns=["email"],
             roles=[str(ROLE_PARTICIPANT)],
         )
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             response = msg.run_job()
         self.assertEqual({"added": 2, "changed": 1, "existed": 0}, response.data.dict())
         # Check pushes
@@ -304,3 +303,16 @@ class AddInviteAnnotationsTests(TestCase):
         ann_data = messages[1]["p"]
         self.assertEqual(1, ann_data["curr"])
         self.assertEqual(1, ann_data["total"])
+
+    @patch.object(MeetingInvitesChannel, "sync_publish")
+    def test_too_many_columns_in_data_rows(self, mock_publish):
+        columns, rows = get_unvalidated_fixture_content("grouprole.csv")
+        msg = self._mk_one(rows=rows, columns=columns)
+        with self.captureOnCommitCallbacks(execute=True):
+            msg.run_job()
+        mock_publish.reset_mock()
+        # Make bad data...
+        rows[0].append("too much data")
+        msg = self._mk_one(rows=rows, columns=columns)
+        with self.captureOnCommitCallbacks(execute=True):
+            msg.run_job()
