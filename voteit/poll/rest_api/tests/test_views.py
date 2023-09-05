@@ -2,6 +2,9 @@ from django.contrib.auth import get_user_model
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
 
@@ -9,16 +12,14 @@ User = get_user_model()
 class PollViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
-        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting",
         )
         cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
         cls.ai_private = cls.meeting.agenda_items.create(title="Private")
         cls.prop = cls.ai.proposals.create()
+        cls.prop2 = cls.ai.proposals.create()
+        cls.prop3 = cls.ai.proposals.create()
         cls.participant: User = User.objects.create_user("participant")
         cls.moderator: User = User.objects.create_user("moderator")
         cls.outsider: User = User.objects.create_user("outsider")
@@ -88,6 +89,23 @@ class PollViewSetTests(APITestCase):
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 400)
+        self.assertIn("method_name", response.json())
+
+    def test_create_repeated_schulze_sort(self):
+        from voteit.poll.app.polls.schulze import RepeatedSchulze
+
+        url = reverse("poll-list")
+        data = {
+            "title": "Let's vote",
+            "meeting": self.meeting.pk,
+            "agenda_item": self.ai.pk,
+            "proposals": [self.prop.pk, self.prop2.pk, self.prop3.pk],
+            "method_name": RepeatedSchulze.name,
+            "settings": {"winners": ""},
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 201)
         self.assertIn("method_name", response.json())
 
     def test_list_poll_in_this_meeting(self):
@@ -165,8 +183,6 @@ class PollViewSetTests(APITestCase):
         self.assertEqual(403, response.status_code)
 
     def test_get_other_meeting(self):
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
         poll = meeting.polls.create(method_name="simple", state="upcoming")
         url = reverse("poll-detail", kwargs={"pk": poll.pk})
@@ -208,8 +224,6 @@ class PollViewSetTests(APITestCase):
 class ElectoralRegisterViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
         from voteit.poll.models import ElectoralRegister
 
         cls.meeting: Meeting = Meeting.objects.create(
@@ -252,8 +266,6 @@ class ElectoralRegisterViewSetTests(APITestCase):
 class ExportElectoralRegisterViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_MODERATOR, ROLE_PARTICIPANT
         from voteit.poll.models import ElectoralRegister
 
         cls.meeting: Meeting = Meeting.objects.create(

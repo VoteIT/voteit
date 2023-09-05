@@ -199,6 +199,15 @@ class RepeatedSchulzeResult(PollResult):
 class RepeatedSchulzeSettingsSchema(SchulzeSettingsSchema):
     winners: int | None  # None means all
 
+    @validator("winners", pre=True)
+    def transform_winners(cls, v):
+        """
+        Serializers will send "" as empty, but we require None here
+        """
+        if isinstance(v, str) and not v:
+            v = None
+        return v
+
     @validator("winners")
     def validate_winners(cls, v):
         if v is not None and v < 2:
