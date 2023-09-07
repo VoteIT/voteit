@@ -43,12 +43,10 @@ class PresenceCheckPolicyTests(TestCase):
             set(self.meeting.latest_er.voters.all()),
         )
 
-    def test_with_no_present(self):
-        self.presence_check.present_users.remove(self.participant)
-        self.presence_check.close()
+    def test_with_no_er_created(self):
         self.assertIsNone(self.meeting.latest_er)
         self.poll.upcoming()
-        self.assertFalse(self.poll.electoral_register_empty_guard())
+        self.assertFalse(self.poll.manual_er_needed_guard())
 
     def test_group_votes(self):
         group = self.meeting.groups.create(groupid="group", votes=4)

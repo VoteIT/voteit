@@ -92,6 +92,8 @@ class ElectoralRegisterPolicy(ABC):
     # Is this OK to use together with a manual selection of voters?
     allow_manual: bool = False
     # Can this method be triggered whenever the moderator likes? (In advance of polls for instance)
+    require_manual: bool = False
+    # This method must be triggered manually before starting a poll
     allow_trigger: bool = False
     # Will this method update ER for ongoing polls? It will also have the effect
     # that polls can be started with an empty ER.
@@ -127,17 +129,6 @@ class ElectoralRegisterPolicy(ABC):
         It could simply be the users from potential voters for instance:
         self.meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER)
         """
-
-    def poll_will_have_voters(self, **kwargs) -> bool:
-        """
-        The method itself needs to be sure that any starting poll must have voters. For instance, if auto
-        is used there must be potential voters.
-
-        Normally this is just a quick check that get_voters() return something.
-        """
-        return self.meeting.roles.filter(
-            assigned__contains=[ROLE_POTENTIAL_VOTER]
-        ).exists()
 
     def new_er_needed(self, **kwargs) -> bool:
         """

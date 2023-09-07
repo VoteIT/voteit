@@ -297,52 +297,13 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
     validate_settings_guard.title = _("Invalid settings")
 
-    def electoral_register_missing_guard(self):
+    def valid_er_policy_guard(self):
         if self.meeting is None:
             return True  # Skip for unittests
-        if not self.meeting.valid_er_policy_guard():
-            return False
-        with suppress(KeyError):
-            if self.meeting.er_policy.allow_poll_er_change:
-                return True  # Skip check, ER might change regardless
-        return bool(self.meeting.get_latest_er())
+        return self.meeting.valid_er_policy_guard()
 
-    electoral_register_missing_guard.title = _(
-        "There's no electoral register or method to create it"
-    )
-
-    def electoral_register_empty_guard(self):
-        if self.meeting is not None:
-            with suppress(KeyError):
-                if self.meeting.er_policy.allow_poll_er_change:
-                    return True  # Skip check, ER might change regardless
-            er = self.meeting.get_latest_er()
-            if er is None:
-                # All guards seem to fire even if previous guards fail.
-                return False
-            return er.voters.exists()
-        return True
-
-    electoral_register_empty_guard.title = _("Electoral register is empty - no voters")
-
-    def no_proposals_guard(self):
-        return self.proposals.exists()
-
-    no_proposals_guard.title = _("No proposals, can't start poll")
-
-    def polls_electoral_register_will_have_voters_guard(self):
-        if self.meeting is None:
-            # We don't care about unittests :)
-            return True
-        with suppress(KeyError):
-            if self.meeting.er_policy.allow_poll_er_change:
-                return True  # Skip check, ER might change regardless
-            return self.meeting.er_policy.poll_will_have_voters()
-        return False
-
-    polls_electoral_register_will_have_voters_guard.title = _(
-        "The electoral register would be empty if you start the poll now. "
-        "Please check electoral register method."
+    valid_er_policy_guard.title = _(
+        "There's no electoral register method on this meeting - check configuration"
     )
 
     def method_guard(self):
@@ -356,6 +317,20 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         return True
 
     method_guard.title = _("Poll method settings invalid")
+
+    def manual_er_needed_guard(self):
+        if (
+            self.meeting  # Skip unittests!
+            and not self.meeting.latest_er
+            and self.valid_er_policy_guard()
+            and self.meeting.er_policy.require_manual
+        ):
+            return False
+        return True
+
+    manual_er_needed_guard.title = _(
+        "This electoral register method requires you to create electoral registers manually before starting a poll."
+    )
 
     def _lock_proposals(self):
         for proposal in self.proposals.filter(
@@ -391,19 +366,16 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         target=PollWf.ONGOING,
         conditions=[
             validate_settings_guard,
-            electoral_register_missing_guard,
-            electoral_register_empty_guard,
-            polls_electoral_register_will_have_voters_guard,
-            no_proposals_guard,
+            valid_er_policy_guard,
+            manual_er_needed_guard,
             method_guard,
         ],
         permission=PollPermissions.CHANGE_STATE,
         custom={"title": _("Start")},
     )
     def ongoing(self):
-        # The guard should've taken care of this already
-        assert self.electoral_register, "No electoral register"
-        self.initial_electoral_register = self.electoral_register
+        if self.electoral_register:
+            self.initial_electoral_register = self.electoral_register
         self.started = now()
         self._lock_proposals()
 

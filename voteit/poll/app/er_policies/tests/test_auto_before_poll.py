@@ -92,8 +92,6 @@ class AutoBeforePollTests(TestCase):
         self.assertRaises(TransitionNotAllowed, self.poll.ongoing)
         self.meeting.er_policy_name = AutoBeforePoll.name
         self.meeting.save()
-        # FIX cache
-        self.meeting.er_policy = self.meeting._er_policy()
         # We still need the meeting to have a policy
         self.assertRaises(TransitionNotAllowed, self.poll.ongoing)
         self.meeting.er_policy.create_er()

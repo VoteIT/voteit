@@ -195,17 +195,14 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
             return reg[self.proposal_id_policy_name](self)
         return reg[DEFAULT_PROPOSAL_ID_POLICY](self)
 
-    @cached_property
+    @property
     def er_policy(self) -> ElectoralRegisterPolicy:
-        return self._er_policy()
+        reg = get_electoral_policy_registry()
+        return reg[self.er_policy_name](self)
 
     @cached_property
     def latest_er(self) -> ElectoralRegister | None:
         return self.get_latest_er()
-
-    def _er_policy(self):
-        reg = get_electoral_policy_registry()
-        return reg[self.er_policy_name](self)
 
     def get_latest_er(self) -> ElectoralRegister | None:
         return (
@@ -217,9 +214,8 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         Method should never signal unless it has a valid ER policy
         """
         try:
-            self.er_policy = self._er_policy()  # In case it was cached
+            self.er_policy
         except KeyError:  # We don't want to check those kinds of errors here
-            self.er_policy = None
             return
         from voteit.meeting.signals import er_policy_changed
 

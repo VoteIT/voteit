@@ -83,57 +83,11 @@ class PollTests(TestCase):
 
         self.assertIsInstance(self.poll.method, Simple)
 
-    def test_start_check_no_electoral_register_no_meeting(self):
-        self.poll.meeting = None
-        self.poll.save()
-        self.assertTrue(self.poll.electoral_register_empty_guard())
-
-    def test_start_check_no_electoral_register_checked_against_meeting(self):
-        self.assertTrue(self.poll.electoral_register_missing_guard())
-        self.er.delete()
-        self.assertFalse(self.poll.electoral_register_missing_guard())
-
-    def test_start_check_no_electoral_register_permissive_er_method(self):
-        self.meeting.er_policy_name = AutoAlways.name
-        self.meeting.save()
-        self.er.delete()
-        self.assertTrue(self.poll.electoral_register_missing_guard())
-
     def test_broken_er_name_checked(self):
-        self.assertTrue(self.poll.electoral_register_missing_guard())
+        self.assertTrue(self.poll.valid_er_policy_guard())
         self.poll.meeting.er_policy_name = "broken"
         self.poll.meeting.save()
-        self.assertFalse(self.poll.electoral_register_missing_guard())
-
-    def test_start_check_electoral_register_empty(self):
-        self.assertTrue(self.poll.electoral_register_empty_guard())
-        self.er.voters.remove(self.participant, self.moderator)
-        self.assertFalse(self.poll.electoral_register_empty_guard())
-
-    def test_start_check_electoral_register_empty_permissive_er_method(self):
-        self.er.voters.remove(self.participant, self.moderator)
-        self.meeting.er_policy_name = AutoAlways.name
-        self.meeting.save()
-        self.assertTrue(self.poll.electoral_register_empty_guard())
-
-    def test_start_check_no_proposals(self):
-        self.assertTrue(self.poll.no_proposals_guard())
-        self.poll.proposals.all().delete()
-        self.assertFalse(self.poll.no_proposals_guard())
-
-    def test_polls_electoral_register_will_have_voters_guard(self):
-        self.assertEqual(AutoBeforePoll.name, self.meeting.er_policy_name)
-        self.assertTrue(self.poll.polls_electoral_register_will_have_voters_guard())
-        self.meeting.remove_roles(self.moderator, ROLE_POTENTIAL_VOTER)
-        self.meeting.remove_roles(self.participant, ROLE_POTENTIAL_VOTER)
-        self.assertFalse(self.poll.polls_electoral_register_will_have_voters_guard())
-
-    def test_polls_electoral_register_will_have_voters_guard_permissive_er_method(self):
-        self.meeting.er_policy_name = AutoAlways.name
-        self.meeting.save()
-        self.meeting.remove_roles(self.moderator, ROLE_POTENTIAL_VOTER)
-        self.meeting.remove_roles(self.participant, ROLE_POTENTIAL_VOTER)
-        self.assertTrue(self.poll.polls_electoral_register_will_have_voters_guard())
+        self.assertFalse(self.poll.valid_er_policy_guard())
 
     def test_opening_poll(self):
         self.poll.upcoming()
