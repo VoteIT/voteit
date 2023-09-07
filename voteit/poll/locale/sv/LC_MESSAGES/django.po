@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-03-30 13:02+0200\n"
-"PO-Revision-Date: 2023-03-30 13:02+0200\n"
+"POT-Creation-Date: 2023-09-07 13:39+0200\n"
+"PO-Revision-Date: 2023-09-07 13:40+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -18,11 +18,11 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 3.2.2\n"
 
-#: app/er_policies/auto_always.py:31
+#: app/er_policies/auto_always.py:32
 msgid "Automatic always"
 msgstr "Alltid automatisk"
 
-#: app/er_policies/auto_always.py:33
+#: app/er_policies/auto_always.py:34
 msgid ""
 "This method will always create a new electoral register when potential "
 "voters change. It will even change electoral register for ongoing polls, so "
@@ -154,7 +154,7 @@ msgstr "Metoden %(method)s kräver minst 2 förslag"
 msgid "Schulze"
 msgstr "Schulze"
 
-#: app/polls/schulze.py:218
+#: app/polls/schulze.py:227
 msgid "Repeated Schulze"
 msgstr "Repeterad Schulze"
 
@@ -176,63 +176,58 @@ msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
 msgid "Simple"
 msgstr "Enkel"
 
-#: models.py:287
+#: models.py:298
 msgid "Invalid settings"
 msgstr "Ogiltiga inställningar"
 
-#: models.py:298
-msgid "There's no electoral register or method to create it"
-msgstr "Det finns ingen röstlängd eller metod för att skapa en"
-
-#: models.py:310
-msgid "Electoral register is empty - no voters"
-msgstr "Röstlängden är tom - inga röstande"
-
-#: models.py:315
-msgid "No proposals, can't start poll"
-msgstr "Inga förslag, kan inte starta omröstningen"
-
-#: models.py:326
+#: models.py:306
 msgid ""
-"The electoral register would be empty if you start the poll now. Please "
-"check electoral register method."
+"There's no electoral register method on this meeting - check configuration"
 msgstr ""
-"Röstlängden skulle vara tom om du startar en omröstning nu. Kontrollera "
-"metod för röstlängd."
+"Det finns ingen metod för att skapa en röstlängd i mötet - kolla "
+"inställningar"
 
-#: models.py:340
+#: models.py:319
 msgid "Poll method settings invalid"
 msgstr "Omröstningens inställningar är fel"
 
-#: models.py:365
+#: models.py:332
+msgid ""
+"This electoral register method requires you to create electoral registers "
+"manually before starting a poll."
+msgstr ""
+"Röstlängdsmetoden kräver att du skapar en röstlängd manuellt. Gör det innan "
+"du startar omröstningen."
+
+#: models.py:358
 msgid "Make upcoming"
 msgstr "Gör kommande"
 
-#: models.py:383
+#: models.py:374
 msgid "Start"
 msgstr "Starta"
 
-#: models.py:397
+#: models.py:387
 msgid "Close"
 msgstr "Stäng"
 
-#: models.py:412
+#: models.py:402
 msgid "Finish"
 msgstr "Avsluta"
 
-#: models.py:444
+#: models.py:434
 msgid "Cancel"
 msgstr "Avbryt"
 
-#: models.py:455
+#: models.py:445
 msgid "Revert to private"
 msgstr "Återgå till privat"
 
-#: models.py:465 workflows.py:20
+#: models.py:455 workflows.py:20
 msgid "Failed"
 msgstr "Misslyckades"
 
-#: models.py:478 workflows.py:21
+#: models.py:468 workflows.py:21
 msgid "No result"
 msgstr "Inget resultat"
 
@@ -259,6 +254,12 @@ msgstr "Avslutad"
 #: workflows.py:19
 msgid "Canceled"
 msgstr "Avbruten"
+
+#~ msgid "Electoral register is empty - no voters"
+#~ msgstr "Röstlängden är tom - inga röstande"
+
+#~ msgid "No proposals, can't start poll"
+#~ msgstr "Inga förslag, kan inte starta omröstningen"
 
 #~ msgid "Closing a presence check will set a new electoral register."
 #~ msgstr "En ny röstlängd skapas när en närvarokontroll avslutas."
