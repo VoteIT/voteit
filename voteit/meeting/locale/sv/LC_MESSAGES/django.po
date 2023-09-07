@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-02 07:50+0000\n"
-"PO-Revision-Date: 2022-06-02 09:45+0200\n"
+"POT-Creation-Date: 2023-09-07 14:00+0200\n"
+"PO-Revision-Date: 2023-09-07 14:03+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -16,60 +16,90 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 2.3\n"
+"X-Generator: Poedit 3.2.2\n"
 
-#: models.py:186
+#: models.py:238
+msgid "Must have valid electoral register policy name"
+msgstr "Mötet måste ha en giltig röstlängdspolicy"
+
+#: models.py:243
+msgid "Meeting has ongoing polls - close them first"
+msgstr "Mötet har pågående omröstningar - stäng dem först"
+
+#: models.py:250
 msgid "Back to upcoming"
 msgstr "Tillbaka till kommande"
 
-#: models.py:197
+#: models.py:261
 msgid "Make ongoing"
 msgstr "Gör pågående"
 
-#: models.py:207
+#: models.py:272
 msgid "Close"
 msgstr "Stäng"
 
-#: models.py:217
+#: models.py:282
 msgid "Request archiving"
 msgstr "Begär arkivering"
 
-#: models.py:228
+#: models.py:293
 msgid "Abort archiving"
 msgstr "Avbryt arkivering"
 
-#: roles.py:9
+#: models.py:321
+msgid "Request delete..."
+msgstr "Begär borttagning…"
+
+#: models.py:332
+msgid "Abort delete"
+msgstr "Avbryt borttagning"
+
+#: roles.py:15
 msgid "Participant"
 msgstr "Deltagare"
 
-#: workflows.py:11
+#: roles.py:16
+msgid "Moderator"
+msgstr "Moderator"
+
+#: roles.py:17
+msgid "Potential voter"
+msgstr "Potentiell rösträtt"
+
+#: roles.py:18
+msgid "Discusser"
+msgstr "Debattör"
+
+#: roles.py:19
+msgid "Proposer"
+msgstr "Förslagsläggare"
+
+#: workflows.py:12
 msgid "Upcoming"
 msgstr "Kommande"
 
-#: workflows.py:12
+#: workflows.py:13
 msgid "Ongoing"
 msgstr "Pågående"
 
-#: workflows.py:13
+#: workflows.py:14
 msgid "Closed"
 msgstr "Stängd"
 
-#: workflows.py:14
+#: workflows.py:15
 msgid "Archiving"
 msgstr "Arkiverar"
 
-#: workflows.py:15
+#: workflows.py:16
 msgid "Archived"
 msgstr "Arkiverad"
+
+#: workflows.py:17
+msgid "Deleting"
+msgstr "Raderar"
 
 #~ msgid "Undo archiving request"
 #~ msgstr "Ångra arkivering"
 
 #~ msgid "Agenda items"
 #~ msgstr "Dagordningspunkter"
-
-#~ msgid "Proposals"
-#~ msgstr "Förslag"
-
-#~ msgid "Meeting"
-#~ msgstr "Möte"

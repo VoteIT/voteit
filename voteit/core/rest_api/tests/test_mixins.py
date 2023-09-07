@@ -90,7 +90,13 @@ class TransitionsMixinTests(APITestCase):
                     "source": "ongoing",
                     "target": "closed",
                     "title": "Close",
-                    "conditions": [],
+                    "conditions": [
+                        {
+                            "allowed": True,
+                            "title": "Meeting has ongoing polls - close them first",
+                            "name": "no_ongoing_polls_guard",
+                        }
+                    ],
                     "has_perm": True,
                     "allowed": True,
                 },

@@ -237,6 +237,11 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
 
     valid_er_policy_guard.title = _("Must have valid electoral register policy name")
 
+    def no_ongoing_polls_guard(self) -> bool:
+        return not self.polls.filter(state="ongoing").exists()
+
+    no_ongoing_polls_guard.title = _("Meeting has ongoing polls - close them first")
+
     @transition(
         field=state,
         source=MeetingWf.ONGOING,
@@ -263,6 +268,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         source=MeetingWf.ONGOING,
         target=MeetingWf.CLOSED,
         permission=MeetingPermissions.MODERATE,
+        conditions=[no_ongoing_polls_guard],
         custom={"title": _("Close")},
     )
     def close(self):

@@ -9,6 +9,8 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.organisation.models import Organisation
+from voteit.poll.app.er_policies.auto_always import AutoAlways
+from voteit.poll.models import Poll
 
 User = get_user_model()
 
@@ -64,6 +66,20 @@ class MeetingTests(TestCase):
         meeting.archive()
         ai = meeting.agenda_items.first()
         self.assertEqual("archived", ai.state)
+
+    def test_valid_er_policy_guard(self):
+        meeting = Meeting.objects.create()
+        self.assertFalse(meeting.valid_er_policy_guard())
+        meeting.er_policy_name = AutoAlways.name
+        self.assertTrue(meeting.valid_er_policy_guard())
+
+    def test_no_ongoing_polls_guard(self):
+        meeting = Meeting.objects.create()
+        poll: Poll = meeting.polls.create(method_name="simple")
+        self.assertTrue(meeting.no_ongoing_polls_guard())
+        poll.state = "ongoing"
+        poll.save()
+        self.assertFalse(meeting.no_ongoing_polls_guard())
 
 
 class ManagerTests(TestCase):
