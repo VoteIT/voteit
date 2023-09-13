@@ -152,10 +152,12 @@ def push_speaker_changed(instance: Speaker, created=False, **kwargs):
         # Speakers in the queue are sent as order instead. We only care about started or historic speakers
         return
     if instance.speaker_list.is_active_list:
-        if instance.speaker_list.speaker_system is not None:
+        if sls_id := instance.speaker_list.speaker_system_id:
             data = SpeakerSerializer(instance).data
+            # add extra attr here to include speaker list system
+            data["sls"] = sls_id
             msg = SpeakerChanged(data=data)
-            ch = SpeakerListSystemChannel.from_instance(instance.speaker_system)
+            ch = SpeakerListSystemChannel(sls_id)
             ch.sync_publish(msg, on_commit=False)  # Already post transaction
 
 
@@ -209,7 +211,8 @@ def list_system_channel_subscribed(
         for speaker in active_list.started_or_historic_speakers().values(
             "pk", "user", "speaker_list", "started", "seconds"
         ):
-            app_state.append(SpeakerAdded(data=speaker))
+            # Inject sls as well
+            app_state.append(SpeakerAdded(data={"sls": context.pk, **speaker}))
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)

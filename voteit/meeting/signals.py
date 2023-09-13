@@ -175,11 +175,10 @@ def meeting_channel_subscribed(
     # FIXME: Saner format for these
     for mg in meeting_groups_qs:
         items.update(mg.memberships.all())
-    app_state.append_from_queryset(
-        items,
-        GroupMembershipSerializer,
-        GroupMembershipAdded,
-    )
+    gm_data = GroupMembershipSerializer(items, many=True).data
+    for item in gm_data:
+        # Inject meeting pk
+        app_state.append(GroupMembershipAdded(data={"m": context.pk, **item}))
     # And GroupRoles
     if context.group_roles_active:
         app_state.append_from_queryset(
@@ -195,15 +194,19 @@ def meeting_channel_subscribed(
 @disable_on_raw_save
 def context_changed_publish_to_meeting(instance, *, sender, created, **kwargs):
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
+    is_gm = sender is GroupMembership
     if created:
         serializer = _added_serializer_class[sender]
         data = serializer(instance).data
+        if is_gm:
+            data["m"] = instance.meeting.pk
         added_msg = _added_msg_class[sender]
         msg = added_msg(**data)
     else:
         serializer = _changed_serializer_class[sender]
-
         data = serializer(instance).data
+        if is_gm:
+            data["m"] = instance.meeting.pk
         changed_msg = _changed_msg_class[sender]
         msg = changed_msg(**data)
     meeting_ch.sync_publish(msg, on_commit=True)

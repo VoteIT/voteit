@@ -141,6 +141,7 @@ class MeetingChannelSubscribedTests(TestCase):
         self.assertEqual(1, len(added))
         payload = added[0].p
         self.assertEqual(self.group_membership.pk, payload["pk"])
+        self.assertEqual(self.meeting.pk, payload["m"])
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -199,6 +200,7 @@ class MeetingGroupChangedTests(TestCase):
         msg = messages[0]
         self.assertIsInstance(msg, GroupMembershipAdded)
         self.assertEqual(self.group.pk, msg.data.meeting_group)
+        self.assertEqual(self.meeting.pk, msg.data.m)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_member_added_compat_reverse(self, mock_publish):
@@ -211,6 +213,7 @@ class MeetingGroupChangedTests(TestCase):
         msg = messages[0]
         self.assertIsInstance(msg, GroupMembershipAdded)
         self.assertEqual(self.group.pk, msg.data.meeting_group)
+        self.assertEqual(self.meeting.pk, msg.data.m)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_member_removed_compat(self, mock_publish):

@@ -47,6 +47,8 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
     batch = Batch(t=ProposalAdded.name, payloads=[])
     serializer = ProposalDetailSerializer(qs, many=True)
     for item in serializer.data:
+        # Inject meeting attr
+        item["m"] = meeting.pk
         batch.append(ProposalAdded(data=item))
     qs = DiffProposal.objects.filter(agenda_item__meeting=meeting).prefetch_related(
         "mentions", "paragraph"
@@ -55,6 +57,8 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
         qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
     serializer = DiffProposalDetailSerializer(qs, many=True)
     for item in serializer.data:
+        # Inject meeting attr
+        item["m"] = meeting.pk
         batch.append(ProposalAdded(data=item))
     app_state.append(batch)
 
@@ -78,40 +82,51 @@ def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
 @receiver_all_subclasses(post_save, sender=Proposal)
 @disable_on_raw_save
 def proposal_updated(instance: Proposal = None, created=None, **kw):
-    if instance.meeting is None:
+    if not instance.agenda_item_id:
         return
-    moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
+    if meeting_pk := instance.agenda_item.meeting_id is None:
+        return
+    moderators_ch = ModeratorsChannel(meeting_pk)
     data = GenericProposalSerializer(instance).data
+    # Inject meeting attr
+    data["m"] = meeting_pk
     if created:
         msg = ProposalAdded(data=data)
     else:
         msg = ProposalChanged(data=data)
     moderators_ch.sync_publish(msg)
-    if instance.agenda_item and not instance.agenda_item.is_private:
-        participants_ch = ParticipantsChannel.from_instance(instance.meeting)
+    if instance.agenda_item_id and not instance.agenda_item.is_private:
+        participants_ch = ParticipantsChannel(meeting_pk)
         participants_ch.sync_publish(msg)
 
 
 @receiver_all_subclasses(pre_delete, sender=Proposal)
-def proposal_delete(instance=None, **kw):
-    if instance.meeting is None:
+def proposal_delete(instance: Proposal = None, **kw):
+    if not instance.agenda_item_id:
         return
-    moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
+    if meeting_pk := instance.agenda_item.meeting_id is None:
+        return
+    moderators_ch = ModeratorsChannel(meeting_pk)
     msg = ProposalDeleted(pk=instance.pk)
     moderators_ch.sync_publish(msg)
-    if instance.agenda_item and not instance.agenda_item.is_private:
-        participants_ch = ParticipantsChannel.from_instance(instance.meeting)
+    if not instance.agenda_item.is_private:
+        participants_ch = ParticipantsChannel(meeting_pk)
         participants_ch.sync_publish(msg)
 
 
 @receiver(post_transition, sender=AgendaItem)
 def private_ai_published(instance: AgendaItem, source: str, **kw):
-    """Notify participants of any existing proposals
-    Note that proposals may appear before the agenda item does!"""
-    if source == AgendaItemWf.PRIVATE and instance.meeting is not None:
-        participants_ch = ParticipantsChannel.from_instance(instance.meeting)
+    """
+    Notify participants of any existing proposals
+    Note that proposals may appear before the agenda item does!
+    """
+    if source == AgendaItemWf.PRIVATE and instance.meeting_id is not None:
+        meeting_pk = instance.meeting_id
+        participants_ch = ParticipantsChannel(meeting_pk)
         for proposal in instance.proposals.all():
             data = GenericProposalSerializer(proposal).data
+            # Inject meeting pk
+            data["m"] = meeting_pk
             msg = ProposalAdded(data=data)
             participants_ch.sync_publish(msg)
 
