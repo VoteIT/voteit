@@ -84,7 +84,8 @@ def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
 def proposal_updated(instance: Proposal = None, created=None, **kw):
     if not instance.agenda_item_id:
         return
-    if meeting_pk := instance.agenda_item.meeting_id is None:
+    meeting_pk = instance.agenda_item.meeting_id
+    if not meeting_pk:
         return
     moderators_ch = ModeratorsChannel(meeting_pk)
     data = GenericProposalSerializer(instance).data
@@ -104,7 +105,8 @@ def proposal_updated(instance: Proposal = None, created=None, **kw):
 def proposal_delete(instance: Proposal = None, **kw):
     if not instance.agenda_item_id:
         return
-    if meeting_pk := instance.agenda_item.meeting_id is None:
+    meeting_pk = instance.agenda_item.meeting_id
+    if not meeting_pk:
         return
     moderators_ch = ModeratorsChannel(meeting_pk)
     msg = ProposalDeleted(pk=instance.pk)

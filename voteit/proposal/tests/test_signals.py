@@ -11,6 +11,8 @@ from envelope.messages.channels import Subscribe
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
+from voteit.meeting.models import Meeting
+from voteit.proposal.models import TextDocument
 
 if TYPE_CHECKING:
     from voteit.proposal.models import DiffProposal
@@ -108,10 +110,6 @@ class AnyProposalChangedTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.proposal.models import DiffProposal
-        from voteit.proposal.models import TextDocument
-
         cls.meeting: Meeting = Meeting.objects.create()
         cls.ai = cls.meeting.agenda_items.create()
         cls.ai.upcoming()
