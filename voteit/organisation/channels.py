@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from logging import getLogger
 
-from envelope.core.channels import ContextChannel
+from envelope.channels.models import ContextChannel
 
 from .models import Organisation
 from .permissions import OrgPermissions

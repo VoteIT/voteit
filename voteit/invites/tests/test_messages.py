@@ -297,7 +297,7 @@ class AddInviteAnnotationsTests(TestCase):
             msg.run_job()
 
         self.assertTrue(mock_send.called)
-        messages = [loads(x.args[1]["text_data"]) for x in mock_send.mock_calls]
+        messages = [x.args[1] for x in mock_send.mock_calls]
         self.assertEqual(2, len(messages))
         self.assertEqual({"curr": 0, "total": 1, "msg": None}, messages[0]["p"])
         ann_data = messages[1]["p"]

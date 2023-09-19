@@ -2,7 +2,7 @@ from unittest import mock
 
 from django.test import TestCase, override_settings
 
-from envelope.consumers.websocket import WebsocketConsumer
+from envelope.tests.helpers import mk_consumer
 
 _channel_layers_setting = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
@@ -21,7 +21,8 @@ class GetAllTransitionsTests(TestCase):
         from voteit.core.messages.transitions import AllTransitions
 
         msg = self._cut(mm={"consumer_name": "abc"})
-        consumer = WebsocketConsumer()
+
+        consumer = mk_consumer()
         consumer.send_ws_message = mock.AsyncMock()
         response = await msg.run(consumer=consumer)
         self.assertIsInstance(response, AllTransitions)

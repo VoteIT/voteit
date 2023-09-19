@@ -4,8 +4,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
-from envelope.messages.channels import Subscribe
-from envelope.messages.channels import Subscribed
+from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
 from voteit.active.components import ActiveUsersComponent
 from voteit.core.testing import FakeCommit
 from voteit.core.workflows import EnabledWf
@@ -46,7 +46,6 @@ class MeetingChannelSubscribedTests(TestCase):
 
     def test_meeting_components_in_app_state(self):
         msg = self._mk_subscribe()
-        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         payloads = [
@@ -82,7 +81,6 @@ class MeetingChannelSubscribedTests(TestCase):
         self.flash.settings_data = {}
         self.flash.save()
         msg = self._mk_subscribe()
-        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         payloads = [
@@ -94,7 +92,6 @@ class MeetingChannelSubscribedTests(TestCase):
         self.flash.disable()
         self.flash.save()
         msg = self._mk_subscribe()
-        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         payloads = [

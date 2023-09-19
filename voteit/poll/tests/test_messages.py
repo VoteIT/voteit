@@ -233,14 +233,14 @@ class ManualCreateERTests(TestCase):
         self.assertEqual({2: 1}, self.meeting.latest_er.weight_dict)
 
     def test_add_with_duplicate(self):
-        msg = self._mk_one(
-            self.moderator,
-            weights=[
-                {"user": self.participant.pk, "weight": 5},
-                {"user": self.participant.pk, "weight": 3},
-            ],
-        )
-        self.assertRaises(ValidationError, msg.run_job)
+        with self.assertRaises(ValidationError):
+            msg = self._mk_one(
+                self.moderator,
+                weights=[
+                    {"user": self.participant.pk, "weight": 5},
+                    {"user": self.participant.pk, "weight": 3},
+                ],
+            )
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

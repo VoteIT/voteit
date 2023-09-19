@@ -29,7 +29,7 @@ class FrontendVersionMessageTests(TestCase):
                 sender=None,
                 user=self.user,
                 consumer_name=self.conn.channel_name,
-                connection=self.conn,
+                instance=self.conn,
             )
             self.assertTrue(mock_method.called)
             self.assertEqual("abc", mock_method.mock_calls[0].args[0])
@@ -39,6 +39,7 @@ class FrontendVersionMessageTests(TestCase):
                     "p": {"version": "1.2.3"},
                     "i": None,
                     "s": None,
+                    "type": "websocket.send",
                 },
-                loads(mock_method.mock_calls[0].args[1].get("text_data")),
+                mock_method.mock_calls[0].args[1],
             )

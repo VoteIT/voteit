@@ -57,11 +57,11 @@ class CloneMeetingTests(TestCase):
                 self.assertEqual(1, len(mocked_send.mock_calls))
                 self.assertEqual(
                     {
-                        "text_data": '{"t": "s.stat", "p": null, "i": "copy", "s": "r"}',
-                        "type": "websocket.send",
                         "i": "copy",
-                        "t": "s.stat",
+                        "p": None,
                         "s": "r",
+                        "t": "s.stat",
+                        "type": "websocket.send",
                     },
                     mocked_send.mock_calls[0].args[1],
                 )
@@ -69,11 +69,11 @@ class CloneMeetingTests(TestCase):
             self.assertEqual(2, len(mocked_send.mock_calls))
             self.assertEqual(
                 {
-                    "text_data": '{"t": "s.stat", "p": null, "i": "copy", "s": "s"}',
-                    "type": "websocket.send",
                     "i": "copy",
-                    "t": "s.stat",
+                    "p": None,
                     "s": "s",
+                    "t": "s.stat",
+                    "type": "websocket.send",
                 },
                 mocked_send.mock_calls[1].args[1],
             )
@@ -130,18 +130,17 @@ class CreateMeetingGroupsTests(TestCase):
         )
 
     def test_duplicate_group_id(self):
-        msg = self._mk_one(
-            self.moderator,
-            groups=[
-                {"title": "a", "groupid": "a"},
-                {
-                    "title": "B",
-                    "groupid": "A",
-                },  # <- Duplicate group id, since lowercased
-            ],
-        )
         with self.assertRaises(ValidationError) as cm:
-            msg.run_job()
+            msg = self._mk_one(
+                self.moderator,
+                groups=[
+                    {"title": "a", "groupid": "a"},
+                    {
+                        "title": "B",
+                        "groupid": "A",
+                    },  # <- Duplicate group id, since lowercased
+                ],
+            )
         self.assertEqual(
             [
                 {
@@ -154,18 +153,17 @@ class CreateMeetingGroupsTests(TestCase):
         )
 
     def test_duplicate_title(self):
-        msg = self._mk_one(
-            self.moderator,
-            groups=[
-                {"title": "a", "groupid": "a"},
-                {
-                    "title": "A",
-                    "groupid": "b",
-                },  # <- Duplicate title since checked with lowercase
-            ],
-        )
         with self.assertRaises(ValidationError) as cm:
-            msg.run_job()
+            msg = self._mk_one(
+                self.moderator,
+                groups=[
+                    {"title": "a", "groupid": "a"},
+                    {
+                        "title": "A",
+                        "groupid": "b",
+                    },  # <- Duplicate title since checked with lowercase
+                ],
+            )
         self.assertEqual(
             [
                 {

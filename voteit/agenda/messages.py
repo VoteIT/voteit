@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 from pydantic import validator
-from envelope.core.message import ContextAction
+from envelope.deferred_jobs.message import ContextAction
 from envelope.core.message import Message
 from envelope.utils import websocket_send
 from django.utils import timezone

@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.test import override_settings
 
 from envelope.app.user_channel.channel import UserChannel
-from envelope.messages.channels import Subscribe
+from envelope.channels.messages import Subscribe
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
 

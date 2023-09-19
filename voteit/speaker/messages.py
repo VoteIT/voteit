@@ -9,7 +9,7 @@ from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
 
 from auditlog.context import set_actor
-from envelope.core.message import ContextAction
+from envelope.deferred_jobs.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError

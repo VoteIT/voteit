@@ -4,8 +4,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
-from envelope.messages.channels import Subscribe
-from envelope.messages.channels import Subscribed
+from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
 
 from ..channels import OrganisationChannel
 
@@ -32,7 +32,6 @@ class OrganisationChangedTests(TestCase):
         self.org.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        msg.validate()
         self.assertIsInstance(msg, OrganisationChanged)
         self.assertEqual(self.org.pk, msg.data.pk)
 
@@ -52,7 +51,6 @@ class OrganisationChannelSubscribedTests(TestCase):
             channel_type="organisation",
             pk=self.org.pk,
         )
-        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         added_org_roles = [

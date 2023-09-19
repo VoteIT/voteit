@@ -14,8 +14,7 @@ from pydantic import ValidationError
 from pythonjsonlogger.jsonlogger import JsonFormatter
 from rq import SimpleWorker
 
-from envelope.consumers.websocket import WebsocketConsumer
-from envelope.messages.channels import ChannelSubscription
+from envelope.consumer.websocket import WebsocketConsumer
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
 from voteit.core.queues import TESTING_QUEUE
@@ -150,8 +149,8 @@ class AddRolesTests(TestCase):
         self.assertRaises(ValidationErrorMsg, msg.run_job)
 
     def test_bad_role(self):
-        msg = self._mk_msg(self.moderator, [self.participant.pk], ["jeff"])
-        self.assertRaises(ValidationError, msg.run_job)
+        with self.assertRaises(ValidationError):
+            msg = self._mk_msg(self.moderator, [self.participant.pk], ["jeff"])
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -210,79 +209,5 @@ class RemoveRolesTests(TestCase):
         self.assertRaises(ValidationErrorMsg, msg.run_job)
 
     def test_bad_role(self):
-        msg = self._mk_msg(self.moderator, [self.participant.pk], ["jeff"])
-        self.assertRaises(ValidationError, msg.run_job)
-
-
-# FIXME: This was the old test
-# @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
-# class RolesIntegrationTests(TransactionTestCase):
-#     def setUp(self):
-#         self.user_a = User.objects.create(username="abel")
-#         self.user_b = User.objects.create(username="bret")
-#         self.meeting = Meeting.objects.create()
-#         self.meeting.add_roles(self.user_a, "moderator")
-#         self.meeting.add_roles(self.user_b, "moderator")
-#
-#     async def test_roles_removed_kicks_user_from_protected_channel(self):
-#         from voteit.meeting.channels import ModeratorsChannel
-#         from voteit.messaging.messages.roles import RemoveRoles
-#
-#         fakeredis_conn = FakeRedis()
-#
-#         queue = get_queue(TESTING_QUEUE, autocommit=True, connection=fakeredis_conn)
-#
-#         worker = SimpleWorker(
-#             queues=[queue],
-#             connection=fakeredis_conn,
-#             disable_default_exception_handler=True,
-#             log_job_description=False,
-#         )
-#
-#         consumer_a = WebsocketConsumer(enable_connection_signals=False)
-#         consumer_a.get_user = mock.AsyncMock(return_value=self.user_a)
-#         consumer_a.get_queue = mock.MagicMock(return_value=queue)
-#
-#         consumer_b = WebsocketConsumer(enable_connection_signals=False)
-#         consumer_b.get_user = mock.AsyncMock(return_value=self.user_b)
-#         consumer_b.get_queue = mock.MagicMock(return_value=queue)
-#
-#         # Subscribe both users to the moderator channel
-#         mod_channel = ModeratorsChannel.from_instance(self.meeting)
-#         subscription = ChannelSubscription(
-#             pk=self.meeting.pk,
-#             channel_type=mod_channel.name,
-#             channel_name=mod_channel.channel_name,
-#         )
-#         consumer_a.mark_subscribed(subscription)
-#         consumer_b.mark_subscribed(subscription)
-#
-#         # And connect
-#         communicator_a = WebsocketCommunicator(consumer_a, "/testws")
-#         connected_a, subprotocol = await communicator_a.connect()
-#         assert connected_a
-#
-#         communicator_b = WebsocketCommunicator(consumer_b, "/testws")
-#         connected_b, subprotocol = await communicator_b.connect()
-#         assert connected_b
-#         try:
-#             # User A sends this message
-#             msg = RemoveRoles(
-#                 mm={"user_pk": self.user_a.pk},
-#                 users=[self.user_a.pk, self.user_b.pk],
-#                 roles=["moderator"],
-#                 model="meeting",
-#                 pk=self.meeting.pk,
-#             )
-#             await consumer_a.handle_message(msg)
-#             completed = await sync_to_async(worker.work)(burst=True)
-#             self.failUnless(completed)
-#             # Consumers must receive the messages to act
-#             await communicator_a.receive_from()
-#             await communicator_b.receive_from()
-#
-#             self.assertFalse(consumer_a.subscriptions)
-#             self.assertFalse(consumer_b.subscriptions)
-#         finally:
-#             await communicator_a.disconnect()
-#             await communicator_b.disconnect()
+        with self.assertRaises(ValidationError):
+            msg = self._mk_msg(self.moderator, [self.participant.pk], ["jeff"])

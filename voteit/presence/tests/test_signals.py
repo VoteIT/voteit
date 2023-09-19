@@ -4,8 +4,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from envelope.app.user_channel.channel import UserChannel
-from envelope.messages.channels import Subscribe
-from envelope.messages.channels import Subscribed
+from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
 from envelope.utils import channel_layer
 
 from voteit.core.testing import FakeCommit

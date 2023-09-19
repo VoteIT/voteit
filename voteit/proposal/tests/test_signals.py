@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
-from envelope.messages.channels import Subscribe
+from envelope.channels.messages import Subscribe
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel

@@ -5,8 +5,8 @@ from django.dispatch import receiver
 from django.test import TestCase
 from django.test import override_settings
 
-from envelope.messages.channels import Subscribe
-from envelope.messages.channels import Subscribed
+from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
 from voteit.core.testing import FakeCommit
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
@@ -76,7 +76,6 @@ class MeetingChangedTests(TestCase):
         self.meeting.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        msg.validate()
         self.assertIsInstance(msg, MeetingChanged)
         self.assertEqual(self.meeting.pk, msg.data.pk)
 
@@ -105,7 +104,6 @@ class MeetingChannelSubscribedTests(TestCase):
 
     def test_roles_in_app_state(self):
         msg = self._mk_subscribe()
-        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         added_meeting_roles = [
@@ -123,7 +121,6 @@ class MeetingChannelSubscribedTests(TestCase):
         self.meeting.group_roles_active = True
         self.meeting.save()
         msg = self._mk_subscribe()
-        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         # MeetingGroup
@@ -160,7 +157,6 @@ class MeetingGroupChangedTests(TestCase):
             group = self.meeting.groups.create()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        msg.validate()
         self.assertIsInstance(msg, MeetingGroupAdded)
         self.assertEqual(group.pk, msg.data.pk)
 
@@ -173,7 +169,6 @@ class MeetingGroupChangedTests(TestCase):
             self.group.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        msg.validate()
         self.assertIsInstance(msg, MeetingGroupChanged)
         self.assertEqual(self.group.pk, msg.data.pk)
 
@@ -185,7 +180,6 @@ class MeetingGroupChangedTests(TestCase):
         self.group.delete()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        msg.validate()
         self.assertIsInstance(msg, MeetingGroupDeleted)
         self.assertEqual(group_pk, msg.data.pk)
 

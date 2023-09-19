@@ -5,16 +5,16 @@ from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.test import TestCase
 from django.utils.timezone import now
-from envelope.messages.channels import Subscribe
-from envelope.messages.channels import Subscribed
+from envelope.channels.errors import SubscribeError
+from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
 from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import NotFoundError
-from envelope.messages.errors import SubscribeError
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
-from voteit.core.testing import FakeCommit
 
+from voteit.core.testing import FakeCommit
 from voteit.meeting.models import Meeting
 from voteit.speaker.channels import SpeakerListSystemChannel
 from voteit.speaker.models import SpeakerList

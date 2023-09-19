@@ -6,7 +6,7 @@ from django.test import TestCase
 from django.test import override_settings
 from pytz import UTC
 
-from envelope.messages.channels import Subscribe
+from envelope.channels.messages import Subscribe
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.messages import AgendaBodyAdded
 from voteit.agenda.models import AgendaItem

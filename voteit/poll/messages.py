@@ -5,7 +5,7 @@ from abc import ABC
 from auditlog.context import set_actor
 from pydantic.main import BaseModel
 
-from envelope.core.message import ContextAction
+from envelope.deferred_jobs.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.messages.errors import ValidationErrorMsg
