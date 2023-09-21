@@ -332,6 +332,7 @@ class SpeakerSystemDeleted(BaseObjectDeleted):
 class SpeakerSchema(BaseModel):
     pk: int  # Speaker pk
     user: int  # User speaker
+    sls: int
     speaker_list: int
     started: datetime | None
     seconds: int | None
