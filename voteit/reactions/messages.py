@@ -113,12 +113,11 @@ class AddReaction(BaseAddObject):
             )
         # Already validated
         model = get_model_by_shortname(model_shortname)
-        ct = ContentType.objects.get_for_model(model)
         reactable = model.objects.get(pk=self.data.object_id)
         ai_pk = getattr(reactable, "agenda_item_id", None)
         if self.context.flag_mode:
             # Singleton, so only set a single reaction as true - check if any exist regardless of user
-            if not reactable.reaction_set.exists():
+            if not reactable.reaction_set.filter(button=self.context).exists():
                 reactable.reaction_set.create(
                     user=self.user,
                     button=self.context,

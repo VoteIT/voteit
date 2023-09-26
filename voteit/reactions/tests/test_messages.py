@@ -42,9 +42,9 @@ class AddReactionTests(TestCase):
         return AddReaction
 
     def _mk_one(self, context, user, **kw):
+        kw.setdefault("button", self.button.pk)
         return self._cut(
             mm={"consumer_name": "abc", "user_pk": user.pk},
-            button=self.button.pk,
             content_type=get_model_shortname(context),
             object_id=context.pk,
             **kw,
@@ -97,6 +97,19 @@ class AddReactionTests(TestCase):
         msg = self._mk_one(self.prop, self.moderator)
         msg.run_job()
         self.assertEqual(1, self.prop.reaction_set.count())
+
+    def test_add_flag_other_button_exists_in_same_context(self):
+        self.button.flag_mode = True
+        self.button.save()
+        self.button.reactions.create(user=self.voter, object=self.prop)
+        self.assertEqual(1, self.prop.reaction_set.count())
+        msg = self._mk_one(self.prop, self.moderator)
+        msg.run_job()
+        self.assertEqual(1, self.prop.reaction_set.count())
+        new_button = self.meeting.reaction_buttons.create(flag_mode=True)
+        msg = self._mk_one(self.prop, self.moderator, button=new_button.pk)
+        msg.run_job()
+        self.assertEqual(2, self.prop.reaction_set.count())
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
