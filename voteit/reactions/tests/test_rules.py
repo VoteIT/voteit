@@ -124,7 +124,7 @@ class ReactionPermissionTests(TestCase):
         self.button.change_roles.remove("participant")
         self.button.save()
         self.assertFalse(self.participant.has_perm(ADD, self.button))
-        self.assertFalse(self.moderator.has_perm(ADD, self.button))
+        self.assertTrue(self.moderator.has_perm(ADD, self.button))
 
     def test_add_reaction_not_active(self):
         self.button.active = False

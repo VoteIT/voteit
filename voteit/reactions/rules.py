@@ -5,6 +5,7 @@ from django.contrib.auth.models import AbstractUser
 
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_not_archived
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.rules import can_view_meeting
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import meeting_upcoming_ongoing
@@ -26,14 +27,19 @@ def is_button_active(user: AbstractUser, obj: Reaction | ReactionButton) -> bool
 
 
 @predicate
-def has_list_users_reactions_role(user: AbstractUser, obj: ReactionButton) -> bool:
-    return isinstance(obj, ReactionButton) and obj.meeting.has_any_roles(
-        user, *obj.list_roles
-    )
+def has_list_users_reactions_role_or_moderator(
+    user: AbstractUser, obj: ReactionButton
+) -> bool:
+    if isinstance(obj, ReactionButton):
+        roles = obj.list_roles
+        if ROLE_MODERATOR not in roles:
+            roles.append(ROLE_MODERATOR)
+        return obj.meeting.has_any_roles(user, *roles)
+    return False
 
 
 @predicate
-def has_change_own_reaction_role(
+def has_change_own_reaction_role_or_moderator(
     user: AbstractUser, obj: Reaction | ReactionButton
 ) -> bool:
     # This requires all reaction permissions to be exactly the same regardless of any agenda items state
@@ -46,6 +52,9 @@ def has_change_own_reaction_role(
         roles = obj.change_roles
     else:
         return False
+    # Moderator should always have that permission
+    if ROLE_MODERATOR not in roles:
+        roles.append(ROLE_MODERATOR)
     return meeting.has_any_roles(user, *roles)
 
 
@@ -68,15 +77,15 @@ rules.add_perm(
 rules.add_perm(ReactionButtonPermissions.VIEW, can_view_meeting)
 rules.add_perm(
     ReactionButtonPermissions.LIST_REACTIONS,
-    is_moderator | has_list_users_reactions_role,
+    has_list_users_reactions_role_or_moderator,
 )
 rules.add_perm(
     ReactionPermissions.ADD,
-    is_button_active & has_change_own_reaction_role,
+    is_button_active & has_change_own_reaction_role_or_moderator,
 )
 
 # Reaction
 rules.add_perm(
     ReactionPermissions.DELETE,
-    is_reaction_owner & is_button_active & has_change_own_reaction_role,
+    is_reaction_owner & is_button_active & has_change_own_reaction_role_or_moderator,
 )
