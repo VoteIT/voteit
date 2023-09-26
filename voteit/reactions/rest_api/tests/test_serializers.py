@@ -35,6 +35,9 @@ class ButtonDetailSerializerTests(TestCase):
                 "active": True,
                 "allowed_models": ["proposal", "discussion_post"],
                 "target": None,
+                "flag_mode": False,
+                "on_presentation": False,
+                "on_vote": False,
             },
             data,
         )

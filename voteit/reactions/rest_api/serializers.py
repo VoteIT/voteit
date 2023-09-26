@@ -8,7 +8,7 @@ from voteit.reactions.models import ReactionButton
 class ButtonDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReactionButton
-        read_only_fields = ("meeting",)
+        read_only_fields = ("meeting", "flag_mode")
         fields = list(read_only_fields) + [
             "pk",
             "meeting",
@@ -21,6 +21,8 @@ class ButtonDetailSerializer(serializers.ModelSerializer):
             "active",
             "allowed_models",
             "target",
+            "on_presentation",
+            "on_vote",
         ]
 
 
@@ -37,6 +39,9 @@ class ButtonCreateSerializer(serializers.ModelSerializer):
             "list_roles",
             "allowed_models",
             "target",
+            "flag_mode",
+            "on_presentation",
+            "on_vote",
         )
 
 

@@ -45,9 +45,11 @@ class ReactionButton(MeetingContext):
         default=_default_allowed_models,
         blank=True,
     )
-
-    exporters = {"meeting": {}}
-    importers = {"meeting": {}, "organisation": {}}
+    on_presentation = models.BooleanField(
+        verbose_name="Show in presentation mode", default=False
+    )
+    on_vote = models.BooleanField(verbose_name="Show during vote", default=False)
+    flag_mode = models.BooleanField(verbose_name="Flag mode?", default=False)
 
     class Meta:
         verbose_name = "Reaction button"
@@ -93,10 +95,10 @@ class ReactionButton(MeetingContext):
         return f"ReactionButton: {self.title}"
 
 
-class Reaction(AgendaItemContext):
+class Reaction(AgendaItemContext, MeetingContext):
     """
     Works as a boolean true for a specific context, user and button.
-    Essentially users never have reactions if the haven't marked something.
+    Essentially users never have reactions if they haven't marked something.
     """
 
     content_type: ContentType = models.ForeignKey(ContentType, on_delete=models.CASCADE)
@@ -121,6 +123,10 @@ class Reaction(AgendaItemContext):
         verbose_name = "Reaction"
         verbose_name_plural = "Reactions"
         unique_together = [["content_type", "object_id", "button", "user"]]
+
+    @property
+    def meeting(self) -> Meeting | None:
+        return self.button.meeting
 
     def __str__(self):
         return f"{self.button.title} from {self.user}"

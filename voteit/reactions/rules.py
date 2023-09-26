@@ -21,21 +21,33 @@ def is_button_active(user: AbstractUser, obj: Reaction | ReactionButton) -> bool
         button = obj
     elif isinstance(obj, Reaction):
         button = obj.button
-    else:
-        return False
+    else:  # pragma: no coverage
+        raise TypeError("obj is not a Reaction or ReactionButton")
     return button.active
+
+
+@predicate
+def is_button_flag(user: AbstractUser, obj: Reaction | ReactionButton) -> bool:
+    if isinstance(obj, ReactionButton):
+        button = obj
+    elif isinstance(obj, Reaction):
+        button = obj.button
+    else:  # pragma: no coverage
+        # We don't want to return a bool here since this must be negatable
+        raise TypeError(f"obj is not an instance of Reaction or ReactionButton")
+    return button.flag_mode
 
 
 @predicate
 def has_list_users_reactions_role_or_moderator(
     user: AbstractUser, obj: ReactionButton
 ) -> bool:
-    if isinstance(obj, ReactionButton):
-        roles = obj.list_roles
-        if ROLE_MODERATOR not in roles:
-            roles.append(ROLE_MODERATOR)
-        return obj.meeting.has_any_roles(user, *roles)
-    return False
+    if not isinstance(obj, ReactionButton):  # pragma: no coverage
+        raise TypeError(f"obj is not an instance of ReactionButton")
+    roles = obj.list_roles
+    if ROLE_MODERATOR not in roles:
+        roles.append(ROLE_MODERATOR)
+    return obj.meeting.has_any_roles(user, *roles)
 
 
 @predicate
@@ -50,8 +62,8 @@ def has_change_own_reaction_role_or_moderator(
     elif isinstance(obj, ReactionButton):
         meeting = obj.meeting
         roles = obj.change_roles
-    else:
-        return False
+    else:  # pragma: no coverage
+        raise TypeError("obj is not an instance of Reaction or ReactionButton")
     # Moderator should always have that permission
     if ROLE_MODERATOR not in roles:
         roles.append(ROLE_MODERATOR)
@@ -79,13 +91,25 @@ rules.add_perm(
     ReactionButtonPermissions.LIST_REACTIONS,
     has_list_users_reactions_role_or_moderator,
 )
-rules.add_perm(
-    ReactionPermissions.ADD,
-    is_button_active & has_change_own_reaction_role_or_moderator,
-)
 
 # Reaction
 rules.add_perm(
+    ReactionPermissions.ADD,
+    is_button_active
+    & (
+        (~is_button_flag & has_change_own_reaction_role_or_moderator)
+        | (is_button_flag & is_moderator)
+    ),
+)
+rules.add_perm(
     ReactionPermissions.DELETE,
-    is_reaction_owner & is_button_active & has_change_own_reaction_role_or_moderator,
+    is_button_active
+    & (
+        (
+            ~is_button_flag
+            & is_reaction_owner
+            & has_change_own_reaction_role_or_moderator
+        )
+        | (is_button_flag & is_moderator)
+    ),
 )

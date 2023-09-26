@@ -98,17 +98,22 @@ class ReactionPermissionTests(TestCase):
         cls.participant = User.objects.create(username="participant")
         cls.meeting.add_roles(cls.moderator, "moderator")
         cls.meeting.add_roles(cls.participant, "participant")
+        cls.ai = cls.meeting.agenda_items.create()
         cls.button = cls.meeting.reaction_buttons.create(
             change_roles=["participant"], list_roles=["participant"]
         )
-        cls.ai = cls.meeting.agenda_items.create()
+        cls.flag = cls.meeting.reaction_buttons.create(flag_mode=True)
         cls.disc = cls.ai.discussions.create()
         cls.reaction = cls.disc.reaction_set.create(
             user=cls.moderator, object=cls.disc, button=cls.button
         )
+        cls.flagged = cls.disc.reaction_set.create(
+            user=cls.participant, object=cls.disc, button=cls.flag
+        )
 
     def setUp(self):
         self.button.refresh_from_db()
+        self.flag.refresh_from_db()
 
     @property
     def p(self):
@@ -126,6 +131,12 @@ class ReactionPermissionTests(TestCase):
         self.assertFalse(self.participant.has_perm(ADD, self.button))
         self.assertTrue(self.moderator.has_perm(ADD, self.button))
 
+    def test_add_reaction_flag(self):
+        ADD = self.p.ADD
+        self.assertFalse(self.anon_user.has_perm(ADD, self.flag))
+        self.assertFalse(self.participant.has_perm(ADD, self.flag))
+        self.assertTrue(self.moderator.has_perm(ADD, self.flag))
+
     def test_add_reaction_not_active(self):
         self.button.active = False
         self.button.save()
@@ -133,6 +144,14 @@ class ReactionPermissionTests(TestCase):
         self.assertFalse(self.anon_user.has_perm(ADD, self.button))
         self.assertFalse(self.participant.has_perm(ADD, self.button))
         self.assertFalse(self.moderator.has_perm(ADD, self.button))
+
+    def test_add_reaction_not_active_and_flag(self):
+        ADD = self.p.ADD
+        self.flag.active = False
+        self.flag.save()
+        self.assertFalse(self.anon_user.has_perm(ADD, self.flag))
+        self.assertFalse(self.participant.has_perm(ADD, self.flag))
+        self.assertFalse(self.moderator.has_perm(ADD, self.flag))
 
     def test_delete(self):
         DELETE = self.p.DELETE
@@ -147,3 +166,17 @@ class ReactionPermissionTests(TestCase):
         self.assertFalse(self.anon_user.has_perm(DELETE, self.reaction))
         self.assertFalse(self.participant.has_perm(DELETE, self.reaction))
         self.assertFalse(self.moderator.has_perm(DELETE, self.reaction))
+
+    def test_delete_flag(self):
+        DELETE = self.p.DELETE
+        self.assertFalse(self.anon_user.has_perm(DELETE, self.flagged))
+        self.assertFalse(self.participant.has_perm(DELETE, self.flagged))
+        self.assertTrue(self.moderator.has_perm(DELETE, self.flagged))
+
+    def test_delete_inactive_flag(self):
+        self.flag.active = False
+        self.flag.save()
+        DELETE = self.p.DELETE
+        self.assertFalse(self.anon_user.has_perm(DELETE, self.flagged))
+        self.assertFalse(self.participant.has_perm(DELETE, self.flagged))
+        self.assertFalse(self.moderator.has_perm(DELETE, self.flagged))
