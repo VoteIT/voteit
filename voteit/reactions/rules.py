@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import rules
 from django.contrib.auth.models import AbstractUser
 
@@ -14,9 +12,6 @@ from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
 from voteit.reactions.permissions import ReactionButtonPermissions
 from voteit.reactions.permissions import ReactionPermissions
-
-if TYPE_CHECKING:
-    pass
 
 
 @predicate
@@ -41,7 +36,7 @@ def has_list_users_reactions_role(user: AbstractUser, obj: ReactionButton) -> bo
 def has_change_own_reaction_role(
     user: AbstractUser, obj: Reaction | ReactionButton
 ) -> bool:
-    # This require all reaction permissions to be exactly the same regardless of any agenda items state
+    # This requires all reaction permissions to be exactly the same regardless of any agenda items state
     # Do we want to check permissions against the context we add the reaction on instead?
     if isinstance(obj, Reaction):
         meeting = obj.button.meeting
