@@ -1,11 +1,39 @@
 from rest_framework import serializers
 
 from voteit.core.utils import get_model_shortname
+from voteit.core.validators import root_validate_roles_and_model
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
 
 
+def meeting_role_validator(value):
+    """
+    >>> meeting_role_validator(['moderator'])
+
+    >>> meeting_role_validator(['moderator', 'participant'])
+
+    >>> meeting_role_validator(['bleh'])
+    Traceback (most recent call last):
+    ...
+    rest_framework.exceptions.ValidationError:
+    """
+    if isinstance(value, list) and value:
+        try:
+            root_validate_roles_and_model(None, {"model": "meeting", "roles": value})
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+    elif value:
+        serializers.ValidationError("Must be a list or empty")
+
+
 class ButtonDetailSerializer(serializers.ModelSerializer):
+    change_roles = serializers.ListField(
+        required=False, default=[], validators=[meeting_role_validator]
+    )
+    list_roles = serializers.ListField(
+        required=False, default=[], validators=[meeting_role_validator]
+    )
+
     class Meta:
         model = ReactionButton
         read_only_fields = ("meeting", "flag_mode")
@@ -26,9 +54,9 @@ class ButtonDetailSerializer(serializers.ModelSerializer):
         ]
 
 
-class ButtonCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ReactionButton
+class ButtonCreateSerializer(ButtonDetailSerializer):
+    class Meta(ButtonDetailSerializer.Meta):
+        read_only_fields = ()
         fields = (
             "title",
             "icon",

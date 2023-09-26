@@ -1,15 +1,17 @@
 from django.test import TestCase
 
+from voteit.meeting.models import Meeting
+from voteit.reactions.models import Reaction
+from voteit.reactions.models import ReactionButton
+
 
 class ButtonDetailSerializerTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-        from voteit.reactions.models import ReactionButton
-
-        self.meeting: Meeting = Meeting.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        self.button: ReactionButton = self.meeting.reaction_buttons.create(
+        cls.button: ReactionButton = cls.meeting.reaction_buttons.create(
             title="Thumbs up", color="primary", icon="mdi-thumb-up"
         )
 
@@ -51,11 +53,19 @@ class ButtonDetailSerializerTests(TestCase):
         self.assertEqual(self.button.title, "Just thumbs")
         self.assertEqual(self.button.target, 10)
 
+    def test_patch_bad_roles(self):
+        serializer = self._cut(self.button, {"list_roles": ["hello"]}, partial=True)
+        serializer.is_valid()
+        self.assertIn("list_roles", serializer.errors)
+
+    def test_patch_bad_role_data(self):
+        serializer = self._cut(self.button, {"list_roles": "hello"}, partial=True)
+        serializer.is_valid()
+        self.assertIn("list_roles", serializer.errors)
+
 
 class ButtonCreateSerializerTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
@@ -67,8 +77,6 @@ class ButtonCreateSerializerTests(TestCase):
         return ButtonCreateSerializer
 
     def test_create(self):
-        from voteit.reactions.models import ReactionButton
-
         serializer = self._cut(
             data={
                 "meeting": self.meeting.pk,
@@ -77,7 +85,8 @@ class ButtonCreateSerializerTests(TestCase):
                 "icon": "mdi-thumb-up",
             }
         )
-        self.assertTrue(serializer.is_valid())
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
         instance = serializer.save()
         self.assertIsInstance(instance, ReactionButton)
         self.assertEqual(instance.meeting, self.meeting)
@@ -85,10 +94,6 @@ class ButtonCreateSerializerTests(TestCase):
 
 class ReactionSerializerSerializerTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-        from voteit.reactions.models import Reaction
-        from voteit.reactions.models import ReactionButton
-
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )

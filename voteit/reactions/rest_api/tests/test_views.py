@@ -46,6 +46,8 @@ class ReactionButtonViewSetTests(APITestCase):
             "meeting": self.meeting.pk,
             "icon": "mdi-thumb-up",
             "color": "primary",
+            "change_roles": [],
+            "list_roles": [],
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
