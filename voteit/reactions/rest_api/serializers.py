@@ -41,6 +41,7 @@ class ButtonDetailSerializer(serializers.ModelSerializer):
             "pk",
             "meeting",
             "title",
+            "description",
             "icon",
             "color",
             "order",
@@ -49,6 +50,7 @@ class ButtonDetailSerializer(serializers.ModelSerializer):
             "active",
             "allowed_models",
             "target",
+            "vote_template",
             "on_presentation",
             "on_vote",
         ]
@@ -59,6 +61,7 @@ class ButtonCreateSerializer(ButtonDetailSerializer):
         read_only_fields = ()
         fields = (
             "title",
+            "description",
             "icon",
             "color",
             "meeting",
@@ -68,6 +71,7 @@ class ButtonCreateSerializer(ButtonDetailSerializer):
             "allowed_models",
             "target",
             "flag_mode",
+            "vote_template",
             "on_presentation",
             "on_vote",
         )

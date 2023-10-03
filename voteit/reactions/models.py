@@ -28,7 +28,18 @@ def _default_allowed_models():
 class ReactionButton(MeetingContext):
     name = "reaction_button"
     title: str = models.CharField(verbose_name="Display name", max_length=80)
-    icon: str = models.CharField(verbose_name="Icon name", max_length=30)
+    description: str = models.CharField(
+        verbose_name="Description",
+        max_length=100,
+        blank=True,
+        default="",
+    )
+    icon: str = models.CharField(
+        verbose_name="Icon name",
+        max_length=30,
+        default="",
+        blank=True,
+    )
     color: str = models.CharField(verbose_name="Color", max_length=15)
     target: int | None = models.SmallIntegerField(
         verbose_name="Required target", null=True, blank=True
@@ -45,11 +56,14 @@ class ReactionButton(MeetingContext):
         default=_default_allowed_models,
         blank=True,
     )
-    on_presentation = models.BooleanField(
+    on_presentation: bool = models.BooleanField(
         verbose_name="Show in presentation mode", default=False
     )
-    on_vote = models.BooleanField(verbose_name="Show during vote", default=False)
-    flag_mode = models.BooleanField(verbose_name="Flag mode?", default=False)
+    on_vote: bool = models.BooleanField(verbose_name="Show during vote", default=False)
+    vote_template: bool = models.BooleanField(
+        verbose_name="As Vote template", default=False
+    )
+    flag_mode: bool = models.BooleanField(verbose_name="Flag mode?", default=False)
 
     class Meta:
         verbose_name = "Reaction button"
