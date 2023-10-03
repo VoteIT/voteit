@@ -14,7 +14,6 @@ from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
-from voteit.meeting.signals import archive_meeting
 from voteit.reactions.messages import ButtonAdded
 from voteit.reactions.messages import ButtonChanged
 from voteit.reactions.messages import ButtonDeleted
@@ -145,11 +144,3 @@ def send_deleted_to_user(instance: Reaction = None, **kw):
     msg = UserReactionDeleted(pk=instance.pk)
     user_ch = UserChannel.from_instance(instance.user)
     user_ch.sync_publish(msg)
-
-
-@receiver(archive_meeting)
-def disable_buttons(meeting: Meeting, **kw):
-    """Archived meetings shouldn't have active buttons."""
-    for button in meeting.reaction_buttons.filter(active=True):
-        button.active = False
-        button.save()

@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.meeting.models import Meeting
 
 User = get_user_model()
 
@@ -8,8 +9,6 @@ User = get_user_model()
 class ButtonPermissionTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting: Meeting = Meeting.objects.create()
         cls.anon_user = User.objects.create(username="anon")
         cls.moderator = User.objects.create(username="moderator")
@@ -90,8 +89,6 @@ class ButtonPermissionTests(TestCase):
 class ReactionPermissionTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting: Meeting = Meeting.objects.create()
         cls.anon_user = User.objects.create(username="anon")
         cls.moderator = User.objects.create(username="moderator")
@@ -153,6 +150,14 @@ class ReactionPermissionTests(TestCase):
         self.assertFalse(self.participant.has_perm(ADD, self.flag))
         self.assertFalse(self.moderator.has_perm(ADD, self.flag))
 
+    def test_add_reaction_closed_meeting(self):
+        self.meeting.state = "closed"
+        self.meeting.save()
+        ADD = self.p.ADD
+        self.assertFalse(self.anon_user.has_perm(ADD, self.button))
+        self.assertFalse(self.participant.has_perm(ADD, self.button))
+        self.assertFalse(self.moderator.has_perm(ADD, self.button))
+
     def test_delete(self):
         DELETE = self.p.DELETE
         self.assertFalse(self.anon_user.has_perm(DELETE, self.reaction))
@@ -180,3 +185,11 @@ class ReactionPermissionTests(TestCase):
         self.assertFalse(self.anon_user.has_perm(DELETE, self.flagged))
         self.assertFalse(self.participant.has_perm(DELETE, self.flagged))
         self.assertFalse(self.moderator.has_perm(DELETE, self.flagged))
+
+    def test_delete_closed_meeting(self):
+        self.meeting.state = "closed"
+        self.meeting.save()
+        DELETE = self.p.DELETE
+        self.assertFalse(self.anon_user.has_perm(DELETE, self.reaction))
+        self.assertFalse(self.participant.has_perm(DELETE, self.reaction))
+        self.assertFalse(self.moderator.has_perm(DELETE, self.reaction))

@@ -4,7 +4,6 @@ import rules
 from django.contrib.auth.models import AbstractUser
 
 from voteit.core.decorators import predicate
-from voteit.core.rules import is_not_archived
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.rules import can_view_meeting
 from voteit.meeting.rules import is_moderator
@@ -76,10 +75,7 @@ def is_reaction_owner(user: AbstractUser, obj: Reaction):
 
 
 # Button
-rules.add_perm(
-    ReactionButtonPermissions.ADD,
-    is_not_archived & is_moderator,
-)
+rules.add_perm(ReactionButtonPermissions.ADD, meeting_upcoming_ongoing & is_moderator)
 rules.add_perm(
     ReactionButtonPermissions.CHANGE, meeting_upcoming_ongoing & is_moderator
 )
@@ -88,14 +84,14 @@ rules.add_perm(
 )
 rules.add_perm(ReactionButtonPermissions.VIEW, can_view_meeting)
 rules.add_perm(
-    ReactionButtonPermissions.LIST_REACTIONS,
-    has_list_users_reactions_role_or_moderator,
+    ReactionButtonPermissions.LIST_REACTIONS, has_list_users_reactions_role_or_moderator
 )
 
 # Reaction
 rules.add_perm(
     ReactionPermissions.ADD,
     is_button_active
+    & meeting_upcoming_ongoing
     & (
         (~is_button_flag & has_change_own_reaction_role_or_moderator)
         | (is_button_flag & is_moderator)
@@ -104,6 +100,7 @@ rules.add_perm(
 rules.add_perm(
     ReactionPermissions.DELETE,
     is_button_active
+    & meeting_upcoming_ongoing
     & (
         (
             ~is_button_flag
