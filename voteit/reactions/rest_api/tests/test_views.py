@@ -118,3 +118,13 @@ class ReactionButtonViewSetTests(APITestCase):
             204,
         )
         self.assertRaises(ObjectDoesNotExist, button.refresh_from_db)
+
+    def test_delete_participant(self):
+        button = self._mk_one()
+        url = reverse("reaction-buttons-detail", kwargs={"pk": button.pk})
+        self.client.force_login(self.participant)
+        response = self.client.delete(url)
+        self.assertEqual(
+            response.status_code,
+            403,
+        )
