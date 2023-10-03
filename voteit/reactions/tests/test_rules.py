@@ -34,6 +34,14 @@ class ButtonPermissionTests(TestCase):
         self.assertFalse(self.participant.has_perm(ADD, self.meeting))
         self.assertTrue(self.moderator.has_perm(ADD, self.meeting))
 
+    def test_add_closed_meeting(self):
+        self.meeting.state = "closed"
+        self.meeting.save()
+        ADD = self.p.ADD
+        self.assertFalse(self.anon_user.has_perm(ADD, self.meeting))
+        self.assertFalse(self.participant.has_perm(ADD, self.meeting))
+        self.assertFalse(self.moderator.has_perm(ADD, self.meeting))
+
     def test_view(self):
         VIEW = self.p.VIEW
         self.assertFalse(self.anon_user.has_perm(VIEW, self.button))
