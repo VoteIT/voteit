@@ -15,4 +15,4 @@ class ReactionButtonPermissions(ModelPermissions):
 class ReactionPermissions(ModelPermissions):
     model = "reaction"
     ADD = P("reactions.add_reaction", context="reaction_button")
-    DELETE = P("reactions.delete_reaction")
+    DELETE = P("reactions.delete_reaction", context={"reaction", "reaction_button"})

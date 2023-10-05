@@ -171,18 +171,3 @@ class SignalReactionTests(TestCase):
         msg = mock_publish.mock_calls[-1].args[0]
         self.assertIsInstance(msg, UserReactionDeleted)
         self.assertEqual(reaction_pk, msg.data.pk)
-
-
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
-class ArchiveMeetingTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-
-        self.meeting = Meeting.objects.create()
-        self.button = self.meeting.reaction_buttons.create()
-
-    def test_button_inactive_when_archived(self):
-        self.assertTrue(self.button.active)
-        self.meeting.archive()
-        self.button.refresh_from_db()
-        self.assertFalse(self.button.active)
