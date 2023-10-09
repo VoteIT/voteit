@@ -7,6 +7,10 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
+
 if TYPE_CHECKING:
     from voteit.reactions.models import ReactionButton
 
@@ -16,10 +20,6 @@ User = get_user_model()
 class ReactionButtonViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_MODERATOR
-        from voteit.meeting.roles import ROLE_PARTICIPANT
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
@@ -46,6 +46,8 @@ class ReactionButtonViewSetTests(APITestCase):
             "meeting": self.meeting.pk,
             "icon": "mdi-thumb-up",
             "color": "primary",
+            "change_roles": [],
+            "list_roles": [],
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
@@ -116,3 +118,13 @@ class ReactionButtonViewSetTests(APITestCase):
             204,
         )
         self.assertRaises(ObjectDoesNotExist, button.refresh_from_db)
+
+    def test_delete_participant(self):
+        button = self._mk_one()
+        url = reverse("reaction-buttons-detail", kwargs={"pk": button.pk})
+        self.client.force_login(self.participant)
+        response = self.client.delete(url)
+        self.assertEqual(
+            response.status_code,
+            403,
+        )
