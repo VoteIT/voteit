@@ -9,7 +9,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = "change-me"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
+
+os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 ID_HOST = "http://example.com"  # Required setting by organisation app
 
