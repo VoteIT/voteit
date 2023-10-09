@@ -5,3 +5,4 @@ psycopg2-binary>=2.9.6
 # "Manual" requirements go here - stuff that isn't mentioned in any other requirement
 # This file is only used when building the freeze-img
 pydantic<2
+black
