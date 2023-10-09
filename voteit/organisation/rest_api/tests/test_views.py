@@ -8,7 +8,6 @@ from django.utils.http import urlencode
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
-from voteit.core.loggers import notification_logger
 from voteit.organisation.models import Organisation
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
@@ -19,9 +18,6 @@ if TYPE_CHECKING:
 class OrganisationViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.organisation.models import Organisation
-        from voteit.organisation.roles import ROLE_ORG_MANAGER
-
         # Note on these tests: The host for test client is always 'testserver'
         cls.org: Organisation = Organisation.objects.create(
             title="Test org", host="testserver"
