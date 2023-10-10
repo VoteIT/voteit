@@ -10,6 +10,7 @@ SECRET_KEY = "change-me"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+ALLOWED_HOSTS = ["*"]
 
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
