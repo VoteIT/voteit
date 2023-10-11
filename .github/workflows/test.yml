@@ -41,10 +41,8 @@ jobs:
         pip install -r requirements.txt
 
     - name: Django testrunner
-      env:
-        DJANGO_SETTINGS_MODULE: project.settings
       run: |
-        django-admin test voteit
+        DJANGO_SETTINGS_MODULE='project.settings' django-admin test voteit
 
     - name: Test with black
       run: |
