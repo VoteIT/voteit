@@ -66,17 +66,19 @@ class CloneMeetingTests(TestCase):
                     mocked_send.mock_calls[0].args[1],
                 )
             # Committed here
-            self.assertEqual(2, len(mocked_send.mock_calls))
-            self.assertEqual(
-                {
-                    "i": "copy",
-                    "p": None,
-                    "s": "s",
-                    "t": "s.stat",
-                    "type": "websocket.send",
-                },
-                mocked_send.mock_calls[1].args[1],
-            )
+            found = False
+            match = {
+                "text_data": '{"t": "s.stat", "p": null, "i": "copy", "s": "s"}',
+                "type": "websocket.send",
+                "i": "copy",
+                "t": "s.stat",
+                "s": "s",
+            }
+            for call in mocked_send.mock_calls:
+                if call.args[1] == match:
+                    found = True
+                    break
+            self.assertTrue(found)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

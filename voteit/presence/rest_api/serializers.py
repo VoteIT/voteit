@@ -29,7 +29,6 @@ class PresenceCheckCreateSerializer(serializers.ModelSerializer):
 
 class PresenceCheckDetailSerializer(PresenceCheckCreateSerializer):
     class Meta(PresenceCheckCreateSerializer.Meta):
-
         read_only_fields = PresenceCheckCreateSerializer.Meta.read_only_fields + [
             "meeting",
         ]

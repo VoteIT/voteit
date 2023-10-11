@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 class SpeakerListSerializer(serializers.ModelSerializer):
     queue = serializers.SerializerMethodField()
     current = serializers.SerializerMethodField()
+
     # FIXME: Don't allow system and agenda items to be within different meetings
     # It's at least prevented in .save() right now
     class Meta:

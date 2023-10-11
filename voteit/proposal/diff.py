@@ -3,7 +3,7 @@ from difflib import SequenceMatcher
 
 
 class ChangeGroup:
-    WORD_CAP = (8, 4)      # Cap at, cap to
+    WORD_CAP = (8, 4)  # Cap at, cap to
     LINE_CAP = (2, 1)
     CAP_FILL = ["[...]"]
     first = False

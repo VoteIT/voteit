@@ -24,7 +24,7 @@ def upcoming_or_ongoing_ai(user: AbstractUser, context: AgendaItemContext):
 
 @predicate
 def upcoming_ongoing_or_private_ai(user: AbstractUser, context: AgendaItemContext):
-    """ For moderators basically"""
+    """For moderators basically"""
     return (
         isinstance(context, AgendaItemContext)
         and context.agenda_item is not None
@@ -35,7 +35,7 @@ def upcoming_ongoing_or_private_ai(user: AbstractUser, context: AgendaItemContex
 
 @predicate
 def can_view_ai(user: AbstractUser, context: AgendaItemContext) -> bool:
-    """ Shorthand for checks that decide if related agenda item can be viewed"""
+    """Shorthand for checks that decide if related agenda item can be viewed"""
     if isinstance(context, AgendaItemContext):
         return is_moderator(user, context.agenda_item) or (
             is_not_private(user, context.agenda_item)

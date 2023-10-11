@@ -50,8 +50,10 @@ class GenerateValidUseridTests(TestCase):
             username="jeff", first_name="Jeff", last_name="Benzies"
         )
         self.org_user = User.objects.create(
-            username="virginia", first_name="Virginia", last_name="Woolf",
-            organisation=Organisation.objects.create(title="King's College")
+            username="virginia",
+            first_name="Virginia",
+            last_name="Woolf",
+            organisation=Organisation.objects.create(title="King's College"),
         )
 
     @property

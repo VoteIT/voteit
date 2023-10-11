@@ -135,7 +135,6 @@ def real_user_only(method):
     """Role method should never return true for anon users."""
 
     def _inner(context, user, *args, **kwargs):
-
         if not user.is_authenticated:
             return set()  # OK as bool false too
         return method(context, user, *args, **kwargs)

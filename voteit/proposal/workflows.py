@@ -14,7 +14,7 @@ class ProposalWf:
         VOTING: _("Voting"),
         APPROVED: _("Approved"),
         DENIED: _("Denied"),
-        UNHANDLED: _("Unhandled")
+        UNHANDLED: _("Unhandled"),
     }
     initial = PUBLISHED
 

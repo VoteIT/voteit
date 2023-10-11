@@ -11,7 +11,7 @@ User = get_user_model()
     CHECK_PERMISSION_CONTEXT=True,
 )
 class VerbosePermissionBackendTests(TestCase):
-    """ Check against real permissions"""
+    """Check against real permissions"""
 
     def setUp(self):
         self.user = User.objects.create(username="tester")

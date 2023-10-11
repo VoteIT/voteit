@@ -4,8 +4,7 @@ from django.apps import AppConfig
 class AgendaConfig(AppConfig):
     name = "voteit.agenda"
     verbose_name = "Agenda"
-    default_auto_field = 'django.db.models.BigAutoField'
-
+    default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
         from voteit.agenda import rules

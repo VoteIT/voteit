@@ -125,7 +125,7 @@ class ScottishSTV(PollMethod):
     def finalize_stv_result(
         self, counter: Counter, poll_counter: STVPollBase
     ) -> STVResultSchema:
-        for (ballot, count) in counter.items():
+        for ballot, count in counter.items():
             ballot_as_list = [int(r) for r in ballot.split(",")]
             poll_counter.add_ballot(ballot_as_list, count)
         result_dict = poll_counter.calculate().as_dict()

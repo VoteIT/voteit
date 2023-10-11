@@ -69,9 +69,7 @@ def polls_context_not_archived(
 
 
 @predicate
-def polls_context_not_closed(
-    user: AbstractUser, instance: Poll | AgendaItem | Meeting
-):
+def polls_context_not_closed(user: AbstractUser, instance: Poll | AgendaItem | Meeting):
     """This is a special case where polls without agenda items are checked against meeting instead"""
     if isinstance(instance, Poll):
         if instance.agenda_item is not None:

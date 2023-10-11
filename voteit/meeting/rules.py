@@ -50,7 +50,7 @@ def is_moderator(user: AbstractUser, context: MeetingContext) -> bool:
     Note that this method isn't negatable!
     """
     if not isinstance(context, MeetingContext):
-        raise TypeError("context isn't a MeetingContext")
+        return False
     return context.meeting is not None and context.meeting.has_roles(
         user, ROLE_MODERATOR
     )

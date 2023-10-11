@@ -384,6 +384,7 @@ class ChannelSubscribedTests(TestCase):
         self.assertIsInstance(data.pop("started"), datetime)
         self.assertIsNone(data.pop("seconds"))
         self.assertEqual(self.user_one.pk, data.pop("user"))
+        self.assertEqual(self.system.pk, data.pop("sls"))
         self.assertFalse(data)
 
 

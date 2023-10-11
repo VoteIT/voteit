@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-02 07:50+0000\n"
-"PO-Revision-Date: 2022-06-01 15:16+0200\n"
+"POT-Creation-Date: 2023-10-09 13:00+0200\n"
+"PO-Revision-Date: 2023-10-09 13:02+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -16,23 +16,23 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 2.3\n"
+"X-Generator: Poedit 3.2.2\n"
 
-#: models.py:146
+#: models.py:145
 msgid "Make upcoming"
 msgstr "Gör kommande"
 
-#: models.py:160
+#: models.py:159
 msgid "Unpublish"
 msgstr "Avpublicera"
 
-#: models.py:175
+#: models.py:174
 msgid "Make ongoing"
 msgstr "Gör pågående"
 
-#: models.py:187
+#: models.py:186
 msgid "Close"
-msgstr "Stäng"
+msgstr "Avsluta"
 
 #: workflows.py:11
 msgid "Private"
@@ -48,7 +48,7 @@ msgstr "Pågående"
 
 #: workflows.py:14
 msgid "Closed"
-msgstr "Stängd"
+msgstr "Avslutat"
 
 #: workflows.py:15
 msgid "Archived"

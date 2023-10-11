@@ -24,7 +24,6 @@ class ViewSetDummy:
 
 
 class HasPermDRFTests(TestCase):
-
     fixtures = ["meeting_test_fixture"]
 
     @classmethod

@@ -155,7 +155,6 @@ class UpdateUserSerializerTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-
         cls.mock_api_return = {
             "pk": 1,
             "application": 1,
