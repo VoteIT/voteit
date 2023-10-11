@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
@@ -36,7 +37,7 @@ class UpdateLastReadTests(TestCase):
         self.assertIsInstance(last_read, LastRead)
 
     def test_response_sent(self):
-        from envelope.utils import channel_layer
+        channel_layer = get_channel_layer()
 
         with patch.object(channel_layer, "send") as mocked_send:
             msg = self._mk_one(agenda_item=1)

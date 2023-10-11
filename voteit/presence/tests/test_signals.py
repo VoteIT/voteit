@@ -1,12 +1,12 @@
 from unittest.mock import patch
 
+from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from envelope.app.user_channel.channel import UserChannel
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
-from envelope.utils import channel_layer
 
 from voteit.core.testing import FakeCommit
 from voteit.core.workflows import EnabledWf
@@ -95,6 +95,7 @@ class SignalsTests(TestCase):
 
     def test_meeting_channel_subscribed(self):
         self._mk_presence()
+        channel_layer = get_channel_layer()
 
         with patch.object(channel_layer, "send") as mocked_send:
             with FakeCommit():
@@ -116,6 +117,8 @@ class SignalsTests(TestCase):
     def test_meeting_channel_subscribed_no_presence_check(self, mock_publish):
         self.check.delete()
         mock_publish.reset_mock()
+        channel_layer = get_channel_layer()
+
         with patch.object(channel_layer, "send") as mocked_send:
             with FakeCommit():
                 msg = Subscribe(
@@ -131,6 +134,8 @@ class SignalsTests(TestCase):
     def test_presence_check_channel_subscribed(self):
         self._mk_presence()
         self.check.presences.create(user=self.moderator)
+        channel_layer = get_channel_layer()
+
         with patch.object(channel_layer, "send") as mocked_send:
             with FakeCommit():
                 msg = Subscribe(

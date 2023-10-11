@@ -3,6 +3,7 @@ from unittest import mock
 from unittest.mock import patch
 
 from asgiref.sync import sync_to_async
+from channels.layers import get_channel_layer
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -76,7 +77,6 @@ class MeetingRolesTests(TestCase):
     def test_get_meeting_roles(self):
         from voteit.core.messages.roles import GetRoles
         from voteit.core.messages.roles import AssignedRolesResponse
-        from envelope.utils import channel_layer
 
         self.meeting.add_roles(self.user_a, "participant", "moderator")
         msg = GetRoles(
@@ -84,7 +84,7 @@ class MeetingRolesTests(TestCase):
             pk=self.meeting.pk,
             model="meeting",
         )
-
+        channel_layer = get_channel_layer()
         with patch.object(channel_layer, "send") as mock_method:
             response = msg.run_job()
             self.assertTrue(mock_method.called)

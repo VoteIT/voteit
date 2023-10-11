@@ -6,13 +6,14 @@ from typing import TYPE_CHECKING
 from django.db.models.signals import class_prepared
 from django.dispatch import Signal
 from django.dispatch import receiver
-
-from envelope.signals import client_connect
+from async_signals import receiver as areceiver
+from envelope.async_signals import consumer_connected
 from envelope.utils import websocket_send
 from voteit.core import models_to_register
 
 if TYPE_CHECKING:
     from django.db.models import Model
+    from envelope.consumer.websocket import WebsocketConsumer
 
 
 # The following signals will provide arguments "sender", "instance" and "roles"
@@ -29,11 +30,11 @@ def deferred_register_model(sender: Model, **kw):
     models_to_register.add(sender)
 
 
-@receiver(client_connect)
-def send_frontend_version(consumer_name=None, **kwargs):
-    if consumer_name:
+@areceiver(consumer_connected)
+async def send_frontend_version(*, consumer: WebsocketConsumer, **kwargs):
+    if consumer.channel_name:
         if FRONTEND_VERSION := getenv("FRONTEND_VERSION"):
             from voteit.core.messages.frontend_version import FrontendVersion
 
             msg = FrontendVersion(version=FRONTEND_VERSION)
-            websocket_send(msg, channel_name=consumer_name, on_commit=False)
+            await consumer.send_ws_message(msg)
