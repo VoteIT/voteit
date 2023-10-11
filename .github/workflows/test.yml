@@ -42,7 +42,7 @@ jobs:
 
     - name: Django testrunner
       run: |
-        DJANGO_SETTINGS_MODULE='project.settings' django-admin test voteit
+        ./manage.py test voteit
 
     - name: Test with black
       run: |
