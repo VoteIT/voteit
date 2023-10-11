@@ -101,7 +101,7 @@ class Majority(PollMethod):
         MajorityPollResult(approved=[2], denied=[1], vote_count=None, results=[ProposalResult(proposal=1, votes=5), ProposalResult(proposal=2, votes=10)])
         """
         results = []
-        for (vote_str, count) in counter.items():
+        for vote_str, count in counter.items():
             vote = self.vote_to_obj(vote_str)
             results.append(ProposalResult(proposal=vote.choice, votes=count))
         results.sort(key=lambda x: x.votes)

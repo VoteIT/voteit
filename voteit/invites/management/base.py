@@ -54,7 +54,7 @@ class BaseInvitesCommand(BaseCommand):
 
     def get_roles(self, options: dict) -> set[str]:
         roles = {str(ROLE_PARTICIPANT)}
-        for (k, role) in _ROLES.items():
+        for k, role in _ROLES.items():
             if options.get(k):
                 roles.add(role)
         return roles

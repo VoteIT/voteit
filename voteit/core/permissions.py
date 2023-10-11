@@ -85,7 +85,7 @@ class MPMeta(ABCMeta):
             assert cls == reg.model_permissions[cls.model]
         else:
             reg.model_permissions[cls.model] = cls
-        for (k, v) in namespace.items():
+        for k, v in namespace.items():
             if isinstance(v, Permission):
                 perm: Permission = getattr(cls, k)
                 if perm.model is None:

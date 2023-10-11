@@ -32,5 +32,5 @@ class Command(BaseCommand):
                 raise exc
             sys.exit(str(exc))
         print("Everything worked as expected. Available dialects:")
-        for (name, title) in results:
+        for name, title in results:
             print(f"{name.ljust(30)} {title}")

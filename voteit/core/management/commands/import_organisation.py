@@ -218,7 +218,7 @@ def update_all_poll_results(importer: Importer):
         if method_name == "combined_simple":
             result: CombinedSimplePollResult
             reformatted = {}
-            for (k, v) in result.results.items():
+            for k, v in result.results.items():
                 reformatted[importer.get_remap_obj(Proposal, k).pk] = v
             result.results = reformatted
         elif method_name == "majority":

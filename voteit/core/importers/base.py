@@ -112,7 +112,7 @@ class BaseImporter(ABC):
         if settings_key is None:
             settings_key = self.import_class.name
         assert isinstance(settings_key, str)
-        for (name, model) in get_content_registry().items():
+        for name, model in get_content_registry().items():
             if importers := getattr(model, "importers", None):
                 if settings_key in importers:
                     try:
@@ -233,7 +233,7 @@ class BaseImporter(ABC):
         if method_name == "combined_simple":
             result: CombinedSimplePollResult
             reformatted = {}
-            for (k, v) in result.results.items():
+            for k, v in result.results.items():
                 reformatted[self.get_remap_obj("proposal", k).pk] = v
             result.results = reformatted
         elif method_name == "majority":
@@ -307,9 +307,9 @@ class BaseImporter(ABC):
                             remap_to = self.get_remap_obj(model_name, pk)
                             new_val.append(remap_to.pk)
                         deserialized.m2m_data[relation_attr_name] = new_val
-        unhandled_m2m = (
-            {k for k, v in deserialized.m2m_data.items() if v} - m2ms_handled
-        )
+        unhandled_m2m = {
+            k for k, v in deserialized.m2m_data.items() if v
+        } - m2ms_handled
         if unhandled_m2m:
             raise Exception(
                 f"{deserialized.object} has undhandled m2ms: {unhandled_m2m}"

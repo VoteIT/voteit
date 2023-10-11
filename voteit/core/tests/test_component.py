@@ -50,7 +50,6 @@ class FactoryRegistryTests(TestCase):
 
     def test_registration_bad_implementation(self):
         class A(ABC):
-
             @abstractmethod
             def important(self):
                 pass

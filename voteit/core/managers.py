@@ -4,8 +4,10 @@ from model_utils.managers import InheritanceQuerySet
 
 class AutoInheritanceQuerySet(InheritanceQuerySet):
     def instance_of(self, *models):
-        """ Disabled here. It may not work when forcing select_subclasses() """
-        raise NotImplementedError("Not available in AutoInheritanceManager. Use plain InheritanceManager for this.")
+        """Disabled here. It may not work when forcing select_subclasses()"""
+        raise NotImplementedError(
+            "Not available in AutoInheritanceManager. Use plain InheritanceManager for this."
+        )
 
 
 class AutoInheritanceManager(Manager):

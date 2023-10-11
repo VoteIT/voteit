@@ -8,7 +8,6 @@ from voteit.core.testing import load_doctests
 
 
 class CoreDocTests(TestCase):
-
     DOCS_RELATIVE = os.path.join("..", "..", "..", "docs")
 
     def _docfile(self, fn):

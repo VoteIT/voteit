@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 @predicate(role=ROLE_ORG_MANAGER)
 def is_manager(user: User, org_context: OrganisationContext):
-    """ User has org manager role"""
+    """User has org manager role"""
     return (
         isinstance(org_context, OrganisationContext)
         and org_context.organisation is not None
@@ -30,7 +30,7 @@ def is_manager(user: User, org_context: OrganisationContext):
 
 @predicate(role=ROLE_MEETING_CREATOR)
 def is_meeting_creator(user: User, org_context: OrganisationContext):
-    """ User has meeting creator role"""
+    """User has meeting creator role"""
     return (
         isinstance(org_context, OrganisationContext)
         and org_context.organisation is not None
@@ -40,7 +40,7 @@ def is_meeting_creator(user: User, org_context: OrganisationContext):
 
 @predicate
 def is_org_user(user: User, org_context):
-    """ The user is attached to the organisation"""
+    """The user is attached to the organisation"""
     # FIXME: There might be ways to block users from the organisation later on.
     # Django has several ways and we could remove the link to the organisation too.
     return (

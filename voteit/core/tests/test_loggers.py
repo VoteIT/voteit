@@ -66,7 +66,6 @@ class EventLoggerTests(TestCase):
 
 
 class LogRolesChangeTests(TestCase):
-
     fixtures = ["meeting_test_fixture"]
 
     @classmethod

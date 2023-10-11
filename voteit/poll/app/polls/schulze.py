@@ -103,7 +103,7 @@ class Schulze(PollMethod):
         Internal helper to fix expected input.
         """
         input = []
-        for (text, count) in counter.items():
+        for text, count in counter.items():
             ballot = self.vote_to_obj(text)
             ranking = dict(ballot.ranking)  # Method needs a dict
             input.append({"count": count, "ballot": ranking})

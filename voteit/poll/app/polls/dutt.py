@@ -120,7 +120,7 @@ class Dutt(PollMethod):
         Counter({2: 3, 1: 2, 3: 1})
         """
         reformatted = Counter()
-        for (k, v) in counter.items():
+        for k, v in counter.items():
             ballot = self.vote_to_obj(k)
             for proposal in ballot.choices:
                 reformatted[proposal] += v
@@ -137,7 +137,7 @@ class Dutt(PollMethod):
         """
         prop_counter = self.reformat_counter(counter)
         results = []
-        for (prop, votes) in prop_counter.items():
+        for prop, votes in prop_counter.items():
             results.append(DuttScore(proposal=prop, votes=votes))
         return self.result_schema(results=results)
 

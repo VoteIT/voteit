@@ -291,7 +291,7 @@ def prepare_available_transitions():
     from voteit.core.rest_api.serializers import BaseFSMTransitonSerializer
 
     content_reg = get_content_registry()
-    for (name, content) in content_reg.items():
+    for name, content in content_reg.items():
         # FIXME: This may change, but currently all models use "state" as attr.
         if hasattr(content, "state"):
             serializer = BaseFSMTransitonSerializer(

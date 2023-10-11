@@ -39,7 +39,6 @@ logger = getLogger(__name__)
 
 @dataclass
 class InviteResult:
-
     pks: set[str]
     added: int
     changed: int
@@ -66,7 +65,7 @@ class MeetingInviteManager(models.Manager):
         """
         reg = get_invite_adapter_registry()
         queries = []
-        for (k, values) in kw.items():
+        for k, values in kw.items():
             if not values:
                 continue
             if k not in reg:

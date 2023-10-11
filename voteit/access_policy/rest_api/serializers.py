@@ -27,7 +27,6 @@ ap_to_serializer = {
 
 
 class MeetingAccessPoliciesSerializer(serializers.ModelSerializer):
-
     policies = serializers.SerializerMethodField("get_enabled_policies")
 
     class Meta:
