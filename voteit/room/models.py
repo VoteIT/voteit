@@ -1,0 +1,128 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from django.conf import settings
+from django.db import IntegrityError
+from django.db import models
+from django.utils.timezone import now
+
+from voteit.core.abcs import MeetingContext
+from voteit.core.fields import RichTextField
+from voteit.core.utils import relaxed_clean_html
+from voteit.meeting.models import Meeting
+from voteit.proposal.models import Proposal
+from voteit.speaker.models import SpeakerListSystem
+
+if TYPE_CHECKING:
+    from voteit.core.models import User as UserType
+
+
+class Room(MeetingContext):
+    name = "room"
+    active: bool = models.BooleanField(verbose_name="Active?", default=False)
+    handler: UserType | None = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="Who's in the drivers seat?",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+    )
+    title: str = models.CharField(
+        verbose_name="Title",
+        max_length=100,
+        default="",
+        blank=True,
+    )
+    body: str = RichTextField(
+        verbose_name="Body", blank=True, default="", html_cleaner=relaxed_clean_html
+    )
+    created: datetime = models.DateTimeField(editable=False, default=now)
+    meeting: Meeting = models.ForeignKey(
+        Meeting,
+        on_delete=models.CASCADE,
+        related_name="rooms",
+    )
+    sls: SpeakerListSystem | None = models.ForeignKey(
+        SpeakerListSystem,
+        verbose_name="Speaker list system",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,  # FIXME: check relation sls__meeting == meeting
+    )
+    send_sls: bool = models.BooleanField(
+        verbose_name="Send Speaker lists?", default=False
+    )
+    send_proposals: bool = models.BooleanField(
+        verbose_name="Send proposals?", default=False
+    )
+    show_time: bool = models.BooleanField(verbose_name="Show time?", default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                condition=models.Q(sls__isnull=False),
+                fields=["meeting", "sls"],
+                name="unique_room_meeting_sls",
+            )
+        ]
+
+    @property
+    def highlighted_proposal_pks(self):
+        return (
+            self.highlighted_proposals.all()
+            .order_by("order")
+            .values_list("proposal", flat=True)
+        )
+
+    def save(self, **kwargs):
+        if not self.pk and self.sls_id:
+            if self.sls.meeting_id != self.meeting_id:
+                raise IntegrityError("SLS links to another meeting")
+        super().save(**kwargs)
+
+    def __str__(self):
+        return f"Room {self.title} for meeting {self.meeting.pk}"
+
+    # annotations
+    meeting_id: int
+    sls_id: int
+    highlighted_proposals: models.Manager
+    objects: models.Manager
+
+
+class HighlightProposal(models.Model):
+    proposal: Proposal = models.ForeignKey(
+        Proposal, on_delete=models.CASCADE, related_name="highlighted_in"
+    )
+    room: Room = models.ForeignKey(
+        Room, on_delete=models.CASCADE, related_name="highlighted_proposals"
+    )
+    order: int = models.PositiveSmallIntegerField()
+
+    class Meta:
+        ordering = ["order"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["room", "proposal"],
+                name="unique_room_prop",
+            )
+        ]
+
+    def save(self, **kwargs):
+        if not self.pk and not self.order:
+            max_order = self.room.highlighted_proposals.aggregate(
+                max_order=models.Max("order")
+            )["max_order"]
+            if max_order is None:
+                self.order = 1
+            else:
+                self.order = max_order + 1
+        super().save(**kwargs)
+
+    # annotations
+    objects: models.Manager
+    proposal_id: int
+    room_id: int
+    order: int

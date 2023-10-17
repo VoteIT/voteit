@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from voteit.proposal.abcs import ProposalIDPolicy
     from voteit.proposal.models import Proposal
     from voteit.speaker.models import SpeakerListSystem
+    from voteit.room.models import Room
 
 __all__ = (
     "Meeting",
@@ -393,6 +394,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     roles: models.QuerySet[MeetingRoles]
     group_roles: models.QuerySet[GroupRole]
     active_users: models.QuerySet[ActiveUser]
+    rooms: models.QuerySet[Room]
 
 
 class MeetingGroup(BaseContent, MeetingContext):
