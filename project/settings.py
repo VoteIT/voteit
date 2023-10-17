@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "voteit.organisation",
     "voteit.participant_number",
     "voteit.reactions",
+    "voteit.room",
 ]
 AUTH_USER_MODEL = "core.User"
 
