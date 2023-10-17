@@ -10,3 +10,4 @@ class RoomConfig(AppConfig):
         from . import permissions
         from . import rules
         from . import signals
+        from .rest_api import views
