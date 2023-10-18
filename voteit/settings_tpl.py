@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "fsm_admin",
     "channels",
     "envelope",
+    "envelope.app.online_channel",
     "envelope.app.user_channel",
     "corsheaders",
     "auditlog",
