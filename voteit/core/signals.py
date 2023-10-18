@@ -3,12 +3,17 @@ from __future__ import annotations
 from os import getenv
 from typing import TYPE_CHECKING
 
+from django.contrib.auth import get_user_model
 from django.db.models.signals import class_prepared
+from django.db.models.signals import post_save
+from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
 from async_signals import receiver as areceiver
 from envelope.async_signals import consumer_connected
+from envelope.app.online_channel.channel import OnlineChannel
 from envelope.utils import websocket_send
+
 from voteit.core import models_to_register
 
 if TYPE_CHECKING:
@@ -38,3 +43,15 @@ async def send_frontend_version(*, consumer: WebsocketConsumer, **kwargs):
 
             msg = FrontendVersion(version=FRONTEND_VERSION)
             await consumer.send_ws_message(msg)
+
+
+def post_init_registrations():
+    User = get_user_model()
+    from voteit.core.messages.user import InvalidateUserCache
+
+    @receiver(pre_delete, sender=User)
+    @receiver(post_save, sender=User)
+    def invalidate_user_cache(*, instance: User, created=False, **kwargs):
+        if not created:
+            msg = InvalidateUserCache(pk=instance.pk)
+            OnlineChannel().sync_publish(msg)

@@ -39,6 +39,7 @@ jobs:
       run: |
         pip install --upgrade pip
         pip install -r requirements.txt
+        pip freeze
 
     - name: Django testrunner
       run: |

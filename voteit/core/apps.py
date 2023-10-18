@@ -29,6 +29,10 @@ class CoreConfig(AppConfig):
 
         register()
 
+        from voteit.core.signals import post_init_registrations
+
+        post_init_registrations()
+
 
 def register_model(model, registry):
     """
