@@ -18,7 +18,6 @@ from envelope.consumers.websocket import WebsocketConsumer
 from envelope.messages.channels import ChannelSubscription
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
-from voteit.core.queues import TESTING_QUEUE
 from voteit.core.schemas import RoleOutput
 from voteit.core.testing import FakeCommit
 from voteit.meeting.models import Meeting
