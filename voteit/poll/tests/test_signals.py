@@ -11,9 +11,12 @@ from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.channels import PollChannel
 from voteit.poll.models import ElectoralRegister
+from voteit.poll.workflows import PollWf
 
 User = get_user_model()
 
@@ -25,16 +28,16 @@ _channel_layers_setting = {
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class PollSubscribedTests(TestCase):
-    def setUp(self):
-        er = ElectoralRegister.objects.create()
-        self.meeting = Meeting.objects.create()
-        self.poll = self.meeting.polls.create(
-            method_name="simple", electoral_register=er
-        )
-        self.poll.upcoming()
-        self.poll.save()
-        self.user = User.objects.create(username="user")
-        self.meeting.add_roles(self.user, "participant")
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create(er_policy_name=AutoAlways.name)
+        cls.ai = cls.meeting.agenda_items.create(state="ongoing")
+        cls.user = User.objects.create(username="user")
+        cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER)
+        cls.poll = cls.meeting.polls.create(method_name="simple")
+        cls.poll.upcoming()
+        cls.poll.save()
+        cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
 
     def test_app_state_sent(self):
         command = Subscribe(
@@ -67,12 +70,13 @@ class MeetingSubscribedTests(TestCase):
         cls.poll_private = cls.meeting.polls.create(
             method_name="simple", electoral_register=cls.er
         )
-        cls.user = cls.er.voters.create(username="user")
-        cls.meeting.add_roles(cls.user, "moderator")
+        cls.user = User.objects.get(username="participant")
+        cls.moderator = User.objects.get(username="moderator")
+        cls.er.voters.add(cls.user, cls.moderator)
         # Props
-        cls.poll.proposals.create(agenda_item=cls.ai)
-        cls.poll2.proposals.create(agenda_item=cls.ai)
-        cls.poll_private.proposals.create(agenda_item=cls.ai)
+        cls.prop1 = cls.poll.proposals.create(agenda_item=cls.ai)
+        cls.prop2 = cls.poll2.proposals.create(agenda_item=cls.ai)
+        cls.prop3 = cls.poll_private.proposals.create(agenda_item=cls.ai)
         # Create votes
         cls.vote = cls.poll.votes.create(user=cls.user, vote="yes")
         cls.vote2 = cls.poll2.votes.create(user=cls.user, vote="yes")
@@ -102,7 +106,7 @@ class MeetingSubscribedTests(TestCase):
 
     def test_app_state_sent_moderators(self):
         command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
+            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
             pk=self.meeting.pk,
             channel_type=ModeratorsChannel.name,
         )
@@ -144,6 +148,63 @@ class MeetingSubscribedTests(TestCase):
         app_state = AppState()
         with self.assertNumQueries(4):
             self._fut(self.meeting, app_state, self.user)
+
+    def test_withheld_result_participant(self):
+        self.meeting.er_policy_name = AutoAlways.name
+        self.meeting.save()
+        self.meeting.add_roles(self.user, ROLE_POTENTIAL_VOTER)
+        self.poll.withheld_result = True
+        self.poll.ongoing()
+        self.poll.close()
+        self.poll.save()
+        self.assertEqual(PollWf.WITHHELD, self.poll.state)
+        command = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.meeting.pk,
+            channel_type=ParticipantsChannel.name,
+        )
+        msg = command.run_job()
+        payloads = [x.p for x in msg.data.app_state if x.t == "poll.added"]
+        self.assertEqual(2, len(payloads))
+        for payload in payloads:
+            if payload["pk"] == self.poll.pk:
+                break
+        else:
+            self.fail("Poll pk wasn't found in payload")
+        self.assertEqual(None, payload["result"])
+
+    def test_withheld_result_moderator(self):
+        self.meeting.er_policy_name = AutoAlways.name
+        self.meeting.save()
+        self.meeting.add_roles(self.user, ROLE_POTENTIAL_VOTER)
+        self.poll.withheld_result = True
+        self.poll.ongoing()
+        self.poll.close()
+        self.poll.save()
+        self.assertEqual(PollWf.WITHHELD, self.poll.state)
+        command = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
+            pk=self.meeting.pk,
+            channel_type=ModeratorsChannel.name,
+        )
+        msg = command.run_job()
+        payloads = [x.p for x in msg.data.app_state if x.t == "poll.added"]
+        self.assertEqual(3, len(payloads))
+        for payload in payloads:
+            if payload["pk"] == self.poll.pk:
+                break
+        else:
+            self.fail("Poll pk wasn't found in payload")
+        self.assertEqual(
+            {
+                "no": 0,
+                "yes": 1,
+                "denied": [],
+                "approved": [self.prop1.pk],
+                "vote_count": 1,
+            },
+            payload["result"],
+        )
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

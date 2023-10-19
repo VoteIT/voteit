@@ -12,9 +12,9 @@ from django.dispatch import Signal
 from django.dispatch import receiver
 from django_fsm import pre_transition
 from django_fsm.signals import post_transition
-
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
+
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.decorators import disable_on_raw_save
@@ -106,11 +106,13 @@ def moderators_subscribed(
     """
     Populate app_state with current meeting polls
     """
-    app_state.append_from_queryset(
+    serializer = PollDetailSerializer(
         context.polls.all().prefetch_related("proposals"),
-        PollDetailSerializer,
-        PollAdded,
+        many=True,
+        context={"show_withheld": True},
     )
+    for item in serializer.data:
+        app_state.append(PollAdded(data=item))
 
 
 @receiver(post_save, sender=Poll)
@@ -124,13 +126,21 @@ def poll_change(instance: Poll = None, created: bool = None, **kw):
     outside a transaction.
     """
     if instance.meeting is not None:
-        data = PollDetailSerializer(instance).data
+        if instance.withheld_result:
+            mod_data = PollDetailSerializer(
+                instance, context={"show_withheld", True}
+            ).data
+            part_data = PollDetailSerializer(instance).data
+        else:
+            mod_data = part_data = PollDetailSerializer(instance).data
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
         if created:
-            msg = PollAdded(data=data)
+            mod_msg = PollAdded(data=mod_data)
+            part_msg = PollAdded(data=part_data)
         else:
-            msg = PollChanged(data=data)
+            mod_msg = PollChanged(data=mod_data)
+            part_msg = PollChanged(data=part_data)
         if instance.is_private:
             # Only care about transmitting to participants if it existed previously
             if not created:
@@ -138,8 +148,8 @@ def poll_change(instance: Poll = None, created: bool = None, **kw):
                 participants_ch.sync_publish(participants_msg, on_commit=False)
         elif instance.agenda_item is None or not instance.agenda_item.is_private:
             # Publish if ai isn't private
-            participants_ch.sync_publish(msg, on_commit=False)
-        moderators_ch.sync_publish(msg, on_commit=False)
+            participants_ch.sync_publish(part_msg, on_commit=False)
+        moderators_ch.sync_publish(mod_msg, on_commit=False)
 
 
 @receiver(pre_delete, sender=Poll)

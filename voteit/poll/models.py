@@ -214,6 +214,10 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         choices=P_ORD_CHOICES,
         max_length=1,
     )
+    withheld_result: bool = models.BooleanField(
+        verbose_name="Withheld result",
+        default=False,
+    )
 
     importers = {
         "organisation": {
@@ -349,6 +353,30 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
                 proposal.publish()
                 proposal.save()
 
+    def set_proposals_from_result(self):
+        for proposal in self.proposals.filter(
+            pk__in=self.result.approved
+        ).select_subclasses():
+            with suppress(TransitionNotAllowed):
+                proposal.approved()
+                proposal.save()
+        for proposal in self.proposals.filter(
+            pk__in=self.result.denied
+        ).select_subclasses():
+            with suppress(TransitionNotAllowed):
+                proposal.denied()
+                proposal.save()
+
+    def set_result(self):
+        counter = self.finalize_vote_data()
+        assert self.ballot_data
+        assert self.ballot_checksum
+        result = self.method.calculate_result(counter)
+        # Ensure vote count is same as the poll method uses, including vote weight.
+        # Abstains aren't included here
+        result.vote_count = sum(counter.values())
+        self.result = result
+
     @transition(
         field=state,
         source=PollWf.PRIVATE,
@@ -405,26 +433,44 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         """
         Count the votes and finish up.
         """
-        counter = self.finalize_vote_data()
-        assert self.ballot_data
-        assert self.ballot_checksum
-        result = self.method.calculate_result(counter)
-        # Ensure vote count is same as the poll method uses, including vote weight.
-        # Abstains aren't included here
-        result.vote_count = sum(counter.values())
-        self.result = result
-        for proposal in self.proposals.filter(
-            pk__in=self.result.approved
-        ).select_subclasses():
-            with suppress(TransitionNotAllowed):
-                proposal.approved()
-                proposal.save()
-        for proposal in self.proposals.filter(
-            pk__in=self.result.denied
-        ).select_subclasses():
-            with suppress(TransitionNotAllowed):
-                proposal.denied()
-                proposal.save()
+        self.set_result()
+        self.set_proposals_from_result()
+
+    @transition(
+        field=state,
+        source=PollWf.CLOSED,
+        target=PollWf.WITHHELD,
+        on_error=PollWf.FAILED,
+        permission=NOT_ALLOWED,
+    )
+    def finish_withhold(self):
+        """
+        Count the votes and finish up but don't publish the result just yet.
+        """
+        self.set_result()
+
+    @transition(
+        field=state,
+        source=PollWf.WITHHELD,
+        target=PollWf.FINISHED,
+        on_error=PollWf.FAILED,
+        permission=PollPermissions.CHANGE_STATE,
+        custom={"title": _("Publish result")},
+    )
+    def publish_result(self):
+        self.set_proposals_from_result()
+        self.withhold_result = False
+
+    @transition(
+        field=state,
+        source=PollWf.FINISHED,
+        target=PollWf.WITHHELD,
+        on_error=PollWf.FAILED,
+        permission=PollPermissions.CHANGE_STATE,
+        custom={"title": _("Withold detailed result")},
+    )
+    def withhold_result(self):
+        self.withhold_result = True
 
     @transition(
         field=state,
@@ -482,6 +528,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         Return JSON-serializable result counter.
         Will also save ballot data and create a checksum + store abstentions.
         """
+        if self.ballot_data is not None:
+            raise PollError("Poll already finalized")
         counter = Counter()
         abstains = 0
         for v in self.votes.all().order_by("pk"):
@@ -495,7 +543,6 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         logger.debug(
             "Finalized ballots for poll %s. Checksum: %s", self.pk, self.ballot_checksum
         )
-        self.save()
         return counter
 
     def verify_checksum(self):
@@ -556,7 +603,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
     @property
     def is_finished(self) -> bool:
-        return self.state == PollWf.FINISHED
+        return self.state in PollWf.finished_states
 
     # Annotations
     objects: models.Manager
@@ -628,7 +675,8 @@ class Vote(models.Model):
 def finish_closed_poll(
     sender: Poll, instance: Poll, source: str, target: str, **kwargs
 ):
-    """As soon as the poll has closed, calculate the result.
+    """
+    As soon as the poll has closed, calculate the result.
     This method should probably offload this transition change to a worker later on.
     """
     if target == PollWf.CLOSED:
@@ -636,6 +684,9 @@ def finish_closed_poll(
         # This is probably not allowed in most meetings.
         instance.vote_cleanup_set().delete()
         if instance.votes.filter(abstain=False).count():
-            instance.finish()
+            if instance.withheld_result:
+                instance.finish_withhold()
+            else:
+                instance.finish()
         else:
             instance.no_result()

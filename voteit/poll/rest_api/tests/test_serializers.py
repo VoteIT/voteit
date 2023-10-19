@@ -7,14 +7,25 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
+from voteit.poll.workflows import PollWf
 
 User = get_user_model()
 
 
 class PollDetailSerializerTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create()
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.meeting.add_roles(cls.moderator, ROLE_POTENTIAL_VOTER)
+        cls.meeting.add_roles(cls.participant, ROLE_POTENTIAL_VOTER)
+
+        cls.er = cls.meeting.er_policy.create_er()
+
         cls.ai = cls.meeting.agenda_items.create(title="Hello")
         cls.poll = cls.meeting.polls.create(
             agenda_item=cls.ai,
@@ -104,6 +115,23 @@ class PollDetailSerializerTests(TestCase):
             data,
         )
 
+    def test_serializer_simple_withheld(self):
+        self.poll.abstains = 5
+        self.poll.state = PollWf.ONGOING
+        self.poll.withheld_result = True
+        self.poll.electoral_register = self.er
+        self.poll.proposals.remove(self.prop2)
+        self.poll.save()
+        self.poll.votes.create(user=self.moderator, vote="yes")
+        self.poll.votes.create(user=self.participant, vote="yes")
+        serializer = self._cut(self.poll)
+        self.assertEqual(serializer.data["result"], None)
+        self.poll.close()
+        self.assertEqual(PollWf.WITHHELD, self.poll.state)
+        serializer = self._cut(self.poll)
+        self.assertEqual(serializer.data["result"], None)
+        self.assertIsNotNone(self.poll.result_data)
+
     def test_serializer_repeated_schulze(self):
         self.poll.method_name = "repeated_schulze"
         # reset cache
@@ -141,6 +169,7 @@ class PollDetailSerializerTests(TestCase):
         }
         formatted_fake_result = self.poll.method.schulze_to_poll_result(fake_result)
         self.poll.result = formatted_fake_result
+        self.poll.state = PollWf.FINISHED
         self.poll.save()
         serializer = self._cut(self.poll)
         expected_data = serializer.data.copy()
