@@ -56,15 +56,19 @@ class Role:
     description: str = ""
     roles_cls: type[Roles]
     requires: set[Role]
+    letter: str
 
     def __init__(
         self,
         name,
+        letter: str = "",
         predicate: Predicate | None = None,
         title: str | None = None,
         description: str = "",
     ):
         self.name = name
+        assert isinstance(letter, str) and len(letter) in [0, 1]
+        self.letter = letter
         if predicate:
             self.predicate = predicate
         if title is None:

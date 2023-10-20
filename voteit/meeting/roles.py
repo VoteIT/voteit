@@ -12,11 +12,11 @@ __all__ = (
     "ROLE_PROPOSER",
 )
 
-ROLE_PARTICIPANT = Role("participant", title=_("Participant"))
-ROLE_MODERATOR = Role("moderator", title=_("Moderator"))
-ROLE_POTENTIAL_VOTER = Role("potential_voter", title=_("Potential voter"))
-ROLE_DISCUSSER = Role("discusser", title=_("Discusser"))
-ROLE_PROPOSER = Role("proposer", title=_("Proposer"))
+ROLE_PARTICIPANT = Role("participant", title=_("Participant"), letter="p")
+ROLE_MODERATOR = Role("moderator", title=_("Moderator"), letter="m")
+ROLE_POTENTIAL_VOTER = Role("potential_voter", title=_("Potential voter"), letter="v")
+ROLE_DISCUSSER = Role("discusser", title=_("Discusser"), letter="d")
+ROLE_PROPOSER = Role("proposer", title=_("Proposer"), letter="r")
 
 MeetingRoles.add_valid(
     ROLE_PARTICIPANT,
