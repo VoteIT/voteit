@@ -82,6 +82,7 @@ class PollDetailSerializerTests(TestCase):
                 "url": None,
                 "abstain_count": None,
                 "p_ord": "c",
+                "withheld_result": False,
             },
             data,
         )
@@ -111,6 +112,7 @@ class PollDetailSerializerTests(TestCase):
                 "url": None,
                 "abstain_count": 5,
                 "p_ord": "c",
+                "withheld_result": False,
             },
             data,
         )

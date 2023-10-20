@@ -33,6 +33,7 @@ class PollDetailSerializer(serializers.ModelSerializer):
             "closed",
             "electoral_register",
             "initial_electoral_register",
+            "withheld_result",
             "meeting",
             "method_name",
             "pk",
@@ -163,6 +164,7 @@ class PollCreateSerializer(serializers.ModelSerializer):
         fields = read_only_fields + [
             "agenda_item",
             "body",
+            "withheld_result",
             "meeting",
             "method_name",
             "proposals",
