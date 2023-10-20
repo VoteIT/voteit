@@ -459,7 +459,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     )
     def publish_result(self):
         self.set_proposals_from_result()
-        self.withhold_result = False
+        self.withheld_result = False
 
     @transition(
         field=state,
@@ -470,7 +470,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         custom={"title": _("Withold detailed result")},
     )
     def withhold_result(self):
-        self.withhold_result = True
+        self.withheld_result = True
 
     @transition(
         field=state,

@@ -128,7 +128,7 @@ def poll_change(instance: Poll = None, created: bool = None, **kw):
     if instance.meeting is not None:
         if instance.withheld_result:
             mod_data = PollDetailSerializer(
-                instance, context={"show_withheld", True}
+                instance, context={"show_withheld": True}
             ).data
             part_data = PollDetailSerializer(instance).data
         else:
