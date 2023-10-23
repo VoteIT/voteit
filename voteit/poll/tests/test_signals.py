@@ -101,8 +101,14 @@ class MeetingSubscribedTests(TestCase):
             channel_type=ParticipantsChannel.name,
         )
         msg = command.run_job()
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "poll.added"}
-        self.assertEqual({self.poll.pk, self.poll2.pk}, pks)
+        batched_payload = [
+            x.p["payloads"]
+            for x in msg.data.app_state
+            if x.t == "s.batch" and x.p.get("t") == "poll.added"
+        ]
+        self.assertEqual(1, len(batched_payload))
+        payloads = batched_payload[0]
+        self.assertEqual({self.poll.pk, self.poll2.pk}, {x.pk for x in payloads})
 
     def test_app_state_sent_moderators(self):
         command = Subscribe(
@@ -111,8 +117,17 @@ class MeetingSubscribedTests(TestCase):
             channel_type=ModeratorsChannel.name,
         )
         msg = command.run_job()
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "poll.added"}
-        self.assertEqual({self.poll.pk, self.poll_private.pk, self.poll2.pk}, pks)
+        batched_payload = [
+            x.p["payloads"]
+            for x in msg.data.app_state
+            if x.t == "s.batch" and x.p.get("t") == "poll.added"
+        ]
+        self.assertEqual(1, len(batched_payload))
+        payloads = batched_payload[0]
+        self.assertEqual(
+            {self.poll.pk, self.poll_private.pk, self.poll2.pk},
+            {x.pk for x in payloads},
+        )
 
     def test_app_state_sent_votes(self):
         command = Subscribe(
@@ -164,14 +179,20 @@ class MeetingSubscribedTests(TestCase):
             channel_type=ParticipantsChannel.name,
         )
         msg = command.run_job()
-        payloads = [x.p for x in msg.data.app_state if x.t == "poll.added"]
+        batched_payload = [
+            x.p["payloads"]
+            for x in msg.data.app_state
+            if x.t == "s.batch" and x.p.get("t") == "poll.added"
+        ]
+        self.assertEqual(1, len(batched_payload))
+        payloads = batched_payload[0]
         self.assertEqual(2, len(payloads))
         for payload in payloads:
-            if payload["pk"] == self.poll.pk:
+            if payload.pk == self.poll.pk:
                 break
         else:
             self.fail("Poll pk wasn't found in payload")
-        self.assertEqual(None, payload["result"])
+        self.assertEqual(None, payload.result)
 
     def test_withheld_result_moderator(self):
         self.meeting.er_policy_name = AutoAlways.name
@@ -188,10 +209,16 @@ class MeetingSubscribedTests(TestCase):
             channel_type=ModeratorsChannel.name,
         )
         msg = command.run_job()
-        payloads = [x.p for x in msg.data.app_state if x.t == "poll.added"]
+        batched_payload = [
+            x.p["payloads"]
+            for x in msg.data.app_state
+            if x.t == "s.batch" and x.p.get("t") == "poll.added"
+        ]
+        self.assertEqual(1, len(batched_payload))
+        payloads = batched_payload[0]
         self.assertEqual(3, len(payloads))
         for payload in payloads:
-            if payload["pk"] == self.poll.pk:
+            if payload.pk == self.poll.pk:
                 break
         else:
             self.fail("Poll pk wasn't found in payload")
@@ -203,7 +230,7 @@ class MeetingSubscribedTests(TestCase):
                 "approved": [self.prop1.pk],
                 "vote_count": 1,
             },
-            payload["result"],
+            payload.result,
         )
 
 

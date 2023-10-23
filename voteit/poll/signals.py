@@ -13,6 +13,7 @@ from django.dispatch import receiver
 from django_fsm import pre_transition
 from django_fsm.signals import post_transition
 from envelope.app.user_channel.channel import UserChannel
+from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
 
 from voteit.agenda.models import AgendaItem
@@ -72,13 +73,17 @@ def participants_subscribed(
     """
     Populate app_state with current meeting polls, except private ones
     """
-    app_state.append_from_queryset(
+    qs = (
         context.polls.exclude(state=PollWf.PRIVATE)
         .exclude(agenda_item__state=AgendaItemWf.PRIVATE)
-        .prefetch_related("proposals"),
-        PollDetailSerializer,
-        PollAdded,
+        .prefetch_related("proposals")
     )
+    serializer = PollDetailSerializer(qs, many=True)
+    if serializer.data:
+        batch = Batch(t=PollAdded.name, payloads=[])
+        for item in serializer.data:
+            batch.append(PollAdded(data=item))
+        app_state.append(batch)
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
@@ -111,8 +116,11 @@ def moderators_subscribed(
         many=True,
         context={"show_withheld": True},
     )
-    for item in serializer.data:
-        app_state.append(PollAdded(data=item))
+    if serializer.data:
+        batch = Batch(t=PollAdded.name, payloads=[])
+        for item in serializer.data:
+            batch.append(PollAdded(data=item))
+        app_state.append(batch)
 
 
 @receiver(post_save, sender=Poll)
