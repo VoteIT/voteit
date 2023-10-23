@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-09-07 13:39+0200\n"
-"PO-Revision-Date: 2023-09-07 13:40+0200\n"
+"POT-Creation-Date: 2023-10-23 15:21+0200\n"
+"PO-Revision-Date: 2023-10-23 15:22+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -176,22 +176,22 @@ msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
 msgid "Simple"
 msgstr "Enkel"
 
-#: models.py:298
+#: models.py:302
 msgid "Invalid settings"
 msgstr "Ogiltiga inställningar"
 
-#: models.py:306
+#: models.py:310
 msgid ""
 "There's no electoral register method on this meeting - check configuration"
 msgstr ""
 "Det finns ingen metod för att skapa en röstlängd i mötet - kolla "
 "inställningar"
 
-#: models.py:319
+#: models.py:323
 msgid "Poll method settings invalid"
 msgstr "Omröstningens inställningar är fel"
 
-#: models.py:332
+#: models.py:336
 msgid ""
 "This electoral register method requires you to create electoral registers "
 "manually before starting a poll."
@@ -199,59 +199,71 @@ msgstr ""
 "Röstlängdsmetoden kräver att du skapar en röstlängd manuellt. Gör det innan "
 "du startar omröstningen."
 
-#: models.py:358
+#: models.py:386
 msgid "Make upcoming"
 msgstr "Gör kommande"
 
-#: models.py:374
+#: models.py:402
 msgid "Start"
 msgstr "Starta"
 
-#: models.py:387
+#: models.py:415
 msgid "Close"
 msgstr "Stäng"
 
-#: models.py:402
+#: models.py:430
 msgid "Finish"
 msgstr "Avsluta"
 
-#: models.py:434
+#: models.py:458
+msgid "Publish result"
+msgstr "Publicera resultat"
+
+#: models.py:470
+msgid "Withold detailed result"
+msgstr "Dölj detaljerat resultat"
+
+#: models.py:480
 msgid "Cancel"
 msgstr "Avbryt"
 
-#: models.py:445
+#: models.py:491
 msgid "Revert to private"
 msgstr "Återgå till privat"
 
-#: models.py:455 workflows.py:20
+#: models.py:501 workflows.py:22
 msgid "Failed"
 msgstr "Misslyckades"
 
-#: models.py:468 workflows.py:21
+#: models.py:514 workflows.py:23
 msgid "No result"
 msgstr "Inget resultat"
 
-#: workflows.py:14
+#: workflows.py:15
 msgid "Private"
 msgstr "Privat"
 
-#: workflows.py:15
+#: workflows.py:16
 msgid "Upcoming"
 msgstr "Kommande"
 
-#: workflows.py:16
+#: workflows.py:17
 msgid "Ongoing"
 msgstr "Pågående"
 
-#: workflows.py:17
+#: workflows.py:18
 msgid "Closed"
 msgstr "Stängd"
 
-#: workflows.py:18
+#: workflows.py:19
 msgid "Finished"
 msgstr "Avslutad"
 
-#: workflows.py:19
+#: workflows.py:20
+msgid "Withheld"
+msgstr "Dolt resultat"
+
+#: workflows.py:21
 msgid "Canceled"
 msgstr "Avbruten"
 
