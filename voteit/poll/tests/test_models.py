@@ -156,6 +156,22 @@ class PollTests(TestCase):
             },
         )
 
+    def test_no_er_causes_poll_to_have_no_result(self):
+        self.poll.upcoming()
+        self.poll.ongoing()
+        vote1 = self.poll.votes.create(user=self.participant, vote="yes")
+        vote2 = self.poll.votes.create(user=self.moderator, vote="yes")
+        votes = self.poll.votes.all()
+        self.assertIn(vote1, votes)
+        self.assertIn(vote2, votes)
+        self.poll.electoral_register = None
+        self.poll.close()
+        self.poll.save()
+        votes = self.poll.votes.all()
+        self.assertIn(vote1, votes)
+        self.assertIn(vote2, votes)
+        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+
     def test_abstentions(self):
         self.poll.upcoming()
         self.poll.ongoing()

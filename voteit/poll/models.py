@@ -561,9 +561,12 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             )
 
     def vote_cleanup_set(self) -> models.QuerySet:
-        """Votes that shouldn't be here if the poll closes.
+        """
+        Votes that shouldn't be here if the poll closes.
         Essentially that someone has voted but aren't in the current electoral register.
         """
+        if self.electoral_register is None:
+            raise PollError("No electoral register")
         voters = self.electoral_register.voters.all()
         return self.votes.exclude(user__in=voters)
 
@@ -680,6 +683,10 @@ def finish_closed_poll(
     This method should probably offload this transition change to a worker later on.
     """
     if target == PollWf.CLOSED:
+        # Sometimes polls can exist without an electoral register, in that case fail!
+        if instance.electoral_register is None:
+            instance.no_result()
+            return
         # Remove bad votes due to a change in electoral register during the poll.
         # This is probably not allowed in most meetings.
         instance.vote_cleanup_set().delete()
