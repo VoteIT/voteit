@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from django.utils.module_loading import import_string
 from pydantic import BaseModel
+from typing import Generator
 from yaml import safe_load
 
 from voteit.components.app.components.dialects import DialectsFilter
@@ -34,7 +35,7 @@ def refresh(method):
 
     def inner(ref: DialectRegistry, *args, **kwargs):
         ref.data.clear()
-        for name, path in get_named_path_dict().items():
+        for name, path in get_named_paths():
             ref[name] = DialectHandler.load_from_file(name, path)
         return method(ref, *args, **kwargs)
 
@@ -127,20 +128,17 @@ class DialectRegistry(UserDict):
 dialect_registry = DialectRegistry()
 
 
-def get_named_path_dict() -> dict[str, str]:
-    results = {}
+def get_named_paths() -> Generator[tuple[str, str]]:
     dialects_dir = getattr(settings, "MEETING_DIALECTS_DIR", None)
     if dialects_dir is None:
         logger.warning("Missing MEETING_DIALECTS_DIR settings, can't load dialects.")
-        return results
-    for root, dirs, files in os.walk(dialects_dir):
-        for fname in files:
-            parts = fname.split(".")
-            if parts[-1] not in {"yaml", "yml"}:
-                continue
-            name = ".".join(parts[:-1])
-            results[name] = os.path.join(root, fname)
-    return results
+    else:
+        for root, dirs, files in os.walk(dialects_dir):
+            for fname in files:
+                parts = fname.split(".")
+                if parts[-1] not in {"yaml", "yml"}:
+                    continue
+                yield ".".join(parts[:-1]), os.path.join(root, fname)
 
 
 class DialectHandler:
@@ -281,9 +279,8 @@ def check_dialect_files() -> list[tuple[str, str]]:
     >>> _ = check_dialect_files()
     """
     intra_req_checks = defaultdict(set)
-    named_paths = get_named_path_dict()
     names_titles = []
-    for name, path in named_paths.items():
+    for name, path in get_named_paths():
         handler = DialectHandler.load_from_file(name, path)
         intra_req_checks[name].update(handler.data.requires)
         names_titles.append((name, handler.data.title))

@@ -34,8 +34,14 @@ class AgendaSubscribedTests(TestCase):
             channel_type="agenda_item",
         )
         msg = command.run_job()
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "discussion_post.added"}
-        self.assertEqual({self.disc1.pk, self.disc2.pk}, pks)
+        batched_payload = [
+            x.p["payloads"]
+            for x in msg.data.app_state
+            if x.t == "s.batch" and x.p.get("t") == "discussion_post.added"
+        ]
+        self.assertEqual(1, len(batched_payload))
+        payloads = batched_payload[0]
+        self.assertEqual({self.disc1.pk, self.disc2.pk}, {x.pk for x in payloads})
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
