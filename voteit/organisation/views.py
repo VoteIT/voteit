@@ -15,6 +15,7 @@ from django.http import HttpResponse
 from django.http import HttpResponseBadRequest
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
+from oauthlib.oauth2 import OAuth2Error
 from pydantic import ValidationError
 from requests_oauthlib import OAuth2Session
 
@@ -119,11 +120,15 @@ def finish_auth(request: WSGIRequest):
             "Finish auth: Error - no code param", request=request, context=provider
         )
         return HttpResponseBadRequest("Login error - no code param")
-    token_response = auth_session.fetch_token(
-        provider.token_url,
-        code=code,
-        client_secret=provider.client_secret,
-    )
+    try:
+        token_response = auth_session.fetch_token(
+            provider.token_url,
+            code=code,
+            client_secret=provider.client_secret,
+        )
+    except OAuth2Error as exc:
+        logger.warning("fetch_token caused OAuth2Error: %s", exc)
+        return HttpResponseBadRequest("Login error - please restart login procedure")
     logger.debug("Access token fetched, fetching identity")
     identity_response = auth_session.get(provider.identity_url)
     if not identity_response.ok:

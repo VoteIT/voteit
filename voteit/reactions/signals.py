@@ -8,6 +8,7 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from envelope.app.user_channel.channel import UserChannel
+from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
@@ -59,9 +60,20 @@ def ai_channel_subscribed(
         button["content_type"] = get_model_shortname(model)
         app_state.append(ReactionCount(**button))
     # Users own reactions
-    app_state.append_from_queryset(
-        context.reactions.filter(user=user), ReactionSerializer, UserReactionAdded
+    serializer = ReactionSerializer(
+        context.reactions.filter(user=user),
+        many=True,
     )
+    if serializer.data:
+        batch = Batch(t=UserReactionAdded.name, payloads=[])
+        for item in serializer.data:
+            batch.append(UserReactionAdded(data=item))
+        app_state.append(batch)
+    # app_state.append_from_queryset(
+    #    , ReactionSerializer, UserReactionAdded
+
+
+# )
 
 
 @receiver(post_save, sender=ReactionButton)
