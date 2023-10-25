@@ -23,9 +23,9 @@ class DialectsFilterSchema(BaseModel):
 
     @validator("include", "exclude")
     def validate_dialect_name(cls, v: list[str]):
-        from voteit.meeting.dialects import get_named_path_dict  # Avoid circular
+        from voteit.meeting.dialects import get_named_paths  # Avoid circular
 
-        valid_names = set(get_named_path_dict())
+        valid_names = {k for k, v in get_named_paths()}
         invalid = set(v) - valid_names
         if invalid:
             raise ValueError(f"Doesn't match known dialects: {', '.join(invalid)}")

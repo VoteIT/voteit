@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from rest_framework.exceptions import ValidationError
 
 from voteit.meeting.dialects import dialect_registry
-from voteit.meeting.dialects import get_named_path_dict
+from voteit.meeting.dialects import get_named_paths
 
 
 if TYPE_CHECKING:
@@ -33,7 +33,7 @@ class DialectInstallableValidator:
     def __call__(self, value, serializer: Serializer):
         if not value:
             return
-        named_paths = get_named_path_dict()
+        named_paths = {k for k, v in get_named_paths()}
         if value not in named_paths:
             raise ValidationError(f"No meeting dialect named {value}")
         request = serializer.context.get("request")
