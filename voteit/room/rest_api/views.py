@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
 from voteit.core.rest_api import router
@@ -32,3 +33,15 @@ class RoomsViewSet(DefaultModelViewSet):
                 return self.queryset.filter(meeting=meeting)
             return self.queryset.none()
         return self.queryset
+
+    @transaction.atomic(durable=True)
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @transaction.atomic(durable=True)
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
+    @transaction.atomic(durable=True)
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
