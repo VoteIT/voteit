@@ -8,6 +8,7 @@ from django.db import IntegrityError
 from django.db import models
 from django.utils.timezone import now
 
+from voteit.agenda.models import AgendaItem
 from voteit.core.abcs import MeetingContext
 from voteit.core.fields import RichTextField
 from voteit.core.utils import relaxed_clean_html
@@ -44,6 +45,14 @@ class Room(MeetingContext):
         on_delete=models.CASCADE,
         related_name="rooms",
     )
+    agenda_item: AgendaItem = models.ForeignKey(
+        AgendaItem,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        null=True,
+        blank=True,
+    )
+    # Auto set speaker list from active agenda?
     sls: SpeakerListSystem | None = models.ForeignKey(
         SpeakerListSystem,
         verbose_name="Speaker list system",

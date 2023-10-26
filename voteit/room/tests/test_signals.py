@@ -5,13 +5,15 @@ from django.test import TestCase
 from django.test import override_settings
 
 from envelope.messages.channels import Subscribe
+from envelope.utils import AppState
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.room.channels import RoomChannel
 from voteit.room.messages import RoomChanged
 from voteit.room.messages import RoomDeleted
-from voteit.room.messages import RoomHighlightedProposals
+from voteit.room.messages import RoomHighlighted
+from voteit.room.models import Room
 
 _channel_layers_setting = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
@@ -30,7 +32,7 @@ class SubscriptionTests(TestCase):
         cls.ai = cls.meeting.agenda_items.create()
         cls.prop1 = cls.ai.proposals.create()
         cls.prop2 = cls.ai.proposals.create()
-        cls.room = cls.meeting.rooms.create()
+        cls.room = cls.meeting.rooms.create(agenda_item=cls.ai)
         cls.hl1 = cls.room.highlighted_proposals.create(proposal=cls.prop1)
 
     def test_subscribe_meeting(self):
@@ -56,6 +58,7 @@ class SubscriptionTests(TestCase):
                 "show_time": False,
                 "sls": None,
                 "title": "",
+                "agenda_item": self.ai.pk,
             },
             data,
         )
@@ -68,9 +71,23 @@ class SubscriptionTests(TestCase):
         )
         msg = command.run_job()
         self.assertEqual(
-            [{"highlighted": [self.prop1.pk], "pk": self.room.pk}],
-            [x.p for x in msg.data.app_state if x.t == "room.props"],
+            [
+                {
+                    "highlighted": [self.prop1.pk],
+                    "pk": self.room.pk,
+                    "agenda_item": self.ai.pk,
+                }
+            ],
+            [x.p for x in msg.data.app_state if x.t == RoomHighlighted.name],
         )
+
+    def test_subscribe_room_queries(self):
+        from voteit.room.signals import room_subscribed
+
+        room = Room.objects.get(pk=self.room.pk)
+        app_state = AppState()
+        with self.assertNumQueries(1):
+            room_subscribed(room, app_state)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_room_changed(self, mock_publish):
@@ -110,7 +127,7 @@ class SubscriptionTests(TestCase):
         messages = [
             x.args[0]
             for x in mock_publish.mock_calls
-            if isinstance(x.args[0], RoomHighlightedProposals)
+            if isinstance(x.args[0], RoomHighlighted)
         ]
         self.assertEqual(1, len(messages))
         msg = messages[0]
@@ -125,7 +142,7 @@ class SubscriptionTests(TestCase):
         messages = [
             x.args[0]
             for x in mock_publish.mock_calls
-            if isinstance(x.args[0], RoomHighlightedProposals)
+            if isinstance(x.args[0], RoomHighlighted)
         ]
         self.assertEqual(1, len(messages))
         msg = messages[0]
@@ -139,7 +156,7 @@ class SubscriptionTests(TestCase):
         messages = [
             x.args[0]
             for x in mock_publish.mock_calls
-            if isinstance(x.args[0], RoomHighlightedProposals)
+            if isinstance(x.args[0], RoomHighlighted)
         ]
         self.assertEqual(1, len(messages))
         msg = messages[0]

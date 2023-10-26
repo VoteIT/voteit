@@ -15,8 +15,8 @@ class RoomChanged(BaseObjectChanged):
 
 
 @outgoing
-class RoomHighlightedProposals(BaseObjectChanged):
-    name = "room.props"
+class RoomHighlighted(BaseObjectChanged):
+    name = "room.highlighted"
 
 
 @outgoing

@@ -13,7 +13,7 @@ from voteit.room.channels import RoomChannel
 from voteit.room.messages import RoomAdded
 from voteit.room.messages import RoomChanged
 from voteit.room.messages import RoomDeleted
-from voteit.room.messages import RoomHighlightedProposals
+from voteit.room.messages import RoomHighlighted
 from voteit.room.models import HighlightProposal
 from voteit.room.models import Room
 from voteit.room.rest_api.serializers import RoomHighlightedSerializer
@@ -37,7 +37,7 @@ def room_subscribed(context: Room, app_state: AppState, **kw):
     """
     Send highlighted proposals
     """
-    app_state.append_from(context, RoomHighlightedSerializer, RoomHighlightedProposals)
+    app_state.append_from(context, RoomHighlightedSerializer, RoomHighlighted)
 
 
 @receiver(post_save, sender=Room)
@@ -67,7 +67,7 @@ def send_highlighted_proposal_updates(
 ):
     room_ch = RoomChannel(instance.room_id)
     data = RoomHighlightedSerializer(instance.room).data
-    msg = RoomHighlightedProposals(**data)
+    msg = RoomHighlighted(**data)
     room_ch.sync_publish(msg)
 
 
@@ -75,5 +75,5 @@ def send_highlighted_proposal_updates(
 def send_highlighted_proposal_deleted(*, instance: HighlightProposal, **kwargs):
     room_ch = RoomChannel(instance.room_id)
     data = RoomHighlightedSerializer(instance.room).data
-    msg = RoomHighlightedProposals(**data)
+    msg = RoomHighlighted(**data)
     room_ch.sync_publish(msg)
