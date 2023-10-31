@@ -1,6 +1,3 @@
-from typing import Optional
-from typing import Type
-
 from django.db import transaction
 from rest_framework import serializers
 
@@ -24,7 +21,7 @@ __all__ = (
 class PollDetailSerializer(serializers.ModelSerializer):
     serializer_url_field = OptionalHyperlinkedIdentityField
     settings = PydanticFieldSerializer(allow_null=True, required=False)
-    result = PydanticFieldSerializer(allow_null=True, required=False)
+    result = serializers.SerializerMethodField()
     abstain_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -36,6 +33,7 @@ class PollDetailSerializer(serializers.ModelSerializer):
             "closed",
             "electoral_register",
             "initial_electoral_register",
+            "withheld_result",
             "meeting",
             "method_name",
             "pk",
@@ -50,9 +48,18 @@ class PollDetailSerializer(serializers.ModelSerializer):
         )
         fields = read_only_fields
 
-    def get_abstain_count(self, instance: models.Poll) -> Optional[int]:
+    def get_abstain_count(self, instance: models.Poll) -> int | None:
         if instance.is_finished:
             return instance.abstains
+
+    def get_result(self, instance: models.Poll):
+        if instance.is_finished and (
+            self.context.get("show_withheld", False) or not instance.withheld_result
+        ):
+            return instance.result_data
+
+
+# FIXME: This should be removed?
 
 
 class PollListSerializer(PollDetailSerializer):
@@ -95,7 +102,7 @@ class PollCreateSerializer(serializers.ModelSerializer):
                 {"proposals": "Proposals must be published on Agenda Item"}
             )
         reg = get_poll_method_registry()
-        method: Type[PollMethod] = reg.get(method_name)
+        method: type[PollMethod] = reg.get(method_name)
         if method is None:
             raise serializers.ValidationError(
                 {
@@ -157,6 +164,7 @@ class PollCreateSerializer(serializers.ModelSerializer):
         fields = read_only_fields + [
             "agenda_item",
             "body",
+            "withheld_result",
             "meeting",
             "method_name",
             "proposals",

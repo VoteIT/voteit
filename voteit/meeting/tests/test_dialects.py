@@ -7,7 +7,7 @@ from voteit.components.app.components.dialects import DialectsFilter
 from voteit.components.app.components.irv import RepeatedIRV
 from voteit.components.app.components.message import FlashMessage
 from voteit.core.workflows import EnabledWf
-from voteit.meeting.dialects import get_named_path_dict
+from voteit.meeting.dialects import get_named_paths
 from voteit.meeting.exceptions import DialectError
 from voteit.meeting.models import Meeting
 from voteit.meeting.tests.fixtures import CYCLIC_DIALECT_FIXTURES
@@ -278,10 +278,10 @@ class DialectRegistryTests(TestCase):
 class UtilsTests(TestCase):
     @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
     def test_get_named_path_dict(self):
-        results = get_named_path_dict()
-        self.assertEqual({"two", "one", "three", "main_subst"}, set(results))
+        self.assertEqual(
+            {"two", "one", "three", "main_subst"}, {k for k, v in get_named_paths()}
+        )
 
     @override_settings(MEETING_DIALECTS_DIR=None)
     def test_get_named_path_dict_not_set(self):
-        results = get_named_path_dict()
-        self.assertEqual(set(), set(results))
+        self.assertEqual(set(), {k for k, v in get_named_paths()})

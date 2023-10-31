@@ -3,9 +3,10 @@ from __future__ import annotations
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-
+from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
 from envelope.utils import AppState
+
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import disable_on_raw_save
@@ -21,9 +22,15 @@ def _channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
     """
     Populate app_state with current discussions
     """
-    app_state.append_from_queryset(
-        context.get_discussions(), DiscussionPostDetailSerializer, DiscussionPostAdded
+    serializer = DiscussionPostDetailSerializer(
+        context.get_discussions(),
+        many=True,
     )
+    if serializer.data:
+        batch = Batch(t=DiscussionPostAdded.name, payloads=[])
+        for item in serializer.data:
+            batch.append(DiscussionPostAdded(data=item))
+        app_state.append(batch)
 
 
 @receiver(post_save, sender=DiscussionPost)

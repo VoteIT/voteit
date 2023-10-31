@@ -1,3 +1,5 @@
+from json import dumps
+
 from django.contrib.auth import get_user_model
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
@@ -5,6 +7,12 @@ from rest_framework.test import APITestCase
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.workflows import MeetingWf
+from voteit.poll.app.er_policies.auto_always import AutoAlways
+from voteit.poll.app.polls.combined_simple import CombinedSimple
+from voteit.poll.workflows import PollWf
+from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
 
@@ -216,9 +224,45 @@ class PollViewSetTests(APITestCase):
         url = reverse("poll-transitions", kwargs={"pk": poll.pk})
         self.client.force_login(self.moderator)
         response = self.client.post(url, data={"transition": "ongoing"})
-        self.assertEqual(400, response.status_code)
-        data = response.json()
-        # FIXME
+        self.assertContains(
+            response, "no electoral register method on this meeting", status_code=400
+        )
+
+    def test_publish_result(self):
+        self.meeting.add_roles(self.participant, ROLE_POTENTIAL_VOTER)
+        self.meeting.er_policy_name = AutoAlways.name
+        self.meeting.state = MeetingWf.ONGOING
+        self.meeting.save()
+        self.meeting.er_policy.create_er()
+        poll = self.meeting.polls.create(
+            method_name=CombinedSimple.name,
+            title="First",
+            state="upcoming",
+            withheld_result=True,
+        )
+        poll.proposals.add(self.prop)
+        poll.ongoing()
+        poll.save()
+        poll.votes.create(user=self.participant, vote=f'{{"yes": [{self.prop.pk}]}}')
+
+        url = reverse("poll-transitions", kwargs={"pk": poll.pk})
+        self.client.force_login(self.moderator)
+        # Close poll
+        response = self.client.post(url, data={"transition": "close"})
+        self.assertEqual(201, response.status_code)
+        self.assertEqual({"state": PollWf.WITHHELD}, response.json())
+        self.prop.refresh_from_db()
+        self.assertEqual(ProposalWf.VOTING, self.prop.state)
+        poll.refresh_from_db()
+        self.assertEqual(PollWf.WITHHELD, poll.state)
+        # Publish result
+        response = self.client.post(url, data={"transition": "publish_result"})
+        self.assertEqual(201, response.status_code)
+        self.assertEqual({"state": PollWf.FINISHED}, response.json())
+        self.prop.refresh_from_db()
+        self.assertEqual(ProposalWf.APPROVED, self.prop.state)
+        poll.refresh_from_db()
+        self.assertEqual(PollWf.FINISHED, poll.state)
 
 
 class ElectoralRegisterViewSetTests(APITestCase):

@@ -93,9 +93,16 @@ class SignalButtonTests(TestCase):
             channel_type="agenda_item",
         )
         msg = command.run_job()
-        reactions = [x for x in msg.data.app_state if x.t == "reaction.added"]
-        self.assertEqual(2, len(reactions))
-        self.assertEqual(self.button.pk, reactions[0].p["button"])
+        batched_payload = [
+            x.p["payloads"]
+            for x in msg.data.app_state
+            if x.t == "s.batch" and x.p.get("t") == "reaction.added"
+        ]
+        self.assertEqual(1, len(batched_payload))
+        payloads = batched_payload[0]
+
+        self.assertEqual(2, len(payloads))
+        self.assertEqual(self.button.pk, payloads[0].button)
         counts = [m for m in msg.data.app_state if m.t == "reaction.count"]
         self.assertEqual(len(counts), 2)
         self.assertEqual(sum(c.p["count"] for c in counts), 3)
