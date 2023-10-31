@@ -24,7 +24,7 @@ but can't touch anything else.
 
     >>> from voteit.organisation.rules import is_meeting_creator
     >>> org.add_roles(jane, "meeting_creator")
-    [meeting_creator]
+    {Meeting creator (meeting_creator)}
 
     >>> is_meeting_creator(jane, org)
     True
@@ -35,7 +35,7 @@ settings and meetings. The rule is_manager checks that.
 
     >>> from voteit.organisation.rules import is_manager
     >>> org.add_roles(jane, "org_manager")
-    [org_manager]
+    {Organisation manager (org_manager)}
 
     >>> is_manager(jane, org)
     True
@@ -68,7 +68,7 @@ a meeting should pass that rule first.
     False
 
     >>> meeting.add_roles(jane, "participant")
-    [participant]
+    {Participant (participant)}
 
     >>> is_participant(jane, meeting)
     True

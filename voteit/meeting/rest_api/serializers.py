@@ -215,6 +215,7 @@ class AgendaOrderSerializer(serializers.Serializer):
 class MeetingRolesSerializer(serializers.ModelSerializer):
     meeting = serializers.IntegerField(source="context_id", read_only=True)
     user = UserListSerializer(read_only=True)
+    assigned = serializers.ListSerializer(child=serializers.CharField())
 
     class Meta:
         model = MeetingRoles

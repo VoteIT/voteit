@@ -9,8 +9,6 @@ class RoleOutput(BaseModel):
     title: str
     description: str
     require_names: list[str] | None
-    roles_cls_natural_key: str | None
-    context_natural_key: str | None
     predicate_info: PredicateOutput | None
 
     class Config:

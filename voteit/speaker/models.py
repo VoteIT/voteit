@@ -13,6 +13,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
+from django.forms import MultipleChoiceField
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
@@ -23,6 +24,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import ensure_atomic
+from voteit.core.fields import RolesField
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.permissions import NOT_ALLOWED
@@ -31,6 +33,8 @@ from voteit.meeting.models import MeetingRoles
 from voteit.speaker.abcs import SpeakerSystemContext
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.permissions import SpeakerSystemPermissions
+from voteit.speaker.roles import ROLE_LIST_MODERATOR
+from voteit.speaker.roles import ROLE_SPEAKER
 from voteit.speaker.utils import get_list_method_registry
 from voteit.speaker.workflows import SpeakerListWf
 from voteit.speaker.workflows import SpeakerSystemWf
@@ -44,9 +48,15 @@ __all__ = "SpeakerSystemRoles", "SpeakerListSystem", "Speaker", "SpeakerList"
 
 class SpeakerSystemRoles(Roles, MeetingContext):
     name = "speaker_roles"
+    valid_roles = {
+        ROLE_LIST_MODERATOR: ROLE_LIST_MODERATOR,
+        ROLE_SPEAKER: ROLE_SPEAKER,
+    }
     context: SpeakerListSystem = models.ForeignKey(
         "SpeakerListSystem", on_delete=models.CASCADE
     )
+    # assigned = MultipleChoiceField()
+    assigned: str = RolesField(valid_roles=valid_roles.values())
 
     @property
     def meeting(self) -> Meeting | None:

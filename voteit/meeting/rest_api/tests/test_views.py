@@ -676,7 +676,8 @@ class MeetingRolesViewSetTests(APITestCase):
         self.client.force_login(self.participant)
         response = self.client.get(
             self.roles_url,
-            {"meeting": self.meeting.pk, "any_roles": "proposer,discusser"},
+            {"meeting": self.meeting.pk, "any_roles": ["proposer", "discusser"]},
+            # {"meeting": self.meeting.pk, "any_roles": "proposer,discusser"},
         )
         self.assertEqual(len(response.json()), 2, "Should match any of the roles")
         response = self.client.get(

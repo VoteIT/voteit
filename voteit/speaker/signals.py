@@ -187,12 +187,13 @@ def meeting_channel_subscribed(
     app_state.append_from_queryset(
         systems_qs, SpeakerListSystemSerializer, SpeakerSystemAdded
     )
+    # FIXME: Annotate instead!
     for system in systems_qs:
         # Roles
         roles = system.get_roles(user)
         if roles:
             msg = RolesAdded(
-                roles=system.roles_to_strings(*roles),
+                roles=roles,
                 pk=system.pk,
                 model=get_model_shortname(system),
                 user_pk=user.pk,
@@ -274,7 +275,7 @@ def push_roles_added(instance: SpeakerSystemRoles, roles: list[Role], **kwargs):
     _role_msg_publish(
         instance,
         RolesAdded(
-            roles=instance.context.roles_to_strings(*roles),
+            roles=roles,
             pk=instance.context.pk,
             model=get_model_shortname(instance.context),
             user_pk=instance.user.pk,
@@ -288,7 +289,7 @@ def push_roles_removed(instance: SpeakerSystemRoles, roles: list[Role], **kwargs
     _role_msg_publish(
         instance,
         RolesRemoved(
-            roles=instance.context.roles_to_strings(*roles),
+            roles=roles,
             pk=instance.context.pk,
             model=get_model_shortname(instance.context),
             user_pk=instance.user.pk,

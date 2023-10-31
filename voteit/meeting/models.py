@@ -23,12 +23,14 @@ from django_fsm import transition
 from voteit.core.abcs import MeetingContext
 from voteit.core.abcs import OrganisationContext
 from voteit.core.fields import RichTextField
+from voteit.core.fields import RolesField
 from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.models import User
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.utils import relaxed_clean_html
+from voteit.meeting import roles
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.permissions import OrgPermissions
@@ -68,15 +70,28 @@ def _rnd_role_id():
 
 
 class MeetingRoles(Roles, MeetingContext):
-    """Contains assigned meeting roles for a specific meeting and user"""
+    """
+    Contains assigned meeting roles for a specific meeting and user
+    """
 
     name = "meeting_roles"
+    valid_roles = {
+        roles.ROLE_DISCUSSER: roles.ROLE_DISCUSSER,
+        roles.ROLE_MODERATOR: roles.ROLE_MODERATOR,
+        roles.ROLE_PARTICIPANT: roles.ROLE_PARTICIPANT,
+        roles.ROLE_POTENTIAL_VOTER: roles.ROLE_POTENTIAL_VOTER,
+        roles.ROLE_PROPOSER: roles.ROLE_PROPOSER,
+    }
 
     user: User = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="meeting_roles"
     )
     context: Meeting = models.ForeignKey(
         "Meeting", on_delete=models.CASCADE, related_name="roles"
+    )
+    assigned = RolesField(
+        max_length=60,
+        valid_roles=valid_roles.values(),
     )
 
     @property

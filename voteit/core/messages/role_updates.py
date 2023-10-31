@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from pydantic import validator
 from pydantic.main import BaseModel
 
 from envelope.core.message import Message
+from voteit.core.role import Role
 from voteit.messaging.decorators import outgoing
 
 
@@ -17,6 +19,12 @@ class RolesChangeSchema(BaseModel):
     roles: list[str]
     pk: int  # context where the change happened, use together with model
     model: str  # The model shortname
+
+    @validator("roles", pre=True, each_item=True)
+    def roles_to_str(cls, v: str | Role):
+        if isinstance(v, Role):
+            v = str(v)
+        return v
 
 
 @outgoing

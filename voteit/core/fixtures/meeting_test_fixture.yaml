@@ -32,19 +32,19 @@
 - model: organisation.organisationroles
   pk: 1
   fields:
-    assigned: '["org_manager"]'
+    assigned: ["org_manager"]
     user: 3
     context: 1
 - model: meeting.meetingroles
   pk: 1
   fields:
-    assigned: '["participant", "moderator"]'
+    assigned: ["participant", "moderator"]
     user: 1
     context: 1
 - model: meeting.meetingroles
   pk: 2
   fields:
-    assigned: '["participant"]'
+    assigned: ["participant"]
     user: 2
     context: 1
 - model: meeting.meeting

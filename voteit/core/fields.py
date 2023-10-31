@@ -1,9 +1,13 @@
+from logging import getLogger
+
 from django.core.exceptions import ValidationError
 from django.db import models
 from typing import Callable
 from typing import Iterable
 
 from voteit.core.role import Role
+
+logger = getLogger(__name__)
 
 
 class RichTextField(models.TextField):
@@ -27,87 +31,96 @@ class RichTextField(models.TextField):
 
 class RolesField(models.CharField):
     """
-    Charfield that only accepts valid roles and stores them as a sorted string of role-related letters.
+    Charfield that only accepts valid roles and stores them as a sorted string.
 
     >>> from voteit.core.role import Role
-    >>> ROLE_FARMER = Role('farmer', letter='f')
-    >>> ROLE_COW = Role('cow', letter='c')
+    >>> ROLE_FARMER = Role('farmer')
+    >>> ROLE_COW = Role('cow')
     >>> ROLE_HAMBURGER = Role('hamburger')
 
     >>> f = RolesField(valid_roles={ROLE_FARMER, ROLE_COW})
-    >>> f.valid_role_letters
-    'cf'
+    >>> sorted(f.name_to_role)
+    ['cow', 'farmer']
     >>> RolesField(valid_roles={ROLE_FARMER, "hello"})
-    Traceback (most recent call last):
-    ...
-    AssertionError
-    >>> RolesField(valid_roles={ROLE_HAMBURGER})
     Traceback (most recent call last):
     ...
     AssertionError
     """
 
-    def __init__(self, *args, valid_roles=set[Role], max_length=10, **kwargs):
-        assert isinstance(valid_roles, set)
-        assert len(valid_roles)
-        valid_role_letters = []
-        self.valid_roles = {}
+    name_to_role: dict[str, Role]
+    description = "Roles storage, saved as csv but handled as list"
+    implicit_role: None | Role
+
+    def __init__(
+        self,
+        *args,
+        valid_roles: Iterable[Role] = (),
+        max_length=20,
+        # implicit_role: None | Role = None,
+        **kwargs,
+    ):
+        # assert implicit_role is None or isinstance(implicit_role, Role)
+        self.name_to_role = {}
         for role in valid_roles:
             assert isinstance(role, Role)
-            assert role.letter
-            if role.letter in valid_role_letters:
-                raise ValueError(
-                    f"{role} has the same letter '{role.letter}' as another role which already exists on this field."
-                )
-            valid_role_letters.append(role.letter)
-            if role.name in self.valid_roles:
+            if role.name in self.name_to_role:
                 raise ValueError(
                     f"{role} has the same name '{role.name}' as another role which already exists on this field."
                 )
-            self.valid_roles[role.name] = role
-        self.valid_role_letters = "".join(sorted(valid_role_letters))
+            self.name_to_role[role.name] = role
+        kwargs.setdefault("default", "")
+        # self.implicit_role = implicit_role
         super().__init__(*args, max_length=max_length, **kwargs)
+
+    def from_db_value(self, value: str, expression, connection) -> list[str]:
+        """
+        >>> f = RolesField()
+        >>> f.from_db_value("a,b,c", None, None)
+        ['a', 'b', 'c']
+        >>> f.from_db_value("", None, None)
+        []
+        >>> f.from_db_value(None, None, None)
+        []
+        """
+        if isinstance(value, str):
+            if value:
+                return value.split(",")
+        return []
+
+    def get_prep_value(self, value: Iterable[Role | str]) -> str:
+        if value is not None:
+            return ",".join(sorted(str(x).strip() for x in value if x))
 
     def to_python(self, value: str | Iterable[str]):
         """
         >>> from voteit.core.role import Role
-        >>> ROLE_FARMER = Role('farmer', letter='f')
-        >>> ROLE_COW = Role('cow', letter='c')
-        >>> ROLE_HAMBURGER = Role('hamburger', letter='h')
+        >>> ROLE_FARMER = Role('f', title="Farmer")
+        >>> ROLE_COW = Role('c', title="Cow")
+        >>> ROLE_HAMBURGER = Role('h', title='Hamburger')
 
         >>> f = RolesField(valid_roles={ROLE_FARMER, ROLE_COW})
         >>> f.to_python({ROLE_FARMER, })
-        'f'
+        ['f']
         >>> f.to_python([ROLE_FARMER, ROLE_FARMER])
-        'f'
+        ['f']
         >>> f.to_python([ROLE_FARMER.name, ROLE_COW])
-        'cf'
-        >>> f.to_python([ROLE_FARMER.name, ROLE_COW, ROLE_HAMBURGER])
-        Traceback (most recent call last):
-        ...
-        django.core.exceptions.ValidationError: ['No role letter h']
+        ['c', 'f']
         """
-        letter_set = set()
+        values_set = set()
         if isinstance(value, str):
-            letter_set.update(value)
+            if value:
+                values_set.update({x for x in value.split(",") if x})
         else:
             for item in value:
                 if isinstance(item, str):
-                    if len(item) == 1:
-                        letter_set.add(item)
-                    else:
-                        if item in self.valid_roles:
-                            letter_set.add(self.valid_roles[item].letter)
-                        else:
-                            raise ValidationError(f"No role with name {item}")
+                    values_set.add(item)
                 elif isinstance(item, Role):
-                    letter_set.add(item.letter)
+                    values_set.add(item.name)
                 else:
-                    raise ValidationError(
-                        f"{item} must be a a string or a Role-instance"
-                    )
-        value = "".join(sorted(letter_set))  # Unique and predictable order
-        for char in value:
-            if char not in self.valid_role_letters:
-                raise ValidationError(f"No role letter {char}")
-        return value
+                    raise ValidationError("Must be string or Role instance")
+        # if self.implicit_role:
+        #    values_set.add(self.implicit_role.name)
+        # for v in values_set:
+        #     if v not in self.name_to_role:
+        #         raise ValidationError(f"No role letter '{char}'")
+        return sorted(values_set)

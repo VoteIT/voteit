@@ -31,61 +31,77 @@ class RolesTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import MeetingRoles
         from voteit.meeting.models import Meeting
         from voteit.organisation.models import Organisation
+        from voteit.meeting.roles import ROLE_PARTICIPANT
+        from voteit.meeting.roles import ROLE_DISCUSSER
+        from voteit.meeting.roles import ROLE_PROPOSER
+        from voteit.meeting.roles import ROLE_MODERATOR
+        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+        from voteit.meeting.models import MeetingRoles
 
+        cls.ROLE_PARTICIPANT = ROLE_PARTICIPANT
+        cls.ROLE_DISCUSSER = ROLE_DISCUSSER
+        cls.ROLE_PROPOSER = ROLE_PROPOSER
+        cls.ROLE_MODERATOR = ROLE_MODERATOR
+        cls.ROLE_POTENTIAL_VOTER = ROLE_POTENTIAL_VOTER
+        cls.MeetingRoles = MeetingRoles
         User = get_user_model()
         org = Organisation.objects.create()
         cls.user = User.objects.create(username="jane", organisation=org)
         cls.meeting = Meeting.objects.create(organisation=org)
         cls.roles = MeetingRoles.objects.create(user=cls.user, context=cls.meeting)
-        cls.ROLES = MeetingRoles.valid_roles
 
     def test_get_roles(self):
-        participant = self.ROLES["participant"]
         self.assertIsNone(self.meeting.get_roles(self.user))
-        self.roles.add(participant)
+        self.roles.add(self.ROLE_PARTICIPANT)
         self.roles.save()
-        self.assertEqual({participant}, self.meeting.get_roles(self.user))
+        self.assertEqual({self.ROLE_PARTICIPANT}, self.meeting.get_roles(self.user))
 
     def test_get_required_roles(self):
-        participant = self.ROLES["participant"]
-        proposer = self.ROLES["proposer"]
-        discusser = self.ROLES["discusser"]
         self.assertEqual(
-            {participant, proposer}, self.roles.get_required_roles(proposer)
+            {self.ROLE_PARTICIPANT, self.ROLE_PROPOSER},
+            self.roles.get_required_roles(self.ROLE_PROPOSER),
         )
-        self.assertEqual({participant}, self.roles.get_required_roles(participant))
         self.assertEqual(
-            {participant, discusser}, self.roles.get_required_roles(discusser)
+            {self.ROLE_PARTICIPANT},
+            self.roles.get_required_roles(self.ROLE_PARTICIPANT),
+        )
+        self.assertEqual(
+            {self.ROLE_PARTICIPANT, self.ROLE_DISCUSSER},
+            self.roles.get_required_roles(self.ROLE_DISCUSSER),
         )
 
     def test_get_reverse_required_roles(self):
-        participant = self.ROLES["participant"]
-        proposer = self.ROLES["proposer"]
-        discusser = self.ROLES["discusser"]
-        potential_voter = self.ROLES["potential_voter"]
-        moderator = self.ROLES["moderator"]
-        self.assertEqual({proposer}, self.roles.get_reverse_required_roles(proposer))
         self.assertEqual(
-            {participant, proposer, discusser, potential_voter, moderator},
-            self.roles.get_reverse_required_roles(participant),
+            {self.ROLE_PROPOSER},
+            self.roles.get_reverse_required_roles(self.ROLE_PROPOSER),
         )
-        self.assertEqual({discusser}, self.roles.get_reverse_required_roles(discusser))
+        self.assertEqual(
+            {
+                self.ROLE_PARTICIPANT,
+                self.ROLE_PROPOSER,
+                self.ROLE_DISCUSSER,
+                self.ROLE_POTENTIAL_VOTER,
+                self.ROLE_MODERATOR,
+            },
+            self.roles.get_reverse_required_roles(self.ROLE_PARTICIPANT),
+        )
+        self.assertEqual(
+            {self.ROLE_DISCUSSER},
+            self.roles.get_reverse_required_roles(self.ROLE_DISCUSSER),
+        )
 
     def test_add_role(self):
-        participant = self.ROLES["participant"]
-        self.assertNotIn(participant, self.roles)
-        self.roles.add(participant)
-        self.assertIn(participant, self.roles)
+        self.assertNotIn(self.ROLE_PARTICIPANT, self.roles)
+        self.roles.add(self.ROLE_PARTICIPANT)
+        self.assertIn(self.ROLE_PARTICIPANT, self.roles)
 
     def test_remove_role(self):
-        participant = self.ROLES["participant"]
-        self.roles.add(participant)
-        self.assertIn(participant, self.roles)
-        self.roles.remove(participant)
-        self.assertNotIn(participant, self.roles)
+        self.roles.add(self.ROLE_PARTICIPANT)
+        self.assertIn(self.ROLE_PARTICIPANT, self.roles)
+        self.roles.remove(self.ROLE_PARTICIPANT)
+        self.assertNotIn(self.ROLE_PARTICIPANT, self.roles)
 
     def test_set_invalid_role(self):
         from voteit.organisation.roles import ROLE_MEETING_CREATOR
@@ -93,66 +109,54 @@ class RolesTests(TestCase):
         self.assertRaises(AssertionError, self.roles.add, ROLE_MEETING_CREATOR)
 
     def test_role_requirement_add(self):
-        participant = self.ROLES["participant"]
-        proposer = self.ROLES["proposer"]
-        self.roles.add(proposer)
-        self.assertIn(participant, self.roles)
-        self.assertIn(proposer, self.roles)
+        self.roles.add(self.ROLE_PROPOSER)
+        self.assertIn(self.ROLE_PARTICIPANT, self.roles)
+        self.assertIn(self.ROLE_PROPOSER, self.roles)
 
     def test_role_requirement_remove(self):
-        participant = self.ROLES["participant"]
-        proposer = self.ROLES["proposer"]
-        self.roles.add(proposer)
-        self.assertIn(participant, self.roles)
-        self.assertIn(proposer, self.roles)
+        self.roles.add(self.ROLE_PARTICIPANT, self.ROLE_PROPOSER)
+        self.assertIn(self.ROLE_PARTICIPANT, self.roles)
+        self.assertIn(self.ROLE_PROPOSER, self.roles)
         # This will cause proposer to be removed too since it doesn't work without participant
-        self.roles.remove(participant)
-        self.assertNotIn(participant, self.roles)
-        self.assertNotIn(proposer, self.roles)
+        self.roles.remove(self.ROLE_PARTICIPANT)
+        self.assertNotIn(self.ROLE_PARTICIPANT, self.roles)
+        self.assertNotIn(self.ROLE_PROPOSER, self.roles)
 
     def test_signal_roles_added(self):
         from voteit.core.signals import roles_added
-        from voteit.meeting.models import MeetingRoles
 
-        participant = self.ROLES["participant"]
-        proposer = self.ROLES["proposer"]
         L = []
 
-        @receiver(roles_added, sender=MeetingRoles)
+        @receiver(roles_added, sender=self.MeetingRoles)
         def my_listener(roles=(), **kw):
             L.extend(roles)
 
-        self.roles.add(proposer)
-        self.assertIn(proposer, L)
-        self.assertIn(participant, L)
+        self.roles.add(self.ROLE_PROPOSER)
+        self.assertIn(self.ROLE_PROPOSER, L)
+        self.assertIn(self.ROLE_PARTICIPANT, L)
 
     def test_signal_roles_removed(self):
         from voteit.core.signals import roles_removed
-        from voteit.meeting.models import MeetingRoles
 
-        participant = self.ROLES["participant"]
-        proposer = self.ROLES["proposer"]
         L = []
-        self.roles.add(proposer)
+        self.roles.add(self.ROLE_PROPOSER)
 
-        @receiver(roles_removed, sender=MeetingRoles)
+        @receiver(roles_removed, sender=self.MeetingRoles)
         def my_listener(roles=(), **kw):
             L.extend(roles)
 
-        self.roles.remove(participant)
-        self.assertIn(proposer, L)
-        self.assertIn(participant, L)
+        self.roles.remove(self.ROLE_PARTICIPANT)
+        self.assertIn(self.ROLE_PROPOSER, L)
+        self.assertIn(self.ROLE_PARTICIPANT, L)
 
     def test_roles_object_removed_when_assignment_empty(self):
-        from voteit.meeting.models import MeetingRoles
-
-        participant = self.ROLES["participant"]
-
-        self.roles.add(participant)
-        self.roles.remove(participant)
+        self.roles.add(self.ROLE_PARTICIPANT)
+        self.roles.remove(self.ROLE_PARTICIPANT)
         # Roles deleted
         self.assertFalse(
-            MeetingRoles.objects.filter(user=self.user, context=self.meeting).exists()
+            self.MeetingRoles.objects.filter(
+                user=self.user, context=self.meeting
+            ).exists()
         )
 
     def test_assign_roles_to_user_within_another_org(self):
@@ -231,3 +235,128 @@ class AuditLogTests(TestCase):
         qs = LogEntry.objects.filter(object_id=prop_id)
         log = qs.first()
         self.assertEqual(ai_pk, log.additional_data.get("ai"))
+
+
+class RolesContextTests(TestCase):
+    # The roles tests use the Meeting class instead, since it's kind of hard to test abstract db models in django
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.meeting.models import Meeting
+        from voteit.meeting.roles import ROLE_PARTICIPANT
+        from voteit.meeting.roles import ROLE_DISCUSSER
+        from voteit.meeting.roles import ROLE_PROPOSER
+        from voteit.meeting.roles import ROLE_MODERATOR
+        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+
+        cls.ROLE_PARTICIPANT = ROLE_PARTICIPANT
+        cls.ROLE_DISCUSSER = ROLE_DISCUSSER
+        cls.ROLE_PROPOSER = ROLE_PROPOSER
+        cls.ROLE_MODERATOR = ROLE_MODERATOR
+        cls.ROLE_POTENTIAL_VOTER = ROLE_POTENTIAL_VOTER
+
+        User = get_user_model()
+
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        # cls.roles = cls.meeting.roles.filter(user=cls.moderator).get()
+
+    def test_add_roles(self):
+        self.assertIsNone(
+            self.meeting.add_roles(self.moderator, self.ROLE_MODERATOR),
+        )
+        self.assertEqual(
+            {self.ROLE_PROPOSER},
+            self.meeting.add_roles(self.moderator, self.ROLE_PROPOSER),
+        )
+
+    def test_remove_roles(self):
+        self.assertIsNone(
+            self.meeting.remove_roles(self.moderator, self.ROLE_PROPOSER),
+        )
+        self.assertEqual(
+            {self.ROLE_MODERATOR},
+            self.meeting.remove_roles(self.moderator, self.ROLE_MODERATOR),
+        )
+
+    def test_get_roles(self):
+        self.assertEqual(
+            {self.ROLE_MODERATOR, self.ROLE_PARTICIPANT},
+            self.meeting.get_roles(self.moderator),
+        )
+        self.meeting.remove_roles(
+            self.moderator, self.ROLE_MODERATOR, self.ROLE_PARTICIPANT
+        )
+        self.assertIsNone(self.meeting.get_roles(self.moderator))
+
+    def test_has_roles(self):
+        self.assertTrue(self.meeting.has_roles(self.moderator, self.ROLE_MODERATOR))
+        self.assertTrue(
+            self.meeting.has_roles(
+                self.moderator, self.ROLE_MODERATOR, self.ROLE_PARTICIPANT
+            )
+        )
+        self.assertFalse(
+            self.meeting.has_roles(
+                self.moderator, self.ROLE_MODERATOR, self.ROLE_PROPOSER
+            )
+        )
+
+    def test_has_any_roles(self):
+        self.assertTrue(self.meeting.has_any_roles(self.moderator, self.ROLE_MODERATOR))
+        self.assertTrue(
+            self.meeting.has_any_roles(
+                self.moderator, self.ROLE_MODERATOR, self.ROLE_PARTICIPANT
+            )
+        )
+        self.assertTrue(
+            self.meeting.has_any_roles(
+                self.moderator, self.ROLE_MODERATOR, self.ROLE_PROPOSER
+            )
+        )
+
+    def test_get_userids_with_roles(self):
+        self.assertEqual(
+            {self.moderator.pk},
+            set(self.meeting.get_userids_with_roles(self.ROLE_MODERATOR)),
+        )
+        self.assertEqual(
+            {self.moderator.pk},
+            set(
+                self.meeting.get_userids_with_roles(
+                    self.ROLE_MODERATOR, self.ROLE_PARTICIPANT
+                )
+            ),
+        )
+        self.assertEqual(
+            set(),
+            set(
+                self.meeting.get_userids_with_roles(
+                    self.ROLE_MODERATOR, self.ROLE_PROPOSER
+                )
+            ),
+        )
+
+    def test_get_userids_with_any_roles(self):
+        self.assertEqual(
+            {self.moderator.pk},
+            set(self.meeting.get_userids_with_any_roles(self.ROLE_MODERATOR)),
+        )
+        self.assertEqual(
+            {self.moderator.pk, self.participant.pk},
+            set(
+                self.meeting.get_userids_with_any_roles(
+                    self.ROLE_MODERATOR, self.ROLE_PARTICIPANT
+                )
+            ),
+        )
+        self.assertEqual(
+            {self.moderator.pk},
+            set(
+                self.meeting.get_userids_with_any_roles(
+                    self.ROLE_MODERATOR, self.ROLE_PROPOSER
+                )
+            ),
+        )
