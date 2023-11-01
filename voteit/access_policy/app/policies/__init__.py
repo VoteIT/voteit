@@ -1,2 +1,3 @@
 from voteit.access_policy.app.policies.automatic import AutomaticAccess
-from voteit.access_policy.app.policies.moderator_approved import ModeratorApprovedAccess
+
+# from voteit.access_policy.app.policies.moderator_approved import ModeratorApprovedAccess

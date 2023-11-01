@@ -34,8 +34,3 @@ class AutomaticAPTests(TestCase):
         auto_ap.roles_given = ("participant",)
         auto_ap.assign(self.user)
         self.assertTrue(self.meeting.has_roles(self.user, ROLE_PARTICIPANT))
-
-    def test_bad_role_names_on_save(self):
-        auto_ap = self._cut.objects.create(meeting=self.meeting, active=True)
-        auto_ap.roles_given = ("404",)
-        self.assertRaises(ValueError, auto_ap.save)

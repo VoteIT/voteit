@@ -9,14 +9,14 @@ class GetPoliciesTests(TestCase):
         from voteit.meeting.models import Meeting
         from voteit.access_policy.app.policies import (
             AutomaticAccess,
-            ModeratorApprovedAccess,
+            # ModeratorApprovedAccess,
         )
 
         self.meeting = Meeting.objects.create()
         auto_ap = AutomaticAccess.objects.create(meeting=self.meeting)
-        mod_ap = ModeratorApprovedAccess.objects.create(
-            meeting=self.meeting, active=True
-        )
+        # mod_ap = ModeratorApprovedAccess.objects.create(
+        #     meeting=self.meeting, active=True
+        # )
 
     @property
     def _fut(self):
@@ -25,10 +25,8 @@ class GetPoliciesTests(TestCase):
         return get_policies
 
     def test_function(self):
+        self.assertEqual(set(), {x.name for x in self._fut(self.meeting)})
         self.assertEqual(
-            {"moderator_approved"}, {x.name for x in self._fut(self.meeting)}
-        )
-        self.assertEqual(
-            {"automatic", "moderator_approved"},
+            {"automatic"},
             {x.name for x in self._fut(self.meeting, only_active=False)},
         )

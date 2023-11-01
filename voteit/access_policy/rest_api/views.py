@@ -33,6 +33,7 @@ class AccessPoliciesViewSet(viewsets.ReadOnlyModelViewSet):
 class AutomaticAccessViewSet(DefaultModelViewSet):
     model = AutomaticAccess
     serializer_class = serializers.AutomaticAccessSerializer
+    serializer_classes = {"create": serializers.CreateAutomaticAccessSerializer}
     context_queryset = Meeting.objects.all()
     context_lookup_kwarg = "meeting"
     permission_classes = (IsAuthenticated,)

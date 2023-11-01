@@ -24,26 +24,26 @@ class AutomaticAccessSerializerTests(TestCase):
         self.assertEqual(self.ap.name, data["name"])
 
 
-class ModeratorApprovedAccessSerializerTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-        from voteit.access_policy.app.policies import ModeratorApprovedAccess
-
-        meeting = Meeting.objects.create()
-        self.ap = ModeratorApprovedAccess.objects.create(meeting=meeting, active=True)
-
-    @property
-    def _cut(self):
-        from voteit.access_policy.rest_api.serializers import (
-            ModeratorApprovedAccessSerializer,
-        )
-
-        return ModeratorApprovedAccessSerializer
-
-    def test_serializer(self):
-        data = self._cut(self.ap).data
-        self.assertEqual(self.ap.pk, data["pk"])
-        self.assertEqual(self.ap.name, data["name"])
+# class ModeratorApprovedAccessSerializerTests(TestCase):
+#     def setUp(self):
+#         from voteit.meeting.models import Meeting
+#         from voteit.access_policy.app.policies import ModeratorApprovedAccess
+#
+#         meeting = Meeting.objects.create()
+#         self.ap = ModeratorApprovedAccess.objects.create(meeting=meeting, active=True)
+#
+#     @property
+#     def _cut(self):
+#         from voteit.access_policy.rest_api.serializers import (
+#             ModeratorApprovedAccessSerializer,
+#         )
+#
+#         return ModeratorApprovedAccessSerializer
+#
+#     def test_serializer(self):
+#         data = self._cut(self.ap).data
+#         self.assertEqual(self.ap.pk, data["pk"])
+#         self.assertEqual(self.ap.name, data["name"])
 
 
 class MeetingAccessPoliciesSerializerTests(TestCase):
