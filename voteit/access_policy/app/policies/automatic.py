@@ -2,7 +2,6 @@ from __future__ import annotations
 from logging import getLogger
 
 from django.contrib.auth.models import AbstractUser
-from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from typing import TYPE_CHECKING

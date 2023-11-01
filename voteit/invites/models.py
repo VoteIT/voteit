@@ -11,7 +11,6 @@ from operator import or_
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
