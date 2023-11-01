@@ -14,6 +14,7 @@ from voteit.components.app.components.proposal_print import ProposalPrint
 from voteit.meeting.models import Meeting
 from voteit.meeting.channels import MeetingChannel
 from voteit.components.models import MeetingComponent
+from voteit.meeting.roles import ROLE_MODERATOR
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -27,7 +28,7 @@ class MeetingChannelSubscribedTests(TestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
         cls.user: User = cls.meeting.participants.create(username="user")
-        cls.meeting.add_roles(cls.user, "moderator")
+        cls.meeting.add_roles(cls.user, ROLE_MODERATOR)
         cls.flash = cls.meeting.components.create(
             component_name=FlashMessage.name,
             settings={"msg": "Hello!"},

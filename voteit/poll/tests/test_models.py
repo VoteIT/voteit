@@ -304,8 +304,8 @@ class ElectoralRegisterTests(TestCase):
         cls.meeting = Meeting.objects.get(pk=1)
         cls.participant = User.objects.get(username="participant")
         cls.moderator = User.objects.get(username="moderator")
-        cls.meeting.add_roles(cls.participant, "potential_voter")
-        cls.meeting.add_roles(cls.moderator, "potential_voter")
+        cls.meeting.add_roles(cls.participant, ROLE_POTENTIAL_VOTER)
+        cls.meeting.add_roles(cls.moderator, ROLE_POTENTIAL_VOTER)
         cls.er: ElectoralRegister = cls.meeting.er_policy.create_er()
         wv_participant = cls.er.voterweight_set.get(user=cls.participant)
         wv_participant.weight = 4
@@ -411,7 +411,6 @@ class VoteTests(TestCase):
         cls.ai: AgendaItem = cls.meeting.agenda_items.create()
         cls.poll: Poll = cls.ai.polls.create(method_name="simple")
         cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
-        # cls.moderator = User.objects.get(username="moderator")
         cls.voter = User.objects.get(username="participant")
         cls.meeting.add_roles(cls.voter, ROLE_POTENTIAL_VOTER)
         # cls.er: ElectoralRegister = cls.meeting.new_electoral_register()

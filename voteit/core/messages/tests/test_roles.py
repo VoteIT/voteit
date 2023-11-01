@@ -91,7 +91,7 @@ class MeetingRolesTests(TestCase):
             data = response.data
             self.assertEqual(1, len(data.items))
             self.assertIn(self.user_a.pk, [x[0] for x in data.items])
-            self.assertEqual({"participant", "moderator"}, set(data.items[0][1]))
+            self.assertEqual({ROLE_PARTICIPANT, ROLE_MODERATOR}, set(data.items[0][1]))
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -132,7 +132,7 @@ class AddRolesTests(TestCase):
                 "meeting": 1,
                 "actor": 1,
                 "for_user": 2,
-                "roles": [str(ROLE_DISCUSSER)],
+                "roles": [ROLE_DISCUSSER],
             },
             data,
         )

@@ -10,6 +10,8 @@ from voteit.core.workflows import EnabledWf
 from voteit.meeting.dialects import get_named_paths
 from voteit.meeting.exceptions import DialectError
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.tests.fixtures import CYCLIC_DIALECT_FIXTURES
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 from voteit.organisation.models import Organisation
@@ -84,7 +86,7 @@ class DialectHandlerTests(TestCase):
         group_role.refresh_from_db()
         group.refresh_from_db()
         self.assertEqual("Supervisor", group_role.title)
-        self.assertEqual(["discusser", "proposer"], group_role.roles)
+        self.assertEqual([ROLE_DISCUSSER, ROLE_PROPOSER], group_role.roles)
         self.assertEqual("Board", group.title)
 
     def test_install_with_script(self):

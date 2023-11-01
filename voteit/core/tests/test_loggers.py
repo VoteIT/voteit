@@ -104,7 +104,7 @@ class LogRolesChangeTests(TestCase):
                 "context": 1,
                 "for_user": 2,
                 "message": "Stuff I did",
-                "roles": ["moderator"],
+                "roles": [ROLE_MODERATOR],
                 "meeting": 1,
                 "org": 1,
             },

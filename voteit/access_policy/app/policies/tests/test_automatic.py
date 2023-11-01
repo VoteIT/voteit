@@ -21,16 +21,16 @@ class AutomaticAPTests(TestCase):
 
     def test_set_given_roles(self):
         auto_ap = self._cut.objects.create(meeting=self.meeting, active=True)
-        auto_ap.roles_given = ("participant",)
+        auto_ap.roles_given = (ROLE_PARTICIPANT,)
         auto_ap.save()
         auto_ap.refresh_from_db()
-        self.assertEqual(["participant"], auto_ap.roles_given)
+        self.assertEqual([ROLE_PARTICIPANT], auto_ap.roles_given)
 
     def test_assign(self):
         auto_ap = self._cut.objects.create(meeting=self.meeting, active=True)
         self.assertFalse(self.meeting.has_roles(self.user, ROLE_PARTICIPANT))
         auto_ap.assign(self.user)
         self.assertFalse(self.meeting.has_roles(self.user, ROLE_PARTICIPANT))
-        auto_ap.roles_given = ("participant",)
+        auto_ap.roles_given = (ROLE_PARTICIPANT,)
         auto_ap.assign(self.user)
         self.assertTrue(self.meeting.has_roles(self.user, ROLE_PARTICIPANT))

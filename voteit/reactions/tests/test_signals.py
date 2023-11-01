@@ -8,6 +8,8 @@ from envelope.app.user_channel.channel import UserChannel
 from envelope.messages.channels import Subscribe
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 
 User = get_user_model()
 
@@ -19,23 +21,21 @@ _channel_layers_setting = {
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalButtonTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.prop = self.ai.proposals.create()
-        self.disc = self.ai.discussions.create()
-        self.button = self.meeting.reaction_buttons.create()
-        self.moderator = User.objects.create(username="moderator")
-        self.meeting.add_roles(self.moderator, "moderator")
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.prop = cls.ai.proposals.create()
+        cls.disc = cls.ai.discussions.create()
+        cls.button = cls.meeting.reaction_buttons.create()
+        cls.moderator = User.objects.create(username="moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_button_added(self, mock_publish):
         from voteit.reactions.messages import ButtonAdded
 
         button = self.meeting.reaction_buttons.create()
-
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ButtonAdded)
@@ -60,7 +60,6 @@ class SignalButtonTests(TestCase):
         self.assertFalse(mock_publish.called)
         button_pk = self.button.pk
         self.button.delete()
-
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ButtonDeleted)
         self.assertEqual(button_pk, msg.data.pk)
@@ -100,7 +99,6 @@ class SignalButtonTests(TestCase):
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]
-
         self.assertEqual(2, len(payloads))
         self.assertEqual(self.button.pk, payloads[0].button)
         counts = [m for m in msg.data.app_state if m.t == "reaction.count"]
@@ -109,14 +107,13 @@ class SignalButtonTests(TestCase):
 
 
 class SignalReactionTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.prop = self.ai.proposals.create()
-        self.button = self.meeting.reaction_buttons.create()
-        self.user = User.objects.create(username="hej")
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.prop = cls.ai.proposals.create()
+        cls.button = cls.meeting.reaction_buttons.create()
+        cls.user = User.objects.create(username="hej")
 
     def _mk_reaction(self, **kw):
         from voteit.reactions.models import Reaction

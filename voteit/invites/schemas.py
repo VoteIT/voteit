@@ -94,8 +94,8 @@ class AddMixedUserDataInvitesSchema(RowColInvitesBaseSchema, InvitesMetaMixinSch
 
     Initial validation before touching the db. Very basic checks.
     The structure will be transformed later on to relevant data structure.
-
-    >>> base_qs = {'meeting': 1, 'roles': ['participant']}
+    >>> from voteit.meeting.roles import ROLE_PARTICIPANT
+    >>> base_qs = {'meeting': 1, 'roles': [str(ROLE_PARTICIPANT)]}
 
     Single line
     >>> AddMixedUserDataInvitesSchema(columns=['email'], rows=[["one@betahaus.net"], ["two@betahaus.net"]], **base_qs).dict(exclude_unset=True, exclude={'meeting', 'roles'})

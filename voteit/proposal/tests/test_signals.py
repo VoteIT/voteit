@@ -6,12 +6,15 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-
 from envelope.messages.channels import Subscribe
+
 from voteit.agenda.channels import AgendaItemChannel
+from voteit.agenda.models import AgendaItem
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.proposal.models import TextDocument
 
 if TYPE_CHECKING:
@@ -28,8 +31,6 @@ _channel_layers_setting = {
 class MeetingSubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting: Meeting = Meeting.objects.create()
         cls.ai = cls.meeting.agenda_items.create()
         cls.ai.upcoming()
@@ -37,7 +38,7 @@ class MeetingSubscribedTests(TestCase):
         cls.prop1 = cls.ai.proposals.create()
         cls.prop2 = cls.ai.proposals.create()
         cls.user = User.objects.create(username="user")
-        cls.meeting.add_roles(cls.user, "moderator")
+        cls.meeting.add_roles(cls.user, ROLE_MODERATOR)
 
     def setUp(self):
         self.ai.refresh_from_db()
@@ -290,13 +291,11 @@ class AnyProposalChangedTests(TestCase):
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class PrivateAIPublishedTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create()
         self.ai.proposals.create(body="Hello")
         self.user = User.objects.create(username="user")
-        self.meeting.add_roles(self.user, "participant")
+        self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_ai_made_public(self, mock_publish):
@@ -305,7 +304,6 @@ class PrivateAIPublishedTests(TestCase):
 
         self.ai.upcoming()
         self.ai.save()
-
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
         self.assertEqual(1, len([x for x in messages if isinstance(x, AgendaChanged)]))
@@ -316,18 +314,13 @@ class PrivateAIPublishedTests(TestCase):
 class AgendaItemChannelTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
-        from voteit.proposal.models import TextDocument
-
         cls.meeting: Meeting = Meeting.objects.create(state="upcoming")
         cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="upcoming")
         cls.text_document: TextDocument = cls.ai.text_documents.create(
             body="Hello\n\nWorld", base_tag="hi"
         )
-        # cls.para = cls.ai.text_paragraphs.create()
         cls.user = cls.meeting.participants.create(username="participant")
-        cls.meeting.add_roles(cls.user, "participant")
+        cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT)
 
     @patch.object(AgendaItemChannel, "sync_publish")
     def test_create(self, mock_publish):

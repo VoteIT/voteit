@@ -1,6 +1,7 @@
 from django.test import RequestFactory
 from django.test import TestCase
 from voteit.core.testing import mk_hashtag
+from voteit.meeting.roles import ROLE_MODERATOR
 
 
 class ValidateGroupAIContextTests(TestCase):
@@ -70,7 +71,7 @@ class ValidateGroupAIContextTests(TestCase):
         self.assertIn("meeting_group", serializer.errors)
 
     def test_create_unrelated_group_with_moderator(self):
-        self.meeting.add_roles(self.user, "moderator")
+        self.meeting.add_roles(self.user, ROLE_MODERATOR)
         data = {
             "body": "Hello " + mk_hashtag("world"),
             "agenda_item": self.ai.pk,
