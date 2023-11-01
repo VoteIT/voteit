@@ -49,7 +49,7 @@ class OrganisationRoles(OrganisationContext, Roles):
         on_delete=models.CASCADE,
         related_name="organisation_roles",
     )
-    assigned: str = RolesField(valid_roles=valid_roles.values())
+    assigned: str = RolesField(valid_roles=valid_roles.values(), max_length=30)
     context: Organisation = models.ForeignKey(
         "Organisation", on_delete=models.CASCADE, related_name="roles"
     )
