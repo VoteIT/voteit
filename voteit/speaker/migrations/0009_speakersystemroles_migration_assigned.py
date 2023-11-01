@@ -4,35 +4,44 @@ from django.db import migrations
 import voteit.core.fields
 
 
-_ROLE_LETTER_MIGRATION = (("m", "list_moderator"), ("s", "speaker"))
+# _ROLE_LETTER_MIGRATION = (("m", "list_moderator"), ("s", "speaker"))
 _MODEL = ("speaker", "SpeakerSystemRoles")
+_MODEL_SLS = ("speaker", "SpeakerListSystem")
 
 
-def migrate_role_letters(apps, schema_editor):
+def migrate_role_assigned(apps, schema_editor):
     # We get the model from the versioned app registry;
     # if we directly import it, it'll be the wrong version
     model = apps.get_model(*_MODEL)
     db_alias = schema_editor.connection.alias
     for roles in model.objects.using(db_alias).all():
-        # v = ""
-        # for letter, name in _ROLE_LETTER_MIGRATION:
-        #    if name in roles.assigned:
-        #        v += letter
-        # roles.migration_assigned = v
         roles.migration_assigned = roles.assigned
         roles.save()
 
 
-def reverse_migrate_role_letters(apps, schema_editor):
+def reverse_migrate_role_assigned(apps, schema_editor):
     model = apps.get_model(*_MODEL)
     db_alias = schema_editor.connection.alias
     for roles in model.objects.using(db_alias).all():
-        # v = []
-        # for letter, name in _ROLE_LETTER_MIGRATION:
-        #     if letter in roles.migration_assigned:
-        #         v.append(name)
-        # roles.assigned = v
         roles.assigned = roles.migration_assigned
+        roles.save()
+
+
+def migrate_role_sls(apps, schema_editor):
+    # We get the model from the versioned app registry;
+    # if we directly import it, it'll be the wrong version
+    model = apps.get_model(*_MODEL_SLS)
+    db_alias = schema_editor.connection.alias
+    for roles in model.objects.using(db_alias).all():
+        roles.migration_meeting_roles_to_speaker = roles.meeting_roles_to_speaker
+        roles.save()
+
+
+def reverse_migrate_role_sls(apps, schema_editor):
+    model = apps.get_model(*_MODEL_SLS)
+    db_alias = schema_editor.connection.alias
+    for roles in model.objects.using(db_alias).all():
+        roles.meeting_roles_to_speaker = roles.migration_meeting_roles_to_speaker
         roles.save()
 
 
@@ -48,7 +57,7 @@ class Migration(migrations.Migration):
             field=voteit.core.fields.RolesField(default="", max_length=20),
         ),
         migrations.RunPython(
-            code=migrate_role_letters, reverse_code=reverse_migrate_role_letters
+            code=migrate_role_assigned, reverse_code=reverse_migrate_role_assigned
         ),
         migrations.RemoveField(
             model_name="speakersystemroles",
@@ -58,5 +67,23 @@ class Migration(migrations.Migration):
             model_name="speakersystemroles",
             new_name="assigned",
             old_name="migration_assigned",
+        ),
+        # SpeakerListSystem
+        migrations.AddField(
+            model_name="speakerlistsystem",
+            name="migration_meeting_roles_to_speaker",
+            field=voteit.core.fields.RolesField(default="", max_length=60),
+        ),
+        migrations.RunPython(
+            code=migrate_role_sls, reverse_code=reverse_migrate_role_sls
+        ),
+        migrations.RemoveField(
+            model_name="speakerlistsystem",
+            name="meeting_roles_to_speaker",
+        ),
+        migrations.RenameField(
+            model_name="speakerlistsystem",
+            new_name="meeting_roles_to_speaker",
+            old_name="migration_meeting_roles_to_speaker",
         ),
     ]

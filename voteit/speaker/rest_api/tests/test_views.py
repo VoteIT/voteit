@@ -9,6 +9,7 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.speaker.app.list_methods.priority import Priority
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
@@ -252,9 +253,12 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.assertEqual("Mkay", self.system.title)
 
     def test_patch(self):
-        # url = f"/api/speaker-list-systems/{self.system.pk}/"
         url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
-        data = {"title": "Mkay", "very": "bogus"}
+        data = {
+            "title": "Mkay",
+            "very": "bogus",
+            "meeting_roles_to_speaker": [str(ROLE_PARTICIPANT)],
+        }
         self.client.force_login(self.moderator)
         response = self.client.patch(url, data)
         self.assertEqual(
@@ -263,7 +267,19 @@ class SpeakerListSystemViewTestCase(APITestCase):
         )
         self.system.refresh_from_db()
         self.assertEqual("Mkay", self.system.title)
+        self.assertEqual([ROLE_PARTICIPANT], self.system.meeting_roles_to_speaker)
         self.assertIsNone(self.system.settings)
+
+    def test_patch_bad_roles(self):
+        url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
+        data = {"meeting_roles_to_speaker": ["Noo"]}
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data)
+        self.assertEqual(
+            response.status_code,
+            400,
+        )
+        self.assertIn("meeting_roles_to_speaker", response.json())
 
     def test_patch_with_settings_for_method_with(self):
         self.system.method_name = Priority.name

@@ -1,19 +1,17 @@
 from __future__ import annotations
 
+import math
 from contextlib import suppress
 from datetime import datetime
 from datetime import timedelta
 from typing import TYPE_CHECKING
-import math
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
-from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
-from django.forms import MultipleChoiceField
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
@@ -28,6 +26,7 @@ from voteit.core.fields import RolesField
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.permissions import NOT_ALLOWED
+from voteit.core.role import Role
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.speaker.abcs import SpeakerSystemContext
@@ -55,7 +54,6 @@ class SpeakerSystemRoles(Roles, MeetingContext):
     context: SpeakerListSystem = models.ForeignKey(
         "SpeakerListSystem", on_delete=models.CASCADE
     )
-    # assigned = MultipleChoiceField()
     assigned: str = RolesField(valid_roles=valid_roles.values())
 
     @property
@@ -119,8 +117,8 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         on_delete=models.SET_NULL,
         related_name="active_in_system",
     )
-    meeting_roles_to_speaker: list[str] = ArrayField(
-        models.CharField(max_length=20), default=tuple
+    meeting_roles_to_speaker: list[Role] = RolesField(
+        valid_roles=MeetingRoles.valid_roles.values()
     )
 
     roles_cls = SpeakerSystemRoles
