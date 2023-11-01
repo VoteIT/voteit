@@ -11,6 +11,8 @@ from django.db import models
 
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
+from voteit.core.fields import RolesField
+from voteit.core.role import Role
 from voteit.core.utils import get_model_by_shortname
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
@@ -48,8 +50,12 @@ class ReactionButton(MeetingContext):
         Meeting, on_delete=models.CASCADE, related_name="reaction_buttons"
     )
     order: int = models.PositiveSmallIntegerField(default=0)
-    change_roles: list[str] = ArrayField(models.CharField(max_length=20), default=tuple)
-    list_roles: list[str] = ArrayField(models.CharField(max_length=20), default=tuple)
+    change_roles: list[Role] = RolesField(
+        valid_roles=MeetingRoles.valid_roles.values(), max_length=60
+    )
+    list_roles: list[Role] = RolesField(
+        valid_roles=MeetingRoles.valid_roles.values(), max_length=60
+    )
     active: bool = models.BooleanField(verbose_name="Is this activated?", default=True)
     allowed_models: list[str] = ArrayField(
         models.CharField(max_length=20),

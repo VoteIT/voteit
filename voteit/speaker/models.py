@@ -118,7 +118,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         related_name="active_in_system",
     )
     meeting_roles_to_speaker: list[Role] = RolesField(
-        valid_roles=MeetingRoles.valid_roles.values()
+        valid_roles=MeetingRoles.valid_roles.values(), max_length=60
     )
 
     roles_cls = SpeakerSystemRoles
