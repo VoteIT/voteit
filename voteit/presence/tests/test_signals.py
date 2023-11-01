@@ -12,6 +12,8 @@ from voteit.core.testing import FakeCommit
 from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.presence.channels import PresenceCheckChannel
 from voteit.presence.components import PresenceCheckComponent
 from voteit.presence.models import PresenceCheck
@@ -33,8 +35,8 @@ class SignalsTests(TestCase):
         cls.component = cls.meeting.components.create(
             component_name=PresenceCheckComponent.name, state=EnabledWf.ON
         )
-        cls.meeting.add_roles(cls.user, "participant")
-        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.check = PresenceCheck.objects.create(meeting=cls.meeting)
 
     def setUp(self):

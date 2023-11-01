@@ -9,7 +9,11 @@ from voteit.components.app.components.dialects import DialectsFilter
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
+from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.signals import group_role_added
 from voteit.meeting.signals import group_role_removed
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
@@ -65,7 +69,7 @@ class MeetingViewSetTests(APITestCase):
         response = self.client.post(url, data)
         data = response.json()
         meeting = Meeting.objects.get(pk=data["pk"])
-        self.assertTrue(meeting.has_roles(org_manager, "moderator"))
+        self.assertTrue(meeting.has_roles(org_manager, ROLE_MODERATOR))
 
     def test_create_public_ignored_but_visible_in_lists_works(self):
         url = reverse("meeting-list")
@@ -590,10 +594,10 @@ class MeetingRolesViewSetTests(APITestCase):
         cls.user_jeff = cls.meeting.participants.create(
             username="jeff", userid="key", first_name="Jeff", last_name="Jefferson"
         )
-        cls.meeting.add_roles(cls.user_jeff, "participant")
+        cls.meeting.add_roles(cls.user_jeff, ROLE_PARTICIPANT)
         cls.other_meeting = Meeting.objects.create()
-        cls.other_meeting.add_roles(cls.moderator, "moderator")
-        cls.other_meeting.add_roles(cls.participant, "participant")
+        cls.other_meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.other_meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
 
     def test_org_manager_without_meeting(self):
         self.client.force_login(self.org_manager)
@@ -676,13 +680,12 @@ class MeetingRolesViewSetTests(APITestCase):
         self.client.force_login(self.participant)
         response = self.client.get(
             self.roles_url,
-            {"meeting": self.meeting.pk, "any_roles": ["proposer", "discusser"]},
-            # {"meeting": self.meeting.pk, "any_roles": "proposer,discusser"},
+            {"meeting": self.meeting.pk, "any_roles": [ROLE_PROPOSER, ROLE_DISCUSSER]},
         )
         self.assertEqual(len(response.json()), 2, "Should match any of the roles")
         response = self.client.get(
             self.roles_url,
-            {"meeting": self.meeting.pk, "any_roles": "participant"},
+            {"meeting": self.meeting.pk, "any_roles": ROLE_PARTICIPANT},
         )
         self.assertContains(response, "Jeff")
         self.assertEqual(len(response.json()), 5, "Should match all users")

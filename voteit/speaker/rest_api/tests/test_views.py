@@ -9,12 +9,14 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.speaker.app.list_methods.priority import Priority
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
+from voteit.speaker.roles import ROLE_SPEAKER
 from voteit.speaker.workflows import SpeakerSystemWf
 
 User = get_user_model()
@@ -399,11 +401,11 @@ class HistoricSpeakerViewTests(APITestCase):
         )
         cls.participant: User = cls.meeting.participants.create(username="participant")
         cls.outsider: User = User.objects.create(username="outsider")
-        cls.system.add_roles(cls.user_one, "speaker")
-        cls.system.add_roles(cls.list_moderator, "list_moderator")
-        cls.meeting.add_roles(cls.user_one, "participant")
-        cls.meeting.add_roles(cls.user_two_nospeaker, "participant")
-        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.system.add_roles(cls.user_one, ROLE_SPEAKER)
+        cls.system.add_roles(cls.list_moderator, ROLE_LIST_MODERATOR)
+        cls.meeting.add_roles(cls.user_one, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.user_two_nospeaker, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         # Add spoken time
         for i in range(1, 4):
             cls.slist.speaker_items.create(

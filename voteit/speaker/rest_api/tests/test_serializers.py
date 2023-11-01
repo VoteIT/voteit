@@ -5,6 +5,8 @@ from django.test import TestCase
 from django.utils.timezone import now
 
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.speaker.models import SpeakerList
 
 User = get_user_model()
@@ -139,13 +141,13 @@ class SpeakerListSystemSerializerTests(TestCase):
     def test_patch_meeting_roles_to_speaker(self):
         serializer = self._cut(
             self.system,
-            data={"meeting_roles_to_speaker": ["potential_voter", "proposer"]},
+            data={"meeting_roles_to_speaker": [ROLE_POTENTIAL_VOTER, ROLE_PROPOSER]},
             partial=True,
         )
         self.assertTrue(serializer.is_valid())
         serializer.save()
         self.assertEqual(
-            self.system.meeting_roles_to_speaker, ["potential_voter", "proposer"]
+            self.system.meeting_roles_to_speaker, [ROLE_POTENTIAL_VOTER, ROLE_PROPOSER]
         )
 
     def test_patch_with_settings(self):

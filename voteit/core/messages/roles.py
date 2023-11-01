@@ -40,7 +40,8 @@ if TYPE_CHECKING:
 class ChangeRolesSchema(BaseModel):
     """
     Typical valid input:
-    >>> ChangeRolesSchema(users=[1], roles=["participant"], model="meeting", pk=2)
+    >>> from voteit.meeting.roles import ROLE_PARTICIPANT
+    >>> ChangeRolesSchema(users=[1], roles=[ROLE_PARTICIPANT], model="meeting", pk=2)
     ChangeRolesSchema(pk=2, users=[1], roles=['participant'], model='meeting')
 
     Valid role but not for this context:

@@ -1,7 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
 
@@ -76,13 +78,11 @@ class SpeakerListTests(TestCase):
 
     def test_view_speaker_meeting(self):
         VIEW = self.p("VIEW")
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
         self.system.meeting = meeting
         self.system.save()
         meeting_participant = User.objects.create(username="participant")
-        meeting.add_roles(meeting_participant, "participant")
+        meeting.add_roles(meeting_participant, ROLE_PARTICIPANT)
         self.assertTrue(self.user_list_moderator.has_perm(VIEW, self.list))
         self.assertTrue(self.user_speaker.has_perm(VIEW, self.list))
         self.assertFalse(self.user_any.has_perm(VIEW, self.list))

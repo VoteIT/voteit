@@ -249,7 +249,7 @@ class PollChangedTests(TestCase):
         cls.poll.upcoming()
         cls.poll.save()
         cls.user = User.objects.create(username="user")
-        cls.meeting.add_roles(cls.user, "participant")
+        cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT)
 
     def setUp(self):
         self.poll = self.meeting.polls.get(pk=self.poll_pk)
@@ -340,7 +340,7 @@ class PrivateAIPublishedTests(TestCase):
             method_name="simple", electoral_register=self.er, agenda_item=self.ai
         )
         self.user = User.objects.create(username="user")
-        self.meeting.add_roles(self.user, "participant")
+        self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_ai_made_public_private_poll(self, mock_publish):
@@ -348,7 +348,6 @@ class PrivateAIPublishedTests(TestCase):
 
         self.ai.upcoming()
         self.ai.save()
-
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, AgendaChanged)
@@ -364,7 +363,6 @@ class PrivateAIPublishedTests(TestCase):
         mock_publish.reset_mock()
         self.ai.upcoming()
         self.ai.save()
-
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
         self.assertEqual(1, len([x for x in messages if isinstance(x, AgendaChanged)]))
@@ -377,7 +375,7 @@ class NewERSentToMeetingTests(TestCase):
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create(er_policy_name="manual")
         cls.user = User.objects.create(username="user")
-        cls.meeting.add_roles(cls.user, "participant", "potential_voter")
+        cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added(self, mock_publish):
@@ -402,7 +400,7 @@ class VoteSignalsTests(TestCase):
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create(er_policy_name=AutoAlways.name)
         cls.user = User.objects.create(username="user")
-        cls.meeting.add_roles(cls.user, "participant", "potential_voter")
+        cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER)
         cls.ai = cls.meeting.agenda_items.create()
         cls.prop = cls.ai.proposals.create()
         cls.poll = cls.meeting.polls.create(method_name="simple")
