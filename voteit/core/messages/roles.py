@@ -42,10 +42,11 @@ class ChangeRolesSchema(BaseModel):
     Typical valid input:
     >>> from voteit.meeting.roles import ROLE_PARTICIPANT
     >>> ChangeRolesSchema(users=[1], roles=[ROLE_PARTICIPANT], model="meeting", pk=2)
-    ChangeRolesSchema(pk=2, users=[1], roles=['participant'], model='meeting')
+    ChangeRolesSchema(pk=2, users=[1], roles=['pa'], model='meeting')
 
     Valid role but not for this context:
-    >>> ChangeRolesSchema(users=[1], roles=['speaker'], model="meeting", pk=2)
+    >>> from voteit.speaker.roles import ROLE_SPEAKER
+    >>> ChangeRolesSchema(users=[1], roles=[ROLE_SPEAKER], model="meeting", pk=2)
     Traceback (most recent call last):
     ...
     pydantic.error_wrappers.ValidationError:

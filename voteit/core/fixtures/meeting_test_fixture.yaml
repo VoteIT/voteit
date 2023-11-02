@@ -38,13 +38,13 @@
 - model: meeting.meetingroles
   pk: 1
   fields:
-    assigned: ["participant", "moderator"]
+    assigned: ["pa", "mo"]
     user: 1
     context: 1
 - model: meeting.meetingroles
   pk: 2
   fields:
-    assigned: ["participant"]
+    assigned: ["pa"]
     user: 2
     context: 1
 - model: meeting.meeting
