@@ -3,10 +3,15 @@
 from django.db import migrations
 import voteit.core.fields
 
-
-# _ROLE_LETTER_MIGRATION = (("m", "list_moderator"), ("s", "speaker"))
 _MODEL = ("speaker", "SpeakerSystemRoles")
 _MODEL_SLS = ("speaker", "SpeakerListSystem")
+_SHORTER_ROLE_NAME_MAP = {
+    "participant": "pa",
+    "moderator": "mo",
+    "potential_voter": "pv",
+    "discusser": "di",
+    "proposer": "pr",
+}
 
 
 def migrate_role_assigned(apps, schema_editor):
@@ -16,7 +21,7 @@ def migrate_role_assigned(apps, schema_editor):
     db_alias = schema_editor.connection.alias
     for roles in model.objects.using(db_alias).all():
         roles.migration_assigned = roles.assigned
-        roles.save()
+        model.save_base(roles, raw=True)
 
 
 def reverse_migrate_role_assigned(apps, schema_editor):
@@ -24,7 +29,7 @@ def reverse_migrate_role_assigned(apps, schema_editor):
     db_alias = schema_editor.connection.alias
     for roles in model.objects.using(db_alias).all():
         roles.assigned = roles.migration_assigned
-        roles.save()
+        model.save_base(roles, raw=True)
 
 
 def migrate_role_sls(apps, schema_editor):
@@ -33,16 +38,23 @@ def migrate_role_sls(apps, schema_editor):
     model = apps.get_model(*_MODEL_SLS)
     db_alias = schema_editor.connection.alias
     for roles in model.objects.using(db_alias).all():
-        roles.migration_meeting_roles_to_speaker = roles.meeting_roles_to_speaker
-        roles.save()
+        values = []
+        for v in roles.meeting_roles_to_speaker:
+            values.append(_SHORTER_ROLE_NAME_MAP[v])
+        roles.migration_meeting_roles_to_speaker = values
+        model.save_base(roles, raw=True)
 
 
 def reverse_migrate_role_sls(apps, schema_editor):
     model = apps.get_model(*_MODEL_SLS)
     db_alias = schema_editor.connection.alias
+    reversed_map = {v: k for k, v in _SHORTER_ROLE_NAME_MAP.items()}
     for roles in model.objects.using(db_alias).all():
-        roles.meeting_roles_to_speaker = roles.migration_meeting_roles_to_speaker
-        roles.save()
+        values = []
+        for v in roles.migration_meeting_roles_to_speaker:
+            values.append(reversed_map[v])
+        roles.meeting_roles_to_speaker = values
+        model.save_base(roles, raw=True)
 
 
 class Migration(migrations.Migration):
@@ -54,7 +66,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="speakersystemroles",
             name="migration_assigned",
-            field=voteit.core.fields.RolesField(default="", max_length=20),
+            field=voteit.core.fields.RolesField(default="", max_length=30),
         ),
         migrations.RunPython(
             code=migrate_role_assigned, reverse_code=reverse_migrate_role_assigned

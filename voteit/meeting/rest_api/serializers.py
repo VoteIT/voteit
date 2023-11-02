@@ -11,6 +11,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator
 
+from voteit.core.rest_api.fields import RolesField
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
 from voteit.core.rest_api.serializers import UserSerializer
@@ -304,6 +305,7 @@ class MeetingGroupSerializer(CreateMeetingGroupSerializer):
 
 class GroupRoleSerializer(BaseModelSerializer):
     pk = serializers.IntegerField(read_only=True)
+    roles = RolesField()
 
     class Meta:
         model = GroupRole

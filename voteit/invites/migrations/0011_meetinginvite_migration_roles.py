@@ -3,13 +3,13 @@
 from django.db import migrations
 import voteit.core.fields
 
-_ROLE_LETTER_MIGRATION = (
-    ("p", "participant"),
-    ("m", "moderator"),
-    ("v", "potential_voter"),
-    ("d", "discusser"),
-    ("r", "proposer"),
-)
+_SHORTER_ROLE_NAME_MAP = {
+    "participant": "pa",
+    "moderator": "mo",
+    "potential_voter": "pv",
+    "discusser": "di",
+    "proposer": "pr",
+}
 
 _MODEL = ("invites", "MeetingInvite")
 
@@ -20,26 +20,23 @@ def migrate_role(apps, schema_editor):
     model = apps.get_model(*_MODEL)
     db_alias = schema_editor.connection.alias
     for roles in model.objects.using(db_alias).all():
-        # v = ""
-        # for letter, name in _ROLE_LETTER_MIGRATION:
-        #    if name in roles.assigned:
-        #        v += letter
-        # roles.migration_assigned = v
-        roles.migration_roles = roles.roles
-        roles.save()
+        values = []
+        for v in roles.roles:
+            values.append(_SHORTER_ROLE_NAME_MAP[v])
+        roles.migration_roles = values
+        model.save_base(roles, raw=True)
 
 
 def reverse_migrate_role(apps, schema_editor):
     model = apps.get_model(*_MODEL)
     db_alias = schema_editor.connection.alias
+    reversed_map = {v: k for k, v in _SHORTER_ROLE_NAME_MAP.items()}
     for roles in model.objects.using(db_alias).all():
-        # v = []
-        # for letter, name in _ROLE_LETTER_MIGRATION:
-        #     if letter in roles.migration_assigned:
-        #         v.append(name)
-        # roles.assigned = v
-        roles.roles = roles.migration_roles
-        roles.save()
+        values = []
+        for v in roles.migration_roles:
+            values.append(reversed_map[v])
+        roles.roles = values
+        model.save_base(roles, raw=True)
 
 
 class Migration(migrations.Migration):

@@ -54,7 +54,7 @@ class SpeakerSystemRoles(Roles, MeetingContext):
     context: SpeakerListSystem = models.ForeignKey(
         "SpeakerListSystem", on_delete=models.CASCADE
     )
-    assigned: str = RolesField(valid_roles=valid_roles.values())
+    assigned: str = RolesField(valid_roles=valid_roles.values(), max_length=30)
 
     @property
     def meeting(self) -> Meeting | None:

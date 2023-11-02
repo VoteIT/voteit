@@ -3,6 +3,13 @@
 from django.db import migrations
 import voteit.core.fields
 
+_SHORTER_ROLE_NAME_MAP = {
+    "participant": "pa",
+    "moderator": "mo",
+    "potential_voter": "pv",
+    "discusser": "di",
+    "proposer": "pr",
+}
 _MODEL = ("reactions", "ReactionButton")
 
 
@@ -12,18 +19,31 @@ def migrate_role(apps, schema_editor):
     model = apps.get_model(*_MODEL)
     db_alias = schema_editor.connection.alias
     for roles in model.objects.using(db_alias).all():
-        roles.m_change_roles = roles.change_roles
-        roles.m_list_roles = roles.list_roles
-        roles.save()
+        values = []
+        for v in roles.change_roles:
+            values.append(_SHORTER_ROLE_NAME_MAP[v])
+        roles.m_change_roles = values
+        values = []
+        for v in roles.list_roles:
+            values.append(_SHORTER_ROLE_NAME_MAP[v])
+        roles.m_list_roles = values
+        model.save_base(roles, raw=True)
 
 
 def reverse_migrate_role(apps, schema_editor):
     model = apps.get_model(*_MODEL)
     db_alias = schema_editor.connection.alias
+    reversed_map = {v: k for k, v in _SHORTER_ROLE_NAME_MAP.items()}
     for roles in model.objects.using(db_alias).all():
-        roles.change_roles = roles.m_change_roles
-        roles.list_roles = roles.m_list_roles
-        roles.save()
+        values = []
+        for v in roles.m_change_roles:
+            values.append(reversed_map[v])
+        roles.change_roles = values
+        values = []
+        for v in roles.m_list_roles:
+            values.append(reversed_map[v])
+        roles.list_roles = values
+        model.save_base(roles, raw=True)
 
 
 class Migration(migrations.Migration):

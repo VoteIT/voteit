@@ -3,43 +3,68 @@
 from django.db import migrations
 import voteit.core.fields
 
-# _ROLE_LETTER_MIGRATION = (
-#     ("p", "participant"),
-#     ("m", "moderator"),
-#     ("v", "potential_voter"),
-#     ("d", "discusser"),
-#     ("r", "proposer"),
-# )
+
+_SHORTER_ROLE_NAME_MAP = {
+    "participant": "pa",
+    "moderator": "mo",
+    "potential_voter": "pv",
+    "discusser": "di",
+    "proposer": "pr",
+}
+
 
 _MODEL = ("meeting", "MeetingRoles")
+_MODEL_GR = ("meeting", "GroupRole")
 
 
-def migrate_role_letters(apps, schema_editor):
+def migrate_role(apps, schema_editor):
     # We get the model from the versioned app registry;
     # if we directly import it, it'll be the wrong version
     model = apps.get_model(*_MODEL)
     db_alias = schema_editor.connection.alias
     for roles in model.objects.using(db_alias).all():
-        # v = ""
-        # for letter, name in _ROLE_LETTER_MIGRATION:
-        #    if name in roles.assigned:
-        #        v += letter
-        # roles.migration_assigned = v
-        roles.migration_assigned = roles.assigned
-        roles.save()
+        values = []
+        for v in roles.assigned:
+            values.append(_SHORTER_ROLE_NAME_MAP[v])
+        roles.migration_assigned = values
+        model.save_base(roles, raw=True)
 
 
-def reverse_migrate_role_letters(apps, schema_editor):
+def reverse_migrate_role(apps, schema_editor):
     model = apps.get_model(*_MODEL)
     db_alias = schema_editor.connection.alias
+    reversed_map = {v: k for k, v in _SHORTER_ROLE_NAME_MAP.items()}
     for roles in model.objects.using(db_alias).all():
-        # v = []
-        # for letter, name in _ROLE_LETTER_MIGRATION:
-        #     if letter in roles.migration_assigned:
-        #         v.append(name)
-        # roles.assigned = v
-        roles.assigned = roles.migration_assigned
-        roles.save()
+        values = []
+        for v in roles.migration_assigned:
+            values.append(reversed_map[v])
+        roles.assigned = values
+        model.save_base(roles, raw=True)
+
+
+def migrate_role_gr(apps, schema_editor):
+    # We get the model from the versioned app registry;
+    # if we directly import it, it'll be the wrong version
+    model = apps.get_model(*_MODEL_GR)
+    db_alias = schema_editor.connection.alias
+    for roles in model.objects.using(db_alias).all():
+        values = []
+        for v in roles.roles:
+            values.append(_SHORTER_ROLE_NAME_MAP[v])
+        roles.migration_roles = values
+        model.save_base(roles, raw=True)
+
+
+def reverse_migrate_role_gr(apps, schema_editor):
+    model = apps.get_model(*_MODEL_GR)
+    db_alias = schema_editor.connection.alias
+    reversed_map = {v: k for k, v in _SHORTER_ROLE_NAME_MAP.items()}
+    for roles in model.objects.using(db_alias).all():
+        values = []
+        for v in roles.migration_roles:
+            values.append(reversed_map[v])
+        roles.roles = values
+        model.save_base(roles, raw=True)
 
 
 class Migration(migrations.Migration):
@@ -53,9 +78,7 @@ class Migration(migrations.Migration):
             name="migration_assigned",
             field=voteit.core.fields.RolesField(default="", max_length=60),
         ),
-        migrations.RunPython(
-            code=migrate_role_letters, reverse_code=reverse_migrate_role_letters
-        ),
+        migrations.RunPython(code=migrate_role, reverse_code=reverse_migrate_role),
         migrations.RemoveField(
             model_name="meetingroles",
             name="assigned",
@@ -64,5 +87,23 @@ class Migration(migrations.Migration):
             model_name="meetingroles",
             new_name="assigned",
             old_name="migration_assigned",
+        ),
+        # GroupRole
+        migrations.AddField(
+            model_name="grouprole",
+            name="migration_roles",
+            field=voteit.core.fields.RolesField(default="", max_length=60),
+        ),
+        migrations.RunPython(
+            code=migrate_role_gr, reverse_code=reverse_migrate_role_gr
+        ),
+        migrations.RemoveField(
+            model_name="grouprole",
+            name="roles",
+        ),
+        migrations.RenameField(
+            model_name="grouprole",
+            new_name="roles",
+            old_name="migration_roles",
         ),
     ]

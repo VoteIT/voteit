@@ -9,7 +9,6 @@ from typing import Generator
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db import transaction
 from django.utils import timezone
@@ -42,6 +41,7 @@ if TYPE_CHECKING:
     from voteit.access_policy.models import AccessPolicy
     from voteit.active.models import ActiveUser
     from voteit.components.models import MeetingComponent
+    from voteit.core.role import Role
     from voteit.discussion.models import DiscussionPost
     from voteit.organisation.models import Organisation
     from voteit.poll.models import ElectoralRegister
@@ -89,7 +89,7 @@ class MeetingRoles(Roles, MeetingContext):
     context: Meeting = models.ForeignKey(
         "Meeting", on_delete=models.CASCADE, related_name="roles"
     )
-    assigned = RolesField(
+    assigned: list[Role] = RolesField(
         max_length=60,
         valid_roles=valid_roles.values(),
     )
@@ -502,11 +502,9 @@ class GroupRole(MeetingContext):
     )
     can_propose_as: bool = models.BooleanField("Can propose as group", default=False)
     can_discuss_as: bool = models.BooleanField("Can discuss as group", default=False)
-    roles: list[str] = ArrayField(
-        models.CharField(
-            max_length=20,
-        ),
-        default=tuple,
+    roles: list[Role] = RolesField(
+        max_length=60,
+        valid_roles=MeetingRoles.valid_roles.values(),
     )
     users = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
