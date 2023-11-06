@@ -38,7 +38,7 @@ class MeetingInviteAdmin(FSMTransitionMixin, MeetingAdminMixin, admin.ModelAdmin
         "meeting_link",
         "state",
         "used_by",
-        "roles",
+        "get_roles",
     )
     list_filter = (
         "state",
@@ -55,5 +55,8 @@ class MeetingInviteAdmin(FSMTransitionMixin, MeetingAdminMixin, admin.ModelAdmin
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return self.annotate_meeting(qs)
+
+    def get_roles(self, instance: MeetingInvite):
+        return instance.roles
 
     # FIXME: Filter type

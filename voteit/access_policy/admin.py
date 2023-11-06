@@ -14,13 +14,16 @@ class AutomaticAccessAdmin(admin.ModelAdmin):
     list_display = (
         "meeting",
         "active",
-        "roles_given",
+        "get_roles_given",
     )
     list_filter = (
-        "meeting",
+        "meeting__organisation",
         "active",
     )
     autocomplete_fields = ("meeting",)
+
+    def get_roles_given(self, instance: AutomaticAccess):
+        return instance.roles_given
 
 
 # @admin.register(ModeratorApprovedAccess)

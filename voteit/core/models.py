@@ -317,6 +317,12 @@ class Roles(ABCModel):
                 )
         super().save(**kwargs)
 
+    def __str__(self):
+        return f"{self.__class__.__name__} ({self.pk}) {getattr(self.context, 'title', self.context)}"
+
+    def __repr__(self):
+        return f"{self.__class__.__name__} ({self.pk})"
+
     # annotations
     objects: models.Manager
 

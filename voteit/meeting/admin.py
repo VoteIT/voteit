@@ -271,7 +271,7 @@ class MeetingAdminMixin:
 @admin.register(MeetingRoles)
 class MeetingRolesAdmin(MeetingAdminMixin, admin.ModelAdmin):
     autocomplete_fields = "user", "context"
-    list_display = "user", "assigned", "meeting_link"
+    list_display = "user", "get_assigned", "meeting_link"
     list_filter = ("user__organisation",)
     search_fields = (
         "context__title",
@@ -279,6 +279,9 @@ class MeetingRolesAdmin(MeetingAdminMixin, admin.ModelAdmin):
         "user__first_name",
         "user__userid",
     )
+
+    def get_assigned(self, instance):
+        return instance.assigned
 
 
 @admin.register(MeetingGroup)
@@ -308,10 +311,14 @@ class GroupRoleAdmin(MeetingAdminMixin, admin.ModelAdmin):
     list_display = (
         "title",
         "meeting_link",
+        "get_roles",
     )
     list_filter = ("meeting__organisation",)
     search_fields = ("title", "meeting__title")
     exclude = ("mentions",)
+
+    def get_roles(self, instance: GroupRole):
+        return instance.roles
 
 
 @admin.register(GroupMembership)
