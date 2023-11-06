@@ -99,7 +99,7 @@ class RolesField(models.CharField):
         value = self.to_python(value)
         if value:
             return ",".join(value)
-        # How do we handle empty string here?
+        return ""
 
     def to_python(self, value: str | Iterable[str]) -> list[str]:
         """

@@ -1,15 +1,17 @@
 from django.test import RequestFactory
 from django.test import TestCase
 
+from voteit.access_policy.app.policies import AutomaticAccess
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PARTICIPANT
+
 
 class AutomaticAccessSerializerTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-        from voteit.access_policy.app.policies import AutomaticAccess
-
-        meeting = Meeting.objects.create()
-        self.ap = AutomaticAccess.objects.create(
-            meeting=meeting, active=True, roles_given=["participant"]
+    @classmethod
+    def setUpTestData(cls):
+        meeting: Meeting = Meeting.objects.create()
+        cls.ap: AutomaticAccess = AutomaticAccess.objects.create(
+            meeting=meeting, active=True, roles_given=[ROLE_PARTICIPANT]
         )
 
     @property
@@ -47,13 +49,11 @@ class AutomaticAccessSerializerTests(TestCase):
 
 
 class MeetingAccessPoliciesSerializerTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-        from voteit.access_policy.app.policies import AutomaticAccess
-
-        self.meeting = Meeting.objects.create()
-        self.ap_aa = AutomaticAccess.objects.create(
-            meeting=self.meeting, active=True, roles_given=["participant"]
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.create()
+        cls.ap_aa: AutomaticAccess = AutomaticAccess.objects.create(
+            meeting=cls.meeting, active=True, roles_given=[ROLE_PARTICIPANT]
         )
 
     @property

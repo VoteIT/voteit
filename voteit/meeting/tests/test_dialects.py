@@ -78,7 +78,7 @@ class DialectHandlerTests(TestCase):
 
     def test_install_adjusts_groups_and_roles(self):
         group_role = self.meeting.group_roles.create(
-            title="Jeff", role_id="supervisor", roles=["discusser"]
+            title="Jeff", role_id="supervisor", roles=[ROLE_DISCUSSER]
         )
         group = self.meeting.groups.create(title="Jane", groupid="board")
         handler = self._cut.load_from_dict(dialect_named_test)

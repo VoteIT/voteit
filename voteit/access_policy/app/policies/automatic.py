@@ -37,3 +37,5 @@ class AutomaticAccess(AccessPolicy):
     def assign(self, user: AbstractUser):
         if self.roles_given:
             self.meeting.add_roles(user, *self.roles_given)
+
+    objects: models.Manager

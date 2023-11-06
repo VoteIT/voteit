@@ -75,12 +75,12 @@ class AddInvitesTests(TestCase):
         moderator = User.objects.get(username="moderator")
         diffing_data_invite: MeetingInvite = meeting.invites.create(
             user_data={"email": "one@betahaus.net"},
-            roles=["voter"],
+            roles=[ROLE_POTENTIAL_VOTER],
         )
         # Will be changed too
         rejected_invite: MeetingInvite = meeting.invites.create(
             user_data={"email": "two@betahaus.net"},
-            roles=["participant", "voter"],
+            roles=[ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER],
             state=InviteWf.REJECTED,
         )
         mock_publish.reset_mock()
