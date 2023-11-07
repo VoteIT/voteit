@@ -4,6 +4,7 @@ from django.test import TestCase
 from voteit.invites.models import MeetingInvite
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation.models import Organisation
 
 
@@ -15,7 +16,7 @@ class MeetingInviteSerializerTests(TestCase):
         cls.user = cls.meeting.participants.create(username="inviter")
         cls.invite: MeetingInvite = cls.meeting.invites.create(
             user_data={"email": "hello@betahaus.net"},
-            roles=["participant"],
+            roles=[ROLE_PARTICIPANT],
         )
         cls.group = cls.meeting.groups.create()
         cls.invite.group_annotations.create(meeting_group=cls.group)
@@ -60,7 +61,7 @@ class ExternalMeetingInviteSerializerTests(TestCase):
         cls.user = cls.meeting.participants.create(username="inviter")
         cls.invite: MeetingInvite = cls.meeting.invites.create(
             user_data={"email": "hello@betahaus.net"},
-            roles=["participant"],
+            roles=[ROLE_PARTICIPANT],
         )
 
     @property

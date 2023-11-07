@@ -23,6 +23,7 @@ from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import websocket_send
 from voteit.core.loggers import log_roles_change
 from voteit.core.permissions import NOT_ALLOWED
+from voteit.core.role import Role
 from voteit.core.schemas import RoleOutput
 from voteit.core.utils import get_model_by_shortname
 from voteit.core.utils import get_model_shortname
@@ -39,11 +40,13 @@ if TYPE_CHECKING:
 class ChangeRolesSchema(BaseModel):
     """
     Typical valid input:
-    >>> ChangeRolesSchema(users=[1], roles=["participant"], model="meeting", pk=2)
-    ChangeRolesSchema(pk=2, users=[1], roles=['participant'], model='meeting')
+    >>> from voteit.meeting.roles import ROLE_PARTICIPANT
+    >>> ChangeRolesSchema(users=[1], roles=[ROLE_PARTICIPANT], model="meeting", pk=2)
+    ChangeRolesSchema(pk=2, users=[1], roles=['pa'], model='meeting')
 
     Valid role but not for this context:
-    >>> ChangeRolesSchema(users=[1], roles=["speaker"], model="meeting", pk=2)
+    >>> from voteit.speaker.roles import ROLE_SPEAKER
+    >>> ChangeRolesSchema(users=[1], roles=[ROLE_SPEAKER], model="meeting", pk=2)
     Traceback (most recent call last):
     ...
     pydantic.error_wrappers.ValidationError:
@@ -51,7 +54,7 @@ class ChangeRolesSchema(BaseModel):
 
     pk: int
     users: list[int]
-    roles: list[str]  # We have no clue of roles are valid here
+    roles: list[str]
     model: str  # The short name of the model to change roles in
 
     # Validators
@@ -59,6 +62,12 @@ class ChangeRolesSchema(BaseModel):
     _check_roles = root_validator(skip_on_failure=True, allow_reuse=True)(
         root_validate_roles_and_model
     )
+
+    @validator("roles", pre=True, each_item=True)
+    def roles_to_str(cls, v: str | Role):
+        if isinstance(v, Role):
+            v = str(v)
+        return v
 
 
 class BaseRoles(ContextAction, ABC):

@@ -1,24 +1,25 @@
 from http import HTTPStatus
 
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
 from voteit.bug_reports.models import BugReport
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.organisation.models import Organisation
+
+User = get_user_model()
 
 
 class BugReportRestTests(APITestCase):
-    def setUp(self):
-        from voteit.core.models import User
-        from voteit.organisation.models import Organisation
-        from voteit.meeting.models import Meeting
-
-        self.org = Organisation.objects.create(title="Testing org")
-        self.meeting = Meeting.objects.create(
-            title="Test meeting", organisation=self.org
-        )
-        self.user = User.objects.create_user("testing", organisation=self.org)
-        self.meeting.add_roles(self.user, "participant")
-        self.url = reverse("bugreport-list")
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create(title="Testing org")
+        cls.meeting = Meeting.objects.create(title="Test meeting", organisation=cls.org)
+        cls.user = User.objects.create_user("testing", organisation=cls.org)
+        cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT)
+        cls.url = reverse("bugreport-list")
 
     @property
     def example_report(self):
@@ -48,10 +49,8 @@ class BugReportRestTests(APITestCase):
         self.assertEqual(BugReport.objects.count(), 1, "Bug report count wrong")
 
     def test_list(self):
-        from voteit.core.models import User
-
         other_user = User.objects.create_user("other", organisation=self.org)
-        self.meeting.add_roles(other_user, "participant")
+        self.meeting.add_roles(other_user, ROLE_PARTICIPANT)
         self._create(other_user, self.example_report)
         self._create(self.user, self.example_report)
         response = self.client.get(self.url)

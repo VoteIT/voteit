@@ -2,6 +2,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase
 from voteit.agenda.workflows import AgendaItemWf
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
 
@@ -29,12 +31,12 @@ class PollRulesTests(TestCase):
         cls.anon = AnonymousUser()
         cls.outsider = User.objects.create(username="anon")
         cls.participant_user = User.objects.create(username="participant")
-        cls.meeting.add_roles(cls.participant_user, "participant")
+        cls.meeting.add_roles(cls.participant_user, ROLE_PARTICIPANT)
         cls.voter_user = cls.er.voters.create(username="voter")
         # Voters should always be participants too
-        cls.meeting.add_roles(cls.voter_user, "participant")
+        cls.meeting.add_roles(cls.voter_user, ROLE_PARTICIPANT)
         cls.moderator = User.objects.create(username="moderator")
-        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
 
     def setUp(self):
         self.meeting.refresh_from_db()
@@ -248,16 +250,16 @@ class VoteRulesTests(TestCase):
         cls.poll.save()
         cls.anon_user = User.objects.create(username="anon")
         cls.participant_user = User.objects.create(username="participant")
-        cls.meeting.add_roles(cls.participant_user, "participant")
+        cls.meeting.add_roles(cls.participant_user, ROLE_PARTICIPANT)
         cls.voter_user = cls.er.voters.create(username="voter")
         cls.voted_user = cls.er.voters.create(username="voted")
         cls.anon = AnonymousUser()
         # Voters should always be participants too
-        cls.meeting.add_roles(cls.voter_user, "participant")
-        cls.meeting.add_roles(cls.voted_user, "participant")
+        cls.meeting.add_roles(cls.voter_user, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.voted_user, ROLE_PARTICIPANT)
 
         cls.moderator = User.objects.create(username="moderator")
-        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         # And the voted user have voted of course :)
         cls.vote = cls.poll.votes.create(vote_data="yes", user=cls.voted_user)
 
@@ -357,8 +359,8 @@ class ElectoralRegisterTests(TestCase):
         cls.outsider = User.objects.create(username="outsider")
         cls.moderator = User.objects.create(username="moderator")
         cls.anon = AnonymousUser()
-        cls.meeting.add_roles(cls.participant, "participant")
-        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.VIEW_PERM = ElectoralRegisterPermissions.VIEW
         cls.ADD_PERM = ElectoralRegisterPermissions.ADD
 

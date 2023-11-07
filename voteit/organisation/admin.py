@@ -51,7 +51,7 @@ class OrganisationAdmin(admin.ModelAdmin):
 @admin.register(OrganisationRoles)
 class OrganisationRolesAdmin(admin.ModelAdmin):
     autocomplete_fields = "user", "context"
-    list_display = "user", "assigned", "context"
+    list_display = "user", "get_assigned", "context"
     list_filter = ("context",)
     search_fields = (
         "context__title",
@@ -59,6 +59,9 @@ class OrganisationRolesAdmin(admin.ModelAdmin):
         "user__first_name",
         "user__userid",
     )
+
+    def get_assigned(self, instance):
+        return instance.assigned
 
 
 @admin.register(AccessToken)

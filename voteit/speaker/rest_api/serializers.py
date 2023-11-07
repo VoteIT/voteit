@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from rest_framework import serializers
 from rest_framework import exceptions
 
+from voteit.core.rest_api.fields import RolesField
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.meeting.models import MeetingRoles
 from voteit.speaker.models import Speaker
@@ -73,6 +74,9 @@ class SpeakerSerializer(serializers.ModelSerializer):
 
 class SpeakerListSystemSerializer(serializers.ModelSerializer):
     settings = PydanticFieldSerializer(allow_null=True, required=False)
+    meeting_roles_to_speaker = RolesField(
+        required=False, valid_roles=set(MeetingRoles.valid_roles.values())
+    )
 
     class Meta:
         model = SpeakerListSystem
@@ -113,12 +117,6 @@ class SpeakerListSystemSerializer(serializers.ModelSerializer):
             except ValueError as exc:
                 raise exceptions.ValidationError({"settings": [str(exc)]})
         return super().validate(attrs)
-
-    def validate_meeting_roles_to_speaker(self, value):
-        for role in value:
-            if role not in MeetingRoles.valid_roles:
-                raise exceptions.ValidationError(f"{role} is not a valid meeting role")
-        return value
 
 
 class SpeakerExportSerializer(serializers.ModelSerializer):

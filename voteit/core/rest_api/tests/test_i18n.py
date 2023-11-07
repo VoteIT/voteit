@@ -1,6 +1,8 @@
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
+from voteit.meeting.roles import ROLE_MODERATOR
+
 
 class TranslationTests(APITestCase):
     """
@@ -19,7 +21,7 @@ class TranslationTests(APITestCase):
         cls.moderator = cls.meeting.participants.create(
             username="moderator", organisation=org
         )
-        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.url = reverse("meeting-transitions", kwargs={"pk": cls.meeting.pk})
 
     def setUp(self):
@@ -79,7 +81,7 @@ class TranslationTests(APITestCase):
         self.assertEqual("Autentiseringsuppgifter ej tillhandahållna.", data["detail"])
 
     def test_bad_permission(self):
-        self.meeting.remove_roles(self.moderator, "moderator")
+        self.meeting.remove_roles(self.moderator, ROLE_MODERATOR)
         participant = self.moderator
         self.client.force_login(participant)
         url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})

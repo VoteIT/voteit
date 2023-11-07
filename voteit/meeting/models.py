@@ -9,7 +9,6 @@ from typing import Generator
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db import transaction
 from django.utils import timezone
@@ -23,12 +22,14 @@ from django_fsm import transition
 from voteit.core.abcs import MeetingContext
 from voteit.core.abcs import OrganisationContext
 from voteit.core.fields import RichTextField
+from voteit.core.fields import RolesField
 from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.models import User
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.utils import relaxed_clean_html
+from voteit.meeting import roles
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.permissions import OrgPermissions
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from voteit.access_policy.models import AccessPolicy
     from voteit.active.models import ActiveUser
     from voteit.components.models import MeetingComponent
+    from voteit.core.role import Role
     from voteit.discussion.models import DiscussionPost
     from voteit.organisation.models import Organisation
     from voteit.poll.models import ElectoralRegister
@@ -69,15 +71,28 @@ def _rnd_role_id():
 
 
 class MeetingRoles(Roles, MeetingContext):
-    """Contains assigned meeting roles for a specific meeting and user"""
+    """
+    Contains assigned meeting roles for a specific meeting and user
+    """
 
     name = "meeting_roles"
+    valid_roles = {
+        roles.ROLE_DISCUSSER: roles.ROLE_DISCUSSER,
+        roles.ROLE_MODERATOR: roles.ROLE_MODERATOR,
+        roles.ROLE_PARTICIPANT: roles.ROLE_PARTICIPANT,
+        roles.ROLE_POTENTIAL_VOTER: roles.ROLE_POTENTIAL_VOTER,
+        roles.ROLE_PROPOSER: roles.ROLE_PROPOSER,
+    }
 
     user: User = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="meeting_roles"
     )
     context: Meeting = models.ForeignKey(
         "Meeting", on_delete=models.CASCADE, related_name="roles"
+    )
+    assigned: list[Role] = RolesField(
+        max_length=60,
+        role_choices=valid_roles.values(),
     )
 
     @property
@@ -489,11 +504,9 @@ class GroupRole(MeetingContext):
     )
     can_propose_as: bool = models.BooleanField("Can propose as group", default=False)
     can_discuss_as: bool = models.BooleanField("Can discuss as group", default=False)
-    roles: list[str] = ArrayField(
-        models.CharField(
-            max_length=20,
-        ),
-        default=tuple,
+    roles: list[Role] = RolesField(
+        max_length=60,
+        role_choices=MeetingRoles.valid_roles.values(),
     )
     users = models.ManyToManyField(
         settings.AUTH_USER_MODEL,

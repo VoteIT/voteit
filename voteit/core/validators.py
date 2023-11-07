@@ -60,7 +60,8 @@ def validate_roles_context_model(v: str) -> str:
 def root_validate_roles_and_model(cls, values: Dict):
     """
     Checking roles requires the model too
-    >>> v = {"model": "meeting", "roles": ["participant"]}
+    >>> from voteit.meeting.roles import ROLE_PARTICIPANT
+    >>> v = {"model": "meeting", "roles": [ROLE_PARTICIPANT]}
     >>> res = root_validate_roles_and_model(None, v)
     >>> v == res
     True
@@ -71,7 +72,7 @@ def root_validate_roles_and_model(cls, values: Dict):
     ...
     ValueError:
 
-    >>> v = {"model": "meeting", "roles": ["participant", "404"]}
+    >>> v = {"model": "meeting", "roles": ["p4"]}
     >>> root_validate_roles_and_model(None, v)
     Traceback (most recent call last):
     ...
@@ -83,7 +84,7 @@ def root_validate_roles_and_model(cls, values: Dict):
     roles = set(values["roles"])
     if not roles:
         raise ValueError("Specify roles")
-    not_valid = roles - set(model.roles_cls.valid_roles.keys())
+    not_valid = roles - set(model.roles_cls.valid_roles)
     if not_valid:
         raise ValueError(f"Invalid roles for this context: {', '.join(not_valid)}")
     return values

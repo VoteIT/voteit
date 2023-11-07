@@ -155,7 +155,7 @@ def meeting_channel_subscribed(
     roles = context.get_roles(user)
     if roles:
         msg = RolesAdded(
-            roles=context.roles_to_strings(*roles),
+            roles=roles,
             pk=context.pk,
             model=get_model_shortname(context),
             user_pk=user.pk,
@@ -245,7 +245,7 @@ def push_roles_added(instance: MeetingRoles, roles: list[Role], **kwargs):
     _role_msg_publish(
         instance,
         RolesAdded(
-            roles=instance.context.roles_to_strings(*roles),
+            roles=roles,
             pk=instance.context.pk,
             model=get_model_shortname(instance.context),
             user_pk=instance.user.pk,
@@ -258,7 +258,7 @@ def push_roles_removed(instance: MeetingRoles, roles: list[Role], **kwargs):
     _role_msg_publish(
         instance,
         RolesRemoved(
-            roles=instance.context.roles_to_strings(*roles),
+            roles=roles,
             pk=instance.context.pk,
             model=get_model_shortname(instance.context),
             user_pk=instance.user.pk,

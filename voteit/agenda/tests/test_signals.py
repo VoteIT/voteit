@@ -14,6 +14,7 @@ from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -31,7 +32,7 @@ class SubscribedTests(TestCase):
         cls.ai.save()
         cls.ai_private: AgendaItem = cls.meeting.agenda_items.create()
         cls.user = User.objects.create(username="user")
-        cls.meeting.add_roles(cls.user, "moderator")
+        cls.meeting.add_roles(cls.user, ROLE_MODERATOR)
         cls.ai_private.mark_read(cls.user)
 
     def test_app_state_sent_participants(self):

@@ -32,6 +32,7 @@ class MeetingInviteSerializer(BaseModelSerializer):
 
     meeting_title = serializers.SerializerMethodField()
     has_annotations = serializers.SerializerMethodField()
+    roles = serializers.ListSerializer(child=serializers.CharField())
 
     class Meta:
         model = MeetingInvite
@@ -72,6 +73,7 @@ class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
 
     organisation_host = serializers.SerializerMethodField()
     meeting_title = serializers.SerializerMethodField()
+    roles = serializers.ListSerializer(child=serializers.CharField())
 
     class Meta:
         model = MeetingInvite

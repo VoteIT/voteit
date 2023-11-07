@@ -12,10 +12,12 @@ from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.speaker.channels import SpeakerListSystemChannel
 from voteit.speaker.messages import SpeakerListAdded
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.roles import ROLE_LIST_MODERATOR
 
 User = get_user_model()
 
@@ -331,8 +333,8 @@ class ChannelSubscribedTests(TestCase):
         cls.active_list.start_speaker(cls.speaker_one)
         # Moderator
         cls.moderator = User.objects.create(username="moderator")
-        cls.meeting.add_roles(cls.moderator, "participant")
-        cls.system.add_roles(cls.moderator, "list_moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_PARTICIPANT)
+        cls.system.add_roles(cls.moderator, ROLE_LIST_MODERATOR)
 
     def _mk_one(self, pk, channel_type):
         return Subscribe(
@@ -397,9 +399,9 @@ class RolesRelationsTests(TestCase):
         cls.user = User.objects.create(username="jane")
 
     def test_removing_participant_removes_system_roles(self):
-        self.meeting.add_roles(self.user, "participant")
+        self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
         self.system.add_roles(self.user, "speaker")
-        self.meeting.remove_roles(self.user, "participant")
+        self.meeting.remove_roles(self.user, ROLE_PARTICIPANT)
         self.assertFalse(self.system.get_roles(self.user))
 
     def test_adding_system_roles_adds_participant(self):

@@ -178,7 +178,7 @@ class DiscussionPostAPITests(APITestCase):
         meeting = Meeting.objects.create()
         ai = meeting.agenda_items.create()
         disc = ai.discussions.create(body="I'm from another meeting")
-        meeting.add_roles(self.moderator, "moderator")
+        meeting.add_roles(self.moderator, ROLE_MODERATOR)
         url = reverse("discussion-posts-detail", kwargs={"pk": disc.pk})
         self.client.force_login(self.moderator)
         response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})

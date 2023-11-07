@@ -13,6 +13,8 @@ from voteit.meeting.rest_api.serializers import CreateMeetingGroupSerializer
 from voteit.meeting.rest_api.serializers import GroupMembershipSerializer
 from voteit.meeting.rest_api.serializers import GroupRoleSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 from voteit.poll.app.er_policies.auto_always import AutoAlways
@@ -45,13 +47,14 @@ class MeetingSerializerTests(TestCase):
         request = self._mk_request(self.moderator)
         serializer = self._cut(self.meeting, context={"request": request})
         self.assertEqual(
-            {"participant", "moderator"}, set(serializer.data["current_user_roles"])
+            {ROLE_PARTICIPANT, ROLE_MODERATOR},
+            set(serializer.data["current_user_roles"]),
         )
 
     def test_participant(self):
         request = self._mk_request(self.participant)
         serializer = self._cut(self.meeting, context={"request": request})
-        self.assertEqual({"participant"}, set(serializer.data["current_user_roles"]))
+        self.assertEqual({ROLE_PARTICIPANT}, set(serializer.data["current_user_roles"]))
 
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
@@ -195,7 +198,7 @@ class MeetingRolesSerializerTests(TestCase):
         instance = MeetingRoles.objects.get(pk=1)
         serializer = self._cut(instance)
         data = serializer.data
-        self.assertEqual({"participant", "moderator"}, set(data["assigned"]))
+        self.assertEqual({ROLE_PARTICIPANT, ROLE_MODERATOR}, set(data["assigned"]))
         self.assertEqual(
             {
                 "pk": 1,

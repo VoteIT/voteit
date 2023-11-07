@@ -310,12 +310,10 @@ class ProposalsAPITests(APITestCase):
         self.assertEqual(prop.author, self.moderator)
 
     def test_patch_author_not_in_meeting(self):
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
         ai = meeting.agenda_items.create()
         prop = ai.proposals.create(body="I'm from another meeting")
-        meeting.add_roles(self.moderator, "moderator")
+        meeting.add_roles(self.moderator, ROLE_MODERATOR)
         url = reverse("proposal-detail", kwargs={"pk": prop.pk})
         self.client.force_login(self.moderator)
         response = self.client.patch(url, data={"author": self.proposer.pk})
@@ -335,12 +333,10 @@ class ProposalsAPITests(APITestCase):
         self.assertIsNone(self.prop.meeting_group)
 
     def test_patch_meeting_group_not_in_meeting(self):
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
         ai = meeting.agenda_items.create()
         prop = ai.proposals.create(body="I'm from another meeting")
-        meeting.add_roles(self.moderator, "moderator")
+        meeting.add_roles(self.moderator, ROLE_MODERATOR)
         url = reverse("proposal-detail", kwargs={"pk": prop.pk})
         self.client.force_login(self.moderator)
         response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})
@@ -350,12 +346,10 @@ class ProposalsAPITests(APITestCase):
         )
 
     def test_create_meeting_group_not_in_meeting(self):
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
         ai = meeting.agenda_items.create()
         prop = ai.proposals.create(body="I'm from another meeting")
-        meeting.add_roles(self.moderator, "moderator")
+        meeting.add_roles(self.moderator, ROLE_MODERATOR)
         url = reverse("proposal-detail", kwargs={"pk": prop.pk})
         self.client.force_login(self.moderator)
         response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})

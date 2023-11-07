@@ -253,10 +253,10 @@ class MeetingInviteTests(TestCase):
         cls.invite: MeetingInvite = MeetingInvite.objects.create(
             meeting=cls.meeting,
             user_data={"email": "a@betahaus.net"},
-            roles=["participant"],
+            roles=[ROLE_PARTICIPANT],
         )
 
     def test_accept(self):
         self.invite.accept(self.user)
         self.assertEqual(self.user, self.invite.used_by)
-        self.assertEqual({"participant"}, self.meeting.get_roles(self.user))
+        self.assertEqual({ROLE_PARTICIPANT}, self.meeting.get_roles(self.user))

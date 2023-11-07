@@ -323,7 +323,7 @@ class PollCreateSerializerTests(TestCase):
     def test_serializer_start(self):
         self.meeting.er_policy_name = "auto_always"
         self.meeting.save()
-        self.meeting.add_roles(self.voter, "potential_voter")
+        self.meeting.add_roles(self.voter, ROLE_POTENTIAL_VOTER)
         data = self._fixture(start=True)
         serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertTrue(serializer.is_valid())

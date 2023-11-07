@@ -55,7 +55,7 @@ class AddInvitesTests(TestCase):
         data = []
         for name in ["one", "two", "three"]:
             data.append(f"{name}@betahaus.net")
-        msg = self._mk_one(rows=data, columns=["email"], roles=["participant"])
+        msg = self._mk_one(rows=data, columns=["email"], roles=[str(ROLE_PARTICIPANT)])
         with self.captureOnCommitCallbacks(execute=True):
             response = msg.run_job()
         self.assertEqual({"added": 3, "changed": 0, "existed": 0}, response.data.dict())
@@ -75,12 +75,12 @@ class AddInvitesTests(TestCase):
         moderator = User.objects.get(username="moderator")
         diffing_data_invite: MeetingInvite = meeting.invites.create(
             user_data={"email": "one@betahaus.net"},
-            roles=["voter"],
+            roles=[ROLE_POTENTIAL_VOTER],
         )
         # Will be changed too
         rejected_invite: MeetingInvite = meeting.invites.create(
             user_data={"email": "two@betahaus.net"},
-            roles=["participant", "voter"],
+            roles=[ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER],
             state=InviteWf.REJECTED,
         )
         mock_publish.reset_mock()
@@ -88,7 +88,10 @@ class AddInvitesTests(TestCase):
         for name in ["one", "two", "three"]:
             data.append(f"{name}@betahaus.net")
         msg = self._mk_one(
-            user_pk=moderator.pk, rows=data, columns=["email"], roles=["participant"]
+            user_pk=moderator.pk,
+            rows=data,
+            columns=["email"],
+            roles=[str(ROLE_PARTICIPANT)],
         )
         with self.captureOnCommitCallbacks(execute=True):
             response = msg.run_job()
@@ -98,7 +101,7 @@ class AddInvitesTests(TestCase):
         self.assertEqual(3, len(mock_publish.mock_calls))
         changed_msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(changed_msg, MeetingInviteChanged)
-        self.assertEqual(["participant"], changed_msg.data.roles)
+        self.assertEqual([ROLE_PARTICIPANT], changed_msg.data.roles)
         added_msg = mock_publish.mock_calls[2].args[0]
         self.assertIsInstance(added_msg, MeetingInviteAdded)
 

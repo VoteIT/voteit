@@ -11,7 +11,6 @@ from operator import or_
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
@@ -22,16 +21,19 @@ from django_fsm import transition
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import ensure_atomic
 from voteit.core.decorators import has_exact_filter
+from voteit.core.fields import RolesField
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import GroupRole
+from voteit.meeting.models import MeetingRoles
 from voteit.meeting.models import MeetingGroup
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
     from voteit.meeting.models import Meeting
+    from voteit.core.role import Role
     from voteit.organisation.models import Organisation
 
 logger = getLogger(__name__)
@@ -257,7 +259,9 @@ class MeetingInvite(MeetingContext):
         on_delete=models.CASCADE,
         related_name="invites",
     )
-    roles: list[str] = ArrayField(models.CharField(max_length=20), default=tuple)
+    roles: list[Role] = RolesField(
+        max_length=60, role_choices=MeetingRoles.valid_roles.values()
+    )
     user_data: dict = models.JSONField(
         encoder=DjangoJSONEncoder,
     )
