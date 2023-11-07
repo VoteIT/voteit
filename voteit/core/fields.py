@@ -40,37 +40,45 @@ class RolesField(models.CharField):
     >>> ROLE_COW = Role('cow')
     >>> ROLE_HAMBURGER = Role('hamburger')
 
-    >>> f = RolesField(valid_roles={ROLE_FARMER, ROLE_COW})
-    >>> sorted(f.name_to_role)
+    >>> f = RolesField(role_choices={ROLE_FARMER, ROLE_COW})
+    >>> sorted(f.valid_keys)
     ['cow', 'farmer']
-    >>> RolesField(valid_roles={ROLE_FARMER, "hello"})
+    >>> RolesField(role_choices={ROLE_FARMER, "hello"})
     Traceback (most recent call last):
     ...
     AssertionError
     """
 
-    name_to_role: dict[str, Role]
     description = "Roles storage, saved as csv but handled as list"
+    valid_keys: frozenset[str]
 
     def __init__(
         self,
         *args,
-        valid_roles: Iterable[Role] = (),
         max_length=20,
+        role_choices=(),
         **kwargs,
     ):
-        self.name_to_role = {}
-        for role in valid_roles:
-            assert isinstance(role, Role)
-            if role.name in self.name_to_role:
-                raise ValueError(
-                    f"{role} has the same name '{role.name}' as another role which already exists on this field."
-                )
-            self.name_to_role[role.name] = role
         kwargs.setdefault("default", "")
-        kwargs.setdefault(
-            "choices", ((r.name, r.title) for r in self.name_to_role.values())
-        )
+        choices = kwargs.setdefault("choices", [])
+        if role_choices:
+            for role in role_choices:
+                assert isinstance(role, Role)
+                choices.append((str(role), role.title))
+        valid_choices = set()
+        for option_key, option_value in choices:
+            if isinstance(option_value, (list, tuple)):
+                # This is an optgroup, so look inside the group for
+                # options.
+                for optgroup_key, _ in option_value:
+                    if optgroup_key in valid_choices:
+                        raise ValueError("Duplicate choice value: %s" % optgroup_key)
+                    valid_choices.add(optgroup_key)
+            elif option_key:
+                if option_key in valid_choices:
+                    raise ValueError("Duplicate choice value: %s" % option_key)
+                valid_choices.add(option_key)
+        self.valid_keys = frozenset(valid_choices)
         super().__init__(
             *args,
             max_length=max_length,
@@ -107,7 +115,7 @@ class RolesField(models.CharField):
         >>> ROLE_COW = Role('c', title="Cow")
         >>> ROLE_HAMBURGER = Role('h', title='Hamburger')
 
-        >>> f = RolesField(valid_roles={ROLE_FARMER, ROLE_COW})
+        >>> f = RolesField(role_choices=[ROLE_FARMER, ROLE_COW])
         >>> f.to_python({ROLE_FARMER, })
         ['f']
         >>> f.to_python([ROLE_FARMER, ROLE_FARMER])
@@ -127,9 +135,12 @@ class RolesField(models.CharField):
                     values_set.add(item.name)
                 else:
                     raise ValidationError("Must be string or Role instance")
-        for name in values_set:
-            if name not in self.name_to_role:
-                raise ValidationError(f"{name} is not a valid role for this context")
+        if self.valid_keys:  # Only validate if choices set
+            for name in values_set:
+                if name not in self.valid_keys:
+                    raise ValidationError(
+                        f"{name} is not a valid role for this context"
+                    )
         return sorted(values_set)
 
     def formfield(self, **kwargs):
@@ -152,17 +163,8 @@ class RolesField(models.CharField):
 
         if self.choices is not None and value not in self.empty_values:
             # value should be an array here
-            valid_choices = set()
-            for option_key, option_value in self.choices:
-                if isinstance(option_value, (list, tuple)):
-                    # This is an optgroup, so look inside the group for
-                    # options.
-                    for optgroup_key, _ in option_value:
-                        valid_choices.add(optgroup_key)
-                elif option_key:
-                    valid_choices.add(option_key)
             for v in value:
-                if v not in valid_choices:
+                if v not in self.valid_keys:
                     raise ValidationError(
                         self.error_messages["invalid_choice"],
                         code="invalid_choice",

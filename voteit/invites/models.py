@@ -260,7 +260,7 @@ class MeetingInvite(MeetingContext):
         related_name="invites",
     )
     roles: list[Role] = RolesField(
-        max_length=60, valid_roles=MeetingRoles.valid_roles.values()
+        max_length=60, role_choices=MeetingRoles.valid_roles.values()
     )
     user_data: dict = models.JSONField(
         encoder=DjangoJSONEncoder,

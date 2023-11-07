@@ -25,7 +25,7 @@ class Role:
     ...     valid_roles = {GAMER: GAMER}
     ...     user = None  # Normally ForeignKey
     ...     context = None
-    ...     assigned = RolesField(valid_roles=valid_roles.values())
+    ...     assigned = RolesField(role_choices=valid_roles.values())
 
     The roles-aware class needs to register usable roles
     >>> GAMER.name in MyContext.valid_roles

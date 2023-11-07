@@ -91,7 +91,7 @@ class MeetingRoles(Roles, MeetingContext):
     )
     assigned: list[Role] = RolesField(
         max_length=60,
-        valid_roles=valid_roles.values(),
+        role_choices=valid_roles.values(),
     )
 
     @property
@@ -504,7 +504,7 @@ class GroupRole(MeetingContext):
     can_discuss_as: bool = models.BooleanField("Can discuss as group", default=False)
     roles: list[Role] = RolesField(
         max_length=60,
-        valid_roles=MeetingRoles.valid_roles.values(),
+        role_choices=MeetingRoles.valid_roles.values(),
     )
     users = models.ManyToManyField(
         settings.AUTH_USER_MODEL,

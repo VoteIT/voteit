@@ -36,7 +36,7 @@ class RoleField(fields.CharField):
             ) from exc
         f = model._meta.get_field(self.parent.source)
         assert isinstance(f, ModelRolesField)
-        return set(f.name_to_role)
+        return set(f.valid_keys)
 
 
 class RolesField(fields.ListField):

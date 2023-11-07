@@ -51,10 +51,10 @@ class ReactionButton(MeetingContext):
     )
     order: int = models.PositiveSmallIntegerField(default=0)
     change_roles: list[Role] = RolesField(
-        valid_roles=MeetingRoles.valid_roles.values(), max_length=60
+        role_choices=MeetingRoles.valid_roles.values(), max_length=60
     )
     list_roles: list[Role] = RolesField(
-        valid_roles=MeetingRoles.valid_roles.values(), max_length=60
+        role_choices=MeetingRoles.valid_roles.values(), max_length=60
     )
     active: bool = models.BooleanField(verbose_name="Is this activated?", default=True)
     allowed_models: list[str] = ArrayField(

@@ -29,7 +29,7 @@ class AutomaticAccess(AccessPolicy):
     name: str = "automatic"
     title: str = _("Give users access automatically")
     roles_given: list[Role] = RolesField(
-        max_length=60, valid_roles=MeetingRoles.valid_roles.values()
+        max_length=60, role_choices=MeetingRoles.valid_roles.values()
     )
     exporters = {"meeting": {}}
     importers = {"meeting": {}, "organisation": {}}
