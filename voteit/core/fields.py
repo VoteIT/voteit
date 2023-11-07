@@ -90,9 +90,8 @@ class RolesField(models.CharField):
         >>> f.from_db_value(None, None, None)
         []
         """
-        if isinstance(value, str):
-            if value:
-                return value.split(",")
+        if isinstance(value, str) and value:
+            return value.split(",")
         return []
 
     def get_prep_value(self, value: Iterable[Role | str]) -> str:

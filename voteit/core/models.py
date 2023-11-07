@@ -242,7 +242,6 @@ class Roles(ABCModel):
         if new_roles:
             self.assigned = assigned | new_roles
             self.save()
-            # role_objs = [self.valid_roles[x] for x in new_roles]
             roles_added.send(sender=self.__class__, instance=self, roles=new_roles)
             return new_roles
         return None
@@ -255,7 +254,6 @@ class Roles(ABCModel):
         if remove_roles:
             self.assigned = assigned - remove_roles
             self.save()
-            # role_objs = [self.valid_roles[x] for x in remove_roles]
             roles_removed.send(sender=self.__class__, instance=self, roles=remove_roles)
             # Cleanup roles if all were removed
             if not self.assigned:
