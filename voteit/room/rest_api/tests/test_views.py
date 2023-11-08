@@ -15,10 +15,13 @@ class RoomsViewTestCase(APITestCase):
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
+        cls.room = cls.meeting.rooms.create(title="Room")
         cls.ai = cls.meeting.agenda_items.create()
         cls.other_meeting: Meeting = Meeting.objects.create()
         # Speaker system
-        cls.sls = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.sls = cls.meeting.speaker_systems.create(
+            method_name="simple", room=cls.room
+        )
         # Props
         cls.prop1 = cls.ai.proposals.create()
         cls.prop2 = cls.ai.proposals.create()
@@ -30,7 +33,6 @@ class RoomsViewTestCase(APITestCase):
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         # Default room
-        cls.room = cls.meeting.rooms.create(title="Room", sls=cls.sls)
         cls.room.highlighted_proposals.create(proposal=cls.prop1)
         cls.room.highlighted_proposals.create(proposal=cls.prop2)
 
@@ -56,22 +58,6 @@ class RoomsViewTestCase(APITestCase):
                 status,
                 f"{user} action returned wrong response code",
             )
-
-    def test_create_duplicate(self):
-        url = reverse("rooms-list")
-        data = {"title": "A big room", "meeting": self.meeting.pk, "sls": self.sls.pk}
-        self.client.force_login(self.moderator)
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 400)
-
-    def test_create_sls_ne(self):
-        url = reverse("rooms-list")
-        data = {"title": "A big room", "meeting": self.meeting.pk, "sls": -1}
-        self.client.force_login(self.moderator)
-        response = self.client.post(url, data)
-        self.assertEqual(
-            {"sls": ['Invalid pk "-1" - object does not exist.']}, response.json()
-        )
 
     def test_list(self):
         url = reverse("rooms-list")

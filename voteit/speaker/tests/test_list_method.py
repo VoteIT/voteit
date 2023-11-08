@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.meeting.models import Meeting
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
@@ -15,8 +16,10 @@ class ListMethodTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+        cls.room = cls.meeting.rooms.create()
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
-            method_name="simple"
+            method_name="simple", room=cls.room
         )
         cls.speaker_list: SpeakerList = SpeakerList.objects.create(
             speaker_system=cls.system

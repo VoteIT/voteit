@@ -11,10 +11,26 @@ from voteit.speaker.models import SpeakerSystemRoles
 @admin.register(SpeakerListSystem)
 class SLSystemAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = "state"
-    list_display = ("title", "meeting_link", "method_name", "state")
-    list_filter = ("meeting__organisation", "method_name", "state")
-    readonly_fields = ("active_list",)
-    autocomplete_fields = ("meeting",)
+    list_display = (
+        "room",
+        "meeting_link",
+        "method_name",
+        "state",
+    )
+    list_filter = (
+        "meeting__organisation",
+        "method_name",
+        "state",
+    )
+    readonly_fields = (
+        "active_list",
+        "meeting",
+        "room",
+    )
+    autocomplete_fields = (
+        "meeting",
+        "room",
+    )
     search_fields = (
         "title",
         "meeting",

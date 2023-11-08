@@ -18,7 +18,7 @@ class RoomSerializer(ModelSerializer):
         model = Room
         fields = [
             "pk",
-        ] + [x.name for x in Room._meta.fields if x.name not in ("id")]
+        ] + [x.name for x in Room._meta.fields if x.name not in ("id",)]
 
 
 class RoomDetailSerializer(RoomSerializer):
@@ -36,17 +36,10 @@ class RoomDetailSerializer(RoomSerializer):
         fields = [
             "pk",
             "highlighted",
-        ] + [x.name for x in Room._meta.fields if x.name not in ("id")]
+        ] + [x.name for x in Room._meta.fields if x.name not in ("id",)]
         validators = [
             HighlightedValidator(),
-            UniqueTogetherValidator(
-                queryset=Room.objects.filter(sls__isnull=False),
-                fields=["sls", "meeting"],
-            ),
         ]
-        extra_kwargs = {
-            "sls": {"default": None},
-        }
 
     @ensure_atomic
     def create(self, validated_data) -> Room:

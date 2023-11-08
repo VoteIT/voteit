@@ -19,6 +19,9 @@ from voteit.meeting.models import Meeting
 from voteit.speaker.channels import SpeakerListSystemChannel
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.roles import ROLE_LIST_MODERATOR
+from voteit.speaker.roles import ROLE_SPEAKER
+from voteit.speaker.workflows import SpeakerSystemWf
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -33,11 +36,11 @@ class SpeakerListSystemChannelSubscribeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.participant = User.objects.get(username="participant")
-        # cls.moderator = User.objects.get(username="moderator")
         cls.outsider = User.objects.create(username="outsider")
         cls.meeting = Meeting.objects.get(pk=1)
+        cls.room = cls.meeting.rooms.create()
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
-            method_name="simple", meeting=cls.meeting
+            method_name="simple", room=cls.room
         )
 
     def _mk_msg(self, user):
@@ -62,12 +65,16 @@ class SpeakerListSystemChannelSubscribeTests(TestCase):
 class SpeakerListEnterTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        meeting = Meeting.objects.create()
+        room = meeting.rooms.create()
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
-            method_name="simple", state="active"
+            method_name="simple",
+            state=SpeakerSystemWf.ACTIVE,
+            room=room,
         )
         cls.list: SpeakerList = SpeakerList.objects.create(speaker_system=cls.system)
         cls.user = User.objects.create(username="jane")
-        cls.system.add_roles(cls.user, "speaker")
+        cls.system.add_roles(cls.user, ROLE_SPEAKER)
 
     @property
     def _cut(self):
@@ -102,11 +109,13 @@ class SpeakerListEnterTests(TestCase):
 class SpeakerListLeaveTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        meeting = Meeting.objects.create()
+        room = meeting.rooms.create()
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
-            method_name="simple"
+            method_name="simple", room=room
         )
         cls.user = User.objects.create(username="jane")
-        cls.system.add_roles(cls.user, "speaker")
+        cls.system.add_roles(cls.user, ROLE_SPEAKER)
 
     def setUp(self):
         self.list = self.system.speaker_lists.create()
@@ -148,12 +157,13 @@ class SpeakerListSetActiveTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         meeting: Meeting = Meeting.objects.create()
+        room = meeting.rooms.create()
         cls.system = meeting.speaker_systems.create(
-            method_name="simple", state="active"
+            method_name="simple", state=SpeakerSystemWf.ACTIVE, room=room
         )
         cls.list: SpeakerList = SpeakerList.objects.create(speaker_system=cls.system)
         cls.user = User.objects.create(username="jane")
-        cls.system.add_roles(cls.user, "list_moderator")
+        cls.system.add_roles(cls.user, ROLE_LIST_MODERATOR)
 
     @property
     def _cut(self):
@@ -194,8 +204,9 @@ class StartSpeakerInListTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         meeting: Meeting = Meeting.objects.create()
+        room = meeting.rooms.create()
         cls.system: SpeakerListSystem = meeting.speaker_systems.create(
-            method_name="simple", state="active"
+            method_name="simple", state=SpeakerSystemWf.ACTIVE, room=room
         )
         cls.list = SpeakerList.objects.create(speaker_system=cls.system)
         cls.system.active_list = cls.list
@@ -203,8 +214,8 @@ class StartSpeakerInListTests(TestCase):
         cls.user = User.objects.create(username="jane")
         cls.speaker = cls.list.speaker_items.create(user=cls.user)
         cls.moderator = User.objects.create(username="moderator")
-        cls.system.add_roles(cls.user, "speaker")
-        cls.system.add_roles(cls.moderator, "list_moderator")
+        cls.system.add_roles(cls.user, ROLE_SPEAKER)
+        cls.system.add_roles(cls.moderator, ROLE_LIST_MODERATOR)
 
     @property
     def _cut(self):
@@ -257,8 +268,9 @@ class StopSpeakerInListTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         meeting: Meeting = Meeting.objects.create()
+        room = meeting.rooms.create()
         cls.system: SpeakerListSystem = meeting.speaker_systems.create(
-            method_name="simple", state="active"
+            method_name="simple", state=SpeakerSystemWf.ACTIVE, room=room
         )
         cls.list = SpeakerList.objects.create(speaker_system=cls.system)
         cls.system.active_list = cls.list
@@ -268,8 +280,8 @@ class StopSpeakerInListTests(TestCase):
         cls.list.start_speaker(cls.speaker)
         cls.list.refresh_from_db()
         cls.moderator = User.objects.create(username="moderator")
-        cls.system.add_roles(cls.user, "speaker")
-        cls.system.add_roles(cls.moderator, "list_moderator")
+        cls.system.add_roles(cls.user, ROLE_SPEAKER)
+        cls.system.add_roles(cls.moderator, ROLE_LIST_MODERATOR)
 
     @property
     def _cut(self):
@@ -308,14 +320,17 @@ class ModeratorSpeakerListEnterTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         meeting: Meeting = Meeting.objects.create()
+        cls.room = meeting.rooms.create()
         cls.system: SpeakerListSystem = meeting.speaker_systems.create(
-            method_name="simple", state="active"
+            method_name="simple",
+            state=SpeakerSystemWf.ACTIVE,
+            room=cls.room,
         )
         cls.list: SpeakerList = cls.system.speaker_lists.create()
         cls.user = User.objects.create(username="jane")
         cls.moderator = User.objects.create(username="moderator")
-        cls.system.add_roles(cls.user, "speaker")
-        cls.system.add_roles(cls.moderator, "list_moderator")
+        cls.system.add_roles(cls.user, ROLE_SPEAKER)
+        cls.system.add_roles(cls.moderator, ROLE_LIST_MODERATOR)
 
     def setUp(self):
         self.list.refresh_from_db()
@@ -373,15 +388,16 @@ class ModeratorSpeakerListLeaveTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         meeting: Meeting = Meeting.objects.create()
+        cls.room = meeting.rooms.create()
         cls.system: SpeakerListSystem = meeting.speaker_systems.create(
-            method_name="simple", state="active"
+            method_name="simple", state=SpeakerSystemWf.ACTIVE, room=cls.room
         )
         cls.list: SpeakerList = SpeakerList.objects.create(speaker_system=cls.system)
         cls.user = User.objects.create(username="jane")
         cls.system.add_roles(cls.user, "speaker")
         cls.speaker = cls.list.speaker_items.create(user=cls.user)
         cls.moderator = User.objects.create(username="moderator")
-        cls.system.add_roles(cls.moderator, "list_moderator")
+        cls.system.add_roles(cls.moderator, ROLE_LIST_MODERATOR)
 
     @property
     def _cut(self):
@@ -423,7 +439,10 @@ class ModeratorSpeakerListUndoTests(TestCase):
     def setUpTestData(cls):
         meeting = Meeting.objects.create()
         user = User.objects.create(username="jane")
-        system = meeting.speaker_systems.create(method_name="simple", state="active")
+        room = meeting.rooms.create()
+        system = meeting.speaker_systems.create(
+            method_name="simple", state=SpeakerSystemWf.ACTIVE, room=room
+        )
         system.add_roles(user, "speaker")
         cls.list = system.speaker_lists.create()
         system.active_list = cls.list
@@ -431,7 +450,7 @@ class ModeratorSpeakerListUndoTests(TestCase):
         cls.speaker = cls.list.speaker_items.create(user=user)
         cls.list.start_speaker(cls.speaker)
         cls.moderator = User.objects.create(username="moderator")
-        system.add_roles(cls.moderator, "list_moderator")
+        system.add_roles(cls.moderator, ROLE_LIST_MODERATOR)
 
     @property
     def _cut(self):
@@ -477,11 +496,13 @@ class ModeratorSpeakerListUndoTests(TestCase):
 class SpeakerListShuffleTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        meeting = Meeting.objects.create()
+        room = meeting.rooms.create()
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
-            method_name="simple", state="active"
+            method_name="simple", state=SpeakerSystemWf.ACTIVE, room=room
         )
         cls.moderator = User.objects.create(username="moderator")
-        cls.system.add_roles(cls.moderator, "list_moderator")
+        cls.system.add_roles(cls.moderator, ROLE_LIST_MODERATOR)
         cls.list: SpeakerList = SpeakerList.objects.create(speaker_system=cls.system)
         for i in range(10):
             user = cls.list.speakers.create(username=f"user-{i}")

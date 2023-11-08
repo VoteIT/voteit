@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.db import IntegrityError
 from django.db import models
 from django.utils.timezone import now
 
@@ -13,16 +12,19 @@ from voteit.core.abcs import MeetingContext
 from voteit.core.fields import RichTextField
 from voteit.core.utils import relaxed_clean_html
 from voteit.meeting.models import Meeting
+from voteit.poll.models import Poll
 from voteit.proposal.models import Proposal
-from voteit.speaker.models import SpeakerListSystem
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
+    from voteit.speaker.models import SpeakerListSystem
 
 
 class Room(MeetingContext):
     name = "room"
-    active: bool = models.BooleanField(verbose_name="Active?", default=False)
+    open: bool = models.BooleanField(
+        verbose_name="Is it open for participants?", default=False
+    )
     handler: UserType | None = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="Who's in the drivers seat?",
@@ -52,30 +54,24 @@ class Room(MeetingContext):
         null=True,
         blank=True,
     )
-    # Auto set speaker list from active agenda?
-    sls: SpeakerListSystem | None = models.ForeignKey(
-        SpeakerListSystem,
-        verbose_name="Speaker list system",
-        on_delete=models.RESTRICT,
+    poll: Poll = models.ForeignKey(
+        Poll,
+        on_delete=models.SET_NULL,
+        related_name="+",
         null=True,
-        blank=True,  # FIXME: check relation sls__meeting == meeting
+        blank=True,
     )
+    # Auto set speaker list from active agenda?
     send_sls: bool = models.BooleanField(
         verbose_name="Send Speaker lists?", default=False
     )
     send_proposals: bool = models.BooleanField(
         verbose_name="Send proposals?", default=False
     )
-    show_time: bool = models.BooleanField(verbose_name="Show time?", default=False)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                condition=models.Q(sls__isnull=False),
-                fields=["meeting", "sls"],
-                name="unique_room_meeting_sls",
-            )
-        ]
+    show_time: bool = models.BooleanField(
+        verbose_name="Show time?",
+        default=False,
+    )
 
     @property
     def highlighted_proposal_pks(self):
@@ -85,18 +81,13 @@ class Room(MeetingContext):
             .values_list("proposal", flat=True)
         )
 
-    def save(self, **kwargs):
-        if not self.pk and self.sls_id:
-            if self.sls.meeting_id != self.meeting_id:
-                raise IntegrityError("SLS links to another meeting")
-        super().save(**kwargs)
-
     def __str__(self):
         return f"Room {self.title} for meeting {self.meeting.pk}"
 
     # annotations
     meeting_id: int
-    sls_id: int
+    sls: SpeakerListSystem | None
+    poll_id: int | None
     highlighted_proposals: models.Manager
     objects: models.Manager
 

@@ -19,7 +19,10 @@ class SpeakerListSerializerTests(TestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
-        cls.system = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.room = cls.meeting.rooms.create()
+        cls.system = cls.meeting.speaker_systems.create(
+            method_name="simple", room=cls.room
+        )
         cls.slist: SpeakerList = cls.system.speaker_lists.create(agenda_item=cls.ai)
         cls.participant = User.objects.get(username="participant")
         cls.moderator = User.objects.get(username="moderator")
@@ -82,14 +85,13 @@ class HistoricSpeakerListSerializerTests(TestCase):
 class SpeakerListSystemSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
         # self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
+        cls.room = cls.meeting.rooms.create()
         cls.system = cls.meeting.speaker_systems.create(
-            method_name="simple", state="active"
+            method_name="simple", state="active", room=cls.room
         )
         cls.slist = cls.system.speaker_lists.create()
 
@@ -106,7 +108,6 @@ class SpeakerListSystemSerializerTests(TestCase):
         self.assertEqual(
             {
                 "pk": self.system.pk,
-                "title": None,
                 "meeting": self.meeting.pk,
                 "method_name": "simple",
                 "settings": None,
@@ -114,6 +115,7 @@ class SpeakerListSystemSerializerTests(TestCase):
                 "state": "active",
                 "active_list": None,
                 "meeting_roles_to_speaker": [],
+                "room": self.room.pk,
             },
             data,
         )
@@ -121,12 +123,11 @@ class SpeakerListSystemSerializerTests(TestCase):
     def test_patch(self):
         serializer = self._cut(
             self.system,
-            {"title": "Hello", "active_list": self.slist.pk},
+            {"active_list": self.slist.pk},
             partial=True,
         )
         self.assertTrue(serializer.is_valid())
         serializer.save()
-        self.assertEqual(self.system.title, "Hello")
         self.assertEqual(self.slist, self.system.active_list)
 
     def test_patch_meeting_roles_to_speaker_bad_roles(self):

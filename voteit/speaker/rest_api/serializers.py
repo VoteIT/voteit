@@ -72,7 +72,7 @@ class SpeakerSerializer(serializers.ModelSerializer):
         fields = ["seconds"] + read_only_fields
 
 
-class SpeakerListSystemSerializer(serializers.ModelSerializer):
+class CreateSpeakerListSystemSerializer(serializers.ModelSerializer):
     settings = PydanticFieldSerializer(allow_null=True, required=False)
     meeting_roles_to_speaker = RolesField(
         required=False, valid_roles=set(MeetingRoles.valid_roles.values())
@@ -80,21 +80,19 @@ class SpeakerListSystemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SpeakerListSystem
-        read_only_fields = ["state"]
-        fields = [
-            "pk",
+        read_only_fields = [
+            "state",
             "meeting",
+            "pk",
+        ]
+        fields = [
             "method_name",
-            "title",
             "settings",
             "active_list",
             "safe_positions",
+            "room",
             "meeting_roles_to_speaker",
         ] + read_only_fields
-        extra_kwargs = {
-            # At least right now...
-            "meeting": {"required": True},
-        }
 
     def validate_method_name(self, value):
         if value not in get_list_method_registry():
@@ -117,6 +115,16 @@ class SpeakerListSystemSerializer(serializers.ModelSerializer):
             except ValueError as exc:
                 raise exceptions.ValidationError({"settings": [str(exc)]})
         return super().validate(attrs)
+
+
+class SpeakerListSystemSerializer(CreateSpeakerListSystemSerializer):
+    class Meta(CreateSpeakerListSystemSerializer.Meta):
+        read_only_fields = [
+            "pk",
+            "state",
+            "room",
+            "meeting",
+        ]
 
 
 class SpeakerExportSerializer(serializers.ModelSerializer):

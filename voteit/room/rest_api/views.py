@@ -8,6 +8,7 @@ from voteit.meeting.permissions import MeetingPermissions
 from voteit.room.models import Room
 from voteit.room.rest_api.serializers import RoomDetailSerializer
 from voteit.room.rest_api.serializers import RoomSerializer
+from voteit.speaker.models import Speaker
 
 
 @router.register("rooms", basename="rooms")

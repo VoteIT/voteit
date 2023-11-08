@@ -14,6 +14,7 @@ from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.models import SpeakerList
+from voteit.speaker.workflows import SpeakerSystemWf
 
 User = get_user_model()
 
@@ -21,7 +22,9 @@ User = get_user_model()
 class SpeakerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.system = SpeakerListSystem.objects.create(method_name="simple")
+        meeting = Meeting.objects.create()
+        room = meeting.rooms.create()
+        cls.system = SpeakerListSystem.objects.create(method_name="simple", room=room)
         cls.list = SpeakerList.objects.create(speaker_system=cls.system)
         cls.user = User.objects.create(username="jane")
 
@@ -70,8 +73,10 @@ class SpeakerListTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        meeting = Meeting.objects.create()
+        cls.room = meeting.rooms.create()
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
-            method_name="simple"
+            method_name="simple", room=cls.room
         )
         cls.speaker_list: SpeakerList = SpeakerList.objects.create(
             speaker_system=cls.system
@@ -114,8 +119,6 @@ class SpeakerListTests(TestCase):
         @receiver(post_save, sender=SpeakerList)
         def my_listener(instance, **kw):
             L.append(instance.order_list)
-
-        # breakpoint()
 
         self.speaker_list.reorder()
         # No change
@@ -189,8 +192,10 @@ class SpeakerListTests(TestCase):
 class SpeakerListSystemsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.create()
+        room = cls.meeting.rooms.create()
         cls.system = SpeakerListSystem.objects.create(
-            method_name="simple", state="active"
+            method_name="simple", state=SpeakerSystemWf.ACTIVE, room=room
         )
 
     def test_set_settings_from_schema_directly(self):
@@ -222,8 +227,9 @@ class SpeakerListSystemsTests(TestCase):
         self.assertFalse(speaker_one.in_queue)
 
     def test_set_active_that_belongs_to_other_system(self):
+        room = self.meeting.rooms.create()
         other_sys = SpeakerListSystem.objects.create(
-            method_name="simple", state="active"
+            method_name="simple", state=SpeakerSystemWf.ACTIVE, room=room
         )
         other_list = other_sys.speaker_lists.create()
         self.system.active_list = other_list
@@ -256,9 +262,10 @@ class DeletingMeetingTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.room = cls.meeting.rooms.create()
         ai = cls.meeting.agenda_items.create(title="ai one")
         system: SpeakerListSystem = cls.meeting.speaker_systems.create(
-            method_name=Priority.name
+            method_name=Priority.name, room=cls.room
         )
         sl: SpeakerList = system.speaker_lists.create(title="One list", agenda_item=ai)
         moderator = User.objects.get(username="moderator")

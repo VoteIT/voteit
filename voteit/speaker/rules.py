@@ -74,6 +74,13 @@ def is_system_not_archived(user: AbstractUser, context: SpeakerSystemContext) ->
 
 
 @predicate
+def has_no_active_list(user: AbstractUser, context: SpeakerSystemContext) -> bool:
+    if isinstance(context, SpeakerSystemContext):
+        return context.speaker_system.active_list_id is None
+    raise TypeError(f"{context} is not a speaker_system context")
+
+
+@predicate
 def not_currently_speaking(user: AbstractUser, speaker_list: SpeakerList) -> bool:
     if isinstance(speaker_list, SpeakerList):
         if speaker_list.current is None:
@@ -136,7 +143,10 @@ rules.add_perm(
 )
 rules.add_perm(
     SpeakerSystemPermissions.DELETE,
-    is_moderator & meeting_upcoming_ongoing & is_system_not_archived,
+    is_moderator
+    & meeting_upcoming_ongoing
+    & is_system_not_archived
+    & has_no_active_list,
 )
 rules.add_perm(
     SpeakerSystemPermissions.VIEW,

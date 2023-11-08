@@ -48,7 +48,7 @@ class SubscriptionTests(TestCase):
         self.assertTrue(data.pop("created", None))
         self.assertEqual(
             {
-                "active": False,
+                "open": False,
                 "body": "",
                 "handler": None,
                 "meeting": self.meeting.pk,
@@ -56,9 +56,9 @@ class SubscriptionTests(TestCase):
                 "send_proposals": False,
                 "send_sls": False,
                 "show_time": False,
-                "sls": None,
                 "title": "",
                 "agenda_item": self.ai.pk,
+                "poll": None,
             },
             data,
         )

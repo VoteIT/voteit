@@ -2,6 +2,7 @@ import csv
 from logging import getLogger
 
 from django.db import models
+from django.db.models import QuerySet
 from django.http import Http404
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -24,6 +25,8 @@ from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
+from voteit.room.models import Room
+from voteit.room.permissions import RoomPermissions
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
@@ -103,25 +106,16 @@ class SpeakerListSystemViewSet(DefaultModelViewSet):
     model = SpeakerListSystem
     queryset = SpeakerListSystem.objects.all()
     serializer_class = serializers.SpeakerListSystemSerializer
-    context_lookup_kwarg: str = "meeting"
+    serializer_classes = {"create": serializers.CreateSpeakerListSystemSerializer}
+    context_lookup_kwarg: str = "room"
     context_lookup_field: str = "pk"
-    context_queryset = Meeting.objects.all()
-    context_permission = MeetingPermissions.VIEW
-
-    def perform_create(self, serializer):
-        instance: SpeakerListSystem = serializer.save()
-        instance.add_roles(self.request.user, ROLE_LIST_MODERATOR)
+    context_queryset = Room.objects.all()
+    context_permission = RoomPermissions.VIEW
 
     def get_queryset(self):
-        if self.detail:
-            return self.queryset
-        try:
-            meeting = self.get_context(self.request)
-        except exceptions.ValidationError:
-            meeting = None
-        if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
-            return self.queryset.filter(meeting=meeting)
-        self.queryset.none()
+        if self.action == "list":
+            return self.queryset.none()
+        return self.queryset
 
 
 @router.register("speakers", basename="speakers")

@@ -10,7 +10,10 @@ class RoomDetailSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create()
-        cls.sls = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.room = cls.meeting.rooms.create()
+        cls.sls = cls.meeting.speaker_systems.create(
+            method_name="simple", room=cls.room
+        )
         cls.ai = cls.meeting.agenda_items.create()
         cls.prop1 = cls.ai.proposals.create()
         cls.prop2 = cls.ai.proposals.create()
@@ -25,7 +28,7 @@ class RoomDetailSerializerTests(TestCase):
         return RoomDetailSerializer
 
     def test_create(self):
-        serializer = self._cut(data={"meeting": self.meeting.pk, "sls": self.sls.pk})
+        serializer = self._cut(data={"meeting": self.meeting.pk})
         serializer.is_valid()
         self.assertFalse(serializer.errors)
         instance = serializer.save()
@@ -44,21 +47,6 @@ class RoomDetailSerializerTests(TestCase):
         instance = serializer.save()
         self.assertIsInstance(instance, Room)
 
-    def test_create_duplicate_sls(self):
-        serializer = self._cut(data={"meeting": self.meeting.pk, "sls": self.sls.pk})
-        serializer.is_valid()
-        self.assertFalse(serializer.errors)
-        one = serializer.save()
-        # Empty ok
-        serializer = self._cut(data={"meeting": self.meeting.pk})
-        serializer.is_valid()
-        self.assertFalse(serializer.errors)
-        two = serializer.save()
-        # But not with same sls
-        serializer = self._cut(data={"meeting": self.meeting.pk, "sls": self.sls.pk})
-        with self.assertRaises(ValidationError):
-            serializer.is_valid(raise_exception=True)
-
     def test_serialize(self):
         instance = self.meeting.rooms.create(sls=self.sls, title="Hello")
         serializer = self._cut(instance)
@@ -68,8 +56,7 @@ class RoomDetailSerializerTests(TestCase):
         self.assertEqual(
             {
                 "meeting": self.meeting.pk,
-                "sls": self.sls.pk,
-                "active": False,
+                "open": False,
                 "title": "Hello",
                 "body": "",
                 "send_sls": False,
@@ -77,6 +64,7 @@ class RoomDetailSerializerTests(TestCase):
                 "handler": None,
                 "show_time": False,
                 "agenda_item": None,
+                "poll": None,
             },
             data,
         )
@@ -140,7 +128,10 @@ class RoomHighlightedSerializerTests(TestCase):
         cls.prop1 = cls.ai.proposals.create()
         cls.prop2 = cls.ai.proposals.create()
         cls.prop3 = cls.ai.proposals.create()
-        cls.sls = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.room = cls.meeting.rooms.create()
+        cls.sls = cls.meeting.speaker_systems.create(
+            method_name="simple", room=cls.room
+        )
         cls.room = cls.meeting.rooms.create()
 
     @property

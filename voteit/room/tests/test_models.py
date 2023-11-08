@@ -16,9 +16,6 @@ class RoomTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.create()
         cls.ai: AgendaItem = cls.meeting.agenda_items.create()
         cls.user = User.objects.create(username="abel")
-        cls.sls: SpeakerListSystem = SpeakerListSystem.objects.create(
-            meeting=cls.meeting, method_name="simple"
-        )
         cls.prop1 = cls.ai.proposals.create()
         cls.prop2 = cls.ai.proposals.create()
 
@@ -28,25 +25,11 @@ class RoomTests(TestCase):
 
         return Room
 
-    def test_constraint_blank_sls(self):
-        instance = self._cut.objects.create(meeting=self.meeting)
-        self.assertIsInstance(instance, self._cut)
+    # FIXME: Constraint-tests not needed here. Test other logic
 
-    def test_constraint_sls_same(self):
-        self._cut.objects.create(meeting=self.meeting, sls=self.sls)
-        with self.assertRaises(IntegrityError):
-            self._cut.objects.create(meeting=self.meeting, sls=self.sls)
-
-    def test_constraint_sls_unset_no_block(self):
-        one = self._cut.objects.create(meeting=self.meeting)
-        two = self._cut.objects.create(meeting=self.meeting, sls=self.sls)
-        three = self._cut.objects.create(meeting=self.meeting)
-
-    def test_constraint_missmatching_meeting(self):
-        new_meeting = Meeting.objects.create()
-        with self.assertRaises(IntegrityError) as cm:
-            self._cut.objects.create(meeting=new_meeting, sls=self.sls)
-        self.assertEqual("SLS links to another meeting", str(cm.exception))
+    # def test_constraint_blank_sls(self):
+    #     instance = self._cut.objects.create(meeting=self.meeting)
+    #     self.assertIsInstance(instance, self._cut)
 
 
 class HighlightProposalTests(TestCase):
