@@ -85,8 +85,9 @@ class MeetingCloneTests(TestCase):
         )
 
     def test_clone_with_active_speakerlist(self):
+        room = self.meeting.rooms.create()
         sls: SpeakerListSystem = self.meeting.speaker_systems.create(
-            method_name="simple"
+            method_name="simple", room=room
         )
         slist = sls.speaker_lists.create()
         sls.active_list = slist
