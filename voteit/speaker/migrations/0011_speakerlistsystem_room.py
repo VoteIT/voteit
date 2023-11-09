@@ -14,9 +14,12 @@ def migrate_sls_marry_room(apps, schema_editor):
     room_model = apps.get_model(*_ROOM_MODEL)
     db_alias = schema_editor.connection.alias
     for sls in model.objects.using(db_alias).all():
-        room_model.objects.using(db_alias).create(
-            sls=sls, title=sls.title, meeting=sls.meeting
+        title = sls.title or sls.meeting.title or str(sls.meeting)
+        room = room_model.objects.using(db_alias).create(
+            title=title, meeting=sls.meeting
         )
+        sls.room = room
+        room_model.save_base(sls, raw=True)
 
 
 def migrate_sls_divorce_room(apps, schema_editor):
@@ -52,17 +55,6 @@ class Migration(migrations.Migration):
         migrations.RemoveField(
             model_name="speakerlistsystem",
             name="title",
-        ),
-        migrations.AlterField(
-            model_name="speakerlistsystem",
-            name="room",
-            field=models.OneToOneField(
-                on_delete=django.db.models.deletion.RESTRICT,
-                related_name="sls",
-                to="room.room",
-                verbose_name="Room",
-            ),
-            preserve_default=False,
         ),
         migrations.AlterField(
             model_name="speakerlistsystem",
