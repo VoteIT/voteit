@@ -75,7 +75,6 @@ class SubscriptionTests(TestCase):
                 {
                     "highlighted": [self.prop1.pk],
                     "pk": self.room.pk,
-                    "agenda_item": self.ai.pk,
                 }
             ],
             [x.p for x in msg.data.app_state if x.t == RoomHighlighted.name],
@@ -131,7 +130,10 @@ class SubscriptionTests(TestCase):
         ]
         self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual([self.prop1.pk, self.prop2.pk], msg.data.highlighted)
+        self.assertEqual(
+            {"highlighted": [self.prop1.pk, self.prop2.pk], "pk": self.room.pk},
+            msg.data.dict(),
+        )
 
     @patch.object(RoomChannel, "sync_publish")
     def test_highlight_changed(self, mock_publish):
@@ -146,7 +148,9 @@ class SubscriptionTests(TestCase):
         ]
         self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual([self.prop1.pk], msg.data.highlighted)
+        self.assertEqual(
+            {"highlighted": [self.prop1.pk], "pk": self.room.pk}, msg.data.dict()
+        )
 
     @patch.object(RoomChannel, "sync_publish")
     def test_highlight_deleted(self, mock_publish):
@@ -160,4 +164,4 @@ class SubscriptionTests(TestCase):
         ]
         self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual([], msg.data.highlighted)
+        self.assertEqual({"highlighted": [], "pk": self.room.pk}, msg.data.dict())

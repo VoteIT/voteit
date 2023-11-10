@@ -81,7 +81,6 @@ class RoomHighlightedSerializer(RoomSerializer):
         fields = (
             "pk",
             "highlighted",
-            "agenda_item",
         )
 
     def get_highlighted(self, instance: Room):

@@ -142,20 +142,18 @@ class RoomHighlightedSerializerTests(TestCase):
 
     def test_no_highlighted(self):
         self.assertEqual(
-            {"pk": self.room.pk, "highlighted": [], "agenda_item": None},
+            {"pk": self.room.pk, "highlighted": []},
             self._cut(self.room).data,
         )
 
     def test_some_selected(self):
         self.room.highlighted_proposals.create(proposal=self.prop2)
         self.room.highlighted_proposals.create(proposal=self.prop1)
-        self.room.agenda_item = self.ai
         self.room.save()
         self.assertEqual(
             {
                 "pk": self.room.pk,
                 "highlighted": [self.prop2.pk, self.prop1.pk],
-                "agenda_item": self.ai.pk,
             },
             self._cut(self.room).data,
         )
