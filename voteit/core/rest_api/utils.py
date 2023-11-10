@@ -48,7 +48,7 @@ def get_identity_data(user: User) -> dict:
     except RConnectionError:
         # Proper exception later?
         exc = APIException(
-            detail="Identity service not available - can't login",
+            detail=_("Identity service not available right now"),
             code="service_unavailable",
         )
         exc.status_code = 503
@@ -211,4 +211,4 @@ def meeting_from_unsafe_data(serializer) -> Meeting:
         except ObjectDoesNotExist:
             pass
     # Fail
-    raise ValidationError("Can't find meeting")
+    raise ValidationError(_("Can't find meeting"))
