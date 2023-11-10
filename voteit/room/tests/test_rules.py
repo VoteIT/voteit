@@ -15,7 +15,9 @@ class RulesTests(TestCase):
         cls.participant = User.objects.create(username="participant")
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.moderator = User.objects.create(username="moderator")
+        cls.moderator2 = User.objects.create(username="moderator2")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.meeting.add_roles(cls.moderator2, ROLE_MODERATOR)
         cls.room = cls.meeting.rooms.create()
 
     def setUp(self):
@@ -66,3 +68,17 @@ class RulesTests(TestCase):
         self.assertFalse(self.anon_user.has_perm(DELETE, self.room))
         self.assertFalse(self.participant.has_perm(DELETE, self.room))
         self.assertTrue(self.moderator.has_perm(DELETE, self.room))
+
+    def test_handle_no_handler_set(self):
+        HANDLE = self.p("HANDLE")
+        self.assertFalse(self.anon_user.has_perm(HANDLE, self.room))
+        self.assertFalse(self.participant.has_perm(HANDLE, self.room))
+        self.assertFalse(self.moderator.has_perm(HANDLE, self.room))
+        self.assertFalse(self.moderator2.has_perm(HANDLE, self.room))
+
+    def test_handle(self):
+        self.room.handler = self.moderator
+        self.room.save()
+        HANDLE = self.p("HANDLE")
+        self.assertTrue(self.moderator.has_perm(HANDLE, self.room))
+        self.assertFalse(self.moderator2.has_perm(HANDLE, self.room))

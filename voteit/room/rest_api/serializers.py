@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
-from rest_framework.validators import UniqueTogetherValidator
 
 from voteit.core.decorators import ensure_atomic
 from voteit.room.models import Room
@@ -21,9 +22,9 @@ class RoomSerializer(ModelSerializer):
         ] + [x.name for x in Room._meta.fields if x.name not in ("id",)]
 
 
-class RoomDetailSerializer(RoomSerializer):
+class RoomHandleSerializer(RoomSerializer):
     """
-    Used for create and full read
+    For highlighting and handling rooms
     """
 
     highlighted = serializers.ListSerializer(
@@ -31,29 +32,17 @@ class RoomDetailSerializer(RoomSerializer):
     )
 
     class Meta(RoomSerializer.Meta):
-        # WARNING! UniqueTogetherValidator doesn't work if we don't specify fieldnames explicitly.
-        # This is a bug in DRF and should be fixed upstreams. Hence, this bs
         fields = [
             "pk",
             "highlighted",
-        ] + [x.name for x in Room._meta.fields if x.name not in ("id",)]
+            "poll",
+            "agenda_item",
+        ]
         validators = [
             HighlightedValidator(),
         ]
 
-    @ensure_atomic
-    def create(self, validated_data) -> Room:
-        highlighted = validated_data.pop("highlighted", None)
-        instance = super().create(validated_data)
-        if highlighted:
-            for i, prop_id in enumerate(highlighted, start=1):
-                instance.highlighted_proposals.update_or_create(
-                    proposal_id=prop_id, defaults={"order": i}
-                )
-        return instance
-
-    @ensure_atomic
-    def update(self, instance: Room, validated_data) -> Room:
+    def update(self, instance, validated_data):
         highlighted = validated_data.get("highlighted", None)
         if highlighted is not None:
             if highlighted:
@@ -66,7 +55,52 @@ class RoomDetailSerializer(RoomSerializer):
                     )
             else:
                 instance.highlighted_proposals.all().delete()
-        validated_data.pop("meeting", None)  # Can't be changed later on
+        vd_len = len(validated_data)
+        # We DON'T want to save here if no data has changed - it will trigger other events
+        if "highlighted" in validated_data and vd_len > 1 or vd_len:
+            return super().update(instance, validated_data)
+        return instance
+
+
+class CreateRoomSerializer(RoomSerializer):
+    class Meta(RoomSerializer.Meta):
+        # WARNING! UniqueTogetherValidator doesn't work if we don't specify fieldnames explicitly.
+        # This is a bug in DRF and should be fixed upstreams. Hence, this bs
+        fields = [
+            "pk",
+        ] + [
+            x.name
+            for x in Room._meta.fields
+            if x.name
+            not in (
+                "id",
+                "handler",
+            )
+        ]
+
+    @ensure_atomic
+    def create(self, validated_data) -> Room:
+        return super().create(validated_data)
+
+
+class RoomDetailSerializer(RoomSerializer):
+    """
+    Used for update and full read
+    """
+
+    class Meta(RoomSerializer.Meta):
+        # WARNING! UniqueTogetherValidator doesn't work if we don't specify fieldnames explicitly.
+        # This is a bug in DRF and should be fixed upstreams. Hence, this bs
+        fields = [
+            "pk",
+        ] + [x.name for x in Room._meta.fields if x.name not in ("id",)]
+        read_only_fields = [
+            "handler",
+            "meeting",
+        ]
+
+    @ensure_atomic
+    def update(self, instance: Room, validated_data) -> Room:
         return super().update(instance, validated_data)
 
 

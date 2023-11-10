@@ -1,16 +1,33 @@
-# from django.test import RequestFactory
 from django.test import TestCase
-from rest_framework.exceptions import ValidationError
 
 from voteit.meeting.models import Meeting
 from voteit.room.models import Room
+
+
+class CreateRoomSerializerTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+
+    @property
+    def _cut(self):
+        from voteit.room.rest_api.serializers import CreateRoomSerializer
+
+        return CreateRoomSerializer
+
+    def test_create(self):
+        serializer = self._cut(data={"meeting": self.meeting.pk})
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.save()
+        self.assertIsInstance(instance, Room)
 
 
 class RoomDetailSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create()
-        cls.room = cls.meeting.rooms.create()
+        cls.room: Room = cls.meeting.rooms.create()
         cls.sls = cls.meeting.speaker_systems.create(
             method_name="simple", room=cls.room
         )
@@ -26,26 +43,6 @@ class RoomDetailSerializerTests(TestCase):
         from voteit.room.rest_api.serializers import RoomDetailSerializer
 
         return RoomDetailSerializer
-
-    def test_create(self):
-        serializer = self._cut(data={"meeting": self.meeting.pk})
-        serializer.is_valid()
-        self.assertFalse(serializer.errors)
-        instance = serializer.save()
-        self.assertIsInstance(instance, Room)
-
-    def test_create_with_highlight(self):
-        serializer = self._cut(
-            data={
-                "meeting": self.meeting.pk,
-                "sls": self.sls.pk,
-                "highlighted": [self.prop2.pk, self.prop1.pk],
-            }
-        )
-        serializer.is_valid()
-        self.assertFalse(serializer.errors)
-        instance = serializer.save()
-        self.assertIsInstance(instance, Room)
 
     def test_serialize(self):
         instance = self.meeting.rooms.create(sls=self.sls, title="Hello")
@@ -68,6 +65,28 @@ class RoomDetailSerializerTests(TestCase):
             },
             data,
         )
+
+
+class RoomHandleSerializerTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+        cls.room = cls.meeting.rooms.create()
+        cls.sls = cls.meeting.speaker_systems.create(
+            method_name="simple", room=cls.room
+        )
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.prop1 = cls.ai.proposals.create()
+        cls.prop2 = cls.ai.proposals.create()
+        cls.prop2 = cls.ai.proposals.create()
+        cls.prop3 = cls.ai.proposals.create()
+        cls.room = cls.meeting.rooms.create()
+
+    @property
+    def _cut(self):
+        from voteit.room.rest_api.serializers import RoomHandleSerializer
+
+        return RoomHandleSerializer
 
     def test_no_highlighted(self):
         self.room.highlighted_proposals.create(proposal=self.prop2)

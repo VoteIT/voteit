@@ -1,9 +1,27 @@
+from __future__ import annotations
 from rest_framework.serializers import ModelSerializer
 from rest_framework.exceptions import ValidationError
+from typing import TYPE_CHECKING
 
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
 from voteit.proposal.models import Proposal
+
+if TYPE_CHECKING:
+    from voteit.core.models import User as UserType
+
+
+def _get_meeting(value: dict, serializer: ModelSerializer) -> Meeting | None:
+    """
+    Fetch meeting from values + model serializer that works with a meeting context
+    """
+    if isinstance(serializer.instance, MeetingContext):
+        return serializer.instance.meeting
+    # Never used?
+    # elif isinstance(value.get("meeting"), int):
+    #    prop_qs = Proposal.objects.filter(agenda_item__meeting_id=value["meeting"])
+    elif isinstance(value.get("meeting"), Meeting):
+        return value.get("meeting")
 
 
 class HighlightedValidator:
@@ -16,22 +34,18 @@ class HighlightedValidator:
         highlighted = value.get(self.highlight_fieldname, None)
         if not highlighted:
             return
-        if isinstance(serializer.instance, MeetingContext):
-            prop_qs = Proposal.objects.filter(
-                agenda_item__meeting=serializer.instance.meeting
-            )
-        # Never used?
-        # elif isinstance(value.get("meeting"), int):
-        #    prop_qs = Proposal.objects.filter(agenda_item__meeting_id=value["meeting"])
-        elif isinstance(value.get("meeting"), Meeting):
-            prop_qs = Proposal.objects.filter(agenda_item__meeting=value["meeting"])
-        else:
+        meeting = _get_meeting(value, serializer)
+        if meeting is None:
             raise ValidationError(
                 {
                     self.highlight_fieldname: "Meeting or instance doesn't exist to check against."
                 }
             )
-        prop_pks = set(prop_qs.values_list("pk", flat=True))
+        prop_pks = set(
+            Proposal.objects.filter(agenda_item__meeting=meeting).values_list(
+                "pk", flat=True
+            )
+        )
         if missing := set(highlighted) - prop_pks:
             raise ValidationError(
                 {

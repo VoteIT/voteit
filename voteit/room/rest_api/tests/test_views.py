@@ -15,13 +15,8 @@ class RoomsViewTestCase(APITestCase):
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
-        cls.room = cls.meeting.rooms.create(title="Room")
         cls.ai = cls.meeting.agenda_items.create()
         cls.other_meeting: Meeting = Meeting.objects.create()
-        # Speaker system
-        cls.sls = cls.meeting.speaker_systems.create(
-            method_name="simple", room=cls.room
-        )
         # Props
         cls.prop1 = cls.ai.proposals.create()
         cls.prop2 = cls.ai.proposals.create()
@@ -33,8 +28,13 @@ class RoomsViewTestCase(APITestCase):
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         # Default room
+        cls.room = cls.meeting.rooms.create(title="Room", handler=cls.moderator)
         cls.room.highlighted_proposals.create(proposal=cls.prop1)
         cls.room.highlighted_proposals.create(proposal=cls.prop2)
+        # Speaker system
+        cls.sls = cls.meeting.speaker_systems.create(
+            method_name="simple", room=cls.room
+        )
 
     def setUp(self):
         self.meeting.refresh_from_db()
@@ -97,7 +97,7 @@ class RoomsViewTestCase(APITestCase):
         self.assertEqual(self.meeting.pk, data["meeting"])
 
     def test_patch_change_highlighted(self):
-        url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
+        url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
         self.client.force_login(self.moderator)
         data = {"highlighted": [self.prop3.pk, self.prop2.pk]}
         response = self.client.patch(url, data)
@@ -108,8 +108,34 @@ class RoomsViewTestCase(APITestCase):
             [self.prop3.pk, self.prop2.pk], list(self.room.highlighted_proposal_pks)
         )
 
+    def test_patch_change_highlighted_no_handler(self):
+        self.room.handler = None
+        self.room.save()
+        url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        data = {"highlighted": [self.prop3.pk, self.prop2.pk]}
+        response = self.client.patch(url, data)
+        self.assertContains(
+            response,
+            "You're missing the permission 'room.handle_room'",
+            status_code=403,
+        )
+
+    def test_patch_change_highlighted_other_handler(self):
+        self.room.handler = self.participant
+        self.room.save()
+        url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        data = {"highlighted": [self.prop3.pk, self.prop2.pk]}
+        response = self.client.patch(url, data)
+        self.assertContains(
+            response,
+            "You're missing the permission 'room.handle_room'",
+            status_code=403,
+        )
+
     def test_patch_change_highlighted_order(self):
-        url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
+        url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
         self.client.force_login(self.moderator)
         data = {"highlighted": [self.prop1.pk, self.prop2.pk]}
         response = self.client.patch(url, data)
@@ -121,7 +147,7 @@ class RoomsViewTestCase(APITestCase):
         )
 
     def test_patch_blank_highlighted(self):
-        url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
+        url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
         self.client.force_login(self.moderator)
         data = {"highlighted": []}
         response = self.client.patch(url, data)
@@ -129,3 +155,32 @@ class RoomsViewTestCase(APITestCase):
         data = response.json()
         self.assertEqual([], data["highlighted"])
         self.assertEqual([], list(self.room.highlighted_proposal_pks))
+
+    def test_patch_set_ai_and_poll(self):
+        url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        data = {"agenda_item": self.ai.pk, "poll": None}
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(None, data["poll"])
+        self.assertEqual(self.ai.pk, data["agenda_item"])
+
+    def test_patch_moderator_replaces_handler(self):
+        self.room.handler = self.participant
+        self.room.save()
+        url = reverse("rooms-set-handler", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        data = {"handler": self.moderator.pk}
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 200)
+        self.room.refresh_from_db()
+        self.assertEqual(self.moderator, self.room.handler)
+
+    def test_patch_moderator_step_down_as_handler(self):
+        url = reverse("rooms-set-handler", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url)
+        self.assertEqual(response.status_code, 200)
+        self.room.refresh_from_db()
+        self.assertEqual(self.moderator, self.room.handler)
