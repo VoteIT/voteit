@@ -1,22 +1,22 @@
 from __future__ import annotations
 
 from abc import ABC
-from datetime import datetime
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
-
 from auditlog.context import set_actor
 from envelope.core.message import ContextAction
-from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import NotFoundError
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import websocket_send
+
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.messaging.base import BaseObjectAdded
+from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
@@ -269,28 +269,14 @@ class ModeratorSpeakerListShuffle(ListMessage):
         return msg
 
 
-class SpeakerListSchema(BaseModel):
-    title: str | None
-    pk: int
-    state: str
-    speaker_system: int  # pk
-    agenda_item: int | None  # pk
-    queue: list[int]  # user pks, unique values
-    current: int | None  # current user pk if speaker
-
-
 @outgoing
-class SpeakerListAdded(Message):
+class SpeakerListAdded(BaseObjectAdded):
     name = "speaker_list.added"
-    schema = SpeakerListSchema
-    data: SpeakerListSchema
 
 
 @outgoing
-class SpeakerListChanged(Message):
+class SpeakerListChanged(BaseObjectChanged):
     name = "speaker_list.changed"
-    schema = SpeakerListSchema
-    data: SpeakerListSchema
 
 
 @outgoing
@@ -298,30 +284,14 @@ class SpeakerListDeleted(BaseObjectDeleted):
     name = "speaker_list.deleted"
 
 
-class SpeakerSystemSchema(BaseModel):
-    pk: int
-    state: str
-    title: str | None
-    meeting: int | None
-    method_name: str
-    settings: dict | None
-    safe_positions: int | None
-    active_list: int | None
-    meeting_roles_to_speaker: list[str]
-
-
 @outgoing
-class SpeakerSystemAdded(Message):
+class SpeakerSystemAdded(BaseObjectAdded):
     name = "speaker_system.added"
-    schema = SpeakerSystemSchema
-    data: SpeakerSystemSchema
 
 
 @outgoing
-class SpeakerSystemChanged(Message):
+class SpeakerSystemChanged(BaseObjectChanged):
     name = "speaker_system.changed"
-    schema = SpeakerSystemSchema
-    data: SpeakerSystemSchema
 
 
 @outgoing
@@ -329,27 +299,14 @@ class SpeakerSystemDeleted(BaseObjectDeleted):
     name = "speaker_system.deleted"
 
 
-class SpeakerSchema(BaseModel):
-    pk: int  # Speaker pk
-    user: int  # User speaker
-    sls: int
-    speaker_list: int
-    started: datetime | None
-    seconds: int | None
-
-
 @outgoing
-class SpeakerChanged(Message):
+class SpeakerChanged(BaseObjectChanged):
     name = "speaker.changed"
-    schema = SpeakerSchema
-    data: SpeakerSchema
 
 
 @outgoing
-class SpeakerAdded(Message):
+class SpeakerAdded(BaseObjectAdded):
     name = "speaker.added"
-    schema = SpeakerSchema
-    data: SpeakerSchema
 
 
 @outgoing
