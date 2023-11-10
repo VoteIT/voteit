@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-02 07:50+0000\n"
-"PO-Revision-Date: 2022-06-02 09:49+0200\n"
+"POT-Creation-Date: 2023-11-10 10:15+0100\n"
+"PO-Revision-Date: 2023-11-10 10:15+0100\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -16,52 +16,59 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 2.3\n"
+"X-Generator: Poedit 3.4.1\n"
 
-#: messages/roles.py:91
+#: messages/roles.py:97
 msgid "Some users don't exist, aborting"
 msgstr "Några av användarna existerar inte, avbryter"
 
-#: models.py:107
+#: models.py:104
 msgid "Make user active"
 msgstr "Gör användaren aktiv"
 
-#: models.py:117
+#: models.py:114
 msgid "Mark user as incomplete"
 msgstr "Markera användaren som ofullständig"
 
-#: rest_api/mixins.py:28
+#: rest_api/serializers.py:198
+msgid "Email you specified isn't validated. It must exist on your profile."
+msgstr "Eposten du specificerade är inte validerad. Den måste finnas i din profil."
+
+#: rest_api/serializers.py:401
+msgid "You can only pick existing users within this meeting"
+msgstr "Du kan bara välja existerande användare som är med i mötet"
+
+#: rest_api/utils.py:51
+msgid "Identity service not available right now"
+msgstr "Identitetstjänsten är inte tillgänglig just nu"
+
+#: rest_api/utils.py:68
 #, python-format
 msgid "You're missing the permission '%(perm)s' on %(obj)s."
 msgstr "Du saknar behörigheten ’%(perm)s’ på %(obj)s."
 
-#: rest_api/mixins.py:235
+#: rest_api/utils.py:122
 msgid "Transition not specified"
 msgstr "Handling måste anges"
 
-#: rest_api/mixins.py:247
+#: rest_api/utils.py:127
 #, python-format
 msgid "Invalid transition: %(name)s"
 msgstr "Ogiltig handling: %(name)s"
 
-#: rest_api/mixins.py:260
+#: rest_api/utils.py:138
 #, python-format
 msgid "Can't switch from state '%(state)s' using method '%(method)s'"
 msgstr "Kan inte byta från tillståndet ’%(state)s’ med metoden ’%(method)s’"
 
-#: rest_api/mixins.py:274
+#: rest_api/utils.py:151
 #, python-format
 msgid "Guard %(guard)s blocks transition %(name)s"
 msgstr "Regeln %(guard)s blockerar handlingen %(name)s"
 
-#: rest_api/serializers.py:202
-msgid "Email you specified isn't validated. It must exist on your profile."
-msgstr ""
-"Eposten du specificerade är inte validerad. Den måste finnas i din profil."
-
-#: rest_api/serializers.py:390
-msgid "You can only pick existing users within this meeting"
-msgstr "Du kan bara välja existerande användare som är med i mötet"
+#: rest_api/utils.py:214
+msgid "Can't find meeting"
+msgstr "Kan inte hitta mötet"
 
 #: workflows.py:10
 msgid "Unhandled"
@@ -102,6 +109,14 @@ msgstr "Skickad"
 #: workflows.py:49
 msgid "Failed"
 msgstr "Misslyckades"
+
+#: workflows.py:62
+msgid "On"
+msgstr "På"
+
+#: workflows.py:63
+msgid "Off"
+msgstr "Av"
 
 #, python-format
 #~ msgid "%(lookup_kw)s not specified"
