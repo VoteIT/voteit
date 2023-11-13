@@ -73,7 +73,6 @@ class RoomsViewSet(DefaultModelViewSet):
         detail=True,
         serializer_class=RoomHandleSerializer,
     )
-    @transaction.atomic(durable=True)
     def handle(self, request, *args, **kwargs):
         kwargs["partial"] = True
         return self.update(request, *args, **kwargs)
