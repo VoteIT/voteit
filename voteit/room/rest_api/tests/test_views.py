@@ -171,16 +171,7 @@ class RoomsViewTestCase(APITestCase):
         self.room.save()
         url = reverse("rooms-set-handler", kwargs={"pk": self.room.pk})
         self.client.force_login(self.moderator)
-        data = {"handler": self.moderator.pk}
-        response = self.client.patch(url, data)
-        self.assertEqual(response.status_code, 200)
-        self.room.refresh_from_db()
-        self.assertEqual(self.moderator, self.room.handler)
-
-    def test_patch_moderator_step_down_as_handler(self):
-        url = reverse("rooms-set-handler", kwargs={"pk": self.room.pk})
-        self.client.force_login(self.moderator)
-        response = self.client.patch(url)
+        response = self.client.post(url)
         self.assertEqual(response.status_code, 200)
         self.room.refresh_from_db()
         self.assertEqual(self.moderator, self.room.handler)

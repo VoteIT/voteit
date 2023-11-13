@@ -56,7 +56,7 @@ class RoomsViewSet(DefaultModelViewSet):
         return super().update(request, *args, **kwargs)
 
     @action(
-        methods=["patch", "put"],
+        methods=["post"],
         detail=True,
         url_path="set-handler",
     )
