@@ -6,10 +6,12 @@ from django.test import override_settings
 
 from envelope.app.user_channel.channel import UserChannel
 from envelope.messages.channels import Subscribe
+from envelope.utils import AppState
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.reactions.models import ReactionButton
 
 User = get_user_model()
 
@@ -104,6 +106,21 @@ class SignalButtonTests(TestCase):
         counts = [m for m in msg.data.app_state if m.t == "reaction.count"]
         self.assertEqual(len(counts), 2)
         self.assertEqual(sum(c.p["count"] for c in counts), 3)
+
+    def test_ai_channel_subscribed_n1_problem(self):
+        from voteit.reactions.signals import ai_channel_subscribed
+
+        button2: ReactionButton = self.meeting.reaction_buttons.create()
+        button3 = self.meeting.reaction_buttons.create()
+        flag1 = self.meeting.reaction_buttons.create(flag_mode=True)
+        flag2 = self.meeting.reaction_buttons.create(flag_mode=True)
+        flag3 = self.meeting.reaction_buttons.create(flag_mode=True)
+        for btn in (self.button, button2, button3, flag1, flag2, flag3):
+            btn.reactions.create(object=self.prop, user=self.moderator)
+            btn.reactions.create(object=self.disc, user=self.moderator)
+        app_state = AppState()
+        with self.assertNumQueries(2):
+            ai_channel_subscribed(self.ai, app_state, self.moderator)
 
 
 class SignalReactionTests(TestCase):
