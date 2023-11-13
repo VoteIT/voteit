@@ -58,7 +58,7 @@ class RoomsViewSet(DefaultModelViewSet):
     @action(
         methods=["patch", "put"],
         detail=True,
-        name="set-handler",
+        url_path="set-handler",
     )
     @transaction.atomic(durable=True)
     def set_handler(self, request, *args, **kwargs):
