@@ -35,10 +35,10 @@ if TYPE_CHECKING:
     from voteit.core.abcs import MeetingContext
 
 
-class AgendaItemInline(admin.TabularInline):
-    model = AgendaItem
-    fields = "title", "order"
-    extra = 1
+# class AgendaItemInline(admin.TabularInline):
+#     model = AgendaItem
+#     fields = "title", "order"
+#     extra = 1
 
 
 @admin.register(Meeting)
@@ -55,7 +55,7 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
     )
     list_filter = "organisation", "state"
     search_fields = ("title",)
-    inlines = (AgendaItemInline,)
+    # inlines = (AgendaItemInline,)
     actions = ["report_clone_meeting", "clone_meeting"]
     exclude = ("mentions",)
 
