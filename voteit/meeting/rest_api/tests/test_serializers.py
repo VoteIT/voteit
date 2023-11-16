@@ -258,8 +258,6 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         self.assertEqual("Moderator club", data.pop("title"))
         self.assertEqual("modclub", data.pop("groupid"))
         self.assertEqual(0, data.pop("votes"))
-        self.assertEqual(None, data.pop("author"))
-        self.assertEqual(None, data.pop("last_modified_by"))
         self.assertEqual(self.meeting.pk, data.pop("meeting"))
         self.assertEqual(None, data.pop("delegate_to"))
         self.assertFalse(data.keys())

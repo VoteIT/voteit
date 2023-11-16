@@ -283,6 +283,8 @@ class MeetingGroupSerializer(CreateMeetingGroupSerializer):
             "id",
             "members",
             "mentions",
+            "author",
+            "last_modified_by",
         )
         read_only_fields = [
             "meeting",
