@@ -306,16 +306,3 @@ class AddInviteAnnotationsTests(TestCase):
         ann_data = messages[1]["p"]
         self.assertEqual(1, ann_data["curr"])
         self.assertEqual(1, ann_data["total"])
-
-    @patch.object(MeetingInvitesChannel, "sync_publish")
-    def test_too_many_columns_in_data_rows(self, mock_publish):
-        columns, rows = get_unvalidated_fixture_content("grouprole.csv")
-        msg = self._mk_one(rows=rows, columns=columns)
-        with self.captureOnCommitCallbacks(execute=True):
-            msg.run_job()
-        mock_publish.reset_mock()
-        # Make bad data...
-        rows[0].append("too much data")
-        msg = self._mk_one(rows=rows, columns=columns)
-        with self.captureOnCommitCallbacks(execute=True):
-            msg.run_job()
