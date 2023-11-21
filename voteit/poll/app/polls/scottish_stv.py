@@ -46,7 +46,7 @@ class STVResultRoundSchema(BaseModel):
     method: str
     status: str
     selected: list[int]
-    vote_count: list[tuple[int, Decimal]]
+    vote_count: list[tuple[int, float]]
 
     @validator("vote_count", pre=True)
     def convert_vote_count(cls, v):
@@ -54,14 +54,14 @@ class STVResultRoundSchema(BaseModel):
         >>> vote_count = {1: 0.0, 2: 2.0}
         >>> result = STVResultRoundSchema.convert_vote_count(vote_count)
         >>> sorted(result, key=lambda x:x[0])
-        [(1, Decimal('0')), (2, Decimal('2'))]
+        [(1, 0.0), (2, 2.0)]
 
         Feeding it the same data again should yield the same result
         >>> result == STVResultRoundSchema.convert_vote_count(vote_count)
         True
         """
         if isinstance(v, dict):
-            return list((k, Decimal(v)) for k, v in v.items())
+            return list((k, float(v)) for k, v in v.items())
         return v
 
 
