@@ -115,6 +115,9 @@ class RepeatedIRVSettings(BaseModel):
     >>> s(winners=2, max=1, min=1).dict(include={'min', 'max'})
     {'max': 1, 'min': 1}
 
+    >>> s(winners=2, max=0).dict(include={'min', 'max'})
+    {'max': None, 'min': None}
+
     >>> s(winners=2, min=1).dict(include={'min', 'max'})
     {'max': None, 'min': 1}
 
@@ -137,6 +140,12 @@ class RepeatedIRVSettings(BaseModel):
     allow_random: bool = True
     max: None | PositiveInt
     min: None | PositiveInt
+
+    @validator("min", "max", pre=True)
+    def no_zeroes(cls, v: int | None):
+        if v == 0:
+            return None
+        return v
 
     @validator("winners")
     def validate_winners(cls, v):
