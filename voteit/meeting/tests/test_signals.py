@@ -7,6 +7,7 @@ from django.test import override_settings
 
 from envelope.messages.channels import Subscribe
 from envelope.messages.channels import Subscribed
+from envelope.messages.common import Batch
 from voteit.core.testing import FakeCommit
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
@@ -129,21 +130,29 @@ class MeetingChannelSubscribedTests(TestCase):
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         # MeetingGroup
-        added = [x for x in response.data.app_state if x.t == "meeting_group.added"]
+        added = [
+            x
+            for x in response.data.app_state
+            if x.t == Batch.name and x.p["t"] == "meeting_group.added"
+        ]
         self.assertEqual(1, len(added))
-        payload = added[0].p
-        self.assertEqual(self.group.pk, payload["pk"])
+        payload = added[0].p["payloads"][0]
+        self.assertEqual(self.group.pk, payload.pk)
         # GroupRole
         added = [x for x in response.data.app_state if x.t == "group_role.added"]
         self.assertEqual(1, len(added))
         payload = added[0].p
         self.assertEqual(self.group_role.pk, payload["pk"])
         # GroupMembership
-        added = [x for x in response.data.app_state if x.t == "group_membership.added"]
+        added = [
+            x
+            for x in response.data.app_state
+            if x.t == Batch.name and x.p["t"] == "group_membership.added"
+        ]
         self.assertEqual(1, len(added))
-        payload = added[0].p
-        self.assertEqual(self.group_membership.pk, payload["pk"])
-        self.assertEqual(self.meeting.pk, payload["m"])
+        payload = added[0].p["payloads"][0]
+        self.assertEqual(self.group_membership.pk, payload.pk)
+        self.assertEqual(self.meeting.pk, payload.m)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

@@ -252,8 +252,6 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         data = MeetingGroupSerializer(self.moderator_club).data
         self.assertEqual(self.moderator_club.pk, data.pop("pk"))
         self.assertEqual("", data.pop("body"))
-        self.assertIsNotNone(data.pop("created"))
-        self.assertIsNotNone(data.pop("modified"))
         self.assertEqual([], data.pop("tags"))
         self.assertEqual("Moderator club", data.pop("title"))
         self.assertEqual("modclub", data.pop("groupid"))

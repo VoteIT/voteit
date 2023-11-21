@@ -11,6 +11,7 @@ from django.db.models.signals import pre_save
 from django.dispatch import Signal
 from django.dispatch import receiver
 from envelope.app.user_channel.channel import UserChannel
+from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
 
 from voteit.core.decorators import disable_on_raw_save
@@ -162,23 +163,22 @@ def meeting_channel_subscribed(
         )
         app_state.append(msg)
     # Append all groups - members have moved to GroupMembership!
-    meeting_groups_qs = context.groups.all().prefetch_related(
-        "mentions", "memberships", "delegate_to"
-    )
-    app_state.append_from_queryset(
-        meeting_groups_qs,
-        MeetingGroupSerializer,
-        MeetingGroupAdded,
-    )
+    meeting_groups_qs = context.groups.all().prefetch_related("delegate_to")
+    mg_serializer = MeetingGroupSerializer(meeting_groups_qs, many=True)
+    if mg_serializer.data:
+        batch = Batch(t=MeetingGroupAdded.name, payloads=[])
+        for item in mg_serializer.data:
+            batch.append(MeetingGroupAdded(data=item))
+        app_state.append(batch)
     # GroupMemberships
-    items = set()
-    # FIXME: Saner format for these
-    for mg in meeting_groups_qs:
-        items.update(mg.memberships.all())
-    gm_data = GroupMembershipSerializer(items, many=True).data
-    for item in gm_data:
-        # Inject meeting pk
-        app_state.append(GroupMembershipAdded(data={"m": context.pk, **item}))
+    gm_qs = GroupMembership.objects.filter(meeting_group__meeting=context)
+    gm_data = GroupMembershipSerializer(gm_qs, many=True).data
+    if gm_data:
+        batch = Batch(t=GroupMembershipAdded.name, payloads=[])
+        for item in gm_data:
+            # Inject meeting pk
+            batch.append(GroupMembershipAdded(data={"m": context.pk, **item}))
+        app_state.append(batch)
     # And GroupRoles
     if context.group_roles_active:
         app_state.append_from_queryset(
