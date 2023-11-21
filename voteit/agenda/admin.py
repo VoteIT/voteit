@@ -10,6 +10,7 @@ from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.admin import MeetingAdminMixin
+from voteit.meeting.admin import MeetingFilter
 
 if TYPE_CHECKING:
     from voteit.core.abcs import AgendaItemContext
@@ -27,6 +28,7 @@ class AgendaAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
     list_filter = (
         "state",
         "meeting__organisation",
+        MeetingFilter,
     )
     autocomplete_fields = (
         "meeting",
