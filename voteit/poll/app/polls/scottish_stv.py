@@ -1,5 +1,4 @@
 from collections import Counter
-from decimal import Decimal
 
 from django.utils.translation import gettext as _
 from pydantic import validator
@@ -10,10 +9,9 @@ from envelope.messages.errors import ValidationErrorMsg
 
 from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
+from voteit.poll.app.polls.ranked import AddRankedVote
 from voteit.poll.exceptions import InvalidProposalCount
-from voteit.poll.messages import AddVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import AddRankedVoteSchema
 from voteit.poll.schemas import PollResult
 from voteit.poll.schemas import RankingSchema
 
@@ -36,10 +34,8 @@ class ScottishSTVSettings(BaseModel):
 
 
 @incoming
-class AddSTVVote(AddVote):
+class AddSTVVote(AddRankedVote):
     name = "scottish_stv_vote.add"
-    schema = AddRankedVoteSchema
-    data: AddRankedVoteSchema
 
 
 class STVResultRoundSchema(BaseModel):
@@ -79,7 +75,8 @@ class STVResultSchema(PollResult):
 
 @poll_methods
 class ScottishSTV(PollMethod):
-    """Scottish STV, a ranked proportional vote method for multiple winners.
+    """
+    Scottish STV, a ranked proportional vote method for multiple winners.
     proportional = True
     majority_winner = False
     min_losers = 1
@@ -145,7 +142,7 @@ class ScottishSTV(PollMethod):
         )
         return self.finalize_stv_result(counter, poll_counter)
 
-    def validate_vote(self, msg: AddSTVVote) -> None:
+    def validate_vote(self, msg: AddRankedVote) -> None:
         matched_pks = set(
             self.poll.proposals.filter(pk__in=msg.data.vote.ranking).values_list(
                 "pk", flat=True

@@ -1,6 +1,7 @@
 """ Testing helpers"""
 from __future__ import annotations
 import doctest
+import random
 from contextlib import contextmanager
 from pkgutil import walk_packages
 from time import perf_counter
@@ -95,3 +96,18 @@ class FakeCommit:
 def exectime() -> float:
     start = perf_counter()
     yield lambda: perf_counter() - start
+
+
+class SetSeed:
+    """
+    Simply set a specific seed then go back to sys default
+    """
+
+    def __enter__(self, seed=1337):
+        random.seed(seed)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Execute all on_commit hooks and cleanup.
+        """
+        random.seed()

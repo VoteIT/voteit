@@ -7,6 +7,7 @@ from django.test import TestCase
 from pydantic import ValidationError
 from envelope.messages.errors import ValidationErrorMsg
 
+from voteit.core.testing import SetSeed
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.models import Poll
 from voteit.poll.models import ElectoralRegister
@@ -43,7 +44,6 @@ class IRVTests(TestCase):
         self.assertEqual(vote_data.ranking, [one.pk, two.pk])
 
     def test_random_votes_result(self):
-        seed(1337)
         for n in range(10):
             self.poll.proposals.create()
         self.assertIsNone(self.poll.method.start_check())
@@ -59,7 +59,8 @@ class IRVTests(TestCase):
                     str(pk) for pk in sample(proposal_pks, randint(3, 10))
                 ),
             )
-        self.poll.close()
+        with SetSeed():
+            self.poll.close()
         result = self.poll.result
         self.assertEqual(len(result.approved), 1)
         self.assertEqual(len(result.denied), 9)
@@ -109,13 +110,20 @@ class AddVoteTests(TestCase):
     def setUpTestData(cls):
         cls.er = ElectoralRegister.objects.create()
         cls.voter = cls.er.voters.create(username="voter")
-        cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="irv")
-        cls.prop1 = cls.poll.proposals.create()
-        cls.prop2 = cls.poll.proposals.create()
-        cls.prop3 = cls.poll.proposals.create()
-        cls.poll.upcoming()
-        cls.poll.ongoing()
-        cls.poll.save()
+        cls.irv_poll = Poll.objects.create(electoral_register=cls.er, method_name="irv")
+        cls.repeated_irv_poll = Poll.objects.create(
+            electoral_register=cls.er,
+            method_name="repeated_irv",
+            settings={"winners": 2},
+        )
+        cls.prop1 = cls.irv_poll.proposals.create()
+        cls.prop2 = cls.irv_poll.proposals.create()
+        cls.prop3 = cls.irv_poll.proposals.create()
+        cls.repeated_irv_poll.proposals.add(cls.prop1, cls.prop2, cls.prop3)
+        for poll in (cls.irv_poll, cls.repeated_irv_poll):
+            poll.upcoming()
+            poll.ongoing()
+            poll.save()
 
     @property
     def _cut(self):
@@ -127,13 +135,13 @@ class AddVoteTests(TestCase):
         kw.setdefault(
             "vote", {"ranking": [self.prop1.pk, self.prop2.pk, self.prop3.pk]}
         )
-        kw.setdefault("poll", self.poll.pk)
+        kw.setdefault("poll", self.irv_poll.pk)
         return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_add(self):
         msg = self._mk_one()
         msg.run_job()
-        vote = self.poll.votes.filter(user=self.voter).first()
+        vote = self.irv_poll.votes.filter(user=self.voter).first()
         self.assertIsNotNone(vote)
         self.assertEqual(
             f"{self.prop1.pk},{self.prop2.pk},{self.prop3.pk}", vote.vote_data
@@ -142,6 +150,68 @@ class AddVoteTests(TestCase):
     def test_add_bad_vote(self):
         msg = self._mk_one(vote={"ranking": [-1, self.prop2.pk]})
         self.assertRaises(ValidationErrorMsg, msg.run_job)
+
+    def test_add_repeated(self):
+        msg = self._mk_one(poll=self.repeated_irv_poll.pk)
+        msg.run_job()
+        vote = self.repeated_irv_poll.votes.filter(user=self.voter).first()
+        self.assertIsNotNone(vote)
+        self.assertEqual(
+            f"{self.prop1.pk},{self.prop2.pk},{self.prop3.pk}", vote.vote_data
+        )
+
+    def test_min(self):
+        settings = self.repeated_irv_poll.settings.dict()
+        settings["min"] = 2
+        self.repeated_irv_poll.settings = settings
+        self.repeated_irv_poll.save()
+        msg = self._mk_one(
+            poll=self.repeated_irv_poll.pk,
+            vote={"ranking": [self.prop1.pk, self.prop2.pk]},
+        )
+        msg.run_job()
+        msg = self._mk_one(
+            poll=self.repeated_irv_poll.pk, vote={"ranking": [self.prop1.pk]}
+        )
+        with self.assertRaises(ValidationErrorMsg) as cm:
+            msg.run_job()
+        self.assertEqual(
+            [
+                {
+                    "loc": ("vote.ranking",),
+                    "msg": "Too few selected",
+                    "type": "value.error",
+                }
+            ],
+            cm.exception.data.errors,
+        )
+
+    def test_max(self):
+        settings = self.repeated_irv_poll.settings.dict()
+        settings["max"] = 2
+        self.repeated_irv_poll.settings = settings
+        self.repeated_irv_poll.save()
+        msg = self._mk_one(
+            poll=self.repeated_irv_poll.pk,
+            vote={"ranking": [self.prop1.pk, self.prop2.pk]},
+        )
+        msg.run_job()
+        msg = self._mk_one(
+            poll=self.repeated_irv_poll.pk,
+            vote={"ranking": [self.prop1.pk, self.prop2.pk, self.prop3.pk]},
+        )
+        with self.assertRaises(ValidationErrorMsg) as cm:
+            msg.run_job()
+        self.assertEqual(
+            [
+                {
+                    "loc": ("vote.ranking",),
+                    "msg": "Too many selected",
+                    "type": "value.error",
+                }
+            ],
+            cm.exception.data.errors,
+        )
 
 
 class RepeatedIRVTests(TestCase):
@@ -154,6 +224,9 @@ class RepeatedIRVTests(TestCase):
             settings={"winners": 2},
         )
         cls.voter = er.voters.create(username="a_voter")
+        cls.prop_one = cls.poll.proposals.create()
+        cls.prop_two = cls.poll.proposals.create()
+        cls.prop_three = cls.poll.proposals.create()
 
     @property
     def RepeatedIRV(self):
@@ -162,8 +235,6 @@ class RepeatedIRVTests(TestCase):
         return RepeatedIRV
 
     def test_one_winner(self):
-        from voteit.poll.models import Poll
-
         with self.assertRaises(ValidationError):
             Poll.objects.create(
                 electoral_register=self.er,
@@ -172,22 +243,23 @@ class RepeatedIRVTests(TestCase):
             )
 
     def test_start_check(self):
-        self.assertRaises(InvalidProposalCount, self.poll.method.start_check)
+        self.assertIsNone(self.poll.method.start_check())
+        self.prop_three.delete()
+        with self.assertRaises(InvalidProposalCount):
+            self.poll.method.start_check()
 
     def test_vote_schema(self):
-        one = self.poll.proposals.create()
-        two = self.poll.proposals.create()
-        self.poll.proposals.create()
         self.poll.upcoming()
         self.poll.ongoing()
-        vote = self.poll.votes.create(user=self.voter, vote=f"{one.pk},{two.pk}")
+        vote = self.poll.votes.create(
+            user=self.voter, vote=f"{self.prop_one.pk},{self.prop_two.pk}"
+        )
         vote_data = vote.vote
         self.assertIsInstance(vote_data, RankingSchema)
-        self.assertEqual(vote_data.ranking, [one.pk, two.pk])
+        self.assertEqual(vote_data.ranking, [self.prop_one.pk, self.prop_two.pk])
 
     def test_random_votes_result(self):
-        seed(1337)
-        for n in range(10):
+        for n in range(7):  # 3 exist already
             self.poll.proposals.create()
         self.assertIsNone(self.poll.method.start_check())
         proposal_pks = list(self.poll.proposals.values_list("pk", flat=True))
@@ -195,14 +267,15 @@ class RepeatedIRVTests(TestCase):
             self.er.voters.create(username=f"voter-{n}")
         self.poll.upcoming()
         self.poll.ongoing()
-        for voter in self.er.voters.all():
-            self.poll.votes.create(
-                user=voter,
-                vote_data=",".join(
-                    str(pk) for pk in sample(proposal_pks, randint(3, 10))
-                ),
-            )
-        self.poll.close()
+        with SetSeed():
+            for voter in self.er.voters.all():
+                self.poll.votes.create(
+                    user=voter,
+                    vote_data=",".join(
+                        str(pk) for pk in sample(proposal_pks, randint(3, 10))
+                    ),
+                )
+            self.poll.close()
         result = self.poll.result
         self.assertEqual(len(result.approved), 2)
         self.assertEqual(len(result.denied), 8)
@@ -214,15 +287,12 @@ class RepeatedIRVTests(TestCase):
             self.assertEqual(self.poll.proposals.filter(state=state).count(), count)
 
     def test_result(self):
-        one = self.poll.proposals.create()
-        two = self.poll.proposals.create()
-        three = self.poll.proposals.create()
         counter = Counter()
-        counter[f"{one.pk},{two.pk},{three.pk}"] = 5
-        counter[f"{one.pk},{three.pk}"] = 2
-        counter[f"{three.pk},{two.pk}"] = 4
+        counter[f"{self.prop_one.pk},{self.prop_two.pk},{self.prop_three.pk}"] = 5
+        counter[f"{self.prop_one.pk},{self.prop_three.pk}"] = 2
+        counter[f"{self.prop_three.pk},{self.prop_two.pk}"] = 4
         result = self.poll.method.calculate_result(counter)
-        self.assertEqual([one.pk, three.pk], result.approved)
+        self.assertEqual([self.prop_one.pk, self.prop_three.pk], result.approved)
         self.assertIsInstance(result.json(), str)
 
     def test_no_majority(self):
@@ -232,14 +302,11 @@ class RepeatedIRVTests(TestCase):
         self.assertIs(result.complete, False)
 
     def test_one_reaches_quota(self):
-        one = self.poll.proposals.create()
-        two = self.poll.proposals.create()
-        three = self.poll.proposals.create()
         counter = Counter()
-        counter[str(one.pk)] = 5
-        counter[f"{one.pk},{three.pk}"] = 2
-        counter[f"{three.pk},{two.pk}"] = 2
+        counter[str(self.prop_one.pk)] = 5
+        counter[f"{self.prop_one.pk},{self.prop_three.pk}"] = 2
+        counter[f"{self.prop_three.pk},{self.prop_two.pk}"] = 2
         result = self.poll.method.calculate_result(counter)
-        self.assertEqual([one.pk], result.approved)
+        self.assertEqual([self.prop_one.pk], result.approved)
         self.assertIsInstance(result.json(), str)
         self.assertIs(result.complete, False)
