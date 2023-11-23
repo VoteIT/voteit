@@ -57,3 +57,6 @@ class DiscussionPost(
         """While not directly related, it still good to be able to do lookups this way"""
         if self.agenda_item:
             return self.agenda_item.meeting
+
+    # Annotations
+    objects: models.Manager
