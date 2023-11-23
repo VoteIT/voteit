@@ -248,12 +248,15 @@ class CreateMeetingGroupSerializer(BaseModelSerializer):
 
     class Meta:
         model = MeetingGroup
-        exclude = (
-            "id",
-            "members",
-            "delegate_to",
-            "mentions",
-        )
+        fields = [
+            "pk",
+            "body",
+            "groupid",
+            "meeting",
+            "tags",
+            "title",
+            "votes",
+        ]
         extra_kwargs = {
             "groupid": {"required": False},
         }
@@ -279,14 +282,18 @@ class MeetingGroupSerializer(CreateMeetingGroupSerializer):
     pk = serializers.IntegerField(read_only=True)
 
     class Meta(CreateMeetingGroupSerializer.Meta):
-        exclude = (
-            "id",
-            "members",
-            "mentions",
-        )
         read_only_fields = [
             "meeting",
         ]
+        fields = [
+            "pk",
+            "body",
+            "delegate_to",
+            "groupid",
+            "tags",
+            "title",
+            "votes",
+        ] + read_only_fields
 
     def validate_delegate_to(self, value: MeetingGroup | None):
         if value:

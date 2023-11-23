@@ -74,12 +74,14 @@ def moderators_channel_subscribed(
 def meeting_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    # lr_qs = context.last_read_set.filter(user=user).values("timestamp", "agenda_item")
+    # This will cause last read to be sent for private agenda items that the user has visited,
+    # but that shouldn't be a problem.
     serializer = LastReadSerializer(context.last_read_set.filter(user=user), many=True)
-    for data in serializer.data:
-        # This will cause last read to be sent for private agenda items that the user has visited,
-        # but that shouldn't be a problem.
-        app_state.append(LastReadChanged(**data))
+    if serializer.data:
+        batch = Batch(t=LastReadChanged.name, payloads=[])
+        for item in serializer.data:
+            batch.append(LastReadChanged(data=item))
+        app_state.append(batch)
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)

@@ -35,10 +35,10 @@ if TYPE_CHECKING:
     from voteit.core.abcs import MeetingContext
 
 
-class AgendaItemInline(admin.TabularInline):
-    model = AgendaItem
-    fields = "title", "order"
-    extra = 1
+# class AgendaItemInline(admin.TabularInline):
+#     model = AgendaItem
+#     fields = "title", "order"
+#     extra = 1
 
 
 @admin.register(Meeting)
@@ -53,9 +53,12 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
         "start_time",
         "end_time",
     )
-    list_filter = "organisation", "state"
+    list_filter = (
+        "organisation",
+        "state",
+    )
     search_fields = ("title",)
-    inlines = (AgendaItemInline,)
+    # inlines = (AgendaItemInline,)
     actions = ["report_clone_meeting", "clone_meeting"]
     exclude = ("mentions",)
 
@@ -140,6 +143,14 @@ class MeetingViaAIFilter(MeetingFilter):
     search_param = "agenda_item__meeting"
 
 
+class MeetingViaMeetingGroupFilter(MeetingFilter):
+    search_param = "meeting_group__meeting"
+
+
+class MeetingAsContextFilter(MeetingFilter):
+    search_param = "context"
+
+
 class DialectFilter(admin.SimpleListFilter):
     title = "Dialect"
 
@@ -191,9 +202,9 @@ class MeetingDialectProxyAdmin(MeetingAdmin):
         "end_time",
     )
     list_filter = (
+        DialectFilter,
         "organisation",
         "state",
-        DialectFilter,
     )
     search_fields = ("title", "installed_dialect")
     actions = ["uninstall_dialect", "trigger_reinstall_dialect"]
@@ -272,7 +283,10 @@ class MeetingAdminMixin:
 class MeetingRolesAdmin(MeetingAdminMixin, admin.ModelAdmin):
     autocomplete_fields = "user", "context"
     list_display = "user", "get_assigned", "meeting_link"
-    list_filter = ("user__organisation",)
+    list_filter = (
+        MeetingAsContextFilter,
+        "user__organisation",
+    )
     search_fields = (
         "context__title",
         "user__last_name",
@@ -296,7 +310,10 @@ class MeetingGroupAdmin(MeetingAdminMixin, admin.ModelAdmin):
         "votes",
         "member_count",
     )
-    list_filter = ("meeting__organisation",)
+    list_filter = (
+        MeetingFilter,
+        "meeting__organisation",
+    )
     search_fields = ("title", "meeting__title")
     exclude = ("mentions",)
 
@@ -313,7 +330,10 @@ class GroupRoleAdmin(MeetingAdminMixin, admin.ModelAdmin):
         "meeting_link",
         "get_roles",
     )
-    list_filter = ("meeting__organisation",)
+    list_filter = (
+        MeetingFilter,
+        "meeting__organisation",
+    )
     search_fields = ("title", "meeting__title")
     exclude = ("mentions",)
 
@@ -323,11 +343,23 @@ class GroupRoleAdmin(MeetingAdminMixin, admin.ModelAdmin):
 
 @admin.register(GroupMembership)
 class GroupMembershipAdmin(MeetingAdminMixin, admin.ModelAdmin):
-    autocomplete_fields = ()
+    autocomplete_fields = (
+        "user",
+        "meeting_group",
+        "role",
+    )
     list_display = (
         "__str__",
         "meeting_link",
     )
-    list_filter = ("meeting_group__meeting__organisation",)
+    list_filter = (
+        MeetingViaMeetingGroupFilter,
+        "meeting_group__meeting__organisation",
+    )
     search_fields = ("title",)
     exclude = ("mentions",)
+    readonly_fields = (
+        "role",
+        "meeting_group",
+        "user",
+    )
