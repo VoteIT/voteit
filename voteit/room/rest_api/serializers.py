@@ -104,6 +104,16 @@ class RoomDetailSerializer(RoomSerializer):
         return super().update(instance, validated_data)
 
 
+class SpeakerManagerRoomDetailSerializer(RoomDetailSerializer):
+    class Meta(RoomDetailSerializer.Meta):
+        fields = [
+            "body",
+            "open",
+            "show_time",
+            "send_sls",
+        ]
+
+
 class RoomHighlightedSerializer(RoomSerializer):
     """
     Used when highlighted proposals change

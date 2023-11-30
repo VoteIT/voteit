@@ -5,6 +5,8 @@ from rest_framework.test import APITestCase
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.speaker.app.list_methods.simple import Simple
+from voteit.speaker.roles import ROLE_LIST_MODERATOR
 
 User = get_user_model()
 
@@ -95,6 +97,30 @@ class RoomsViewTestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(self.meeting.pk, data["meeting"])
+
+    def test_patch_change_as_speaker_manager(self):
+        url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
+        speaker_manager = User.objects.create_user("speaker_manager")
+        self.client.force_login(speaker_manager)
+        data = {"body": "How about that?", "title": "Not changed"}
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 403)
+        self.sls.add_roles(speaker_manager, ROLE_LIST_MODERATOR)
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 200)
+        self.room.refresh_from_db()
+        self.assertEqual("Room", self.room.title)  # Not changed
+        self.assertEqual("How about that?", self.room.body)
+
+    def test_patch_change_as_regular_user(self):
+        url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
+        data = {"body": "body"}
+        self.client.force_login(self.participant)
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 403)
+        self.sls.delete()
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 403)
 
     def test_patch_change_highlighted(self):
         url = reverse("rooms-handle", kwargs={"pk": self.room.pk})

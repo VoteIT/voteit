@@ -1,6 +1,10 @@
+from contextlib import suppress
+
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
@@ -9,10 +13,13 @@ from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.room.models import Room
+from voteit.room.permissions import RoomPermissions
 from voteit.room.rest_api.serializers import CreateRoomSerializer
 from voteit.room.rest_api.serializers import RoomDetailSerializer
 from voteit.room.rest_api.serializers import RoomHandleSerializer
 from voteit.room.rest_api.serializers import RoomSerializer
+from voteit.room.rest_api.serializers import SpeakerManagerRoomDetailSerializer
+from voteit.speaker.permissions import SpeakerSystemPermissions
 
 
 @router.register("rooms", basename="rooms")
@@ -30,11 +37,15 @@ class RoomsViewSet(DefaultModelViewSet):
 
     @property
     def permission_type_map(self) -> dict:
-        return {
-            "set_handler": "change",
-            "handle": "handle",
-            **super().permission_type_map,
-        }
+        default = super().permission_type_map.copy()
+        default.update(
+            {
+                "set_handler": "change",
+                "handle": "handle",
+                "partial_update": None,  # checked in method - only partial needs to be handled manually
+            }
+        )
+        return default
 
     def get_queryset(self):
         if self.action == "list":
@@ -80,3 +91,18 @@ class RoomsViewSet(DefaultModelViewSet):
     @transaction.atomic(durable=True)
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
+
+    def get_serializer_class(self):
+        if self.action != "partial_update":
+            return super().get_serializer_class()
+        room = self.get_object()
+        if self.request.user.has_perm(RoomPermissions.CHANGE, room):
+            return super().get_serializer_class()
+        # FIXME Empty==object not found?
+        else:
+            with suppress(ObjectDoesNotExist):  # sls is a reverse relation
+                if room.sls is not None and self.request.user.has_perm(
+                    SpeakerSystemPermissions.MANAGE, room.sls
+                ):
+                    return SpeakerManagerRoomDetailSerializer
+        raise PermissionDenied()
