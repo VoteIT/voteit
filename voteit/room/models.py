@@ -70,7 +70,7 @@ class Room(MeetingContext):
     )
     show_time: bool = models.BooleanField(
         verbose_name="Show time?",
-        default=False,
+        default=True,
     )
 
     @property

@@ -67,7 +67,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "show_time",
-                    models.BooleanField(default=False, verbose_name="Show time?"),
+                    models.BooleanField(default=True, verbose_name="Show time?"),
                 ),
                 (
                     "agenda_item",

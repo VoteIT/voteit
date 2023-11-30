@@ -59,7 +59,7 @@ class RoomDetailSerializerTests(TestCase):
                 "send_sls": False,
                 "send_proposals": False,
                 "handler": None,
-                "show_time": False,
+                "show_time": True,
                 "agenda_item": None,
                 "poll": None,
             },

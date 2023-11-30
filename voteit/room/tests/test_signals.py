@@ -55,7 +55,7 @@ class SubscriptionTests(TestCase):
                 "pk": self.room.pk,
                 "send_proposals": False,
                 "send_sls": False,
-                "show_time": False,
+                "show_time": True,
                 "title": "",
                 "agenda_item": self.ai.pk,
                 "poll": None,
