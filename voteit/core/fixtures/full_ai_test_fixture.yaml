@@ -27,6 +27,7 @@
     created: '2020-05-18T13:53:14.961055Z'
     mentions: []
     modified: '2020-05-18T13:53:14.961055Z'
+    meeting_group: 1
     tags:
     - styrelse-1
   model: discussion.discussionpost
