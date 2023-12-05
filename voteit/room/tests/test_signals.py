@@ -59,6 +59,7 @@ class SubscriptionTests(TestCase):
                 "title": "",
                 "agenda_item": self.ai.pk,
                 "poll": None,
+                "show_ballot": False,
             },
             data,
         )

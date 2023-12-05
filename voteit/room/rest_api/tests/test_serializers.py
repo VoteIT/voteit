@@ -62,6 +62,7 @@ class RoomDetailSerializerTests(TestCase):
                 "show_time": True,
                 "agenda_item": None,
                 "poll": None,
+                "show_ballot": False,
             },
             data,
         )

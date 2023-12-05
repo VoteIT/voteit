@@ -7,6 +7,7 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.speaker.app.list_methods.simple import Simple
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
+from voteit.poll.app.polls.simple import Simple as SimplePoll
 
 User = get_user_model()
 
@@ -191,6 +192,18 @@ class RoomsViewTestCase(APITestCase):
         data = response.json()
         self.assertEqual(None, data["poll"])
         self.assertEqual(self.ai.pk, data["agenda_item"])
+
+    def test_patch_set_poll_resets_show_ballot(self):
+        poll = self.meeting.polls.create(method_name=SimplePoll.name)
+        self.room.show_ballot = True
+        self.room.save()
+        url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        data = {"poll": poll.pk}
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 200)
+        self.room.refresh_from_db()
+        self.assertFalse(self.room.show_ballot)
 
     def test_patch_moderator_replaces_handler(self):
         self.room.handler = self.participant

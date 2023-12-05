@@ -21,6 +21,13 @@ if TYPE_CHECKING:
 
 
 class Room(MeetingContext):
+    _initial_poll_value = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._initial_poll_value = self.poll
+        self._initial_show_ballot = self.show_ballot
+
     name = "room"
     open: bool = models.BooleanField(
         verbose_name="Is it open for participants?", default=False
@@ -61,6 +68,9 @@ class Room(MeetingContext):
         null=True,
         blank=True,
     )
+    show_ballot: bool = models.BooleanField(
+        verbose_name="Show the ballot", default=False
+    )
     # Auto set speaker list from active agenda?
     send_sls: bool = models.BooleanField(
         verbose_name="Send Speaker lists?", default=False
@@ -80,6 +90,11 @@ class Room(MeetingContext):
             .order_by("order")
             .values_list("proposal", flat=True)
         )
+
+    def save(self, **kwargs):
+        if self.poll != self._initial_poll_value and self._initial_show_ballot:
+            self.show_ballot = False
+        super().save(**kwargs)
 
     def __str__(self):
         return f"Room {self.title} for meeting {self.meeting.pk}"

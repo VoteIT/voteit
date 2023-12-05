@@ -37,6 +37,7 @@ class RoomHandleSerializer(RoomSerializer):
             "highlighted",
             "poll",
             "agenda_item",
+            "show_ballot",
         ]
         validators = [
             HighlightedValidator(),
