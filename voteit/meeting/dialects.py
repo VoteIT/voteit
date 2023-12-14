@@ -53,18 +53,27 @@ class DialectRegistry(UserDict):
     def load(self):
         ...
 
+    def get_partial_dialect(self, dialect: DialectSchema) -> dict[str, str]:
+        return {
+            "description": dialect.description,
+            "name": dialect.name,
+            "title": dialect.title,
+        }
+
     @refresh
-    def get_installable(self, include=tuple(), exclude=tuple()) -> dict[str, str]:
+    def get_installable(self, include=tuple(), exclude=tuple()) -> dict[str, dict]:
         """
         Return installable dialects
         """
-        results = {}
-        for k, v in self.items():
-            if k in exclude:
-                continue
-            if k in include or v.data.installable:
-                results[k] = v.data.title or k
-        return results
+
+        def dialect_filter(item: tuple[str, DialectHandler]) -> bool:
+            key, dialect = item
+            return key not in exclude and (key in include or dialect.data.installable)
+
+        return {
+            k: self.get_partial_dialect(v.data)
+            for k, v in filter(dialect_filter, self.items())
+        }
 
     @refresh
     def get_dependent_dialects(self, name: str) -> list[DialectHandler]:
@@ -135,10 +144,9 @@ def get_named_paths() -> Generator[tuple[str, str]]:
     else:
         for root, dirs, files in os.walk(dialects_dir):
             for fname in files:
-                parts = fname.split(".")
-                if parts[-1] not in {"yaml", "yml"}:
-                    continue
-                yield ".".join(parts[:-1]), os.path.join(root, fname)
+                name, ext = fname.rsplit(".", 1)
+                if ext in {"yaml", "yml"}:
+                    yield name, os.path.join(root, fname)
 
 
 class DialectHandler:

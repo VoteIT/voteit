@@ -365,7 +365,5 @@ class MeetingDialectsViewSet(viewsets.ViewSet):
             organisation=request.user.organisation
         )
         return Response(
-            data=[
-                {"name": x[0], "title": x[1]} for x in sorted(org_installable.items())
-            ]
+            data=sorted(org_installable.values(), key=lambda item: item.get("name"))
         )

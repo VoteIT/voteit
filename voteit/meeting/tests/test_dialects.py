@@ -170,6 +170,15 @@ class DialectHandlerTests(TestCase):
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
 class DialectRegistryTests(TestCase):
+    one = {"description": "", "name": "one", "title": "Hello"}
+    two = {"description": "", "name": "two", "title": "Two!"}
+    three = {"description": "", "name": "three", "title": "Three"}
+    main_subst = {
+        "description": "Main and substitute roles",
+        "name": "main_subst",
+        "title": "Main/subst",
+    }
+
     @classmethod
     def setUpTestData(cls):
         from voteit.meeting.dialects import DialectRegistry
@@ -178,19 +187,19 @@ class DialectRegistryTests(TestCase):
 
     def test_get_installable(self):
         self.assertEqual(
-            {"three": "Three", "main_subst": "Main/subst", "two": "Two!"},
+            {"two": self.two, "three": self.three, "main_subst": self.main_subst},
             self.registry.get_installable(),
         )
         self.assertEqual(
-            {"three": "Three", "main_subst": "Main/subst"},
+            {"three": self.three, "main_subst": self.main_subst},
             self.registry.get_installable(exclude={"two"}),
         )
         self.assertEqual(
             {
-                "main_subst": "Main/subst",
-                "one": "Hello",
-                "three": "Three",
-                "two": "Two!",
+                "one": self.one,
+                "two": self.two,
+                "three": self.three,
+                "main_subst": self.main_subst,
             },
             self.registry.get_installable(include={"one"}),
         )
@@ -224,7 +233,7 @@ class DialectRegistryTests(TestCase):
     def test_get_org_installable(self):
         org = Organisation.objects.create()
         self.assertEqual(
-            {"main_subst": "Main/subst", "three": "Three", "two": "Two!"},
+            {"two": self.two, "three": self.three, "main_subst": self.main_subst},
             self.registry.get_org_installable(org),
         )
         org.components.create(
@@ -236,7 +245,7 @@ class DialectRegistryTests(TestCase):
             state=EnabledWf.ON,
         )
         self.assertEqual(
-            {"one": "Hello"},
+            {"one": self.one},
             self.registry.get_org_installable(org),
         )
 
