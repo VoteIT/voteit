@@ -337,6 +337,9 @@ class RichTextSerializerMixin:
 
     partial: bool
     instance: BaseContent
+    # Should body tags always exist within tags field?
+    add_body_tags: bool = True
+    add_body_mentions: bool = True
 
     def get_user_queryset(self, attrs: OrderedDict) -> models.QuerySet:
         """
@@ -373,14 +376,17 @@ class RichTextSerializerMixin:
             body = self.instance.body
         else:
             body = attrs.get("body", "")
-        body_tags = get_tagged_hashtags(body)
-        body_mentions = get_tagged_userids(body)
         if self.partial and "tags" not in attrs:
             tags = self.instance.tags and set(self.instance.tags) or set()
         else:
             tags = set(attrs.get("tags", []))
-        tags.update(body_tags)
+        # Body tags
+        if self.add_body_tags:
+            body_tags = get_tagged_hashtags(body)
+            tags.update(body_tags)
         attrs["tags"] = sorted(tags)
+        # Body entions
+        body_mentions = self.add_body_mentions and get_tagged_userids(body) or set()
         if self.partial and "mentions" not in attrs:
             mentions = set(self.instance.mentions.all().values_list("pk", flat=True))
         else:
@@ -391,7 +397,7 @@ class RichTextSerializerMixin:
                     attrs.get("mentions", []),
                 )
             )
-        # Validate in 2 steps so we know where things went wrong
+        # Validate in 2 steps, so we know where things went wrong
         combined_mentions = mentions | body_mentions
         user_qs = self.get_user_queryset(attrs)
         found_users_qs = user_qs.filter(pk__in=combined_mentions)
