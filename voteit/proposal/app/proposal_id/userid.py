@@ -14,19 +14,22 @@ __all__ = ("UseridPID",)
 @proposal_id_registry
 class UseridPID(ProposalIDPolicy):
     name = "userid"
+    EST_MAX_LEN = 45
 
     def __call__(self, proposal: Proposal) -> str | None:
-        if proposal.meeting is None or proposal.author is None:
+        # if proposal.meeting is None or proposal.author is None:
+        if proposal.meeting is None:
             return None
-
+        base_suggestion = None
         if proposal.meeting_group:
             base_suggestion = proposal.meeting_group.groupid
-        elif proposal.author.userid:
-            base_suggestion = proposal.author.userid
-        else:
-            base_suggestion = slugify(proposal.author.get_full_name())
-
+        elif proposal.author is not None:
+            if proposal.author.userid:
+                base_suggestion = proposal.author.userid
+            else:
+                base_suggestion = slugify(proposal.author.get_full_name())
         if base_suggestion:
+            base_suggestion = base_suggestion[: self.EST_MAX_LEN]
             meeting_proposals = Proposal.objects.filter(
                 agenda_item__meeting=proposal.meeting
             )
