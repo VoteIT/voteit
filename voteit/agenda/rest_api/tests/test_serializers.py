@@ -1,7 +1,7 @@
-from django.test import RequestFactory
 from django.test import TestCase
 
 from voteit.agenda.models import AgendaItem
+from voteit.core.testing import mk_hashtag
 from voteit.meeting.models import Meeting
 
 
@@ -37,6 +37,22 @@ class AgendaItemSerializerTests(TestCase):
             },
             data,
         )
+
+    def test_create_agenda_item_no_tags_from_body(self):
+        from voteit.agenda.rest_api.serializers import CreateAgendaItemSerializer
+
+        serializer = CreateAgendaItemSerializer(
+            data={
+                "meeting": self.meeting.pk,
+                "body": f"Hello {mk_hashtag('world')}!",
+                "tags": ["cheese"],
+                "title": "Hello world!",
+            }
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.save()
+        self.assertEqual(["cheese"], instance.tags)
 
     def test_agenda_item_body(self):
         from voteit.agenda.rest_api.serializers import AgendaItemBodySerializer
