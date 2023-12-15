@@ -4,6 +4,8 @@ import itertools
 
 from django.utils.text import slugify
 
+from voteit.core.models import User as UserType
+from voteit.meeting.models import MeetingGroup
 from voteit.proposal.abcs import ProposalIDPolicy
 from voteit.proposal.models import Proposal
 from voteit.proposal.registries import proposal_id_registry
@@ -16,20 +18,31 @@ class UseridPID(ProposalIDPolicy):
     name = "userid"
     EST_MAX_LEN = 45
 
+    def suggestion(
+        self,
+        author: UserType | None = None,
+        meeting_group: MeetingGroup | None = None,
+        **kwargs,
+    ) -> str | None:
+        base_suggestion = None
+        if meeting_group:
+            base_suggestion = meeting_group.groupid
+        elif author is not None:
+            if author.userid:
+                base_suggestion = author.userid
+            else:
+                base_suggestion = author.get_full_name()
+        base_suggestion = slugify(base_suggestion, allow_unicode=True)
+        if base_suggestion:
+            return base_suggestion[: self.EST_MAX_LEN]
+
     def __call__(self, proposal: Proposal) -> str | None:
         # if proposal.meeting is None or proposal.author is None:
         if proposal.meeting is None:
             return None
-        base_suggestion = None
-        if proposal.meeting_group:
-            base_suggestion = proposal.meeting_group.groupid
-        elif proposal.author is not None:
-            if proposal.author.userid:
-                base_suggestion = proposal.author.userid
-            else:
-                base_suggestion = slugify(proposal.author.get_full_name())
-        if base_suggestion:
-            base_suggestion = base_suggestion[: self.EST_MAX_LEN]
+        if base_suggestion := self.suggestion(
+            author=proposal.author, meeting_group=proposal.meeting_group
+        ):
             meeting_proposals = Proposal.objects.filter(
                 agenda_item__meeting=proposal.meeting
             )

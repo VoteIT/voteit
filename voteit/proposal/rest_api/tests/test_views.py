@@ -39,7 +39,7 @@ class ProposalsAPITests(APITestCase):
         cls.para: TextParagraph = cls.text_doc.text_paragraphs.first()
         cls.participant: User = User.objects.create_user("participant")
         cls.proposer: User = User.objects.create_user("proposer")
-        cls.moderator: User = User.objects.create_user("moderator")
+        cls.moderator: User = User.objects.create_user("moderator", userid="Moderator")
         cls.outsider: User = User.objects.create_user("outsider")
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.proposer, ROLE_PROPOSER)
@@ -256,6 +256,7 @@ class ProposalsAPITests(APITestCase):
         response = self.client.post(url, data)
         self.assertEqual(200, response.status_code)
         data = response.json()
+        self.assertEqual("moderator-{n}", data["prop_id"])
         self.assertEqual(
             "Hello world!",
             data["body"],

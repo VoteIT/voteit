@@ -1,3 +1,4 @@
+from contextlib import suppress
 from typing import OrderedDict
 
 from django.utils.text import slugify
@@ -10,6 +11,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import ExportBaseSerializerMixin
 from voteit.core.rest_api.serializers import RichTextSerializerMixin
+from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.core.rest_api.validators import ValidateGroupAIContext
 from voteit.core.utils import get_model_shortname
 from voteit.proposal.diff import Changes
@@ -127,16 +129,17 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
 
     def get_prop_id(self, instance):
         # FIXME Proposal id method should be used instead
-        try:
+        with suppress(AttributeError):
             return instance.prop_id
-        except AttributeError:
-            if meeting_group := instance.get("meeting_group"):
-                return f"{meeting_group.groupid}-{{n}}"
-            author = instance.get("author")
-            return f"{author.userid}-{{n}}"
+        meeting = meeting_from_unsafe_data(self)
+        if suggestion := meeting.pid_policy.suggestion(
+            author=instance.get("author"), meeting_group=instance.get("meeting_group")
+        ):
+            return "%s-{n}" % suggestion
 
     class Meta:
         model = Proposal
+        read_only_fields = ["prop_id"]
         fields = [
             "author",
             "agenda_item",
@@ -145,7 +148,7 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "mentions",
             "prop_id",
             "tags",
-        ]
+        ] + read_only_fields
         validators = (ValidateGroupAIContext(),)
         extra_kwargs = {
             "agenda_item": {"required": True},
