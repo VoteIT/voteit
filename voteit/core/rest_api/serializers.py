@@ -22,6 +22,7 @@ from voteit.core.rest_api.utils import get_identity_data
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
+from voteit.core.validators import get_invalid_tags
 from voteit.core.validators import valid_userid
 from voteit.meeting.permissions import MeetingPermissions
 
@@ -367,7 +368,7 @@ class RichTextSerializerMixin:
         User = get_user_model()
         return User.objects.none()
 
-    # FIXME: body might contain bad tags. That will be cleaned on save, but do we want to send error messages?
+    # FIXME: body might contain bad html-tags. That will be cleaned on save, but do we want to send error messages?
     def validate(self, attrs: OrderedDict):
         """
         We'll use this to populate attrs. Pretty silly but there's no other obvious way?
@@ -380,12 +381,22 @@ class RichTextSerializerMixin:
             tags = self.instance.tags and set(self.instance.tags) or set()
         else:
             tags = set(attrs.get("tags", []))
+            # We only need to check updated
+            if bad_tags := get_invalid_tags(tags):
+                raise ValidationError(
+                    {"tags": ["Tags with invalid format: %s" % ", ".join(bad_tags)]}
+                )
         # Body tags
         if self.add_body_tags:
             body_tags = get_tagged_hashtags(body)
+            if bad_tags := get_invalid_tags(body_tags):
+                raise ValidationError(
+                    {"body": ["Tags with invalid format: %s" % ", ".join(bad_tags)]}
+                )
             tags.update(body_tags)
+        # Proper tag check
         attrs["tags"] = sorted(tags)
-        # Body entions
+        # Body mentions
         body_mentions = self.add_body_mentions and get_tagged_userids(body) or set()
         if self.partial and "mentions" not in attrs:
             mentions = set(self.instance.mentions.all().values_list("pk", flat=True))

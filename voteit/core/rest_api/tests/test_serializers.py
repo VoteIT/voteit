@@ -99,6 +99,19 @@ class RichTextSerializerMixinTests(TestCase):
         serializer.save()
         self.assertEqual(["körvi", "participants", "sup"], self.ai.tags)
 
+    def test_bad_body_tags(self):
+        body = f"{mk_hashtag('S!P')}"
+        serializer = self.Serializer(self.ai, data={"body": body}, partial=True)
+        serializer.is_valid(raise_exception=False)
+        self.assertIn("body", serializer.errors)
+
+    def test_bad_tag_update(self):
+        serializer = self.Serializer(
+            self.ai, data={"tags": [" w e ", "are"]}, partial=True
+        )
+        serializer.is_valid()
+        self.assertIn("tags", serializer.errors)
+
     def test_dont_add_body_tags(self):
         body = f"{mk_hashtag('SUP')} all {mk_hashtag('participants')}? {mk_hashtag('KörVi')}!"
         serializer = self.Serializer(self.ai, data={"body": body}, partial=True)

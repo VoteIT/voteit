@@ -2,9 +2,8 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.dispatch import receiver
 from django.test import TestCase
-
-from auditlog.context import set_actor
 from auditlog.models import LogEntry
+
 from voteit.core.testing import mk_hashtag
 from voteit.meeting.models import Meeting
 
