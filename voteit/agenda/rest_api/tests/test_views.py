@@ -109,13 +109,13 @@ class AgendaItemViewTestCase(APITestCase):
     def test_patch_change_tags(self):
         url = reverse("agendaitem-detail", kwargs={"pk": self.ai.pk})
         data = {
-            "tags": ["a", "b"],
+            "tags": ["aa", "bb"],
         }
         self.client.force_login(self.moderator)
         response = self.client.patch(url, data)
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(["a", "b"], data["tags"])
+        self.assertEqual(["aa", "bb"], data["tags"])
 
     def test_patch_remove_tags(self):
         url = reverse("agendaitem-detail", kwargs={"pk": self.ai.pk})

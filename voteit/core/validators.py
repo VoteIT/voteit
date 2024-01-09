@@ -1,4 +1,5 @@
 # Common validators
+from collections.abc import Iterable
 from typing import Dict
 
 from django.core import validators
@@ -97,7 +98,57 @@ class UserIDValidator(validators.RegexValidator):
         "Enter a valid username. This value may contain only a-z, "
         "numbers, and /-/_ characters."
     )
-    flags = 0
+
+
+@deconstructible
+class TagValidator(validators.RegexValidator):
+    r"""
+    This should cause errors on anything that we really don't under any circumstances want to allow,
+    including failing legacy data.
+
+    >>> f = lambda x: TagValidator().regex.search(x) is not None  # Instead of exceptions here
+    >>> f('HelloWorld.')
+    True
+    >>> f('HelloWorld.123')
+    True
+    >>> f('Hellö_wörld')
+    True
+    >>> f('你好')
+    True
+    >>> f("helloworld"*5)
+    True
+    >>> f("helloworld"*10) # too long
+    False
+    >>> f('hi')
+    True
+    >>> f('h')
+    False
+    >>> f('Hello#World.')
+    False
+    >>> f('Hello World')
+    False
+    >>> f("Hello\nWorld")
+    False
+    >>> f("§Hello-World")
+    False
+    """
+    regex = r"^[\w\\.\-]{2,50}$"
+    message = (
+        "Tags must be 2-50 characters long and only contain letters, numbers and .-_"
+    )
+
+
+tag_validator = TagValidator()
+
+
+def get_invalid_tags(tags: Iterable[str]) -> set[str]:
+    bad = set()
+    for tag in tags:
+        try:
+            tag_validator(tag)
+        except ValidationError:
+            bad.add(tag)
+    return bad
 
 
 def valid_userid(value: str) -> str:
