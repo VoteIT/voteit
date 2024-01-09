@@ -128,6 +128,9 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     meeting_roles_to_speaker: list[Role] = RolesField(
         role_choices=MeetingRoles.valid_roles.values(), max_length=60
     )
+    show_time: bool = models.BooleanField(
+        verbose_name="Show time spoken for all", default=False
+    )
 
     roles_cls = SpeakerSystemRoles
     exporters = {"meeting": {"ignore_fields": ("active_list",)}}

@@ -92,6 +92,7 @@ class CreateSpeakerListSystemSerializer(serializers.ModelSerializer):
             "safe_positions",
             "room",
             "meeting_roles_to_speaker",
+            "show_time",
         ] + read_only_fields
 
     def validate_method_name(self, value):

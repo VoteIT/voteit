@@ -116,6 +116,7 @@ class SpeakerListSystemSerializerTests(TestCase):
                 "active_list": None,
                 "meeting_roles_to_speaker": [],
                 "room": self.room.pk,
+                "show_time": False,
             },
             data,
         )
