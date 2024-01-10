@@ -62,6 +62,7 @@ class PriorityTests(TestCase):
 
     def test_safe_users_checked_with_current_order(self):
         self.speaker_list.speaker_items.all().delete()  # Start fresh here
+        self.speaker_list.reorder()
         self.assertEqual([], self.speaker_list.order_list)
         self._mk_previous_spoken(self.user_two)
         self._mk_previous_spoken(self.user_one, count=2)

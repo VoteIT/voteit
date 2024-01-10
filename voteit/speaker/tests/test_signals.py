@@ -6,8 +6,10 @@ from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
 
+from envelope.core.channels import ContextChannel
 from envelope.messages.channels import Subscribe
 from envelope.messages.channels import Subscribed
+
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
@@ -236,6 +238,33 @@ class SignalListChangesTests(TestCase):
         msg = messages[0]
         self.assertIsInstance(msg, SpeakerListDeleted)
         self.assertEqual(list_pk, msg.data.pk)
+
+    @patch.object(ContextChannel, "sync_publish")  # All of them here
+    def test_list_deleted_event_order(self, mock_publish):
+        from voteit.speaker.messages import SpeakerListChanged
+        from voteit.speaker.messages import SpeakerListDeleted
+
+        self.speaker_list.start_speaker(self.speaker)
+        mock_publish.reset_mock()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.speaker_list.delete()
+            self.assertTrue(mock_publish.called)
+
+        messages = [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if x.args[0].name.startswith("speaker")
+        ]
+        changed_positions = [
+            messages.index(x) for x in messages if isinstance(x, SpeakerListChanged)
+        ]
+        deleted_positions = [
+            messages.index(x) for x in messages if isinstance(x, SpeakerListDeleted)
+        ]
+        self.assertEqual(1, len(deleted_positions))
+        deleted_pos = deleted_positions[0]
+        for pos in changed_positions:
+            self.assertLess(pos, deleted_pos)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

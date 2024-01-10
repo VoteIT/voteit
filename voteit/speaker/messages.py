@@ -84,6 +84,7 @@ class SpeakerListLeave(ListMessage):
         if existing_obj is None:
             raise BadRequestError.from_message(self, msg=_("Not in list"))
         existing_obj.delete()
+        self.context.reorder()
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
         return msg
@@ -207,7 +208,7 @@ class ModeratorSpeakerListEnter(ModeratorListMessage):
     def run_job(self) -> Status:
         self.assert_perm()
         user = self.get_user()
-        # Negating rules has unwanted side-effects, hence this silly thing :)
+        # Negating rules has unwanted side effects, hence this silly thing :)
         if not not_currently_speaking(user, self.context):
             raise BadRequestError.from_message(self, msg=_("Currently speaking"))
         if self.context.meeting is not None:
@@ -237,6 +238,7 @@ class ModeratorSpeakerListLeave(ModeratorListMessage):
         if existing_obj is None:
             raise BadRequestError.from_message(self, msg=_("Not in list"))
         existing_obj.delete()
+        self.context.reorder()
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
         return msg

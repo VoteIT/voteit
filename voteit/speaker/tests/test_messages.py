@@ -33,7 +33,6 @@ class SpeakerListSystemChannelSubscribeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.participant = User.objects.get(username="participant")
-        # cls.moderator = User.objects.get(username="moderator")
         cls.outsider = User.objects.create(username="outsider")
         cls.meeting = Meeting.objects.get(pk=1)
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(

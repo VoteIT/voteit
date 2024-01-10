@@ -130,26 +130,6 @@ class SpeakerListTests(TestCase):
             [self.user_two.pk, self.user_three.pk, self.user_one.pk], L[0]
         )  # First event
 
-    def test_order_signaled_on_delete(self):
-        L = []
-
-        @receiver(post_save, sender=SpeakerList)
-        def my_listener(instance, **kw):
-            L.append(instance.order_list)
-
-        self.speaker_two.delete()
-        self.assertTrue(L)
-        self.assertEqual([self.user_one.pk, self.user_three.pk], L[0])  # First event
-
-    def test_reoder_invoked_on_delete(self):
-        self.speaker_one.created = now()  # Now later than the 3rd speaker
-        self.speaker_one.save()
-        self.speaker_two.delete()
-        self.assertEqual(
-            [self.user_three.pk, self.user_one.pk],
-            self.speaker_list.order_list,
-        )
-
     def test_different_meeting_contexts(self):
         new_meeting = Meeting.objects.create()
         new_ai = new_meeting.agenda_items.create()
