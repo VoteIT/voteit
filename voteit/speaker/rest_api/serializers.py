@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from rest_framework import serializers
@@ -44,9 +46,10 @@ class SpeakerListSerializer(serializers.ModelSerializer):
     def get_queue(self, instance: SpeakerList) -> list[int]:
         return instance.order_list
 
-    def get_current(self, instance: SpeakerList) -> list[int]:
-        if instance.current:
-            return instance.current.user_id
+    def get_current(self, instance: SpeakerList) -> int | None:
+        with suppress(Speaker.DoesNotExist):
+            if instance.current:
+                return instance.current.user_id
 
 
 class HistoricSpeakerListSerializer(serializers.Serializer):

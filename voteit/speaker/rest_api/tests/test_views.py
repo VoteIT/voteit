@@ -35,6 +35,7 @@ class SpeakerListsViewTestCase(APITestCase):
         cls.system = cls.meeting.speaker_systems.create(
             method_name="simple", room=cls.room
         )
+        cls.slist = cls.system.speaker_lists.create()
         cls.list_moderator: User = User.objects.create_user("list_moderator")
         cls.participant: User = User.objects.create_user("participant")
         cls.moderator: User = User.objects.create_user("moderator")
@@ -42,6 +43,7 @@ class SpeakerListsViewTestCase(APITestCase):
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.system.add_roles(cls.list_moderator, ROLE_LIST_MODERATOR)
+        cls.part_speaker = cls.slist.speaker_items.create(user=cls.participant)
 
     def test_create(self):
         url = reverse("speaker-lists-list")
@@ -98,7 +100,7 @@ class SpeakerListsViewTestCase(APITestCase):
         self.client.force_login(self.list_moderator)
         response = self.client.get(url, data)
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.json())
+        self.assertEqual(1, len(response.json()))
 
     def test_transition_list_moderator(self):
         self.client.force_login(self.list_moderator)
@@ -164,15 +166,68 @@ class SpeakerListsViewTestCase(APITestCase):
         self.assertEqual("Sup?", slist.title)
 
     def test_delete(self):
-        slist = self.system.speaker_lists.create()
-        url = f"/api/speaker-lists/{slist.pk}/"
+        url = reverse("speaker-lists-detail", kwargs={"pk": self.slist.pk})
         self.client.force_login(self.list_moderator)
         response = self.client.delete(url)
         self.assertEqual(
             204,
             response.status_code,
         )
-        self.assertRaises(ObjectDoesNotExist, slist.refresh_from_db)
+        self.assertRaises(ObjectDoesNotExist, self.slist.refresh_from_db)
+
+    def test_delete_with_started_speaker(self):
+        self.slist.start_speaker(self.part_speaker)
+        url = reverse("speaker-lists-detail", kwargs={"pk": self.slist.pk})
+        self.client.force_login(self.list_moderator)
+        response = self.client.delete(url)
+        self.assertEqual(
+            204,
+            response.status_code,
+        )
+        self.assertRaises(ObjectDoesNotExist, self.slist.refresh_from_db)
+
+    def test_get(self):
+        url = reverse("speaker-lists-detail", kwargs={"pk": self.slist.pk})
+        self.client.force_login(self.list_moderator)
+        response = self.client.get(url)
+        self.assertEqual(
+            200,
+            response.status_code,
+        )
+        self.assertEqual(
+            {
+                "pk": self.slist.pk,
+                "title": "",
+                "speaker_system": self.system.pk,
+                "agenda_item": None,
+                "state": "open",
+                "queue": [self.participant.pk],
+                "current": None,
+            },
+            response.json(),
+        )
+
+    def test_get_with_current(self):
+        self.slist.start_speaker(self.part_speaker)
+        url = reverse("speaker-lists-detail", kwargs={"pk": self.slist.pk})
+        self.client.force_login(self.list_moderator)
+        response = self.client.get(url)
+        self.assertEqual(
+            200,
+            response.status_code,
+        )
+        self.assertEqual(
+            {
+                "pk": self.slist.pk,
+                "title": "",
+                "speaker_system": self.system.pk,
+                "agenda_item": None,
+                "state": "open",
+                "queue": [],
+                "current": self.participant.pk,
+            },
+            response.json(),
+        )
 
 
 class SpeakerListSystemViewTestCase(APITestCase):
