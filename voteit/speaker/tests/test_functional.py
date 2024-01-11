@@ -49,7 +49,9 @@ class SpeakerListFunctionalTests(TestCase):
         cls.user_one = User.objects.create(username="one")
         cls.user_two = User.objects.create(username="two")
         cls.user_three = User.objects.create(username="three")
+        cls.room = cls.meeting.rooms.create()
         cls.system: SpeakerListSystem = cls.meeting.speaker_systems.create(
+            room=cls.room,
             method_name=Priority.name,
             state="active",
             meeting_roles_to_speaker=[ROLE_PARTICIPANT],
