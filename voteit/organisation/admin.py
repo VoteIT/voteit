@@ -11,6 +11,7 @@ from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserConsent
+from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 
@@ -25,12 +26,17 @@ class OrganisationAdmin(admin.ModelAdmin):
         "meeting_count",
         "users_count",
         "manager_count",
+        "meeting_creator_count",
     )
     autocomplete_fields = ("mentions",)
 
     @admin.display(description="Managers")
     def manager_count(self, obj: Organisation):
-        return obj.roles.filter(assigned__contains=[ROLE_ORG_MANAGER]).count()
+        return obj.roles.filter(assigned__contains=ROLE_ORG_MANAGER).count()
+
+    @admin.display(description="Meeting Creators")
+    def meeting_creator_count(self, obj: Organisation):
+        return obj.roles.filter(assigned__contains=ROLE_MEETING_CREATOR).count()
 
     @admin.display(description="Online users")
     def users_count(self, obj: Organisation):
