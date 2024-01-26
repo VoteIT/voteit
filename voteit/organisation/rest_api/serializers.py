@@ -188,7 +188,6 @@ class OrganisationRolesSerializer(serializers.ModelSerializer):
 
 
 class ExternalOrphanSerializer(serializers.ModelSerializer):
-
     """
     Used when returning response to login service.
     Returns information about unclaimed / orphan users that matches

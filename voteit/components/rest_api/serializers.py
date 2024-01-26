@@ -88,11 +88,9 @@ class VerboseComponentSerializer(serializers.ModelSerializer):
 
 class VerboseMeetingComponentSerializer(
     MeetingComponentSerializer, VerboseComponentSerializer
-):
-    ...
+): ...
 
 
 class VerboseOrganisationComponentSerializer(
     OrganisationComponentSerializer, VerboseComponentSerializer
-):
-    ...
+): ...

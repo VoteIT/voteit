@@ -132,6 +132,7 @@ class TagValidator(validators.RegexValidator):
     >>> f("§Hello-World")
     False
     """
+
     regex = r"^[\w\\.\-]{2,50}$"
     message = (
         "Tags must be 2-50 characters long and only contain letters, numbers and .-_"

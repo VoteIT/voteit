@@ -50,8 +50,7 @@ class DialectRegistry(UserDict):
     data: dict[str, DialectHandler]
 
     @refresh
-    def load(self):
-        ...
+    def load(self): ...
 
     @refresh
     def get_installable(self, include=tuple(), exclude=tuple()) -> dict[str, str]:
@@ -311,8 +310,6 @@ class DialectScript:
     def __init__(self, handler: DialectHandler):
         self.handler = handler
 
-    def install(self, meeting: Meeting):
-        ...
+    def install(self, meeting: Meeting): ...
 
-    def remove(self, meeting: Meeting):
-        ...
+    def remove(self, meeting: Meeting): ...

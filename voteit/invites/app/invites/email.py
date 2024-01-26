@@ -24,7 +24,6 @@ class EmailSchema(BaseModel):
 
 @invite_adapter_registry
 class InviteEmail(InviteUserDataAdapter):
-
     """
     >>> rows = [['HI@betahaus.net']]
     >>> InviteEmail.preflight(['email'], rows)

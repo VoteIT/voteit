@@ -36,8 +36,7 @@ class InviteDataAdapter(ABC):
 
     @property
     @abstractmethod
-    def schema(self) -> type[BaseModel]:
-        ...
+    def schema(self) -> type[BaseModel]: ...
 
     @classproperty
     def title(self) -> str | _:
