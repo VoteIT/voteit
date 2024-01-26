@@ -121,9 +121,9 @@ class ExportERViewSet(viewsets.GenericViewSet):
             raise Http404("No data yet")
         serializer = self.get_serializer(self.get_export_qs(er), many=True)
         response = HttpResponse(content_type="text/csv")
-        response[
-            "Content-Disposition"
-        ] = f'attachment; filename="er_{er.pk}_export.csv"'
+        response["Content-Disposition"] = (
+            f'attachment; filename="er_{er.pk}_export.csv"'
+        )
         # FIXME:Get proper field headers
         writer = csv.DictWriter(response, fieldnames=serializer.child.fields)
         writer.writeheader()

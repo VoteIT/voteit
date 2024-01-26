@@ -50,8 +50,7 @@ class DialectRegistry(UserDict):
     data: dict[str, DialectHandler]
 
     @refresh
-    def load(self):
-        ...
+    def load(self): ...
 
     def get_partial_dialect(self, dialect: DialectSchema) -> dict[str, str]:
         return {
@@ -319,8 +318,6 @@ class DialectScript:
     def __init__(self, handler: DialectHandler):
         self.handler = handler
 
-    def install(self, meeting: Meeting):
-        ...
+    def install(self, meeting: Meeting): ...
 
-    def remove(self, meeting: Meeting):
-        ...
+    def remove(self, meeting: Meeting): ...

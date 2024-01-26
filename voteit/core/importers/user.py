@@ -41,16 +41,16 @@ class UserImporter(BaseImporter):
                         raise ValueError(
                             f"Duplicate email address: {deserialized.object.email}"
                         )
-                    email_to_import_pk[
-                        deserialized.object.email
-                    ] = deserialized.object.pk
+                    email_to_import_pk[deserialized.object.email] = (
+                        deserialized.object.pk
+                    )
                 if deserialized.object.username in username_to_import_pk:
                     raise ValueError(
                         f"Duplicate username in import: {deserialized.object.username}"
                     )
-                username_to_import_pk[
-                    deserialized.object.username
-                ] = deserialized.object.pk
+                username_to_import_pk[deserialized.object.username] = (
+                    deserialized.object.pk
+                )
             if get_model_shortname(deserialized.object) == "organisation":
                 if deserialized_organisation is not None:
                     sys.exit("Multiple organisations found in import file")

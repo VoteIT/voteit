@@ -52,12 +52,10 @@ class Registry(Dict[str, T]):
         super().__init__()
 
     @overload
-    def __call__(self, factory: T) -> T:
-        ...
+    def __call__(self, factory: T) -> T: ...
 
     @overload
-    def __call__(self, name: str) -> Callable[[T], T]:
-        ...
+    def __call__(self, name: str) -> Callable[[T], T]: ...
 
     def __call__(self, factory_or_name: Union[T, str]):
         if isinstance(factory_or_name, str):

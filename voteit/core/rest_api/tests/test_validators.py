@@ -5,7 +5,6 @@ from voteit.meeting.roles import ROLE_MODERATOR
 
 
 class ValidateGroupAIContextTests(TestCase):
-
     """
     Tested through DiscussionPostCreateSerializer
     """

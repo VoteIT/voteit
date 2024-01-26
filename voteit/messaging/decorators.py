@@ -1,6 +1,7 @@
 """
 Shorthand decorators for registries.
 """
+
 from typing import Type
 
 from envelope.core.channels import ContextChannel

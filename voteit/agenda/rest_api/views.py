@@ -71,9 +71,9 @@ class ExportAgendaItemsViewSet(viewsets.GenericViewSet):
         if not serializer.data:
             raise Http404("No data yet")
         response = HttpResponse(content_type="text/csv")
-        response[
-            "Content-Disposition"
-        ] = f'attachment; filename="agenda_items_m{meeting.pk}_export.csv"'
+        response["Content-Disposition"] = (
+            f'attachment; filename="agenda_items_m{meeting.pk}_export.csv"'
+        )
         writer = csv.DictWriter(response, fieldnames=serializer.child.fields)
         writer.writeheader()
         for row in serializer.data:

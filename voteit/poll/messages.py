@@ -66,8 +66,7 @@ class PollStatus(Message):
     data: PollStatusSchema
 
 
-class VoteBase(ContextAction, ABC):
-    ...
+class VoteBase(ContextAction, ABC): ...
 
 
 class AddVote(VoteBase, ABC):

@@ -84,8 +84,7 @@ class BaseImport(ABC):
 class BaseImporter(ABC):
     @property
     @abstractmethod
-    def import_class(self) -> type[BaseImport]:
-        ...
+    def import_class(self) -> type[BaseImport]: ...
 
     def __init__(self, using=DEFAULT_DB_ALIAS, filename=None, stream=None, format=None):
         self.using = using
@@ -126,8 +125,7 @@ class BaseImporter(ABC):
                         raise
 
     @abstractmethod
-    def run(self, **kwargs):
-        ...
+    def run(self, **kwargs): ...
 
     def get_remap_obj(self, shortname: str, curr_val: int) -> models.Model:
         assert isinstance(

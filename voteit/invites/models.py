@@ -129,9 +129,7 @@ class MeetingInviteManager(models.Manager):
         return result
 
     @has_exact_filter("meeting")
-    def find_mixed_user_data(
-        self, *items: dict[str, str]
-    ) -> Sequence[
+    def find_mixed_user_data(self, *items: dict[str, str]) -> Sequence[
         models.QuerySet[MeetingInvite],
         dict[str, models.QuerySet[MeetingInvite]],
     ]:

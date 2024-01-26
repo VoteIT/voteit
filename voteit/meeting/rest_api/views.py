@@ -275,9 +275,9 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
         if not serializer.data:
             raise Http404("No data yet")
         response = HttpResponse(content_type="text/csv")
-        response[
-            "Content-Disposition"
-        ] = f'attachment; filename="participants_m{meeting.pk}_export.csv"'
+        response["Content-Disposition"] = (
+            f'attachment; filename="participants_m{meeting.pk}_export.csv"'
+        )
         writer = csv.DictWriter(response, fieldnames=serializer.child.fields)
         writer.writeheader()
         for row in serializer.data:
@@ -325,9 +325,9 @@ class ExportMeetingGroupsViewSet(viewsets.GenericViewSet):
         if not serializer.data:
             raise Http404("No data yet")
         response = HttpResponse(content_type="text/csv")
-        response[
-            "Content-Disposition"
-        ] = f'attachment; filename="meting_groups_m{meeting.pk}_export.csv"'
+        response["Content-Disposition"] = (
+            f'attachment; filename="meting_groups_m{meeting.pk}_export.csv"'
+        )
         writer = csv.DictWriter(response, fieldnames=serializer.child.fields)
         writer.writeheader()
         for row in serializer.data:

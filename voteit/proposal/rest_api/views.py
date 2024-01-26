@@ -126,9 +126,9 @@ class ExportProposalsViewSet(viewsets.GenericViewSet):
         if not export_qs.exists():
             raise Http404("No data yet")
         response = HttpResponse(content_type="text/csv")
-        response[
-            "Content-Disposition"
-        ] = f'attachment; filename="proposals_{meeting.pk}_export.csv"'
+        response["Content-Disposition"] = (
+            f'attachment; filename="proposals_{meeting.pk}_export.csv"'
+        )
         # FIXME:Get proper field headers
         fieldnames = GenericExportProposalSerializer.get_all_field_names()
         writer = csv.DictWriter(response, fieldnames=fieldnames)

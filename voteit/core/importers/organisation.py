@@ -52,17 +52,17 @@ class OrganisationImporter(BaseImporter):
                         raise ValueError(
                             f"Duplicate email address: {deserialized.object.email}"
                         )
-                    email_to_import_pk[
-                        deserialized.object.email
-                    ] = deserialized.object.pk
+                    email_to_import_pk[deserialized.object.email] = (
+                        deserialized.object.pk
+                    )
                 # username
                 if deserialized.object.username in username_to_import_pk:
                     raise ValueError(
                         f"Duplicate username in import: {deserialized.object.username}"
                     )
-                username_to_import_pk[
-                    deserialized.object.username
-                ] = deserialized.object.pk
+                username_to_import_pk[deserialized.object.username] = (
+                    deserialized.object.pk
+                )
                 # userid
                 if deserialized.object.userid in userid_to_import_pk:
                     raise ValueError(
