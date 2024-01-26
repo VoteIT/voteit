@@ -8,13 +8,6 @@ from django.utils.functional import cached_property
 from django.utils.timezone import now
 from envelope.models import Connection
 
-try:
-    from voteit_org.models import Membership
-    from voteit_org.models import MembershipType
-except ImportError:
-    Membership = None
-    MembershipType = None
-
 from voteit.organisation.models import AccessToken
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
@@ -59,7 +52,7 @@ class InactiveOrgFilter(admin.SimpleListFilter):
         yield {
             "selected": self.value() is None,
             "query_string": changelist.get_query_string(remove=[self.parameter_name]),
-            "display": "Hide    ",
+            "display": "Hide",
         }
         for lookup, title in self.lookup_choices:
             yield {
@@ -69,90 +62,6 @@ class InactiveOrgFilter(admin.SimpleListFilter):
                 ),
                 "display": title,
             }
-
-
-class MemberYearFilter(admin.SimpleListFilter):
-    title = "Year"
-    parameter_name = "year"
-    search_param = "memberships__year"
-
-    def lookups(self, request, model_admin):
-        """
-        URL query str + Human-readable
-        """
-        if Membership:
-            values = []
-            if v := self.value():
-                if v.startswith("not"):
-                    values.append((f"not{v[3:]}", f"Negate {v[3:]}"))
-                else:
-                    values.append((f"not{v}", f"Negate {v}"))
-            values.extend(
-                [
-                    (x, x)
-                    for x in sorted(
-                        Membership.objects.values_list("year", flat=True).distinct()
-                    )
-                ]
-            )
-            return values
-        return ()
-
-    def queryset(self, request, queryset):
-        """
-        Returns the filtered queryset based on the value
-        provided in the query string and retrievable via
-        `self.value()`.
-        """
-        if v := self.value():
-            if v.startswith("not"):
-                v = v[3:]
-                return queryset.exclude(**{self.search_param: v})
-            else:
-                return queryset.filter(**{self.search_param: v})
-        return queryset
-
-
-class MemberTypeFilter(admin.SimpleListFilter):
-    title = "Membertype"
-    parameter_name = "mtype"
-    search_param = "memberships__membership_type"
-
-    def lookups(self, request, model_admin):
-        """
-        URL query str + Human-readable
-        """
-        if MembershipType:
-            values = []
-            if v := self.value():
-                if v.startswith("not"):
-                    if negated := MembershipType.objects.filter(pk=v[3:]).first():
-                        values.append((f"not{v[3:]}", f"Negate {negated.title}"))
-                else:
-                    if selected := MembershipType.objects.filter(pk=v).first():
-                        values.append((f"not{v}", f"Negate {selected.title}"))
-            values.extend(
-                [
-                    (x.pk, x.title)
-                    for x in sorted(MembershipType.objects.all().order_by("title"))
-                ]
-            )
-            return values
-        return ()
-
-    def queryset(self, request, queryset):
-        """
-        Returns the filtered queryset based on the value
-        provided in the query string and retrievable via
-        `self.value()`.
-        """
-        if v := self.value():
-            if v.startswith("not"):
-                v = v[3:]
-                return queryset.exclude(**{self.search_param: v})
-            else:
-                return queryset.filter(**{self.search_param: v})
-        return queryset
 
 
 @admin.register(Organisation)
@@ -166,15 +75,10 @@ class OrganisationAdmin(admin.ModelAdmin):
         "meeting_creator_count",
     )
     autocomplete_fields = ("mentions",)
-    list_filter = (
-        InactiveOrgFilter,
-        MemberYearFilter,
-        MemberTypeFilter,
-    )
+    list_filter = (InactiveOrgFilter,)
     actions = [
         "mark_as_active",
         "mark_as_inactive",
-        "mark_as_member",
     ]
 
     @admin.display(description="Managers")
@@ -184,7 +88,6 @@ class OrganisationAdmin(admin.ModelAdmin):
     @admin.display(description="Meeting Creators")
     def meeting_creator_count(self, obj: Organisation):
         return obj.meeting_creator__count
-        # return obj.roles.filter(assigned__contains=ROLE_MEETING_CREATOR).count()
 
     @admin.display(description="Online users")
     def users_count(self, obj: Organisation):
@@ -235,30 +138,6 @@ class OrganisationAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"Marked {changed} inactive",
-            messages.SUCCESS,
-        )
-
-    @admin.action(description="Create member for negated type and year")
-    def mark_as_member(self, request, queryset):
-        year = request.GET.get("year")
-        mtype = request.GET.get("mtype")
-        if not (year and year.startswith("not") and mtype and mtype.startswith("not")):
-            self.message_user(
-                request,
-                f"Both year and membership type must be selected and negated",
-                messages.ERROR,
-            )
-            return
-        year = year[3:]
-        mtype = mtype[3:]
-        queryset = queryset.exclude(memberships__year=year).exclude(
-            memberships__membership_type=mtype
-        )
-        for org in queryset:
-            org.memberships.create(year=year, membership_type_id=mtype)
-        self.message_user(
-            request,
-            f"{queryset.count()} organisations marked as members",
             messages.SUCCESS,
         )
 
