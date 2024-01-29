@@ -56,9 +56,13 @@ class RoomHandleSerializer(RoomSerializer):
                     )
             else:
                 instance.highlighted_proposals.all().delete()
-        vd_len = len(validated_data)
+            instance.signal_highlighted()
         # We DON'T want to save here if no data has changed - it will trigger other events
-        if "highlighted" in validated_data and vd_len > 1 or vd_len:
+        vd_len = len(validated_data)
+        if "highlighted" in validated_data:
+            if vd_len > 1:
+                return super().update(instance, validated_data)
+        elif vd_len:
             return super().update(instance, validated_data)
         return instance
 

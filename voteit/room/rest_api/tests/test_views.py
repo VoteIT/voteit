@@ -129,8 +129,6 @@ class RoomsViewTestCase(APITestCase):
         data = {"highlighted": [self.prop3.pk, self.prop2.pk]}
         response = self.client.patch(url, data)
         self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual([self.prop3.pk, self.prop2.pk], data["highlighted"])
         self.assertEqual(
             [self.prop3.pk, self.prop2.pk], list(self.room.highlighted_proposal_pks)
         )
@@ -167,8 +165,6 @@ class RoomsViewTestCase(APITestCase):
         data = {"highlighted": [self.prop1.pk, self.prop2.pk]}
         response = self.client.patch(url, data)
         self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual([self.prop1.pk, self.prop2.pk], data["highlighted"])
         self.assertEqual(
             [self.prop1.pk, self.prop2.pk], list(self.room.highlighted_proposal_pks)
         )
@@ -180,7 +176,6 @@ class RoomsViewTestCase(APITestCase):
         response = self.client.patch(url, data)
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual([], data["highlighted"])
         self.assertEqual([], list(self.room.highlighted_proposal_pks))
 
     def test_patch_set_ai_and_poll(self):

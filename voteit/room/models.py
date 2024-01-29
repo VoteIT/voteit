@@ -91,6 +91,11 @@ class Room(MeetingContext):
             .values_list("proposal", flat=True)
         )
 
+    def signal_highlighted(self):
+        from voteit.room.signals import highlighted_proposals_changed
+
+        highlighted_proposals_changed.send(sender=self.__class__, instance=self)
+
     def save(self, **kwargs):
         if self.poll != self._initial_poll_value and self._initial_show_ballot:
             self.show_ballot = False
