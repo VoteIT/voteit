@@ -19,6 +19,8 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.polls.simple import Simple
+from voteit.room.models import Room
+from voteit.speaker.models import SpeakerListSystem
 
 User = get_user_model()
 
@@ -112,6 +114,29 @@ class CreateMeetingSerializerTests(TestCase):
         self.assertFalse(serializer.errors)
         instance = serializer.save()
         self.assertIsNone(instance.er_policy_name)
+
+    def test_create_with_room(self):
+        serializer = self._mk_one(room={"title": "Room"})
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.save()
+        room = instance.rooms.first()
+        self.assertIsInstance(room, Room)
+        self.assertEqual("Room", room.title)
+
+    def test_create_with_sls(self):
+        serializer = self._mk_one(
+            room={"title": "Room"},
+            sls={"method_name": "simple", "safe_positions": 2},
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.save()
+        room = instance.rooms.first()
+        self.assertIsInstance(room, Room)
+        self.assertEqual("Room", room.title)
+        self.assertIsInstance(room.sls, SpeakerListSystem)
+        self.assertEqual(room.sls.safe_positions, 2)
 
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
