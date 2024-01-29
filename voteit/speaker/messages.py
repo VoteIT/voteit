@@ -23,6 +23,7 @@ from voteit.messaging.decorators import outgoing
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.rules import not_currently_speaking
+from voteit.speaker.workflows import SpeakerListWf
 
 
 class SpeakerListActionSchema(BaseModel):
@@ -123,6 +124,51 @@ class SetActiveList(ListMessage):
             msg = Status.from_message(self)
             websocket_send(msg, state=msg.SUCCESS)
             return msg
+
+
+class DeactivateListSchema(SpeakerListActionSchema):
+    close_list: bool = False
+
+
+@incoming
+class DeactivateList(ListMessage):
+    name = "speaker_list.deactivate"
+    permission = SpeakerListPermissions.CHANGE
+    model = SpeakerList
+    schema = DeactivateListSchema
+    data: DeactivateListSchema
+
+    def run_job(self) -> Status:
+        self.assert_perm()
+        if self.context.is_active_list:
+            if self.context.current is not None:
+                raise ValidationErrorMsg.from_message(
+                    self,
+                    msg=_("A speaker is currently speaking."),
+                    errors=[
+                        {
+                            "loc": ("sls",),
+                            "msg": _(
+                                "List '%(title)s' has an active speaker"
+                                % {
+                                    "title": self.context.title,
+                                }
+                            ),
+                            "type": "value.error",
+                        }
+                    ],
+                )
+            with set_actor(self.user):
+                self.context.speaker_system.active_list = None
+                self.context.speaker_system.save()
+                if self.data.close_list and self.context.state != SpeakerListWf.CLOSED:
+                    self.context.close()
+                self.context.save()
+
+        # Yes, indentation is correct. We'll want to send thumbs up even if nothing was done. No need to raise alarms.
+        msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
+        return msg
 
 
 @incoming

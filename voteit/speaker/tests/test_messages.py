@@ -21,6 +21,7 @@ from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 from voteit.speaker.roles import ROLE_SPEAKER
+from voteit.speaker.workflows import SpeakerListWf
 from voteit.speaker.workflows import SpeakerSystemWf
 
 User = get_user_model()
@@ -197,6 +198,55 @@ class SpeakerListSetActiveTests(TestCase):
         other_list.start_speaker(other_speaker)
         msg = self._mk_one()
         self.assertRaises(ValidationErrorMsg, msg.run_job)
+
+
+@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+class DeactivateListTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        meeting: Meeting = Meeting.objects.create()
+        cls.room = meeting.rooms.create()
+        cls.system = meeting.speaker_systems.create(
+            method_name="simple", state=SpeakerSystemWf.ACTIVE, room=cls.room
+        )
+        cls.list: SpeakerList = SpeakerList.objects.create(speaker_system=cls.system)
+        cls.user = User.objects.create(username="jane")
+        cls.system.add_roles(cls.user, ROLE_LIST_MODERATOR)
+        cls.system.active_list = cls.list
+        cls.system.save()
+
+    @property
+    def _cut(self):
+        from voteit.speaker.messages import DeactivateList
+
+        return DeactivateList
+
+    def _mk_one(self, **kw):
+        kw.setdefault("pk", self.list.pk)
+        return self._cut(mm={"user_pk": self.user.pk, "consumer_name": "abc"}, **kw)
+
+    def test_deactivate(self):
+        msg = self._mk_one()
+        response = msg.run_job()
+        self.assertIsInstance(response, Status)
+        self.system.refresh_from_db()
+        self.assertEqual(self.system.active_list, None)
+        self.list.refresh_from_db()
+        self.assertFalse(self.list.is_active_list)
+
+    def test_deactivate_with_active_speaker(self):
+        speaker = self.list.speaker_items.create(user=self.user)
+        self.list.start_speaker(speaker)
+        msg = self._mk_one()
+        with self.assertRaises(ValidationErrorMsg):
+            msg.run_job()
+
+    def test_deactivate_and_close_list(self):
+        msg = self._mk_one(close_list=True)
+        msg.run_job()
+        self.list.refresh_from_db()
+        self.assertEqual(SpeakerListWf.CLOSED, self.list.state)
+        self.assertFalse(self.list.is_active_list)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
