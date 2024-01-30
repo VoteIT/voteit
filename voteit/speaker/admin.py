@@ -32,8 +32,8 @@ class SLSystemAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
         "room",
     )
     search_fields = (
-        "title",
-        "meeting",
+        "room__title",
+        "meeting__title",
     )
 
     def get_queryset(self, request):
