@@ -216,6 +216,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
 
     @transition(
         field=state,
+        source=["+"],
         target=SpeakerSystemWf.ARCHIVED,
         permission=NOT_ALLOWED,
         custom={"title": _("Archive")},
