@@ -3,16 +3,20 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
+from django.db import models
 from django.db.models.signals import m2m_changed
-from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
+from django_fsm import TransitionNotAllowed
+from django_fsm import post_transition
+from django_fsm import pre_transition
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
+from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.core.messages.role_updates import RolesAdded
@@ -43,6 +47,7 @@ from voteit.speaker.models import SpeakerSystemRoles
 from voteit.speaker.rest_api.serializers import SpeakerListSerializer
 from voteit.speaker.rest_api.serializers import SpeakerListSystemSerializer
 from voteit.speaker.rest_api.serializers import SpeakerSerializer
+from voteit.speaker.workflows import SpeakerListWf
 from voteit.speaker.workflows import SpeakerSystemWf
 
 if TYPE_CHECKING:
@@ -165,6 +170,34 @@ def speaker_attached_through_m2m(
         and not pk_set.issubset(instance.order_list)
     ):
         instance.reorder()
+
+
+@receiver(pre_transition, sender=AgendaItem)
+def check_no_active_speaker(instance: AgendaItem, source: str, target: str, **kwargs):
+    if (
+        target == AgendaItemWf.CLOSED
+        and instance.speaker_lists.filter(current__isnull=False).exists()
+    ):
+        raise TransitionNotAllowed(
+            "Finish active speaker first", object=instance, method="close"
+        )
+
+
+@receiver(post_transition, sender=AgendaItem)
+def close_and_deactivate_when_ai_closes(
+    instance: AgendaItem, source: str, target: str, **kw
+):
+    if target == AgendaItemWf.CLOSED:
+        for slist in instance.speaker_lists.filter(
+            models.Q(state=SpeakerListWf.OPEN)
+            | models.Q(active_in_system__isnull=False)
+        ):
+            if slist.is_active_list:
+                slist.speaker_system.active_list = None
+                slist.speaker_system.save()
+            if slist.state != SpeakerListWf.CLOSED:
+                slist.close()
+                slist.save()
 
 
 # Channels

@@ -343,7 +343,6 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.system.save()
         url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
         data = {
-            "title": "Mkay",
             "settings": {
                 "very": "bogus",
             },
@@ -353,6 +352,15 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.assertEqual(200, response.status_code)
         self.system.refresh_from_db()
         self.assertEqual({"max_times": 0}, self.system.settings.dict())
+
+    def test_patch_with_odd_state(self):
+        self.system.archive()
+        self.system.save()
+        url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
+        data = {"show_time": True}
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data)
+        self.assertEqual(403, response.status_code)
 
     def test_method_name(self):
         url = reverse("speaker-list-systems-list")

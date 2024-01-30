@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
+from django_fsm import TransitionNotAllowed
 
 from envelope.core.channels import ContextChannel
 from envelope.messages.channels import Subscribe
@@ -20,6 +21,7 @@ from voteit.speaker.messages import SpeakerListAdded
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
+from voteit.speaker.workflows import SpeakerListWf
 from voteit.speaker.workflows import SpeakerSystemWf
 
 User = get_user_model()
@@ -270,6 +272,20 @@ class SignalListChangesTests(TestCase):
         deleted_pos = deleted_positions[0]
         for pos in changed_positions:
             self.assertLess(pos, deleted_pos)
+
+    def test_exception_when_trying_to_close_ai_with_active_speaker(self):
+        self.speaker_list.start_speaker(self.speaker)
+        with self.assertRaises(TransitionNotAllowed):
+            self.ai.close()
+
+    def test_close_lists_automatically_when_ai_closes(self):
+        self.system.active_list = self.speaker_list
+        self.assertTrue(self.speaker_list.is_active_list)
+        self.system.save()
+        self.ai.close()
+        self.speaker_list.refresh_from_db()
+        self.assertFalse(self.speaker_list.is_active_list)
+        self.assertEqual(SpeakerListWf.CLOSED, self.speaker_list.state)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
