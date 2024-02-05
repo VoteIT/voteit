@@ -9,9 +9,11 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
+from oauthlib.oauth2 import InvalidGrantError
 from requests.exceptions import ConnectionError as RConnectionError
 from requests.exceptions import JSONDecodeError
 from rest_framework.exceptions import APIException
+from rest_framework.exceptions import NotAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 
@@ -54,6 +56,10 @@ def get_identity_data(user: User) -> dict:
         )
         exc.status_code = 503
         raise exc
+    except InvalidGrantError:
+        raise NotAuthenticated(
+            detail=_("You need to login again to use invites"),
+        )
     # Not the correct serializer exception, but this is kind of the crash and burn...
     if not response.ok:
         try:
