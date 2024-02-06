@@ -20,6 +20,7 @@ from rest_framework.exceptions import ValidationError
 from voteit.core.permissions import NOT_ALLOWED
 
 if TYPE_CHECKING:
+    from pydantic import ValidationError as PydanticValidationError
     from django.db.models import Model
     from voteit.core.models import User
     from voteit.organisation.models import OAuth2Provider
@@ -219,3 +220,25 @@ def meeting_from_unsafe_data(serializer) -> Meeting:
             pass
     # Fail
     raise ValidationError(_("Can't find meeting"))
+
+
+def pydantic_to_drf_validation_error(error: PydanticValidationError) -> ValidationError:
+    """
+    >>> import pydantic
+    >>> class Number(pydantic.BaseModel):
+    ...     num: int
+    ...
+    >>> try:
+    ...     Number(num='a')
+    ... except pydantic.ValidationError as exc:
+    ...     new_exc = pydantic_to_drf_validation_error(exc)
+    >>> isinstance(new_exc, ValidationError)
+    True
+    >>> new_exc
+    ValidationError({'num': 'value is not a valid integer'})
+    """
+    eoutput = {}
+    for error in error.errors():
+        for loc in error["loc"]:
+            eoutput[loc] = error["msg"]
+    return ValidationError(eoutput)
