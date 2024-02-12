@@ -184,7 +184,7 @@ AUDITLOG_INCLUDE_TRACKING_MODELS = (
     },
     {
         "model": "invites.meetinginvite",
-        "exclude_fields": ["send_state", "last_sent", "used_at"] + _BC_EXCL,
+        "include_fields": ["state", "used_by", "meeting", "roles", "user_data"],
     },
     "meeting.meetingroles",
     {
@@ -281,6 +281,16 @@ AUDITLOG_INCLUDE_TRACKING_MODELS = (
             "settings_data",
             "safe_positions",
             "meeting_roles_to_speaker",
+        ],
+    },
+    {
+        "model": "room.room",
+        "include_fields": [
+            "open",
+            "title",
+            "meeting",
+            "send_sls",
+            "send_proposals",
         ],
     },
 )
