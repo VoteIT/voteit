@@ -18,6 +18,10 @@ class RoomAdmin(MeetingAdminMixin, admin.ModelAdmin):
         "user__last_nam",
         "user__userid",
     )
-    autocomplete_fields = ("handler",)
+    autocomplete_fields = (
+        "agenda_item",
+        "handler",
+        "poll",
+    )
     list_filter = ("meeting__organisation",)
     readonly_fields = ("meeting",)
