@@ -295,7 +295,7 @@ class MeetingInvite(MeetingContext):
         target=InviteWf.REJECTED,
         permission=NOT_ALLOWED,  # Special view, not a normal transition
     )
-    def reject(self, user: UserType | None):
+    def reject(self, user: UserType | None = None):
         if not user:
             return
         if user.pk is not None:
