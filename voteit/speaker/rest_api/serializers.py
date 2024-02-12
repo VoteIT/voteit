@@ -114,6 +114,8 @@ class CreateSpeakerListSystemSerializer(serializers.ModelSerializer):
             attrs.pop("settings", None)
         else:
             settings = attrs.get("settings", {})
+            if not isinstance(settings, dict):
+                attrs["settings"] = settings = {}
             try:
                 method.settings_schema(**settings)
             except ValueError as exc:

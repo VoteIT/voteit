@@ -89,8 +89,6 @@ class SpeakerListsViewTestCase(APITestCase):
         self.client.force_login(self.list_moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 400)
-        # How do we get a sane exception here?
-        # self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
 
     def test_list(self):
         url = reverse("speaker-lists-list")
@@ -286,6 +284,14 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual({"detail": "No item found where pk==-1"}, response.json())
+
+    def test_create_with_missing_settings(self):
+        room = self.meeting.rooms.create()
+        url = reverse("speaker-list-systems-list")
+        data = {"method_name": "priority", "room": room.pk, "settings": None}
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual({"max_times": 0}, response.json().get("settings"))
 
     def test_list(self):
         url = reverse("speaker-list-systems-list")
