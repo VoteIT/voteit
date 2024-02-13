@@ -18,7 +18,10 @@ _channel_layers_setting = {
 
 
 @patch.dict(environ, {"FRONTEND_VERSION": "1.2.3"})
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(
+    CHANNEL_LAYERS=_channel_layers_setting,
+    ENVELOPE_CONNECTIONS_QUEUE=None,
+)
 class FrontendVersionMessageTests(TestCase):
     @classmethod
     def setUpTestData(cls):

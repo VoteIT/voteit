@@ -113,3 +113,8 @@ class SetSeed:
         Execute all on_commit hooks and cleanup.
         """
         random.seed()
+
+
+testing_channel_layers_setting = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}

@@ -4,6 +4,7 @@ from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+from envelope.tests.helpers import testing_channel_layers_setting
 
 from voteit.agenda.messages import LastReadChangedSchema
 from voteit.agenda.models import AgendaItem
@@ -13,12 +14,9 @@ from voteit.agenda.rest_api.serializers import LastReadSerializer
 from voteit.core.testing import FakeCommit
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class UpdateLastReadTests(TestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
 

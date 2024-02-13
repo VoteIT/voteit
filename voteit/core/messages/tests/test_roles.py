@@ -2,22 +2,17 @@ from json import loads
 from unittest import mock
 from unittest.mock import patch
 
-from asgiref.sync import sync_to_async
 from channels.layers import get_channel_layer
-from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import TransactionTestCase
 from django.test import override_settings
-from django_rq import get_queue
-from fakeredis import FakeRedis
 from pydantic import ValidationError
 from pythonjsonlogger.jsonlogger import JsonFormatter
-from rq import SimpleWorker
-
 from envelope.consumer.websocket import WebsocketConsumer
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
+from envelope.tests.helpers import testing_channel_layers_setting
+
 from voteit.core.schemas import RoleOutput
 from voteit.core.testing import FakeCommit
 from voteit.meeting.models import Meeting
@@ -26,9 +21,6 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 json_formatter = JsonFormatter()
 
 
@@ -38,7 +30,7 @@ def _record_to_dict(record):
     return loads(output)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AvalableMeetingRolesTests(TestCase):
     def _mk_one(self, **kw):
         from voteit.core.messages.roles import AvailableRoles
@@ -57,7 +49,7 @@ class AvalableMeetingRolesTests(TestCase):
         self.assertIsInstance(response.data.roles[0], RoleOutput)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingRolesTests(TestCase):
     def setUp(self):
         self.user_a = User.objects.create(username="abel")
@@ -93,7 +85,7 @@ class MeetingRolesTests(TestCase):
             self.assertEqual({ROLE_PARTICIPANT, ROLE_MODERATOR}, set(data.items[0][1]))
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AddRolesTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -151,7 +143,7 @@ class AddRolesTests(TestCase):
             msg = self._mk_msg(self.moderator, [self.participant.pk], ["jeff"])
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class RemoveRolesTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 

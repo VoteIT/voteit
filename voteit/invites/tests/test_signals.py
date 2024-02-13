@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from envelope.channels.messages import Subscribe
+from envelope.tests.helpers import testing_channel_layers_setting
 
 from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
@@ -18,11 +19,12 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+    #    ENVELOPE_CONNECTIONS_QUEUE=None,
+)
 class AutoUseInviteTests(TestCase):
     def setUp(self):
         self.meeting = Meeting.objects.create()
@@ -60,7 +62,7 @@ class InvitesExpireWhenMeetingArchivedTests(TestCase):
         self.assertEqual(InviteWf.EXPIRED, self.inv1.state)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class InvitesSubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -95,7 +97,7 @@ class InvitesSubscribedTests(TestCase):
         self.assertEqual({True, False}, {x.has_annotations for x in payloads})
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingInviteSignalTests(TestCase):
     @classmethod
     def setUpTestData(cls):

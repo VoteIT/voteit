@@ -5,9 +5,10 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from pytz import UTC
-
 from envelope.channels.messages import Subscribe
 from envelope.messages.common import Batch
+from envelope.tests.helpers import testing_channel_layers_setting
+
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.messages import AgendaBodyAdded
 from voteit.agenda.messages import LastReadChanged
@@ -19,12 +20,9 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class SubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -94,7 +92,7 @@ class SubscribedTests(TestCase):
         self.assertEqual({"pk": self.ai.pk, "body": "Hello world"}, msg.p)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AgendaChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -169,7 +167,7 @@ class ArchiveAgendaTests(TestCase):
         self.assertEqual("archived", ai.state)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class RelatedItemsTests(TestCase):
     @classmethod
     def setUpTestData(cls):

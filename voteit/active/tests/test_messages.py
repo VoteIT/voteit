@@ -7,6 +7,7 @@ from django.test import override_settings
 from django.utils.timezone import now
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
+from envelope.tests.helpers import testing_channel_layers_setting
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.active.messages import PurgeInactiveUsers
@@ -20,12 +21,8 @@ from voteit.meeting.workflows import MeetingWf
 
 User = get_user_model()
 
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
-
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class SetActiveTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -101,7 +98,7 @@ class SetActiveTests(TestCase):
         )
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class PurgeInactiveUsersTests(TestCase):
     @classmethod
     def setUpTestData(cls):

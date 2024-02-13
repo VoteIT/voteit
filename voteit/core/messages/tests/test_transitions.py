@@ -3,13 +3,10 @@ from unittest import mock
 from django.test import TestCase, override_settings
 
 from envelope.tests.helpers import mk_consumer
-
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
+from envelope.tests.helpers import testing_channel_layers_setting
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class GetAllTransitionsTests(TestCase):
     @property
     def _cut(self):
