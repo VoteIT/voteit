@@ -13,12 +13,15 @@ from requests_oauthlib import OAuth2Session
 
 from voteit.core.abcs import OrganisationContext
 from voteit.core.fields import RichTextField
+from voteit.core.fields import RolesField
 from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.utils import relaxed_clean_html
 from voteit.core.utils import strict_clean_html
 from voteit.core.workflows import EnabledWf
+from voteit.organisation.roles import ROLE_MEETING_CREATOR
+from voteit.organisation.roles import ROLE_ORG_MANAGER
 from voteit.organisation.schemas import OAuthTokenSchema
 from voteit.organisation.utils import get_provider_response_adapters
 
@@ -36,12 +39,17 @@ class OrganisationRoles(OrganisationContext, Roles):
     """
 
     name = "organisation_roles"
+    valid_roles = {
+        ROLE_ORG_MANAGER: ROLE_ORG_MANAGER,
+        ROLE_MEETING_CREATOR: ROLE_MEETING_CREATOR,
+    }
 
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="organisation_roles",
     )
+    assigned: str = RolesField(role_choices=valid_roles.values(), max_length=30)
     context: Organisation = models.ForeignKey(
         "Organisation", on_delete=models.CASCADE, related_name="roles"
     )

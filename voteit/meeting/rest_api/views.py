@@ -31,6 +31,8 @@ from voteit.meeting.permissions import MeetingGroupPermissions
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.rest_api import serializers
 from voteit.meeting.rest_api.filters import MeetingRolesFilter
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation.models import Organisation
 
 __all__ = (
@@ -133,7 +135,9 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             raise ValidationError({"meeting": ["No such meeting"]})
         # FIXME: Public meeting is used in an odd way in frontend. This needs to be cleaned up.
         # Related to #206
-        if not meeting.has_any_roles(self.request.user, "participant", "moderator"):
+        if not meeting.has_any_roles(
+            self.request.user, ROLE_PARTICIPANT, ROLE_MODERATOR
+        ):
             raise PermissionDenied()
         return self.queryset.filter(context=meeting).prefetch_related("user")
 
@@ -271,9 +275,9 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
         if not serializer.data:
             raise Http404("No data yet")
         response = HttpResponse(content_type="text/csv")
-        response[
-            "Content-Disposition"
-        ] = f'attachment; filename="participants_m{meeting.pk}_export.csv"'
+        response["Content-Disposition"] = (
+            f'attachment; filename="participants_m{meeting.pk}_export.csv"'
+        )
         writer = csv.DictWriter(response, fieldnames=serializer.child.fields)
         writer.writeheader()
         for row in serializer.data:
@@ -321,9 +325,9 @@ class ExportMeetingGroupsViewSet(viewsets.GenericViewSet):
         if not serializer.data:
             raise Http404("No data yet")
         response = HttpResponse(content_type="text/csv")
-        response[
-            "Content-Disposition"
-        ] = f'attachment; filename="meting_groups_m{meeting.pk}_export.csv"'
+        response["Content-Disposition"] = (
+            f'attachment; filename="meting_groups_m{meeting.pk}_export.csv"'
+        )
         writer = csv.DictWriter(response, fieldnames=serializer.child.fields)
         writer.writeheader()
         for row in serializer.data:
@@ -361,7 +365,5 @@ class MeetingDialectsViewSet(viewsets.ViewSet):
             organisation=request.user.organisation
         )
         return Response(
-            data=[
-                {"name": x[0], "title": x[1]} for x in sorted(org_installable.items())
-            ]
+            data=sorted(org_installable.values(), key=lambda item: item.get("name"))
         )

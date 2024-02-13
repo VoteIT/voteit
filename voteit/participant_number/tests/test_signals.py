@@ -9,6 +9,8 @@ from django.test import override_settings
 from envelope.channels.messages import Subscribe
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -26,9 +28,9 @@ class SignalsTests(TestCase):
         cls.user_a = User.objects.create(username="a")
         cls.user_b = User.objects.create(username="b")
         cls.user_c = User.objects.create(username="c")
-        cls.meeting.add_roles(cls.user_a, "participant", "moderator")
-        cls.meeting.add_roles(cls.user_b, "participant")
-        cls.meeting.add_roles(cls.user_c, "participant")
+        cls.meeting.add_roles(cls.user_a, ROLE_PARTICIPANT, ROLE_MODERATOR)
+        cls.meeting.add_roles(cls.user_b, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.user_c, ROLE_PARTICIPANT)
         cls.pn_sys: PNSystem = PNSystem.objects.create(meeting=cls.meeting)
         cls.one = cls.pn_sys.numbers.create(user=cls.user_a)
         cls.two = cls.pn_sys.numbers.create(user=cls.user_b)

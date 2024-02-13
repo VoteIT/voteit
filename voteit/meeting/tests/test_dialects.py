@@ -10,6 +10,8 @@ from voteit.core.workflows import EnabledWf
 from voteit.meeting.dialects import get_named_paths
 from voteit.meeting.exceptions import DialectError
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.tests.fixtures import CYCLIC_DIALECT_FIXTURES
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 from voteit.organisation.models import Organisation
@@ -76,7 +78,7 @@ class DialectHandlerTests(TestCase):
 
     def test_install_adjusts_groups_and_roles(self):
         group_role = self.meeting.group_roles.create(
-            title="Jeff", role_id="supervisor", roles=["discusser"]
+            title="Jeff", role_id="supervisor", roles=[ROLE_DISCUSSER]
         )
         group = self.meeting.groups.create(title="Jane", groupid="board")
         handler = self._cut.load_from_dict(dialect_named_test)
@@ -84,7 +86,7 @@ class DialectHandlerTests(TestCase):
         group_role.refresh_from_db()
         group.refresh_from_db()
         self.assertEqual("Supervisor", group_role.title)
-        self.assertEqual(["discusser", "proposer"], group_role.roles)
+        self.assertEqual([ROLE_DISCUSSER, ROLE_PROPOSER], group_role.roles)
         self.assertEqual("Board", group.title)
 
     def test_install_with_script(self):
@@ -168,6 +170,15 @@ class DialectHandlerTests(TestCase):
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
 class DialectRegistryTests(TestCase):
+    one = {"description": "", "name": "one", "title": "Hello"}
+    two = {"description": "", "name": "two", "title": "Two!"}
+    three = {"description": "", "name": "three", "title": "Three"}
+    main_subst = {
+        "description": "Main and substitute roles",
+        "name": "main_subst",
+        "title": "Main/subst",
+    }
+
     @classmethod
     def setUpTestData(cls):
         from voteit.meeting.dialects import DialectRegistry
@@ -176,19 +187,19 @@ class DialectRegistryTests(TestCase):
 
     def test_get_installable(self):
         self.assertEqual(
-            {"three": "Three", "main_subst": "Main/subst", "two": "Two!"},
+            {"two": self.two, "three": self.three, "main_subst": self.main_subst},
             self.registry.get_installable(),
         )
         self.assertEqual(
-            {"three": "Three", "main_subst": "Main/subst"},
+            {"three": self.three, "main_subst": self.main_subst},
             self.registry.get_installable(exclude={"two"}),
         )
         self.assertEqual(
             {
-                "main_subst": "Main/subst",
-                "one": "Hello",
-                "three": "Three",
-                "two": "Two!",
+                "one": self.one,
+                "two": self.two,
+                "three": self.three,
+                "main_subst": self.main_subst,
             },
             self.registry.get_installable(include={"one"}),
         )
@@ -222,7 +233,7 @@ class DialectRegistryTests(TestCase):
     def test_get_org_installable(self):
         org = Organisation.objects.create()
         self.assertEqual(
-            {"main_subst": "Main/subst", "three": "Three", "two": "Two!"},
+            {"two": self.two, "three": self.three, "main_subst": self.main_subst},
             self.registry.get_org_installable(org),
         )
         org.components.create(
@@ -234,7 +245,7 @@ class DialectRegistryTests(TestCase):
             state=EnabledWf.ON,
         )
         self.assertEqual(
-            {"one": "Hello"},
+            {"one": self.one},
             self.registry.get_org_installable(org),
         )
 

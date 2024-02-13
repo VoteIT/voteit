@@ -6,7 +6,11 @@ from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation.models import OAuth2Provider
+from voteit.organisation.models import Organisation
+from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 User = get_user_model()
 
@@ -16,9 +20,6 @@ class UserSearchViewSetTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.organisation.models import Organisation
-
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
         cls.org_manager = User.objects.get(username="org_manager")
@@ -30,9 +31,9 @@ class UserSearchViewSetTests(APITestCase):
         cls.other_meeting_user = cls.other_org.users.create(
             username="other_meeting_user"
         )
-        cls.other_meeting.add_roles(cls.other_meeting_user, "participant")
+        cls.other_meeting.add_roles(cls.other_meeting_user, ROLE_PARTICIPANT)
         cls.other_org_manager = cls.other_org.users.create(username="other_org_manager")
-        cls.other_org.add_roles(cls.other_org_manager, "org_manager")
+        cls.other_org.add_roles(cls.other_org_manager, ROLE_ORG_MANAGER)
         # And superuser
         cls.superuser = User.objects.create(
             username="super", is_superuser=True, organisation=cls.other_org

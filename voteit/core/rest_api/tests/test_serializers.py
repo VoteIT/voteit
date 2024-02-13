@@ -8,8 +8,10 @@ from django.test import TestCase
 from django.utils.timezone import now
 from rest_framework.serializers import ModelSerializer
 
+from voteit.agenda.models import AgendaItem
 from voteit.core.testing import mk_hashtag
 from voteit.core.testing import mk_usertag
+from voteit.meeting.models import Meeting
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 
@@ -23,8 +25,6 @@ class RichTextSerializerMixinTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         # Testing abstract model through agenda item model
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
         from voteit.core.rest_api.serializers import RichTextSerializerMixin
 
         cls.meeting: Meeting = Meeting.objects.create()
@@ -52,6 +52,17 @@ class RichTextSerializerMixinTests(TestCase):
         self.assertFalse(serializer.errors)
         serializer.save()
         self.assertTrue(self.ai.mentions.filter(pk=self.user.pk).exists())
+
+    def test_body_mentions_dont_fetch_update(self):
+        self.assertFalse(self.ai.mentions.filter(pk=self.user.pk).exists())
+        body = f"Hello {mk_usertag(self.user.pk)} what's up?"
+        serializer = self.Serializer(self.ai, data={"body": body}, partial=True)
+        serializer.add_body_mentions = False
+        serializer.is_valid(raise_exception=False)
+        # So we see errors in the failed tests
+        self.assertFalse(serializer.errors)
+        serializer.save()
+        self.assertFalse(self.ai.mentions.filter(pk=self.user.pk).exists())
 
     def test_body_mentions_with_nonexisting_user(self):
         # Shouldn't kill setting text
@@ -87,6 +98,28 @@ class RichTextSerializerMixinTests(TestCase):
         self.assertFalse(serializer.errors)
         serializer.save()
         self.assertEqual(["körvi", "participants", "sup"], self.ai.tags)
+
+    def test_bad_body_tags(self):
+        body = f"{mk_hashtag('S!P')}"
+        serializer = self.Serializer(self.ai, data={"body": body}, partial=True)
+        serializer.is_valid(raise_exception=False)
+        self.assertIn("body", serializer.errors)
+
+    def test_bad_tag_update(self):
+        serializer = self.Serializer(
+            self.ai, data={"tags": [" w e ", "are"]}, partial=True
+        )
+        serializer.is_valid()
+        self.assertIn("tags", serializer.errors)
+
+    def test_dont_add_body_tags(self):
+        body = f"{mk_hashtag('SUP')} all {mk_hashtag('participants')}? {mk_hashtag('KörVi')}!"
+        serializer = self.Serializer(self.ai, data={"body": body}, partial=True)
+        serializer.add_body_tags = False
+        serializer.is_valid(raise_exception=False)
+        self.assertFalse(serializer.errors)
+        serializer.save()
+        self.assertEqual([], self.ai.tags)
 
     def test_body_tags_plus_specified(self):
         body = f"{mk_hashtag('SUP')} all {mk_hashtag('participants')}? {mk_hashtag('KörVi')}!"

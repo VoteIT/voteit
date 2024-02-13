@@ -1,7 +1,14 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_PROPOSER
+from voteit.speaker.models import SpeakerList
+from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.roles import ROLE_LIST_MODERATOR
+from voteit.speaker.roles import ROLE_SPEAKER
 
 User = get_user_model()
 
@@ -9,19 +16,13 @@ User = get_user_model()
 class SpeakerListTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.speaker.roles import ROLE_SPEAKER
-        from voteit.speaker.roles import ROLE_LIST_MODERATOR
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_MODERATOR
-        from voteit.speaker.models import SpeakerListSystem
-        from voteit.speaker.models import SpeakerList
-        from voteit.meeting.roles import ROLE_PROPOSER
-
         cls.meeting: Meeting = Meeting.objects.create()
+        cls.room = cls.meeting.rooms.create()
         cls.system: SpeakerListSystem = cls.meeting.speaker_systems.create(
             method_name="simple",
             state="active",
             meeting_roles_to_speaker=[ROLE_PROPOSER],
+            room=cls.room,
         )
         cls.user_meeting_moderator = User.objects.create(username="moderator")
         cls.meeting.add_roles(cls.user_meeting_moderator, ROLE_MODERATOR)
@@ -76,13 +77,11 @@ class SpeakerListTests(TestCase):
 
     def test_view_speaker_meeting(self):
         VIEW = self.p("VIEW")
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
         self.system.meeting = meeting
         self.system.save()
         meeting_participant = User.objects.create(username="participant")
-        meeting.add_roles(meeting_participant, "participant")
+        meeting.add_roles(meeting_participant, ROLE_PARTICIPANT)
         self.assertTrue(self.user_list_moderator.has_perm(VIEW, self.list))
         self.assertTrue(self.user_speaker.has_perm(VIEW, self.list))
         self.assertFalse(self.user_any.has_perm(VIEW, self.list))
@@ -172,12 +171,11 @@ class SpeakerListTests(TestCase):
 class SpeakerListSystemTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.speaker.roles import ROLE_LIST_MODERATOR, ROLE_SPEAKER
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_PARTICIPANT
-
         cls.meeting = Meeting.objects.create()
-        cls.system = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.room = cls.meeting.rooms.create()
+        cls.system = cls.meeting.speaker_systems.create(
+            method_name="simple", room=cls.room
+        )
         cls.user_meeting_moderator = User.objects.create(username="m_moderator")
         cls.meeting.add_roles(cls.user_meeting_moderator, ROLE_MODERATOR)
         cls.user_list_moderator = User.objects.create(username="s_moderator")
@@ -200,10 +198,10 @@ class SpeakerListSystemTests(TestCase):
     def test_add_system(self):
         # FIXME We have no clue about contextless yet
         ADD = self.p("ADD")
-        self.assertTrue(self.user_meeting_moderator.has_perm(ADD, self.meeting))
-        self.assertFalse(self.user_list_moderator.has_perm(ADD, self.meeting))
-        self.assertFalse(self.user_speaker.has_perm(ADD, self.meeting))
-        self.assertFalse(self.user_any.has_perm(ADD, self.meeting))
+        self.assertTrue(self.user_meeting_moderator.has_perm(ADD, self.room))
+        self.assertFalse(self.user_list_moderator.has_perm(ADD, self.room))
+        self.assertFalse(self.user_speaker.has_perm(ADD, self.room))
+        self.assertFalse(self.user_any.has_perm(ADD, self.room))
 
     def test_change_system(self):
         CHANGE = self.p("CHANGE")
@@ -244,15 +242,6 @@ class SpeakerListSystemTests(TestCase):
         self.assertIs(self.user_speaker.has_perm(DELETE, self.system), False)
         self.assertIs(self.user_any.has_perm(DELETE, self.system), False)
 
-    def test_view_system_contextless(self):
-        self.system.meeting = None
-        self.system.save()
-        VIEW = self.p("VIEW")
-        self.assertIs(self.user_meeting_moderator.has_perm(VIEW, self.system), False)
-        self.assertTrue(self.user_list_moderator.has_perm(VIEW, self.system))
-        self.assertTrue(self.user_speaker.has_perm(VIEW, self.system))
-        self.assertFalse(self.user_any.has_perm(VIEW, self.system))
-
     def test_view_system_meeting(self):
         VIEW = self.p("VIEW")
         self.assertIs(self.user_meeting_moderator.has_perm(VIEW, self.system), True)
@@ -264,19 +253,13 @@ class SpeakerListSystemTests(TestCase):
 class SpeakerPermissionTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.speaker.roles import ROLE_SPEAKER
-        from voteit.speaker.roles import ROLE_LIST_MODERATOR
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_MODERATOR
-        from voteit.speaker.models import SpeakerListSystem
-        from voteit.speaker.models import SpeakerList
-        from voteit.meeting.roles import ROLE_PROPOSER
-
         cls.meeting: Meeting = Meeting.objects.create()
+        cls.room = cls.meeting.rooms.create()
         cls.system: SpeakerListSystem = cls.meeting.speaker_systems.create(
             method_name="simple",
             state="active",
             meeting_roles_to_speaker=[ROLE_PROPOSER],
+            room=cls.room,
         )
         cls.user_meeting_moderator = User.objects.create(username="moderator")
         cls.meeting.add_roles(cls.user_meeting_moderator, ROLE_MODERATOR)

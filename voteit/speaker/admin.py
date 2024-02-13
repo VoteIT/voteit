@@ -11,13 +11,29 @@ from voteit.speaker.models import SpeakerSystemRoles
 @admin.register(SpeakerListSystem)
 class SLSystemAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = "state"
-    list_display = ("title", "meeting_link", "method_name", "state")
-    list_filter = ("meeting__organisation", "method_name", "state")
-    readonly_fields = ("active_list",)
-    autocomplete_fields = ("meeting",)
-    search_fields = (
-        "title",
+    list_display = (
+        "room",
+        "meeting_link",
+        "method_name",
+        "state",
+    )
+    list_filter = (
+        "meeting__organisation",
+        "method_name",
+        "state",
+    )
+    readonly_fields = (
+        "active_list",
         "meeting",
+        "room",
+    )
+    autocomplete_fields = (
+        "meeting",
+        "room",
+    )
+    search_fields = (
+        "room__title",
+        "meeting__title",
     )
 
     def get_queryset(self, request):
@@ -65,7 +81,7 @@ class SLAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
 @admin.register(SpeakerSystemRoles)
 class SpeakerSystemRolesAdmin(MeetingAdminMixin, admin.ModelAdmin):
     autocomplete_fields = "user", "context"
-    list_display = "user", "meeting_link", "assigned"
+    list_display = "user", "meeting_link", "get_assigned"
     list_filter = ("user__organisation",)
     search_fields = (
         "context__title",
@@ -73,6 +89,9 @@ class SpeakerSystemRolesAdmin(MeetingAdminMixin, admin.ModelAdmin):
         "user__first_name",
         "user__userid",
     )
+
+    def get_assigned(self, instance):
+        return instance.assigned
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

@@ -13,6 +13,7 @@ from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
 from django.http import HttpResponseBadRequest
+from django.http import HttpResponseForbidden
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from oauthlib.oauth2 import OAuth2Error
@@ -32,13 +33,14 @@ logger = getLogger(__name__)
 
 
 def begin_auth(request):
-    # FIXME: Very early, for testing
     host = request.get_host()
     hostname = host.split(":")[0]
     try:
         organisation = Organisation.objects.get(host=hostname)
     except Organisation.DoesNotExist:
         raise Http404("No organisation with host %s" % hostname)
+    if not organisation.active:
+        return HttpResponseForbidden("This organisation is no longer active")
     try:
         provider = organisation.provider
     except Organisation.provider.RelatedObjectDoesNotExist as exc:

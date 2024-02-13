@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import functools
 from abc import abstractmethod
 from datetime import datetime
 from logging import getLogger
+from operator import or_
 from typing import TYPE_CHECKING
 
 from django.conf import settings
@@ -177,45 +179,31 @@ class RoleContextMixin(OrganisationContext):
 
     @real_user_only
     def has_roles(self, user: User, *roles: str | Role) -> bool:
-        q = self.roles_to_strings(*roles)
-        return self.roles_cls.objects.filter(
-            user=user, context=self, assigned__contains=q
-        ).exists()
+        qs = self.roles_cls.objects.filter(user=user, context=self)
+        for role in roles:
+            qs = qs.filter(assigned__contains=role)
+        return qs.exists()
 
     @real_user_only
     def has_any_roles(self, user: User, *roles: str | Role) -> bool:
-        q = self.roles_to_strings(*roles)
-        return self.roles_cls.objects.filter(
-            user=user, context=self, assigned__overlap=q
-        ).exists()
+        qs = self.roles_cls.objects.filter(user=user, context=self)
+        or_queries = functools.reduce(
+            or_, [models.Q(assigned__contains=r) for r in roles]
+        )
+        return qs.filter(or_queries).exists()
 
     def get_userids_with_roles(self, *roles: str | Role):
-        q = self.roles_to_strings(*roles)
-        return self.roles_cls.objects.filter(
-            context=self,
-            assigned__contains=q,
-        ).values_list("user", flat=True)
+        qs = self.roles_cls.objects.filter(context=self)
+        for role in roles:
+            qs = qs.filter(assigned__contains=role)
+        return qs.values_list("user", flat=True)
 
     def get_userids_with_any_roles(self, *roles):
-        q = self.roles_to_strings(*roles)
-        return self.roles_cls.objects.filter(
-            context=self, assigned__overlap=q
-        ).values_list("user", flat=True)
-
-    def roles_to_strings(self, *roles):
-        r = []
-        for role in roles:
-            if isinstance(role, Role):
-                r.append(role.name)
-            elif isinstance(role, str):
-                r.append(role)
-            else:
-                raise ValueError(f"{role} is not a str or Role object")
-        return r
-
-    def filter_valid_roles(self, *roles: Role | str) -> set[str]:
-        items = self.roles_to_strings(*roles)
-        return {x for x in items if x in self.roles_cls.valid_roles}
+        qs = self.roles_cls.objects.filter(context=self)
+        or_queries = functools.reduce(
+            or_, [models.Q(assigned__contains=r) for r in roles]
+        )
+        return qs.filter(or_queries).values_list("user", flat=True)
 
     class Meta:
         abstract = True
@@ -224,14 +212,15 @@ class RoleContextMixin(OrganisationContext):
 class Roles(ABCModel):
     """Context for role assignments"""
 
-    valid_roles: dict = None  # Don't instantiate dict here!
+    assigned: list[str] | set[str]
+    valid_roles: dict[str, Role]
+
     # It's a good idea to override the user relation to have a sane related_name
     user: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="roles_%(app_label)s_%(class)s",
     )
-    assigned: list[str] = ArrayField(models.CharField(max_length=20), default=tuple)
 
     @property
     @abstractmethod
@@ -247,31 +236,29 @@ class Roles(ABCModel):
 
     def add(self, *roles: Role | str) -> set[Role] | None:
         checked = self.validate_roles(*roles)
-        assigned = set(self.assigned)
-        query_add = {x.name for x in self.get_required_roles(*checked)}
+        assigned = {self.valid_roles[x] for x in self.assigned}
+        query_add = self.get_required_roles(*checked)
         new_roles = query_add - assigned
         if new_roles:
-            self.assigned = sorted(set(self.assigned) | new_roles)
+            self.assigned = assigned | new_roles
             self.save()
-            role_objs = [self.valid_roles[x] for x in new_roles]
-            roles_added.send(sender=self.__class__, instance=self, roles=role_objs)
-            return role_objs
+            roles_added.send(sender=self.__class__, instance=self, roles=new_roles)
+            return new_roles
         return None
 
     def remove(self, *roles: Role | str) -> set[Role] | None:
         checked = self.validate_roles(*roles)
         assigned = set(self.assigned)
-        query_remove = {x.name for x in self.get_reverse_required_roles(*checked)}
+        query_remove = self.get_reverse_required_roles(*checked)
         remove_roles = assigned & query_remove
         if remove_roles:
-            self.assigned = sorted(set(self.assigned) - remove_roles)
+            self.assigned = assigned - remove_roles
             self.save()
-            role_objs = [self.valid_roles[x] for x in remove_roles]
-            roles_removed.send(sender=self.__class__, instance=self, roles=role_objs)
+            roles_removed.send(sender=self.__class__, instance=self, roles=remove_roles)
             # Cleanup roles if all were removed
             if not self.assigned:
                 self.delete()
-            return role_objs
+            return remove_roles
         return None
 
     def get_required_roles(self, *roles: Role) -> set[Role]:
@@ -298,24 +285,9 @@ class Roles(ABCModel):
                 x = self.valid_roles[x]
             else:
                 assert isinstance(x, Role), f"{x} is not an instance of Role"
-            assert (
-                x.name in self.valid_roles
-            ), f"{x} is not a valid role for this context"
+            assert x in self.valid_roles, f"{x} is not a valid role for this context"
             found.add(x)
         return found
-
-    @classmethod
-    def add_valid(cls, *roles: Role):
-        """Assign a Role instance as a valid choice here."""
-        for role in roles:
-            assert isinstance(role, Role)
-            assert (
-                role.roles_cls is None
-            ), "Role already assigned as valid choice on another Roles model"
-            role.roles_cls = cls
-            if cls.valid_roles is None:
-                cls.valid_roles = {}
-            cls.valid_roles[role.name] = role
 
     def __contains__(self, role: Role | str):
         if isinstance(role, Role):
@@ -328,6 +300,7 @@ class Roles(ABCModel):
         return f"{related._meta.app_label}.{related._meta.model_name.lower()}"
 
     def save(self, **kwargs):
+        # FIXME: This will cause a lot of lookups
         if self.user.organisation is None:
             # Just skip this
             ...
@@ -341,6 +314,12 @@ class Roles(ABCModel):
                     f"User {self.user} is attached to another organisation."
                 )
         super().save(**kwargs)
+
+    def __str__(self):
+        return f"{self.__class__.__name__} ({self.pk}) {getattr(self.context, 'title', self.context)}"
+
+    def __repr__(self):
+        return f"{self.__class__.__name__} ({self.pk})"
 
     # annotations
     objects: models.Manager

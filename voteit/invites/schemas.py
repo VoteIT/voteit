@@ -32,6 +32,25 @@ class InvitesMetaMixinSchema(BaseModel):
 
 
 class RowColInvitesBaseSchema(BaseModel):
+    r"""<- Note raw string for doctests here!
+    >>> s = RowColInvitesBaseSchema
+
+    Double empty should be okay
+    >>> s(columns={'email'}, rows=[[''], ['hello@voteit.se'], ['']]).dict(include={'rows'})
+    {'rows': [['hello@voteit.se']]}
+
+    As text
+    >>> s(columns={'email'}, rows="  \n \n hello@voteit.se \n \n ").dict(include={'rows'})
+    {'rows': [['hello@voteit.se']]}
+
+    With important data outside included columns
+    >>> s(columns={'email'}, rows=[['', 'hello@voteit.se']])
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError: 1 validation error for RowColInvitesBaseSchema
+        rows
+    """
+
     columns: conlist(
         constr(
             strip_whitespace=True,
@@ -66,7 +85,9 @@ class RowColInvitesBaseSchema(BaseModel):
             result = []
             for i, row in enumerate(v):
                 if isinstance(row, str):
-                    result.append([x.strip() for x in row.split("\t")])
+                    row = [x.strip() for x in row.split("\t")]
+                    if any(row):
+                        result.append(row)
                 elif isinstance(row, list):
                     row = [x.strip() if isinstance(x, str) else x for x in row]
                     if any(row):
@@ -83,6 +104,33 @@ class RowColInvitesBaseSchema(BaseModel):
         raise ValueError("Initial value of rows must be either string or list")
 
     @validator("rows")
+    def check_important_data_outside_read_columns(
+        cls, v: list[list[str]], values: dict
+    ):
+        col_len = len(values["columns"])
+        bad_rows = []
+        first_offender = None
+        for i, row in enumerate(v):
+            if any(row[col_len:]):
+                if first_offender is None:
+                    first_offender = row
+                bad_rows.append(i)
+
+        if bad_rows:
+            msg = (
+                f"You have rows that contain data that wouldn't be used since they have to many columns. "
+                f"Example on line {bad_rows[0]} - with tabs replaced:\n'%s'\n"
+                % "', '".join(first_offender)
+            )
+            if len(bad_rows) > 1:
+                if len(bad_rows) > 5:
+                    msg += f"\nThere are {len(bad_rows)-1} other lines too - check your data."
+                else:
+                    msg += "\n%s are also too long" % ",".join(bad_rows[1:])
+            raise ValueError(msg)
+        return v
+
+    @validator("rows")
     def check_user_data_intersections(cls, v: list[list[str]], values: dict):
         reg = get_invite_adapter_registry()
         reg.check_intersections(values["columns"], v)
@@ -94,8 +142,8 @@ class AddMixedUserDataInvitesSchema(RowColInvitesBaseSchema, InvitesMetaMixinSch
 
     Initial validation before touching the db. Very basic checks.
     The structure will be transformed later on to relevant data structure.
-
-    >>> base_qs = {'meeting': 1, 'roles': ['participant']}
+    >>> from voteit.meeting.roles import ROLE_PARTICIPANT
+    >>> base_qs = {'meeting': 1, 'roles': [str(ROLE_PARTICIPANT)]}
 
     Single line
     >>> AddMixedUserDataInvitesSchema(columns=['email'], rows=[["one@betahaus.net"], ["two@betahaus.net"]], **base_qs).dict(exclude_unset=True, exclude={'meeting', 'roles'})

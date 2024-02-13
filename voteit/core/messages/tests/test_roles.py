@@ -22,6 +22,7 @@ from voteit.core.schemas import RoleOutput
 from voteit.core.testing import FakeCommit
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
@@ -54,8 +55,6 @@ class AvalableMeetingRolesTests(TestCase):
         response = await msg.run(consumer=consumer)
         self.assertIsInstance(response, AvailableRolesResponse)
         self.assertIsInstance(response.data.roles[0], RoleOutput)
-        self.assertIsNotNone(response.data.roles[0].roles_cls_natural_key)
-        self.assertIsNotNone(response.data.roles[0].context_natural_key)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -67,7 +66,7 @@ class MeetingRolesTests(TestCase):
         self.meeting = Meeting.objects.create()
 
     def test_get_meeting_roles_unauthorized(self):
-        self.meeting.add_roles(self.user_a, "participant", "moderator")
+        self.meeting.add_roles(self.user_a, ROLE_PARTICIPANT, ROLE_MODERATOR)
         from voteit.core.messages.roles import GetRoles
 
         msg = GetRoles(pk=self.meeting.pk, model="meeting")
@@ -77,7 +76,7 @@ class MeetingRolesTests(TestCase):
         from voteit.core.messages.roles import GetRoles
         from voteit.core.messages.roles import AssignedRolesResponse
 
-        self.meeting.add_roles(self.user_a, "participant", "moderator")
+        self.meeting.add_roles(self.user_a, ROLE_PARTICIPANT, ROLE_MODERATOR)
         msg = GetRoles(
             mm={"user_pk": self.user_a.pk, "consumer_name": "abc"},
             pk=self.meeting.pk,
@@ -91,7 +90,7 @@ class MeetingRolesTests(TestCase):
             data = response.data
             self.assertEqual(1, len(data.items))
             self.assertIn(self.user_a.pk, [x[0] for x in data.items])
-            self.assertEqual({"participant", "moderator"}, set(data.items[0][1]))
+            self.assertEqual({ROLE_PARTICIPANT, ROLE_MODERATOR}, set(data.items[0][1]))
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -132,7 +131,7 @@ class AddRolesTests(TestCase):
                 "meeting": 1,
                 "actor": 1,
                 "for_user": 2,
-                "roles": [str(ROLE_DISCUSSER)],
+                "roles": [ROLE_DISCUSSER],
             },
             data,
         )
@@ -144,7 +143,7 @@ class AddRolesTests(TestCase):
         self.assertRaises(UnauthorizedError, msg.run_job)
 
     def test_bad_user_pks(self):
-        msg = self._mk_msg(self.moderator, [-1], [str(ROLE_DISCUSSER)])
+        msg = self._mk_msg(self.moderator, [-1], [ROLE_DISCUSSER])
         self.assertRaises(ValidationErrorMsg, msg.run_job)
 
     def test_bad_role(self):

@@ -1,11 +1,11 @@
 from django.test import TestCase
 
+from voteit.meeting.models import Meeting
+
 
 class ProposalTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting: Meeting = Meeting.objects.create()
         cls.ai = cls.meeting.agenda_items.create()
         cls.user = cls.meeting.participants.create(
@@ -30,13 +30,15 @@ class ProposalTests(TestCase):
         prop2 = self.ai.proposals.create(author=self.user)
         self.assertEqual("jane-doe-2", prop2.prop_id)
 
-    # Irrelevant because of new userid proposalid policy?
-    # User could have posted 40 group proposals, which should not affect starting prop_id number.
-    # def test_silly_previous(self):
-    #     prop = self.ai.proposals.create(author=self.user, prop_id="jane-doe-hello")
-    #     self.assertEqual("jane-doe-hello", prop.prop_id)
-    #     prop2 = self.ai.proposals.create(author=self.user)
-    #     self.assertEqual("jane-doe-2", prop2.prop_id)  # Skipping and guessing
+    def test_very_long(self):
+        self.user.userid = ""
+        self.user.first_name = "I wish i was a little longer"
+        self.user.last_name = "like really really long!"
+        self.user.save()
+        prop = self.ai.proposals.create(author=self.user)
+        self.assertEqual(
+            "i-wish-i-was-a-little-longer-like-really-real-1", prop.prop_id
+        )
 
     def test_meeting_group_id(self):
         group = self.meeting.groups.create(title="King's College")

@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils.timezone import now
 
+from voteit.meeting.models import Meeting
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 
@@ -11,7 +12,11 @@ User = get_user_model()
 class PriorityTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.system = SpeakerListSystem.objects.create(method_name="priority")
+        cls.meeting = Meeting.objects.create()
+        cls.room = cls.meeting.rooms.create()
+        cls.system = SpeakerListSystem.objects.create(
+            method_name="priority", room=cls.room
+        )
         cls.speaker_list = SpeakerList.objects.create(speaker_system=cls.system)
         cls.user_one = User.objects.create(username="one")
         cls.user_two = User.objects.create(username="two")
@@ -62,6 +67,7 @@ class PriorityTests(TestCase):
 
     def test_safe_users_checked_with_current_order(self):
         self.speaker_list.speaker_items.all().delete()  # Start fresh here
+        self.speaker_list.reorder()
         self.assertEqual([], self.speaker_list.order_list)
         self._mk_previous_spoken(self.user_two)
         self._mk_previous_spoken(self.user_one, count=2)

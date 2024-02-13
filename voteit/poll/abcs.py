@@ -110,13 +110,11 @@ class ElectoralRegisterPolicy(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
     @property
     @abstractmethod
-    def title(self) -> str:
-        ...
+    def title(self) -> str: ...
 
     @abstractmethod
     def get_voters(self, **kwargs) -> dict[int, int]:

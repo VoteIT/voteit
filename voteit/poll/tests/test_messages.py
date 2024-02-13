@@ -8,6 +8,7 @@ from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
 
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 from voteit.poll.app.er_policies.manual import Manual
 from voteit.poll.models import ElectoralRegister
@@ -177,7 +178,7 @@ class ManualCreateERTests(TestCase):
         cls.meeting.er_policy_name = Manual.name
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
-        cls.meeting.add_roles(cls.participant, "potential_voter")
+        cls.meeting.add_roles(cls.participant, ROLE_POTENTIAL_VOTER)
 
     def setUp(self):
         self.meeting.refresh_from_db()
@@ -253,7 +254,7 @@ class TriggerCreateERTests(TestCase):
         cls.meeting.er_policy_name = AutoBeforePoll.name
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
-        cls.meeting.add_roles(cls.participant, "potential_voter")
+        cls.meeting.add_roles(cls.participant, ROLE_POTENTIAL_VOTER)
 
     @property
     def _cut(self):

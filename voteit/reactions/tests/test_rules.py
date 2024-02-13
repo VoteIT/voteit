@@ -2,6 +2,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
 
@@ -13,10 +15,10 @@ class ButtonPermissionTests(TestCase):
         cls.anon_user = User.objects.create(username="anon")
         cls.moderator = User.objects.create(username="moderator")
         cls.participant = User.objects.create(username="participant")
-        cls.meeting.add_roles(cls.moderator, "moderator")
-        cls.meeting.add_roles(cls.participant, "participant")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.button = cls.meeting.reaction_buttons.create(
-            change_roles=["participant"], list_roles=["participant"]
+            change_roles=[ROLE_PARTICIPANT], list_roles=[ROLE_PARTICIPANT]
         )
 
     def setUp(self):
@@ -89,7 +91,7 @@ class ButtonPermissionTests(TestCase):
         self.assertFalse(self.anon_user.has_perm(LIST_REACTIONS, self.button))
         self.assertTrue(self.participant.has_perm(LIST_REACTIONS, self.button))
         self.assertTrue(self.moderator.has_perm(LIST_REACTIONS, self.button))
-        self.button.list_roles.remove("participant")
+        self.button.list_roles.remove(ROLE_PARTICIPANT)
         self.button.save()
         self.assertFalse(self.participant.has_perm(LIST_REACTIONS, self.button))
 
@@ -101,11 +103,11 @@ class ReactionPermissionTests(TestCase):
         cls.anon_user = User.objects.create(username="anon")
         cls.moderator = User.objects.create(username="moderator")
         cls.participant = User.objects.create(username="participant")
-        cls.meeting.add_roles(cls.moderator, "moderator")
-        cls.meeting.add_roles(cls.participant, "participant")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.ai = cls.meeting.agenda_items.create()
         cls.button = cls.meeting.reaction_buttons.create(
-            change_roles=["participant"], list_roles=["participant"]
+            change_roles=[ROLE_PARTICIPANT], list_roles=[ROLE_PARTICIPANT]
         )
         cls.flag = cls.meeting.reaction_buttons.create(flag_mode=True)
         cls.disc = cls.ai.discussions.create()
@@ -131,7 +133,7 @@ class ReactionPermissionTests(TestCase):
         self.assertFalse(self.anon_user.has_perm(ADD, self.button))
         self.assertTrue(self.participant.has_perm(ADD, self.button))
         self.assertTrue(self.moderator.has_perm(ADD, self.button))
-        self.button.change_roles.remove("participant")
+        self.button.change_roles.remove(ROLE_PARTICIPANT)
         self.button.save()
         self.assertFalse(self.participant.has_perm(ADD, self.button))
         self.assertTrue(self.moderator.has_perm(ADD, self.button))

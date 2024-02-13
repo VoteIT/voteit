@@ -39,7 +39,7 @@ class ProposalsAPITests(APITestCase):
         cls.para: TextParagraph = cls.text_doc.text_paragraphs.first()
         cls.participant: User = User.objects.create_user("participant")
         cls.proposer: User = User.objects.create_user("proposer")
-        cls.moderator: User = User.objects.create_user("moderator")
+        cls.moderator: User = User.objects.create_user("moderator", userid="Moderator")
         cls.outsider: User = User.objects.create_user("outsider")
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.proposer, ROLE_PROPOSER)
@@ -256,6 +256,7 @@ class ProposalsAPITests(APITestCase):
         response = self.client.post(url, data)
         self.assertEqual(200, response.status_code)
         data = response.json()
+        self.assertEqual("moderator-{n}", data["prop_id"])
         self.assertEqual(
             "Hello world!",
             data["body"],
@@ -310,12 +311,10 @@ class ProposalsAPITests(APITestCase):
         self.assertEqual(prop.author, self.moderator)
 
     def test_patch_author_not_in_meeting(self):
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
         ai = meeting.agenda_items.create()
         prop = ai.proposals.create(body="I'm from another meeting")
-        meeting.add_roles(self.moderator, "moderator")
+        meeting.add_roles(self.moderator, ROLE_MODERATOR)
         url = reverse("proposal-detail", kwargs={"pk": prop.pk})
         self.client.force_login(self.moderator)
         response = self.client.patch(url, data={"author": self.proposer.pk})
@@ -335,12 +334,10 @@ class ProposalsAPITests(APITestCase):
         self.assertIsNone(self.prop.meeting_group)
 
     def test_patch_meeting_group_not_in_meeting(self):
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
         ai = meeting.agenda_items.create()
         prop = ai.proposals.create(body="I'm from another meeting")
-        meeting.add_roles(self.moderator, "moderator")
+        meeting.add_roles(self.moderator, ROLE_MODERATOR)
         url = reverse("proposal-detail", kwargs={"pk": prop.pk})
         self.client.force_login(self.moderator)
         response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})
@@ -350,12 +347,10 @@ class ProposalsAPITests(APITestCase):
         )
 
     def test_create_meeting_group_not_in_meeting(self):
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
         ai = meeting.agenda_items.create()
         prop = ai.proposals.create(body="I'm from another meeting")
-        meeting.add_roles(self.moderator, "moderator")
+        meeting.add_roles(self.moderator, ROLE_MODERATOR)
         url = reverse("proposal-detail", kwargs={"pk": prop.pk})
         self.client.force_login(self.moderator)
         response = self.client.patch(url, data={"meeting_group": self.meeting_group.pk})

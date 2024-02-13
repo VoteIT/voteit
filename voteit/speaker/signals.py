@@ -3,16 +3,20 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
+from django.db import models
 from django.db.models.signals import m2m_changed
-from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
+from django_fsm import TransitionNotAllowed
+from django_fsm import post_transition
+from django_fsm import pre_transition
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
+from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.core.messages.role_updates import RolesAdded
@@ -43,6 +47,7 @@ from voteit.speaker.models import SpeakerSystemRoles
 from voteit.speaker.rest_api.serializers import SpeakerListSerializer
 from voteit.speaker.rest_api.serializers import SpeakerListSystemSerializer
 from voteit.speaker.rest_api.serializers import SpeakerSerializer
+from voteit.speaker.workflows import SpeakerListWf
 from voteit.speaker.workflows import SpeakerSystemWf
 
 if TYPE_CHECKING:
@@ -133,12 +138,6 @@ def push_speaker_deleted(instance: Speaker, **kwargs):
         ch.sync_publish(msg)
 
 
-@receiver(post_delete, sender=Speaker)
-@disable_on_raw_save
-def reorder_when_speaker_deleted(instance: Speaker, **kwargs):
-    instance.speaker_list.reorder()
-
-
 @receiver(post_save, sender=Speaker)
 @disable_on_raw_save
 @on_transaction_commit
@@ -173,6 +172,34 @@ def speaker_attached_through_m2m(
         instance.reorder()
 
 
+@receiver(pre_transition, sender=AgendaItem)
+def check_no_active_speaker(instance: AgendaItem, source: str, target: str, **kwargs):
+    if (
+        target == AgendaItemWf.CLOSED
+        and instance.speaker_lists.filter(current__isnull=False).exists()
+    ):
+        raise TransitionNotAllowed(
+            "Finish active speaker first", object=instance, method="close"
+        )
+
+
+@receiver(post_transition, sender=AgendaItem)
+def close_and_deactivate_when_ai_closes(
+    instance: AgendaItem, source: str, target: str, **kw
+):
+    if target == AgendaItemWf.CLOSED:
+        for slist in instance.speaker_lists.filter(
+            models.Q(state=SpeakerListWf.OPEN)
+            | models.Q(active_in_system__isnull=False)
+        ):
+            if slist.is_active_list:
+                slist.speaker_system.active_list = None
+                slist.speaker_system.save()
+            if slist.state != SpeakerListWf.CLOSED:
+                slist.close()
+                slist.save()
+
+
 # Channels
 @receiver(channel_subscribed, sender=MeetingChannel)
 def meeting_channel_subscribed(
@@ -184,15 +211,16 @@ def meeting_channel_subscribed(
     - User roles within speaker systems
     """
     systems_qs = context.speaker_systems.all()
-    app_state.append_from_queryset(
-        systems_qs, SpeakerListSystemSerializer, SpeakerSystemAdded
-    )
+    sys_serializer = SpeakerListSystemSerializer(systems_qs, many=True)
+    for item in sys_serializer.data:
+        app_state.append(SpeakerSystemAdded(**item))
+    # FIXME: Annotate instead!
     for system in systems_qs:
         # Roles
         roles = system.get_roles(user)
         if roles:
             msg = RolesAdded(
-                roles=system.roles_to_strings(*roles),
+                roles=roles,
                 pk=system.pk,
                 model=get_model_shortname(system),
                 user_pk=user.pk,
@@ -225,7 +253,9 @@ def ai_channel_subscribed(
     lists_qs = context.speaker_lists.filter(
         speaker_system__state=SpeakerSystemWf.ACTIVE
     )
-    app_state.append_from_queryset(lists_qs, SpeakerListSerializer, SpeakerListAdded)
+    serializer = SpeakerListSerializer(lists_qs, many=True)
+    for item in serializer.data:
+        app_state.append(SpeakerListAdded(**item))
 
 
 # Archiving
@@ -274,7 +304,7 @@ def push_roles_added(instance: SpeakerSystemRoles, roles: list[Role], **kwargs):
     _role_msg_publish(
         instance,
         RolesAdded(
-            roles=instance.context.roles_to_strings(*roles),
+            roles=roles,
             pk=instance.context.pk,
             model=get_model_shortname(instance.context),
             user_pk=instance.user.pk,
@@ -288,7 +318,7 @@ def push_roles_removed(instance: SpeakerSystemRoles, roles: list[Role], **kwargs
     _role_msg_publish(
         instance,
         RolesRemoved(
-            roles=instance.context.roles_to_strings(*roles),
+            roles=roles,
             pk=instance.context.pk,
             model=get_model_shortname(instance.context),
             user_pk=instance.user.pk,

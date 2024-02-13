@@ -4,7 +4,29 @@ from pydantic import constr
 from pydantic import validator
 
 from voteit.components.utils import get_meeting_component_adapters
+from voteit.core.role import Role
 from voteit.core.validators import root_validate_roles_and_model
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_DISCUSSER
+from voteit.meeting.roles import ROLE_PROPOSER
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+
+_DIALECT_ROLE_COMPAT = {
+    "participant": str(ROLE_PARTICIPANT),
+    "moderator": str(ROLE_MODERATOR),
+    "discusser": str(ROLE_DISCUSSER),
+    "proposer": str(ROLE_PROPOSER),
+    "potential_voter": str(ROLE_POTENTIAL_VOTER),
+}
+
+
+def _role_compat(v: str | Role) -> str:
+    if isinstance(v, Role):
+        return str(v)
+    elif isinstance(v, str) and v in _DIALECT_ROLE_COMPAT:
+        return _DIALECT_ROLE_COMPAT[v]
+    return v
 
 
 class GroupRoleSchema(BaseModel):
@@ -13,6 +35,10 @@ class GroupRoleSchema(BaseModel):
     roles: list[str] = ()
     can_propose_as: bool = False
     can_discuss_as: bool = False
+
+    @validator("roles", pre=True, each_item=True)
+    def role_compat(cls, v: str | Role):
+        return _role_compat(v)
 
     @validator("roles")
     def validate_roles(cls, v):
@@ -128,3 +154,7 @@ class DialectSchema(BaseModel):
         if v:
             root_validate_roles_and_model(cls, {"model": "meeting", "roles": v})
         return v
+
+    @validator("block_roles", pre=True, each_item=True)
+    def role_compat(cls, v: str | Role):
+        return _role_compat(v)

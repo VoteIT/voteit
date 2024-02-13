@@ -23,8 +23,9 @@ Meeting creators should only have the option to create a meeting
 but can't touch anything else.
 
     >>> from voteit.organisation.rules import is_meeting_creator
-    >>> org.add_roles(jane, "meeting_creator")
-    [meeting_creator]
+    >>> from voteit.organisation.roles import ROLE_MEETING_CREATOR
+    >>> org.add_roles(jane, ROLE_MEETING_CREATOR)
+    {Meeting creator (meeting_creator)}
 
     >>> is_meeting_creator(jane, org)
     True
@@ -34,8 +35,9 @@ Organisation managers should have access to all
 settings and meetings. The rule is_manager checks that.
 
     >>> from voteit.organisation.rules import is_manager
-    >>> org.add_roles(jane, "org_manager")
-    [org_manager]
+    >>> from voteit.organisation.roles import ROLE_ORG_MANAGER
+    >>> org.add_roles(jane, ROLE_ORG_MANAGER)
+    {Organisation manager (org_manager)}
 
     >>> is_manager(jane, org)
     True
@@ -45,8 +47,6 @@ Most permissions checks are done directly from the user model though.
     >>> from voteit.organisation.permissions import OrgPermissions
     >>> jane.has_perm(OrgPermissions.MANAGE, org)
     True
-
-
 
 ## Meetings
 
@@ -64,11 +64,12 @@ rule is_participant. Any user who interacts with something within
 a meeting should pass that rule first.
 
     >>> from voteit.meeting.rules import is_participant
+    >>> from voteit.meeting.roles import ROLE_PARTICIPANT
     >>> is_participant(jane, meeting)
     False
 
-    >>> meeting.add_roles(jane, "participant")
-    [participant]
+    >>> meeting.add_roles(jane, ROLE_PARTICIPANT)
+    {Participant (pa)}
 
     >>> is_participant(jane, meeting)
     True

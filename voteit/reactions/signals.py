@@ -38,16 +38,17 @@ if TYPE_CHECKING:
 def meeting_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    app_state.append_from_queryset(
-        context.reaction_buttons.all(), ButtonDetailSerializer, ButtonAdded
-    )
+    for item in ButtonDetailSerializer(context.reaction_buttons.all(), many=True).data:
+        app_state.append(ButtonAdded(**item))
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)
 def ai_channel_subscribed(
     context: AgendaItem, app_state: AppState, user: AbstractUser, **kw
 ):
-    """Send users own reactions and the total count for this agenda items content"""
+    """
+    Send users own reactions and the total count for this agenda items content
+    """
     all_buttons = (
         context.reactions.values("content_type", "object_id", "button")
         .annotate(count=Count("pk"))
@@ -69,11 +70,6 @@ def ai_channel_subscribed(
         for item in serializer.data:
             batch.append(UserReactionAdded(data=item))
         app_state.append(batch)
-    # app_state.append_from_queryset(
-    #    , ReactionSerializer, UserReactionAdded
-
-
-# )
 
 
 @receiver(post_save, sender=ReactionButton)

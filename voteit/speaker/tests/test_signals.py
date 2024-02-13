@@ -5,17 +5,23 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
-
+from django_fsm import TransitionNotAllowed
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
+from envelope.channels.models import ContextChannel
+
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.speaker.channels import SpeakerListSystemChannel
 from voteit.speaker.messages import SpeakerListAdded
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.roles import ROLE_LIST_MODERATOR
+from voteit.speaker.workflows import SpeakerListWf
+from voteit.speaker.workflows import SpeakerSystemWf
 
 User = get_user_model()
 
@@ -33,9 +39,11 @@ class SpeakerListSystemAppStateTests(TestCase):
         cls.participant = User.objects.get(username="participant")
         cls.moderator = User.objects.get(username="moderator")
         cls.meeting = Meeting.objects.get(pk=1)
+        cls.room = cls.meeting.rooms.create()
         cls.ai = cls.meeting.agenda_items.create()
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
-            method_name="simple", meeting=cls.meeting
+            method_name="simple",
+            room=cls.room,
         )
         cls.speaker_list: SpeakerList = SpeakerList.objects.create(
             speaker_system=cls.system, agenda_item=cls.ai, title="Hello"
@@ -67,9 +75,10 @@ class SignalListChangeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
+        cls.room = cls.meeting.rooms.create()
         cls.ai = cls.meeting.agenda_items.create()
         cls.system = SpeakerListSystem.objects.create(
-            method_name="simple", meeting=cls.meeting
+            method_name="simple", room=cls.room
         )
         cls.speaker_list: SpeakerList = SpeakerList.objects.create(
             speaker_system=cls.system, agenda_item=cls.ai
@@ -130,9 +139,10 @@ class SignalListChangesTests(TestCase):
         cls.participant = User.objects.get(username="participant")
         cls.moderator = User.objects.get(username="moderator")
         cls.meeting = Meeting.objects.get(pk=1)
+        cls.room = cls.meeting.rooms.create()
         cls.ai = cls.meeting.agenda_items.create()
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
-            method_name="simple", meeting=cls.meeting
+            method_name="simple", room=cls.room
         )
         cls.speaker_list: SpeakerList = SpeakerList.objects.create(
             speaker_system=cls.system, agenda_item=cls.ai, title="Hello"
@@ -235,35 +245,64 @@ class SignalListChangesTests(TestCase):
         self.assertIsInstance(msg, SpeakerListDeleted)
         self.assertEqual(list_pk, msg.data.pk)
 
+    @patch.object(ContextChannel, "sync_publish")  # All of them here
+    def test_list_deleted_event_order(self, mock_publish):
+        from voteit.speaker.messages import SpeakerListChanged
+        from voteit.speaker.messages import SpeakerListDeleted
+
+        self.speaker_list.start_speaker(self.speaker)
+        mock_publish.reset_mock()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.speaker_list.delete()
+            self.assertTrue(mock_publish.called)
+
+        messages = [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if x.args[0].name.startswith("speaker")
+        ]
+        changed_positions = [
+            messages.index(x) for x in messages if isinstance(x, SpeakerListChanged)
+        ]
+        deleted_positions = [
+            messages.index(x) for x in messages if isinstance(x, SpeakerListDeleted)
+        ]
+        self.assertEqual(1, len(deleted_positions))
+        deleted_pos = deleted_positions[0]
+        for pos in changed_positions:
+            self.assertLess(pos, deleted_pos)
+
+    def test_exception_when_trying_to_close_ai_with_active_speaker(self):
+        self.speaker_list.start_speaker(self.speaker)
+        with self.assertRaises(TransitionNotAllowed):
+            self.ai.close()
+
+    def test_close_lists_automatically_when_ai_closes(self):
+        self.system.active_list = self.speaker_list
+        self.assertTrue(self.speaker_list.is_active_list)
+        self.system.save()
+        self.ai.close()
+        self.speaker_list.refresh_from_db()
+        self.assertFalse(self.speaker_list.is_active_list)
+        self.assertEqual(SpeakerListWf.CLOSED, self.speaker_list.state)
+
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class SignalSystemChangesTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
+        cls.room = cls.meeting.rooms.create()
         cls.ai = cls.meeting.agenda_items.create()
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
-            method_name="simple", meeting=cls.meeting, title="We speak in order"
+            method_name="simple", room=cls.room
         )
-
-    @patch.object(MeetingChannel, "sync_publish")
-    def test_meeting_gets_added(self, mock_publish):
-        from voteit.speaker.messages import SpeakerSystemAdded
-        from voteit.speaker.models import SpeakerListSystem
-
-        SpeakerListSystem.objects.create(method_name="simple")
-        self.assertFalse(mock_publish.called)
-        SpeakerListSystem.objects.create(method_name="simple", meeting=self.meeting)
-        self.assertTrue(mock_publish.called)
-
-        msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, SpeakerSystemAdded)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_system_changed(self, mock_publish):
         from voteit.speaker.messages import SpeakerSystemChanged
 
-        self.system.title = "Group 1"
+        self.system.safe_positions = 5
         self.system.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
@@ -271,7 +310,7 @@ class SignalSystemChangesTests(TestCase):
         data = msg.data
         self.assertEqual(self.system.pk, data.pk)
         self.assertEqual(self.meeting.pk, data.meeting)
-        self.assertEqual(self.system.title, data.title)
+        self.assertEqual(self.system.safe_positions, data.safe_positions)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_system_deleted(self, mock_publish):
@@ -308,14 +347,15 @@ class ChannelSubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create()
+        cls.room = cls.meeting.rooms.create()
         cls.ai = cls.meeting.agenda_items.create()
         cls.ai.upcoming()
         cls.ai.save()
         cls.system = SpeakerListSystem.objects.create(
             method_name="simple",
             meeting=cls.meeting,
-            title="We speak in order",
-            state="active",
+            state=SpeakerSystemWf.ACTIVE,
+            room=cls.room,
         )
         # Create lists
         cls.other_list = cls.system.speaker_lists.create(agenda_item=cls.ai)
@@ -331,8 +371,8 @@ class ChannelSubscribedTests(TestCase):
         cls.active_list.start_speaker(cls.speaker_one)
         # Moderator
         cls.moderator = User.objects.create(username="moderator")
-        cls.meeting.add_roles(cls.moderator, "participant")
-        cls.system.add_roles(cls.moderator, "list_moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_PARTICIPANT)
+        cls.system.add_roles(cls.moderator, ROLE_LIST_MODERATOR)
 
     def _mk_one(self, pk, channel_type):
         return Subscribe(
@@ -393,13 +433,16 @@ class RolesRelationsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
-        cls.system = cls.meeting.speaker_systems.create(method_name="simple")
+        cls.room = cls.meeting.rooms.create()
+        cls.system = cls.meeting.speaker_systems.create(
+            method_name="simple", room=cls.room
+        )
         cls.user = User.objects.create(username="jane")
 
     def test_removing_participant_removes_system_roles(self):
-        self.meeting.add_roles(self.user, "participant")
+        self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
         self.system.add_roles(self.user, "speaker")
-        self.meeting.remove_roles(self.user, "participant")
+        self.meeting.remove_roles(self.user, ROLE_PARTICIPANT)
         self.assertFalse(self.system.get_roles(self.user))
 
     def test_adding_system_roles_adds_participant(self):
@@ -412,12 +455,13 @@ class SpeakerSignalTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
+        cls.room = cls.meeting.rooms.create()
         cls.ai = cls.meeting.agenda_items.create()
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
             method_name="simple",
             meeting=cls.meeting,
-            title="We speak in order",
-            state="active",
+            room=cls.room,
+            state=SpeakerSystemWf.ACTIVE,
         )
         cls.active_speaker_list = cls.system.speaker_lists.create()
         cls.system.active_list = cls.active_speaker_list

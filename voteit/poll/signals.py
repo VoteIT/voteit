@@ -91,16 +91,17 @@ def meeting_subscribed(context: Meeting, app_state: AppState, user: AbstractUser
     # FIXME: Transmitting all vote data is probably not a good idea for large meetings.
     # Perhaps change this?
     # We're sending all votes, it is the users own data so private AI shouldn't matter here.
-    app_state.append_from_queryset(
-        Vote.objects.filter(poll__in=context.polls.all(), user=user).prefetch_related(
-            "poll"
-        ),
-        VoteSerializer,
-        GenericVoteResponse,
-    )
+    vote_qs = Vote.objects.filter(
+        poll__in=context.polls.all(), user=user
+    ).prefetch_related("poll")
+    vote_serializer = VoteSerializer(vote_qs, many=True)
+    for item in vote_serializer.data:
+        app_state.append(GenericVoteResponse(**item))
     if context.latest_er:
-        app_state.append_from(
-            context.latest_er, ElectoralRegisterSerializer, ElectoralRegisterAdded
+        app_state.append(
+            ElectoralRegisterAdded(
+                **ElectoralRegisterSerializer(context.latest_er).data
+            )
         )
 
 

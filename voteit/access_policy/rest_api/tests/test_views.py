@@ -3,6 +3,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
+from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
@@ -30,9 +31,7 @@ class AutomaticAccessAPITests(APITestCase):
     def test_create(self):
         self.automatic_access.delete()
         url = reverse(f"{_BASENAME}-list")
-        data = {
-            "meeting": self.meeting.pk,
-        }
+        data = {"meeting": self.meeting.pk, "roles_given": []}
         for user, status in (
             (None, 401),
             (self.moderator, 201),
@@ -98,6 +97,15 @@ class AutomaticAccessAPITests(APITestCase):
             },
             response.json(),
         )
+
+    def test_patch_change_meeting_not_allowed(self):
+        meeting = Meeting.objects.create()
+        url = reverse(f"{_BASENAME}-detail", kwargs={"pk": self.automatic_access.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data={"meeting": meeting.pk})
+        self.assertEqual(response.status_code, 200)
+        self.automatic_access.refresh_from_db()
+        self.assertEqual(self.meeting, self.automatic_access.meeting)
 
     def test_patch(self):
         url = reverse(f"{_BASENAME}-detail", kwargs={"pk": self.automatic_access.pk})

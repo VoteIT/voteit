@@ -13,10 +13,14 @@ from voteit.meeting.rest_api.serializers import CreateMeetingGroupSerializer
 from voteit.meeting.rest_api.serializers import GroupMembershipSerializer
 from voteit.meeting.rest_api.serializers import GroupRoleSerializer
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.polls.simple import Simple
+from voteit.room.models import Room
+from voteit.speaker.models import SpeakerListSystem
 
 User = get_user_model()
 
@@ -45,13 +49,14 @@ class MeetingSerializerTests(TestCase):
         request = self._mk_request(self.moderator)
         serializer = self._cut(self.meeting, context={"request": request})
         self.assertEqual(
-            {"participant", "moderator"}, set(serializer.data["current_user_roles"])
+            {ROLE_PARTICIPANT, ROLE_MODERATOR},
+            set(serializer.data["current_user_roles"]),
         )
 
     def test_participant(self):
         request = self._mk_request(self.participant)
         serializer = self._cut(self.meeting, context={"request": request})
-        self.assertEqual({"participant"}, set(serializer.data["current_user_roles"]))
+        self.assertEqual({ROLE_PARTICIPANT}, set(serializer.data["current_user_roles"]))
 
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
@@ -109,6 +114,29 @@ class CreateMeetingSerializerTests(TestCase):
         self.assertFalse(serializer.errors)
         instance = serializer.save()
         self.assertIsNone(instance.er_policy_name)
+
+    def test_create_with_room(self):
+        serializer = self._mk_one(room={"title": "Room"})
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.save()
+        room = instance.rooms.first()
+        self.assertIsInstance(room, Room)
+        self.assertEqual("Room", room.title)
+
+    def test_create_with_sls(self):
+        serializer = self._mk_one(
+            room={"title": "Room"},
+            sls={"method_name": "simple", "safe_positions": 2},
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
+        instance = serializer.save()
+        room = instance.rooms.first()
+        self.assertIsInstance(room, Room)
+        self.assertEqual("Room", room.title)
+        self.assertIsInstance(room.sls, SpeakerListSystem)
+        self.assertEqual(room.sls.safe_positions, 2)
 
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
@@ -195,7 +223,7 @@ class MeetingRolesSerializerTests(TestCase):
         instance = MeetingRoles.objects.get(pk=1)
         serializer = self._cut(instance)
         data = serializer.data
-        self.assertEqual({"participant", "moderator"}, set(data["assigned"]))
+        self.assertEqual({ROLE_PARTICIPANT, ROLE_MODERATOR}, set(data["assigned"]))
         self.assertEqual(
             {
                 "pk": 1,
@@ -249,14 +277,10 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         data = MeetingGroupSerializer(self.moderator_club).data
         self.assertEqual(self.moderator_club.pk, data.pop("pk"))
         self.assertEqual("", data.pop("body"))
-        self.assertIsNotNone(data.pop("created"))
-        self.assertIsNotNone(data.pop("modified"))
         self.assertEqual([], data.pop("tags"))
         self.assertEqual("Moderator club", data.pop("title"))
         self.assertEqual("modclub", data.pop("groupid"))
         self.assertEqual(0, data.pop("votes"))
-        self.assertEqual(None, data.pop("author"))
-        self.assertEqual(None, data.pop("last_modified_by"))
         self.assertEqual(self.meeting.pk, data.pop("meeting"))
         self.assertEqual(None, data.pop("delegate_to"))
         self.assertFalse(data.keys())

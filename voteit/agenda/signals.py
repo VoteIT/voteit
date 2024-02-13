@@ -7,6 +7,7 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from django_fsm import post_transition
+
 from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
 
@@ -36,7 +37,7 @@ from voteit.proposal.models import Proposal
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from django.db import models
-    from envelope.utils import AppState
+    from envelope.channels.models import AppState
 
 
 def _attach_agenda_items(qs: models.QuerySet[AgendaItem], app_state: AppState):
@@ -74,12 +75,14 @@ def moderators_channel_subscribed(
 def meeting_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    # lr_qs = context.last_read_set.filter(user=user).values("timestamp", "agenda_item")
+    # This will cause last read to be sent for private agenda items that the user has visited,
+    # but that shouldn't be a problem.
     serializer = LastReadSerializer(context.last_read_set.filter(user=user), many=True)
-    for data in serializer.data:
-        # This will cause last read to be sent for private agenda items that the user has visited,
-        # but that shouldn't be a problem.
-        app_state.append(LastReadChanged(**data))
+    if serializer.data:
+        batch = Batch(t=LastReadChanged.name, payloads=[])
+        for item in serializer.data:
+            batch.append(LastReadChanged(data=item))
+        app_state.append(batch)
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)
@@ -87,7 +90,8 @@ def ai_channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
     """
     Send full AI info
     """
-    app_state.append_from(context, AgendaItemBodySerializer, AgendaBodyAdded)
+    msg = AgendaBodyAdded(**AgendaItemBodySerializer(context).data)
+    app_state.append(msg)
 
 
 @receiver(post_save, sender=AgendaItem)

@@ -26,6 +26,7 @@ from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
 from voteit.core.rest_api.utils import get_identity_data
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation.permissions import OrgPermissions
 
 UserModel = get_user_model()
@@ -66,7 +67,7 @@ class UserSearchViewSet(
         except ValidationError:
             meeting = None
         # FIXME: Public meeting is used in an odd way in frontend. This needs to be cleaned up.
-        if meeting and meeting.has_roles(user, "participant"):
+        if meeting and meeting.has_roles(user, ROLE_PARTICIPANT):
             return meeting.participants.all()
         return UserModel.objects.none()
 

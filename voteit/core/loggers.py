@@ -65,18 +65,15 @@ class EventAdapterMixin:
         return msg, kwargs
 
 
-class OnCommitLoggerAdapter(OnCommitAdapterMixin, LoggerAdapter):
-    ...
+class OnCommitLoggerAdapter(OnCommitAdapterMixin, LoggerAdapter): ...
 
 
 class OnCommitEventLoggerAdapter(
     OnCommitAdapterMixin, EventAdapterMixin, LoggerAdapter
-):
-    ...
+): ...
 
 
-class EventLoggerAdapter(EventAdapterMixin, LoggerAdapter):
-    ...
+class EventLoggerAdapter(EventAdapterMixin, LoggerAdapter): ...
 
 
 def getOnCommitLogger(name=None, extra=None):

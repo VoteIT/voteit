@@ -6,6 +6,8 @@ from django.test import override_settings
 
 from envelope.channels.messages import Subscribe
 from voteit.agenda.channels import AgendaItemChannel
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -16,8 +18,6 @@ _channel_layers_setting = {
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class AgendaSubscribedTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create()
         self.ai.upcoming()
@@ -25,7 +25,7 @@ class AgendaSubscribedTests(TestCase):
         self.disc1 = self.ai.discussions.create()
         self.disc2 = self.ai.discussions.create()
         self.user = User.objects.create(username="user")
-        self.meeting.add_roles(self.user, "participant")
+        self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
 
     def test_app_state_sent(self):
         command = Subscribe(
@@ -46,12 +46,11 @@ class AgendaSubscribedTests(TestCase):
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class DiscussionPostChangedTests(TestCase):
-    def setUp(self):
-        from voteit.meeting.models import Meeting
-
-        self.meeting = Meeting.objects.create()
-        self.ai = self.meeting.agenda_items.create()
-        self.disc = self.ai.discussions.create()
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+        cls.ai = cls.meeting.agenda_items.create()
+        cls.disc = cls.ai.discussions.create()
 
     @patch.object(AgendaItemChannel, "sync_publish")
     def test_added(self, mock_publish):

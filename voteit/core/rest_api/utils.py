@@ -1,4 +1,5 @@
 """ REST-specific utils"""
+
 from __future__ import annotations
 
 import logging
@@ -8,15 +9,18 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
+from oauthlib.oauth2 import InvalidGrantError
 from requests.exceptions import ConnectionError as RConnectionError
 from requests.exceptions import JSONDecodeError
 from rest_framework.exceptions import APIException
+from rest_framework.exceptions import NotAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 
 from voteit.core.permissions import NOT_ALLOWED
 
 if TYPE_CHECKING:
+    from pydantic import ValidationError as PydanticValidationError
     from django.db.models import Model
     from voteit.core.models import User
     from voteit.organisation.models import OAuth2Provider
@@ -48,11 +52,15 @@ def get_identity_data(user: User) -> dict:
     except RConnectionError:
         # Proper exception later?
         exc = APIException(
-            detail="Identity service not available - can't login",
+            detail=_("Identity service not available right now"),
             code="service_unavailable",
         )
         exc.status_code = 503
         raise exc
+    except InvalidGrantError:
+        raise NotAuthenticated(
+            detail=_("You need to login again to use invites"),
+        )
     # Not the correct serializer exception, but this is kind of the crash and burn...
     if not response.ok:
         try:
@@ -211,4 +219,26 @@ def meeting_from_unsafe_data(serializer) -> Meeting:
         except ObjectDoesNotExist:
             pass
     # Fail
-    raise ValidationError("Can't find meeting")
+    raise ValidationError(_("Can't find meeting"))
+
+
+def pydantic_to_drf_validation_error(error: PydanticValidationError) -> ValidationError:
+    """
+    >>> import pydantic
+    >>> class Number(pydantic.BaseModel):
+    ...     num: int
+    ...
+    >>> try:
+    ...     Number(num='a')
+    ... except pydantic.ValidationError as exc:
+    ...     new_exc = pydantic_to_drf_validation_error(exc)
+    >>> isinstance(new_exc, ValidationError)
+    True
+    >>> new_exc
+    ValidationError({'num': 'value is not a valid integer'})
+    """
+    eoutput = {}
+    for error in error.errors():
+        for loc in error["loc"]:
+            eoutput[loc] = error["msg"]
+    return ValidationError(eoutput)

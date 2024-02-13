@@ -1,9 +1,12 @@
 from __future__ import annotations
+
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from rest_framework import serializers
 from rest_framework import exceptions
 
+from voteit.core.rest_api.fields import RolesField
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.meeting.models import MeetingRoles
 from voteit.speaker.models import Speaker
@@ -43,9 +46,10 @@ class SpeakerListSerializer(serializers.ModelSerializer):
     def get_queue(self, instance: SpeakerList) -> list[int]:
         return instance.order_list
 
-    def get_current(self, instance: SpeakerList) -> list[int]:
-        if instance.current:
-            return instance.current.user_id
+    def get_current(self, instance: SpeakerList) -> int | None:
+        with suppress(Speaker.DoesNotExist):
+            if instance.current:
+                return instance.current.user_id
 
 
 class HistoricSpeakerListSerializer(serializers.Serializer):
@@ -71,26 +75,28 @@ class SpeakerSerializer(serializers.ModelSerializer):
         fields = ["seconds"] + read_only_fields
 
 
-class SpeakerListSystemSerializer(serializers.ModelSerializer):
+class CreateSpeakerListSystemSerializer(serializers.ModelSerializer):
     settings = PydanticFieldSerializer(allow_null=True, required=False)
+    meeting_roles_to_speaker = RolesField(
+        required=False, valid_roles=set(MeetingRoles.valid_roles.values())
+    )
 
     class Meta:
         model = SpeakerListSystem
-        read_only_fields = ["state"]
-        fields = [
-            "pk",
+        read_only_fields = [
+            "state",
             "meeting",
+            "pk",
+        ]
+        fields = [
             "method_name",
-            "title",
             "settings",
             "active_list",
             "safe_positions",
+            "room",
             "meeting_roles_to_speaker",
+            "show_time",
         ] + read_only_fields
-        extra_kwargs = {
-            # At least right now...
-            "meeting": {"required": True},
-        }
 
     def validate_method_name(self, value):
         if value not in get_list_method_registry():
@@ -108,17 +114,23 @@ class SpeakerListSystemSerializer(serializers.ModelSerializer):
             attrs.pop("settings", None)
         else:
             settings = attrs.get("settings", {})
+            if not isinstance(settings, dict):
+                attrs["settings"] = settings = {}
             try:
                 method.settings_schema(**settings)
             except ValueError as exc:
                 raise exceptions.ValidationError({"settings": [str(exc)]})
         return super().validate(attrs)
 
-    def validate_meeting_roles_to_speaker(self, value):
-        for role in value:
-            if role not in MeetingRoles.valid_roles:
-                raise exceptions.ValidationError(f"{role} is not a valid meeting role")
-        return value
+
+class SpeakerListSystemSerializer(CreateSpeakerListSystemSerializer):
+    class Meta(CreateSpeakerListSystemSerializer.Meta):
+        read_only_fields = [
+            "pk",
+            "state",
+            "room",
+            "meeting",
+        ]
 
 
 class SpeakerExportSerializer(serializers.ModelSerializer):

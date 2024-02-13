@@ -1,14 +1,13 @@
 from __future__ import annotations
 
+import math
 from contextlib import suppress
 from datetime import datetime
 from datetime import timedelta
 from typing import TYPE_CHECKING
-import math
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
-from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
@@ -23,30 +22,41 @@ from voteit.agenda.models import AgendaItem
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import ensure_atomic
+from voteit.core.fields import RolesField
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.permissions import NOT_ALLOWED
+from voteit.core.role import Role
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.speaker.abcs import SpeakerSystemContext
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.permissions import SpeakerSystemPermissions
+from voteit.speaker.roles import ROLE_LIST_MODERATOR
+from voteit.speaker.roles import ROLE_SPEAKER
 from voteit.speaker.utils import get_list_method_registry
 from voteit.speaker.workflows import SpeakerListWf
 from voteit.speaker.workflows import SpeakerSystemWf
+from voteit.room.models import Room
 
 if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
     from voteit.speaker.abcs import ListMethod
+
 
 __all__ = "SpeakerSystemRoles", "SpeakerListSystem", "Speaker", "SpeakerList"
 
 
 class SpeakerSystemRoles(Roles, MeetingContext):
     name = "speaker_roles"
+    valid_roles = {
+        ROLE_LIST_MODERATOR: ROLE_LIST_MODERATOR,
+        ROLE_SPEAKER: ROLE_SPEAKER,
+    }
     context: SpeakerListSystem = models.ForeignKey(
         "SpeakerListSystem", on_delete=models.CASCADE
     )
+    assigned: str = RolesField(role_choices=valid_roles.values(), max_length=30)
 
     @property
     def meeting(self) -> Meeting | None:
@@ -77,12 +87,18 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         choices=SpeakerSystemWf.choices(),
         editable=False,
     )
-    title: str | None = models.CharField(max_length=200, null=True)
-    meeting: Meeting | None = models.ForeignKey(
+    # SpeakerListSystem.objects.filter(title__iregex=r'^.{100,}$')
+    # title: str | None = models.CharField(max_length=200, null=True)
+    room: Room = models.OneToOneField(
+        Room,
+        verbose_name="Room",
+        on_delete=models.RESTRICT,
+        related_name="sls",
+    )
+    meeting: Meeting = models.ForeignKey(
         Meeting,
         verbose_name="Related meeting",
         on_delete=models.CASCADE,
-        null=True,
         related_name="speaker_systems",
     )
     method_name: str = models.CharField(max_length=20)
@@ -109,8 +125,11 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         on_delete=models.SET_NULL,
         related_name="active_in_system",
     )
-    meeting_roles_to_speaker: list[str] = ArrayField(
-        models.CharField(max_length=20), default=tuple
+    meeting_roles_to_speaker: list[Role] = RolesField(
+        role_choices=MeetingRoles.valid_roles.values(), max_length=60
+    )
+    show_time: bool = models.BooleanField(
+        verbose_name="Show time spoken for all", default=False
     )
 
     roles_cls = SpeakerSystemRoles
@@ -197,6 +216,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
 
     @transition(
         field=state,
+        source=["+"],
         target=SpeakerSystemWf.ARCHIVED,
         permission=NOT_ALLOWED,
         custom={"title": _("Archive")},
@@ -213,11 +233,19 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     def save(self, **kw):
         # Will raise error if there's something bogus with settings or referenced method
         self.settings
-        for role in self.meeting_roles_to_speaker:
-            if role not in MeetingRoles.valid_roles:
-                raise ValueError(f"{role} is not a valid meeting role")
-        if self.active_list and self.active_list not in self.speaker_lists.all():
+        if (
+            self.active_list_id
+            and not self.speaker_lists.filter(pk=self.active_list_id).exists()
+        ):
             raise IntegrityError("Active list belongs to another speaker system")
+        # Add meeting on create if not specified
+        if not self.pk and self.meeting_id is None and self.room_id is not None:
+            if self.room.meeting_id:
+                self.meeting_id = self.room.meeting_id
+        # Make sure room and sls links to same meeting
+        if not self.pk and self.room_id:
+            if self.room.meeting_id != self.meeting_id:
+                raise IntegrityError("SLS links to another meeting")
         super().save(**kw)
 
     @property
@@ -231,12 +259,18 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     # Type hinting
     objects: models.Manager
     speaker_lists: models.QuerySet
+    room: Room
+    room_id: int | None
+    meeting_id: int | None
+    active_list_id: int | None
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.pk}>"
 
     def __str__(self):
-        return self.title and self.title[:30] or f"Speaker id {self.pk}"
+        if self.room_id and self.room.title:
+            return self.room.title[:30]
+        return f"SLS {self.pk}"
 
 
 class Speaker(MeetingContext, SpeakerSystemContext):

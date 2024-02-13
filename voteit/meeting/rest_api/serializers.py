@@ -11,9 +11,9 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator
 
+from voteit.core.rest_api.fields import RolesField
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
-from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
@@ -29,6 +29,8 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.poll.utils import get_electoral_policy_registry
+from voteit.room.rest_api.serializers import CreateRoomSerializer
+from voteit.speaker.rest_api.serializers import CreateSpeakerListSystemSerializer
 
 if TYPE_CHECKING:
     from voteit.poll.abcs import ElectoralRegisterPolicy
@@ -84,12 +86,63 @@ class MeetingSerializer(UserRolesMixin, serializers.HyperlinkedModelSerializer):
         )
 
 
+def validate_er_policy_name(instance: Meeting | None, value: str | None):
+    if value:
+        reg = get_electoral_policy_registry()
+        if value not in reg:
+            raise ValidationError(f"No electoral register policy named {value}")
+        er_policy: ElectoralRegisterPolicy = reg[value]
+        if not er_policy.available:
+            # If meeting has no dialect, ER policy isn't available
+            if instance is None or instance.installed_dialect is None:
+                raise_dialect_only(value)
+            handler = dialect_registry.get_merged_handler(instance.installed_dialect)
+            # Check if meeting dialect suggests selected ER policy
+            if handler.data.er_policy_name != value:
+                raise_dialect_only(value)
+        # ER policy requiring group_votes_active must have a meeting
+        if er_policy.group_votes_active and instance is None:
+            raise_dialect_only(value)
+        # This is only valid for subclasses so maybe move later
+        if (
+            instance
+            and er_policy.group_votes_active is not None
+            and instance.group_votes_active != er_policy.group_votes_active
+        ):
+            raise ValidationError(
+                f"Policy '{value}' is not compatible with the meetings group votes setting"
+            )
+        return value
+
+
+def raise_dialect_only(value: str):
+    raise ValidationError(
+        f"Policy '{value}' isn't manually selectable, it must be installed via a meeting dialect"
+    )
+
+
+class CreateRoomOnMeetingSerializer(CreateRoomSerializer):
+    class Meta(CreateRoomSerializer.Meta):
+        fields = [x for x in CreateRoomSerializer.Meta.fields if x not in ["meeting"]]
+
+
+class CreateSpeakerListSystemOnMeetingSerializer(CreateSpeakerListSystemSerializer):
+    class Meta(CreateSpeakerListSystemSerializer.Meta):
+        fields = [
+            x
+            for x in CreateSpeakerListSystemSerializer.Meta.fields
+            if x not in ["meeting", "room"]
+        ]
+
+
 class CreateMeetingSerializer(BaseModelSerializer):
     instance: Meeting | None
     install_dialect = serializers.CharField(
         validators=[DialectInstallableValidator()],
         required=False,
     )
+    room = CreateRoomOnMeetingSerializer(required=False)
+    sls = CreateSpeakerListSystemOnMeetingSerializer(required=False)
 
     class Meta:
         model = Meeting
@@ -103,6 +156,8 @@ class CreateMeetingSerializer(BaseModelSerializer):
             "er_policy_name",
             "visible_in_lists",
             "install_dialect",
+            "room",
+            "sls",
         ]
 
     def create(self, validated_data):
@@ -111,51 +166,31 @@ class CreateMeetingSerializer(BaseModelSerializer):
             validated_data["organisation"] = user.organisation
         with transaction.atomic(durable=True):
             install_dialect = validated_data.pop("install_dialect", None)
+            room_data = validated_data.pop("room", None)
+            sls_data = validated_data.pop("sls", None)
             instance = super().create(validated_data)
             if install_dialect:
                 handler = dialect_registry.get_merged_handler(install_dialect)
                 handler.install(instance)
+            if room_data:
+                room_serializer = CreateRoomSerializer(
+                    data={"meeting": instance.pk, **room_data}
+                )
+                room_serializer.is_valid(raise_exception=True)
+                room = room_serializer.save()
+                if sls_data:
+                    sls_serializer = CreateSpeakerListSystemSerializer(
+                        data={"meeting": instance.pk, "room": room.pk, **sls_data}
+                    )
+                    sls_serializer.is_valid(raise_exception=True)
+                    sls_serializer.save()
             return instance
 
-    @staticmethod
-    def _dialect_only(value: str):
-        raise ValidationError(
-            f"Policy '{value}' isn't manually selectable, it must be installed via a meeting dialect"
-        )
-
-    def validate_er_policy_name(self, value: str | None):
-        if value:
-            reg = get_electoral_policy_registry()
-            if value not in reg:
-                raise ValidationError(f"No electoral register policy named {value}")
-            er_policy: ElectoralRegisterPolicy = reg[value]
-            if not er_policy.available:
-                # If meeting has no dialect, ER policy isn't available
-                if self.instance is None or self.instance.installed_dialect is None:
-                    self._dialect_only(value)
-                handler = dialect_registry.get_merged_handler(
-                    self.instance.installed_dialect
-                )
-                # Check if meeting dialect suggests selected ER policy
-                if handler.data.er_policy_name != value:
-                    self._dialect_only(value)
-            # ER policy requiring group_votes_active must have a meeting
-            if er_policy.group_votes_active and self.instance is None:
-                self._dialect_only(value)
-            # This is only valid for subclasses so maybe move later
-            if (
-                self.instance
-                and er_policy.group_votes_active is not None
-                and self.instance.group_votes_active != er_policy.group_votes_active
-            ):
-                raise ValidationError(
-                    f"Policy '{value}' is not compatible with the meetings group votes setting"
-                )
-
-            return value
+    def validate_er_policy_name(self, value):
+        return validate_er_policy_name(self.instance, value)
 
 
-class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
+class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
     dialect = serializers.SerializerMethodField()
 
     class Meta:
@@ -183,8 +218,8 @@ class MeetingDetailSerializer(UserRolesMixin, CreateMeetingSerializer):
     def validate_er_policy_name(self, value):
         from voteit.poll.workflows import PollWf
 
-        value = super().validate_er_policy_name(value)
         self.instance: Meeting
+        value = validate_er_policy_name(self.instance, value)
         if self.instance.polls.filter(state=PollWf.ONGOING).exists():
             raise ValidationError(
                 "There are ongoing polls - close them before changing policy."
@@ -215,6 +250,7 @@ class AgendaOrderSerializer(serializers.Serializer):
 class MeetingRolesSerializer(serializers.ModelSerializer):
     meeting = serializers.IntegerField(source="context_id", read_only=True)
     user = UserListSerializer(read_only=True)
+    assigned = serializers.ListSerializer(child=serializers.CharField())
 
     class Meta:
         model = MeetingRoles
@@ -246,12 +282,15 @@ class CreateMeetingGroupSerializer(BaseModelSerializer):
 
     class Meta:
         model = MeetingGroup
-        exclude = (
-            "id",
-            "members",
-            "delegate_to",
-            "mentions",
-        )
+        fields = [
+            "pk",
+            "body",
+            "groupid",
+            "meeting",
+            "tags",
+            "title",
+            "votes",
+        ]
         extra_kwargs = {
             "groupid": {"required": False},
         }
@@ -277,14 +316,18 @@ class MeetingGroupSerializer(CreateMeetingGroupSerializer):
     pk = serializers.IntegerField(read_only=True)
 
     class Meta(CreateMeetingGroupSerializer.Meta):
-        exclude = (
-            "id",
-            "members",
-            "mentions",
-        )
         read_only_fields = [
             "meeting",
         ]
+        fields = [
+            "pk",
+            "body",
+            "delegate_to",
+            "groupid",
+            "tags",
+            "title",
+            "votes",
+        ] + read_only_fields
 
     def validate_delegate_to(self, value: MeetingGroup | None):
         if value:
@@ -303,6 +346,7 @@ class MeetingGroupSerializer(CreateMeetingGroupSerializer):
 
 class GroupRoleSerializer(BaseModelSerializer):
     pk = serializers.IntegerField(read_only=True)
+    roles = RolesField()
 
     class Meta:
         model = GroupRole

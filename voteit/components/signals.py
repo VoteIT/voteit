@@ -36,8 +36,8 @@ def meeting_channel_subscribed(
     # Append enabled components
     for component in context.components.filter(state=EnabledWf.ON):
         if component.is_valid:
-            app_state.append_from(
-                component, MeetingComponentSerializer, MeetingComponentAdded
+            app_state.append(
+                MeetingComponentAdded(**MeetingComponentSerializer(component).data)
             )
 
 

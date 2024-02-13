@@ -47,6 +47,7 @@ class MeetingCloneTests(TestCase):
         self.assertEqual({1, 2}, items.pop(get_model_by_shortname("meeting_roles")))
         self.assertEqual({1, 2}, items.pop(get_model_by_shortname("vote")))
         self.assertEqual({1, 2, 3}, items.pop(get_model_by_shortname("user")))
+        self.assertEqual(1, len(items.pop(get_model_by_shortname("group_membership"))))
         self.assertFalse(items)
 
     def test_collect_with_default_ignored(self):
@@ -85,8 +86,9 @@ class MeetingCloneTests(TestCase):
         )
 
     def test_clone_with_active_speakerlist(self):
+        room = self.meeting.rooms.create()
         sls: SpeakerListSystem = self.meeting.speaker_systems.create(
-            method_name="simple"
+            method_name="simple", room=room
         )
         slist = sls.speaker_lists.create()
         sls.active_list = slist

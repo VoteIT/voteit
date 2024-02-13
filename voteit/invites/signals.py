@@ -5,6 +5,7 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
+from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
@@ -47,11 +48,12 @@ def invites_channel_subscribed(
     # FIXME: We may not want to load all invites unless they're needed
     reg = get_invite_adapter_registry()
     invites_qs = reg.prep_invites_qs_for_subscribe(context.invites.all())
-    app_state.append_from_queryset(
-        invites_qs,
-        MeetingInviteSerializer,
-        MeetingInviteAdded,
-    )
+    serializer = MeetingInviteSerializer(invites_qs, many=True)
+    if serializer.data:
+        batch = Batch(t=MeetingInviteAdded.name, payloads=[])
+        for item in serializer.data:
+            batch.append(MeetingInviteAdded(**item))
+        app_state.append(batch)
 
 
 @receiver(post_save, sender=MeetingInvite)

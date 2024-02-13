@@ -16,7 +16,6 @@ os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 ID_HOST = "http://example.com"  # Required setting by organisation app
 
-
 ROOT_URLCONF = "project.urls"
 
 

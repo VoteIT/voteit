@@ -1,28 +1,29 @@
 from __future__ import annotations
 
 from abc import ABC
-from datetime import datetime
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
-
 from auditlog.context import set_actor
 from envelope.deferred_jobs.message import ContextAction
-from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import NotFoundError
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import websocket_send
+
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.messaging.base import BaseObjectAdded
+from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.rules import not_currently_speaking
+from voteit.speaker.workflows import SpeakerListWf
 
 
 class SpeakerListActionSchema(BaseModel):
@@ -84,6 +85,7 @@ class SpeakerListLeave(ListMessage):
         if existing_obj is None:
             raise BadRequestError.from_message(self, msg=_("Not in list"))
         existing_obj.delete()
+        self.context.reorder()
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
         return msg
@@ -122,6 +124,51 @@ class SetActiveList(ListMessage):
             msg = Status.from_message(self)
             websocket_send(msg, state=msg.SUCCESS)
             return msg
+
+
+class DeactivateListSchema(SpeakerListActionSchema):
+    close_list: bool = False
+
+
+@incoming
+class DeactivateList(ListMessage):
+    name = "speaker_list.deactivate"
+    permission = SpeakerListPermissions.CHANGE
+    model = SpeakerList
+    schema = DeactivateListSchema
+    data: DeactivateListSchema
+
+    def run_job(self) -> Status:
+        self.assert_perm()
+        if self.context.is_active_list:
+            if self.context.current is not None:
+                raise ValidationErrorMsg.from_message(
+                    self,
+                    msg=_("A speaker is currently speaking."),
+                    errors=[
+                        {
+                            "loc": ("sls",),
+                            "msg": _(
+                                "List '%(title)s' has an active speaker"
+                                % {
+                                    "title": self.context.title,
+                                }
+                            ),
+                            "type": "value.error",
+                        }
+                    ],
+                )
+            with set_actor(self.user):
+                self.context.speaker_system.active_list = None
+                self.context.speaker_system.save()
+                if self.data.close_list and self.context.state != SpeakerListWf.CLOSED:
+                    self.context.close()
+                self.context.save()
+
+        # Yes, indentation is correct. We'll want to send thumbs up even if nothing was done. No need to raise alarms.
+        msg = Status.from_message(self)
+        websocket_send(msg, state=msg.SUCCESS)
+        return msg
 
 
 @incoming
@@ -207,7 +254,7 @@ class ModeratorSpeakerListEnter(ModeratorListMessage):
     def run_job(self) -> Status:
         self.assert_perm()
         user = self.get_user()
-        # Negating rules has unwanted side-effects, hence this silly thing :)
+        # Negating rules has unwanted side effects, hence this silly thing :)
         if not not_currently_speaking(user, self.context):
             raise BadRequestError.from_message(self, msg=_("Currently speaking"))
         if self.context.meeting is not None:
@@ -237,6 +284,7 @@ class ModeratorSpeakerListLeave(ModeratorListMessage):
         if existing_obj is None:
             raise BadRequestError.from_message(self, msg=_("Not in list"))
         existing_obj.delete()
+        self.context.reorder()
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
         return msg
@@ -269,28 +317,14 @@ class ModeratorSpeakerListShuffle(ListMessage):
         return msg
 
 
-class SpeakerListSchema(BaseModel):
-    title: str | None
-    pk: int
-    state: str
-    speaker_system: int  # pk
-    agenda_item: int | None  # pk
-    queue: list[int]  # user pks, unique values
-    current: int | None  # current user pk if speaker
-
-
 @outgoing
-class SpeakerListAdded(Message):
+class SpeakerListAdded(BaseObjectAdded):
     name = "speaker_list.added"
-    schema = SpeakerListSchema
-    data: SpeakerListSchema
 
 
 @outgoing
-class SpeakerListChanged(Message):
+class SpeakerListChanged(BaseObjectChanged):
     name = "speaker_list.changed"
-    schema = SpeakerListSchema
-    data: SpeakerListSchema
 
 
 @outgoing
@@ -298,30 +332,14 @@ class SpeakerListDeleted(BaseObjectDeleted):
     name = "speaker_list.deleted"
 
 
-class SpeakerSystemSchema(BaseModel):
-    pk: int
-    state: str
-    title: str | None
-    meeting: int | None
-    method_name: str
-    settings: dict | None
-    safe_positions: int | None
-    active_list: int | None
-    meeting_roles_to_speaker: list[str]
-
-
 @outgoing
-class SpeakerSystemAdded(Message):
+class SpeakerSystemAdded(BaseObjectAdded):
     name = "speaker_system.added"
-    schema = SpeakerSystemSchema
-    data: SpeakerSystemSchema
 
 
 @outgoing
-class SpeakerSystemChanged(Message):
+class SpeakerSystemChanged(BaseObjectChanged):
     name = "speaker_system.changed"
-    schema = SpeakerSystemSchema
-    data: SpeakerSystemSchema
 
 
 @outgoing
@@ -329,27 +347,14 @@ class SpeakerSystemDeleted(BaseObjectDeleted):
     name = "speaker_system.deleted"
 
 
-class SpeakerSchema(BaseModel):
-    pk: int  # Speaker pk
-    user: int  # User speaker
-    sls: int
-    speaker_list: int
-    started: datetime | None
-    seconds: int | None
-
-
 @outgoing
-class SpeakerChanged(Message):
+class SpeakerChanged(BaseObjectChanged):
     name = "speaker.changed"
-    schema = SpeakerSchema
-    data: SpeakerSchema
 
 
 @outgoing
-class SpeakerAdded(Message):
+class SpeakerAdded(BaseObjectAdded):
     name = "speaker.added"
-    schema = SpeakerSchema
-    data: SpeakerSchema
 
 
 @outgoing

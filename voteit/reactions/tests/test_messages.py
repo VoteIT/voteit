@@ -7,6 +7,9 @@ from envelope.messages.errors import ValidationErrorMsg
 
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.reactions.models import ReactionButton
 
 User = get_user_model()
@@ -26,14 +29,14 @@ class AddReactionTests(TestCase):
         cls.prop = cls.ai.proposals.create()
         cls.disc = cls.ai.discussions.create()
         cls.button: ReactionButton = cls.meeting.reaction_buttons.create(
-            change_roles=["potential_voter"]
+            change_roles=[ROLE_POTENTIAL_VOTER]
         )
         cls.voter = User.objects.create(username="voter")
         cls.participant = User.objects.create(username="participant")
         cls.moderator = User.objects.create(username="moderator")
-        cls.meeting.add_roles(cls.voter, "potential_voter")
-        cls.meeting.add_roles(cls.participant, "participant")
-        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.meeting.add_roles(cls.voter, ROLE_POTENTIAL_VOTER)
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
 
     @property
     def _cut(self):
@@ -120,12 +123,12 @@ class DeleteReactionTests(TestCase):
         self.prop = self.ai.proposals.create()
         self.disc = self.ai.discussions.create()
         self.button = self.meeting.reaction_buttons.create(
-            change_roles=["potential_voter"]
+            change_roles=[ROLE_POTENTIAL_VOTER]
         )
         self.voter = User.objects.create(username="voter")
         self.participant = User.objects.create(username="participant")
-        self.meeting.add_roles(self.voter, "potential_voter")
-        self.meeting.add_roles(self.participant, "participant")
+        self.meeting.add_roles(self.voter, ROLE_POTENTIAL_VOTER)
+        self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
         self.reaction = self.prop.reaction_set.create(
             user=self.voter,
             button=self.button,
@@ -163,8 +166,8 @@ class DeleteFlagReactionTests(TestCase):
         cls.flag = cls.meeting.reaction_buttons.create(flag_mode=True)
         cls.moderator = User.objects.create(username="moderator")
         cls.participant = User.objects.create(username="participant")
-        cls.meeting.add_roles(cls.participant, "participant")
-        cls.meeting.add_roles(cls.moderator, "moderator")
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.reaction = cls.prop.reaction_set.create(
             user=cls.participant,
             button=cls.flag,
@@ -209,14 +212,14 @@ class ListReactionUsersTests(TestCase):
         cls.prop = cls.ai.proposals.create()
         cls.disc = cls.ai.discussions.create()
         cls.button = cls.meeting.reaction_buttons.create(
-            change_roles=["potential_voter"],
-            list_roles=["potential_voter"],
+            change_roles=[ROLE_POTENTIAL_VOTER],
+            list_roles=[ROLE_POTENTIAL_VOTER],
         )
         cls.voter = User.objects.create(username="voter")
         cls.participant = User.objects.create(username="participant")
         cls.outsider = User.objects.create(username="outsider")
-        cls.meeting.add_roles(cls.voter, "potential_voter")
-        cls.meeting.add_roles(cls.participant, "participant")
+        cls.meeting.add_roles(cls.voter, ROLE_POTENTIAL_VOTER)
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         for user in [cls.voter, cls.participant]:
             cls.prop.reaction_set.create(
                 user=user,

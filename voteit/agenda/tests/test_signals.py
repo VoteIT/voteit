@@ -7,13 +7,16 @@ from django.test import override_settings
 from pytz import UTC
 
 from envelope.channels.messages import Subscribe
+from envelope.messages.common import Batch
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.messages import AgendaBodyAdded
+from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -31,7 +34,7 @@ class SubscribedTests(TestCase):
         cls.ai.save()
         cls.ai_private: AgendaItem = cls.meeting.agenda_items.create()
         cls.user = User.objects.create(username="user")
-        cls.meeting.add_roles(cls.user, "moderator")
+        cls.meeting.add_roles(cls.user, ROLE_MODERATOR)
         cls.ai_private.mark_read(cls.user)
 
     def test_app_state_sent_participants(self):
@@ -67,14 +70,16 @@ class SubscribedTests(TestCase):
             channel_type=MeetingChannel.name,
         )
         msg = command.run_job()
-        agenda_pks = {
-            x.p["agenda_item"] for x in msg.data.app_state if x.t == "last_read.changed"
-        }
-        self.assertEqual({self.ai_private.pk}, agenda_pks)
-        timestamps = {
-            x.p["timestamp"] for x in msg.data.app_state if x.t == "last_read.changed"
-        }
-        self.assertIsInstance(timestamps.pop(), str)
+        batch_msgs = [
+            x
+            for x in msg.data.app_state
+            if x.t == Batch.name and x.p["t"] == LastReadChanged.name
+        ]
+        self.assertEqual(1, len(batch_msgs))
+        batch = batch_msgs[0]
+        self.assertEqual(
+            {self.ai_private.pk}, {x.agenda_item for x in batch.p["payloads"]}
+        )
 
     def test_app_state_sends_body(self):
         command = Subscribe(

@@ -1,6 +1,7 @@
 from collections import Counter
 from typing import List
 
+from pydantic import validator
 from pydantic.main import BaseModel
 
 from voteit.speaker.abcs import ListMethod
@@ -15,6 +16,20 @@ class PrioritySettingsSchema(BaseModel):
 
     class Config:
         allow_mutation = False
+
+    @validator("max_times", pre=True)
+    def set_to_zero_when_falsy(cls, v):
+        """
+        This is kind of a bugfix for frontend, but no harm
+        >>> PrioritySettingsSchema(max_times="")
+        PrioritySettingsSchema(max_times=0)
+
+        >>> PrioritySettingsSchema(max_times=None)
+        PrioritySettingsSchema(max_times=0)
+        """
+        if not v:
+            return 0
+        return v
 
 
 @list_method

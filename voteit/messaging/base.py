@@ -52,8 +52,7 @@ class GenericDeleteSchema(BaseModel):
     pk: int
 
 
-class BaseObjectAction(ContextAction, ABC):
-    ...
+class BaseObjectAction(ContextAction, ABC): ...
 
 
 class BaseAddObject(BaseObjectAction, ABC):

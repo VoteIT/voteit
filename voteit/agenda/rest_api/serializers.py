@@ -7,6 +7,7 @@ from voteit.core.rest_api.serializers import RichTextSerializerMixin
 
 
 class AgendaItemSerializer(RichTextSerializerMixin, BaseModelSerializer):
+    add_body_tags = False
     pk = serializers.IntegerField(read_only=True)
 
     class Meta:

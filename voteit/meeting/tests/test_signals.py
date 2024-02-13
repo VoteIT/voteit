@@ -4,14 +4,17 @@ from django.contrib.auth import get_user_model
 from django.dispatch import receiver
 from django.test import TestCase
 from django.test import override_settings
-
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
+from envelope.messages.common import Batch
+
 from voteit.core.testing import FakeCommit
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import MeetingGroup
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation.models import Organisation
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 
@@ -41,13 +44,13 @@ class MeetingJoinedSignalTests(TestCase):
             L.append(kw)
 
         with FakeCommit():
-            self.meeting.add_roles(self.user, "participant")
+            self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
             self.assertFalse(L)
         self.assertTrue(L)
         kwargs = L[0]
         self.assertEqual(self.meeting, kwargs.pop("meeting"))
         self.assertEqual(self.user, kwargs.pop("user"))
-        self.assertEqual({"participant"}, set(kwargs.pop("meeting_roles").assigned))
+        self.assertEqual({ROLE_PARTICIPANT}, set(kwargs.pop("meeting_roles").assigned))
 
     def test_signal_send_after_invite_used(self):
         @receiver(self._fut)
@@ -86,7 +89,7 @@ class MeetingChannelSubscribedTests(TestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
         cls.user: User = cls.meeting.participants.create(username="user")
-        cls.meeting.add_roles(cls.user, "moderator")
+        cls.meeting.add_roles(cls.user, ROLE_MODERATOR)
         cls.group: MeetingGroup = cls.meeting.groups.create(title="Gang")
         cls.group_role: GroupRole = cls.meeting.group_roles.create(
             title="President", role_id="president"
@@ -113,7 +116,7 @@ class MeetingChannelSubscribedTests(TestCase):
         ]
         self.assertEqual(1, len(added_meeting_roles))
         payload = added_meeting_roles[0].p
-        self.assertEqual(set(payload["roles"]), {"participant", "moderator"})
+        self.assertEqual(set(payload["roles"]), {ROLE_MODERATOR, ROLE_PARTICIPANT})
         self.assertEqual(payload["user_pk"], self.user.pk)
         self.assertEqual(payload["model"], "meeting")
 
@@ -124,21 +127,29 @@ class MeetingChannelSubscribedTests(TestCase):
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         # MeetingGroup
-        added = [x for x in response.data.app_state if x.t == "meeting_group.added"]
+        added = [
+            x
+            for x in response.data.app_state
+            if x.t == Batch.name and x.p["t"] == "meeting_group.added"
+        ]
         self.assertEqual(1, len(added))
-        payload = added[0].p
-        self.assertEqual(self.group.pk, payload["pk"])
+        payload = added[0].p["payloads"][0]
+        self.assertEqual(self.group.pk, payload.pk)
         # GroupRole
         added = [x for x in response.data.app_state if x.t == "group_role.added"]
         self.assertEqual(1, len(added))
         payload = added[0].p
         self.assertEqual(self.group_role.pk, payload["pk"])
         # GroupMembership
-        added = [x for x in response.data.app_state if x.t == "group_membership.added"]
+        added = [
+            x
+            for x in response.data.app_state
+            if x.t == Batch.name and x.p["t"] == "group_membership.added"
+        ]
         self.assertEqual(1, len(added))
-        payload = added[0].p
-        self.assertEqual(self.group_membership.pk, payload["pk"])
-        self.assertEqual(self.meeting.pk, payload["m"])
+        payload = added[0].p["payloads"][0]
+        self.assertEqual(self.group_membership.pk, payload.pk)
+        self.assertEqual(self.meeting.pk, payload.m)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -242,31 +253,31 @@ class RoleChangesPublishedTests(TestCase):
         org: Organisation = Organisation.objects.create()
         cls.meeting: Meeting = org.meetings.create()
         cls.user = cls.meeting.participants.create(username="user", organisation=org)
-        cls.meeting.add_roles(cls.user, "participant")
+        cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added(self, mock_publish):
         from voteit.core.messages.role_updates import RolesAdded
 
         self.assertFalse(mock_publish.called)
-        self.meeting.add_roles(self.user, "moderator")
+        self.meeting.add_roles(self.user, ROLE_MODERATOR)
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, RolesAdded)
         self.assertEqual(self.meeting.pk, msg.data.pk)
-        self.assertEqual({"moderator"}, set(msg.data.roles))
+        self.assertEqual({ROLE_MODERATOR}, set(msg.data.roles))
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_removed(self, mock_publish):
         from voteit.core.messages.role_updates import RolesRemoved
 
         self.assertFalse(mock_publish.called)
-        self.meeting.remove_roles(self.user, "participant")
+        self.meeting.remove_roles(self.user, ROLE_PARTICIPANT)
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, RolesRemoved)
         self.assertEqual(self.meeting.pk, msg.data.pk)
-        self.assertEqual({"participant"}, set(msg.data.roles))
+        self.assertEqual({ROLE_PARTICIPANT}, set(msg.data.roles))
 
 
 class MeetingERChangedTests(TestCase):
