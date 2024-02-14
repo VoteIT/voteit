@@ -12,13 +12,12 @@ from django.dispatch import receiver
 from async_signals import receiver as areceiver
 from envelope.async_signals import consumer_connected
 from envelope.app.online_channel.channel import OnlineChannel
-from envelope.utils import websocket_send
 
 from voteit.core import models_to_register
 
 if TYPE_CHECKING:
     from django.db.models import Model
-    from envelope.consumer.websocket import WebsocketConsumer
+    from envelope.consumers.websocket import WebsocketConsumer
 
 
 # The following signals will provide arguments "sender", "instance" and "roles"

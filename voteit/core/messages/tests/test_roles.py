@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.test import override_settings
 from pydantic import ValidationError
 from pythonjsonlogger.jsonlogger import JsonFormatter
-from envelope.consumer.websocket import WebsocketConsumer
+from envelope.consumers.websocket import WebsocketConsumer
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.tests.helpers import testing_channel_layers_setting
