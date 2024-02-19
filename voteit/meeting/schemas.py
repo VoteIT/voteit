@@ -33,8 +33,6 @@ class GroupRoleSchema(BaseModel):
     title: constr(max_length=100)
     role_id: constr(max_length=100, to_lower=True)
     roles: list[str] = ()
-    can_propose_as: bool = False
-    can_discuss_as: bool = False
 
     @validator("roles", pre=True, each_item=True)
     def role_compat(cls, v: str | Role):

@@ -502,8 +502,6 @@ class GroupRole(MeetingContext):
     meeting: Meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="group_roles"
     )
-    can_propose_as: bool = models.BooleanField("Can propose as group", default=False)
-    can_discuss_as: bool = models.BooleanField("Can discuss as group", default=False)
     roles: list[Role] = RolesField(
         max_length=60,
         role_choices=MeetingRoles.valid_roles.values(),

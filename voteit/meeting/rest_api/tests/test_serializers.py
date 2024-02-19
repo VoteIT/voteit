@@ -404,8 +404,6 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         self.assertEqual(self.group_role.pk, data.pop("pk"))
         self.assertEqual("Supreme leader", data.pop("title"))
         self.assertEqual("leader", data.pop("role_id"))
-        self.assertFalse(data.pop("can_propose_as"))
-        self.assertFalse(data.pop("can_discuss_as"))
         self.assertEqual([ROLE_POTENTIAL_VOTER], data.pop("roles"))
         self.assertEqual(self.meeting.pk, data.pop("meeting"))
         self.assertFalse(data.keys())
