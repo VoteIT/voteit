@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.serializers import ForceDeleteSerializer
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.room.models import Room
@@ -29,6 +30,7 @@ class RoomsViewSet(DefaultModelViewSet):
         "create": CreateRoomSerializer,
         "update": RoomDetailSerializer,
         "partial_update": RoomDetailSerializer,
+        "destroy": ForceDeleteSerializer,
     }
     context_queryset = Meeting.objects.all()
     context_lookup_kwarg = "meeting"
@@ -90,6 +92,29 @@ class RoomsViewSet(DefaultModelViewSet):
 
     @transaction.atomic(durable=True)
     def destroy(self, request, *args, **kwargs):
+        instance: Room = self.get_object()
+        try:
+            sls = instance.sls
+        except ObjectDoesNotExist:
+            sls = None
+        if sls is not None:
+            from voteit.speaker.models import Speaker
+
+            if scount := Speaker.objects.filter(
+                speaker_list__speaker_system=sls
+            ).count():
+                serializer = self.get_serializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                if not serializer.data["force"]:
+                    raise ValidationError(
+                        {
+                            "force": [
+                                f"Room contains {scount} speaker items which would be deleted, "
+                                f"set force=true to delete"
+                            ]
+                        }
+                    )
+            instance.sls.delete()
         return super().destroy(request, *args, **kwargs)
 
     def get_serializer_class(self):

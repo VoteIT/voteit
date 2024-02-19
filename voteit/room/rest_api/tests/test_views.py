@@ -6,6 +6,7 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.speaker.app.list_methods.simple import Simple
+from voteit.speaker.models import Speaker
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 from voteit.poll.app.polls.simple import Simple as SimplePoll
 
@@ -36,7 +37,7 @@ class RoomsViewTestCase(APITestCase):
         cls.room.highlighted_proposals.create(proposal=cls.prop2)
         # Speaker system
         cls.sls = cls.meeting.speaker_systems.create(
-            method_name="simple", room=cls.room
+            method_name=Simple.name, room=cls.room
         )
 
     def setUp(self):
@@ -209,3 +210,36 @@ class RoomsViewTestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.room.refresh_from_db()
         self.assertEqual(self.moderator, self.room.handler)
+
+    def test_delete_with_sls_and_speaker(self):
+        slist = self.sls.speaker_lists.create()
+        speaker = slist.speaker_items.create(user=self.moderator)
+        self.client.force_login(self.moderator)
+        url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
+        response = self.client.delete(url)
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            {
+                "force": [
+                    "Room contains 1 speaker items which would be deleted, set force=true to delete"
+                ]
+            },
+            response.json(),
+        )
+        response = self.client.delete(url, data={"force": True})
+        self.assertEqual(204, response.status_code)
+        with self.assertRaises(Speaker.DoesNotExist):
+            speaker.refresh_from_db()
+
+    def test_delete_with_sls_no_speaker(self):
+        self.client.force_login(self.moderator)
+        url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
+        response = self.client.delete(url)
+        self.assertEqual(204, response.status_code)
+
+    def test_delete_without_sls(self):
+        self.client.force_login(self.moderator)
+        self.sls.delete()
+        url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
+        response = self.client.delete(url)
+        self.assertEqual(204, response.status_code)
