@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from itertools import chain
-from typing import OrderedDict
 
 from rest_framework import serializers
 
@@ -12,7 +11,10 @@ from voteit.core.rest_api.validators import ValidateGroupAIContext
 from voteit.discussion import models
 
 
-__all__ = ("DiscussionPostDetailSerializer", "DiscussionPostCreateSerializer")
+__all__ = (
+    "DiscussionPostDetailSerializer",
+    "DiscussionPostCreateSerializer",
+)
 
 
 class DiscussionPostDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
@@ -29,6 +31,7 @@ class DiscussionPostDetailSerializer(RichTextSerializerMixin, BaseModelSerialize
             "body",
             "meeting_group",
             "tags",
+            "as_group",
         ]
 
 
@@ -45,6 +48,7 @@ class DiscussionPostCreateSerializer(RichTextSerializerMixin, BaseModelSerialize
             "body",
             "meeting_group",
             "tags",
+            "as_group",
         ]
         validators = (ValidateGroupAIContext(),)
 

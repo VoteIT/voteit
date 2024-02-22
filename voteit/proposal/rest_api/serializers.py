@@ -118,6 +118,7 @@ class ProposalDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "meeting_group",
             "mentions",
             "tags",
+            "as_group",
         ]
 
     def get_shortname(self, instance):
@@ -148,6 +149,7 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "mentions",
             "prop_id",
             "tags",
+            "as_group",
         ] + read_only_fields
         validators = (ValidateGroupAIContext(),)
         extra_kwargs = {
