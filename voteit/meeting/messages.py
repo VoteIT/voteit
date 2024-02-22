@@ -120,6 +120,9 @@ class MeetingGroupSchema(BaseModel):
     title: constr(strip_whitespace=True, max_length=100)
     groupid: constr(to_lower=True, min_length=1, max_length=100, strip_whitespace=True)
     votes: int | None
+    show_on_speaker: bool = True
+    post_as: bool = False
+    post_with: bool = True
 
     @validator("groupid", pre=True)
     def transform_groupid(cls, v: str):
@@ -136,7 +139,7 @@ class CreateMeetingGroupsSchema(BaseModel):
     groups
       ensure this value has at most 250 items (type=value_error.list.max_items; limit_value=250)
     >>> CreateMeetingGroupsSchema(groups="a\tA\t\nB\tB\t1", meeting=1)
-    CreateMeetingGroupsSchema(meeting=1, groups=[MeetingGroupSchema(title='a', groupid='a', votes=None), MeetingGroupSchema(title='B', groupid='b', votes=1)])
+    CreateMeetingGroupsSchema(meeting=1, groups=[MeetingGroupSchema(title='a', groupid='a', votes=None, show_on_speaker=True, post_as=False, post_with=True), MeetingGroupSchema(title='B', groupid='b', votes=1, show_on_speaker=True, post_as=False, post_with=True)])
     """
 
     meeting: conint(ge=1)
@@ -149,6 +152,7 @@ class CreateMeetingGroupsSchema(BaseModel):
         >>> f("a\tA\t\nB\tB\t1")
         [{'title': 'a', 'groupid': 'A'}, {'title': 'B', 'groupid': 'B', 'votes': '1'}]
         """
+        # FIXME: This part needs to change as of https://github.com/VoteIT/voteit/issues/317
         if isinstance(v, str):
 
             def _tc(title=None, groupid=None, votes=None, *args):
@@ -171,12 +175,12 @@ class CreateMeetingGroupsSchema(BaseModel):
         >>> MGS = MeetingGroupSchema
         >>> items = [MGS(title=x, groupid=x) for x in ['a', 'b']]
         >>> f(items)
-        [MeetingGroupSchema(title='a', groupid='a', votes=None), \
-            MeetingGroupSchema(title='b', groupid='b', votes=None)]
-        >>> items = [MGS(title=x, groupid=x) for x in ['a', 'A b']]
+        [MeetingGroupSchema(title='a', groupid='a', votes=None, show_on_speaker=True, post_as=False, post_with=True),\
+            MeetingGroupSchema(title='b', groupid='b', votes=None, show_on_speaker=True, post_as=False, post_with=True)]
+        >>> items = [MGS(title=x, groupid=x, show_on_speaker=False) for x in ['a', 'A b']]
         >>> f(items)
-        [MeetingGroupSchema(title='a', groupid='a', votes=None), \
-            MeetingGroupSchema(title='A b', groupid='a-b', votes=None)]
+        [MeetingGroupSchema(title='a', groupid='a', votes=None, show_on_speaker=False, post_as=False, post_with=True), \
+            MeetingGroupSchema(title='A b', groupid='a-b', votes=None, show_on_speaker=False, post_as=False, post_with=True)]
 
         >>> items = [MGS(title=x, groupid=x) for x in ['a', 'A']]
         >>> f(items)
