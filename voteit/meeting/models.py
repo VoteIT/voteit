@@ -437,6 +437,18 @@ class MeetingGroup(BaseContent, MeetingContext):
         null=True,
         related_name="delegations_from",
     )
+    show_on_speaker: bool = models.BooleanField(
+        verbose_name="Display group name on speaker entry in speaker lists",
+        default=True,
+    )
+    post_as: bool = models.BooleanField(
+        verbose_name="Allow members to post as group",
+        default=False,
+    )
+    post_with: bool = models.BooleanField(
+        verbose_name="Allow members to display group next to name when posting",
+        default=True,
+    )
 
     def save(self, **kwargs):
         if not self.groupid:
