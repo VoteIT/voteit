@@ -292,7 +292,6 @@ class CreateMeetingGroupSerializer(BaseModelSerializer):
             "votes",
             "show_on_speaker",
             "post_as",
-            "post_with",
         ]
         extra_kwargs = {
             "groupid": {"required": False},
@@ -332,7 +331,6 @@ class MeetingGroupSerializer(CreateMeetingGroupSerializer):
             "votes",
             "show_on_speaker",
             "post_as",
-            "post_with",
         ] + read_only_fields
 
     def validate_delegate_to(self, value: MeetingGroup | None):

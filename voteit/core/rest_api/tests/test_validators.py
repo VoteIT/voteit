@@ -65,25 +65,6 @@ class ValidateGroupAIContextTests(TestCase):
         instance = serializer.create(serializer.validated_data)
         self.assertEqual(self.group, instance.meeting_group)
 
-    def test_create_with_group_that_doesnt_allow_with(self):
-        self.group.post_with = False
-        self.group.save()
-        self.group.members.add(self.user)
-        data = {
-            "body": "Hello " + mk_hashtag("world"),
-            "agenda_item": self.ai.pk,
-            "meeting_group": self.group.pk,
-        }
-        request = self._mk_request()
-        serializer = self._cut(data=data, context={"request": request})
-        with self.assertRaises(ValidationError) as cm:
-            serializer.is_valid(raise_exception=True)
-        self.assertIn("meeting_group", cm.exception.detail)
-        self.assertEqual(
-            "This meeting group doesn't allow you to display it together with your posts. (post_with=False)",
-            str(cm.exception.detail["meeting_group"][0]),
-        )
-
     def test_create_as_group(self):
         self.group.post_as = True
         self.group.save()

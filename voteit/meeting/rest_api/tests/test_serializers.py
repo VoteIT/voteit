@@ -285,7 +285,6 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         self.assertEqual(None, data.pop("delegate_to"))
         self.assertEqual(True, data.pop("show_on_speaker"))
         self.assertEqual(False, data.pop("post_as"))
-        self.assertEqual(True, data.pop("post_with"))
         self.assertFalse(data.keys())
 
     def test_meeting_group_many(self):

@@ -53,24 +53,13 @@ class ValidateGroupAIContext:
                 if user.has_perm(MeetingPermissions.MODERATE, agenda_item.meeting):
                     return
                 # This op doesn't require a DB lookup so do it before group check
-                if value.get("as_group"):
-                    if not group.post_as:
-                        raise serializers.ValidationError(
-                            {
-                                self.as_group_fieldname: _(
-                                    "This meeting group doesn't allow you to create posts in its name. "
-                                    "(post_as=False)"
-                                )
-                            }
-                        )
-                else:
-                    if not group.post_with:
-                        raise serializers.ValidationError(
-                            {
-                                self.group_fieldname: _(
-                                    "This meeting group doesn't allow you to display it together with your posts. "
-                                    "(post_with=False)"
-                                )
-                            }
-                        )
+                if value.get("as_group") and not group.post_as:
+                    raise serializers.ValidationError(
+                        {
+                            self.as_group_fieldname: _(
+                                "This meeting group doesn't allow you to create posts in its name. "
+                                "(post_as=False)"
+                            )
+                        }
+                    )
                 # Group membership check should be done via BaseModelSerializer

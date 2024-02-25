@@ -445,10 +445,6 @@ class MeetingGroup(BaseContent, MeetingContext):
         verbose_name="Allow members to post as group",
         default=False,
     )
-    post_with: bool = models.BooleanField(
-        verbose_name="Allow members to display group next to name when posting",
-        default=True,
-    )
 
     def save(self, **kwargs):
         if not self.groupid:
