@@ -42,8 +42,12 @@ class ProposalTests(TestCase):
 
     def test_meeting_group_id(self):
         group = self.meeting.groups.create(title="King's College")
-        prop = self.ai.proposals.create(author=self.user, meeting_group=group)
-        prop2 = self.ai.proposals.create(author=self.user, meeting_group=group)
+        prop = self.ai.proposals.create(
+            author=self.user, meeting_group=group, as_group=True
+        )
+        prop2 = self.ai.proposals.create(
+            author=self.user, meeting_group=group, as_group=True
+        )
         user_prop = self.ai.proposals.create(author=self.user)
         self.assertEqual(prop.prop_id, "kings-college-1")
         self.assertEqual(prop2.prop_id, "kings-college-2")

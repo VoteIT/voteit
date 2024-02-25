@@ -134,7 +134,9 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
             return instance.prop_id
         meeting = meeting_from_unsafe_data(self)
         if suggestion := meeting.pid_policy.suggestion(
-            author=instance.get("author"), meeting_group=instance.get("meeting_group")
+            author=instance.get("author"),
+            meeting_group=instance.get("meeting_group"),
+            as_group=instance.get("as_group"),
         ):
             return "%s-{n}" % suggestion
 
