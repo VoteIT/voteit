@@ -9,7 +9,6 @@ from django.db import transaction
 from envelope.core.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.common import ProgressNum
-from envelope.messages.common import ProgressSchema
 from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send

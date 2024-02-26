@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from voteit.invites.management.base import BaseInvitesCommand
 from voteit.invites.messages import AddInvites
+from voteit.invites.schemas import schema_context
 from voteit.meeting.models import Meeting
 
 
@@ -30,13 +31,26 @@ class Command(BaseInvitesCommand):
             )
         )
         user_data = self.get_data(options)
-        command = AddInvites(
-            mm={"user_pk": options.get("u")},
-            meeting=meeting.pk,
-            roles=roles,
-            rows=user_data,
-            columns=["email"],
-            dryrun=options.get("dry_run"),
+        cleaned_userdata = sorted(set(user_data))
+        if len(user_data) != len(cleaned_userdata):
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Removed {len(user_data) - len(cleaned_userdata)} item(s) from list since they were duplicated"
+                )
+            )
+        with schema_context(limit=None):
+            command = AddInvites(
+                mm={"user_pk": options.get("u")},
+                meeting=meeting.pk,
+                roles=roles,
+                rows=cleaned_userdata,
+                columns=["email"],
+                dryrun=options.get("dry_run"),
+            )
+            command.context = meeting
+            response = self.run_cmd(command, options)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Added: {response.data.added} Changed: {response.data.changed} Existed: {response.data.existed}"
+            )
         )
-        command.context = meeting
-        self.run_cmd(command, options)

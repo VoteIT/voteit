@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from voteit.invites.management.base import BaseInvitesCommand
 from voteit.invites.messages import AddInviteAnnotations
+from voteit.invites.schemas import schema_context
 from voteit.meeting.models import Meeting
 
 
@@ -40,11 +41,12 @@ class Command(BaseInvitesCommand):
             dryrun=options.get("dry_run"),
         )
         command.context = meeting
-        for result in self.run_cmd(command, options):
-            if result:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Annotation {result.name}\n"
-                        f"Added: {result.data.added} \nChanged: {result.data.changed} \nExisted: {result.data.existed}"
+        with schema_context(limit=None):
+            for result in self.run_cmd(command, options):
+                if result:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Annotation {result.name}\n"
+                            f"Added: {result.data.added} \nChanged: {result.data.changed} \nExisted: {result.data.existed}"
+                        )
                     )
-                )
