@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from voteit.invites.management.base import BaseInvitesCommand
 from voteit.invites.messages import AddInvites
+from voteit.invites.schemas import schema_context
 from voteit.meeting.models import Meeting
 
 
@@ -33,13 +34,14 @@ class Command(BaseInvitesCommand):
             cols = cols.split(",")
         else:
             cols = rows.pop(0).split("\t")
-        command = AddInvites(
-            mm={"user_pk": options.get("u")},
-            meeting=meeting.pk,
-            roles=roles,
-            rows=rows,
-            columns=cols,
-            dryrun=options.get("dry_run"),
-        )
-        command.context = meeting
-        self.run_cmd(command, options)
+        with schema_context(limit=None):
+            command = AddInvites(
+                mm={"user_pk": options.get("u")},
+                meeting=meeting.pk,
+                roles=roles,
+                rows=rows,
+                columns=cols,
+                dryrun=options.get("dry_run"),
+            )
+            command.context = meeting
+            self.run_cmd(command, options)

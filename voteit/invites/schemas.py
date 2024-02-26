@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 from django.utils.translation import gettext as _
@@ -12,6 +14,26 @@ from voteit.invites.utils import get_invite_adapter_registry
 
 if TYPE_CHECKING:
     from voteit.invites.abcs import InviteDataAdapter
+
+
+class _SchemaContextSettings(BaseModel):
+    limit: int | None = 1000
+
+
+_inv_schema_vars = ContextVar("inv_schema_vars", default=_SchemaContextSettings())
+
+
+@contextmanager
+def schema_context(**kwargs):
+    """
+    Override defaults when checking schema
+    """
+
+    token = _inv_schema_vars.set(_SchemaContextSettings(**kwargs))
+    try:
+        yield
+    finally:
+        _inv_schema_vars.reset(token)
 
 
 class InvitesMetaMixinSchema(BaseModel):
@@ -67,7 +89,6 @@ class RowColInvitesBaseSchema(BaseModel):
             max_items=30,
         ),
         unique_items=True,
-        max_items=1000,
     )
     dryrun: bool = False  # Abort transaction when complete!
 
@@ -102,6 +123,35 @@ class RowColInvitesBaseSchema(BaseModel):
             reg.preflight(values["columns"], result)
             return result
         raise ValueError("Initial value of rows must be either string or list")
+
+    @validator("rows")
+    def check_row_len(cls, v: list):
+        """
+        >>> v = list(range(5))
+        >>> RowColInvitesBaseSchema.check_row_len(v)
+        [0, 1, 2, 3, 4]
+        >>> with schema_context(limit=2):
+        ...     RowColInvitesBaseSchema.check_row_len(v)
+        Traceback (most recent call last):
+        ...
+        ValueError: We only allow 2 rows to be added this way at one time
+        >>> with schema_context(limit=None):
+        ...     RowColInvitesBaseSchema.check_row_len(v)
+        [0, 1, 2, 3, 4]
+
+        # Default
+        >>> RowColInvitesBaseSchema.check_row_len(list(range(1001)))
+        Traceback (most recent call last):
+        ...
+        ValueError: We only allow 1000 rows to be added this way at one time
+
+        """
+        ctx = _inv_schema_vars.get()
+        if ctx.limit and len(v) > ctx.limit:
+            raise ValueError(
+                f"We only allow {ctx.limit} rows to be added this way at one time"
+            )
+        return v
 
     @validator("rows")
     def check_important_data_outside_read_columns(
