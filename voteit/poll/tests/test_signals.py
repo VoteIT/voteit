@@ -14,7 +14,7 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.app.er_policies.auto_always import AutoAlways
-from voteit.poll.channels import PollChannel
+from voteit.poll.messages import PollStatus
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.workflows import PollWf
 
@@ -24,31 +24,6 @@ User = get_user_model()
 _channel_layers_setting = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
 }
-
-
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
-class PollSubscribedTests(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.meeting = Meeting.objects.create(er_policy_name=AutoAlways.name)
-        cls.ai = cls.meeting.agenda_items.create(state="ongoing")
-        cls.user = User.objects.create(username="user")
-        cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER)
-        cls.poll = cls.meeting.polls.create(method_name="simple")
-        cls.poll.upcoming()
-        cls.poll.save()
-        cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
-
-    def test_app_state_sent(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.poll.pk,
-            channel_type="poll",
-        )
-        msg = command.run_job()
-        unpacked = {x.t: x.p for x in msg.data.app_state}
-        self.assertIn("poll.status", unpacked)
-        self.assertEqual(self.poll.pk, unpacked["poll.status"]["pk"])
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -65,7 +40,7 @@ class MeetingSubscribedTests(TestCase):
             method_name="simple", electoral_register=cls.er, state="upcoming"
         )
         cls.poll2 = cls.meeting.polls.create(
-            method_name="simple", electoral_register=cls.er, state="upcoming"
+            method_name="simple", electoral_register=cls.er, state="ongoing"
         )
         cls.poll_private = cls.meeting.polls.create(
             method_name="simple", electoral_register=cls.er
@@ -232,6 +207,18 @@ class MeetingSubscribedTests(TestCase):
             },
             payload.result,
         )
+
+    def test_app_state_ongoing_poll(self):
+        command = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.meeting.pk,
+            channel_type="meeting",
+        )
+        msg = command.run_job()
+        messages = [x.p for x in msg.data.app_state if x.t == PollStatus.name]
+        self.assertEqual(1, len(messages))
+        payload = messages[0]
+        self.assertEqual({"pk": self.poll2.pk, "voted": 2, "total": 2}, payload)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -448,8 +435,8 @@ class VoteSignalsTests(TestCase):
         msg = messages[0]
         self.assertEqual({"choice": "no"}, msg.data.vote)
 
-    @patch.object(PollChannel, "sync_publish")
-    def test_count_sent_to_poll_ch(self, mock_publish):
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_count_sent_to_meeting_ch(self, mock_publish):
         from voteit.poll.messages import PollStatus
 
         with self.captureOnCommitCallbacks(execute=True):

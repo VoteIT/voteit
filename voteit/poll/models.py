@@ -611,6 +611,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     # Annotations
     objects: models.Manager
     votes: models.QuerySet
+    meeting_id: int | None
 
 
 class Vote(models.Model):
