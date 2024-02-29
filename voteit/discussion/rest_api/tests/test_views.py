@@ -91,6 +91,7 @@ class DiscussionPostAPITests(APITestCase):
                 "body": "One for open",
                 "meeting_group": None,
                 "tags": [],
+                "as_group": False,
             },
             data,
         )
@@ -126,6 +127,7 @@ class DiscussionPostAPITests(APITestCase):
                 "body": "Two for private",
                 "meeting_group": None,
                 "tags": [],
+                "as_group": False,
             },
             data,
         )
@@ -312,6 +314,7 @@ class ExportDiscussionsViewSetTests(APITestCase):
                 "pk": self.disc_two.pk,
                 "author": 1,
                 "meeting_group": 1,
+                "as_group": False,
             },
             data[1],
         )
@@ -327,8 +330,21 @@ class ExportDiscussionsViewSetTests(APITestCase):
             response.headers.get("Content-Disposition"),
         )
         rows = response.content.splitlines()
+        headers = rows[0].decode().split(",")
         self.assertEqual(
-            b"created,body,userid,agenda_item,group_title,group_id,tags,pk,author,meeting_group",
-            rows[0],
+            [
+                "created",
+                "body",
+                "userid",
+                "agenda_item",
+                "group_title",
+                "group_id",
+                "tags",
+                "pk",
+                "author",
+                "meeting_group",
+                "as_group",
+            ],
+            headers,
         )
         self.assertEqual(4, len(rows))

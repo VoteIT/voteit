@@ -22,10 +22,11 @@ class UseridPID(ProposalIDPolicy):
         self,
         author: UserType | None = None,
         meeting_group: MeetingGroup | None = None,
+        as_group: bool = False,
         **kwargs,
     ) -> str | None:
         base_suggestion = None
-        if meeting_group:
+        if meeting_group and as_group:
             base_suggestion = meeting_group.groupid
         elif author is not None:
             if author.userid:
@@ -41,7 +42,9 @@ class UseridPID(ProposalIDPolicy):
         if proposal.meeting is None:
             return None
         if base_suggestion := self.suggestion(
-            author=proposal.author, meeting_group=proposal.meeting_group
+            author=proposal.author,
+            meeting_group=proposal.meeting_group,
+            as_group=proposal.as_group,
         ):
             meeting_proposals = Proposal.objects.filter(
                 agenda_item__meeting=proposal.meeting

@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-11-10 10:15+0100\n"
-"PO-Revision-Date: 2023-11-10 10:15+0100\n"
+"POT-Creation-Date: 2024-02-23 10:46+0100\n"
+"PO-Revision-Date: 2024-02-23 10:49+0100\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -30,91 +30,117 @@ msgstr "Gör användaren aktiv"
 msgid "Mark user as incomplete"
 msgstr "Markera användaren som ofullständig"
 
-#: rest_api/serializers.py:198
-msgid "Email you specified isn't validated. It must exist on your profile."
-msgstr "Eposten du specificerade är inte validerad. Den måste finnas i din profil."
+#: rest_api/serializers.py:128
+msgid "Meeting group doesn't exist"
+msgstr "Gruppen existerar inte"
 
-#: rest_api/serializers.py:401
+#: rest_api/serializers.py:135
+msgid "You're not a member of this group"
+msgstr "Du är inte medlem av den här gruppen"
+
+#: rest_api/serializers.py:199
+msgid "Email you specified isn't validated. It must exist on your profile."
+msgstr ""
+"Eposten du specificerade är inte validerad. Den måste finnas i din profil."
+
+#: rest_api/serializers.py:416
 msgid "You can only pick existing users within this meeting"
 msgstr "Du kan bara välja existerande användare som är med i mötet"
 
-#: rest_api/utils.py:51
+#: rest_api/utils.py:55
 msgid "Identity service not available right now"
 msgstr "Identitetstjänsten är inte tillgänglig just nu"
 
-#: rest_api/utils.py:68
+#: rest_api/utils.py:62
+msgid "You need to login again to use invites"
+msgstr "Du behöver logga in igen för att använda inbjudningar"
+
+#: rest_api/utils.py:76
 #, python-format
 msgid "You're missing the permission '%(perm)s' on %(obj)s."
 msgstr "Du saknar behörigheten ’%(perm)s’ på %(obj)s."
 
-#: rest_api/utils.py:122
+#: rest_api/utils.py:130
 msgid "Transition not specified"
 msgstr "Handling måste anges"
 
-#: rest_api/utils.py:127
+#: rest_api/utils.py:135
 #, python-format
 msgid "Invalid transition: %(name)s"
 msgstr "Ogiltig handling: %(name)s"
 
-#: rest_api/utils.py:138
+#: rest_api/utils.py:146
 #, python-format
 msgid "Can't switch from state '%(state)s' using method '%(method)s'"
 msgstr "Kan inte byta från tillståndet ’%(state)s’ med metoden ’%(method)s’"
 
-#: rest_api/utils.py:151
+#: rest_api/utils.py:159
 #, python-format
 msgid "Guard %(guard)s blocks transition %(name)s"
 msgstr "Regeln %(guard)s blockerar handlingen %(name)s"
 
-#: rest_api/utils.py:214
+#: rest_api/utils.py:222
 msgid "Can't find meeting"
 msgstr "Kan inte hitta mötet"
 
-#: workflows.py:10
+#: rest_api/validators.py:61
+msgid ""
+"This meeting group doesn't allow you to create posts in its name. "
+"(post_as=False)"
+msgstr "Denna mötesgrupp tillåter inte att du postar som den (post_as=False)"
+
+#: rest_api/validators.py:71
+msgid ""
+"This meeting group doesn't allow you to display it together with your posts. "
+"(post_with=False)"
+msgstr ""
+"Denna mötesgrupp tillåter inte att du postar med den. (post_with=False)"
+
+#: workflows.py:11
 msgid "Unhandled"
 msgstr "Ohanterad"
 
-#: workflows.py:11
+#: workflows.py:12
 msgid "Accepted"
 msgstr "Accepterad"
 
-#: workflows.py:12
+#: workflows.py:13
 msgid "Rejected"
 msgstr "Nekad"
 
-#: workflows.py:27
+#: workflows.py:28
 msgid "Incomplete"
 msgstr "Ofullständig"
 
-#: workflows.py:28
+#: workflows.py:29
 msgid "Active"
 msgstr "Aktiv"
 
-#: workflows.py:45
+#: workflows.py:46
 msgid "Created"
 msgstr "Skapad"
 
-#: workflows.py:46
+#: workflows.py:47
 msgid "Scheduled"
 msgstr "Schemalagd"
 
-#: workflows.py:47
+#: workflows.py:48
 msgid "Sending"
 msgstr "Skickas"
 
-#: workflows.py:48
+#: workflows.py:49
 msgid "Sent"
 msgstr "Skickad"
 
-#: workflows.py:49
+#: workflows.py:50
 msgid "Failed"
 msgstr "Misslyckades"
 
-#: workflows.py:62
+#: workflows.py:63
 msgid "On"
 msgstr "På"
 
-#: workflows.py:63
+#: workflows.py:64
 msgid "Off"
 msgstr "Av"
 

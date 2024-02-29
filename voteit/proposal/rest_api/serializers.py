@@ -118,6 +118,7 @@ class ProposalDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "meeting_group",
             "mentions",
             "tags",
+            "as_group",
         ]
 
     def get_shortname(self, instance):
@@ -133,7 +134,9 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
             return instance.prop_id
         meeting = meeting_from_unsafe_data(self)
         if suggestion := meeting.pid_policy.suggestion(
-            author=instance.get("author"), meeting_group=instance.get("meeting_group")
+            author=instance.get("author"),
+            meeting_group=instance.get("meeting_group"),
+            as_group=instance.get("as_group"),
         ):
             return "%s-{n}" % suggestion
 
@@ -148,6 +151,7 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "mentions",
             "prop_id",
             "tags",
+            "as_group",
         ] + read_only_fields
         validators = (ValidateGroupAIContext(),)
         extra_kwargs = {

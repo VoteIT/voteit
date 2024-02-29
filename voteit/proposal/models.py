@@ -62,10 +62,13 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         null=True,
         related_name="proposals",
     )
+    as_group: bool = models.BooleanField(
+        verbose_name="Posted as group rather than author", default=False
+    )
 
     @property
     def meeting(self) -> Meeting | None:
-        """While not directly related, it still good to be able to do lookups this way"""
+        """While not directly related, it's still good to be able to do lookups this way"""
         if self.agenda_item:
             return self.agenda_item.meeting
 
@@ -164,6 +167,8 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
                 self.prop_id = _new_proposal_id(self)
         if self.prop_id not in self.tags:
             self.tags.append(self.prop_id)
+        if self.as_group and not self.meeting_group_id:
+            self.as_group = False
         super().save(**kw)
 
     def __repr__(self):
@@ -173,6 +178,9 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         return f"P:{self.prop_id}"
 
     objects = InheritanceManager()
+    meeting_group_id: None | int
+    agenda_item_id: None | int
+    author_id: None | int
 
 
 class TextDocument(AgendaItemContext, MeetingContext):

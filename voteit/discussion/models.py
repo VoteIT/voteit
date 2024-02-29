@@ -43,6 +43,9 @@ class DiscussionPost(
         blank=True,
         related_name="discussions",
     )
+    as_group: bool = models.BooleanField(
+        verbose_name="Posted as group rather than author", default=False
+    )
 
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
     importers = {
@@ -58,5 +61,13 @@ class DiscussionPost(
         if self.agenda_item:
             return self.agenda_item.meeting
 
+    def save(self, **kwargs):
+        if self.as_group and not self.meeting_group_id:
+            self.as_group = False
+        super().save(**kwargs)
+
     # Annotations
     objects: models.Manager
+    meeting_group_id: None | int
+    agenda_item_id: None | int
+    author_id: None | int

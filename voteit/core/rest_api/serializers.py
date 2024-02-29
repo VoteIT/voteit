@@ -124,14 +124,15 @@ class BaseModelSerializer(serializers.ModelSerializer):
             # Tricky part, validate add. Die here if no meeting is found
             meeting = meeting_from_unsafe_data(self)
         assert isinstance(meeting, Meeting)  # Programming bug,not a user error
-        if value not in meeting.groups.all():
-            raise ValidationError("Meeting group doesn't exist")
-        if user in value.members.all() or user.has_perm(
-            MeetingPermissions.MODERATE, meeting
+        if not meeting.groups.filter(pk=value.pk).exists():
+            raise ValidationError(_("Meeting group doesn't exist"))
+        if (
+            user.has_perm(MeetingPermissions.MODERATE, meeting)
+            or value.members.filter(pk=user.pk).exists()
         ):
             return value
         # Fail for anything else
-        raise ValidationError("Meeting group doesn't exist")
+        raise ValidationError(_("You're not a member of this group"))
 
 
 class OptionalHyperlinkedIdentityField(serializers.HyperlinkedIdentityField):

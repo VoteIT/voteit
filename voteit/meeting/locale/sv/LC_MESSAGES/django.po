@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-09 12:58+0200\n"
+"POT-Creation-Date: 2024-02-25 15:36+0100\n"
 "PO-Revision-Date: 2023-10-09 13:02+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
@@ -18,59 +18,59 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 3.2.2\n"
 
-#: models.py:238
+#: models.py:254
 msgid "Must have valid electoral register policy name"
 msgstr "Mötet måste ha en giltig röstlängdspolicy"
 
-#: models.py:243
+#: models.py:259
 msgid "Meeting has ongoing polls - close them first"
 msgstr "Mötet har pågående omröstningar - stäng dem först"
 
-#: models.py:250
+#: models.py:266
 msgid "Back to upcoming"
 msgstr "Tillbaka till kommande"
 
-#: models.py:261
+#: models.py:277
 msgid "Make ongoing"
 msgstr "Gör pågående"
 
-#: models.py:272
+#: models.py:288
 msgid "Close"
 msgstr "Avsluta"
 
-#: models.py:282
+#: models.py:298
 msgid "Request archiving"
 msgstr "Begär arkivering"
 
-#: models.py:293
+#: models.py:309
 msgid "Abort archiving"
 msgstr "Avbryt arkivering"
 
-#: models.py:321
+#: models.py:337
 msgid "Request delete..."
 msgstr "Begär borttagning…"
 
-#: models.py:332
+#: models.py:348
 msgid "Abort delete"
 msgstr "Avbryt borttagning"
 
-#: roles.py:15
+#: roles.py:14
 msgid "Participant"
 msgstr "Deltagare"
 
-#: roles.py:16
+#: roles.py:15
 msgid "Moderator"
 msgstr "Moderator"
 
-#: roles.py:17
+#: roles.py:16
 msgid "Potential voter"
 msgstr "Potentiell rösträtt"
 
-#: roles.py:18
+#: roles.py:17
 msgid "Discusser"
 msgstr "Debattör"
 
-#: roles.py:19
+#: roles.py:18
 msgid "Proposer"
 msgstr "Förslagsläggare"
 
