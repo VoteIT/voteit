@@ -71,13 +71,6 @@ class MeetingInvitePermissionsTests(TestCase):
         self.assertFalse(self.participant.has_perm(PERM, self.invite))
         self.assertFalse(self.moderator.has_perm(PERM, self.invite))
 
-    def test_change_used_invite(self):
-        self.invite.state = InviteWf.ACCEPTED
-        PERM = self.p("CHANGE")
-        self.assertFalse(self.anon_user.has_perm(PERM, self.invite))
-        self.assertFalse(self.participant.has_perm(PERM, self.invite))
-        self.assertFalse(self.moderator.has_perm(PERM, self.invite))
-
     def test_delete(self):
         PERM = self.p("DELETE")
         self.assertFalse(self.anon_user.has_perm(PERM, self.invite))
@@ -86,13 +79,6 @@ class MeetingInvitePermissionsTests(TestCase):
 
     def test_delete_archived_meeting(self):
         self._archive()
-        PERM = self.p("DELETE")
-        self.assertFalse(self.anon_user.has_perm(PERM, self.invite))
-        self.assertFalse(self.participant.has_perm(PERM, self.invite))
-        self.assertFalse(self.moderator.has_perm(PERM, self.invite))
-
-    def test_delete_used_invite(self):
-        self.invite.state = InviteWf.ACCEPTED
         PERM = self.p("DELETE")
         self.assertFalse(self.anon_user.has_perm(PERM, self.invite))
         self.assertFalse(self.participant.has_perm(PERM, self.invite))

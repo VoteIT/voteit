@@ -89,6 +89,15 @@ class InvitesSubscribedTests(TestCase):
         )
         self.assertEqual([self.invite.pk, self.invite2.pk], [x["pk"] for x in payloads])
         self.assertEqual([True, False], [x["has_annotations"] for x in payloads])
+        data = payloads[0]
+        data.pop("pk")
+        data.pop("has_annotations")
+        self.assertEqual(self.meeting.pk, data.pop("meeting"))
+        self.assertEqual({"email": "hello@betahaus.net"}, data.pop("user_data"))
+        self.assertEqual([], data.pop("roles"))
+        self.assertEqual(None, data.pop("used_by"))
+        self.assertEqual("open", data.pop("state"))
+        self.assertFalse(data.keys())
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
