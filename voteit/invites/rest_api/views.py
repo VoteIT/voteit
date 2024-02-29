@@ -121,16 +121,6 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
         return Response(status=200, data=self.serializer_class(instance).data)
 
 
-# FIXME: Not used?
-@router.register("used-invites", basename="users-used-invites")
-class UsedInvitesViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = serializers.MeetingInviteSerializer
-    permission_classes = (IsAuthenticated,)
-
-    def get_queryset(self):
-        return self.request.user.used_invites.all()
-
-
 _marker = object()
 
 
