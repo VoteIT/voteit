@@ -121,6 +121,7 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
         return Response(status=200, data=self.serializer_class(instance).data)
 
 
+# FIXME: Not used?
 @router.register("used-invites", basename="users-used-invites")
 class UsedInvitesViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = serializers.MeetingInviteSerializer
@@ -144,7 +145,7 @@ class HandleMatchedInvitesViewSet(
     """
 
     expected_default_http_status = 403
-    serializer_class = serializers.MeetingInviteSerializer
+    serializer_class = serializers.ExternalMeetingInviteSerializer
     permission_classes = [IsAuthenticated]
 
     @cached_property
