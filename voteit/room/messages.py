@@ -40,7 +40,7 @@ class RoomMarkTextSchema(BaseModel):
     {'room': 1}
 
     >>> S(proposal=1, start=1, end=2, room=1).dict(exclude_unset=True)
-    {'start': 1, 'end': 2, 'proposal': 1}
+    {'room': 1, 'start': 1, 'end': 2, 'proposal': 1}
 
     >>> S(start=1, end=2, room=1).dict(exclude_unset=True)
     Traceback (most recent call last):
