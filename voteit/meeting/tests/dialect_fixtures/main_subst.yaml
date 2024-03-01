@@ -7,16 +7,12 @@ roles:
       - proposer
       - potential_voter
       - discusser
-    can_propose_as: true
-    can_discuss_as: true
   - title: Substitute
     role_id: substitute
     roles:
       - proposer
       - potential_voter
       - discusser
-    can_propose_as: true
-    can_discuss_as: true
 group_roles_active: true
 group_votes_active: true
 configure_components:

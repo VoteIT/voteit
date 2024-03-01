@@ -15,7 +15,6 @@ from pydantic.main import BaseModel
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
-from rest_framework.fields import JSONField
 
 from voteit.core.abcs import MeetingContext
 from voteit.core.rest_api.utils import get_identity_data
@@ -125,14 +124,15 @@ class BaseModelSerializer(serializers.ModelSerializer):
             # Tricky part, validate add. Die here if no meeting is found
             meeting = meeting_from_unsafe_data(self)
         assert isinstance(meeting, Meeting)  # Programming bug,not a user error
-        if value not in meeting.groups.all():
-            raise ValidationError("Meeting group doesn't exist")
-        if user in value.members.all() or user.has_perm(
-            MeetingPermissions.MODERATE, meeting
+        if not meeting.groups.filter(pk=value.pk).exists():
+            raise ValidationError(_("Meeting group doesn't exist"))
+        if (
+            user.has_perm(MeetingPermissions.MODERATE, meeting)
+            or value.members.filter(pk=user.pk).exists()
         ):
             return value
         # Fail for anything else
-        raise ValidationError("Meeting group doesn't exist")
+        raise ValidationError(_("You're not a member of this group"))
 
 
 class OptionalHyperlinkedIdentityField(serializers.HyperlinkedIdentityField):
@@ -223,7 +223,7 @@ class TransitionSerializer(serializers.Serializer):
         fields = ("transition",)
 
 
-class PydanticFieldSerializer(JSONField):
+class PydanticFieldSerializer(serializers.JSONField):
     """
     Handles Pydantic representations and changes them to a rest friendly format.
     It doesn't force pydantic in any way, if it's not a pydantic model it's handled as JSON.
@@ -346,13 +346,11 @@ class RichTextSerializerMixin:
         """
         Figure out which queryset to use depending on what's sent in attrs.
         """
-        meeting = attrs.get("meeting", None)
+        meeting: Meeting | None = attrs.get("meeting", None)
         if isinstance(meeting, models.Model):
-            meeting: Meeting
             return meeting.participants
-        ai = attrs.get("agenda_item", None)
+        ai: AgendaItem | None = attrs.get("agenda_item", None)
         if isinstance(ai, models.Model):
-            ai: AgendaItem
             return ai.meeting.participants
         # We won't catch errors here. This is kind of the last chance to not "leak" data
         # about users through mentions, so if this doesn't work we need to raise a validation error.
@@ -436,3 +434,7 @@ class ExportBaseSerializerMixin(serializers.Serializer):
         if hasattr(obj, "tags"):
             return ",".join(obj.tags)
         return ""
+
+
+class ForceDeleteSerializer(serializers.Serializer):
+    force: bool = serializers.BooleanField(default=False)

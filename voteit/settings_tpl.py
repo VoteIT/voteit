@@ -221,8 +221,6 @@ AUDITLOG_INCLUDE_TRACKING_MODELS = (
             "title",
             "role_id",
             "meeting",
-            "can_propose_as",
-            "can_discuss_as",
             "roles",
         ],
     },

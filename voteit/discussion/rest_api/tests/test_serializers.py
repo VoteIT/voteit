@@ -4,12 +4,11 @@ from django.test import RequestFactory
 from django.test import TestCase
 
 from voteit.core.testing import mk_hashtag
+from voteit.meeting.models import Meeting
 
 
 class DiscussionPostDetailSerializerTests(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
@@ -43,6 +42,7 @@ class DiscussionPostDetailSerializerTests(TestCase):
         self.assertEqual(data.pop("author"), self.user.pk)
         self.assertEqual(data.pop("tags"), ["world"])
         self.assertEqual(data.pop("meeting_group"), self.group.pk)
+        self.assertEqual(data.pop("as_group"), False)
         # Make sure we checked everything
         self.assertFalse(data.keys())
 
@@ -59,8 +59,6 @@ class DiscussionPostDetailSerializerTests(TestCase):
 
 class DiscussionPostCreateSerializer(TestCase):
     def setUp(self):
-        from voteit.meeting.models import Meeting
-
         self.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )

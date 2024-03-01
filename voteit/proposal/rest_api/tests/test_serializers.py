@@ -96,6 +96,7 @@ class ProposalDetailSerializerTests(TestCase):
         self.assertEqual("proposal", data.pop("shortname"))
         dt = datetime.strptime(data.pop("modified"), "%Y-%m-%dT%H:%M:%S.%f%z")
         self.assertIsInstance(dt, datetime)
+        self.assertFalse(data.pop("as_group"))
         # Make sure we checked everything
         self.assertFalse(data.keys())
 
@@ -198,6 +199,7 @@ class DiffProposalDetailSerializerTests(TestCase):
         data = serializer.data
         self.assertEqual(self.diff_prop.pk, data["pk"])
         self.assertEqual(self.diff_prop.body, data["body"])
+        self.assertEqual(self.diff_prop.as_group, data["as_group"])
         self.assertEqual(
             'I am the eggman <br/> I am <span class="text-diff-removed">the walrus</span> <span class="text-diff-added">some kind of mamal</span>',
             data["body_diff_brief"],
@@ -278,10 +280,6 @@ class DiffProposalCreateSerializerTests(TestCase):
 class TextDocumentSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
-        from voteit.proposal.models import TextDocument
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )

@@ -554,5 +554,30 @@ class ExportProposalsViewSetTests(APITestCase):
             response.headers.get("Content-Disposition"),
         )
         rows = response.content.splitlines()
-        self.assertIn("body_diff", str(rows[0]))
+        header = rows[0].decode().split(",")
+        self.assertIn("body_diff_brief", header)
+        self.assertEqual(
+            [
+                "created",
+                "modified",
+                "state",
+                "prop_id",
+                "state",
+                "pk",
+                "agenda_item",
+                "shortname",
+                "author",
+                "body",
+                "meeting_group",
+                "tags",
+                "as_group",
+                "userid",
+                "group_title",
+                "group_id",
+                "tags",
+                "paragraph",
+                "body_diff_brief",
+            ],
+            header,
+        )
         self.assertEqual(4, len(rows))

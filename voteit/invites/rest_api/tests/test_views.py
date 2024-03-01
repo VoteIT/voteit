@@ -89,7 +89,7 @@ class MeetingInviteViewSetTests(APITestCase):
         url = reverse("meeting-invites-detail", kwargs={"pk": self.invite.pk})
         self.client.force_login(self.moderator)
         response = self.client.delete(url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 204)
 
     def test_change(self):
         url = reverse("meeting-invites-detail", kwargs={"pk": self.invite.pk})

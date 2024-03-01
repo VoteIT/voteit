@@ -2,7 +2,6 @@ import csv
 from logging import getLogger
 
 from django.db import models
-from django.db.models import QuerySet
 from django.http import Http404
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -34,7 +33,6 @@ from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.permissions import SpeakerSystemPermissions
 from voteit.speaker.rest_api import serializers
 from voteit.speaker.rest_api.filters import SpeakerFilterSet
-from voteit.speaker.roles import ROLE_LIST_MODERATOR
 
 
 logger = getLogger(__name__)

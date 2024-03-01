@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from django.contrib.auth.models import AbstractUser
 from django.db import IntegrityError
+from django.db import models
 from django.db.models.signals import m2m_changed
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
@@ -24,7 +25,6 @@ from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
-from voteit.poll.channels import PollChannel
 from voteit.poll.messages import ElectoralRegisterAdded
 from voteit.poll.messages import ElectoralRegisterDeleted
 from voteit.poll.messages import GenericVoteResponse
@@ -53,17 +53,21 @@ logger = getLogger(__name__)
 new_er_created = Signal()
 
 
-@receiver(channel_subscribed, sender=PollChannel)
-def poll_subscribed(context: Poll, app_state: AppState, **kw):
+@receiver(channel_subscribed, sender=MeetingChannel)
+def send_ongoing_meeting_poll_stats(context: Meeting, app_state: AppState, **kw):
     """
     Populate app_state with current poll status
     """
-    msg = PollStatus(
-        pk=context.pk,
-        voted=context.votes.count(),
-        total=context.electoral_register.voters.count(),
-    )
-    app_state.append(msg)
+    for poll in context.polls.filter(state=PollWf.ONGOING).annotate(
+        voted=models.Count(models.F("votes")),
+        total=models.Count(models.F("electoral_register__voters")),
+    ):
+        msg = PollStatus(
+            pk=poll.pk,
+            voted=poll.voted,
+            total=poll.total,
+        )
+        app_state.append(msg)
 
 
 @receiver(channel_subscribed, sender=ParticipantsChannel)
@@ -127,7 +131,7 @@ def moderators_subscribed(
 @receiver(post_save, sender=Poll)
 @disable_on_raw_save
 @on_transaction_commit
-def poll_change(instance: Poll = None, created: bool = None, **kw):
+def poll_change(*, instance: Poll, created: bool, **kw):
     """
     Note: This message won't work properly if django admin is used for instance.
     Proposals won't be attached unless it's during a transaction.
@@ -162,7 +166,7 @@ def poll_change(instance: Poll = None, created: bool = None, **kw):
 
 
 @receiver(pre_delete, sender=Poll)
-def poll_delete(instance: Poll = None, **kw):
+def poll_delete(*, instance: Poll, **kw):
     """Poll deleted is only sent to moderators if the poll's private"""
     if instance.meeting is not None:
         moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
@@ -217,7 +221,7 @@ def push_new_er(instance: ElectoralRegister, **kwargs):
 
 @receiver(pre_delete, sender=ElectoralRegister)
 @disable_on_raw_save
-def er_deleted(instance: ElectoralRegister = None, **kw):
+def er_deleted(*, instance: ElectoralRegister, **kw):
     """
     Electoral registers usually aren't deleted, but there are some special cases mostly for demo meetings.
     """
@@ -267,13 +271,14 @@ def vote_added(instance: Vote, *, created: bool, **kw):
     # We don't have to count updated votes!
     if created:
         poll = instance.poll
-        msg = PollStatus(
-            pk=poll.pk,
-            voted=poll.votes.count(),
-            total=poll.electoral_register.voters.count(),
-        )
-        ch = PollChannel.from_instance(poll)
-        ch.sync_publish(msg)
+        if poll.meeting_id is not None:
+            msg = PollStatus(
+                pk=poll.pk,
+                voted=poll.votes.count(),
+                total=poll.electoral_register.voters.count(),
+            )
+            ch = MeetingChannel(poll.meeting_id)
+            ch.sync_publish(msg)
     # We need to send the vote to the user too, so they have access to their own data in case they're using several tabs
     user_ch = UserChannel.from_instance(instance.user)
     serializer = VoteSerializer(instance)

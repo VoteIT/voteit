@@ -72,6 +72,7 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
 
     def report_clone_meeting(self, request, queryset):
         from voteit.speaker.models import SpeakerListSystem
+        from voteit.room.models import Room
 
         if queryset.count() != 1:
             self.message_user(
@@ -86,6 +87,7 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
         cloner = LiveCloner(data=data)
         cloner.add_clear_attrs(SpeakerListSystem, "active_list")
         cloner.add_clear_attrs(Meeting, "participants")
+        cloner.add_clear_attrs(Room, "agenda_item", "handler", "poll")
         cloner.logging_enabled = True
         with transaction.atomic(durable=True):
             cloner()

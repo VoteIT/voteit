@@ -93,7 +93,8 @@ class _WFResetter:
 def clone_meeting(
     meeting: Meeting,
     exclude=None,
-    user: User = None,
+    *,
+    user: User,
     prefix: str = "Copy of",
     reset_wf: bool = True,
 ) -> Meeting:
@@ -104,6 +105,7 @@ def clone_meeting(
     from voteit.meeting.models import Meeting
     from voteit.meeting.roles import ROLE_MODERATOR
     from voteit.speaker.models import SpeakerListSystem
+    from voteit.room.models import Room
 
     assert user is not None
     if exclude is None:
@@ -113,6 +115,7 @@ def clone_meeting(
     # This should never be copied
     cloner.add_clear_attrs(SpeakerListSystem, "active_list")
     cloner.add_clear_attrs(Meeting, "participants")
+    cloner.add_clear_attrs(Room, "agenda_item", "handler", "poll")
     if reset_wf:
         for mod in cloner.data:
             wf_fields = set()

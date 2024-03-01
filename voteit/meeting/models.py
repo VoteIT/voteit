@@ -437,6 +437,14 @@ class MeetingGroup(BaseContent, MeetingContext):
         null=True,
         related_name="delegations_from",
     )
+    show_on_speaker: bool = models.BooleanField(
+        verbose_name="Display group name on speaker entry in speaker lists",
+        default=True,
+    )
+    post_as: bool = models.BooleanField(
+        verbose_name="Allow members to post as group",
+        default=False,
+    )
 
     def save(self, **kwargs):
         if not self.groupid:
@@ -502,8 +510,6 @@ class GroupRole(MeetingContext):
     meeting: Meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="group_roles"
     )
-    can_propose_as: bool = models.BooleanField("Can propose as group", default=False)
-    can_discuss_as: bool = models.BooleanField("Can discuss as group", default=False)
     roles: list[Role] = RolesField(
         max_length=60,
         role_choices=MeetingRoles.valid_roles.values(),

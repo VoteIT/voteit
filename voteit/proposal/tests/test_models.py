@@ -16,6 +16,7 @@ class ProposalTests(TestCase):
         cls.ai = cls.meeting.agenda_items.create()
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
+        cls.group = cls.meeting.groups.create()
 
     @property
     def _cut(self):
@@ -51,6 +52,14 @@ class ProposalTests(TestCase):
         self.assertEqual("hi-2", prop.prop_id)
         prop = self._mk_one(agenda_item=self.ai, author=user2)
         self.assertEqual("hello-1", prop.prop_id)
+
+    def test_as_group_restrictions(self):
+        prop = self._mk_one(author=self.participant, as_group=True)
+        self.assertFalse(prop.as_group)
+        prop = self._mk_one(
+            author=self.participant, meeting_group=self.group, as_group=True
+        )
+        self.assertTrue(prop.as_group)
 
     # def test_userid_based_prop_id_changed_with_author(self):
     #     prop = self._mk_one(agenda_item=self.ai, author=self.moderator)

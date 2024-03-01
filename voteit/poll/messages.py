@@ -23,7 +23,6 @@ from voteit.poll.models import Poll
 from voteit.poll.models import Vote
 from voteit.poll.permissions import ElectoralRegisterPermissions
 from voteit.poll.permissions import VotePermissions
-from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.schemas import AddedVoteSchema
 from voteit.poll.schemas import VotersWeightsSchema
 
@@ -86,15 +85,14 @@ class AddVote(VoteBase, ABC):
         poll.method.validate_vote(self)
         vote = poll.votes.filter(user=self.user).first()
         if vote is None:
-            vote = poll.votes.create(user=self.user, vote=self.data.vote)
+            poll.votes.create(user=self.user, vote=self.data.vote)
         else:
             # Vote already exists - we'll change the existing one instead
             vote.vote = self.data.vote
             vote.abstain = False
             vote.save()
 
-        serializer = VoteSerializer(vote)
-        msg = GenericVoteResponse.from_message(self, **serializer.data)
+        msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
         return msg
 
@@ -120,12 +118,11 @@ class AbstainVote(VoteBase):
         poll = self.context
         vote: Vote = poll.votes.filter(user=self.user).first()
         if vote is None:
-            vote = poll.votes.create(user=self.user, abstain=True)
+            poll.votes.create(user=self.user, abstain=True)
         else:
             vote.abstain = True
             vote.save()
-        serializer = VoteSerializer(vote)
-        msg = GenericVoteResponse.from_message(self, **serializer.data)
+        msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
         return msg
 

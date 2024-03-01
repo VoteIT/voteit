@@ -283,6 +283,8 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         self.assertEqual(0, data.pop("votes"))
         self.assertEqual(self.meeting.pk, data.pop("meeting"))
         self.assertEqual(None, data.pop("delegate_to"))
+        self.assertEqual(True, data.pop("show_on_speaker"))
+        self.assertEqual(False, data.pop("post_as"))
         self.assertFalse(data.keys())
 
     def test_meeting_group_many(self):
@@ -404,8 +406,6 @@ class MeetingGroupRelatedSerializersTests(TestCase):
         self.assertEqual(self.group_role.pk, data.pop("pk"))
         self.assertEqual("Supreme leader", data.pop("title"))
         self.assertEqual("leader", data.pop("role_id"))
-        self.assertFalse(data.pop("can_propose_as"))
-        self.assertFalse(data.pop("can_discuss_as"))
         self.assertEqual([ROLE_POTENTIAL_VOTER], data.pop("roles"))
         self.assertEqual(self.meeting.pk, data.pop("meeting"))
         self.assertFalse(data.keys())

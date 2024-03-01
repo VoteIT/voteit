@@ -36,7 +36,7 @@ class ABCModel(models.Model, metaclass=_AbstractModelMeta):
         You can set this instead by doing name = "somename"
     """
 
-    name = None
+    name: str
 
     class Meta:
         abstract = True

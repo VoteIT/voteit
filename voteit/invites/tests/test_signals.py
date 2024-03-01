@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from envelope.channels.messages import Subscribe
+from envelope.messages.common import Batch
 from envelope.tests.helpers import testing_channel_layers_setting
 
 from voteit.core.testing import FakeCommit
@@ -85,16 +86,20 @@ class InvitesSubscribedTests(TestCase):
             channel_type="invites",
         )
         msg = command.run_job()
-        batch_msg_payloads = [
-            x.p
-            for x in msg.data.app_state
-            if x.t == "s.batch" and x.p["t"] == "meeting_invite.added"
-        ]
-        self.assertEqual(1, len(batch_msg_payloads))
-        payloads = batch_msg_payloads[0]["payloads"]
-        self.assertEqual(2, len(payloads))
-        self.assertEqual({self.invite.pk, self.invite2.pk}, {x.pk for x in payloads})
-        self.assertEqual({True, False}, {x.has_annotations for x in payloads})
+        batch = None
+        for item in msg.data.app_state:
+            if item.t == "s.batch" and item.p["t"] == MeetingInviteAdded.name:
+                batch = item
+        payloads = batch.p["payloads"]
+        self.assertEqual([self.invite.pk, self.invite2.pk], [x.pk for x in payloads])
+        self.assertEqual([True, False], [x.has_annotations for x in payloads])
+        data = payloads[0].dict(exclude={"pk", "has_annotations"})
+        self.assertEqual(self.meeting.pk, data.pop("meeting"))
+        self.assertEqual({"email": "hello@betahaus.net"}, data.pop("user_data"))
+        self.assertEqual([], data.pop("roles"))
+        self.assertEqual(None, data.pop("used_by"))
+        self.assertEqual("open", data.pop("state"))
+        self.assertFalse(data.keys())
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)

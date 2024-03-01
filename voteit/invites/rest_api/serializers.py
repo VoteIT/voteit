@@ -30,20 +30,15 @@ class MeetingInviteSerializer(BaseModelSerializer):
     For read operations
     """
 
-    meeting_title = serializers.SerializerMethodField()
     has_annotations = serializers.SerializerMethodField()
     roles = serializers.ListSerializer(child=serializers.CharField())
 
     class Meta:
         model = MeetingInvite
         read_only_fields = [
-            "created",
             "meeting",
-            "meeting_title",
-            "modified",
             "pk",
             "state",
-            "used_at",
             "used_by",
             "user_data",
             "roles",
@@ -54,9 +49,6 @@ class MeetingInviteSerializer(BaseModelSerializer):
     @cached_property
     def registry(self):
         return get_invite_adapter_registry()
-
-    def get_meeting_title(self, instance: MeetingInvite) -> str:
-        return instance.meeting.title
 
     def get_has_annotations(self, instance: MeetingInvite) -> bool:
         """

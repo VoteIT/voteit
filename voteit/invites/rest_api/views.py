@@ -121,15 +121,6 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
         return Response(status=200, data=self.serializer_class(instance).data)
 
 
-@router.register("used-invites", basename="users-used-invites")
-class UsedInvitesViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = serializers.MeetingInviteSerializer
-    permission_classes = (IsAuthenticated,)
-
-    def get_queryset(self):
-        return self.request.user.used_invites.all()
-
-
 _marker = object()
 
 
@@ -144,7 +135,7 @@ class HandleMatchedInvitesViewSet(
     """
 
     expected_default_http_status = 403
-    serializer_class = serializers.MeetingInviteSerializer
+    serializer_class = serializers.ExternalMeetingInviteSerializer
     permission_classes = [IsAuthenticated]
 
     @cached_property
