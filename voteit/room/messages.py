@@ -61,8 +61,8 @@ class RoomMarkTextSchema(BaseModel):
     @validator("end", always=True)
     def validate_start_end(cls, v: int | None, values: dict):
         start = values.get("start")
-        if bool(v) != bool(start):
-            raise ValueError("Both start and end must be a numer or None")
+        if v is None != start is None:
+            raise ValueError("Both start and end must be a number or None")
         if isinstance(start, int) and not start < v:
             raise ValueError("end must be higher than start")
         return v
@@ -70,13 +70,14 @@ class RoomMarkTextSchema(BaseModel):
     @validator("proposal", always=True)
     def validate_proposal(cls, v: int | None, values: dict):
         start = values.get("start")
-        if bool(v) != bool(start):
+        if v is None != start is None:
             raise ValueError("proposal must be the same type as start and end")
         return v
 
 
 @incoming
 class RoomMarkText(ContextAction):
+    context_schema_attr = "room"
     name = "room.mark_text"
     permission = RoomPermissions.HANDLE
     model = Room
