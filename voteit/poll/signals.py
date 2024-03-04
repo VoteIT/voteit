@@ -59,8 +59,8 @@ def send_ongoing_meeting_poll_stats(context: Meeting, app_state: AppState, **kw)
     Populate app_state with current poll status
     """
     for poll in context.polls.filter(state=PollWf.ONGOING).annotate(
-        voted=models.Count(models.F("votes")),
-        total=models.Count(models.F("electoral_register__voters")),
+        voted=models.Count("votes", distinct=True),
+        total=models.Count("electoral_register__voters", distinct=True),
     ):
         msg = PollStatus(
             pk=poll.pk,
