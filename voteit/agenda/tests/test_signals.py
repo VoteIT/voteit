@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import datetime
 from unittest.mock import patch
 
@@ -8,6 +9,8 @@ from pytz import UTC
 
 from envelope.messages.channels import Subscribe
 from envelope.messages.common import Batch
+from envelope.testing import FakeCommit
+from envelope.utils import get_or_create_txn_sender
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.messages import AgendaBodyAdded
 from voteit.agenda.messages import LastReadChanged
@@ -138,6 +141,27 @@ class AgendaChangedTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, AgendaChanged)
         self.assertEqual(self.ai.pk, msg.data.pk)
+
+    def test_changed_causes_batch_messages(self):
+        ais = []
+        with FakeCommit():  # Also clears callbacks
+            for i in range(5):
+                ais.append(self.meeting.agenda_items.create(title=str(i)))
+
+        # And the actual batch test
+        with self.captureOnCommitCallbacks(execute=True):
+            for ai in ais:
+                ai.title += " updated"
+                ai.save()
+            txn = get_or_create_txn_sender()
+            group_by_keys = [k for k, v in txn.groupby()]
+        counter = Counter()
+        for x in group_by_keys:
+            counter[x] += 1
+        self.assertEqual(
+            1,
+            counter[f"agenda_item.changedmoderators_{self.meeting.pk}10websocket.send"],
+        )
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_deleted_moderators(self, mock_publish):
