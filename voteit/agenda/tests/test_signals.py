@@ -154,13 +154,14 @@ class AgendaChangedTests(TestCase):
                 ai.title += " updated"
                 ai.save()
             txn = get_or_create_txn_sender()
-            group_by_keys = [k for k, v in txn.groupby()]
+            txn.batch_messages()
+            group_keys = [x.group_key for x in txn.data]
         counter = Counter()
-        for x in group_by_keys:
+        for x in group_keys:
             counter[x] += 1
         self.assertEqual(
             1,
-            counter[f"agenda_item.changedmoderators_{self.meeting.pk}10websocket.send"],
+            counter[f"s.batchmoderators_{self.meeting.pk}10websocket.send"],
         )
 
     @patch.object(MeetingChannel, "sync_publish")
