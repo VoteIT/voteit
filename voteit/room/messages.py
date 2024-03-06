@@ -42,6 +42,9 @@ class RoomMarkTextSchema(BaseModel):
     >>> S(proposal=1, start=1, end=2, room=1).dict(exclude_unset=True)
     {'room': 1, 'start': 1, 'end': 2, 'proposal': 1}
 
+    >>> S(proposal=1, room=1).dict(exclude_unset=True)
+    {'room': 1, 'proposal': 1}
+
     >>> S(start=1, end=2, room=1).dict(exclude_unset=True)
     Traceback (most recent call last):
     ...
@@ -70,8 +73,8 @@ class RoomMarkTextSchema(BaseModel):
     @validator("proposal", always=True)
     def validate_proposal(cls, v: int | None, values: dict):
         start = values.get("start")
-        if type(v) != type(start):
-            raise ValueError("proposal must be the same type as start and end")
+        if isinstance(start, int) and not isinstance(v, int):
+            raise ValueError("proposal must be specified if start and end is set")
         return v
 
 
