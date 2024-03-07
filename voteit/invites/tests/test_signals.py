@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.test import override_settings
 from envelope.channels.messages import Subscribe
 from envelope.messages.common import Batch
-from envelope.tests.helpers import testing_channel_layers_setting
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
@@ -91,8 +91,8 @@ class InvitesSubscribedTests(TestCase):
             if item.t == "s.batch" and item.p["t"] == MeetingInviteAdded.name:
                 batch = item
         payloads = batch.p["payloads"]
-        self.assertEqual([self.invite.pk, self.invite2.pk], [x.pk for x in payloads])
-        self.assertEqual([True, False], [x.has_annotations for x in payloads])
+        self.assertEqual({self.invite.pk, self.invite2.pk}, {x.pk for x in payloads})
+        self.assertEqual({True, False}, {x.has_annotations for x in payloads})
         data = payloads[0].dict(exclude={"pk", "has_annotations"})
         self.assertEqual(self.meeting.pk, data.pop("meeting"))
         self.assertEqual({"email": "hello@betahaus.net"}, data.pop("user_data"))

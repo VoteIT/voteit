@@ -7,7 +7,7 @@ from django.test import override_settings
 from pytz import UTC
 from envelope.channels.messages import Subscribe
 from envelope.messages.common import Batch
-from envelope.tests.helpers import testing_channel_layers_setting
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.messages import AgendaBodyAdded

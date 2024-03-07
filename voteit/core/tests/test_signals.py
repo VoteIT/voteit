@@ -7,7 +7,8 @@ from django.test import TestCase
 from django.test import override_settings
 from envelope.app.online_channel.channel import OnlineChannel
 from envelope.async_signals import consumer_connected
-from envelope.tests.helpers import mk_consumer
+from envelope.testing import mk_consumer
+
 
 from voteit.core.messages.user import InvalidateUserCache
 

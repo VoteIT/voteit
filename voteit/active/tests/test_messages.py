@@ -7,7 +7,7 @@ from django.test import override_settings
 from django.utils.timezone import now
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
-from envelope.tests.helpers import testing_channel_layers_setting
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.active.messages import PurgeInactiveUsers

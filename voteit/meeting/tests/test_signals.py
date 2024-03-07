@@ -7,7 +7,7 @@ from django.test import override_settings
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
 from envelope.messages.common import Batch
-from envelope.tests.helpers import testing_channel_layers_setting
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting

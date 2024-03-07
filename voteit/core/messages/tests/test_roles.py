@@ -11,7 +11,7 @@ from pythonjsonlogger.jsonlogger import JsonFormatter
 from envelope.consumers.websocket import WebsocketConsumer
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
-from envelope.tests.helpers import testing_channel_layers_setting
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.core.schemas import RoleOutput
 from voteit.core.testing import FakeCommit

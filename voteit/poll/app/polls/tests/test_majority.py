@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.test import override_settings
 from pydantic import ValidationError
 from envelope.messages.errors import ValidationErrorMsg
-from envelope.tests.helpers import testing_channel_layers_setting
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.poll.app.polls.majority import MajorityVoteSchema
 from voteit.poll.exceptions import InvalidProposalCount

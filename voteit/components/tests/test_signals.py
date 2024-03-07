@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.test import override_settings
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
-from envelope.tests.helpers import testing_channel_layers_setting
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.core.testing import FakeCommit

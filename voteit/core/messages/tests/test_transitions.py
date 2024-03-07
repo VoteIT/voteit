@@ -1,9 +1,8 @@
 from unittest import mock
 
 from django.test import TestCase, override_settings
-
-from envelope.tests.helpers import mk_consumer
-from envelope.tests.helpers import testing_channel_layers_setting
+from envelope.testing import mk_consumer
+from envelope.testing import testing_channel_layers_setting
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
