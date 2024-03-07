@@ -114,6 +114,7 @@ class AddRolesTests(TestCase):
                 self.assertEqual(0, len(logs.records))
             self.assertEqual(1, len(logs.records))
         data = _record_to_dict(logs.records[0])
+        data.pop("taskName", None)  # Not important here
         self.assertEqual(
             {
                 "message": "Added",
@@ -174,6 +175,7 @@ class RemoveRolesTests(TestCase):
                 self.assertEqual(0, len(logs.records))
             self.assertEqual(1, len(logs.records))
         data = _record_to_dict(logs.records[0])
+        data.pop("taskName", None)  # Not important here
         self.assertEqual(
             {
                 "message": "Removed",
