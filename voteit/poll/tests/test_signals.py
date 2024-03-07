@@ -218,7 +218,23 @@ class MeetingSubscribedTests(TestCase):
         messages = [x.p for x in msg.data.app_state if x.t == PollStatus.name]
         self.assertEqual(1, len(messages))
         payload = messages[0]
-        self.assertEqual({"pk": self.poll2.pk, "voted": 2, "total": 2}, payload)
+        self.assertEqual({"pk": self.poll2.pk, "voted": 1, "total": 2}, payload)
+
+    def test_app_state_multiple_ongoing_poll(self):
+        command = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.meeting.pk,
+            channel_type="meeting",
+        )
+        self.poll.state = PollWf.ONGOING
+        self.poll.save()
+        self.poll.votes.create(user=self.moderator, vote="yes")
+        self.poll2.votes.create(user=self.moderator, vote="yes")
+        msg = command.run_job()
+        messages = [x.p for x in msg.data.app_state if x.t == PollStatus.name]
+        self.assertEqual(2, len(messages))
+        self.assertIn({"pk": self.poll.pk, "voted": 2, "total": 2}, messages)
+        self.assertIn({"pk": self.poll2.pk, "voted": 2, "total": 2}, messages)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import datetime
 from unittest.mock import patch
 
@@ -8,11 +9,13 @@ from pytz import UTC
 from envelope.channels.messages import Subscribe
 from envelope.messages.common import Batch
 from envelope.testing import testing_channel_layers_setting
+from envelope.utils import get_or_create_txn_sender
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.messages import AgendaBodyAdded
 from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.models import AgendaItem
+from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
@@ -136,6 +139,28 @@ class AgendaChangedTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, AgendaChanged)
         self.assertEqual(self.ai.pk, msg.data.pk)
+
+    def test_changed_causes_batch_messages(self):
+        ais = []
+        with FakeCommit():  # Also clears callbacks
+            for i in range(5):
+                ais.append(self.meeting.agenda_items.create(title=str(i)))
+
+        # And the actual batch test
+        with self.captureOnCommitCallbacks(execute=True):
+            for ai in ais:
+                ai.title += " updated"
+                ai.save()
+            txn = get_or_create_txn_sender()
+            txn.batch_messages()
+            group_keys = [x.group_key for x in txn.data]
+        counter = Counter()
+        for x in group_keys:
+            counter[x] += 1
+        self.assertEqual(
+            1,
+            counter[f"s.batchmoderators_{self.meeting.pk}ws_outgoing1"],
+        )
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_deleted_moderators(self, mock_publish):
