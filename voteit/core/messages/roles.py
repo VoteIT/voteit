@@ -151,9 +151,10 @@ class RemoveRoles(BaseRoles):
         if self.mm.consumer_name:  # If this is a script, consumer_name will be None
             response = Status.from_message(self)
             websocket_send(response, state=response.SUCCESS)
-        msg = RecheckChannelSubscriptions(_registry=INTERNAL)
+        # FIXME: Why these defaults?
+        msg = RecheckChannelSubscriptions(consumer_name="", subscriptions=[])
         for user in notify_users:
-            user_channel = UserChannel.from_instance(user)
+            user_channel = UserChannel.from_instance(user, envelope_name=INTERNAL)
             user_channel.sync_publish(msg)
         if response:
             return response

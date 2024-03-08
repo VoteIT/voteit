@@ -93,7 +93,11 @@ class InvitesSubscribedTests(TestCase):
         payloads = batch.p["payloads"]
         self.assertEqual({self.invite.pk, self.invite2.pk}, {x.pk for x in payloads})
         self.assertEqual({True, False}, {x.has_annotations for x in payloads})
-        data = payloads[0].dict(exclude={"pk", "has_annotations"})
+        data = {}
+        for item in payloads:
+            if item.pk == self.invite.pk:
+                data = item.dict(exclude={"pk", "has_annotations"})
+                break
         self.assertEqual(self.meeting.pk, data.pop("meeting"))
         self.assertEqual({"email": "hello@betahaus.net"}, data.pop("user_data"))
         self.assertEqual([], data.pop("roles"))
