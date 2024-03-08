@@ -1,4 +1,4 @@
-https://github.com/VoteIT/channels_envelope/archive/refs/heads/main.zip
+https://github.com/VoteIT/channels_envelope/archive/refs/heads/legacy.zip
 https://github.com/VoteIT/dj_dolly/archive/refs/heads/main.zip
 -e .[testing]
 psycopg2-binary>=2.9.6
