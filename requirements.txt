@@ -1,6 +1,7 @@
 https://github.com/VoteIT/dj_dolly/archive/refs/heads/main.zip
+https://github.com/VoteIT/channels_envelope/archive/refs/heads/main.zip
 -e .[testing]
-psycopg2-binary>=2.9.6
+psycopg2-binary
 # "Manual" requirements go here - stuff that isn't mentioned in any other requirement
 # This file is only used when building the freeze-img
 pydantic<2
