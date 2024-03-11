@@ -147,3 +147,8 @@ class PurgeInactiveUsersTests(TestCase):
         msg = self._mk_msg(self.moderator, hours=48)
         msg.run_job()
         self.assertEqual(2, self.meeting.active_users.count())
+
+    def test_purge_0(self):
+        msg = self._mk_msg(self.moderator, hours=0)
+        msg.run_job()
+        self.assertEqual(1, self.meeting.active_users.count())

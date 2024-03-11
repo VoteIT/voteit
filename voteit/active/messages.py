@@ -108,7 +108,7 @@ class ActiveUsers(Message):
 
 class PurgeInactiveUsersSchema(BaseModel):
     meeting: conint(ge=1)
-    hours: conint(ge=1)
+    hours: conint(ge=0) = 1
 
 
 @incoming

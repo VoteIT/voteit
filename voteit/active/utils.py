@@ -20,9 +20,14 @@ def active_enabled_for_meeting(meeting: Meeting) -> bool:
     ).exists()
 
 
-def get_inactive_qs(meeting: Meeting, hours: int = 2) -> QuerySet[ActiveUser]:
+def get_inactive_qs(meeting: Meeting, hours: int = 1) -> QuerySet[ActiveUser]:
+    # Setting 0 will remove every last one, even connected, so we use 5 mins instead
+    if hours:
+        timestamp = now() - timedelta(hours=hours)
+    else:
+        timestamp = now() - timedelta(minutes=5)
     recent_enough_connections_qs = Connection.objects.filter(
-        last_action__gt=now() - timedelta(hours=hours),
+        last_action__gt=timestamp,
     )
     return meeting.active_users.exclude(
         user_id__in=recent_enough_connections_qs.values_list("user_id")
