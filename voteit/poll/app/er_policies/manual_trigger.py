@@ -21,8 +21,7 @@ class ManualTrigger(ElectoralRegisterPolicy):
     name = "manual_trigger"
     title = _("Manual trigger")
     description = _(
-        "Manually trigger creation of electoral registers, there's no automation but the system "
-        "follows potential voters and active users if that's enabled."
+        "Create electoral registers from potential voters. Simply click the button on electoral registers page."
     )
     logger = logger
     handles_vote_weight = False

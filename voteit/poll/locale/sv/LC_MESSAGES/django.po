@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-23 15:21+0200\n"
-"PO-Revision-Date: 2023-10-23 15:22+0200\n"
+"POT-Creation-Date: 2024-03-11 16:44+0100\n"
+"PO-Revision-Date: 2024-03-11 16:48+0100\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 3.2.2\n"
+"X-Generator: Poedit 3.4.1\n"
 
 #: app/er_policies/auto_always.py:32
 msgid "Automatic always"
@@ -72,13 +72,29 @@ msgstr ""
 "behövs."
 
 #: app/er_policies/manual.py:20
-msgid "Manual only"
-msgstr "Bara manuellt"
+msgid "Fully manual"
+msgstr "Helt manuell"
 
 #: app/er_policies/manual.py:22
 msgid ""
-"No electoral registers will be created at all, you have to do it yourself!"
-msgstr "Inga röstlängder skapas alls, du måste göra det själv!"
+"No electoral registers will be created at all, you have to do it yourself! "
+"You need to hand-pick voters from any participants with the role potential "
+"voter."
+msgstr ""
+"Inga röstlängder skapas alls, du måste göra det själv! Du behöver handplocka "
+"röstande från deltagare med rollen potentiell röstare."
+
+#: app/er_policies/manual_trigger.py:22
+msgid "Manual trigger"
+msgstr "Manuellt skapad"
+
+#: app/er_policies/manual_trigger.py:24
+msgid ""
+"Create electoral registers from potential voters. Simply click the button on "
+"electoral registers page."
+msgstr ""
+"Skapa röstlängder från potentiella röstare. Klicka på knappen på sidan med "
+"röstlängder."
 
 #: app/er_policies/presence_check.py:29
 msgid "Presence check"
@@ -111,8 +127,8 @@ msgid "Combined Simple"
 msgstr "Kombinerad enkel"
 
 #: app/polls/dutt.py:150 app/polls/dutt.py:162 app/polls/dutt.py:180
-#: app/polls/majority.py:130 app/polls/schulze.py:172
-#: app/polls/scottish_stv.py:158
+#: app/polls/irv.py:207 app/polls/irv.py:222 app/polls/majority.py:130
+#: app/polls/schulze.py:172 app/polls/scottish_stv.py:155
 msgid "Invalid vote"
 msgstr "Ogiltig röst"
 
@@ -124,23 +140,31 @@ msgstr "För få förslag valda"
 msgid "Too many proposals picked"
 msgstr "För många förslag valda"
 
-#: app/polls/dutt.py:185 app/polls/schulze.py:177 app/polls/scottish_stv.py:163
+#: app/polls/dutt.py:185 app/polls/schulze.py:177 app/polls/scottish_stv.py:160
 #, python-format
 msgid "Invalid choice, the following proposals don't exist: %s"
 msgstr "Ogiltigt val, följande förslag existerar inte: %s"
 
-#: app/polls/irv.py:40
+#: app/polls/irv.py:43
 msgid "Instant-Runoff Voting"
 msgstr "Instant-Runoff Voting"
 
-#: app/polls/irv.py:57 app/polls/irv.py:140
+#: app/polls/irv.py:60 app/polls/irv.py:192
 #, python-format
 msgid "The method %(method)s require at least 3 proposals"
 msgstr "Metoden %(method)s kräver minst 3 förslag"
 
-#: app/polls/irv.py:123
+#: app/polls/irv.py:174
 msgid "Repeated Instant-Runoff Voting"
 msgstr "Repeterad Instant-Runoff Voting"
+
+#: app/polls/irv.py:211
+msgid "Too few selected"
+msgstr "För få valda"
+
+#: app/polls/irv.py:226
+msgid "Too many selected"
+msgstr "För många valda"
 
 #: app/polls/majority.py:67
 msgid "Majority"
@@ -158,16 +182,16 @@ msgstr "Schulze"
 msgid "Repeated Schulze"
 msgstr "Repeterad Schulze"
 
-#: app/polls/scottish_stv.py:89
+#: app/polls/scottish_stv.py:86
 msgid "Scottish STV"
 msgstr "Skotsk STV"
 
-#: app/polls/scottish_stv.py:175
+#: app/polls/scottish_stv.py:172
 #, python-format
 msgid "The method %(method)s can't have as many winners as proposals"
 msgstr "Metoden %(method)s kan inte ha lika många vinnare som förslag"
 
-#: app/polls/scottish_stv.py:180
+#: app/polls/scottish_stv.py:177
 #, python-format
 msgid "The method %(method)s require at least %(min_winners)d winners"
 msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
@@ -266,6 +290,9 @@ msgstr "Dolt resultat"
 #: workflows.py:21
 msgid "Canceled"
 msgstr "Avbruten"
+
+#~ msgid "Manual only"
+#~ msgstr "Bara manuellt"
 
 #~ msgid "Electoral register is empty - no voters"
 #~ msgstr "Röstlängden är tom - inga röstande"
