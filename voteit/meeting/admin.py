@@ -6,7 +6,6 @@ from django.contrib import messages
 from typing import TYPE_CHECKING
 
 from django.contrib import admin
-from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db import models
 from django.http import HttpResponse
@@ -15,11 +14,9 @@ from django.template import loader
 from django.urls import NoReverseMatch
 from django.urls import reverse
 from django.utils.html import format_html
-
 from dolly.core import LiveCloner
 from fsm_admin.mixins import FSMTransitionMixin
 
-from voteit.agenda.models import AgendaItem
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
@@ -35,12 +32,6 @@ if TYPE_CHECKING:
     from voteit.core.abcs import MeetingContext
 
 
-# class AgendaItemInline(admin.TabularInline):
-#     model = AgendaItem
-#     fields = "title", "order"
-#     extra = 1
-
-
 @admin.register(Meeting)
 class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
     fsm_field = ["state"]
@@ -52,13 +43,14 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
         "state",
         "start_time",
         "end_time",
+        "meeting_org",
     )
     list_filter = (
         "organisation",
         "state",
+        "er_policy_name",
     )
     search_fields = ("title",)
-    # inlines = (AgendaItemInline,)
     actions = ["report_clone_meeting", "clone_meeting"]
     exclude = ("mentions",)
 
@@ -69,6 +61,10 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
     @admin.display(description="Proposals")
     def proposal_count(self, obj: Meeting):
         return Proposal.objects.filter(agenda_item__meeting=obj).count()
+
+    @admin.display(description="Organisation")
+    def meeting_org(self, obj: Meeting):
+        return obj.organisation
 
     def report_clone_meeting(self, request, queryset):
         from voteit.speaker.models import SpeakerListSystem
