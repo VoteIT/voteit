@@ -99,7 +99,7 @@ class AutoBeforePollTests(TestCase):
         self.poll.meeting.refresh_from_db()
         self.poll.ongoing()
 
-    def test_active_users_resprected(self):
+    def test_active_users_respected(self):
         self.meeting.components.create(
             component_name=ActiveUsersComponent.name, state=EnabledWf.ON
         )

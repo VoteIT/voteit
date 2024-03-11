@@ -5,3 +5,4 @@ def register():
     from .group_votes_before_poll import GroupVotesBeforePoll
     from .presence_check import PresenceCheckPolicy
     from .manual import Manual
+    from .manual_trigger import ManualTrigger
