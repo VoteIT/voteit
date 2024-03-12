@@ -6,10 +6,9 @@ from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
 from django_fsm import TransitionNotAllowed
-
-from envelope.core.channels import ContextChannel
-from envelope.messages.channels import Subscribe
-from envelope.messages.channels import Subscribed
+from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
+from envelope.channels.models import ContextChannel
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.testing import FakeCommit

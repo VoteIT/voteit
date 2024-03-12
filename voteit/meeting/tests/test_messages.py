@@ -1,12 +1,14 @@
+from json import loads
 from unittest.mock import patch
 
+from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.test import TestCase
 from django.test import override_settings
 from pydantic import ValidationError
 
 from envelope.messages.errors import UnauthorizedError
-from envelope.utils import channel_layer
 from voteit.core.testing import FakeCommit
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -51,34 +53,29 @@ class CloneMeetingTests(TestCase):
 
     def test_copy_org_manager(self):
         msg = self._mk_one(self.org_manager)
+        channel_layer = get_channel_layer()
         with patch.object(channel_layer, "send") as mocked_send:
             with FakeCommit():
                 msg.run_job()
-                self.assertEqual(1, len(mocked_send.mock_calls))
-                self.assertEqual(
+                self.assertIn(
                     {
-                        "text_data": '{"t": "s.stat", "p": null, "i": "copy", "s": "r"}',
-                        "type": "websocket.send",
                         "i": "copy",
                         "t": "s.stat",
                         "s": "r",
+                        "p": None,
                     },
-                    mocked_send.mock_calls[0].args[1],
+                    [loads(x.args[1]["text_data"]) for x in mocked_send.mock_calls],
                 )
             # Committed here
-            found = False
-            match = {
-                "text_data": '{"t": "s.stat", "p": null, "i": "copy", "s": "s"}',
-                "type": "websocket.send",
-                "i": "copy",
-                "t": "s.stat",
-                "s": "s",
-            }
-            for call in mocked_send.mock_calls:
-                if call.args[1] == match:
-                    found = True
-                    break
-            self.assertTrue(found)
+            self.assertIn(
+                {
+                    "i": "copy",
+                    "t": "s.stat",
+                    "s": "s",
+                    "p": None,
+                },
+                [loads(x.args[1]["text_data"]) for x in mocked_send.mock_calls],
+            )
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -132,18 +129,17 @@ class CreateMeetingGroupsTests(TestCase):
         )
 
     def test_duplicate_group_id(self):
-        msg = self._mk_one(
-            self.moderator,
-            groups=[
-                {"title": "a", "groupid": "a"},
-                {
-                    "title": "B",
-                    "groupid": "A",
-                },  # <- Duplicate group id, since lowercased
-            ],
-        )
         with self.assertRaises(ValidationError) as cm:
-            msg.run_job()
+            msg = self._mk_one(
+                self.moderator,
+                groups=[
+                    {"title": "a", "groupid": "a"},
+                    {
+                        "title": "B",
+                        "groupid": "A",
+                    },  # <- Duplicate group id, since lowercased
+                ],
+            )
         self.assertEqual(
             [
                 {
@@ -156,18 +152,17 @@ class CreateMeetingGroupsTests(TestCase):
         )
 
     def test_duplicate_title(self):
-        msg = self._mk_one(
-            self.moderator,
-            groups=[
-                {"title": "a", "groupid": "a"},
-                {
-                    "title": "A",
-                    "groupid": "b",
-                },  # <- Duplicate title since checked with lowercase
-            ],
-        )
         with self.assertRaises(ValidationError) as cm:
-            msg.run_job()
+            msg = self._mk_one(
+                self.moderator,
+                groups=[
+                    {"title": "a", "groupid": "a"},
+                    {
+                        "title": "A",
+                        "groupid": "b",
+                    },  # <- Duplicate title since checked with lowercase
+                ],
+            )
         self.assertEqual(
             [
                 {

@@ -3,7 +3,8 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.messages.channels import Subscribe
+from envelope.channels.messages import Subscribe
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.active.messages import ActiveUserChanged
@@ -15,12 +16,8 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
 
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
-
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class SignalsTests(TestCase):
     @classmethod
     def setUpTestData(cls):

@@ -3,25 +3,13 @@ from datetime import datetime
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import override_settings
 from django.test import TestCase
-from django.utils.timezone import now
-
-from envelope.core.channels import ContextChannel
-from envelope.messages.channels import Subscribe
-from envelope.messages.channels import Subscribed
-from envelope.messages.common import Status
-from envelope.messages.errors import BadRequestError
-from envelope.messages.errors import NotFoundError
-from envelope.messages.errors import SubscribeError
-from envelope.messages.errors import UnauthorizedError
-from envelope.messages.errors import ValidationErrorMsg
-from voteit.core.testing import FakeCommit
+from django.test import override_settings
+from envelope.channels.models import ContextChannel
 
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.speaker.app.list_methods.priority import Priority
-from voteit.speaker.channels import SpeakerListSystemChannel
 from voteit.speaker.messages import ModeratorSpeakerListLeave
 from voteit.speaker.messages import SpeakerListEnter
 from voteit.speaker.messages import SpeakerListLeave

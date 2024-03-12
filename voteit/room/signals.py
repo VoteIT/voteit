@@ -31,7 +31,8 @@ def meeting_subscribed(context: Meeting, app_state: AppState, **kw):
     """
     Send rooms
     """
-    app_state.append_from_queryset(context.rooms.all(), RoomSerializer, RoomAdded)
+    for item in RoomSerializer(context.rooms.all(), many=True).data:
+        app_state.append(RoomAdded(**item))
 
 
 @receiver(channel_subscribed, sender=RoomChannel)
@@ -39,7 +40,7 @@ def room_subscribed(context: Room, app_state: AppState, **kw):
     """
     Send highlighted proposals
     """
-    app_state.append_from(context, RoomHighlightedSerializer, RoomHighlighted)
+    app_state.append(RoomHighlighted(**RoomHighlightedSerializer(context).data))
 
 
 @receiver(post_save, sender=Room)

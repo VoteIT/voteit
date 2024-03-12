@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from pydantic.main import BaseModel
 
-from envelope.core.message import ContextAction
+from envelope.deferred_jobs.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.utils import websocket_send

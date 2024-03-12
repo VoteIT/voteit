@@ -1,8 +1,10 @@
 from unittest.mock import patch
 
+from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.agenda.messages import LastReadChangedSchema
 from voteit.agenda.models import AgendaItem
@@ -12,12 +14,9 @@ from voteit.agenda.rest_api.serializers import LastReadSerializer
 from voteit.core.testing import FakeCommit
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class UpdateLastReadTests(TestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
 
@@ -36,7 +35,7 @@ class UpdateLastReadTests(TestCase):
         self.assertIsInstance(last_read, LastRead)
 
     def test_response_sent(self):
-        from envelope.utils import channel_layer
+        channel_layer = get_channel_layer()
 
         with patch.object(channel_layer, "send") as mocked_send:
             msg = self._mk_one(agenda_item=1)

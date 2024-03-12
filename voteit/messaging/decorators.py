@@ -2,25 +2,33 @@
 Shorthand decorators for registries.
 """
 
-from typing import Type
+from __future__ import annotations
 
-from envelope.core.channels import ContextChannel
-from envelope.core.message import Message
-from envelope.registries import context_channel_registry
-from envelope.registries import ws_outgoing_messages
-from envelope.registries import ws_incoming_messages
+from typing import TYPE_CHECKING
+
+from envelope import WS_INCOMING
+from envelope import WS_OUTGOING
+from envelope.utils import get_message_registry
+from envelope.utils import get_context_channel_registry
+
+if TYPE_CHECKING:
+    from envelope.channels.models import ContextChannel
+    from envelope.core.message import Message
 
 
-def channel(channel: Type[ContextChannel]):
-    context_channel_registry.add(channel)
+def channel(channel: type[ContextChannel]):
+    reg = get_context_channel_registry()
+    reg[channel.name] = channel
     return channel
 
 
-def outgoing(message: Type[Message]):
-    ws_outgoing_messages.add(message)
+def outgoing(message: type[Message]):
+    reg = get_message_registry(WS_OUTGOING)
+    reg[message.name] = message
     return message
 
 
-def incoming(message: Type[Message]):
-    ws_incoming_messages.add(message)
+def incoming(message: type[Message]):
+    reg = get_message_registry(WS_INCOMING)
+    reg[message.name] = message
     return message

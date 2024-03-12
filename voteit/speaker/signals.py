@@ -211,9 +211,9 @@ def meeting_channel_subscribed(
     - User roles within speaker systems
     """
     systems_qs = context.speaker_systems.all()
-    app_state.append_from_queryset(
-        systems_qs, SpeakerListSystemSerializer, SpeakerSystemAdded
-    )
+    sys_serializer = SpeakerListSystemSerializer(systems_qs, many=True)
+    for item in sys_serializer.data:
+        app_state.append(SpeakerSystemAdded(**item))
     # FIXME: Annotate instead!
     for system in systems_qs:
         # Roles
@@ -253,7 +253,9 @@ def ai_channel_subscribed(
     lists_qs = context.speaker_lists.filter(
         speaker_system__state=SpeakerSystemWf.ACTIVE
     )
-    app_state.append_from_queryset(lists_qs, SpeakerListSerializer, SpeakerListAdded)
+    serializer = SpeakerListSerializer(lists_qs, many=True)
+    for item in serializer.data:
+        app_state.append(SpeakerListAdded(**item))
 
 
 # Archiving

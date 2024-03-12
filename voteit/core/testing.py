@@ -89,8 +89,9 @@ class FakeCommit:
         current_run_on_commit = self.connection.run_on_commit
         self.connection.run_on_commit = []
         while current_run_on_commit:
-            sids, func = current_run_on_commit.pop(0)
-            func()
+            items = current_run_on_commit.pop(0)
+            # Django 4.2 has 3 args, <4.2 only 2
+            items[1]()
 
 
 @contextmanager
@@ -112,3 +113,8 @@ class SetSeed:
         Execute all on_commit hooks and cleanup.
         """
         random.seed()
+
+
+testing_channel_layers_setting = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}

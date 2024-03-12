@@ -122,8 +122,8 @@ class AddDuttVoteTests(TestCase):
 
     def test_add_msg_obvious_bad_choice(self):
         # Handled by pydantic
-        msg = self._mk_one([0])
-        self.assertRaises(ValidationError, msg.validate)
+        with self.assertRaises(ValidationError):
+            msg = self._mk_one([0])
 
     def test_add_msg_bad_proposal(self):
         bad_prop_pk = self.prop1.pk - 5

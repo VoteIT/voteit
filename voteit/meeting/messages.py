@@ -8,7 +8,7 @@ from pydantic import conlist
 from pydantic import constr
 from pydantic import validator
 
-from envelope.core.message import ContextAction
+from envelope.deferred_jobs.message import ContextAction
 from envelope.messages.common import Status
 from envelope.messages.errors import UnauthorizedError
 from envelope.utils import websocket_send

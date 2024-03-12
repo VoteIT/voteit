@@ -1,6 +1,6 @@
 from logging import getLogger
 
-from envelope.core.channels import ContextChannel
+from envelope.channels.models import ContextChannel
 
 from voteit.messaging.decorators import channel
 from voteit.presence.permissions import PresenceCheckPermissions

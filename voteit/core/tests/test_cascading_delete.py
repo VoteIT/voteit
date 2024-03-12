@@ -1,14 +1,18 @@
 from django.contrib.auth import get_user_model
-from voteit.core.testing import FakeCommit
-from voteit.meeting.models import Meeting
 
-from voteit.organisation.models import Organisation
+from django.test import TestCase
+from django.test import override_settings
+from envelope.testing import testing_channel_layers_setting
+
+from voteit.meeting.models import Meeting
 
 User = get_user_model()
 
-from django.test import TestCase
 
-
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+    ENVELOPE_CONNECTIONS_QUEUE=None,
+)
 class GenerateValidUseridTests(TestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
 
@@ -16,5 +20,5 @@ class GenerateValidUseridTests(TestCase):
         self.meeting = Meeting.objects.get(pk=1)
 
     def test_delete(self):
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             self.meeting.delete()

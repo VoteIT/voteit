@@ -4,11 +4,11 @@ from django.contrib.auth import get_user_model
 from django.dispatch import receiver
 from django.test import TestCase
 from django.test import override_settings
-
-from envelope.messages.channels import Subscribe
-from envelope.messages.channels import Subscribed
+from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
 from envelope.messages.common import Batch
-from voteit.core.testing import FakeCommit
+from envelope.testing import testing_channel_layers_setting
+
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.channels import MeetingChannel
@@ -19,11 +19,9 @@ from voteit.organisation.models import Organisation
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingJoinedSignalTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -43,7 +41,7 @@ class MeetingJoinedSignalTests(TestCase):
         def my_listener(**kw):
             L.append(kw)
 
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
             self.assertFalse(L)
         self.assertTrue(L)
@@ -53,18 +51,21 @@ class MeetingJoinedSignalTests(TestCase):
         self.assertEqual({ROLE_PARTICIPANT}, set(kwargs.pop("meeting_roles").assigned))
 
     def test_signal_send_after_invite_used(self):
+        from voteit.invites.models import MeetingInvite
+
         @receiver(self._fut)
         def my_listener(user, **kw):
             one = self.meeting.invites.filter(user_data={"boo": "Hoo"}).first()
+            self.assertIsInstance(one, MeetingInvite)
             self.assertEqual(one.state, "accepted")
 
         invite = self.meeting.invites.create(user_data={"boo": "Hoo"})
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             invite.accept(self.user)
             invite.save()
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingChangedTests(TestCase):
     def setUp(self):
         self.meeting = Meeting.objects.create()
@@ -79,12 +80,11 @@ class MeetingChangedTests(TestCase):
         self.meeting.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        msg.validate()
         self.assertIsInstance(msg, MeetingChanged)
         self.assertEqual(self.meeting.pk, msg.data.pk)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingChannelSubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -108,7 +108,6 @@ class MeetingChannelSubscribedTests(TestCase):
 
     def test_roles_in_app_state(self):
         msg = self._mk_subscribe()
-        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         added_meeting_roles = [
@@ -126,7 +125,6 @@ class MeetingChannelSubscribedTests(TestCase):
         self.meeting.group_roles_active = True
         self.meeting.save()
         msg = self._mk_subscribe()
-        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         # MeetingGroup
@@ -155,7 +153,7 @@ class MeetingChannelSubscribedTests(TestCase):
         self.assertEqual(self.meeting.pk, payload.m)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingGroupChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -167,11 +165,10 @@ class MeetingGroupChangedTests(TestCase):
     def test_added(self, mock_publish):
         from voteit.meeting.messages import MeetingGroupAdded
 
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             group = self.meeting.groups.create()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        msg.validate()
         self.assertIsInstance(msg, MeetingGroupAdded)
         self.assertEqual(group.pk, msg.data.pk)
 
@@ -179,12 +176,11 @@ class MeetingGroupChangedTests(TestCase):
     def test_changed(self, mock_publish):
         from voteit.meeting.messages import MeetingGroupChanged
 
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             self.group.title = "Hello"
             self.group.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        msg.validate()
         self.assertIsInstance(msg, MeetingGroupChanged)
         self.assertEqual(self.group.pk, msg.data.pk)
 
@@ -196,7 +192,6 @@ class MeetingGroupChangedTests(TestCase):
         self.group.delete()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        msg.validate()
         self.assertIsInstance(msg, MeetingGroupDeleted)
         self.assertEqual(group_pk, msg.data.pk)
 
@@ -252,7 +247,7 @@ class MeetingGroupChangedTests(TestCase):
         self.assertIsInstance(msg, GroupMembershipDeleted)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class RoleChangesPublishedTests(TestCase):
     @classmethod
     def setUpTestData(cls):

@@ -9,15 +9,15 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
-
+from async_signals import receiver as areceiver
+from envelope.async_signals import consumer_connected
 from envelope.app.online_channel.channel import OnlineChannel
-from envelope.signals import client_connect
-from envelope.utils import websocket_send
+
 from voteit.core import models_to_register
-from voteit.core.messages.user import InvalidateUserCache
 
 if TYPE_CHECKING:
     from django.db.models import Model
+    from envelope.consumers.websocket import WebsocketConsumer
 
 
 # The following signals will provide arguments "sender", "instance" and "roles"
@@ -34,18 +34,19 @@ def deferred_register_model(sender: Model, **kw):
     models_to_register.add(sender)
 
 
-@receiver(client_connect)
-def send_frontend_version(consumer_name=None, **kwargs):
-    if consumer_name:
+@areceiver(consumer_connected)
+async def send_frontend_version(*, consumer: WebsocketConsumer, **kwargs):
+    if consumer.channel_name:
         if FRONTEND_VERSION := getenv("FRONTEND_VERSION"):
             from voteit.core.messages.frontend_version import FrontendVersion
 
             msg = FrontendVersion(version=FRONTEND_VERSION)
-            websocket_send(msg, channel_name=consumer_name, on_commit=False)
+            await consumer.send_ws_message(msg)
 
 
 def post_init_registrations():
     User = get_user_model()
+    from voteit.core.messages.user import InvalidateUserCache
 
     @receiver(pre_delete, sender=User)
     @receiver(post_save, sender=User)

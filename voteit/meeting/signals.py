@@ -181,11 +181,8 @@ def meeting_channel_subscribed(
         app_state.append(batch)
     # And GroupRoles
     if context.group_roles_active:
-        app_state.append_from_queryset(
-            context.group_roles.all(),
-            GroupRoleSerializer,
-            GroupRoleAdded,
-        )
+        for item in GroupRoleSerializer(context.group_roles.all(), many=True).data:
+            app_state.append(GroupRoleAdded(**item))
 
 
 @receiver(post_save, sender=MeetingGroup)

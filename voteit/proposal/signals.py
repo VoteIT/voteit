@@ -8,7 +8,6 @@ from django.dispatch import receiver
 from django_fsm import post_transition
 from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
-from envelope.utils import AppState
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
@@ -33,6 +32,7 @@ from voteit.proposal.rest_api.serializers import TextDocumentSerializer
 
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
+    from envelope.channels.models import AppState
 
 
 def attach_proposals(meeting: Meeting, app_state: AppState, include_private=False):
@@ -138,11 +138,11 @@ def agenda_item_channel_subscribed(context: AgendaItem, app_state: AppState, **k
     """
     Populate app_state with TextDocuments
     """
-    app_state.append_from_queryset(
-        TextDocument.objects.filter(agenda_item=context),
-        TextDocumentSerializer,
-        TextDocumentAdded,
+    serializer = TextDocumentSerializer(
+        TextDocument.objects.filter(agenda_item=context), many=True
     )
+    for item in serializer.data:
+        app_state.append(TextDocumentAdded(**item))
 
 
 @receiver(post_save, sender=TextDocument)

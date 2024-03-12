@@ -3,9 +3,10 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
+from envelope.testing import testing_channel_layers_setting
 
-from envelope.messages.channels import Subscribe
-from envelope.messages.channels import Subscribed
 from voteit.active.components import ActiveUsersComponent
 from voteit.core.testing import FakeCommit
 from voteit.core.workflows import EnabledWf
@@ -17,12 +18,9 @@ from voteit.components.models import MeetingComponent
 from voteit.meeting.roles import ROLE_MODERATOR
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingChannelSubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -47,7 +45,6 @@ class MeetingChannelSubscribedTests(TestCase):
 
     def test_meeting_components_in_app_state(self):
         msg = self._mk_subscribe()
-        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         payloads = [
@@ -83,7 +80,6 @@ class MeetingChannelSubscribedTests(TestCase):
         self.flash.settings_data = {}
         self.flash.save()
         msg = self._mk_subscribe()
-        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         payloads = [
@@ -95,7 +91,6 @@ class MeetingChannelSubscribedTests(TestCase):
         self.flash.disable()
         self.flash.save()
         msg = self._mk_subscribe()
-        msg.validate()
         response = msg.run_job()
         self.assertIsInstance(response, Subscribed)
         payloads = [
@@ -115,7 +110,7 @@ class MeetingChannelSubscribedTests(TestCase):
         )
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingComponentChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -184,7 +179,7 @@ class MeetingComponentChangedTests(TestCase):
         self.assertEqual(component_pk, msg.data.pk)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingComponentsDisabledWhenMeetingClosesTests(TestCase):
     @classmethod
     def setUpTestData(cls):

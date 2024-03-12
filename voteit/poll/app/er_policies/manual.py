@@ -17,9 +17,10 @@ class Manual(ElectoralRegisterPolicy):
     """
 
     name = "manual"
-    title = _("Manual only")
+    title = _("Fully manual")
     description = _(
-        "No electoral registers will be created at all, you have to do it yourself!"
+        "No electoral registers will be created at all, you have to do it yourself! "
+        "You need to hand-pick voters from any participants with the role potential voter."
     )
     logger = logger
     allow_manual = True

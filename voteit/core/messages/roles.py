@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from typing import TYPE_CHECKING
 
+from auditlog.context import set_actor
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.functional import cached_property
@@ -11,16 +12,15 @@ from pydantic import Field
 from pydantic import root_validator
 from pydantic import validator
 from pydantic.main import BaseModel
-
-from auditlog.context import set_actor
 from envelope import INTERNAL
+from envelope.channels.messages import RecheckChannelSubscriptions
 from envelope.core.message import AsyncRunnable
-from envelope.core.message import ContextAction
 from envelope.core.message import Message
-from envelope.messages.channels import RecheckChannelSubscriptions
+from envelope.deferred_jobs.message import ContextAction
 from envelope.messages.common import Status
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import websocket_send
+
 from voteit.core.loggers import log_roles_change
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.role import Role
@@ -131,7 +131,7 @@ class RemoveRoles(BaseRoles):
     data: ChangeRolesSchema
 
     def run_job(self) -> Status:
-        # Avoid problems with out user model
+        # Avoid problems without user model
         from envelope.app.user_channel.channel import UserChannel
 
         users_qs = self.validate_and_fetch()
@@ -151,9 +151,10 @@ class RemoveRoles(BaseRoles):
         if self.mm.consumer_name:  # If this is a script, consumer_name will be None
             response = Status.from_message(self)
             websocket_send(response, state=response.SUCCESS)
-        msg = RecheckChannelSubscriptions(_registry=INTERNAL)
+        # FIXME: Why these defaults?
+        msg = RecheckChannelSubscriptions(consumer_name="", subscriptions=[])
         for user in notify_users:
-            user_channel = UserChannel.from_instance(user)
+            user_channel = UserChannel.from_instance(user, envelope_name=INTERNAL)
             user_channel.sync_publish(msg)
         if response:
             return response
@@ -234,8 +235,10 @@ class AvailableRoles(AsyncRunnable):
             for role in roles:
                 # We don't need to send this
                 role.predicate_info = None
-        response = AvailableRolesResponse.from_message(self, roles=roles)
-        await consumer.send_ws_message(response, state=response.SUCCESS)
+        response = AvailableRolesResponse.from_message(
+            self, roles=roles, state=AvailableRoles.SUCCESS
+        )
+        await consumer.send_ws_message(response)
         return response
 
 

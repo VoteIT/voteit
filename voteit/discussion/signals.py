@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
-from envelope.utils import AppState
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
@@ -15,6 +16,9 @@ from voteit.discussion.messages import DiscussionPostChanged
 from voteit.discussion.messages import DiscussionPostDeleted
 from voteit.discussion.models import DiscussionPost
 from voteit.discussion.rest_api.serializers import DiscussionPostDetailSerializer
+
+if TYPE_CHECKING:
+    from envelope.channels.models import AppState
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)

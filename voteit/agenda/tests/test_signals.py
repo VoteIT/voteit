@@ -6,15 +6,16 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from pytz import UTC
-
-from envelope.messages.channels import Subscribe
+from envelope.channels.messages import Subscribe
 from envelope.messages.common import Batch
-from envelope.testing import FakeCommit
+from envelope.testing import testing_channel_layers_setting
 from envelope.utils import get_or_create_txn_sender
+
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.messages import AgendaBodyAdded
 from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.models import AgendaItem
+from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
@@ -22,12 +23,9 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class SubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -97,7 +95,7 @@ class SubscribedTests(TestCase):
         self.assertEqual({"pk": self.ai.pk, "body": "Hello world"}, msg.p)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AgendaChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -161,7 +159,7 @@ class AgendaChangedTests(TestCase):
             counter[x] += 1
         self.assertEqual(
             1,
-            counter[f"s.batchmoderators_{self.meeting.pk}10websocket.send"],
+            counter[f"s.batchmoderators_{self.meeting.pk}ws_outgoing1"],
         )
 
     @patch.object(MeetingChannel, "sync_publish")
@@ -194,7 +192,7 @@ class ArchiveAgendaTests(TestCase):
         self.assertEqual("archived", ai.state)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class RelatedItemsTests(TestCase):
     @classmethod
     def setUpTestData(cls):

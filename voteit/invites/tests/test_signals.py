@@ -3,7 +3,9 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.messages.channels import Subscribe
+from envelope.channels.messages import Subscribe
+from envelope.messages.common import Batch
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
@@ -18,11 +20,12 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+    #    ENVELOPE_CONNECTIONS_QUEUE=None,
+)
 class AutoUseInviteTests(TestCase):
     def setUp(self):
         self.meeting = Meeting.objects.create()
@@ -60,7 +63,7 @@ class InvitesExpireWhenMeetingArchivedTests(TestCase):
         self.assertEqual(InviteWf.EXPIRED, self.inv1.state)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class InvitesSubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -83,15 +86,18 @@ class InvitesSubscribedTests(TestCase):
             channel_type="invites",
         )
         msg = command.run_job()
-        payloads = sorted(
-            [x.p for x in msg.data.app_state if x.t == "meeting_invite.added"],
-            key=lambda x: x["pk"],
-        )
-        self.assertEqual([self.invite.pk, self.invite2.pk], [x["pk"] for x in payloads])
-        self.assertEqual([True, False], [x["has_annotations"] for x in payloads])
-        data = payloads[0]
-        data.pop("pk")
-        data.pop("has_annotations")
+        batch = None
+        for item in msg.data.app_state:
+            if item.t == "s.batch" and item.p["t"] == MeetingInviteAdded.name:
+                batch = item
+        payloads = batch.p["payloads"]
+        self.assertEqual({self.invite.pk, self.invite2.pk}, {x.pk for x in payloads})
+        self.assertEqual({True, False}, {x.has_annotations for x in payloads})
+        data = {}
+        for item in payloads:
+            if item.pk == self.invite.pk:
+                data = item.dict(exclude={"pk", "has_annotations"})
+                break
         self.assertEqual(self.meeting.pk, data.pop("meeting"))
         self.assertEqual({"email": "hello@betahaus.net"}, data.pop("user_data"))
         self.assertEqual([], data.pop("roles"))
@@ -100,7 +106,7 @@ class InvitesSubscribedTests(TestCase):
         self.assertFalse(data.keys())
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingInviteSignalTests(TestCase):
     @classmethod
     def setUpTestData(cls):

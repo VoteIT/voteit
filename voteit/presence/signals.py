@@ -1,4 +1,6 @@
+from __future__ import annotations
 from contextlib import suppress
+from typing import TYPE_CHECKING
 
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ObjectDoesNotExist
@@ -8,7 +10,6 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
-from envelope.utils import AppState
 
 from voteit.core.decorators import disable_on_raw_save
 from voteit.meeting.channels import MeetingChannel
@@ -23,6 +24,9 @@ from voteit.presence.models import Presence
 from voteit.presence.models import PresenceCheck
 from voteit.presence.rest_api.serializers import PresenceCheckDetailSerializer
 from voteit.presence.rest_api.serializers import PresenceDetailSerializer
+
+if TYPE_CHECKING:
+    from envelope.channels.models import AppState
 
 
 @receiver(post_save, sender=Presence)
@@ -91,12 +95,12 @@ def _channel_subscribed(
     """
     with suppress(ObjectDoesNotExist):
         if presence_check := context.presence_checks.latest_open():
-            app_state.append_from(
-                presence_check, PresenceCheckDetailSerializer, PresenceCheckAdded
+            app_state.append(
+                PresenceCheckAdded(**PresenceCheckDetailSerializer(presence_check).data)
             )
             if user_presence := presence_check.presences.filter(user=user).first():
-                app_state.append_from(
-                    user_presence, PresenceDetailSerializer, PresenceAdded
+                app_state.append(
+                    PresenceAdded(**PresenceDetailSerializer(user_presence).data)
                 )
 
 
@@ -107,6 +111,6 @@ def _check_channel_subscribed(
     """
     Since this sends out who's present, it has restricted access.
     """
-    app_state.append_from_queryset(
-        context.presences.all(), PresenceDetailSerializer, PresenceAdded
-    )
+    qs = context.presences.all()
+    for item in PresenceDetailSerializer(qs, many=True).data:
+        app_state.append(PresenceAdded(**item))

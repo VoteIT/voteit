@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from auditlog.context import set_actor
 from django.db import transaction
-from envelope.core.message import ContextAction
+from envelope.deferred_jobs.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.common import ProgressNum
 from envelope.messages.common import Status
@@ -51,7 +51,6 @@ class AddInvites(ContextAction):
 
     def run_job(self) -> InvitesAdded:
         self.assert_perm()
-        self.validate()  # FIXME
         items = list(
             self.invite_data_reg.build_ud_query_seq(self.data.columns, self.data.rows)
         )
@@ -100,7 +99,6 @@ class AddInviteAnnotations(ContextAction):
 
     def run_job(self) -> list[AnnotationResult, None]:
         self.assert_perm()
-        self.validate()  # FIXME
         items = list(
             self.invite_data_reg.build_ud_query_seq(self.data.columns, self.data.rows)
         )

@@ -38,9 +38,8 @@ if TYPE_CHECKING:
 def meeting_channel_subscribed(
     context: Meeting, app_state: AppState, user: AbstractUser, **kw
 ):
-    app_state.append_from_queryset(
-        context.reaction_buttons.all(), ButtonDetailSerializer, ButtonAdded
-    )
+    for item in ButtonDetailSerializer(context.reaction_buttons.all(), many=True).data:
+        app_state.append(ButtonAdded(**item))
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)

@@ -36,6 +36,7 @@ class PresenceCheckPolicy(ElectoralRegisterPolicy):
     allow_manual = True
     require_manual = True
     handles_vote_weight = True
+    available = False
 
     def get_voters(self, presence_check=None, **kwargs) -> dict[int, int]:
         if presence_check is None:  # pragma: no coverage

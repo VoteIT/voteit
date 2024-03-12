@@ -2,8 +2,9 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from pydantic import ValidationError
-
 from envelope.messages.errors import ValidationErrorMsg
+from envelope.testing import testing_channel_layers_setting
+
 from voteit.poll.app.polls.majority import MajorityVoteSchema
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.models import ElectoralRegister
@@ -13,9 +14,6 @@ from voteit.proposal.models import Proposal
 from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
 class MajorityTests(TestCase):
@@ -131,7 +129,7 @@ class MajorityTests(TestCase):
         self.assertEqual(PollWf.NO_RESULT, self.poll.state)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AddMajorityVoteTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -163,8 +161,8 @@ class AddMajorityVoteTests(TestCase):
 
     def test_add_msg_obvious_bad_choice(self):
         # Handled by pydantic
-        msg = self._mk_one(0)
-        self.assertRaises(ValidationError, msg.validate)
+        with self.assertRaises(ValidationError):
+            msg = self._mk_one(0)
 
     def test_add_msg_bad_proposal(self):
         bad_prop_pk = self.prop1.pk - 5

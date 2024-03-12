@@ -1,8 +1,8 @@
 from pydantic import BaseModel
 from pydantic import validator
 
-from envelope.core.message import ContextAction
-from envelope.core.message import Message
+from envelope.core import Message
+from envelope.deferred_jobs.message import ContextAction
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted

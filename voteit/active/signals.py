@@ -1,11 +1,12 @@
+from __future__ import annotations
 from contextlib import suppress
+from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from envelope.signals import channel_subscribed
-from envelope.utils import AppState
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.active.messages import ActiveUserChanged
@@ -19,6 +20,9 @@ from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
+
+if TYPE_CHECKING:
+    from envelope.channels.models import AppState
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)

@@ -3,10 +3,10 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-
 from envelope.app.user_channel.channel import UserChannel
-from envelope.messages.channels import Subscribe
-from envelope.utils import AppState
+from envelope.channels.messages import Subscribe
+from envelope.channels.models import AppState
+
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
