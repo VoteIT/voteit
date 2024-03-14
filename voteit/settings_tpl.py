@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "django_rq",
     "voteit.core",
     "voteit.meeting",
+    "voteit.export_import",
     "voteit.active",
     "voteit.access_policy",
     "voteit.agenda",

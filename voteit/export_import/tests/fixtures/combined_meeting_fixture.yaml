@@ -1,0 +1,125 @@
+meta:
+  title: Hello world!
+  description: Not much
+  version: 1
+  created: '2023-12-05T14:54:00.000000+01:00'
+agenda_items:
+- block_discussion: false
+  block_proposals: false
+  body: could be tasty
+  created: '2021-01-28T18:12:28.792000+00:00'
+  discussions:
+  - author:
+      email: participant@voteit.se
+      pk: 2
+    body: "\n<span class=\"mention\" data-index=\"0\" data-denotation-char=\"#\" data-id=\"\
+      styrelse-1\" data-value=\"styrelse-1\">\n<span contenteditable=\"false\"><span\
+      \ class=\"ql-mention-denotation-char\">#</span>styrelse-1</span></span> \n\r\
+      \nJag h\xE5ller med"
+    created: '2020-05-18T13:53:14.961055+00:00'
+    meeting_group: the-hellos
+    modified: '2020-05-18T13:53:14.961055+00:00'
+    tags:
+    - styrelse-1
+  - author:
+      email: participant@voteit.se
+      pk: 2
+    body: "Hej och h\xE5"
+    created: '2020-05-19T16:08:33.447094+00:00'
+    meeting_group: null
+    modified: '2020-05-19T16:08:33.447094+00:00'
+    tags:
+    - styrelse-2
+  modified: '2021-01-28T18:12:28.792000+00:00'
+  proposals:
+  - author:
+      email: participant@voteit.se
+      pk: 2
+    body: "L\xF6ks\xE5s \xE4r gott och ska med f\xF6rdel serveras med f\xE4rsk potatis.\
+      \ ipsum bland strand s\xF6ka kunde b\xE5de dunge gamla, d\xE4r \xE5r ska annan\
+      \ faktor n\xE4r dimma samtidigt, miljoner g\xF6r nu oss n\xE4r hwila r\xE4v.\
+      \ Sj\xF6 miljoner n\xE4r samtidigt dimmh\xF6ljd hav nu erfarenheter samma r\xE4\
+      nnil sj\xF6, av rot ska dimma f\xE4rdv\xE4g som genom dimmh\xF6ljd faktor rot\
+      \ fram, verkligen hwila dag inom sorgliga oss \xE4r hela ta. S\xE5 helt och\
+      \ det \xE5r vad helt tid, erfarenheter smultron p\xE5 sin uppr\xE4tth\xE5llande\
+      \ del, sin samtidigt tiden regn stig ta."
+    created: '2022-03-29T09:30:58.356396+00:00'
+    meeting_group: null
+    modified: '2022-03-29T09:30:58.356404+00:00'
+    paragraph: 1
+    text_document: 'stycke'
+    prop_id: loeksas-1
+    state: approved
+    tags:
+    - stycke-1
+  - author:
+      email: participant@voteit.se
+      pk: 2
+    body: "F\xF6r \xF6vrigt anser jag att Karthago ska f\xF6rstr\xF6ras"
+    created: '2022-03-29T09:30:58.356396+00:00'
+    meeting_group: null
+    modified: '2022-03-29T09:30:58.356404+00:00'
+    prop_id: loeksas-3
+    state: published
+    tags:
+    - loeksas-3
+  - author:
+      email: participant@voteit.se
+      pk: 2
+    body: I don't even want to be here
+    created: '2022-03-29T09:30:58.356396+00:00'
+    meeting_group: null
+    modified: '2022-03-29T09:30:58.356404+00:00'
+    prop_id: loeksas-4
+    state: published
+    tags:
+    - loeksas-4
+  state: upcoming
+  tags: []
+  text_documents:
+  - base_tag: stycke
+    body: "L\xF6ks\xE5s ipsum bland strand s\xF6ka kunde b\xE5de dunge gamla, d\xE4\
+      r \xE5r ska annan faktor n\xE4r dimma samtidigt, miljoner g\xF6r nu oss n\xE4\
+      r hwila r\xE4v. Sj\xF6 miljoner n\xE4r samtidigt dimmh\xF6ljd hav nu erfarenheter\
+      \ samma r\xE4nnil sj\xF6, av rot ska dimma f\xE4rdv\xE4g som genom dimmh\xF6\
+      ljd faktor rot fram, verkligen hwila dag inom sorgliga oss \xE4r hela ta. S\xE5\
+      \ helt och det \xE5r vad helt tid, erfarenheter smultron p\xE5 sin uppr\xE4\
+      tth\xE5llande del, sin samtidigt tiden regn stig ta."
+    created: '2022-03-29T09:31:51.413988+00:00'
+    modified: '2022-03-29T09:31:51.413994+00:00'
+    tags: []
+    title: "Verksamhetsplan 2019 \u2013 2020"
+  title: Pickles
+- block_discussion: false
+  block_proposals: false
+  body: must be considered
+  created: '2021-01-28T18:12:28.792000+00:00'
+  discussions: []
+  modified: '2021-01-28T18:12:28.792000+00:00'
+  proposals: []
+  state: upcoming
+  tags: []
+  text_documents: []
+  title: Crisps
+- block_discussion: false
+  block_proposals: false
+  body: as long as they're vegetarian
+  created: '2021-01-28T18:12:28.792000+00:00'
+  discussions: []
+  modified: '2021-01-28T18:12:28.792000+00:00'
+  proposals: []
+  state: private
+  tags: []
+  text_documents: []
+  title: Hot dogs
+groups:
+- body: ''
+  created: '2021-01-28T18:12:28.792000+00:00'
+  groupid: the-hellos
+  modified: '2021-01-28T18:12:28.792000+00:00'
+  tags: []
+  title: The Hellos
+  votes: null
+  members:
+    - email: participant@voteit.se
+      pk: 2

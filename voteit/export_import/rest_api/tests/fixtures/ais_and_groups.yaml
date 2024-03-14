@@ -1,0 +1,24 @@
+meta:
+  version: 1
+agenda_items:
+  - title: Pickles
+    body: could be tasty
+    state: upcoming
+    proposals:
+      - body: as long as they're vegetarian
+        meeting_group: the-hellos
+
+  - title: Crisps
+    body: must be considered
+
+  - title: Hot dogs
+    body: as long as they're vegetarian
+    state: private
+
+groups:
+  - title: The Hellos
+    groupid: the-hellos
+
+
+
+
