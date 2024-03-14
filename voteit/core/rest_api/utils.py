@@ -195,9 +195,28 @@ def _pos_int_or_validation_error(value) -> int:
 def meeting_from_unsafe_data(serializer) -> Meeting:
     """
     This method should only be used directly by a serializer validation method
+
+    >>> from rest_framework.serializers import Serializer
+    >>> from voteit.meeting.models import Meeting
+    >>> m = Meeting()
+    >>> serializer = Serializer(data={}, context={'meeting': m})
+    >>> m is meeting_from_unsafe_data(serializer)
+    True
     """
+    # Via context is a lot better
+    from voteit.meeting.models import Meeting
+
+    _meeting = serializer.context.get("meeting")
+    if isinstance(_meeting, Meeting):
+        return _meeting
+
     # Via agenda_item
-    ai_query_val = serializer.initial_data.get("agenda_item", None)
+    many = serializer.initial_data and isinstance(serializer.initial_data, list)
+    if many:
+        # Just make one attempt here
+        ai_query_val = serializer.initial_data[0].get("agenda_item", None)
+    else:
+        ai_query_val = serializer.initial_data.get("agenda_item", None)
     if ai_query_val:
         ai_query_val = _pos_int_or_validation_error(ai_query_val)
         from voteit.agenda.models import AgendaItem
@@ -209,11 +228,12 @@ def meeting_from_unsafe_data(serializer) -> Meeting:
         except ObjectDoesNotExist:
             pass
     # Via meeting
-    meeting_query_val = serializer.initial_data.get("meeting", None)
+    if many:
+        meeting_query_val = serializer.initial_data[0].get("meeting", None)
+    else:
+        meeting_query_val = serializer.initial_data.get("meeting", None)
     if meeting_query_val:
         meeting_query_val = _pos_int_or_validation_error(meeting_query_val)
-        from voteit.meeting.models import Meeting
-
         try:
             return Meeting.objects.get(pk=meeting_query_val)
         except ObjectDoesNotExist:
