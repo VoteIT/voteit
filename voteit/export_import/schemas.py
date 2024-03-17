@@ -8,6 +8,7 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.text import slugify
+from django.utils.timezone import now
 from pydantic import BaseModel
 from pydantic import EmailStr
 from pydantic import Extra
@@ -499,3 +500,27 @@ class ImportStats(BaseModel):
     diff_proposals: int = 0
     discussion_posts: int = 0
     text_documents: int = 0
+
+
+class ImportMeetingMeta(BaseModel):
+    version: int
+    created: datetime | None
+    title: str = ""
+    description: str = ""
+    sign: str | None
+
+
+class ImportMeetingStructure(MeetingStructure):
+    meta: ImportMeetingMeta | None
+
+
+class ExportMeetingMeta(BaseModel):
+    version: int = 1
+    created: datetime = now()
+    title: str = ""
+    description: str = ""
+    sign: str | None
+
+
+class ExportMeetingStructure(MeetingStructure):
+    meta: ExportMeetingMeta = Field(default_factory=ExportMeetingMeta)

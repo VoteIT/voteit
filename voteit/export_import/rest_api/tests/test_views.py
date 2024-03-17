@@ -2,6 +2,7 @@ import os
 import tempfile
 
 import yaml
+from django.test import override_settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.reverse import reverse
@@ -15,6 +16,7 @@ FIXTURES = os.path.join(_TESTS_DIR, "fixtures")
 User = get_user_model()
 
 
+@override_settings(EXPORT_SECRET_KEY="abcdefghijk")
 class MeetingDataImportViewTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -61,16 +63,59 @@ class MeetingDataImportViewTests(APITestCase):
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with open(os.path.join(FIXTURES, "empty_import.yaml"), "rb") as f:
             response = self.client.put(url, data={"file": f}, format="multipart")
-        self.assertContains(
-            response,
-            "File doesn't contain any",
-            status_code=status.HTTP_400_BAD_REQUEST,
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertEqual(
+            {"file": ["File doesn't contain any agenda items or groups"]},
+            response.json(),
+        )
+
+    def test_empty_sign(self):
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES, "empty_sign.yaml"), "rb") as f:
+            response = self.client.put(url, data={"file": f}, format="multipart")
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertEqual(
+            {"file": ["Signature isn't valid for this file."]},
+            response.json(),
         )
 
     def test_ais_and_groups(self):
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with open(os.path.join(FIXTURES, "ais_and_groups.yaml"), "rb") as f:
+            response = self.client.put(
+                url, data={"file": f, "commit": "1"}, format="multipart"
+            )
+        self.assertEqual(status.HTTP_201_CREATED, response.status_code)
+        self.assertEqual(
+            {
+                "agenda_items": 3,
+                "diff_proposals": 0,
+                "discussion_posts": 0,
+                "groups": 1,
+                "proposals": 1,
+                "text_documents": 0,
+            },
+            response.json(),
+        )
+        self.assertEqual(
+            ["Crisps", "Hot dogs", "Pickles"],
+            list(
+                self.meeting.agenda_items.values_list("title", flat=True).order_by(
+                    "title"
+                )
+            ),
+        )
+        self.assertEqual(
+            ["The Hellos"],
+            list(self.meeting.groups.values_list("title", flat=True).order_by("title")),
+        )
+
+    def test_ais_and_groups_json(self):
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES, "ais_and_groups.json"), "rb") as f:
             response = self.client.put(
                 url, data={"file": f, "commit": "1"}, format="multipart"
             )
@@ -126,6 +171,7 @@ class MeetingDataImportViewTests(APITestCase):
         )
 
 
+@override_settings(EXPORT_SECRET_KEY="abcdefghijk")
 class MeetingDataExportViewTests(APITestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture", "full_ai_test_fixture"]
 

@@ -1,3 +1,4 @@
+from copy import deepcopy
 from itertools import chain
 from uuid import uuid4
 
@@ -6,6 +7,10 @@ from django.contrib.auth import get_user_model
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import ensure_atomic
+from voteit.export_import.exceptions import ImportFileError
+from voteit.export_import.exceptions import SignatureVerificationFailed
+from voteit.export_import.schemas import ImportMeetingStructure
+from voteit.export_import.utils import verify_signature
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -16,26 +21,21 @@ from voteit.export_import import schemas
 
 User = get_user_model()
 
-__all__ = (
-    "Importer",
-    "ImportFileError",
-)
-
-
-class ImportFileError(Exception): ...
+__all__ = ("Importer",)
 
 
 class Importer:
     version = 1
-    data: schemas.MeetingStructure = None
+    data: ImportMeetingStructure = None
 
     def __init__(
         self,
         meeting: Meeting,
-        schema: type[schemas.MeetingStructure] = schemas.MeetingStructure,
+        schema: type[ImportMeetingStructure] = ImportMeetingStructure,
         user_map_attr="email",
         missing_user: str = MissingUser.RAISE,
         add_participants: bool = True,
+        verify=True,
         **kwargs,
     ):
         assert missing_user in (
@@ -55,10 +55,7 @@ class Importer:
         # Internal data
         self.mg_map = {}
         self.user_map = {}
-
-    def prepare(self, data: dict):
-        with schemas.schema_context(**self.export_schema_kwargs):
-            self.data = self.schema(**data)
+        self._verify = verify
 
     def run(self):
         self.collect_users()
@@ -78,6 +75,14 @@ class Importer:
             raise ImportFileError("yaml file malformed, lacks meta version")
         if version != self.version:
             raise ImportFileError("Wrong file version, must be %s" % self.version)
+        if self._verify:
+            verification_data = self.schema(**deepcopy(data))
+            if not verify_signature(
+                verification_data.json(exclude={"meta"}), verification_data.meta.sign
+            ):
+                raise SignatureVerificationFailed(
+                    f"Signature {verification_data.meta.sign} isn't valid for payload"
+                )
         with schemas.schema_context(**self.export_schema_kwargs):
             self.data = self.schema(**data)
 

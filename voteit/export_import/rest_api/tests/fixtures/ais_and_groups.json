@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "version": 1,
+    "sign": "8cdc126e622c9d4c6af5d6f6fdc70cc181a7568f2249c163f219a36eba06e9ab"
+  },
+  "agenda_items": [
+    {
+      "title": "Pickles",
+      "body": "could be tasty",
+      "state": "upcoming",
+      "proposals": [
+        {
+          "body": "as long as they're vegetarian",
+          "meeting_group": "the-hellos"
+        }
+      ]
+    },
+    {
+      "title": "Crisps",
+      "body": "must be considered"
+    },
+    {
+      "title": "Hot dogs",
+      "body": "as long as they're vegetarian",
+      "state": "private"
+    }
+  ],
+  "groups": [
+    {
+      "title": "The Hellos",
+      "groupid": "the-hellos"
+    }
+  ]
+}

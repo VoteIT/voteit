@@ -1,8 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.test import override_settings
 from pydantic import ValidationError
 
 from voteit.agenda.workflows import AgendaItemWf
+from voteit.export_import.utils import verify_signature
 from voteit.meeting.models import Meeting
 from voteit.proposal.workflows import ProposalWf
 from voteit.export_import import schemas
@@ -10,6 +12,7 @@ from voteit.export_import import schemas
 User = get_user_model()
 
 
+@override_settings(EXPORT_SECRET_KEY="abcdefghijk")
 class ExporterTests(TestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture", "full_ai_test_fixture"]
 
@@ -45,6 +48,16 @@ class ExporterTests(TestCase):
         self.assertEqual("The Hellos", exporter.data.groups[0].title)
         self.assertEqual(
             "the-hellos", exporter.data.agenda_items[0].discussions[0].meeting_group
+        )
+        self.assertEqual(
+            "88933fa49bc02484116dad65f71b1e3bb858a12431a88b12f1d0c45915d74297",
+            exporter.data.meta.sign,
+        )
+        self.assertTrue(
+            verify_signature(
+                exporter.data.json(exclude={"meta"}),
+                "88933fa49bc02484116dad65f71b1e3bb858a12431a88b12f1d0c45915d74297",
+            )
         )
 
     def test_bad_kwargs(self):
