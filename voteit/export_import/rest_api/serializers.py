@@ -36,7 +36,6 @@ class ImportFileValidator:
 
 class ImportFileSerializer(serializers.Serializer):
     file = fields.FileField(max_length=1000000, validators=[ImportFileValidator()])
-    commit = fields.BooleanField(default=False)
 
 
 class ExportFileSerializer(serializers.Serializer):

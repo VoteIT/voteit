@@ -84,10 +84,8 @@ class MeetingDataImportViewTests(APITestCase):
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with open(os.path.join(FIXTURES, "ais_and_groups.yaml"), "rb") as f:
-            response = self.client.put(
-                url, data={"file": f, "commit": "1"}, format="multipart"
-            )
-        self.assertEqual(status.HTTP_201_CREATED, response.status_code)
+            response = self.client.put(url, data={"file": f}, format="multipart")
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.assertEqual(
             {
                 "agenda_items": 3,
@@ -116,10 +114,8 @@ class MeetingDataImportViewTests(APITestCase):
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with open(os.path.join(FIXTURES, "ais_and_groups.json"), "rb") as f:
-            response = self.client.put(
-                url, data={"file": f, "commit": "1"}, format="multipart"
-            )
-        self.assertEqual(status.HTTP_201_CREATED, response.status_code)
+            response = self.client.put(url, data={"file": f}, format="multipart")
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.assertEqual(
             {
                 "agenda_items": 3,
@@ -144,30 +140,32 @@ class MeetingDataImportViewTests(APITestCase):
             list(self.meeting.groups.values_list("title", flat=True).order_by("title")),
         )
 
-    def test_ais_and_groups_dryrun(self):
+    def test_ais_and_groups_preview(self):
         self.client.force_login(self.moderator)
-        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
-        with open(os.path.join(FIXTURES, "ais_and_groups.yaml"), "rb") as f:
-            response = self.client.put(url, data={"file": f}, format="multipart")
+        url = reverse("meeting-data-preview", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES, "ais_and_groups.json"), "rb") as f:
+            response = self.client.post(url, data={"file": f}, format="multipart")
         self.assertEqual(status.HTTP_200_OK, response.status_code)
+        data = response.json()
+        self.assertIn("groups", data)
+        self.assertEqual(
+            [{"title": "The Hellos", "groupid": "the-hellos"}], data["groups"]
+        )
+        self.assertIn("agenda_items", data)
+        self.assertEqual(3, len(data["agenda_items"]))
         self.assertEqual(
             {
-                "agenda_items": 3,
-                "diff_proposals": 0,
-                "discussion_posts": 0,
-                "groups": 1,
-                "proposals": 1,
-                "text_documents": 0,
+                "body": "could be tasty",
+                "proposals": [
+                    {
+                        "body": "as long as they're vegetarian",
+                        "meeting_group": "the-hellos",
+                    }
+                ],
+                "state": "upcoming",
+                "title": "Pickles",
             },
-            response.json(),
-        )
-        self.assertEqual(
-            [],
-            list(
-                self.meeting.agenda_items.values_list("title", flat=True).order_by(
-                    "title"
-                )
-            ),
+            data["agenda_items"][0],
         )
 
 
@@ -208,10 +206,8 @@ class MeetingDataExportViewTests(APITestCase):
         with tempfile.NamedTemporaryFile(suffix=".json") as tmp_file:
             tmp_file.write(response.content)
             tmp_file.seek(0)
-            response = self.client.put(
-                url, data={"file": tmp_file, "commit": 1}, format="multipart"
-            )
-        self.assertEqual(status.HTTP_201_CREATED, response.status_code)
+            response = self.client.put(url, data={"file": tmp_file}, format="multipart")
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.assertEqual(
             ["Crisps", "Hot dogs", "Pickles"],
             list(
@@ -230,10 +226,8 @@ class MeetingDataExportViewTests(APITestCase):
         with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp_file:
             tmp_file.write(response.content)
             tmp_file.seek(0)
-            response = self.client.put(
-                url, data={"file": tmp_file, "commit": 1}, format="multipart"
-            )
-        self.assertEqual(status.HTTP_201_CREATED, response.status_code)
+            response = self.client.put(url, data={"file": tmp_file}, format="multipart")
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.assertEqual(
             ["Crisps", "Hot dogs", "Pickles"],
             list(

@@ -33,11 +33,30 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
         return dict(
             yaml="moderate",
             json="moderate",
+            preview="moderate",
             **super().permission_type_map,
         )
 
     def list(self, request, *args, **kwargs):
         return Response(data=[])
+
+    @action(
+        methods=["POST"],
+        detail=True,
+    )
+    def preview(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            data=request.data,
+            context={"meeting": instance, "request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        importer = Importer(instance)
+        importer.from_stream(request.data["file"])
+        return Response(
+            data=importer.data.dict(exclude_unset=True),
+            status=status.HTTP_200_OK,
+        )
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -49,13 +68,11 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
         # Dispatch job?
         importer = Importer(instance)
         importer.from_stream(request.data["file"])
-        commit = serializer.data.get("commit")
-        if commit:
-            with transaction.atomic(durable=True):
-                importer.run()
+        with transaction.atomic(durable=True):
+            importer.run()
         return Response(
             data=importer.stats().dict(),
-            status=commit and status.HTTP_201_CREATED or status.HTTP_200_OK,
+            status=status.HTTP_200_OK,
         )
 
     @action(
