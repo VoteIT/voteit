@@ -51,8 +51,13 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
             context={"meeting": instance, "request": request},
         )
         serializer.is_valid(raise_exception=True)
-        importer = Importer(instance)
-        importer.from_stream(request.data["file"])
+        try:
+            importer = Importer(
+                instance, **{k: v for k, v in serializer.data.items() if k != "file"}
+            )
+            importer.from_stream(request.data["file"])
+        except PydanticValidationError as exc:
+            raise pydantic_to_drf_validation_error(exc)
         return Response(
             data=importer.data.dict(exclude_unset=True),
             status=status.HTTP_200_OK,
@@ -66,8 +71,13 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
         )
         serializer.is_valid(raise_exception=True)
         # Dispatch job?
-        importer = Importer(instance)
-        importer.from_stream(request.data["file"])
+        try:
+            importer = Importer(
+                instance, **{k: v for k, v in serializer.data.items() if k != "file"}
+            )
+            importer.from_stream(request.data["file"])
+        except PydanticValidationError as exc:
+            raise pydantic_to_drf_validation_error(exc)
         with transaction.atomic(durable=True):
             importer.run()
         return Response(

@@ -9,6 +9,7 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.proposal.models import Proposal
 
 _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(_TESTS_DIR, "fixtures")
@@ -138,6 +139,58 @@ class MeetingDataImportViewTests(APITestCase):
         self.assertEqual(
             ["The Hellos"],
             list(self.meeting.groups.values_list("title", flat=True).order_by("title")),
+        )
+
+    def test_ais_and_groups_skip_proposals(self):
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES, "ais_and_groups.yaml"), "rb") as f:
+            response = self.client.put(
+                url, data={"file": f, "include_proposals": False}, format="multipart"
+            )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.assertEqual(
+            {
+                "agenda_items": 3,
+                "diff_proposals": 0,
+                "discussion_posts": 0,
+                "groups": 1,
+                "proposals": 0,
+                "text_documents": 0,
+            },
+            response.json(),
+        )
+
+    def test_ais_and_groups_clear_and_skip_groups(self):
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES, "ais_and_groups.yaml"), "rb") as f:
+            response = self.client.put(
+                url,
+                data={"file": f, "include_groups": False, "clear_group_authors": True},
+                format="multipart",
+            )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.assertEqual(0, self.meeting.groups.count())
+        self.assertEqual(1, Proposal.objects.all().count())
+        prop = Proposal.objects.first()
+        self.assertEqual(None, prop.meeting_group)
+
+    def test_ais_and_groups_bad_combination(self):
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES, "ais_and_groups.yaml"), "rb") as f:
+            response = self.client.put(
+                url,
+                data={"file": f, "include_groups": False},
+                format="multipart",
+            )
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertEqual(
+            {
+                "include_groups": "Groups are needed to set group authors - change 'clear_group_authors' or 'include_groups'"
+            },
+            response.json(),
         )
 
     def test_ais_and_groups_preview(self):

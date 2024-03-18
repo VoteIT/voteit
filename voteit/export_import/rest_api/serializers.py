@@ -35,7 +35,32 @@ class ImportFileValidator:
 
 
 class ImportFileSerializer(serializers.Serializer):
+    """
+    Pass along args to importer
+
+    Compare context arg with serializer args
+    >>> from voteit.export_import.schemas import BaseContext
+    >>> schema_fields = set(BaseContext.schema()['properties'])
+    >>> _ = schema_fields.remove('model_to_schema')
+
+    >>> serializer = ImportFileSerializer()
+    >>> ser_fields = set(serializer.fields)
+    >>> _ = ser_fields.remove('file'), ser_fields.remove('add_participants')  # Not in schema
+
+    >>> schema_fields - ser_fields
+    set()
+    """
+
     file = fields.FileField(max_length=1000000, validators=[ImportFileValidator()])
+    add_participants = fields.BooleanField()
+    clear_group_authors = fields.BooleanField()
+    clear_authors = fields.BooleanField()
+    clear_ai_states = fields.BooleanField()
+    clear_proposal_states = fields.BooleanField()
+    clear_proposal_id = fields.BooleanField()
+    include_groups = fields.BooleanField(default=True)
+    include_proposals = fields.BooleanField(default=True)
+    include_discussions = fields.BooleanField(default=True)
 
 
 class ExportFileSerializer(serializers.Serializer):
