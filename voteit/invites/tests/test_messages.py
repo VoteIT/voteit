@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
+from envelope.messages.errors import BadRequestError
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteAdded
 from voteit.invites.messages import MeetingInviteChanged
@@ -130,6 +131,32 @@ class AddInvitesTests(TestCase):
         self.assertEqual(3, len(mock_publish.mock_calls))
         multi_invite.refresh_from_db()
         self.assertEqual([ROLE_PARTICIPANT], multi_invite.roles)
+
+    @patch.object(MeetingInvitesChannel, "sync_publish")
+    def test_add_problematic_partial_match(self, mock_publish):
+        moderator = User.objects.get(username="moderator")
+        self.meeting.invites.create(
+            user_data={"email": "one@betahaus.net", "swedish_ssn": "121212-1212"},
+            roles=[ROLE_POTENTIAL_VOTER],
+        )
+        self.meeting.invites.create(
+            user_data={"email": "two@betahaus.net", "swedish_ssn": "189912319812"},
+            roles=[ROLE_POTENTIAL_VOTER],
+        )
+        msg = self._mk_one(
+            user_pk=moderator.pk,
+            rows="two@betahaus.net\t121212-1212",
+            columns=["email", "swedish_ssn"],
+            roles=[str(ROLE_PARTICIPANT)],
+        )
+        with self.assertRaises(BadRequestError) as cm:
+            msg.run_job()
+        # breakpoint()
+        self.assertEqual(
+            "Found existing invites matching only parts of a row. "
+            "Look for rows containing the following items: \nColumn email: \ntwo@betahaus.net\n",
+            str(cm.exception.data.msg),
+        )
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -306,3 +333,50 @@ class AddInviteAnnotationsTests(TestCase):
         ann_data = messages[1]["p"]
         self.assertEqual(1, ann_data["curr"])
         self.assertEqual(1, ann_data["total"])
+
+    @patch.object(MeetingInvitesChannel, "sync_publish")
+    def test_add_problematic_partial_match(self, mock_publish):
+        moderator = User.objects.get(username="moderator")
+        self.meeting.invites.create(
+            user_data={"email": "one@betahaus.net", "swedish_ssn": "121212-1212"},
+            roles=[ROLE_POTENTIAL_VOTER],
+        )
+        self.meeting.invites.create(
+            user_data={"email": "two@betahaus.net", "swedish_ssn": "189912319812"},
+            roles=[ROLE_POTENTIAL_VOTER],
+        )
+        msg = self._mk_one(
+            user_pk=moderator.pk,
+            rows="two@betahaus.net\t121212-1212",
+            columns=["email", "swedish_ssn"],
+            roles=[str(ROLE_PARTICIPANT)],
+        )
+        with self.assertRaises(BadRequestError) as cm:
+            msg.run_job()
+        self.assertEqual(
+            "Found existing invites matching only parts of a row. "
+            "Look for rows containing the following items: \nColumn email: \ntwo@betahaus.net\n",
+            cm.exception.data.msg,
+        )
+
+    @patch.object(MeetingInvitesChannel, "sync_publish")
+    def test_add_partial_fetched(self, mock_publish):
+        moderator = User.objects.get(username="moderator")
+        invite = self.meeting.invites.create(
+            user_data={"email": "one@betahaus.net", "swedish_ssn": "121212-1212"},
+            roles=[ROLE_POTENTIAL_VOTER],
+        )
+        msg = self._mk_one(
+            user_pk=moderator.pk,
+            rows="121212-1212",
+            columns=["swedish_ssn"],
+            roles=[str(ROLE_PARTICIPANT)],
+        )
+        with self.assertRaises(BadRequestError) as cm:
+            msg.run_job()
+        self.assertEqual(
+            "The following don't match any existing invites. "
+            "Perhaps the invite doesn't exist or were only partially matched? "
+            "Look for the following data: \n201212121212 \n",
+            cm.exception.data.msg,
+        )
