@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from auditlog.context import set_actor
 from django.db import transaction
+from django.utils.translation import gettext as _
 from envelope.deferred_jobs.message import ContextAction
 from envelope.core.message import Message
 from envelope.messages.common import ProgressNum
@@ -54,11 +55,20 @@ class AddInvites(ContextAction):
         items = list(
             self.invite_data_reg.build_ud_query_seq(self.data.columns, self.data.rows)
         )
-        existing_qs, partial = self.context.invites.find_mixed_user_data(*items)
-        if partial:
-            msg = "Found partial matches, aborting. Matched types:\n"
-            for k, v in partial.items():
-                msg += f"{k}: {v.count()}\n"
+        existing_qs, conflicting_partials = self.context.invites.find_mixed_user_data(
+            *items
+        )
+        if conflicting_partials:
+            msg = _(
+                "Found existing invites matching only parts of a row. "
+                "Look for rows containing the following items:"
+            )
+            msg += " \n"
+            for k, v in conflicting_partials.items():
+                msg += _("Column %(k)s:") % {"k": k}
+                msg += " \n"
+                for ud in v.values_list("user_data", flat=True)[:5]:
+                    msg += f"{ud.get(k)}\n"
             raise BadRequestError.from_message(
                 self,
                 msg=msg,
@@ -97,16 +107,44 @@ class AddInviteAnnotations(ContextAction):
     def invite_data_reg(self) -> InviteAdapterRegistry:
         return get_invite_adapter_registry()
 
-    def run_job(self) -> list[AnnotationResult, None]:
+    def run_job(self) -> list[AnnotationResult | None]:
         self.assert_perm()
         items = list(
             self.invite_data_reg.build_ud_query_seq(self.data.columns, self.data.rows)
         )
-        existing_qs, partial = self.context.invites.find_mixed_user_data(*items)
-        if partial:
-            msg = "Found partial matches, aborting. Matched types:\n"
-            for k, v in partial:
-                msg += f"{k}: {v.count()}\n"
+        existing_qs, conflicting_partials = self.context.invites.find_mixed_user_data(
+            *items
+        )
+        if conflicting_partials:
+            msg = _(
+                "Found existing invites matching only parts of a row. "
+                "Look for rows containing the following items:"
+            )
+            msg += " \n"
+            for k, v in conflicting_partials.items():
+                msg += _("Column %(k)s:") % {"k": k}
+                msg += " \n"
+                for ud in v.values_list("user_data", flat=True)[:5]:
+                    msg += f"{ud.get(k)}\n"
+            raise BadRequestError.from_message(
+                self,
+                msg=msg,
+            )
+        invite_data = list(existing_qs.values_list("user_data", flat=True))
+        bad_row = []
+        for item in items:
+            if item not in invite_data:
+                bad_row.append(item)
+        if bad_row:
+            msg = _(
+                "The following don't match any existing invites. "
+                "Perhaps the invite doesn't exist or were only partially matched? "
+                "Look for the following data:"
+            )
+            msg += " \n"
+            for bad in bad_row[:5]:
+                msg += ",".join(bad.values())
+                msg += " \n"
             raise BadRequestError.from_message(
                 self,
                 msg=msg,
@@ -215,73 +253,6 @@ class AnnotationResult(Message):
     name = "invites.annotation"
     schema = AnnotationResultSchema
     data: AnnotationResultSchema
-
-
-# VALID_STATES = set(SendWf.states.keys()) - {SendWf.SENDING, SendWf.SCHEDULED}
-#
-#
-# class SendInvitesSchema(BaseModel):
-#     meeting: int
-#     subject: str | None  # FIXME - None means default from send dispatcher
-#     body: str  # FIXME
-#     states: list[str] = [SendWf.FAILED, SendWf.SENT, SendWf.CREATED]
-#     dispatcher_name: str = "send_email"
-#     resend_minimum: int = 24  # Don't resend before this
-#
-#     @validator("states")
-#     def validate_states(cls, v: list[str]):
-#         """
-#         >>> SendInvitesSchema.validate_states(['hello'])
-#         Traceback (most recent call last):
-#         ...
-#         ValueError:
-#
-#         >>> SendInvitesSchema.validate_states([SendWf.SENT, SendWf.CREATED])
-#         ['sent', 'created']
-#
-#         """
-#         specified = set(v)
-#         invalid = specified - VALID_STATES
-#         if invalid:
-#             raise ValueError(
-#                 f"The following invite send states aren't valid: '{', '.join(invalid)}'"
-#             )
-#         return v
-#
-#     @validator("dispatcher_name")
-#     def validate_dispatcher_name(cls, v: str):
-#         """
-#         >>> SendInvitesSchema.validate_dispatcher_name('hello')
-#         Traceback (most recent call last):
-#         ...
-#         ValueError:
-#
-#         >>> SendInvitesSchema.validate_dispatcher_name('send_email')
-#         'send_email'
-#
-#         """
-#         reg = get_dispatchers_registry()
-#         if v not in reg:
-#             raise ValueError(f"No invite dispatcher with the name '{v}'")
-#         return v
-#
-#
-# @incoming
-# class SendInvites(ContextAction):
-#     name = "invites.send"
-#     permission = MeetingInvitePermissions.ADD
-#     schema = SendInvitesSchema
-#     data: SendInvitesSchema
-#     model = Meeting
-#     context_schema_attr = "meeting"
-#     job_atomic = False
-#
-#     def run_job(self):
-#         self.assert_perm()
-#         invite_dispatch = create_dispatch_and_schedule_invites(
-#             created_by=self.user, **self.data.dict()
-#         )
-#         invite_dispatch.send_scheduled()
 
 
 @outgoing
