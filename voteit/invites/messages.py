@@ -23,6 +23,7 @@ from voteit.invites.schemas import InvitesResultSchema
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.utils import send_updated_invites
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
@@ -73,7 +74,31 @@ class AddInvites(ContextAction):
                 self,
                 msg=msg,
             )
-        # FIXME: How do we handle longer rows? Do we need to kill msg because of it?
+        # Protect against dumb lockout
+        if ROLE_MODERATOR not in self.data.roles:
+            curr_moderators = self.context.roles.filter(
+                assigned__contains=ROLE_MODERATOR
+            ).values_list("user", flat=True)
+            moderators = existing_qs.filter(used_by__in=curr_moderators)
+            if moderators:
+                items = [
+                    ", ".join(x.values())
+                    for x in moderators.values_list("user_data", flat=True)
+                ]
+                msg = _(
+                    "Your action would downgrade permissions for some moderators. "
+                    "Handle moderators via participants tab instead. "
+                    "Related to userID(s): %(userids)s. Data: %(data)s"
+                ) % {
+                    "userids": ", ".join(
+                        moderators.values_list("used_by__userid", flat=True)
+                    ),
+                    "data": "\n".join(items),
+                }
+                raise BadRequestError.from_message(
+                    self,
+                    msg=msg,
+                )
         with set_actor(self.user):
             with transaction.atomic(durable=True):
                 result = self.context.invites.create_or_update_mixed(
