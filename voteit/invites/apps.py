@@ -1,5 +1,4 @@
 from django.apps import AppConfig
-from django.core.exceptions import ImproperlyConfigured
 
 
 class InvitesConfig(AppConfig):
