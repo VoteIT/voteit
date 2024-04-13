@@ -19,10 +19,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         worker_args = options["rqworkerargs"]
-        if options.get("with-scheduler"):
-            worker_args.append("--with-scheduler")
+        if options.get("with_scheduler"):
+            worker_args.insert(0, "--with-scheduler")
         autoreload.run_with_reloader(
-            lambda: run_worker(options["worker_pid_file"], options["rqworkerargs"])
+            lambda: run_worker(options["worker_pid_file"], worker_args)
         )
 
 
