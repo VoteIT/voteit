@@ -19,6 +19,7 @@ from voteit.invites.schemas import AddMixedUserDataInvitesSchema
 from voteit.invites.schemas import AddInviteAnnotationsSchema
 from voteit.invites.schemas import AnnotationResultSchema
 from voteit.invites.schemas import ClearInviteAnnotationsSchema
+from voteit.invites.schemas import InviteAddedOrUpdatedSchema
 from voteit.invites.schemas import InvitesResultSchema
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.utils import send_updated_invites
@@ -283,11 +284,15 @@ class AnnotationResult(Message):
 @outgoing
 class MeetingInviteAdded(BaseObjectAdded):
     name = "meeting_invite.added"
+    schema = InviteAddedOrUpdatedSchema
+    data: InviteAddedOrUpdatedSchema
 
 
 @outgoing
 class MeetingInviteChanged(BaseObjectChanged):
     name = "meeting_invite.changed"
+    schema = InviteAddedOrUpdatedSchema
+    data: InviteAddedOrUpdatedSchema
 
 
 @outgoing

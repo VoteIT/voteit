@@ -350,6 +350,7 @@ class MeetingInvite(MeetingContext):
 
     # annotations
     group_annotations: models.QuerySet[MeetingGroupAnnotation]
+    meeting_id: int
 
 
 class MeetingGroupAnnotation(models.Model):

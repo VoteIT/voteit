@@ -60,7 +60,7 @@ def invites_channel_subscribed(
 @disable_on_raw_save
 @on_transaction_commit
 def meeting_invite_changed(instance: MeetingInvite = None, created=None, **kw):
-    ch = MeetingInvitesChannel.from_instance(instance.meeting)
+    ch = MeetingInvitesChannel(instance.meeting_id)
     data = MeetingInviteSerializer(instance).data
     if created:
         msg = MeetingInviteAdded(data=data)
@@ -71,6 +71,6 @@ def meeting_invite_changed(instance: MeetingInvite = None, created=None, **kw):
 
 @receiver(pre_delete, sender=MeetingInvite)
 def agenda_delete(instance: MeetingInvite = None, **kw):
-    ch = MeetingInvitesChannel.from_instance(instance.meeting)
+    ch = MeetingInvitesChannel(instance.meeting_id)
     msg = MeetingInviteDeleted(pk=instance.pk)
     ch.sync_publish(msg)
