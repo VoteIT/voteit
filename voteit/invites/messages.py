@@ -92,9 +92,11 @@ class AddInvites(ContextAction):
                     "Related to userID(s): %(userids)s. Data: %(data)s"
                 ) % {
                     "userids": ", ".join(
-                        moderators.values_list("used_by__userid", flat=True)
+                        x
+                        for x in moderators.values_list("used_by__userid", flat=True)
+                        if x
                     ),
-                    "data": "\n".join(items),
+                    "data": ", ".join(items),
                 }
                 raise BadRequestError.from_message(
                     self,

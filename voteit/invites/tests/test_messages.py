@@ -158,6 +158,16 @@ class AddInvitesTests(TestCase):
         )
 
     def test_self_lockout(self):
+        user_with_no_userid = User.objects.create(
+            username="janedoe",
+        )
+        self.meeting.add_roles(user_with_no_userid, ROLE_MODERATOR)
+        self.meeting.invites.create(
+            user_data={"email": "jane@betahaus.net"},
+            roles=[ROLE_MODERATOR],
+            used_by=user_with_no_userid,
+            state=InviteWf.ACCEPTED,
+        )
         self.meeting.invites.create(
             user_data={"email": "moderator@betahaus.net"},
             roles=[ROLE_MODERATOR],
@@ -166,7 +176,7 @@ class AddInvitesTests(TestCase):
         )
         msg = self._mk_one(
             user_pk=self.moderator.pk,
-            rows="moderator@betahaus.net",
+            rows="moderator@betahaus.net\njane@betahaus.net",
             columns=["email"],
             roles=[str(ROLE_PARTICIPANT)],
         )
@@ -175,7 +185,8 @@ class AddInvitesTests(TestCase):
         self.assertEqual(
             "Your action would downgrade permissions for some moderators. "
             "Handle moderators via participants tab instead. "
-            "Related to userID(s): moderator. Data: moderator@betahaus.net",
+            "Related to userID(s): moderator. "
+            "Data: jane@betahaus.net, moderator@betahaus.net",
             str(cm.exception.data.msg),
         )
 
