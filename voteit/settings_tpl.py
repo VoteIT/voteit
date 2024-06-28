@@ -144,6 +144,9 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
 }
 # Auditlog
 AUDITLOG_DISABLE_ON_RAW_SAVE = True
