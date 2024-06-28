@@ -22,7 +22,14 @@ class OAuthStateSchema(BaseModel):
 
     @validator("next")
     def validate_next(cls, v):
+        """
+        >>> s = OAuthStateSchema(next="", provider_pk=1)
+        >>> s.next
+        '/'
+        """
         # FIXME: Proper validation
+        if not v:
+            return "/"
         if not v.startswith("/"):
             raise ValueError("Must start with /")
         return v
