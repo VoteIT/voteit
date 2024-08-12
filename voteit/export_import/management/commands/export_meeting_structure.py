@@ -2,11 +2,10 @@ import yaml
 from django.core.management import BaseCommand
 from django.db.transaction import get_connection
 
+from voteit.core.testing import exectime
 from voteit.meeting.models import Meeting
 from voteit.export_import.exporter import Exporter
 from django.test.utils import CaptureQueriesContext
-
-from voteit_tools.utils import exectime
 
 
 class Command(BaseCommand):
