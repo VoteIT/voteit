@@ -59,3 +59,12 @@ with suppress(ImportError):
         name = "swedish_ssn"
         title = _("Swedish social security number")
         schema = SwedishSSN
+
+        @staticmethod
+        def mask(v: str) -> str:
+            """
+            >>> f = InviteSweSSN.mask
+            >>> f('191212121212')
+            '19121212'
+            """
+            return v[:8]

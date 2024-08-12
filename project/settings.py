@@ -1,6 +1,7 @@
 """
 Test settings
 """
+
 import os
 from voteit.settings_tpl import *
 

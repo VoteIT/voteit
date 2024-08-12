@@ -280,5 +280,10 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
             invites_qs |= self[k].clear(meeting)
         return invites_qs.distinct()
 
+    def get_masked_user_data(self, values: dict) -> dict:
+        return {
+            k: self[k].mask(v) for k, v in values.items() if k in self.user_data_keys
+        }
+
 
 invite_adapter_registry = InviteAdapterRegistry(InviteDataAdapter)

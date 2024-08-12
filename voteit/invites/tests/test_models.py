@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
@@ -8,6 +10,7 @@ from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.organisation.models import Organisation
+from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 
 User = get_user_model()
 
@@ -17,7 +20,9 @@ class MeetingInviteManagerTests(TestCase):
     def setUpTestData(cls):
         cls.org: Organisation = Organisation.objects.create()
         cls.manager = MeetingInvite.objects
-        cls.meeting: Meeting = cls.org.meetings.create()
+        cls.meeting: Meeting = cls.org.meetings.create(
+            er_policy_name=AutoBeforePoll.name
+        )
         cls.user = cls.org.users.create(username="someone")
         cls.inv1: MeetingInvite = MeetingInvite.objects.create(
             meeting=cls.meeting,
@@ -243,6 +248,23 @@ class MeetingInviteManagerTests(TestCase):
             )
         # for now we'll simply block this behaviour
         self.assertEqual("Partial invites found", str(cm.exception))
+
+    def test_should_expire(self):
+        self.assertFalse(self.meeting.invites.should_expire())
+        self.assertFalse(MeetingInvite.objects.should_expire())
+        self.inv1.created = self.inv1.created - timedelta(days=10)
+        self.inv1.save()
+        self.assertFalse(self.meeting.invites.should_expire())
+        self.assertFalse(MeetingInvite.objects.should_expire())
+        self.meeting.ongoing()
+        self.meeting.close()
+        self.meeting.save()
+        self.assertFalse(self.meeting.invites.should_expire())
+        self.assertFalse(MeetingInvite.objects.should_expire())
+        self.meeting.end_time = self.meeting.end_time - timedelta(days=10)
+        self.meeting.save()
+        self.assertSetEqual({self.inv1}, set(self.meeting.invites.should_expire()))
+        self.assertSetEqual({self.inv1}, set(MeetingInvite.objects.should_expire()))
 
 
 class MeetingInviteTests(TestCase):

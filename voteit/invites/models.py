@@ -5,6 +5,7 @@ from collections.abc import Collection
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from datetime import timedelta
 from functools import reduce
 from logging import getLogger
 from operator import or_
@@ -29,10 +30,11 @@ from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.models import MeetingGroup
+from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
-    from voteit.meeting.models import Meeting
     from voteit.core.role import Role
     from voteit.organisation.models import Organisation
 
@@ -220,6 +222,19 @@ class MeetingInviteManager(models.Manager):
             existed=already_correct_count,
         )
 
+    def should_expire(self, days: int = 3) -> models.QuerySet[MeetingInvite]:
+        """
+        We care about both close time for meeting and created time for invites,
+        since creating invites for closed meetings should be possible.
+        """
+        threshold_ts = now() - timedelta(days=days)
+        meeting_qs = Meeting.objects.filter(
+            state=MeetingWf.CLOSED, end_time__lt=threshold_ts
+        )
+        return MeetingInvite.objects.filter(
+            meeting__in=meeting_qs, state=InviteWf.OPEN, created__lt=threshold_ts
+        )
+
 
 class MeetingInvite(MeetingContext):
     name = "meeting_invite"
@@ -335,6 +350,7 @@ class MeetingInvite(MeetingContext):
 
     # annotations
     group_annotations: models.QuerySet[MeetingGroupAnnotation]
+    meeting_id: int
 
 
 class MeetingGroupAnnotation(models.Model):

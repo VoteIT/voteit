@@ -18,6 +18,7 @@ from voteit.invites.testing import get_unvalidated_fixture_content
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.organisation.models import Organisation
@@ -38,6 +39,9 @@ class AddInvitesTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderator = User.objects.get(username="moderator")
+        cls.moderator.userid = "moderator"
+        cls.moderator.save()
 
     @property
     def _cut(self):
@@ -73,7 +77,6 @@ class AddInvitesTests(TestCase):
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_add_modifies_already_existing_invites(self, mock_publish):
         meeting = self.meeting
-        moderator = User.objects.get(username="moderator")
         diffing_data_invite: MeetingInvite = meeting.invites.create(
             user_data={"email": "one@betahaus.net"},
             roles=[ROLE_POTENTIAL_VOTER],
@@ -89,7 +92,7 @@ class AddInvitesTests(TestCase):
         for name in ["one", "two", "three"]:
             data.append(f"{name}@betahaus.net")
         msg = self._mk_one(
-            user_pk=moderator.pk,
+            user_pk=self.moderator.pk,
             rows=data,
             columns=["email"],
             roles=[str(ROLE_PARTICIPANT)],
@@ -108,7 +111,6 @@ class AddInvitesTests(TestCase):
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_add_partial_match(self, mock_publish):
-        moderator = User.objects.get(username="moderator")
         multi_invite: MeetingInvite = self.meeting.invites.create(
             user_data={"email": "one@betahaus.net", "swedish_ssn": "121212-1212"},
             roles=[ROLE_POTENTIAL_VOTER],  # This will change
@@ -118,7 +120,7 @@ class AddInvitesTests(TestCase):
         for name in ["one", "two", "three"]:
             data.append(f"{name}@betahaus.net")
         msg = self._mk_one(
-            user_pk=moderator.pk,
+            user_pk=self.moderator.pk,
             rows=data,
             columns=["email"],
             roles=[str(ROLE_PARTICIPANT)],
@@ -134,7 +136,6 @@ class AddInvitesTests(TestCase):
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_add_problematic_partial_match(self, mock_publish):
-        moderator = User.objects.get(username="moderator")
         self.meeting.invites.create(
             user_data={"email": "one@betahaus.net", "swedish_ssn": "121212-1212"},
             roles=[ROLE_POTENTIAL_VOTER],
@@ -144,17 +145,49 @@ class AddInvitesTests(TestCase):
             roles=[ROLE_POTENTIAL_VOTER],
         )
         msg = self._mk_one(
-            user_pk=moderator.pk,
+            user_pk=self.moderator.pk,
             rows="two@betahaus.net\t121212-1212",
             columns=["email", "swedish_ssn"],
             roles=[str(ROLE_PARTICIPANT)],
         )
         with self.assertRaises(BadRequestError) as cm:
             msg.run_job()
-        # breakpoint()
         self.assertEqual(
             "Found existing invites matching only parts of a row. "
             "Look for rows containing the following items: \nColumn email: \ntwo@betahaus.net\n",
+            str(cm.exception.data.msg),
+        )
+
+    def test_self_lockout(self):
+        user_with_no_userid = User.objects.create(
+            username="janedoe",
+        )
+        self.meeting.add_roles(user_with_no_userid, ROLE_MODERATOR)
+        self.meeting.invites.create(
+            user_data={"email": "jane@betahaus.net"},
+            roles=[ROLE_MODERATOR],
+            used_by=user_with_no_userid,
+            state=InviteWf.ACCEPTED,
+        )
+        self.meeting.invites.create(
+            user_data={"email": "moderator@betahaus.net"},
+            roles=[ROLE_MODERATOR],
+            used_by=self.moderator,
+            state=InviteWf.ACCEPTED,
+        )
+        msg = self._mk_one(
+            user_pk=self.moderator.pk,
+            rows="moderator@betahaus.net\njane@betahaus.net",
+            columns=["email"],
+            roles=[str(ROLE_PARTICIPANT)],
+        )
+        with self.assertRaises(BadRequestError) as cm:
+            msg.run_job()
+        self.assertEqual(
+            "Your action would downgrade permissions for some moderators. "
+            "Handle moderators via participants tab instead. "
+            "Related to userID(s): moderator. "
+            "Data: jane@betahaus.net, moderator@betahaus.net",
             str(cm.exception.data.msg),
         )
 

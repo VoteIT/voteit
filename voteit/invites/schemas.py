@@ -11,6 +11,7 @@ from pydantic import validator
 
 from voteit.core.validators import root_validate_roles_and_model
 from voteit.invites.utils import get_invite_adapter_registry
+from voteit.messaging.base import AddedOrUpdatedSchema
 
 if TYPE_CHECKING:
     from voteit.invites.abcs import InviteDataAdapter
@@ -329,3 +330,20 @@ class ClearInviteAnnotationsSchema(BaseModel):
             if not reg[k].is_clearable:
                 raise ValueError(f"{k} can not be cleared")
         return v
+
+
+class InviteAddedOrUpdatedSchema(AddedOrUpdatedSchema):
+    user_data: dict
+
+    class Config:
+        extra = "allow"
+        arbitrary_types_allowed = True
+
+    @validator("user_data")
+    def mask_sensitive(cls, v: dict):
+        """
+        >>> InviteAddedOrUpdatedSchema(pk=1, user_data={'email': 'jane@voteit.se', 'swedish_ssn': '191212121212'})
+        InviteAddedOrUpdatedSchema(pk=1, user_data={'email': 'jane@voteit.se', 'swedish_ssn': '19121212'})
+        """
+        reg = get_invite_adapter_registry()
+        return reg.get_masked_user_data(v)

@@ -203,34 +203,9 @@ class InviteUserDataAdapter(InviteDataAdapter, ABC):
     def query(cls, *values) -> models.Q:
         return models.Q(**{f"user_data__{cls.name}__in": values})
 
-
-# class InviteDispatcher(ABC):
-#     @property
-#     @abstractmethod
-#     def name(self) -> str:
-#         """
-#         ID-like name of this dispatching strategy.
-#         """
-#
-#     @property
-#     @abstractmethod
-#     def type(self) -> str:
-#         """
-#         Which type does this handle?
-#         """
-#
-#     @property
-#     @abstractmethod
-#     def title(self) -> str:
-#         """
-#         Human-readable title
-#         """
-#
-#     def __init__(self, dispatch: InviteDispatch):
-#         self.dispatch = dispatch
-#
-#     @abstractmethod
-#     def send(self, invite: MeetingInvite) -> bool:
-#         """
-#         Send the invite, return success state
-#         """
+    @staticmethod
+    def mask(v: str) -> str:
+        """
+        Override method to implement masking
+        """
+        return v
