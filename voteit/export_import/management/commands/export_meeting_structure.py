@@ -1,25 +1,19 @@
 import yaml
-from django.core.management import BaseCommand
 from django.db.transaction import get_connection
 
 from voteit.core.testing import exectime
+from voteit.export_import.management.base_cmds import BaseExpImpCommand
 from voteit.meeting.models import Meeting
 from voteit.export_import.exporter import Exporter
 from django.test.utils import CaptureQueriesContext
 
 
-class Command(BaseCommand):
+class Command(BaseExpImpCommand):
     help = "Export meeting structure"
 
     def add_arguments(self, parser):
+        super().add_arguments(parser)
         parser.add_argument("-o", help="Output filename")
-        parser.add_argument("-m", help="Meeting pk", required=True)
-        parser.add_argument(
-            "--skip-disc", help="Skip discussions", default=False, action="store_true"
-        )
-        parser.add_argument(
-            "--skip-prop", help="Skip proposals", default=False, action="store_true"
-        )
         parser.add_argument(
             "--sql", help="Print sql", default=False, action="store_true"
         )
@@ -33,8 +27,12 @@ class Command(BaseCommand):
             meeting,
             include_discussions=not options["skip_disc"],
             include_proposals=not options["skip_prop"],
+            clear_group_authors=options["clear_group_authors"],
+            clear_authors=options["clear_authors"],
+            clear_ai_states=options["clear_ai_states"],
+            clear_proposal_states=options["clear_proposal_states"],
+            clear_proposal_id=options["clear_proposal_ids"],
         )
-
         conn = get_connection()
         with CaptureQueriesContext(connection=conn) as cqc:
             with exectime() as et:

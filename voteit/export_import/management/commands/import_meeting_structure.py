@@ -1,17 +1,17 @@
-from django.core.management import BaseCommand
 from django.db import transaction
 
+from voteit.export_import.management.base_cmds import BaseExpImpCommand
 from voteit.meeting.models import Meeting
 from voteit.export_import.importer import Importer
 from voteit.export_import.importer import MissingUser
 
 
-class Command(BaseCommand):
+class Command(BaseExpImpCommand):
     help = "Import meeting structure"
 
     def add_arguments(self, parser):
+        super().add_arguments(parser)
         parser.add_argument("filename", help="Filename")
-        parser.add_argument("-m", help="Meeting pk", required=True)
         parser.add_argument(
             "--commit", help="Commit result to db", action="store_true", default=False
         )
@@ -20,12 +20,6 @@ class Command(BaseCommand):
             help="Missing user strategy",
             choices=[MissingUser.BLANK, MissingUser.CREATE, MissingUser.RAISE],
             default=MissingUser.RAISE,
-        )
-        parser.add_argument(
-            "--skip-disc", help="Skip discussions", default=False, action="store_true"
-        )
-        parser.add_argument(
-            "--skip-prop", help="Skip proposals", default=False, action="store_true"
         )
         parser.add_argument(
             "--no-part",
@@ -43,6 +37,11 @@ class Command(BaseCommand):
             include_discussions=not options["skip_disc"],
             include_proposals=not options["skip_prop"],
             add_participants=not options["no_part"],
+            clear_group_authors=options["clear_group_authors"],
+            clear_authors=options["clear_authors"],
+            clear_ai_states=options["clear_ai_states"],
+            clear_proposal_states=options["clear_proposal_states"],
+            clear_proposal_id=options["clear_proposal_ids"],
         )
         with transaction.atomic(durable=True):
             self.stdout.write(f'Reading and importing {options["filename"]} ...')
