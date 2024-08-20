@@ -50,13 +50,13 @@ class ExporterTests(TestCase):
             "the-hellos", exporter.data.agenda_items[0].discussions[0].meeting_group
         )
         self.assertEqual(
-            "88933fa49bc02484116dad65f71b1e3bb858a12431a88b12f1d0c45915d74297",
+            "6795df515ce41695a913966ec077a32e31684bfadda90e837b6ba03d916f7306",
             exporter.data.meta.sign,
         )
         self.assertTrue(
             verify_signature(
                 exporter.data.json(exclude={"meta"}),
-                "88933fa49bc02484116dad65f71b1e3bb858a12431a88b12f1d0c45915d74297",
+                "6795df515ce41695a913966ec077a32e31684bfadda90e837b6ba03d916f7306",
             )
         )
 

@@ -103,7 +103,8 @@ class BaseContentData(BaseModel):
 class GroupMixin(BaseModel):
     meeting_group: (
         constr(max_length=100, strip_whitespace=True) | None
-    )  # ID för meeting group
+    )  # ID for meeting group
+    as_group: bool = False
 
     @validator("meeting_group", pre=True, allow_reuse=True)
     def meeting_groupid(cls, v):
@@ -258,6 +259,9 @@ class MeetingGroupData(BaseContentData):
     groupid: constr(max_length=100, strip_whitespace=True)
     votes: int | None
     members: list[UserData] = []
+    post_as: bool = False
+    show_on_speaker: bool = True
+    delegate_to: int | None = None
 
     @validator("title")
     def use_groupid_as_title_if_empty(cls, v, values: dict):
@@ -268,6 +272,21 @@ class MeetingGroupData(BaseContentData):
     @validator("members", pre=True)
     def fetch_members(cls, v):
         return resolve_potential_manager(v)
+
+    @validator("delegate_to", pre=True)
+    def resolve_delegate_to(cls, v):
+        """
+        >>> grp=MeetingGroup(groupid='hi-there')
+        >>> MeetingGroupData.resolve_delegate_to(None) is None
+        True
+        >>> MeetingGroupData.resolve_delegate_to(2)
+        2
+        >>> MeetingGroupData.resolve_delegate_to(grp)
+        'hi-there'
+        """
+        if isinstance(v, MeetingGroup):
+            return v.groupid
+        return v
 
 
 class AgendaItemData(BaseContentData):
@@ -309,9 +328,9 @@ class AgendaItemData(BaseContentData):
         Duck-type dict data as a proposal
         >>> f = AgendaItemData.select_proposal_type
         >>> f([{'body': 'Hello'}, {'body': 'World', 'text_document': 'hi', 'paragraph': 2}, ProposalData(body="Unchanged")])
-        [ProposalData(meeting_group=None, author=None, body='Hello', created=None, modified=None, tags=[], state=None, prop_id=None),\
-            DiffProposalData(meeting_group=None, author=None, body='World', created=None, modified=None, tags=[], state=None, prop_id=None, text_document='hi', paragraph=2), \
-            ProposalData(meeting_group=None, author=None, body='Unchanged', created=None, modified=None, tags=[], state=None, prop_id=None)]
+        [ProposalData(meeting_group=None, as_group=False, author=None, body='Hello', created=None, modified=None, tags=[], state=None, prop_id=None),\
+            DiffProposalData(meeting_group=None, as_group=False, author=None, body='World', created=None, modified=None, tags=[], state=None, prop_id=None, text_document='hi', paragraph=2), \
+            ProposalData(meeting_group=None, as_group=False, author=None, body='Unchanged', created=None, modified=None, tags=[], state=None, prop_id=None)]
         """
         checked = []
         while v:
@@ -426,9 +445,7 @@ class MeetingStructure(BaseModel):
         """
         >>> f = MeetingStructure.check_unique_groupids
         >>> d = MeetingGroupData
-        >>> f([d(groupid='hello'), d(groupid='world')])
-        [MeetingGroupData(body='', created=None, modified=None, tags=[], title='', groupid='hello', votes=None, members=[]), \
-            MeetingGroupData(body='', created=None, modified=None, tags=[], title='', groupid='world', votes=None, members=[])]
+        >>> _ = f([d(groupid='hello'), d(groupid='world')])
         >>> f([d(groupid='same'), d(groupid='same')])
         Traceback (most recent call last):
         ...
