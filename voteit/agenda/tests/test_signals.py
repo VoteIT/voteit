@@ -1,11 +1,11 @@
 from collections import Counter
+from datetime import UTC
 from datetime import datetime
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from pytz import UTC
 from envelope.channels.messages import Subscribe
 from envelope.messages.common import Batch
 from envelope.testing import testing_channel_layers_setting

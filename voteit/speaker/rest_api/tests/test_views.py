@@ -1,10 +1,10 @@
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
-from pytz import UTC
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 

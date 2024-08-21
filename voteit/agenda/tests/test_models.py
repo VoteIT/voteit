@@ -1,3 +1,4 @@
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
 from unittest.mock import patch
@@ -6,7 +7,6 @@ from django.db import IntegrityError
 from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
-from pytz import UTC
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.meeting.channels import ModeratorsChannel

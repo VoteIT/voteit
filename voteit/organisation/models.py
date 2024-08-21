@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -8,7 +9,6 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.urls import reverse
 from django.utils.timezone import now
-from pytz import utc
 from requests_oauthlib import OAuth2Session
 
 from voteit.core.abcs import OrganisationContext
@@ -254,7 +254,7 @@ class AccessTokenManager(models.Manager):
         # FIXME: This should use the already filtered user as default
         return AccessToken.objects.create(
             scope=token.scope,
-            expires_at=datetime.fromtimestamp(token.expires_at, tz=utc),
+            expires_at=datetime.fromtimestamp(token.expires_at, tz=UTC),
             expires_in=token.expires_in,
             access_token=token.access_token,
             refresh_token=token.refresh_token,
@@ -298,7 +298,7 @@ class AccessToken(models.Model):
 
     def save_from_pydantic(self, token: OAuthTokenSchema):
         self.scope = token.scope
-        self.expires_at = datetime.fromtimestamp(token.expires_at, tz=utc)
+        self.expires_at = datetime.fromtimestamp(token.expires_at, tz=UTC)
         self.expires_in = token.expires_in
         self.access_token = token.access_token
         self.refresh_token = token.refresh_token
