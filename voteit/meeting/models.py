@@ -415,7 +415,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
 class MeetingGroup(BaseContent, MeetingContext):
     name: str = "meeting_group"
     title: str = models.CharField(max_length=100, default="")
-    groupid: str = models.CharField(max_length=100, null=True)
+    groupid: str = models.CharField(max_length=100, null=True, blank=True)
     meeting: Meeting = models.ForeignKey(
         "Meeting",
         on_delete=models.CASCADE,

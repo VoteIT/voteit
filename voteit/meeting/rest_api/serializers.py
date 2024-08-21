@@ -279,6 +279,9 @@ class RoleSerializer(serializers.Serializer):
 
 class CreateMeetingGroupSerializer(BaseModelSerializer):
     pk = serializers.IntegerField(read_only=True)
+    # I have no clue why the normal automation for serializer fields stopped working for this field
+    # as of DRF 3.15+
+    groupid = serializers.CharField(max_length=100, default="")
 
     class Meta:
         model = MeetingGroup
@@ -293,9 +296,6 @@ class CreateMeetingGroupSerializer(BaseModelSerializer):
             "show_on_speaker",
             "post_as",
         ]
-        extra_kwargs = {
-            "groupid": {"required": False},
-        }
 
     def validate_groupid(self, value: str | None):
         if value:

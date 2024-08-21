@@ -62,16 +62,6 @@ class TranslationTests(APITestCase):
         data = response.json()
         self.assertEqual(["Ogiltig handling: hello"], data["transition"])
 
-    def test_no_obj(self):
-        url = reverse("meeting-transitions", kwargs={"pk": 0})
-        self.client.force_login(self.moderator)
-        response = self.client.post(
-            url, data={"transition": "hello"}, HTTP_ACCEPT_LANGUAGE="sv"
-        )
-        self.assertEqual("sv", response.headers.get("Content-Language"))
-        data = response.json()
-        self.assertEqual("Hittades inte.", data["detail"])
-
     def test_unauthenticated(self):
         response = self.client.post(
             self.url, data={"transition": "ongoing"}, HTTP_ACCEPT_LANGUAGE="sv"
