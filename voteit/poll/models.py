@@ -161,7 +161,6 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         default=PollWf.initial, choices=PollWf.choices(), editable=False
     )
     title: str = models.CharField(max_length=70)
-    description: str = models.CharField(max_length=200)
     meeting: Meeting | None = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="polls", null=True
     )
