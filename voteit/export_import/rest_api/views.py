@@ -86,7 +86,7 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
         )
 
     @action(
-        methods=["POST"],
+        methods=["GET"],
         detail=True,
         renderer_classes=[JSONRenderer],
         parser_classes=[JSONParser],
@@ -95,7 +95,7 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
         return self._run_export(request, "json")
 
     @action(
-        methods=["POST"],
+        methods=["GET"],
         detail=True,
         renderer_classes=[YAMLRenderer],
     )
@@ -105,7 +105,7 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
     def _run_export(self, request, file_suffix):
         instance = self.get_object()
         serializer = ExportFileSerializer(
-            data=request.data,
+            data=request.query_params,
         )
         serializer.is_valid(raise_exception=True)
         exporter = Exporter(instance, **serializer.data)

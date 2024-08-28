@@ -237,7 +237,7 @@ class MeetingDataExportViewTests(APITestCase):
     def test_json(self):
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-json", kwargs={"pk": self.meeting.pk})
-        response = self.client.post(url)
+        response = self.client.get(url)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         data = response.json()
         self.assertEqual("The Hellos", data["groups"][0]["title"])
@@ -245,7 +245,7 @@ class MeetingDataExportViewTests(APITestCase):
     def test_yaml(self):
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-yaml", kwargs={"pk": self.meeting.pk})
-        response = self.client.post(url)
+        response = self.client.get(url)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         data = yaml.safe_load(response.content)
         self.assertEqual("The Hellos", data["groups"][0]["title"])
@@ -253,7 +253,7 @@ class MeetingDataExportViewTests(APITestCase):
     def test_json_round_trip(self):
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-json", kwargs={"pk": self.meeting.pk})
-        response = self.client.post(url)
+        response = self.client.get(url)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         url = reverse("meeting-data-detail", kwargs={"pk": self.new_meeting.pk})
         with tempfile.NamedTemporaryFile(suffix=".json") as tmp_file:
@@ -273,7 +273,7 @@ class MeetingDataExportViewTests(APITestCase):
     def test_yaml_round_trip(self):
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-yaml", kwargs={"pk": self.meeting.pk})
-        response = self.client.post(url)
+        response = self.client.get(url)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         url = reverse("meeting-data-detail", kwargs={"pk": self.new_meeting.pk})
         with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp_file:
@@ -293,7 +293,7 @@ class MeetingDataExportViewTests(APITestCase):
     def test_json_exclude_groups(self):
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-json", kwargs={"pk": self.meeting.pk})
-        response = self.client.post(
+        response = self.client.get(
             url, data={"include_groups": 0, "clear_group_authors": 1}
         )
         self.assertEqual(status.HTTP_200_OK, response.status_code)
@@ -303,7 +303,7 @@ class MeetingDataExportViewTests(APITestCase):
     def test_json_exclude_groups_bad_combination(self):
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-json", kwargs={"pk": self.meeting.pk})
-        response = self.client.post(url, data={"include_groups": 0})
+        response = self.client.get(url, data={"include_groups": 0})
         self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
         data = response.json()
         self.assertEqual(
