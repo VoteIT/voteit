@@ -10,7 +10,6 @@ from django.db import models
 from django.utils.text import slugify
 from django.utils.timezone import now
 from pydantic import BaseModel
-from pydantic import EmailStr
 from pydantic import Extra
 from pydantic import Field
 from pydantic import constr
@@ -125,7 +124,7 @@ class GroupMixin(BaseModel):
 
 
 class UserData(BaseModel):
-    email: EmailStr | None
+    email: str | None
     pk: int | None
 
     class Config:
