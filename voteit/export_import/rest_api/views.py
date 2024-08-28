@@ -59,7 +59,7 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
         return Response(
-            data=importer.data.dict(exclude_unset=True),
+            data=importer.data.dict(exclude_unset=True, exclude={"meta"}),
             status=status.HTTP_200_OK,
         )
 
