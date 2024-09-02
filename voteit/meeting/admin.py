@@ -301,6 +301,7 @@ class MeetingGroupAdmin(MeetingAdminMixin, admin.ModelAdmin):
     autocomplete_fields = (
         "meeting",
         "members",
+        "delegate_to",
     )
     list_display = (
         "title",
