@@ -114,7 +114,9 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
         return Response(
-            exporter.data.dict(exclude_none=True),
+            exporter.data.dict(
+                exclude_none=True,
+            ),
             headers={
                 f"Content-Disposition": f'attachment; filename="meeting_{instance.pk}_export.{file_suffix}"'
             },

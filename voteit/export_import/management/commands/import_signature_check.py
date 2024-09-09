@@ -22,7 +22,7 @@ class Command(BaseCommand):
 
     >>> with override_settings(EXPORT_SECRET_KEY='abcdefghijk'):
     ...     call_command("import_signature_check", bad_sign_fn)
-    Signature invalid, should be 6795df515ce41695a913966ec077a32e31684bfadda90e837b6ba03d916f7306
+    Signature invalid, should be e3aba1bcca87ee864153a61bea7db72ae3bb1a1e8944e5a539416201a3a29cc0
     """
 
     help = "Import file tools"
@@ -39,7 +39,10 @@ class Command(BaseCommand):
             if not isinstance(data, dict):
                 raise ImportFileError("Import file malformed, must be key-value data")
             import_data = ImportMeetingStructure(**data)
-            payload = import_data.json(exclude={"meta"})
+            payload = import_data.json(
+                exclude={"meta"},
+                exclude_none=True,
+            )
             kwargs = {}
             if override_secret := options.get("secret"):
                 kwargs["EXPORT_SECRET_KEY"] = override_secret

@@ -3,7 +3,7 @@ meta:
   description: Not much
   version: 1
   created: '2023-12-05T14:54:00.000000+01:00'
-  sign: 6795df515ce41695a913966ec077a32e31684bfadda90e837b6ba03d916f7306
+  sign: e3aba1bcca87ee864153a61bea7db72ae3bb1a1e8944e5a539416201a3a29cc0
 agenda_items:
 - block_discussion: false
   block_proposals: false

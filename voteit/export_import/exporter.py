@@ -33,7 +33,9 @@ class Exporter:
         with schema_context(**self.export_schema_kwargs):
             self.data = self.schema.from_orm(self.meeting)
         if self.sign:
-            self.data.meta.sign = sign_payload(self.data.json(exclude={"meta"}))
+            self.data.meta.sign = sign_payload(
+                self.data.json(exclude={"meta"}, exclude_none=True)
+            )
         self.data.meta.title = self.title or self.meeting.title
         self.data.meta.description = self.description
         self.data.meta.version = self.version

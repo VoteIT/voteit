@@ -52,7 +52,9 @@ class Command(BaseExpImpCommand):
         if filename := options.get("o"):
             self.stdout.write(f"Writing YAML-file: {filename} ...")
             with open(filename, "w") as f:
-                output = exporter.data.dict(exclude_none=True)
+                output = exporter.data.dict(
+                    exclude_none=True,
+                )
                 yaml.dump(output, stream=f)
             self.stdout.write(self.style.SUCCESS("Success"))
         else:

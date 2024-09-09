@@ -78,7 +78,11 @@ class Importer:
         if self._verify:
             verification_data = self.schema(**deepcopy(data))
             if not verify_signature(
-                verification_data.json(exclude={"meta"}), verification_data.meta.sign
+                verification_data.json(
+                    exclude={"meta"},
+                    exclude_none=True,
+                ),
+                verification_data.meta.sign,
             ):
                 raise SignatureVerificationFailed(
                     f"Signature {verification_data.meta.sign} isn't valid for payload"
