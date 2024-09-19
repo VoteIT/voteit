@@ -27,6 +27,12 @@ class Command(BaseExpImpCommand):
             default=False,
             action="store_true",
         )
+        parser.add_argument(
+            "--skip-verify",
+            help="Skip signature verification",
+            default=False,
+            action="store_true",
+        )
 
     def handle(self, *args, **options):
         meeting: Meeting = Meeting.objects.get(pk=options.get("m"))
@@ -42,6 +48,7 @@ class Command(BaseExpImpCommand):
             clear_ai_states=options["clear_ai_states"],
             clear_proposal_states=options["clear_proposal_states"],
             clear_proposal_id=options["clear_proposal_ids"],
+            verify=not options["skip_verify"],
         )
         with transaction.atomic(durable=True):
             self.stdout.write(f'Reading and importing {options["filename"]} ...')
