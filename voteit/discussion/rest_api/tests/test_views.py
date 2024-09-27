@@ -67,6 +67,19 @@ class DiscussionPostAPITests(APITestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
 
+    def test_create_bad_input(self):
+        self.client.force_login(self.moderator)
+        url = reverse("discussion-posts-list")
+        data = {
+            "agenda_item": self.ai.pk,
+            "body": '<img name="currentScript" src="https://attacker.controlled.server/"></img>',
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(
+            '&lt;img name="currentScript" src="https://attacker.controlled.server/"&gt;&lt;/img&gt;',
+            response.json().get("body"),
+        )
+
     def test_list(self):
         url = reverse("discussion-posts-list")
         self.client.force_login(self.discusser)
