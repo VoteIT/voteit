@@ -523,7 +523,6 @@ class ImportMeetingMeta(BaseModel):
     created: datetime | None
     title: str = ""
     description: str = ""
-    sign: str | None
 
 
 class ImportMeetingStructure(MeetingStructure):
@@ -535,7 +534,6 @@ class ExportMeetingMeta(BaseModel):
     created: datetime = now()
     title: str = ""
     description: str = ""
-    sign: str | None
 
 
 class ExportMeetingStructure(MeetingStructure):

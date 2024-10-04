@@ -1,7 +1,6 @@
 from pydantic import ConfigError
 
 from voteit.export_import.schemas import ExportMeetingStructure
-from voteit.export_import.utils import sign_payload
 from voteit.meeting.models import Meeting
 from voteit.export_import.schemas import schema_context
 
@@ -17,7 +16,6 @@ class Exporter:
         title: str = "",
         description: str = "",
         schema: type[ExportMeetingStructure] = ExportMeetingStructure,
-        sign: bool = True,
         **kwargs,
     ):
         self.meeting = meeting
@@ -27,15 +25,10 @@ class Exporter:
         self.title = title
         self.description = description
         self.export_schema_kwargs = kwargs
-        self.sign = sign
 
     def __call__(self):
         with schema_context(**self.export_schema_kwargs):
             self.data = self.schema.from_orm(self.meeting)
-        if self.sign:
-            self.data.meta.sign = sign_payload(
-                self.data.json(exclude={"meta"}, exclude_none=True)
-            )
         self.data.meta.title = self.title or self.meeting.title
         self.data.meta.description = self.description
         self.data.meta.version = self.version

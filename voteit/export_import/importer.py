@@ -3,6 +3,7 @@ from itertools import chain
 from uuid import uuid4
 
 import yaml
+from django.conf import settings
 from django.contrib.auth import get_user_model
 
 from voteit.agenda.models import AgendaItem
@@ -10,7 +11,9 @@ from voteit.core.decorators import ensure_atomic
 from voteit.export_import.exceptions import ImportFileError
 from voteit.export_import.exceptions import SignatureVerificationFailed
 from voteit.export_import.schemas import ImportMeetingStructure
+from voteit.export_import.utils import sign_payload
 from voteit.export_import.utils import verify_signature
+from voteit.export_import.utils import verify_stream
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -66,6 +69,9 @@ class Importer:
             return self.from_stream(fs)
 
     def from_stream(self, stream):
+        if self._verify:
+            verify_stream(stream)
+            stream.seek(0)
         data = yaml.safe_load(stream)
         if not isinstance(data, dict):
             raise ImportFileError("Import file malformed, must be key-value data")
@@ -75,18 +81,6 @@ class Importer:
             raise ImportFileError("yaml file malformed, lacks meta version")
         if version != self.version:
             raise ImportFileError("Wrong file version, must be %s" % self.version)
-        if self._verify:
-            verification_data = self.schema(**deepcopy(data))
-            if not verify_signature(
-                verification_data.json(
-                    exclude={"meta"},
-                    exclude_none=True,
-                ),
-                verification_data.meta.sign,
-            ):
-                raise SignatureVerificationFailed(
-                    f"Signature {verification_data.meta.sign} isn't valid for payload"
-                )
         with schemas.schema_context(**self.export_schema_kwargs):
             self.data = self.schema(**data)
 

@@ -1,11 +1,9 @@
-import yaml
 from django.core.management import BaseCommand
 from django.test import override_settings
 
-from voteit.export_import.exceptions import ImportFileError
-from voteit.export_import.schemas import ImportMeetingStructure
-from voteit.export_import.utils import sign_payload
-from voteit.export_import.utils import verify_signature
+from voteit.export_import.exceptions import SignatureVerificationFailed
+from voteit.export_import.utils import file_signature
+from voteit.export_import.utils import verify_file
 
 
 class Command(BaseCommand):
@@ -22,7 +20,7 @@ class Command(BaseCommand):
 
     >>> with override_settings(EXPORT_SECRET_KEY='abcdefghijk'):
     ...     call_command("import_signature_check", bad_sign_fn)
-    Signature invalid, should be e3aba1bcca87ee864153a61bea7db72ae3bb1a1e8944e5a539416201a3a29cc0
+    Signature invalid, should be 905e4c9227b6d166ef6365f0b5d8306733367f31ec255077bb22c8c5f675cdb0
     """
 
     help = "Import file tools"
@@ -33,26 +31,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         filename = options["filename"]
-        with open(filename, "r+") as stream:
-            data = yaml.safe_load(stream)
-            # FIXME:Other formats
-            if not isinstance(data, dict):
-                raise ImportFileError("Import file malformed, must be key-value data")
-            import_data = ImportMeetingStructure(**data)
-            payload = import_data.json(
-                exclude={"meta"},
-                exclude_none=True,
-            )
-            kwargs = {}
-            if override_secret := options.get("secret"):
-                kwargs["EXPORT_SECRET_KEY"] = override_secret
-            with override_settings(**kwargs):
-                valid_signature = verify_signature(payload, import_data.meta.sign)
-                if valid_signature:
-                    self.stdout.write(self.style.SUCCESS("Signature is valid"))
-                else:
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"Signature invalid, should be {sign_payload(payload)}"
-                        )
+        kwargs = {}
+        if override_secret := options.get("secret"):
+            kwargs["EXPORT_SECRET_KEY"] = override_secret
+        with override_settings(**kwargs):
+            try:
+                verify_file(filename)
+                self.stdout.write(self.style.SUCCESS("Signature is valid"))
+            except SignatureVerificationFailed as exc:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"Signature invalid, should be {file_signature(filename)}"
                     )
+                )

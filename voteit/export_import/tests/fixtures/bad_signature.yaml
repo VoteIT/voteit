@@ -1,9 +1,9 @@
+sign: fd3dd9612b1588a9461e6a
 meta:
   title: Hello world!
   description: Not much
   version: 1
   created: '2023-12-05T14:54:00.000000+01:00'
-  sign: fd3dd9612b1588a9461e6a
 agenda_items:
 - block_discussion: false
   block_proposals: false

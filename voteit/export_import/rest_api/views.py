@@ -1,22 +1,22 @@
+import yaml
 from django.db import transaction
+from django.http import HttpResponse
 from pydantic import ValidationError as PydanticValidationError
 from rest_framework import permissions
 from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FileUploadParser
-from rest_framework.parsers import JSONParser
 from rest_framework.parsers import MultiPartParser
-from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.utils import pydantic_to_drf_validation_error
+from voteit.export_import.utils import sign_payload
 from voteit.meeting.models import Meeting
 from voteit.export_import.exporter import Exporter
 from voteit.export_import.importer import Importer
-from voteit.export_import.rest_api.renderers import YAMLRenderer
 from voteit.export_import.rest_api.serializers import ImportFileSerializer
 from voteit.export_import.rest_api.serializers import ExportFileSerializer
 
@@ -59,7 +59,7 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
         return Response(
-            data=importer.data.dict(exclude_unset=True, exclude={"meta"}),
+            data=importer.data.dict(exclude_unset=True, exclude={"meta", "sign"}),
             status=status.HTTP_200_OK,
         )
 
@@ -88,21 +88,8 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
     @action(
         methods=["GET"],
         detail=True,
-        renderer_classes=[JSONRenderer],
-        parser_classes=[JSONParser],
-    )
-    def json(self, request, *args, **kwargs):
-        return self._run_export(request, "json")
-
-    @action(
-        methods=["GET"],
-        detail=True,
-        renderer_classes=[YAMLRenderer],
     )
     def yaml(self, request, *args, **kwargs):
-        return self._run_export(request, "yaml")
-
-    def _run_export(self, request, file_suffix):
         instance = self.get_object()
         serializer = ExportFileSerializer(
             data=request.query_params,
@@ -113,11 +100,12 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
             exporter()
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
-        return Response(
-            exporter.data.dict(
-                exclude_none=True,
-            ),
+        payload = yaml.dump(exporter.data.dict(exclude_none=True))
+        signed_payload = f"sign: {sign_payload(payload)}\n" + payload
+        return HttpResponse(
+            signed_payload,
+            content_type="application/yaml",
             headers={
-                f"Content-Disposition": f'attachment; filename="meeting_{instance.pk}_export.{file_suffix}"'
+                f"Content-Disposition": f'attachment; filename="meeting_{instance.pk}_export.yaml"'
             },
         )

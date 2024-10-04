@@ -49,19 +49,6 @@ class ExporterTests(TestCase):
         self.assertEqual(
             "the-hellos", exporter.data.agenda_items[0].discussions[0].meeting_group
         )
-        self.assertEqual(
-            "e3aba1bcca87ee864153a61bea7db72ae3bb1a1e8944e5a539416201a3a29cc0",
-            exporter.data.meta.sign,
-        )
-        self.assertTrue(
-            verify_signature(
-                exporter.data.json(
-                    exclude={"meta"},
-                    exclude_none=True,
-                ),
-                "e3aba1bcca87ee864153a61bea7db72ae3bb1a1e8944e5a539416201a3a29cc0",
-            )
-        )
 
     def test_bad_kwargs(self):
         exporter = self._cut(self.meeting, woho=1)

@@ -1,9 +1,9 @@
+sign: c41aa7798abaa9a502bb227555296378cc58275ddd58596efed7eda21559d9a2
 meta:
   title: Hello world!
   description: Not much
   version: 1
   created: '2023-12-05T14:54:00.000000+01:00'
-  sign: e3aba1bcca87ee864153a61bea7db72ae3bb1a1e8944e5a539416201a3a29cc0
 agenda_items:
 - block_discussion: false
   block_proposals: false
