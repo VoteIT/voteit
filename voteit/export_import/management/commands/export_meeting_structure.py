@@ -3,6 +3,7 @@ from django.db.transaction import get_connection
 
 from voteit.core.testing import exectime
 from voteit.export_import.management.base_cmds import BaseExpImpCommand
+from voteit.export_import.utils import sign_payload
 from voteit.meeting.models import Meeting
 from voteit.export_import.exporter import Exporter
 from django.test.utils import CaptureQueriesContext
@@ -51,11 +52,10 @@ class Command(BaseExpImpCommand):
                     )
         if filename := options.get("o"):
             self.stdout.write(f"Writing YAML-file: {filename} ...")
+            payload = yaml.dump(exporter.data.dict(exclude_none=True))
+            signed_payload = f"sign: {sign_payload(payload)}\n" + payload
             with open(filename, "w") as f:
-                output = exporter.data.dict(
-                    exclude_none=True,
-                )
-                yaml.dump(output, stream=f)
+                f.write(signed_payload)
             self.stdout.write(self.style.SUCCESS("Success"))
         else:
             self.stdout.write(
