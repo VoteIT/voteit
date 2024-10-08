@@ -26,8 +26,6 @@ __all__ = ("IRV",)
 @incoming
 class AddIRVVote(AddRankedVote):
     name = "irv_vote.add"
-    schema = AddRankedVoteSchema
-    data: AddRankedVoteSchema
 
 
 class IRVSettings(BaseModel):
@@ -99,10 +97,8 @@ class RepeatedIRVPoll(STVPollBase):
 
 
 @incoming
-class AddIRVVote(AddVote):
+class AddRepeatedIRVVote(AddRankedVote):
     name = "repeated_irv_vote.add"
-    schema = AddRankedVoteSchema
-    data: AddRankedVoteSchema
 
 
 class RepeatedIRVSettings(BaseModel):
