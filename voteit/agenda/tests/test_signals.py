@@ -7,7 +7,9 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
 from envelope.messages.common import Batch
+from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 from envelope.utils import get_or_create_txn_sender
 
@@ -44,7 +46,10 @@ class SubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type=ParticipantsChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         pks = set()
         for msg in msg.data.app_state:
             if msg.t == "s.batch" and msg.p["t"] == "agenda_item.added":
@@ -57,7 +62,10 @@ class SubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type=ModeratorsChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         pks = set()
         for msg in msg.data.app_state:
             if msg.t == "s.batch" and msg.p["t"] == "agenda_item.added":
@@ -70,16 +78,18 @@ class SubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type=MeetingChannel.name,
         )
-        msg = command.run_job()
+        ch = MeetingChannel(self.meeting.pk)
+        self.assertTrue(ch.allow_subscribe(self.user))
+        app_state = command.get_app_state(ch)
         batch_msgs = [
             x
-            for x in msg.data.app_state
-            if x.t == Batch.name and x.p["t"] == LastReadChanged.name
+            for x in app_state
+            if x["t"] == Batch.name and x["p"].t == LastReadChanged.name
         ]
         self.assertEqual(1, len(batch_msgs))
         batch = batch_msgs[0]
         self.assertEqual(
-            {self.ai_private.pk}, {x.agenda_item for x in batch.p["payloads"]}
+            {self.ai_private.pk}, {x.agenda_item for x in batch["p"].payloads}
         )
 
     def test_app_state_sends_body(self):
@@ -88,11 +98,13 @@ class SubscribedTests(TestCase):
             pk=self.ai.pk,
             channel_type=AgendaItemChannel.name,
         )
-        response = command.run_job()
-        messages = [x for x in response.data.app_state if x.t == AgendaBodyAdded.name]
+        ch = AgendaItemChannel(self.ai.pk)
+        self.assertTrue(ch.allow_subscribe(self.user))
+        app_state = command.get_app_state(ch)
+        messages = [x for x in app_state if x["t"] == AgendaBodyAdded.name]
         self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual({"pk": self.ai.pk, "body": "Hello world"}, msg.p)
+        self.assertEqual({"pk": self.ai.pk, "body": "Hello world"}, msg["p"].dict())
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)

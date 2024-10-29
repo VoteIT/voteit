@@ -7,6 +7,7 @@ from django.test import override_settings
 from envelope.app.user_channel.channel import UserChannel
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
+from envelope.testing import MessageCatcher
 
 from voteit.core.testing import FakeCommit
 from voteit.core.workflows import EnabledWf
@@ -97,17 +98,15 @@ class SignalsTests(TestCase):
 
     def test_meeting_channel_subscribed(self):
         self._mk_presence()
-        channel_layer = get_channel_layer()
-
-        with patch.object(channel_layer, "send") as mocked_send:
-            with FakeCommit():
-                msg = Subscribe(
-                    mm={"user_pk": self.user.pk, "consumer_name": "abc"},
-                    channel_type=MeetingChannel.name,
-                    pk=self.meeting.pk,
-                )
-                response = msg.run_job()
-            self.assertTrue(mocked_send.called)
+        command = Subscribe(
+            mm={"user_pk": self.user.pk, "consumer_name": "abc"},
+            channel_type=MeetingChannel.name,
+            pk=self.meeting.pk,
+        )
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         found = [x for x in response.data.app_state if x.t == "presence.added"]
         self.assertEqual(1, len(found))
@@ -115,38 +114,32 @@ class SignalsTests(TestCase):
         self.assertEqual(self.check.pk, outgoing.p["presence_check"])
         self.assertEqual(self.user.pk, outgoing.p["user"])
 
-    @patch.object(MeetingChannel, "sync_publish")
-    def test_meeting_channel_subscribed_no_presence_check(self, mock_publish):
+    def test_meeting_channel_subscribed_no_presence_check(self):
         self.check.delete()
-        mock_publish.reset_mock()
-        channel_layer = get_channel_layer()
-
-        with patch.object(channel_layer, "send") as mocked_send:
-            with FakeCommit():
-                msg = Subscribe(
-                    mm={"user_pk": self.moderator.pk, "consumer_name": "abc"},
-                    channel_type=MeetingChannel.name,
-                    pk=self.meeting.pk,
-                )
-                response = msg.run_job()
-            self.assertTrue(mocked_send.called)
+        msg = Subscribe(
+            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"},
+            channel_type=MeetingChannel.name,
+            pk=self.meeting.pk,
+        )
+        with MessageCatcher(Subscribed) as messages:
+            msg.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         # Nothing breaks
 
     def test_presence_check_channel_subscribed(self):
         self._mk_presence()
         self.check.presences.create(user=self.moderator)
-        channel_layer = get_channel_layer()
-
-        with patch.object(channel_layer, "send") as mocked_send:
-            with FakeCommit():
-                msg = Subscribe(
-                    mm={"user_pk": self.moderator.pk, "consumer_name": "abc"},
-                    channel_type=PresenceCheckChannel.name,
-                    pk=self.check.pk,
-                )
-                response = msg.run_job()
-            self.assertTrue(mocked_send.called)
+        msg = Subscribe(
+            mm={"user_pk": self.moderator.pk, "consumer_name": "abc"},
+            channel_type=PresenceCheckChannel.name,
+            pk=self.check.pk,
+        )
+        with MessageCatcher(Subscribed) as messages:
+            msg.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         found = sorted(
             [x for x in response.data.app_state if x.t == "presence.added"],

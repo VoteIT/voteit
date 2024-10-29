@@ -7,6 +7,8 @@ from django.test import TestCase
 from django.test import override_settings
 
 from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
+from envelope.testing import MessageCatcher
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -44,7 +46,10 @@ class SignalsTests(TestCase):
             pk=self.meeting.pk,
             channel_type=MeetingChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         pks = {x.p["pk"] for x in msg.data.app_state if x.t == "pn.added"}
         self.assertEqual({self.one.pk, self.two.pk}, pks)
 

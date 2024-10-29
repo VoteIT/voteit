@@ -4,7 +4,9 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
 from envelope.channels.models import AppState
+from envelope.testing import MessageCatcher
 
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
@@ -41,7 +43,11 @@ class SubscriptionTests(TestCase):
             pk=self.meeting.pk,
             channel_type=MeetingChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, Subscribed)
         payloads = [x.p for x in msg.data.app_state if x.t == "room.added"]
         self.assertEqual(1, len(payloads))
         data = payloads[0]
@@ -70,7 +76,11 @@ class SubscriptionTests(TestCase):
             pk=self.room.pk,
             channel_type=RoomChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, Subscribed)
         self.assertEqual(
             [
                 {

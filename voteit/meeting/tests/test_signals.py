@@ -7,6 +7,7 @@ from django.test import override_settings
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
 from envelope.messages.common import Batch
+from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.meeting.models import GroupRole
@@ -108,7 +109,10 @@ class MeetingChannelSubscribedTests(TestCase):
 
     def test_roles_in_app_state(self):
         msg = self._mk_subscribe()
-        response = msg.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            msg.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         added_meeting_roles = [
             x
@@ -125,7 +129,10 @@ class MeetingChannelSubscribedTests(TestCase):
         self.meeting.group_roles_active = True
         self.meeting.save()
         msg = self._mk_subscribe()
-        response = msg.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            msg.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         # MeetingGroup
         added = [

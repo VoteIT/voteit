@@ -6,7 +6,9 @@ from django.test import override_settings
 
 from envelope.app.user_channel.channel import UserChannel
 from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
 from envelope.channels.models import AppState
+from envelope.testing import MessageCatcher
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
@@ -75,7 +77,10 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type=ParticipantsChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         batched_payload = [
             x.p["payloads"]
             for x in msg.data.app_state
@@ -91,7 +96,10 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type=ModeratorsChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         batched_payload = [
             x.p["payloads"]
             for x in msg.data.app_state
@@ -110,7 +118,10 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type=MeetingChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         pks = {x.p["pk"] for x in msg.data.app_state if x.t == "vote.added"}
         self.assertEqual({self.vote.pk, self.vote2.pk, self.vote_private.pk}, pks)
 
@@ -120,7 +131,10 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type=MeetingChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         pks = {x.p["pk"] for x in msg.data.app_state if x.t == "er.added"}
         self.assertEqual({self.er.pk}, pks)
 
@@ -131,7 +145,10 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type=MeetingChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         self.assertFalse([x for x in msg.data.app_state if x.t == "er.added"])
 
     def test_n1_problem(self):
@@ -153,7 +170,10 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type=ParticipantsChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         batched_payload = [
             x.p["payloads"]
             for x in msg.data.app_state
@@ -183,7 +203,10 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type=ModeratorsChannel.name,
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         batched_payload = [
             x.p["payloads"]
             for x in msg.data.app_state
@@ -214,7 +237,10 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type="meeting",
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         messages = [x.p for x in msg.data.app_state if x.t == PollStatus.name]
         self.assertEqual(1, len(messages))
         payload = messages[0]
@@ -230,7 +256,10 @@ class MeetingSubscribedTests(TestCase):
         self.poll.save()
         self.poll.votes.create(user=self.moderator, vote="yes")
         self.poll2.votes.create(user=self.moderator, vote="yes")
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         messages = [x.p for x in msg.data.app_state if x.t == PollStatus.name]
         self.assertEqual(2, len(messages))
         self.assertIn({"pk": self.poll.pk, "voted": 2, "total": 2}, messages)

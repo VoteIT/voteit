@@ -9,6 +9,7 @@ from django_fsm import TransitionNotAllowed
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
 from envelope.channels.models import ContextChannel
+from envelope.testing import MessageCatcher
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.testing import FakeCommit
@@ -57,15 +58,19 @@ class SpeakerListSystemAppStateTests(TestCase):
     def test_stopped_speakers_sent(self):
         self.system.active_list = self.speaker_list
         self.system.save()
-        msg = Subscribe(
+        command = Subscribe(
             mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
             pk=self.system.pk,
             channel_type=SpeakerListSystemChannel.name,
         )
-        response = msg.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, Subscribed)
         self.assertEqual(self.speaker_list.historic_speakers().count(), 4)
         self.assertEqual(
-            sum(x.t == "speaker.added" for x in response.data.app_state),
+            sum(x.t == "speaker.added" for x in msg.data.app_state),
             4,
         )
 
@@ -204,11 +209,16 @@ class SignalListChangesTests(TestCase):
         self.system.active_list = self.speaker_list
         self.system.save()
         self.speaker_list.start_speaker(self.speaker_moderator)
-        msg = Subscribe(
+        command = Subscribe(
             mm={"consumer_name": "abc", "user_pk": self.participant.pk},
             pk=self.system.pk,
             channel_type=SpeakerListSystemChannel.name,
-        ).run_job()
+        )
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, Subscribed)
         changed_message = list(
             m for m in msg.data.app_state if m.t == SpeakerListAdded.name
         )
@@ -234,7 +244,6 @@ class SignalListChangesTests(TestCase):
         list_pk = self.speaker_list.pk
         self.speaker_list.delete()
         self.assertTrue(mock_publish.called)
-
         messages = [
             x.args[0]
             for x in mock_publish.mock_calls
@@ -255,7 +264,6 @@ class SignalListChangesTests(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             self.speaker_list.delete()
             self.assertTrue(mock_publish.called)
-
         messages = [
             x.args[0]
             for x in mock_publish.mock_calls
@@ -382,8 +390,11 @@ class ChannelSubscribedTests(TestCase):
         )
 
     def test_subscribe_meeting(self):
-        msg = self._mk_one(self.meeting.pk, "meeting")
-        response = msg.run_job()
+        command = self._mk_one(self.meeting.pk, "meeting")
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         appstates = {x.t: x.p for x in response.data.app_state}
         self.assertIn("speaker_system.added", appstates)
@@ -399,8 +410,11 @@ class ChannelSubscribedTests(TestCase):
         self.assertEqual(payload["model"], "speaker_system")
 
     def test_subscribe_ai(self):
-        msg = self._mk_one(self.ai.pk, "agenda_item")
-        response = msg.run_job()
+        command = self._mk_one(self.ai.pk, "agenda_item")
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         payloads = [
             x.p for x in response.data.app_state if x.t == SpeakerListAdded.name
@@ -411,8 +425,11 @@ class ChannelSubscribedTests(TestCase):
         )
 
     def test_subscribe_speaker_list_system(self):
-        msg = self._mk_one(self.system.pk, SpeakerListSystemChannel.name)
-        response = msg.run_job()
+        command = self._mk_one(self.system.pk, SpeakerListSystemChannel.name)
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         speaker_payloads = [
             x.p for x in response.data.app_state if x.t == "speaker.added"

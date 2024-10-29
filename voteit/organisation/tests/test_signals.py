@@ -6,6 +6,7 @@ from django.test import override_settings
 
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
+from envelope.testing import MessageCatcher
 
 from ..channels import OrganisationChannel
 
@@ -51,7 +52,10 @@ class OrganisationChannelSubscribedTests(TestCase):
             channel_type="organisation",
             pk=self.org.pk,
         )
-        response = msg.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            msg.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         added_org_roles = [
             x

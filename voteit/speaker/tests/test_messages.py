@@ -13,6 +13,7 @@ from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import NotFoundError
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
+from envelope.testing import MessageCatcher
 
 from voteit.core.testing import FakeCommit
 from voteit.meeting.models import Meeting
@@ -51,9 +52,12 @@ class SpeakerListSystemChannelSubscribeTests(TestCase):
             channel_type=SpeakerListSystemChannel.name,
         )
 
-    def test_subscribe_(self):
+    def test_subscribe(self):
         msg = self._mk_msg(self.participant)
-        response = msg.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            msg.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
 
     def test_subscribe_outsider(self):

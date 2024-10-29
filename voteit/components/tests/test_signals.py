@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.test import override_settings
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
+from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.active.components import ActiveUsersComponent
@@ -45,7 +46,10 @@ class MeetingChannelSubscribedTests(TestCase):
 
     def test_meeting_components_in_app_state(self):
         msg = self._mk_subscribe()
-        response = msg.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            msg.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         payloads = [
             x.p for x in response.data.app_state if x.t == "meeting_component.added"
@@ -80,7 +84,10 @@ class MeetingChannelSubscribedTests(TestCase):
         self.flash.settings_data = {}
         self.flash.save()
         msg = self._mk_subscribe()
-        response = msg.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            msg.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         payloads = [
             x.p for x in response.data.app_state if x.t == "meeting_component.added"
@@ -91,7 +98,10 @@ class MeetingChannelSubscribedTests(TestCase):
         self.flash.disable()
         self.flash.save()
         msg = self._mk_subscribe()
-        response = msg.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            msg.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertIsInstance(response, Subscribed)
         payloads = [
             x.p for x in response.data.app_state if x.t == "meeting_component.added"

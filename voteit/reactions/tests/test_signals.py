@@ -5,7 +5,9 @@ from django.test import TestCase
 from django.test import override_settings
 from envelope.app.user_channel.channel import UserChannel
 from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
 from envelope.channels.models import AppState
+from envelope.testing import MessageCatcher
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.channels import MeetingChannel
@@ -72,7 +74,11 @@ class SignalButtonTests(TestCase):
             pk=self.meeting.pk,
             channel_type="meeting",
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, Subscribed)
         unpacked = {x.t: x.p for x in msg.data.app_state}
         self.assertIn("reaction_button.added", unpacked)
         self.assertEqual(self.button.pk, unpacked["reaction_button.added"]["pk"])
@@ -93,7 +99,11 @@ class SignalButtonTests(TestCase):
             pk=self.ai.pk,
             channel_type="agenda_item",
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, Subscribed)
         batched_payload = [
             x.p["payloads"]
             for x in msg.data.app_state

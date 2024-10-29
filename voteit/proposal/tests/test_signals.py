@@ -7,6 +7,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
+from envelope.testing import MessageCatcher
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
@@ -49,9 +51,13 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type="moderators",
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
+        self.assertIsInstance(response, Subscribed)
         pks = set()
-        for msg in msg.data.app_state:
+        for msg in response.data.app_state:
             if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
                 pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
@@ -64,9 +70,13 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type="moderators",
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
+        self.assertIsInstance(response, Subscribed)
         pks = set()
-        for msg in msg.data.app_state:
+        for msg in response.data.app_state:
             if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
                 pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
@@ -77,9 +87,13 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type="participants",
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
+        self.assertIsInstance(response, Subscribed)
         pks = set()
-        for msg in msg.data.app_state:
+        for msg in response.data.app_state:
             if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
                 pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
@@ -92,12 +106,13 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type="participants",
         )
-        msg = command.run_job()
-        app_state = msg.data.app_state
-        if app_state is None:
-            app_state = ()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
+        self.assertIsInstance(response, Subscribed)
         pks = set()
-        for msg in msg.data.app_state:
+        for msg in response.data.app_state:
             if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
                 pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual(set(), pks)
@@ -375,6 +390,12 @@ class AgendaItemChannelTests(TestCase):
             pk=self.ai.pk,
             channel_type="agenda_item",
         )
-        msg = command.run_job()
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "text_document.added"}
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
+        self.assertIsInstance(response, Subscribed)
+        pks = {
+            x.p["pk"] for x in response.data.app_state if x.t == "text_document.added"
+        }
         self.assertEqual({self.text_document.pk}, pks)

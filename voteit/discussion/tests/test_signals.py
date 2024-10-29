@@ -5,6 +5,8 @@ from django.test import TestCase
 from django.test import override_settings
 
 from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
+from envelope.testing import MessageCatcher
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -33,7 +35,10 @@ class AgendaSubscribedTests(TestCase):
             pk=self.ai.pk,
             channel_type="agenda_item",
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         batched_payload = [
             x.p["payloads"]
             for x in msg.data.app_state

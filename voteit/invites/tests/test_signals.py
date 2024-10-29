@@ -4,7 +4,9 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from envelope.channels.messages import Subscribe
+from envelope.channels.messages import Subscribed
 from envelope.messages.common import Batch
+from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.core.testing import FakeCommit
@@ -85,7 +87,10 @@ class InvitesSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type="invites",
         )
-        msg = command.run_job()
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
         batch = None
         for item in msg.data.app_state:
             if item.t == "s.batch" and item.p["t"] == MeetingInviteAdded.name:
