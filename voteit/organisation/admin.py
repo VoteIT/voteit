@@ -70,7 +70,7 @@ class OrganisationAdmin(admin.ModelAdmin):
     list_display = (
         "title",
         "meeting_count",
-        "users_count",
+        "online_users",
         "manager_count",
         "meeting_creator_count",
     )
@@ -81,32 +81,38 @@ class OrganisationAdmin(admin.ModelAdmin):
         "mark_as_inactive",
     ]
 
+    @cached_property
+    def online_mapping(self):
+        recent_connections_user_qs = Connection.objects.filter(
+            online=True, last_action__gt=now() - timedelta(minutes=10)
+        ).values_list("user_id", flat=True)
+        user_qs = User.objects.filter(id__in=recent_connections_user_qs).distinct()
+        return {
+            x["organisation"]: x["id__count"]
+            for x in user_qs.values("organisation")
+            .order_by()
+            .annotate(models.Count("id"))
+        }
+
     @admin.display(description="Managers")
     def manager_count(self, obj: Organisation):
         return obj.managers__count
+
+    @admin.display(description="Online users")
+    def online_users(self, obj: Organisation):
+        return f"{self.online_mapping.get(obj.pk, 0)} / {obj.users.count()}"
 
     @admin.display(description="Meeting Creators")
     def meeting_creator_count(self, obj: Organisation):
         return obj.meeting_creator__count
 
-    @admin.display(description="Online users")
-    def users_count(self, obj: Organisation):
-        return f"{obj.users.filter(pk__in=self.online_user_pks).count()} / {obj.users.count()}"
-
     @admin.display(description="Meetings")
     def meeting_count(self, obj: Organisation):
         return obj.meeting__count
 
-    @cached_property
-    def online_user_pks(self):
-        recent_connections_qs = Connection.objects.filter(
-            online=True, last_action__gt=now() - timedelta(minutes=10)
-        )
-        return recent_connections_qs.values_list("user_id", flat=True).distinct()
-
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        qs = qs.annotate(
+        return qs.annotate(
             meeting__count=models.Count("meetings", distinct=True),
             meeting_creator__count=models.Count(
                 "roles",
@@ -119,7 +125,6 @@ class OrganisationAdmin(admin.ModelAdmin):
                 filter=models.Q(roles__assigned__contains=ROLE_ORG_MANAGER),
             ),
         )
-        return qs
 
     @admin.display(description="Mark as active")
     def mark_as_active(self, request, queryset):
