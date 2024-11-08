@@ -494,7 +494,9 @@ def resolve_potential_manager(v: models.Manager | Any, prefetch=(), select=()):
         if select:
             v = v.select_related(*select)
         ctx = get_context()
-        return [ctx.model_to_schema[o.__class__].from_orm(o) for o in v.all()]
+        return [
+            ctx.model_to_schema[o.__class__].from_orm(o) for o in v.all().order_by("id")
+        ]
     return v
 
 
