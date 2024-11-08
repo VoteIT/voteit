@@ -222,6 +222,10 @@ class RepeatedSchulzeTests(TestCase):
         self.assertRaises(InvalidProposalCount, self.poll.method.start_check)
         self.poll.settings = {"winners": 2}
         self.assertIsNone(self.poll.method.start_check())
+        self.poll.settings = {"winners": 3, "deny_proposal": True}
+        self.assertIsNone(self.poll.method.start_check())
+        self.poll.settings = {"winners": 4, "deny_proposal": True}
+        self.assertRaises(InvalidProposalCount, self.poll.method.start_check)
 
     def test_direct_change_of_settings(self):
         with self.assertRaises(TypeError):

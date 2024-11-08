@@ -270,8 +270,12 @@ class RepeatedSchulze(Schulze):
         super().start_check()
         winners = self.poll.settings.winners
         # Don't include the deny proposal in this count so this is correct!
-        if winners and self.poll.proposals.count() <= winners:
-            raise InvalidProposalCount(
-                "Number of winners must be lower than number of proposals. "
-                "If you want the proposals sorted, set winner to None"
-            )
+        if winners:
+            required_count = winners + 1
+            if self.poll.settings.deny_proposal:
+                required_count -= 1
+            if self.poll.proposals.count() < required_count:
+                raise InvalidProposalCount(
+                    "Number of winners must be lower than number of proposals including the option to deny all. "
+                    "If you want the proposals sorted, set winner to None"
+                )
