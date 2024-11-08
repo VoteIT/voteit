@@ -174,7 +174,14 @@ class MeetingGroupTests(TestCase):
         with self.assertRaises(IntegrityError):
             group.save()
 
-    # FIXME: These constraints don't exist yet
+    # FIXME: Would be great with a db constraint, but rest serializer takes care of this too
+    # def test_relation_to_group_from_other_meeting(self):
+    #     group_one = self.meetings[0].groups.create(title="one")
+    #     group_two = self.meetings[1].groups.create(title="two")
+    #     group_one.delegate_to = group_two
+    #     with self.assertRaises(IntegrityError):
+    #         group_one.save()
+    #
     # def test_relation_delegate_when_already_delegated_to(self):
     #     delegator = self.meetings[0].groups.create(title="delegator")
     #     receiver = self.meetings[0].groups.create(title="receiver")

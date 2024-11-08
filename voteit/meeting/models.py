@@ -468,7 +468,8 @@ class MeetingGroup(BaseContent, MeetingContext):
             ),
             models.CheckConstraint(
                 name="prevent_delegate_to_self",
-                check=~models.Q(pk=models.F("delegate_to_id")),
+                check=models.Q(delegate_to_id__isnull=True)
+                | ~models.Q(pk=models.F("delegate_to_id")),
             ),
             # delegations_from won't work due to db restrictions. FIXME
             # models.CheckConstraint(
