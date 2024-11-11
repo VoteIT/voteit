@@ -66,16 +66,11 @@ class SetActive(ContextAction):
                 raise BadRequestError.from_message(self, msg="User not part of meeting")
         else:
             self.data.user = self.user.pk
-        existing = meeting.active_users.filter(user_id=self.data.user).first()
         with set_actor(self.user):
             if self.data.active:
-                # Set active
-                if not existing:
-                    meeting.active_users.create(user_id=self.data.user)
+                meeting.active_users.update_or_create(user_id=self.data.user)
             else:
-                # Remove active
-                if existing is not None:
-                    existing.delete()
+                meeting.active_users.filter(user_id=self.data.user).delete()
         response = Status.from_message(self)
         websocket_send(response, state=self.SUCCESS)
         return response
