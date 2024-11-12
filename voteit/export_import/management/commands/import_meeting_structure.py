@@ -22,6 +22,12 @@ class Command(BaseExpImpCommand):
             default=MissingUser.RAISE,
         )
         parser.add_argument(
+            "--no-reuse-groups",
+            help="Don't reuse existing groups in meeting",
+            default=False,
+            action="store_true",
+        )
+        parser.add_argument(
             "--no-part",
             help="Don't add users as participants",
             default=False,
@@ -43,6 +49,7 @@ class Command(BaseExpImpCommand):
             include_discussions=not options["skip_disc"],
             include_proposals=not options["skip_prop"],
             add_participants=not options["no_part"],
+            use_existing_groups=not options["no_reuse_groups"],
             clear_group_authors=options["clear_group_authors"],
             clear_authors=options["clear_authors"],
             clear_ai_states=options["clear_ai_states"],

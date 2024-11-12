@@ -38,6 +38,7 @@ class Importer:
         user_map_attr="email",
         missing_user: str = MissingUser.RAISE,
         add_participants: bool = True,
+        use_existing_groups: bool = True,
         verify=True,
         **kwargs,
     ):
@@ -53,6 +54,7 @@ class Importer:
         # Config
         self.missing_user_strategy = missing_user
         self.add_participants = add_participants
+        self.use_existing_groups = use_existing_groups
         self.user_map_attr = user_map_attr
         self.export_schema_kwargs = kwargs
         # Internal data
@@ -139,9 +141,18 @@ class Importer:
         # FIXME: This requires proper validation before allowing it to be used via frontend
         # Groups
         for mgd in self.data.groups:
-            group: MeetingGroup = self.meeting.groups.create(
-                **mgd.dict(exclude={"members"}, exclude_none=True)
-            )
+            if self.use_existing_groups:
+                group, _ = self.meeting.groups.update_or_create(
+                    groupid=mgd.groupid,
+                    defaults=mgd.dict(
+                        exclude={"members", "groupid"}, exclude_none=True
+                    ),
+                )
+                group: MeetingGroup
+            else:
+                group: MeetingGroup = self.meeting.groups.create(
+                    **mgd.dict(exclude={"members"}, exclude_none=True)
+                )
             self.mg_map[group.groupid] = group
             if mgd.members:
                 members = set()

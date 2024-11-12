@@ -1,3 +1,5 @@
+from email.policy import default
+
 from rest_framework import fields
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -53,6 +55,7 @@ class ImportFileSerializer(serializers.Serializer):
 
     file = fields.FileField(max_length=1000000, validators=[ImportFileValidator()])
     add_participants = fields.BooleanField()
+    use_existing_groups = fields.BooleanField(default=True)
     clear_group_authors = fields.BooleanField()
     clear_authors = fields.BooleanField()
     clear_ai_states = fields.BooleanField()

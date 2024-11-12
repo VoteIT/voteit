@@ -1,6 +1,7 @@
 import os
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.test import override_settings
 from django.test import TestCase
 
@@ -56,6 +57,28 @@ class ImporterTests(TestCase):
         self.assertEqual("the-hellos", meeting_group.groupid)
         self.assertEqual(meeting_group, disc.meeting_group)
         self.assertEqual({self.participant}, set(meeting_group.members.all()))
+
+    def test_import_already_existing_groups(self):
+        meeting_group = self.meeting.groups.create(
+            groupid="the-hellos", title="I'm a group"
+        )
+        importer = self._cut(self.meeting, use_existing_groups=False)
+        fn = os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml")
+        importer.from_file(fn)
+        with self.assertRaises(IntegrityError):
+            importer.run()
+
+    def test_import_use_already_existing_groups(self):
+        meeting_group = self.meeting.groups.create(
+            groupid="the-hellos", title="I'm a group"
+        )
+        importer = self._cut(self.meeting, use_existing_groups=True)
+        fn = os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml")
+        importer.from_file(fn)
+        importer.run()
+        self.assertEqual({self.participant}, set(meeting_group.members.all()))
+        meeting_group.refresh_from_db()
+        self.assertEqual("The Hellos", meeting_group.title)
 
     def test_import_with_missing_user_abort(self):
         self.participant.delete()
