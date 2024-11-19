@@ -174,7 +174,8 @@ class ManualCreateER(ContextAction):
             )
         weight_dict = {wv.user: wv.weight for wv in self.data.weights}
         manual_er = Manual(self.context)
-        manual_er.create_er(weight_dict=weight_dict)  # Only creates if needed
+        with set_actor(self.user):
+            manual_er.create_er(weight_dict=weight_dict)  # Only creates if needed
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
         return msg
