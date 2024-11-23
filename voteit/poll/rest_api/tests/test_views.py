@@ -1,5 +1,3 @@
-from json import dumps
-
 from django.contrib.auth import get_user_model
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
@@ -11,6 +9,7 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.polls.combined_simple import CombinedSimple
+from voteit.poll.models import ElectoralRegister
 from voteit.poll.workflows import PollWf
 from voteit.proposal.workflows import ProposalWf
 
@@ -268,18 +267,22 @@ class PollViewSetTests(APITestCase):
 class ElectoralRegisterViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import ElectoralRegister
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting",
         )
-        cls.participant: User = User.objects.create_user("participant")
         cls.moderator: User = User.objects.create_user("moderator")
-        cls.outsider: User = User.objects.create_user("outsider")
-        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
-        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.voters = []
+        for i in range(5):
+            voter = User.objects.create_user(f"voter_{i}")
+            cls.meeting.add_roles(voter, ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER)
+            cls.voters.append(voter)
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR, ROLE_POTENTIAL_VOTER)
         cls.er: ElectoralRegister = cls.meeting.electoral_registers.create()
-        cls.er.set_voters_from_dict({cls.moderator.pk: 1, cls.participant.pk: 2})
+        cls.voter_weights = {cls.moderator.pk: 1, **{v.pk: 2 for v in cls.voters}}
+        cls.er.set_voters_from_dict(cls.voter_weights)
+        for i in range(3):
+            er = cls.meeting.electoral_registers.create()
+            er.set_voters_from_dict(cls.voter_weights)
 
     def test_list(self):
         url = reverse("electoral-registers-list")
@@ -287,31 +290,33 @@ class ElectoralRegisterViewSetTests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
         data = response.json()
-        self.assertEqual(1, len(data))
+        self.assertEqual(4, len(data))
 
     def test_get(self):
         url = reverse("electoral-registers-detail", kwargs={"pk": self.er.pk})
         self.client.force_login(self.moderator)
+        # FIXME: assert queries! N+1!
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
         data = response.json()
         self.assertEqual(self.er.pk, data["pk"])
         self.assertIsInstance(data["weights"], list)
-        self.assertEqual(2, len(data["weights"]))
+        self.assertEqual(6, len(data["weights"]))
         self.assertEqual(
-            [
-                {"user": self.participant.pk, "weight": 2},
-                {"user": self.moderator.pk, "weight": 1},
-            ],
-            sorted(data["weights"], key=lambda x: x["user"]),
+            self.voter_weights, {x["user"]: x["weight"] for x in data["weights"]}
         )
+
+    def test_cache(self):
+        url = reverse("electoral-registers-detail", kwargs={"pk": self.er.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("max-age=604800", response.headers.get("Cache-Control"))
 
 
 class ExportElectoralRegisterViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import ElectoralRegister
-
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting",
         )

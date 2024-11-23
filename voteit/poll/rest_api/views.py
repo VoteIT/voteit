@@ -2,6 +2,8 @@ import csv
 
 from django.http import Http404
 from django.http import HttpResponse
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 from rest_framework import viewsets
@@ -71,6 +73,10 @@ class ElectoralRegisterViewSet(ReadonlyModelViewSet):
 
     def get_queryset(self):
         return ElectoralRegister.objects.for_user(self.request.user)
+
+    @method_decorator(cache_page(60 * 60 * 24 * 7))
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
 
 
 @router.register("electoral-register-policies", basename="electoral-register-policies")
