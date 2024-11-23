@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC
 
 from auditlog.context import set_actor
+from django.db import transaction
 from pydantic.main import BaseModel
 
 from envelope.deferred_jobs.message import ContextAction
@@ -78,23 +79,17 @@ class AddVote(VoteBase, ABC):
     model = Poll
     context: Poll
     context_schema_attr = "poll"
+    atomic = False
 
     def run_job(self):
         self.assert_perm()
         poll = self.context
         poll.method.validate_vote(self)
-        vote = poll.votes.filter(user=self.user).first()
-        if vote is None:
-            poll.votes.create(user=self.user, vote=self.data.vote)
-        else:
-            # Vote already exists - we'll change the existing one instead
-            vote.vote = self.data.vote
-            vote.abstain = False
-            vote.save()
-
+        poll.votes.update_or_create(
+            user=self.user, defaults={"vote": self.data.vote, "abstain": False}
+        )
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
-        return msg
 
 
 class AbstainSchema(BaseModel):
@@ -112,19 +107,16 @@ class AbstainVote(VoteBase):
     data: AbstainSchema
     context: Poll
     context_schema_attr = "poll"
+    atomic = False
 
     def run_job(self):
         self.assert_perm()
         poll = self.context
-        vote: Vote = poll.votes.filter(user=self.user).first()
-        if vote is None:
-            poll.votes.create(user=self.user, abstain=True)
-        else:
-            vote.abstain = True
-            vote.save()
+        poll.votes.update_or_create(
+            user=self.user, defaults={"abstain": True, "vote": None}
+        )
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
-        return msg
 
 
 @outgoing

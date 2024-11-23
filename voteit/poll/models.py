@@ -642,6 +642,8 @@ class Vote(models.Model):
             # Validate
             self.poll.method.vote_to_obj(data)
             self.vote_data = data
+        elif data is None:
+            self.vote_data = None
         else:
             raise ValueError("Not a str or vote_schema (pydantic BaseModel)")
 

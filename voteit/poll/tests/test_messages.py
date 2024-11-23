@@ -51,7 +51,7 @@ class AddVoteTests(TestCase):
         kw.setdefault("poll", self.poll.pk)
         return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
-    def test_add(self):
+    def test_add_and_change(self):
         self.poll.ongoing()
         self.poll.save()
         msg = self._mk_one()
@@ -59,6 +59,11 @@ class AddVoteTests(TestCase):
         vote = self.poll.votes.filter(user=self.voter).first()
         self.assertIsNotNone(vote)
         self.assertEqual("yes", vote.vote_data)
+        # And make sure it works to do twice
+        msg = self._mk_one(vote={"choice": "no"})
+        msg.run_job()
+        vote.refresh_from_db()
+        self.assertEqual({"choice": "no"}, vote.vote.dict())
 
     def test_add_not_started(self):
         msg = self._mk_one()
@@ -76,7 +81,7 @@ class AddVoteTests(TestCase):
         self.poll.save()
         self.vote = self.poll.votes.create(user=self.voter, vote_data="no")
         msg = self._mk_one()
-        response = msg.run_job()
+        msg.run_job()
         vote = self.poll.votes.filter(user=self.voter).first()
         self.assertEqual("yes", vote.vote_data)
 
