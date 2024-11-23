@@ -2,14 +2,17 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from envelope.messages.common import Status
+from envelope.messages.errors import NotFoundError
 from envelope.messages.errors import UnauthorizedError
 from envelope.messages.errors import ValidationErrorMsg
+from envelope.testing import MessageCatcher
 
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.reactions.messages import ReactionUserListResponse
 from voteit.reactions.models import ReactionButton
 
 User = get_user_model()
@@ -56,15 +59,13 @@ class AddReactionTests(TestCase):
     def test_add_on_prop(self):
         self.assertFalse(self.prop.reaction_set.count())
         msg = self._mk_one(self.prop, self.voter)
-        response = msg.run_job()
-        self.assertIsInstance(response, Status)
+        msg.run_job()
         self.assertTrue(self.prop.reaction_set.count())
 
     def test_add_on_discussion(self):
         self.assertFalse(self.prop.reaction_set.count())
         msg = self._mk_one(self.disc, self.voter)
-        response = msg.run_job()
-        self.assertIsInstance(response, Status)
+        msg.run_job()
         self.assertTrue(self.disc.reaction_set.count())
 
     def test_add_wrong_type(self):
@@ -113,6 +114,32 @@ class AddReactionTests(TestCase):
         msg = self._mk_one(self.prop, self.moderator, button=new_button.pk)
         msg.run_job()
         self.assertEqual(2, self.prop.reaction_set.count())
+
+    def test_add_on_deleted_prop(self):
+        self.assertFalse(self.prop.reaction_set.count())
+        msg = self._mk_one(self.prop, self.voter)
+        previous_pk = self.prop.pk
+        self.prop.delete()
+        with self.assertRaises(NotFoundError) as cm:
+            msg.run_job()
+        self.assertEqual(
+            {"key": "pk", "value": str(previous_pk), "model": "proposal.proposal"},
+            cm.exception.data.dict(),
+        )
+
+    def test_add_on_prop_from_another_meeting(self):
+        new_meeting: Meeting = Meeting.objects.create()
+        new_ai = new_meeting.agenda_items.create(title="ai")
+        new_prop = new_ai.proposals.create()
+        msg = self._mk_one(new_prop, self.voter)
+        with self.assertRaises(NotFoundError):
+            msg.run_job()
+
+    def test_add_duplicate(self):
+        msg = self._mk_one(self.prop, self.voter)
+        msg.run_job()
+        # Nothing should happen
+        msg.run_job()
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -253,6 +280,9 @@ class ListReactionUsersTests(TestCase):
 
     def test_has_correct_role(self):
         msg = self._mk_one(self.voter, self.prop)
-        response = msg.run_job()
+        with MessageCatcher(ReactionUserListResponse) as messages:
+            msg.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
         self.assertEqual("reaction.list", response.name)
         self.assertEqual({self.voter.pk, self.participant.pk}, set(response.data.users))

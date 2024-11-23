@@ -107,6 +107,7 @@ class ReactionButton(MeetingContext):
 
     objects = Manager()
     reactions: models.QuerySet
+    meeting_id: int
 
     def __str__(self):
         return self.title

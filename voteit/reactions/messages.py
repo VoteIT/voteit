@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
+from envelope.messages.errors import NotFoundError
 from pydantic import validator
 from pydantic.main import BaseModel
 
@@ -99,8 +101,12 @@ class AddReaction(BaseAddObject):
     data: ReactionSchema
     context: ReactionButton
     context_schema_attr = "button"
+    atomic = False
+    result_ttl: int | None = None
+    ttl: int | None = 10
+    job_timeout: int | None = 5
 
-    def run_job(self) -> Status:
+    def run_job(self):
         self.assert_perm()
         model_shortname = self.data.content_type
         if model_shortname not in self.context.allowed_models:
@@ -112,27 +118,34 @@ class AddReaction(BaseAddObject):
                 ],
             )
         # Already validated
+        button: ReactionButton = self.context
         model = get_model_by_shortname(model_shortname)
-        reactable = model.objects.get(pk=self.data.object_id)
+        try:
+            reactable = model.objects.get(
+                pk=self.data.object_id, agenda_item__meeting_id=button.meeting_id
+            )
+        except ObjectDoesNotExist:
+            raise NotFoundError.from_message(
+                self, value=self.data.object_id, model=model
+            )
         ai_pk = getattr(reactable, "agenda_item_id", None)
-        if self.context.flag_mode:
+        if button.flag_mode:
             # Singleton, so only set a single reaction as true - check if any exist regardless of user
-            if not reactable.reaction_set.filter(button=self.context).exists():
+            if not reactable.reaction_set.filter(button=button).exists():
                 reactable.reaction_set.create(
                     user=self.user,
-                    button=self.context,
+                    button=button,
                     agenda_item_id=ai_pk,
                 )
         else:
             # Normal multi-mode
-            reactable.reaction_set.create(
+            reactable.reaction_set.update_or_create(
                 user=self.user,
-                button=self.context,
+                button=button,
                 agenda_item_id=ai_pk,
             )
         response = Status.from_message(self)
         websocket_send(response, state=response.SUCCESS)
-        return response
 
 
 @incoming
@@ -144,13 +157,16 @@ class DeleteReaction(BaseDeleteObject):
     name = "reaction.delete"
     permission = ReactionPermissions.DELETE
     model = Reaction
+    atomic = False
+    result_ttl: int | None = None
+    ttl: int | None = 10
+    job_timeout: int | None = 5
 
-    def run_job(self) -> Status:
+    def run_job(self):
         self.assert_perm()
         self.context.delete()
         response = Status.from_message(self)
         websocket_send(response, state=response.SUCCESS)
-        return response
 
 
 @incoming
@@ -168,8 +184,12 @@ class DeleteFlagReaction(BaseDeleteObject):
     data: ReactionSchema
     context: ReactionButton
     context_schema_attr = "button"
+    atomic = False
+    result_ttl: int | None = None
+    ttl: int | None = 10
+    job_timeout: int | None = 5
 
-    def run_job(self) -> Status:
+    def run_job(self):
         self.assert_perm()
         model_shortname = self.data.content_type
         if model_shortname not in self.context.allowed_models:
@@ -188,12 +208,11 @@ class DeleteFlagReaction(BaseDeleteObject):
         # Already validated
         model = get_model_by_shortname(model_shortname)
         ct = ContentType.objects.get_for_model(model)
-        Reaction.objects.filter(
-            button=self.context, object_id=self.data.object_id, content_type=ct
+        self.context.reactions.filter(
+            object_id=self.data.object_id, content_type=ct
         ).delete()
         response = Status.from_message(self)
         websocket_send(response, state=response.SUCCESS)
-        return response
 
 
 @incoming
@@ -205,8 +224,12 @@ class ListReactionUsers(BaseObjectAction):
     data: ReactionSchema
     context: ReactionButton
     context_schema_attr = "button"
+    atomic = False
+    result_ttl: int | None = None
+    ttl = 10
+    job_timeout: int | None = 5
 
-    def run_job(self) -> ReactionUserListResponse:
+    def run_job(self):
         self.assert_perm()
         model_shortname = self.data.content_type
         # Already validated
@@ -219,7 +242,6 @@ class ListReactionUsers(BaseObjectAction):
             self, users=list(user_pks), **self.data.dict()
         )
         websocket_send(response, state=response.SUCCESS)
-        return response
 
 
 @outgoing
