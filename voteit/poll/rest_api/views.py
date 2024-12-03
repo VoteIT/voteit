@@ -83,6 +83,7 @@ class ElectoralRegisterViewSet(ReadonlyModelViewSet):
 class ElectoralRegisterPoliciesViewSet(ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
+    @method_decorator(cache_page(60 * 60 * 2))
     def list(self, request):
         reg = get_electoral_policy_registry()
         results = []
