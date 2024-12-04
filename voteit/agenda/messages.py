@@ -55,8 +55,9 @@ class UpdateLastRead(ContextAction):
     permission = AgendaPermissions.VIEW  # FIXME: Anon users and public meetings?
     schema = UpdateLastReadSchema
     data: UpdateLastReadSchema
+    ttl = 15
 
-    def run_job(self) -> LastReadChanged:
+    def run_job(self):
         """
         Create or mark agenda as read. This will create a separate database entry,
         but we'll serialize the agenda item instead.
@@ -67,7 +68,6 @@ class UpdateLastRead(ContextAction):
             self, timestamp=timestamp, agenda_item=self.context.pk
         )
         websocket_send(response, state=response.SUCCESS)
-        return response
 
 
 @outgoing
