@@ -182,4 +182,10 @@ class UserConsentAdmin(admin.ModelAdmin):
 
 @admin.register(OAuth2Provider)
 class OAuth2ProviderAdmin(admin.ModelAdmin):
-    pass
+    list_display = ["__str__", "organisation_active", "scope"]
+    list_filter = ["scope", "organisation__active"]
+
+    @admin.display(description="Org active?", boolean=True)
+    def organisation_active(self, instance):
+        if org := instance.organisation:
+            return org.active
