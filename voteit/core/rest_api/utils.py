@@ -87,7 +87,7 @@ def get_valid_transitions(
     Return all transitions that make any sense to test from a specific state.
 
     The reason for duplicating this functionality from FSM is that we'll want to conduct the tests one by one
-    to give the user meaningfull feedback.
+    to give the user meaningful feedback.
 
     Required user checks are permission and condition.
     """
