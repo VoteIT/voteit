@@ -1,20 +1,25 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+from envelope.messages.common import BatchMessage
+from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
 from envelope.testing import ChannelMessageCatcher
 from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.agenda.messages import AgendaChanged
+from voteit.agenda.messages import AgendaDeleted
 from voteit.agenda.messages import LastReadChangedSchema
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.models import LastRead
 from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.rest_api.serializers import LastReadSerializer
 from voteit.agenda.workflows import AgendaItemWf
+from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
+from voteit.organisation.views import begin_auth
 
 User = get_user_model()
 
@@ -151,3 +156,40 @@ class AgendaItemBulkChangeTests(TestCase):
             },
             response.data.dict(exclude={"related_modified", "tags", "order"}),
         )
+
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+class AgendaItemBulkDeleteTests(TestCase):
+    fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.participant = cls.meeting.participants.get(username="participant")
+        cls.moderator = cls.meeting.participants.get(username="moderator")
+
+    def _mk_one(self, user, **kw):
+        from voteit.agenda.messages import AgendaItemBulkDelete
+
+        kw.setdefault("meeting", 1)
+
+        return AgendaItemBulkDelete(
+            mm={"user_pk": user.pk, "consumer_name": "abc"}, **kw
+        )
+
+    def test_message_job(self):
+        msg = self._mk_one(self.moderator, agenda_items=[1, 2, 3])
+        with ChannelMessageCatcher(
+            MeetingChannel, AgendaDeleted, BatchMessage
+        ) as messages:
+            msg.run_job()
+        self.assertFalse(self.meeting.agenda_items.filter(pk__in=[1, 2, 3]).count())
+        self.assertEqual(3, len(messages))
+        self.assertEqual({1, 2, 3}, {x.data.pk for x in messages})
+
+    def test_message_meeting_not_ongoing(self):
+        self.meeting.ongoing()
+        self.meeting.save()
+        msg = self._mk_one(self.moderator, agenda_items=[1, 2, 3])
+        with self.assertRaises(BadRequestError):
+            msg.run_job()

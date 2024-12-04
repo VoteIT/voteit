@@ -4,8 +4,10 @@ from datetime import datetime
 from logging import getLogger
 
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from envelope.core.message import Message
 from envelope.deferred_jobs.message import ContextAction
+from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
 from pydantic import BaseModel
 from pydantic import conlist
@@ -19,6 +21,7 @@ from voteit.core.rest_api.utils import drf_do_transition
 from voteit.core.rest_api.utils import get_valid_transitions
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
+from voteit.meeting.workflows import MeetingWf
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
@@ -28,13 +31,16 @@ from voteit.messaging.decorators import outgoing
 logger = getLogger(__name__)
 
 
-class AgendaItemBulkChangeSchema(BaseModel):
+class AgendaItemBulkSchema(BaseModel):
     meeting: int
+    # Agenda items validated in message to avoid loading models
+    agenda_items: conlist(int, min_items=1, unique_items=True)
+
+
+class AgendaItemBulkChangeSchema(AgendaItemBulkSchema):
     state: str | None = None
     block_discussion: bool | None = None
     block_proposals: bool | None = None
-    # Agenda items validated in message to avoid loading models
-    agenda_items: conlist(int, min_items=1, unique_items=True)
 
     @root_validator
     def do_something(cls, values):
@@ -106,6 +112,26 @@ class AgendaItemBulkChange(ContextAction):
                     must_save.add(ai)
         for ai in must_save:
             ai.save()
+
+
+@incoming
+class AgendaItemBulkDelete(ContextAction):
+    name = "agenda_item.bulk_delete"
+    model = Meeting
+    schema = AgendaItemBulkSchema
+    data: AgendaItemBulkSchema
+    context: Meeting
+    context_schema_attr = "meeting"
+    permission = MeetingPermissions.CHANGE
+    ttl: 20
+
+    def run_job(self):
+        self.assert_perm()
+        if self.context.state == MeetingWf.ONGOING:
+            raise BadRequestError.from_message(
+                self, msg=_("Can't bulk delete in ongoing meeting")
+            )
+        self.context.agenda_items.filter(pk__in=self.data.agenda_items).delete()
 
 
 class UpdateLastReadSchema(BaseModel):
