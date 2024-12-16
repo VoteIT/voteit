@@ -18,6 +18,7 @@ class ReactionButtonAdmin(MeetingAdminMixin, admin.ModelAdmin):
         "meeting__title",
         "title",
     )
+    autocomplete_fields = ("meeting",)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -34,4 +35,13 @@ class ReactionAdmin(admin.ModelAdmin):
         "agenda_item",
     )
     list_filter = ("user__organisation",)
-    search_fields = ("meeting__title", "title", "user__userid")
+    search_fields = (
+        "meeting__title",
+        "title",
+        "user__userid",
+    )
+    autocomplete_fields = (
+        "button",
+        "user",
+        "agenda_item",
+    )

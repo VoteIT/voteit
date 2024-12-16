@@ -7,6 +7,7 @@ from voteit.meeting.admin import MeetingViaAIFilter
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
+from voteit.proposal.models import TextParagraph
 
 
 @admin.register(Proposal)
@@ -91,6 +92,7 @@ class DiffProposalAdmin(ProposalAdmin):
         "author",
         "meeting_group",
         "mentions",
+        "paragraph",
     )
     exclude = ("state",)
 
@@ -103,6 +105,16 @@ class DiffProposalAdmin(ProposalAdmin):
         )
         qs = self.annotate_ai(qs)
         return qs.prefetch_related("author")
+
+
+@admin.register(TextParagraph)
+class TextParagraphAdmin(admin.ModelAdmin):
+    search_fields = (
+        "body",
+        "agenda_item__title",
+    )
+    list_display = ("__str__", "agenda_item", "text_document")
+    readonly_fields = ("agenda_item", "text_document")
 
 
 @admin.register(TextDocument)
