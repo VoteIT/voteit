@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from envelope.core.message import Message
 from envelope.deferred_jobs.message import ContextAction
+from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
 from pydantic import BaseModel
@@ -112,6 +113,8 @@ class AgendaItemBulkChange(ContextAction):
                     must_save.add(ai)
         for ai in must_save:
             ai.save()
+        response = Status.from_message(self, state=Status.SUCCESS)
+        websocket_send(response)
 
 
 @incoming
@@ -132,6 +135,8 @@ class AgendaItemBulkDelete(ContextAction):
                 self, msg=_("Can't bulk delete in ongoing meeting")
             )
         self.context.agenda_items.filter(pk__in=self.data.agenda_items).delete()
+        response = Status.from_message(self, state=Status.SUCCESS)
+        websocket_send(response)
 
 
 class UpdateLastReadSchema(BaseModel):
