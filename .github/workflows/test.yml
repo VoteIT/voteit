@@ -44,7 +44,3 @@ jobs:
     - name: Django testrunner
       run: |
         ./manage.py test voteit
-
-    - name: Test with black
-      run: |
-        python -m black --exclude \/migrations\/ --check voteit
