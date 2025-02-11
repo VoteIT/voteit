@@ -68,7 +68,6 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
 
     def save(self, **kw):
         """Set order as last agenda item for meeting when creating."""
-        print("SAVING ", self)
         if not self.pk:
             max_order = self.meeting.agenda_items.aggregate(
                 max_order=models.Max("order")
