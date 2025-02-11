@@ -198,6 +198,7 @@ _relaxed["attributes"].setdefault("img", []).append("src")
 _relaxed["attributes"].setdefault("iframe", []).extend(
     ["class", "frameborder", "allowfullscreen", "src"]
 )
+_relaxed["attributes"].setdefault("li", []).append("data-list")
 
 
 def relaxed_clean_html(text: str):

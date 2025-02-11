@@ -196,6 +196,12 @@ class BaseContentTests(TestCase):
         self.meeting.save()
         self.assertEqual("&lt;javascript&gt;is annoying", self.meeting.body)
 
+    def test_weird_list_fetish(self):
+        body = '<ol><li data-list="bullet">.</li><li data-list="ordered">.</li><li data-list="checked">.</li></ol>'
+        self.meeting.body = body
+        self.meeting.save()
+        self.assertEqual(self.meeting.body, body)
+
 
 class AuditLogTests(TestCase):
     fixtures = ["meeting_test_fixture"]
