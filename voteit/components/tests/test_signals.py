@@ -92,7 +92,9 @@ class MeetingChannelSubscribedTests(TestCase):
         payloads = [
             x.p for x in response.data.app_state if x.t == "meeting_component.added"
         ]
-        self.assertEqual(0, len(payloads))
+        # Only prop_print here, flash should have invalid settings
+        self.assertEqual(1, len(payloads))
+        self.assertEqual(payloads[0]["component_name"], ProposalPrint.name)
 
     def test_meeting_components_disabled(self):
         self.flash.disable()
@@ -106,8 +108,10 @@ class MeetingChannelSubscribedTests(TestCase):
         payloads = [
             x.p for x in response.data.app_state if x.t == "meeting_component.added"
         ]
-        self.assertEqual(1, len(payloads))
-        self.assertEqual(
+        # All sent, but one is disabled
+        self.assertEqual(2, len(payloads))
+        self.assertDictEqual(
+            payloads[0],
             {
                 "pk": self.prop_print.pk,
                 "settings": None,
@@ -116,7 +120,20 @@ class MeetingChannelSubscribedTests(TestCase):
                 "state": EnabledWf.ON,
                 "is_valid": True,
             },
-            payloads[0],
+        )
+        self.assertDictEqual(
+            payloads[1],
+            {
+                "pk": self.flash.pk,
+                "settings": {
+                    "msg": "Hello!",
+                    "type": "info",
+                },
+                "meeting": self.meeting.pk,
+                "component_name": FlashMessage.name,
+                "state": EnabledWf.OFF,
+                "is_valid": True,
+            },
         )
 
 
@@ -132,10 +149,9 @@ class MeetingComponentChangedTests(TestCase):
     @patch.object(MeetingChannel, "sync_publish")
     def test_added_disabled(self, mock_publish):
         with FakeCommit():
-            component = self.meeting.components.create(
-                component_name=ProposalPrint.name
-            )
-        self.assertFalse(mock_publish.called)
+            self.meeting.components.create(component_name=ProposalPrint.name)
+        # Disabled components still published
+        self.assertIs(True, mock_publish.called)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added_enabled(self, mock_publish):
@@ -154,6 +170,7 @@ class MeetingComponentChangedTests(TestCase):
     def test_changed_enabled(self, mock_publish):
         from voteit.components.messages import MeetingComponentChanged
 
+        # Enabled components should be sent as a change
         with FakeCommit():
             self.component.enable()
             self.component.save()
@@ -164,17 +181,15 @@ class MeetingComponentChangedTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_changed_disabled(self, mock_publish):
-        from voteit.components.messages import MeetingComponentDeleted
+        from voteit.components.messages import MeetingComponentChanged
 
-        # For any disabled component, delete is always sent since frontend can't distinguish between
-        # actual deleted or just disabled.
-        # Unless we're editing the component itself, that distinction isn't relevant.
+        # Updated components should be sent as a change
         with FakeCommit():
             self.component.settings = {"msg": "Bye"}
             self.component.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, MeetingComponentDeleted)
+        self.assertIsInstance(msg, MeetingComponentChanged)
         self.assertEqual(self.component.pk, msg.data.pk)
 
     @patch.object(MeetingChannel, "sync_publish")
