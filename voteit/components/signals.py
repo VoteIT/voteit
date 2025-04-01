@@ -34,7 +34,7 @@ def meeting_channel_subscribed(
     Send active components
     """
     # Append enabled components
-    for component in context.components.filter(state=EnabledWf.ON):
+    for component in context.components.all():
         if component.is_valid:
             app_state.append(
                 MeetingComponentAdded(**MeetingComponentSerializer(component).data)
@@ -53,21 +53,17 @@ def meeting_component_updated(instance: MeetingComponent = None, created=None, *
     """
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
     data = MeetingComponentSerializer(instance).data
-    component_on = data["state"] == EnabledWf.ON
     is_valid = data["is_valid"]
-    msg = None
     if created:
-        if component_on and is_valid:
-            msg = MeetingComponentAdded(**data)
+        if is_valid:
+            meeting_ch.sync_publish(MeetingComponentAdded(**data))
     else:
         # Update
-        if component_on and is_valid:
-            # Only send if valid
-            msg = MeetingComponentChanged(**data)
-        else:
-            msg = MeetingComponentDeleted(**data)
-    if msg:
-        meeting_ch.sync_publish(msg)
+        meeting_ch.sync_publish(
+            MeetingComponentChanged(**data)
+            if is_valid
+            else MeetingComponentDeleted(**data)
+        )
 
 
 @receiver(pre_delete, sender=MeetingComponent)
