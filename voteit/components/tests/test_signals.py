@@ -110,19 +110,9 @@ class MeetingChannelSubscribedTests(TestCase):
         ]
         # All sent, but one is disabled
         self.assertEqual(2, len(payloads))
+        payloads = sorted(payloads, key=lambda x: x["component_name"])
         self.assertDictEqual(
             payloads[0],
-            {
-                "pk": self.prop_print.pk,
-                "settings": None,
-                "meeting": self.meeting.pk,
-                "component_name": ProposalPrint.name,
-                "state": EnabledWf.ON,
-                "is_valid": True,
-            },
-        )
-        self.assertDictEqual(
-            payloads[1],
             {
                 "pk": self.flash.pk,
                 "settings": {
@@ -132,6 +122,17 @@ class MeetingChannelSubscribedTests(TestCase):
                 "meeting": self.meeting.pk,
                 "component_name": FlashMessage.name,
                 "state": EnabledWf.OFF,
+                "is_valid": True,
+            },
+        )
+        self.assertDictEqual(
+            payloads[1],
+            {
+                "pk": self.prop_print.pk,
+                "settings": None,
+                "meeting": self.meeting.pk,
+                "component_name": ProposalPrint.name,
+                "state": EnabledWf.ON,
                 "is_valid": True,
             },
         )

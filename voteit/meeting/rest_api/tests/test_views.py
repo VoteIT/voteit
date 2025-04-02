@@ -704,18 +704,19 @@ class ExportMeetingGroupsViewSetTests(APITestCase):
         self.client.force_login(self.moderator)
         response = self.client.get(url)
         data = response.json()
+        data = sorted(data, key=lambda x: x["groupid"])
         self.assertEqual(
             [
-                {
-                    "title": "Özgür",
-                    "groupid": "ozgur",
-                    "votes": 5,
-                },
-                {"title": "好", "groupid": "ni-hao", "votes": 8},
                 {
                     "title": "Fika nu kör vi",
                     "groupid": "fika-nu-kor-vi",
                     "votes": None,
+                },
+                {"title": "好", "groupid": "ni-hao", "votes": 8},
+                {
+                    "title": "Özgür",
+                    "groupid": "ozgur",
+                    "votes": 5,
                 },
             ],
             data,
