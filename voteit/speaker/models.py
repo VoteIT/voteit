@@ -294,7 +294,19 @@ class Speaker(MeetingContext, SpeakerSystemContext):
     importers = {"organisation": {}}
 
     class Meta:
-        constraints = []
+        constraints = [
+            models.UniqueConstraint(
+                "speaker_list",
+                condition=models.Q(started__isnull=False, seconds__isnull=True),
+                name="only_one_ongoing_speaker",
+            ),
+            models.UniqueConstraint(
+                "user",
+                "speaker_list",
+                condition=models.Q(seconds__isnull=True),
+                name="only_unique_users_in_queue",
+            ),
+        ]
 
     @property
     def ended(self) -> datetime | None:

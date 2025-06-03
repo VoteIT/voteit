@@ -27,6 +27,7 @@ class SpeakerTests(TestCase):
         cls.system = SpeakerListSystem.objects.create(method_name="simple", room=room)
         cls.list = SpeakerList.objects.create(speaker_system=cls.system)
         cls.user = User.objects.create(username="jane")
+        cls.user2 = User.objects.create(username="doe")
 
     def test_create_sets_order(self):
         user_one = User.objects.create(username="one")
@@ -63,6 +64,29 @@ class SpeakerTests(TestCase):
         self.assertTrue(speaker.current)
         speaker.seconds = 1
         self.assertFalse(speaker.current)
+
+    def test_constraint_only_one_ongoing_speaker(self):
+        speaker = self.list.speaker_items.create(user=self.user)
+        speaker2 = self.list.speaker_items.create(user=self.user2)
+        self.list.start_speaker(speaker)
+        with self.assertRaises(IntegrityError) as cm:
+            speaker2.started = now()
+            speaker2.save()
+        self.assertIn(
+            'duplicate key value violates unique constraint "only_one_ongoing_speaker"',
+            str(cm.exception),
+        )
+
+    def test_constraint_only_unique_users_in_queue(self):
+        speaker = self.list.speaker_items.create(user=self.user)
+        self.assertFalse(speaker.current)
+        # self.list.start_speaker(speaker)
+        with self.assertRaises(IntegrityError) as cm:
+            self.list.speaker_items.create(user=self.user)
+        self.assertIn(
+            'duplicate key value violates unique constraint "only_unique_users_in_queue"',
+            str(cm.exception),
+        )
 
 
 class SpeakerListTests(TestCase):
