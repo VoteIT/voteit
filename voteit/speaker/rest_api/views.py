@@ -22,6 +22,7 @@ from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.mixins import ModelContextMixin
+from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.room.models import Room
@@ -37,78 +38,78 @@ from voteit.speaker.rest_api.filters import SpeakerFilterSet
 
 logger = getLogger(__name__)
 
+# class CandidateRelationsFilter(django_filters.FilterSet):
+#     poll = django_filters.ModelChoiceFilter(
+#         field_name="polls", label="Poll", queryset=user_poll_qs
+#     )
+#     process = django_filters.ModelChoiceFilter(queryset=user_process_qs)
+#     mine = MineFilter(field_name="user", label="Mine")
+#     eligible = django_filters.BooleanFilter()
+
 
 @router.register("speaker-lists", basename="speaker-lists")
-class SpeakerListViewSet(DefaultModelViewSet):
+class SpeakerListViewSet(
+    AutoPermissionViewSetMixin, TransitionsMixin, viewsets.ModelViewSet
+):
     model = SpeakerList
     queryset = SpeakerList.objects.all()
     serializer_class = serializers.SpeakerListSerializer
-    context_lookup_kwarg: str = "speaker_system"
-    context_lookup_field: str = "pk"
-    context_queryset = SpeakerListSystem.objects.all()
+    serializer_classes = {"create": serializers.CreateSpeakerListSerializer}
 
     def get_queryset(self):
         if self.detail:
             return self.queryset
-        try:
-            speaker_system = self.get_context(self.request)
-        except exceptions.ValidationError:
-            speaker_system = None
-        if speaker_system and self.request.user.has_perm(
-            SpeakerSystemPermissions.VIEW, speaker_system
-        ):
-            return self.queryset.filter(speaker_system=speaker_system)
         return self.queryset.none()
 
 
-@router.register("speaker-history", basename="speaker-history")
-class HistoricSpeakerViewSet(
-    ModelContextMixin,
-    ListModelMixin,
-    GenericViewSet,
-):
-    model = Speaker
-    queryset = (
-        Speaker.objects.filter(
-            seconds__isnull=False,
-        )
-        .values(
-            "user",
-        )
-        .annotate(
-            times_spoken=models.Count("user"),
-            seconds_spoken=models.Sum("seconds"),
-        )
-    )
-    serializer_class = serializers.HistoricSpeakerListSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filterset_class = SpeakerFilterSet
-    permission_classes = (permissions.IsAuthenticated,)
-    context_lookup_kwarg = "meeting"
-    context_queryset = Meeting.objects.all()
-
-    def get_queryset(self):
-        if self.detail:
-            return self.queryset
-        try:
-            meeting = self.get_context(self.request)
-        except exceptions.ValidationError:
-            meeting = None
-        if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
-            return self.queryset.filter(speaker_list__speaker_system__meeting=meeting)
-        return self.queryset.none()
+# @router.register("speaker-history", basename="speaker-history")
+# class HistoricSpeakerViewSet(
+#     ModelContextMixin,
+#     ListModelMixin,
+#     GenericViewSet,
+# ):
+#     model = Speaker
+#     queryset = (
+#         Speaker.objects.filter(
+#             seconds__isnull=False,
+#         )
+#         .values(
+#             "user",
+#         )
+#         .annotate(
+#             times_spoken=models.Count("user"),
+#             seconds_spoken=models.Sum("seconds"),
+#         )
+#     )
+#     serializer_class = serializers.HistoricSpeakerListSerializer
+#     filter_backends = (DjangoFilterBackend,)
+#     filterset_class = SpeakerFilterSet
+#     permission_classes = (permissions.IsAuthenticated,)
+#     context_lookup_kwarg = "meeting"
+#     context_queryset = Meeting.objects.all()
+#
+#     def get_queryset(self):
+#         if self.detail:
+#             return self.queryset
+#         try:
+#             meeting = self.get_context(self.request)
+#         except exceptions.ValidationError:
+#             meeting = None
+#         if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
+#             return self.queryset.filter(speaker_list__speaker_system__meeting=meeting)
+#         return self.queryset.none()
 
 
 @router.register("speaker-list-systems", basename="speaker-list-systems")
-class SpeakerListSystemViewSet(DefaultModelViewSet):
+class SpeakerListSystemViewSet(
+    AutoPermissionViewSetMixin,
+    TransitionsMixin,
+    viewsets.ModelViewSet,
+):
     model = SpeakerListSystem
     queryset = SpeakerListSystem.objects.all()
     serializer_class = serializers.SpeakerListSystemSerializer
     serializer_classes = {"create": serializers.CreateSpeakerListSystemSerializer}
-    context_lookup_kwarg: str = "room"
-    context_lookup_field: str = "pk"
-    context_queryset = Room.objects.all()
-    context_permission = RoomPermissions.VIEW
 
     def get_queryset(self):
         if self.action == "list":

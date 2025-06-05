@@ -55,7 +55,7 @@ class SLAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
         "speakers_count",
     )
     list_filter = ("speaker_system__meeting__organisation",)
-    readonly_fields = ("current", "order")
+    readonly_fields = ("order",)
     search_fields = (
         "title",
         "meeting__title",

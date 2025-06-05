@@ -44,7 +44,12 @@ if TYPE_CHECKING:
     from voteit.speaker.abcs import ListMethod
 
 
-__all__ = "SpeakerSystemRoles", "SpeakerListSystem", "Speaker", "SpeakerList"
+__all__ = (
+    "SpeakerSystemRoles",
+    "SpeakerListSystem",
+    "Speaker",
+    "SpeakerList",
+)
 
 
 class SpeakerSystemRoles(Roles, MeetingContext):
@@ -87,8 +92,6 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         choices=SpeakerSystemWf.choices(),
         editable=False,
     )
-    # SpeakerListSystem.objects.filter(title__iregex=r'^.{100,}$')
-    # title: str | None = models.CharField(max_length=200, null=True)
     room: Room = models.OneToOneField(
         Room,
         verbose_name="Room",
@@ -223,27 +226,29 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     )
     def archive(self):
         self.active_list = None
-        for slist in self.speaker_lists.all():
-            slist.stop_speaker()
-            slist.speakers_in_queue().delete()
-            slist.order_list = []
-            slist.save()
+        # for slist in self.speaker_lists.all():
+        # slist.stop_speaker()
+        # slist.speakers_in_queue().delete()
+        # slist.order_list = []
+        # slist.save()
+        # FIXME: Update this
         self.save()
 
     def save(self, **kw):
         # Will raise error if there's something bogus with settings or referenced method
         self.settings
+        # FIXME This should be checked in serializer instead
         if (
             self.active_list_id
             and not self.speaker_lists.filter(pk=self.active_list_id).exists()
         ):
             raise IntegrityError("Active list belongs to another speaker system")
         # Add meeting on create if not specified
-        if not self.pk and self.meeting_id is None and self.room_id is not None:
-            if self.room.meeting_id:
-                self.meeting_id = self.room.meeting_id
-        # Make sure room and sls links to same meeting
-        if not self.pk and self.room_id:
+        if self._state.adding:
+            if self.meeting_id is None and self.room_id is not None:
+                if self.room.meeting_id:
+                    self.meeting_id = self.room.meeting_id
+            # Make sure room and sls links to same meeting
             if self.room.meeting_id != self.meeting_id:
                 raise IntegrityError("SLS links to another meeting")
         super().save(**kw)
@@ -279,7 +284,6 @@ class Speaker(MeetingContext, SpeakerSystemContext):
     """
 
     name = "speaker"
-
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.RESTRICT
     )
@@ -337,7 +341,7 @@ class Speaker(MeetingContext, SpeakerSystemContext):
         return self.speaker_list.speaker_system
 
     # Type hinting
-    objects = models.Manager()
+    objects: models.Manager
     user_id: int
 
     def __repr__(self):
@@ -346,26 +350,27 @@ class Speaker(MeetingContext, SpeakerSystemContext):
     def __str__(self):
         return f"Speaker id {self.pk}"
 
-    def save(self, **kwargs):
-        new_obj = self.pk is None
-        super().save(**kwargs)
-        if new_obj:
-            self.speaker_list.reorder()
+    # def save(self, **kwargs):
+    #     new_obj = self.pk is None
+    #     super().save(**kwargs)
+    #     if new_obj:
+    #         self.speaker_list.reorder()
 
 
 class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     name = "speaker_list"
+    _active_speaker: Speaker | None
     title = models.CharField(max_length=200)
     state = FSMField(
         default=SpeakerListWf.initial, choices=SpeakerListWf.choices(), editable=False
     )
-    current: Speaker | None = models.OneToOneField(
-        Speaker,
-        verbose_name="Current speaker, if any",
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
-    )
+    # current: Speaker | None = models.OneToOneField(
+    #     Speaker,
+    #     verbose_name="Current speaker, if any",
+    #     null=True,
+    #     blank=True,
+    #     on_delete=models.CASCADE,
+    # )
     speaker_system: SpeakerListSystem = models.ForeignKey(
         SpeakerListSystem, on_delete=models.CASCADE, related_name="speaker_lists"
     )
@@ -387,12 +392,11 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     importers = {"meeting": {}, "organisation": {}}
 
     @property
-    def meeting(self) -> Meeting | None:
+    def meeting(self) -> Meeting:
         """
         While not directly related, it's still good to be able to do lookups this way
         """
-        if self.speaker_system:
-            return self.speaker_system.meeting
+        return self.speaker_system.meeting
 
     @property
     def method(self) -> ListMethod:
@@ -436,13 +440,20 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     def close(self):
         pass
 
-    @ensure_atomic
-    def shuffle(self):
-        """
-        Randomize the order of the speakers. Run reorder afterwards to make sure any other priorities gets applied.
-        """
-        self.method.shuffle(self)
-        self.reorder()
+    def active_speaker(self, refresh=False) -> Speaker | None:
+        if refresh or not hasattr(self, "_active_speaker"):
+            self._active_speaker = self.speaker_items.filter(
+                started__isnull=False, seconds__isnull=True
+            ).first()
+        return self._active_speaker
+
+    # @ensure_atomic
+    # def shuffle(self):
+    #     """
+    #     Randomize the order of the speakers. Run reorder afterwards to make sure any other priorities gets applied.
+    #     """
+    #     self.method.shuffle(self)
+    #     self.reorder()
 
     def reorder(self):
         """
@@ -454,6 +465,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         if order_list != new_order:
             self.order_list = new_order
             self.save()
+        # FIXME: Return order changed?
         return new_order
 
     def speakers_in_queue(self) -> models.QuerySet[Speaker]:
@@ -475,23 +487,24 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
             .values_list("user_id", flat=True)
         )
 
-    @ensure_atomic
-    def start_speaker(self, speaker: Speaker) -> None:
-        """
-        Start a specific user in the queue
-        """
-        order_list = self.order_list
-        order_list.remove(speaker.user.pk)
-        if speaker.started is None:
-            self.stop_speaker()
-            speaker.started = now()
-            speaker.save()
-            self.current = speaker
-            self.order_list = order_list
-            self.save()
-        else:  # pragma: no coverage
-            # FIXME: Something...?
-            raise ValueError()
+    # @ensure_atomic
+    # def start_speaker(self, speaker: Speaker) -> None:
+    #     """
+    #     Start a specific user in the queue
+    #     """
+    #     #order_list = self.order_list
+    #     #order_list.remove(speaker.user.pk)
+    #     if speaker.started is None:
+    #         self.stop_speaker()
+    #         speaker.started = now()
+    #         speaker.seconds=None#Just to make sure
+    #         speaker.save()
+    #         self.current = speaker
+    #         self.order_list = order_list
+    #         self.save()
+    #     else:  # pragma: no coverage
+    #         # FIXME: Something...?
+    #         raise ValueError()
 
     @ensure_atomic
     def stop_speaker(self) -> None:
@@ -529,21 +542,24 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     def save(self, **kw):
         if self.title is None:
             self.title = "list @ " + self.agenda_item.title
-        with suppress(ObjectDoesNotExist):
-            if (
-                self.agenda_item_id
-                and self.agenda_item.meeting_id
-                and self.speaker_system.meeting_id != self.agenda_item.meeting_id
-            ):
-                raise IntegrityError(
-                    "agenda item and list system attached to different meetings"
-                )
+        if self._state.adding:
+            with suppress(ObjectDoesNotExist):
+                if (
+                    self.agenda_item_id
+                    and self.agenda_item.meeting_id
+                    and self.speaker_system.meeting_id != self.agenda_item.meeting_id
+                ):
+                    raise IntegrityError(
+                        "agenda item and list system attached to different meetings"
+                    )
         super().save(**kw)
 
     # Type hinting
     current_id: int | None
-    objects = models.Manager()
-    speaker_items = models.QuerySet()
+    objects: models.Manager
+    speaker_items: models.QuerySet[Speaker]
+    # Accessing will raise ObjectNotFound if None, so use is_active_list
+    active_in_system: SpeakerListSystem | None
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.title[:50]}>"

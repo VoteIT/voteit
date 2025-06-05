@@ -17,22 +17,21 @@ from voteit.speaker.roles import ROLE_SPEAKER
 from voteit.speaker.workflows import SpeakerListWf
 
 if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractUser
+    from voteit.core.models import User
 
 
 @predicate
-def is_speaker_moderator(user: AbstractUser, context: SpeakerSystemContext) -> bool:
+def is_speaker_moderator(user: User, context: SpeakerSystemContext) -> bool:
     """
     Check if a user has list moderator status within this speaker list system.
     """
     if isinstance(context, SpeakerSystemContext):
         return context.speaker_system.has_roles(user, ROLE_LIST_MODERATOR)
-    # pragma: no cover
-    return False
+    raise TypeError(f"{context} is not an instance of SpeakerSystemContext")
 
 
 @predicate
-def has_speaker_role(user: AbstractUser, context: SpeakerSystemContext) -> bool:
+def has_speaker_role(user: User, context: SpeakerSystemContext) -> bool:
     """
     Check if a user has speaker role status within this speaker list system.
     """
@@ -43,51 +42,53 @@ def has_speaker_role(user: AbstractUser, context: SpeakerSystemContext) -> bool:
             return context.speaker_system.meeting.has_any_roles(
                 user, *context.speaker_system.meeting_roles_to_speaker
             )
-    return False
+    raise TypeError(f"{context} is not an instance of SpeakerSystemContext")
 
 
 @predicate
-def is_list_open(user: AbstractUser, speaker_list: SpeakerList) -> bool:
-    return (
-        isinstance(speaker_list, SpeakerList)
-        and speaker_list.state == SpeakerListWf.OPEN
-    )
+def is_list_open(user: User, speaker_list: SpeakerList) -> bool:
+    if isinstance(speaker_list, SpeakerList):
+        return speaker_list.state == SpeakerListWf.OPEN
+    raise TypeError(f"{speaker_list} is not an instance of SpeakerList")
 
 
 @predicate
-def is_active_list(user: AbstractUser, speaker_list: SpeakerList) -> bool:
-    return isinstance(speaker_list, SpeakerList) and speaker_list.is_active_list
+def is_active_list(user: User, speaker_list: SpeakerList) -> bool:
+    if isinstance(speaker_list, SpeakerList):
+        return speaker_list.is_active_list
+    raise TypeError(f"{speaker_list} is not an instance of SpeakerList")
 
 
 @predicate
-def is_system_active(user: AbstractUser, context: SpeakerSystemContext) -> bool:
+def is_system_active(user: User, context: SpeakerSystemContext) -> bool:
     if isinstance(context, SpeakerSystemContext):
         return context.speaker_system.is_active
-    return False
+    raise TypeError(f"{context} is not an instance of SpeakerSystemContext")
 
 
 @predicate
-def is_system_not_archived(user: AbstractUser, context: SpeakerSystemContext) -> bool:
+def is_system_not_archived(user: User, context: SpeakerSystemContext) -> bool:
     if isinstance(context, SpeakerSystemContext):
         return not context.speaker_system.is_archived
+    # FIXME: This sometimes receives context as None?
+    # raise TypeError(f"{context} is not an instance of SpeakerSystemContext")
     return False
 
 
 @predicate
-def has_no_active_list(user: AbstractUser, context: SpeakerSystemContext) -> bool:
+def has_no_active_list(user: User, context: SpeakerSystemContext) -> bool:
     if isinstance(context, SpeakerSystemContext):
         return context.speaker_system.active_list_id is None
     raise TypeError(f"{context} is not a speaker_system context")
 
 
 @predicate
-def not_currently_speaking(user: AbstractUser, speaker_list: SpeakerList) -> bool:
+def not_currently_speaking(user: User, speaker_list: SpeakerList) -> bool:
     if isinstance(speaker_list, SpeakerList):
-        if speaker_list.current is None:
-            return True
-        return speaker_list.current.user != user
-    else:  # pragma: no cover
-        return False
+        if speaker := speaker_list.active_speaker():
+            return speaker.user_id != user.id
+        return True
+    raise TypeError(f"{speaker_list} is not an instance of SpeakerList")
 
 
 # Speaker list permissions
@@ -112,7 +113,7 @@ rules.add_perm(
 )
 rules.add_perm(
     SpeakerListPermissions.ENTER,
-    not_currently_speaking & (has_speaker_role & is_list_open & is_system_active)
+    not_currently_speaking & (is_list_open & has_speaker_role & is_system_active)
     | (is_system_not_archived & (is_speaker_moderator | is_moderator)),
 )
 

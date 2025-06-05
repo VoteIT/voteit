@@ -23,7 +23,7 @@ from voteit.speaker.workflows import SpeakerSystemWf
 User = get_user_model()
 
 
-class SpeakerListsViewTestCase(APITestCase):
+class SpeakerListsViewTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create(
@@ -76,8 +76,11 @@ class SpeakerListsViewTestCase(APITestCase):
         }
         self.client.force_login(self.list_moderator)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            {"speaker_system": ['Invalid pk "-1" - object does not exist.']},
+            response.json(),
+        )
 
     def test_create_ai_ne(self):
         url = reverse("speaker-lists-list")
@@ -92,13 +95,10 @@ class SpeakerListsViewTestCase(APITestCase):
 
     def test_list(self):
         url = reverse("speaker-lists-list")
-        data = {
-            "speaker_system": self.system.pk,
-        }
         self.client.force_login(self.list_moderator)
-        response = self.client.get(url, data)
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(1, len(response.json()))
+        self.assertEqual(0, len(response.json()))
 
     def test_transition_list_moderator(self):
         self.client.force_login(self.list_moderator)
@@ -174,7 +174,9 @@ class SpeakerListsViewTestCase(APITestCase):
         self.assertRaises(ObjectDoesNotExist, self.slist.refresh_from_db)
 
     def test_delete_with_started_speaker(self):
-        self.slist.start_speaker(self.part_speaker)
+        # self.slist.start_speaker(self.part_speaker)
+        self.part_speaker.started = now()
+        self.part_speaker.save()
         url = reverse("speaker-lists-detail", kwargs={"pk": self.slist.pk})
         self.client.force_login(self.list_moderator)
         response = self.client.delete(url)
@@ -199,36 +201,34 @@ class SpeakerListsViewTestCase(APITestCase):
                 "speaker_system": self.system.pk,
                 "agenda_item": None,
                 "state": "open",
-                "queue": [self.participant.pk],
-                "current": None,
             },
             response.json(),
         )
 
-    def test_get_with_current(self):
-        self.slist.start_speaker(self.part_speaker)
-        url = reverse("speaker-lists-detail", kwargs={"pk": self.slist.pk})
-        self.client.force_login(self.list_moderator)
-        response = self.client.get(url)
-        self.assertEqual(
-            200,
-            response.status_code,
-        )
-        self.assertEqual(
-            {
-                "pk": self.slist.pk,
-                "title": "",
-                "speaker_system": self.system.pk,
-                "agenda_item": None,
-                "state": "open",
-                "queue": [],
-                "current": self.participant.pk,
-            },
-            response.json(),
-        )
+    # def test_get_with_current(self):
+    #     self.slist.start_speaker(self.part_speaker)
+    #     url = reverse("speaker-lists-detail", kwargs={"pk": self.slist.pk})
+    #     self.client.force_login(self.list_moderator)
+    #     response = self.client.get(url)
+    #     self.assertEqual(
+    #         200,
+    #         response.status_code,
+    #     )
+    #     self.assertEqual(
+    #         {
+    #             "pk": self.slist.pk,
+    #             "title": "",
+    #             "speaker_system": self.system.pk,
+    #             "agenda_item": None,
+    #             "state": "open",
+    #             "queue": [],
+    #             "current": self.participant.pk,
+    #         },
+    #         response.json(),
+    #     )
 
 
-class SpeakerListSystemViewTestCase(APITestCase):
+class SpeakerListSystemViewTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create(
@@ -238,6 +238,7 @@ class SpeakerListSystemViewTestCase(APITestCase):
         cls.system = cls.meeting.speaker_systems.create(
             method_name="simple", state=SpeakerSystemWf.INACTIVE, room=cls.room
         )
+        cls.slist = cls.system.speaker_lists.create()
         cls.participant: User = User.objects.create_user("participant")
         cls.moderator: User = User.objects.create_user("moderator")
         cls.outsider: User = User.objects.create_user("outsider")
@@ -245,6 +246,13 @@ class SpeakerListSystemViewTestCase(APITestCase):
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.system.add_roles(cls.list_moderator, ROLE_LIST_MODERATOR)
+        # And the bad parts
+        cls.other_meeting: Meeting = Meeting.objects.create(title="Other meeting")
+        cls.other_room = cls.other_meeting.rooms.create()
+        cls.other_system = cls.other_meeting.speaker_systems.create(
+            method_name="simple", state=SpeakerSystemWf.INACTIVE, room=cls.other_room
+        )
+        cls.other_list = cls.other_system.speaker_lists.create()
 
     def test_create(self):
         room = self.meeting.rooms.create()
@@ -263,7 +271,8 @@ class SpeakerListSystemViewTestCase(APITestCase):
 
     def test_create_bad_users(self):
         url = reverse("speaker-list-systems-list")
-        data = {"room": self.room.pk, "method_name": "simple"}
+        room = self.meeting.rooms.create()
+        data = {"room": room.pk, "method_name": "simple"}
         for user, status in (
             (None, 401),
             (self.participant, 403),
@@ -283,7 +292,9 @@ class SpeakerListSystemViewTestCase(APITestCase):
         data = {"method_name": "simple", "room": -1}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual({"detail": "No item found where pk==-1"}, response.json())
+        self.assertEqual(
+            {"room": ['Invalid pk "-1" - object does not exist.']}, response.json()
+        )
 
     def test_create_with_missing_settings(self):
         room = self.meeting.rooms.create()
@@ -310,10 +321,7 @@ class SpeakerListSystemViewTestCase(APITestCase):
         }
         self.client.force_login(self.moderator)
         response = self.client.put(url, data)
-        self.assertEqual(
-            response.status_code,
-            200,
-        )
+        self.assertEqual(response.status_code, 200, response.json())
         self.system.refresh_from_db()
         self.assertEqual(2, self.system.safe_positions)
 
@@ -332,6 +340,38 @@ class SpeakerListSystemViewTestCase(APITestCase):
         self.system.refresh_from_db()
         self.assertEqual([ROLE_PARTICIPANT], self.system.meeting_roles_to_speaker)
         self.assertIsNone(self.system.settings)
+
+    def test_patch_active_list(self):
+        url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
+        data = {
+            "active_list": self.slist.pk,
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 200)
+        self.system.refresh_from_db()
+        self.assertEqual(self.system.active_list, self.slist)
+        response = self.client.patch(url, {"active_list": None})
+        self.assertEqual(response.status_code, 200, response.json())
+        self.system.refresh_from_db()
+        self.assertIsNone(self.system.active_list)
+
+    def test_patch_active_list_from_another_system(self):
+        url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})
+        data = {
+            "active_list": self.other_list.pk,
+        }
+        self.client.force_login(self.moderator)
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            {
+                "active_list": [
+                    f'Invalid pk "{self.other_list.pk}" - object does not exist.'
+                ]
+            },
+            response.json(),
+        )
 
     def test_patch_bad_roles(self):
         url = reverse("speaker-list-systems-detail", kwargs={"pk": self.system.pk})

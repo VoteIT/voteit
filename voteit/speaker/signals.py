@@ -103,6 +103,8 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
     else:
         msg_class = SpeakerListChanged
     data = SpeakerListSerializer(instance).data
+    # FIXME
+    return
     msg = msg_class(**data)
     with suppress(AgendaItem.DoesNotExist):
         if instance.agenda_item:

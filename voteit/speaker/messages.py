@@ -91,84 +91,84 @@ class SpeakerListLeave(ListMessage):
         return msg
 
 
-@incoming
-class SetActiveList(ListMessage):
-    name = "speaker_list.set_active"
-    permission = SpeakerListPermissions.CHANGE
+# @incoming
+# class SetActiveList(ListMessage):
+#     name = "speaker_list.set_active"
+#     permission = SpeakerListPermissions.CHANGE
+#
+#     def run_job(self) -> Status:
+#         self.assert_perm()
+#         system = self.context.speaker_system
+#         if not self.context.is_active_list:
+#             if system.active_list and system.active_list.current is not None:
+#                 raise ValidationErrorMsg.from_message(
+#                     self,
+#                     msg=_("Another list has an active speaker."),
+#                     errors=[
+#                         {
+#                             "loc": ("pk",),
+#                             "msg": _(
+#                                 "List '%(title)s' with id %(id)s is active"
+#                                 % {
+#                                     "title": system.active_list.title,
+#                                     "id": system.active_list,
+#                                 }
+#                             ),
+#                             "type": "value.error",
+#                         }
+#                     ],
+#                 )
+#             with set_actor(self.user):
+#                 system.active_list = self.context
+#                 system.save()
+#             msg = Status.from_message(self)
+#             websocket_send(msg, state=msg.SUCCESS)
+#             return msg
+#
+#
+# class DeactivateListSchema(SpeakerListActionSchema):
+#     close_list: bool = False
 
-    def run_job(self) -> Status:
-        self.assert_perm()
-        system = self.context.speaker_system
-        if not self.context.is_active_list:
-            if system.active_list and system.active_list.current is not None:
-                raise ValidationErrorMsg.from_message(
-                    self,
-                    msg=_("Another list has an active speaker."),
-                    errors=[
-                        {
-                            "loc": ("pk",),
-                            "msg": _(
-                                "List '%(title)s' with id %(id)s is active"
-                                % {
-                                    "title": system.active_list.title,
-                                    "id": system.active_list,
-                                }
-                            ),
-                            "type": "value.error",
-                        }
-                    ],
-                )
-            with set_actor(self.user):
-                system.active_list = self.context
-                system.save()
-            msg = Status.from_message(self)
-            websocket_send(msg, state=msg.SUCCESS)
-            return msg
 
-
-class DeactivateListSchema(SpeakerListActionSchema):
-    close_list: bool = False
-
-
-@incoming
-class DeactivateList(ListMessage):
-    name = "speaker_list.deactivate"
-    permission = SpeakerListPermissions.CHANGE
-    model = SpeakerList
-    schema = DeactivateListSchema
-    data: DeactivateListSchema
-
-    def run_job(self) -> Status:
-        self.assert_perm()
-        if self.context.is_active_list:
-            if self.context.current is not None:
-                raise ValidationErrorMsg.from_message(
-                    self,
-                    msg=_("A speaker is currently speaking."),
-                    errors=[
-                        {
-                            "loc": ("sls",),
-                            "msg": _(
-                                "List '%(title)s' has an active speaker"
-                                % {
-                                    "title": self.context.title,
-                                }
-                            ),
-                            "type": "value.error",
-                        }
-                    ],
-                )
-            with set_actor(self.user):
-                self.context.speaker_system.active_list = None
-                self.context.speaker_system.save()
-                if self.data.close_list and self.context.state != SpeakerListWf.CLOSED:
-                    self.context.close()
-                self.context.save()
-
-        # Yes, indentation is correct. We'll want to send thumbs up even if nothing was done. No need to raise alarms.
-        msg = Status.from_message(self)
-        websocket_send(msg, state=msg.SUCCESS)
-        return msg
+# @incoming
+# class DeactivateList(ListMessage):
+#     name = "speaker_list.deactivate"
+#     permission = SpeakerListPermissions.CHANGE
+#     model = SpeakerList
+#     schema = DeactivateListSchema
+#     data: DeactivateListSchema
+#
+#     def run_job(self) -> Status:
+#         self.assert_perm()
+#         if self.context.is_active_list:
+#             if self.context.current is not None:
+#                 raise ValidationErrorMsg.from_message(
+#                     self,
+#                     msg=_("A speaker is currently speaking."),
+#                     errors=[
+#                         {
+#                             "loc": ("sls",),
+#                             "msg": _(
+#                                 "List '%(title)s' has an active speaker"
+#                                 % {
+#                                     "title": self.context.title,
+#                                 }
+#                             ),
+#                             "type": "value.error",
+#                         }
+#                     ],
+#                 )
+#             with set_actor(self.user):
+#                 self.context.speaker_system.active_list = None
+#                 self.context.speaker_system.save()
+#                 if self.data.close_list and self.context.state != SpeakerListWf.CLOSED:
+#                     self.context.close()
+#                 self.context.save()
+#
+#         # Yes, indentation is correct. We'll want to send thumbs up even if nothing was done. No need to raise alarms.
+#         msg = Status.from_message(self)
+#         websocket_send(msg, state=msg.SUCCESS)
+#         return msg
 
 
 @incoming
