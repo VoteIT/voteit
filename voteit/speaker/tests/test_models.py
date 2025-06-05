@@ -47,6 +47,7 @@ class SpeakerTests(TestCase):
         tarzan = User.objects.create(username="tarzan")
         tarzan_speaker = self.list.speaker_items.create(user=tarzan)
         self.list.start_speaker(tarzan_speaker)
+        speaker.refresh_from_db()
         self.assertEqual(1, speaker.seconds)
         self.assertEqual(tarzan_speaker, self.list.current)
 
@@ -179,6 +180,7 @@ class SpeakerListTests(TestCase):
         self.speaker_list.start_speaker(self.speaker_two)
         self.speaker_two.started = now() - timedelta(minutes=1)
         self.speaker_list.stop_speaker()
+        self.speaker_two.refresh_from_db()
         self.assertIsNotNone(self.speaker_two.seconds)
 
     def test_stop_forgotten_speaker(self):
@@ -190,6 +192,7 @@ class SpeakerListTests(TestCase):
         self.speaker_list.current.started = now() - timedelta(days=999)
         self.speaker_list.current.save()
         self.speaker_list.stop_speaker()
+        self.speaker_two.refresh_from_db()
         self.assertEqual(32767, self.speaker_two.seconds)
 
 

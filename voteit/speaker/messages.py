@@ -203,7 +203,7 @@ class StartSpeakerInList(ModeratorListMessage):
 
 
 @incoming
-class StopSpeakerInList(ModeratorListMessage):
+class StopSpeakerInList(ListMessage):
     """
     Stop user. Ignore if not speaking.
     """
@@ -213,32 +213,6 @@ class StopSpeakerInList(ModeratorListMessage):
 
     def run_job(self) -> Status:
         self.assert_perm()
-        user = self.get_user()
-        speaker = self.context.current
-        if speaker is None:
-            raise ValidationErrorMsg.from_message(
-                self,
-                msg=_("No current speaker"),
-                errors=[
-                    {
-                        "loc": ("user",),
-                        "msg": "",
-                        "type": "value.error",
-                    }
-                ],
-            )
-        if user != speaker.user:
-            raise ValidationErrorMsg.from_message(
-                self,
-                msg=_("That user isn't speaking."),
-                errors=[
-                    {
-                        "loc": ("user",),
-                        "msg": _("user_pk %s") % user.pk,
-                        "type": "value.error",
-                    }
-                ],
-            )
         self.context.stop_speaker()
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)

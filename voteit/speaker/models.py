@@ -498,26 +498,30 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         """
         Stop current speaker and set spoken time
         """
-        if speaker := self.current:
+        # The end of the atomic transaction will trigger a speaker changed message here
+        if self.current_id:
+            self.current = None
+            self.save()
+        for speaker in self.speaker_items.filter(
+            started__isnull=False, seconds__isnull=True
+        ):
             end_td = now() - speaker.started
             speaker.seconds = min(
                 math.ceil(end_td.total_seconds()) or 1, 32767
             )  # Max value of PosSmallIntField ~ 9 hours
             speaker.save()
-            self.current = None
-            self.save()
-            # The end of the atomic transaction will trigger a speaker changed message here
 
     @ensure_atomic
     def undo_speaker(self) -> bool:
         """Move current speaker back to top of queue"""
-        speaker = self.current
-        if speaker is None:
-            return False
-
-        speaker.started = None
-        speaker.save()
-        self.current = None
+        if self.current_id:
+            self.current = None
+            # This is somewhat silly but to catch odd behaviour with current.
+        for speaker in self.speaker_items.filter(
+            started__isnull=False, seconds__isnull=True
+        ):
+            speaker.started = None
+            speaker.save()
         # The end of the atomic transaction will trigger a speaker changed message
         self.reorder()
         return True
@@ -537,6 +541,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         super().save(**kw)
 
     # Type hinting
+    current_id: int | None
     objects = models.Manager()
     speaker_items = models.QuerySet()
 

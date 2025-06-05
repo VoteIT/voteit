@@ -358,15 +358,15 @@ class StopSpeakerInListTests(TestCase):
         self.assertIsNone(self.list.current)
         self.assertEqual(1, self.speaker.seconds)
 
-    def test_stop_speaker_no_current_speaker(self):
+    def test_stop_speaker_no_current_speaker_with_bogus_data(self):
         self.list.stop_speaker()
+        self.speaker.started = now()
+        self.assertIsNone(self.speaker.seconds)
         msg = self._mk_one()
-        self.assertRaises(ValidationErrorMsg, msg.run_job)
-
-    def test_stop_speaker_another_speaker_is_active(self):
-        nonspeaking_user = self.list.speakers.create(username="falsy")
-        msg = self._mk_one(user=nonspeaking_user.pk)
-        self.assertRaises(ValidationErrorMsg, msg.run_job)
+        # No longer failing
+        msg.run_job()
+        self.speaker.refresh_from_db()
+        self.assertEqual(1, self.speaker.seconds)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -529,7 +529,8 @@ class ModeratorSpeakerListUndoTests(TestCase):
         self.list.stop_speaker()
         self.assertFalse(self.list.current)
         msg = self._mk_one()
-        self.assertRaises(BadRequestError, msg.run_job)
+        msg.run_job()
+        # This shouldn't fail anylonger
 
     @patch.object(SpeakerListSystemChannel, "sync_publish")
     def test_undo_received_messages(self, mock_publish):
