@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models.signals import m2m_changed
 from django.db.models.signals import post_save
@@ -232,7 +233,11 @@ def meeting_channel_subscribed(
 
 @receiver(channel_subscribed, sender=RoomChannel)
 def send_active_speaker_list_speakers(context: Room, app_state: AppState, **kwargs):
-    if context.sls.active_list:
+    try:
+        active_list = context.sls.active_list
+    except ObjectDoesNotExist:
+        return  # sls will raise this
+    if active_list:
         qs = Speaker.objects.filter(
             speaker_list__speaker_system__room=context,
             speaker_list=context.sls.active_list,
