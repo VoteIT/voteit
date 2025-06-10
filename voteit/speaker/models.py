@@ -139,10 +139,18 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     exporters = {"meeting": {"ignore_fields": ("active_list",)}}
     importers = {"meeting": {}, "organisation": {}}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._initial_active_list_id = self.active_list_id
+
     def get_method_class(self) -> type[ListMethod]:
         """Fetch the poll method class, a django proxy model."""
         reg = get_list_method_registry()
         return reg[self.method_name]
+
+    @property
+    def active_list_changed(self) -> bool:
+        return self.active_list_id != self._initial_active_list_id
 
     @property
     def speaker_system(self) -> SpeakerListSystem:
@@ -185,7 +193,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
 
     def no_active_speaker_guard(self) -> bool:
         if self.active_list:
-            return not bool(self.active_list.current)
+            return not bool(self.active_list.active_speaker())
         return True
 
     @transition(
@@ -226,23 +234,20 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     )
     def archive(self):
         self.active_list = None
-        # for slist in self.speaker_lists.all():
-        # slist.stop_speaker()
-        # slist.speakers_in_queue().delete()
-        # slist.order_list = []
-        # slist.save()
-        # FIXME: Update this
+        Speaker.objects.filter(
+            speaker_list__speaker_system=self, seconds__isnull=True
+        ).delete()
+        for slist in self.speaker_lists.exclude(order=""):
+            slist.order = ""
+            slist.save()
         self.save()
 
+    def signal_active_list_changed(self):
+        from voteit.speaker.signals import active_list_changed
+
+        active_list_changed.send(sender=self.__class__, instance=self)
+
     def save(self, **kw):
-        # Will raise error if there's something bogus with settings or referenced method
-        self.settings
-        # FIXME This should be checked in serializer instead
-        if (
-            self.active_list_id
-            and not self.speaker_lists.filter(pk=self.active_list_id).exists()
-        ):
-            raise IntegrityError("Active list belongs to another speaker system")
         # Add meeting on create if not specified
         if self._state.adding:
             if self.meeting_id is None and self.room_id is not None:
@@ -252,6 +257,9 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
             if self.room.meeting_id != self.meeting_id:
                 raise IntegrityError("SLS links to another meeting")
         super().save(**kw)
+        if self.active_list_changed:
+            print("Active list changed")
+            self.signal_active_list_changed()
 
     @property
     def is_archived(self):
@@ -312,6 +320,27 @@ class Speaker(MeetingContext, SpeakerSystemContext):
             ),
         ]
 
+    def start(self) -> datetime | None:
+        # Validation before this function
+        if self.started is None:
+            self.started = now()
+            return self.started
+
+    def stop(self) -> int | None:
+        # Validation before this function
+        if self.seconds is None:
+            end_td = now() - self.started
+            self.seconds = min(
+                math.ceil(end_td.total_seconds()) or 1, 32767
+            )  # Max value of PosSmallIntField ~ 9 hours. But must at least be 1.
+            return self.seconds
+
+    def undo(self) -> bool:
+        if self.started and self.seconds is None:
+            self.started = None
+            return True
+        return False
+
     @property
     def ended(self) -> datetime | None:
         if self.seconds is not None and isinstance(self.started, datetime):
@@ -340,21 +369,15 @@ class Speaker(MeetingContext, SpeakerSystemContext):
     def speaker_system(self) -> SpeakerListSystem:
         return self.speaker_list.speaker_system
 
-    # Type hinting
-    objects: models.Manager
-    user_id: int
-
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.pk}>"
 
     def __str__(self):
         return f"Speaker id {self.pk}"
 
-    # def save(self, **kwargs):
-    #     new_obj = self.pk is None
-    #     super().save(**kwargs)
-    #     if new_obj:
-    #         self.speaker_list.reorder()
+    # Type hinting
+    objects: models.Manager
+    user_id: int
 
 
 class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
@@ -447,14 +470,16 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
             ).first()
         return self._active_speaker
 
-    # @ensure_atomic
-    # def shuffle(self):
-    #     """
-    #     Randomize the order of the speakers. Run reorder afterwards to make sure any other priorities gets applied.
-    #     """
-    #     self.method.shuffle(self)
-    #     self.reorder()
+    @ensure_atomic
+    def shuffle(self):
+        """
+        Randomize the order of the speakers. Run reorder after to make sure any other priorities gets applied.
+        This method should lock speaker list first via queryset.select_for_update()
+        """
+        self.method.shuffle(self)
+        self.reorder()
 
+    @ensure_atomic
     def reorder(self):
         """
         Something have changed within the list that makes reordering necessary.
@@ -467,6 +492,9 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
             self.save()
         # FIXME: Return order changed?
         return new_order
+
+    def speakers_in_queue_or_speaking(self) -> models.QuerySet[Speaker]:
+        return self.speaker_items.filter(seconds__isnull=True)
 
     def speakers_in_queue(self) -> models.QuerySet[Speaker]:
         """
@@ -482,7 +510,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
 
     def get_user_pk_in_queue_created_order(self) -> list[int]:
         return list(
-            self.speakers_in_queue()
+            self.speakers_in_queue_or_speaking()
             .order_by("created")
             .values_list("user_id", flat=True)
         )
@@ -506,38 +534,38 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     #         # FIXME: Something...?
     #         raise ValueError()
 
-    @ensure_atomic
-    def stop_speaker(self) -> None:
-        """
-        Stop current speaker and set spoken time
-        """
-        # The end of the atomic transaction will trigger a speaker changed message here
-        if self.current_id:
-            self.current = None
-            self.save()
-        for speaker in self.speaker_items.filter(
-            started__isnull=False, seconds__isnull=True
-        ):
-            end_td = now() - speaker.started
-            speaker.seconds = min(
-                math.ceil(end_td.total_seconds()) or 1, 32767
-            )  # Max value of PosSmallIntField ~ 9 hours
-            speaker.save()
-
-    @ensure_atomic
-    def undo_speaker(self) -> bool:
-        """Move current speaker back to top of queue"""
-        if self.current_id:
-            self.current = None
-            # This is somewhat silly but to catch odd behaviour with current.
-        for speaker in self.speaker_items.filter(
-            started__isnull=False, seconds__isnull=True
-        ):
-            speaker.started = None
-            speaker.save()
-        # The end of the atomic transaction will trigger a speaker changed message
-        self.reorder()
-        return True
+    # @ensure_atomic
+    # def stop_speaker(self) -> None:
+    #     """
+    #     Stop current speaker and set spoken time
+    #     """
+    #     # The end of the atomic transaction will trigger a speaker changed message here
+    #     if self.current_id:
+    #         self.current = None
+    #         self.save()
+    #     for speaker in self.speaker_items.filter(
+    #         started__isnull=False, seconds__isnull=True
+    #     ):
+    #         end_td = now() - speaker.started
+    #         speaker.seconds = min(
+    #             math.ceil(end_td.total_seconds()) or 1, 32767
+    #         )  # Max value of PosSmallIntField ~ 9 hours
+    #         speaker.save()
+    #
+    # @ensure_atomic
+    # def undo_speaker(self) -> bool:
+    #     """Move current speaker back to top of queue"""
+    #     if self.current_id:
+    #         self.current = None
+    #         # This is somewhat silly but to catch odd behaviour with current.
+    #     for speaker in self.speaker_items.filter(
+    #         started__isnull=False, seconds__isnull=True
+    #     ):
+    #         speaker.started = None
+    #         speaker.save()
+    #     # The end of the atomic transaction will trigger a speaker changed message
+    #     self.reorder()
+    #     return True
 
     def save(self, **kw):
         if self.title is None:
@@ -556,6 +584,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
 
     # Type hinting
     current_id: int | None
+    agenda_item_id: int | None
     objects: models.Manager
     speaker_items: models.QuerySet[Speaker]
     # Accessing will raise ObjectNotFound if None, so use is_active_list

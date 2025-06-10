@@ -9,6 +9,7 @@ from time import perf_counter
 
 from django.contrib.auth import get_user_model
 from django.db.transaction import get_connection
+from envelope.testing import testing_channel_layers_setting  # noqa
 
 user_tag = """
 <span class="mention" data-index="0" data-denotation-char="@" data-id="{user_pk}" data-value="{name}">
@@ -113,8 +114,3 @@ class SetSeed:
         Execute all on_commit hooks and cleanup.
         """
         random.seed()
-
-
-testing_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}

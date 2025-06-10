@@ -29,47 +29,30 @@ class SpeakerTests(TestCase):
         cls.user = User.objects.create(username="jane")
         cls.user2 = User.objects.create(username="doe")
 
-    def test_create_sets_order(self):
-        user_one = User.objects.create(username="one")
-        user_two = User.objects.create(username="two")
-        self.list.speaker_items.create(user=user_one)
-        self.list.speaker_items.create(user=user_two)
-        self.assertEqual([user_one.pk, user_two.pk], self.list.order_list)
-
     def test_start(self):
         speaker = self.list.speaker_items.create(user=self.user)
-        self.list.start_speaker(speaker)
+        speaker.start()
         self.assertIsInstance(speaker.started, datetime)
 
-    def test_start_with_another_speaker_active(self):
-        speaker = self.list.speaker_items.create(user=self.user)
-        self.list.start_speaker(speaker)
-        tarzan = User.objects.create(username="tarzan")
-        tarzan_speaker = self.list.speaker_items.create(user=tarzan)
-        self.list.start_speaker(tarzan_speaker)
-        speaker.refresh_from_db()
-        self.assertEqual(1, speaker.seconds)
-        self.assertEqual(tarzan_speaker, self.list.current)
-
     def test_ended(self):
-        speaker = self.list.speaker_items.create(user=self.user)
-        self.list.start_speaker(speaker)
-        speaker.seconds = 100
+        speaker = self.list.speaker_items.create(
+            user=self.user, started=now(), seconds=100
+        )
         self.assertEqual(timedelta(seconds=100), speaker.ended - speaker.started)
 
     def test_current(self):
         # This is cheating since we can only expect it to be the current speaker if some data isn't corrupt ;)
         speaker = self.list.speaker_items.create(user=self.user)
         self.assertFalse(speaker.current)
-        self.list.start_speaker(speaker)
+        speaker.start()
         self.assertTrue(speaker.current)
-        speaker.seconds = 1
+        speaker.stop()
         self.assertFalse(speaker.current)
+        self.assertEqual(1, speaker.seconds)
 
     def test_constraint_only_one_ongoing_speaker(self):
-        speaker = self.list.speaker_items.create(user=self.user)
+        speaker = self.list.speaker_items.create(user=self.user, started=now())
         speaker2 = self.list.speaker_items.create(user=self.user2)
-        self.list.start_speaker(speaker)
         with self.assertRaises(IntegrityError) as cm:
             speaker2.started = now()
             speaker2.save()
@@ -81,13 +64,20 @@ class SpeakerTests(TestCase):
     def test_constraint_only_unique_users_in_queue(self):
         speaker = self.list.speaker_items.create(user=self.user)
         self.assertFalse(speaker.current)
-        # self.list.start_speaker(speaker)
         with self.assertRaises(IntegrityError) as cm:
             self.list.speaker_items.create(user=self.user)
         self.assertIn(
             'duplicate key value violates unique constraint "only_unique_users_in_queue"',
             str(cm.exception),
         )
+
+    def test_stop_forgotten_speaker(self):
+        speaker = self.list.speaker_items.create(
+            user=self.user, started=now() - timedelta(days=999)
+        )
+        speaker.stop()
+        speaker.save()
+        self.assertEqual(32767, speaker.seconds)
 
 
 class SpeakerListTests(TestCase):
@@ -118,6 +108,7 @@ class SpeakerListTests(TestCase):
         cls.speaker_three: Speaker = cls.speaker_list.speaker_items.create(
             user=cls.user_three
         )
+        cls.speaker_list.reorder()
 
     def test_order_list(self):
         self.assertEqual(
@@ -161,39 +152,8 @@ class SpeakerListTests(TestCase):
     def test_different_meeting_contexts(self):
         new_meeting = Meeting.objects.create()
         new_ai = new_meeting.agenda_items.create()
-        self.speaker_list.agenda_item = new_ai
-        self.assertRaises(IntegrityError, self.speaker_list.save)
-
-    def test_undo(self):
-        self.speaker_list.start_speaker(self.speaker_two)
-        self.assertEqual(
-            [self.user_one.pk, self.user_three.pk],
-            self.speaker_list.order_list,
-        )
-        self.speaker_list.undo_speaker()
-        self.assertEqual(
-            [self.user_one.pk, self.user_two.pk, self.user_three.pk],
-            self.speaker_list.order_list,
-        )
-
-    def test_stop(self):
-        self.speaker_list.start_speaker(self.speaker_two)
-        self.speaker_two.started = now() - timedelta(minutes=1)
-        self.speaker_list.stop_speaker()
-        self.speaker_two.refresh_from_db()
-        self.assertIsNotNone(self.speaker_two.seconds)
-
-    def test_stop_forgotten_speaker(self):
-        self.speaker_list.start_speaker(self.speaker_two)
-        self.assertEqual(
-            [self.user_one.pk, self.user_three.pk],
-            self.speaker_list.order_list,
-        )
-        self.speaker_list.current.started = now() - timedelta(days=999)
-        self.speaker_list.current.save()
-        self.speaker_list.stop_speaker()
-        self.speaker_two.refresh_from_db()
-        self.assertEqual(32767, self.speaker_two.seconds)
+        with self.assertRaises(IntegrityError):
+            self.system.speaker_lists.create(agenda_item=new_ai)
 
 
 class SpeakerListSystemsTests(TestCase):
@@ -220,27 +180,15 @@ class SpeakerListSystemsTests(TestCase):
         one_two = User.objects.create(username="two")
         one_list = self.system.speaker_lists.create()
         speaker_one = one_list.speaker_items.create(user=one_user)
-        speaker_two = one_list.speaker_items.create(user=one_two)
-        one_list.start_speaker(speaker_one)
+        speaker_two = one_list.speaker_items.create(user=one_two, started=now())
         self.system.active_list = one_list
         self.system.save()
         self.system.archive()
         self.assertIsNone(self.system.active_list)
         self.assertTrue(self.system.is_archived)
         one_list.refresh_from_db()
-        self.assertEqual([], one_list.order_list)  # two was deleted
-        speaker_one.refresh_from_db()
-        self.assertEqual(1, speaker_one.seconds)
-        self.assertFalse(speaker_one.in_queue)
-
-    def test_set_active_that_belongs_to_other_system(self):
-        room = self.meeting.rooms.create()
-        other_sys = SpeakerListSystem.objects.create(
-            method_name="simple", state=SpeakerSystemWf.ACTIVE, room=room
-        )
-        other_list = other_sys.speaker_lists.create()
-        self.system.active_list = other_list
-        self.assertRaises(IntegrityError, self.system.save)
+        self.assertEqual([], one_list.order_list)
+        self.assertEqual(0, one_list.speaker_items.count())
 
     def test_inactivating_causes_active_list_to_become_inactive(self):
         slist = self.system.speaker_lists.create()
@@ -252,9 +200,7 @@ class SpeakerListSystemsTests(TestCase):
         user = User.objects.create(username="speaker")
         slist = self.system.speaker_lists.create()
         self.system.active_list = slist
-        speaker = slist.speaker_items.create(user=user)
-        slist.current = speaker
-        slist.save()
+        slist.speaker_items.create(user=user, started=now())
         with self.assertRaises(TransitionNotAllowed):
             self.system.inactivate()
 

@@ -7,13 +7,12 @@ class SpeakerConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        from voteit.speaker import rules
-        from voteit.speaker import roles
-        from voteit.speaker import signals
-        from voteit.meeting import channels
-        from voteit.speaker import messages
+        from voteit.speaker import rules  # noqa
+        from voteit.speaker import roles  # noqa
+        from voteit.speaker import signals  # noqa
+        from voteit.speaker import messages  # noqa
+        from voteit.speaker.rest_api import views  # noqa
 
-        from .rest_api import views
         from voteit.speaker.app.list_methods import register
 
         register()

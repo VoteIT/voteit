@@ -87,85 +87,37 @@ class SpeakerListTests(TestCase):
         self.assertFalse(self.user_any.has_perm(VIEW, self.list))
         self.assertTrue(meeting_participant.has_perm(VIEW, self.list))
 
-    def test_enter_speaker_list_open(self):
-        ENTER = self.p("ENTER")
-        self.assertTrue(self.user_meeting_moderator.has_perm(ENTER, self.list))
-        self.assertTrue(self.user_list_moderator.has_perm(ENTER, self.list))
-        self.assertTrue(self.user_speaker.has_perm(ENTER, self.list))
-        self.assertTrue(self.user_proposer.has_perm(ENTER, self.list))
-        self.assertFalse(self.user_any.has_perm(ENTER, self.list))
-
-    def test_enter_speaker_list_closed(self):
-        ENTER = self.p("ENTER")
-        self.list.close()
-        self.list.save()
-        self.assertTrue(self.user_meeting_moderator.has_perm(ENTER, self.list))
-        self.assertTrue(self.user_list_moderator.has_perm(ENTER, self.list))
-        self.assertFalse(self.user_speaker.has_perm(ENTER, self.list))
-        self.assertFalse(self.user_proposer.has_perm(ENTER, self.list))
-        self.assertFalse(self.user_any.has_perm(ENTER, self.list))
-
-    def test_enter_speaker_list_speaking_user(self):
-        ENTER = self.p("ENTER")
-        self.assertIs(self.user_speaker.has_perm(ENTER, self.list), True)
-        speaker = self.list.speaker_items.create(user=self.user_speaker)
-        self.list.start_speaker(speaker)
-        self.assertIs(self.user_speaker.has_perm(ENTER, self.list), False)
-
-    def test_leave_speaker_list_open(self):
-        LEAVE = self.p("LEAVE")
-        self.assertTrue(self.user_meeting_moderator.has_perm(LEAVE, self.list))
-        self.assertTrue(self.user_list_moderator.has_perm(LEAVE, self.list))
-        self.assertTrue(self.user_speaker.has_perm(LEAVE, self.list))
-        self.assertTrue(self.user_proposer.has_perm(LEAVE, self.list))
-        self.assertTrue(self.user_any.has_perm(LEAVE, self.list))
-
-    def test_leave_currently_speaking(self):
-        LEAVE = self.p("LEAVE")
-        speaker = self.list.speaker_items.create(user=self.user_speaker)
-        self.assertTrue(self.user_meeting_moderator.has_perm(LEAVE, self.list))
-        self.assertTrue(self.user_list_moderator.has_perm(LEAVE, self.list))
-        self.assertTrue(self.user_speaker.has_perm(LEAVE, self.list))
-        self.assertTrue(self.user_proposer.has_perm(LEAVE, self.list))
-        self.assertTrue(self.user_any.has_perm(LEAVE, self.list))
-        self.list.current = speaker
-        self.list.save()
-        self.assertTrue(self.user_meeting_moderator.has_perm(LEAVE, self.list))
-        self.assertTrue(self.user_list_moderator.has_perm(LEAVE, self.list))
-        self.assertFalse(self.user_speaker.has_perm(LEAVE, self.list))
-        self.assertTrue(self.user_any.has_perm(LEAVE, self.list))
-
-    def test_start(self):
-        START = self.p("START")
-        self.assertTrue(self.user_meeting_moderator.has_perm(START, self.list))
-        self.assertTrue(self.user_list_moderator.has_perm(START, self.list))
-        self.assertFalse(self.user_speaker.has_perm(START, self.list))
-        self.assertFalse(self.user_any.has_perm(START, self.list))
-
-    def test_start_not_active_list(self):
-        START = self.p("START")
-        self.system.active_list = None
-        self.system.save()
-        self.assertFalse(self.user_meeting_moderator.has_perm(START, self.list))
-        self.assertFalse(self.user_list_moderator.has_perm(START, self.list))
-        self.assertFalse(self.user_speaker.has_perm(START, self.list))
-        self.assertFalse(self.user_any.has_perm(START, self.list))
-
-    def test_stop(self):
-        STOP = self.p("STOP")
-        self.assertTrue(self.user_meeting_moderator.has_perm(STOP, self.list))
-        self.assertTrue(self.user_list_moderator.has_perm(STOP, self.list))
-        self.assertFalse(self.user_speaker.has_perm(STOP, self.list))
-        self.assertFalse(self.user_any.has_perm(STOP, self.list))
-
-    def test_stop_not_active_list(self):
-        STOP = self.p("STOP")
-        self.system.active_list = None
-        self.system.save()
-        self.assertFalse(self.user_meeting_moderator.has_perm(STOP, self.list))
-        self.assertFalse(self.user_list_moderator.has_perm(STOP, self.list))
-        self.assertFalse(self.user_speaker.has_perm(STOP, self.list))
-        self.assertFalse(self.user_any.has_perm(STOP, self.list))
+    # def test_start(self):
+    #     START = self.p("START")
+    #     self.assertTrue(self.user_meeting_moderator.has_perm(START, self.list))
+    #     self.assertTrue(self.user_list_moderator.has_perm(START, self.list))
+    #     self.assertFalse(self.user_speaker.has_perm(START, self.list))
+    #     self.assertFalse(self.user_any.has_perm(START, self.list))
+    #
+    # def test_start_not_active_list(self):
+    #     START = self.p("START")
+    #     self.system.active_list = None
+    #     self.system.save()
+    #     self.assertFalse(self.user_meeting_moderator.has_perm(START, self.list))
+    #     self.assertFalse(self.user_list_moderator.has_perm(START, self.list))
+    #     self.assertFalse(self.user_speaker.has_perm(START, self.list))
+    #     self.assertFalse(self.user_any.has_perm(START, self.list))
+    #
+    # def test_stop(self):
+    #     STOP = self.p("STOP")
+    #     self.assertTrue(self.user_meeting_moderator.has_perm(STOP, self.list))
+    #     self.assertTrue(self.user_list_moderator.has_perm(STOP, self.list))
+    #     self.assertFalse(self.user_speaker.has_perm(STOP, self.list))
+    #     self.assertFalse(self.user_any.has_perm(STOP, self.list))
+    #
+    # def test_stop_not_active_list(self):
+    #     STOP = self.p("STOP")
+    #     self.system.active_list = None
+    #     self.system.save()
+    #     self.assertFalse(self.user_meeting_moderator.has_perm(STOP, self.list))
+    #     self.assertFalse(self.user_list_moderator.has_perm(STOP, self.list))
+    #     self.assertFalse(self.user_speaker.has_perm(STOP, self.list))
+    #     self.assertFalse(self.user_any.has_perm(STOP, self.list))
 
 
 class SpeakerListSystemTests(TestCase):

@@ -26,6 +26,7 @@ class ListMethodTests(TestCase):
         )
         for i in range(5):
             cls.speaker_list.speakers.create(username=f"user-{i}")
+        cls.speaker_list.reorder()
 
     def test_shuffle(self):
         current_order = self.speaker_list.order_list

@@ -3,7 +3,9 @@ from __future__ import annotations
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
+from django.contrib.auth import get_user_model
 from django.db import models
+from django.utils.translation import gettext as _
 from rest_framework import serializers
 from rest_framework import exceptions
 from rest_framework.exceptions import ValidationError
@@ -15,11 +17,14 @@ from voteit.meeting.models import MeetingRoles
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.rules import is_speaker_moderator
 from voteit.speaker.utils import get_list_method_registry
 
 if TYPE_CHECKING:
     from voteit.speaker.abcs import ListMethod
     from voteit.room.models import Room
+
+User = get_user_model()
 
 
 def _validate_add(serializer, model: type, value):
@@ -31,12 +36,11 @@ def _validate_add(serializer, model: type, value):
 
 
 class CreateSpeakerListSerializer(serializers.ModelSerializer):
+    queue = serializers.SerializerMethodField()
+
     class Meta:
         model = SpeakerList
-        read_only_fields = [
-            "state",
-            "pk",
-        ]
+        read_only_fields = ["state", "pk", "queue"]
         fields = read_only_fields + [
             "agenda_item",
             "speaker_system",
@@ -51,28 +55,27 @@ class CreateSpeakerListSerializer(serializers.ModelSerializer):
         if ai := attrs.get("agenda_item"):
             if ai.meeting_id != attrs["speaker_system"].meeting_id:
                 raise ValidationError(
-                    "SpeakerListSystem and AgendaItem belong to different meetings."
+                    {
+                        "agenda_item": [
+                            "SpeakerListSystem and AgendaItem belong to different meetings."
+                        ]
+                    }
                 )
         return attrs
 
+    def get_queue(self, instance: SpeakerList) -> list[int]:
+        return instance.order_list
 
-class SpeakerListSerializer(serializers.ModelSerializer):
+
+class SpeakerListSerializer(CreateSpeakerListSerializer):
+
     class Meta(CreateSpeakerListSerializer.Meta):
         read_only_fields = [
             "state",
+            "pk",
             "agenda_item",
             "speaker_system",
         ]
-
-    # def get_queue(self, instance: SpeakerList) -> list[int]:
-    #    return instance.order_list
-
-    # def get_current(self, instance: SpeakerList) -> int | None:
-    #    return
-    # FIXME:XXXX
-    # with suppress(Speaker.DoesNotExist):
-    #    if instance.current:
-    #        return instance.current.user_id
 
 
 class HistoricSpeakerListSerializer(serializers.Serializer):
@@ -84,6 +87,57 @@ class HistoricSpeakerListSerializer(serializers.Serializer):
         # model = Speaker
         fields = ("user", "times_spoken", "seconds_spoken")
         read_only_fields = fields
+
+
+class CreateSpeakerSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Speaker
+        read_only_fields = [
+            "pk",
+            "started",
+            "seconds",
+        ]
+        fields = [
+            "user",
+            "speaker_list",
+        ] + read_only_fields
+
+    def validate_speaker_list(self, value: SpeakerList):
+        _validate_add(self, Speaker, value)
+        return value
+
+    def validate(self, attrs):
+        speaker_list = attrs["speaker_list"]
+        user = attrs["user"]
+        if speaker_list.speaker_items.filter(seconds__isnull=True, user=user).exists():
+            raise ValidationError({"user": _("User already in list.")})
+        if not user.meeting_roles.filter(context=speaker_list.meeting):
+            raise ValidationError(
+                {"user": _("User isn't a participant in this meeting.")}
+            )
+        return attrs
+
+
+class CreateSpeakerUserImplicitSerializer(CreateSpeakerSerializer):
+
+    class Meta:
+        model = Speaker
+        read_only_fields = ["pk", "started", "seconds", "user"]
+        fields = [
+            "speaker_list",
+        ] + read_only_fields
+
+    def validate_speaker_list(self, value: SpeakerList):
+        perm = self.context["view"].get_model_perm(Speaker, "enter")
+        user = self.context["request"].user
+        if not user.has_perm(perm, value):
+            raise exceptions.PermissionDenied(perm_denied_msg(perm, value))
+        return value
+
+    def validate(self, attrs):
+        attrs["user"] = self.context["request"].user
+        return super().validate(attrs)
 
 
 class SpeakerSerializer(serializers.ModelSerializer):

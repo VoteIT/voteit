@@ -28,7 +28,9 @@ class SpeakerListSerializerTests(TestCase):
         cls.moderator = User.objects.get(username="moderator")
         cls.participant_speaker = cls.slist.speaker_items.create(user=cls.participant)
         cls.moderator_speaker = cls.slist.speaker_items.create(user=cls.moderator)
-        cls.slist.start_speaker(cls.participant_speaker)
+        cls.participant_speaker.start()
+        cls.participant_speaker.save()
+        cls.slist.reorder()
 
     @property
     def _cut(self):
@@ -47,8 +49,7 @@ class SpeakerListSerializerTests(TestCase):
                 "speaker_system": self.system.pk,
                 "agenda_item": self.ai.pk,
                 "state": "open",
-                "queue": [self.moderator.pk],
-                "current": self.participant.pk,
+                "queue": [self.participant.pk, self.moderator.pk],
             },
             data,
         )

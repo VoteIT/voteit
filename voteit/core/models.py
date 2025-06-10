@@ -131,6 +131,7 @@ class User(AbstractUser):
     last_read_set: models.QuerySet
     access_tokens: models.QuerySet
     organisation_id: int | None
+    meeting_roles: models.QuerySet
 
 
 def real_user_only(method):

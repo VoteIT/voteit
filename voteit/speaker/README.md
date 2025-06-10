@@ -5,19 +5,29 @@
 
 What's pushed to each channel and why?
 
+### Noteringar
+
+- Reorder får inte påverka nuvarande talare + antal säkra platser
+- order_list har "eventual consistency"
+
+## Contexts and their needs
+
+### Agenda item
+
+- All list names
+- Changes to speaker list
+- User id order (preserve order, don't change when a speaker is started)
+- current speaker (on subscribe)
+
+- started or stopped speaker (live)
+
 ### Meeting
 
-* Any changes to speaker list system (this includes indication of active speaker list, but not the contents of it.)
-* Deleted speaker lists, since both agenda and speaker systems need to know about them.
-  (And the deleted state isn't sent via subscribe)
- 
+Speaker system + ändringar (utom aktiv talarlista)
 
-### Agenda Item
+### Room
 
-* Speaker List - combined message with order and details about current speaker
+All speakers within active list, regardless of their state
 
-### Speaker list system
+List activated-message
 
-* The active speaker list - combined message with order and details about current speaker
-* Changes to speaker object if it's at least started and within an active list
-* All speaker objects that have been started at least
