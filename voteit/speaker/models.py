@@ -258,7 +258,6 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
                 raise IntegrityError("SLS links to another meeting")
         super().save(**kw)
         if self.active_list_changed:
-            print("Active list changed")
             self.signal_active_list_changed()
 
     @property
@@ -387,13 +386,6 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     state = FSMField(
         default=SpeakerListWf.initial, choices=SpeakerListWf.choices(), editable=False
     )
-    # current: Speaker | None = models.OneToOneField(
-    #     Speaker,
-    #     verbose_name="Current speaker, if any",
-    #     null=True,
-    #     blank=True,
-    #     on_delete=models.CASCADE,
-    # )
     speaker_system: SpeakerListSystem = models.ForeignKey(
         SpeakerListSystem, on_delete=models.CASCADE, related_name="speaker_lists"
     )
@@ -477,6 +469,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         This method should lock speaker list first via queryset.select_for_update()
         """
         self.method.shuffle(self)
+        self.order = ""  # Will cause reorder to save
         self.reorder()
 
     @ensure_atomic
@@ -490,11 +483,21 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         if order_list != new_order:
             self.order_list = new_order
             self.save()
-        # FIXME: Return order changed?
         return new_order
 
-    def speakers_in_queue_or_speaking(self) -> models.QuerySet[Speaker]:
-        return self.speaker_items.filter(seconds__isnull=True)
+    def speakers_in_queue_or_speaking(
+        self, spoken_count: bool = False
+    ) -> models.QuerySet[Speaker]:
+        qs = self.speaker_items.filter(seconds__isnull=True)
+        if spoken_count:
+            qs = qs.annotate(
+                spoken_count=Speaker.objects.filter(
+                    seconds__isnull=False, user=models.OuterRef("user")
+                )
+                .annotate(count=models.Func(models.F("id"), function="Count"))
+                .values("count")
+            )
+        return qs
 
     def speakers_in_queue(self) -> models.QuerySet[Speaker]:
         """
@@ -514,58 +517,6 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
             .order_by("created")
             .values_list("user_id", flat=True)
         )
-
-    # @ensure_atomic
-    # def start_speaker(self, speaker: Speaker) -> None:
-    #     """
-    #     Start a specific user in the queue
-    #     """
-    #     #order_list = self.order_list
-    #     #order_list.remove(speaker.user.pk)
-    #     if speaker.started is None:
-    #         self.stop_speaker()
-    #         speaker.started = now()
-    #         speaker.seconds=None#Just to make sure
-    #         speaker.save()
-    #         self.current = speaker
-    #         self.order_list = order_list
-    #         self.save()
-    #     else:  # pragma: no coverage
-    #         # FIXME: Something...?
-    #         raise ValueError()
-
-    # @ensure_atomic
-    # def stop_speaker(self) -> None:
-    #     """
-    #     Stop current speaker and set spoken time
-    #     """
-    #     # The end of the atomic transaction will trigger a speaker changed message here
-    #     if self.current_id:
-    #         self.current = None
-    #         self.save()
-    #     for speaker in self.speaker_items.filter(
-    #         started__isnull=False, seconds__isnull=True
-    #     ):
-    #         end_td = now() - speaker.started
-    #         speaker.seconds = min(
-    #             math.ceil(end_td.total_seconds()) or 1, 32767
-    #         )  # Max value of PosSmallIntField ~ 9 hours
-    #         speaker.save()
-    #
-    # @ensure_atomic
-    # def undo_speaker(self) -> bool:
-    #     """Move current speaker back to top of queue"""
-    #     if self.current_id:
-    #         self.current = None
-    #         # This is somewhat silly but to catch odd behaviour with current.
-    #     for speaker in self.speaker_items.filter(
-    #         started__isnull=False, seconds__isnull=True
-    #     ):
-    #         speaker.started = None
-    #         speaker.save()
-    #     # The end of the atomic transaction will trigger a speaker changed message
-    #     self.reorder()
-    #     return True
 
     def save(self, **kw):
         if self.title is None:

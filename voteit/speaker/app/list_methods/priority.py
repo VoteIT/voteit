@@ -45,33 +45,37 @@ class Priority(ListMethod):
         """
         Prioritise according to spoken times. Just return the items, don't touch any data
         """
-        initial_queue = speaker_list.get_user_pk_in_queue_created_order()
+        safe_positions = self.speaker_system.safe_positions
+        user_to_speaker_dict = {
+            x.user_id: x
+            for x in speaker_list.speakers_in_queue_or_speaking(
+                spoken_count=True
+            ).order_by("created")
+        }
         # Fetch order and respect cached setting, but don't assume the values there are correct!
-        sort_vals = [x for x in speaker_list.order_list if x in initial_queue]
-        sort_vals.extend(x for x in initial_queue if x not in sort_vals)
-        spoken_count = Counter()
-        for v in speaker_list.speaker_items.filter(seconds__isnull=False).values_list(
-            "user_id", flat=True
-        ):
-            spoken_count[v] += 1
-        if speaker_list.speaker_system.safe_positions:
-            safe_speakers = sort_vals[: speaker_list.speaker_system.safe_positions]
-            speakers_to_sort = sort_vals[speaker_list.speaker_system.safe_positions :]
-        else:
-            safe_speakers = []
-            speakers_to_sort = sort_vals
-        new_order = []
-        # A lower value is better, essentially "how many times have this person spoklen before?
-        user_cmp_vals = {}
+        sort_vals = [x for x in speaker_list.order_list if x in user_to_speaker_dict]
+        sort_vals.extend(x for x in user_to_speaker_dict if x not in sort_vals)
+        safe_speakers = []
+        if safe_positions:
+            for user_id in list(sort_vals):
+                # In case we touch current speaker, include them but don't consume safe pos.
+                if user_to_speaker_dict[user_id].started:
+                    safe_positions += 1
+                sort_vals.remove(user_id)
+                safe_speakers.append(user_id)
+                if len(safe_speakers) == safe_positions:
+                    break
+        # A lower value is better, essentially "how many times have this person spoken before?"
         max_times = self.speaker_system.settings.max_times
-        for user_pk in speakers_to_sort:
-            # user_cmp_vals[user_pk] = self.get_cmp_val(speaker_list, user_pk)
-            count = spoken_count.get(user_pk, 0)
-            if max_times:
-                user_cmp_vals[user_pk] = min(count, max_times)
-            else:
-                user_cmp_vals[user_pk] = count
-        for user_pk in speakers_to_sort:
+        if max_times:
+            user_cmp_vals = {
+                k: min(v.spoken_count, max_times)
+                for k, v in user_to_speaker_dict.items()
+            }
+        else:
+            user_cmp_vals = {k: v.spoken_count for k, v in user_to_speaker_dict.items()}
+        new_order = []
+        for user_pk in sort_vals:
             cmp_val = user_cmp_vals[user_pk]
             insert_at = len(new_order)
             for pk in reversed(new_order):
@@ -79,5 +83,4 @@ class Priority(ListMethod):
                     break
                 insert_at -= 1
             new_order.insert(insert_at, user_pk)
-        new_order = safe_speakers + new_order
-        return new_order
+        return safe_speakers + new_order

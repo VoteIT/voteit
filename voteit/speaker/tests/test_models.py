@@ -129,6 +129,29 @@ class SpeakerListTests(TestCase):
             self.speaker_list.reorder(),
         )
 
+    def test_speakers_in_queue_or_speaking(self):
+        for _ in range(3):
+            self.speaker_list.speaker_items.create(
+                user=self.user_one, started=now(), seconds=1
+            )
+        for _ in range(4):
+            self.speaker_list.speaker_items.create(
+                user=self.user_two, started=now(), seconds=1
+            )
+        for _ in range(5):
+            self.speaker_list.speaker_items.create(
+                user=self.user_three, started=now(), seconds=1
+            )
+        self.assertEqual(
+            {self.user_one.pk: 3, self.user_two.pk: 4, self.user_three.pk: 5},
+            {
+                x.user_id: x.spoken_count
+                for x in self.speaker_list.speakers_in_queue_or_speaking(
+                    spoken_count=True
+                )
+            },
+        )
+
     def test_reorder_signals_on_change(self):
         L = []
 

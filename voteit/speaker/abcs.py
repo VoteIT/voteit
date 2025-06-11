@@ -62,23 +62,18 @@ class ListMethod(ABC):
 
     def shuffle(self, speaker_list: SpeakerList) -> list[int]:
         """
-        Shuffle order - should always be handled within an atomic transaction.
-        It fetches speaker objects rather than using the cached speaker_list.order.
+        Shuffle order - should always be handled within an atomic transaction + the speaker list locked!
+        It fetches speaker objects and updates them rather than using the cached speaker_list.order.
 
         The reason for this somewhat odd solution: Keep order even when other methods may reorder later on.
         """
-        speaker_qs = speaker_list.speakers_in_queue()
-        new_order = list(
-            speaker_list.speakers_in_queue().values_list("user_id", flat=True)
-        )
-        shuffle(new_order)
-        new_created_base = now() - timedelta(seconds=len(new_order))
-        for i, speaker in enumerate(
-            sorted(speaker_qs, key=lambda x: new_order.index(x.user_id)), 1
-        ):
+        speakers = list(speaker_list.speakers_in_queue())
+        shuffle(speakers)
+        new_created_base = now() - timedelta(seconds=len(speakers))
+        for i, speaker in enumerate(speakers, 1):
             speaker.created = new_created_base + timedelta(seconds=i)
             speaker.save()
-        return new_order
+        return [x.user_id for x in speakers]  # For testing, not used
 
     @abstractmethod
     def reorder(self, speaker_list: SpeakerList) -> list[int]:

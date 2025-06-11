@@ -5,7 +5,6 @@ import rules
 
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_user
-from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.rules import can_view_meeting
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import meeting_upcoming_ongoing
@@ -101,11 +100,13 @@ def not_currently_speaking(user: User, speaker_list: SpeakerList) -> bool:
 
 @predicate
 def has_active_speaker_in_same_list(user: User, speaker: Speaker):
-    return Speaker.objects.filter(
-        seconds__isnull=True,
-        started__isnull=False,
-        speaker_list_id=speaker.speaker_list_id,
-    ).exists()
+    if isinstance(speaker, Speaker):
+        return Speaker.objects.filter(
+            seconds__isnull=True,
+            started__isnull=False,
+            speaker_list_id=speaker.speaker_list_id,
+        ).exists()
+    raise TypeError(f"{speaker} is not a Speaker instance")
 
 
 # Speaker list permissions
@@ -125,6 +126,10 @@ rules.add_perm(
     SpeakerListPermissions.VIEW,
     # Due to possible contextless systems later on
     can_view_meeting | is_speaker_moderator | has_speaker_role,
+)
+rules.add_perm(
+    SpeakerListPermissions.SHUFFLE,
+    meeting_upcoming_ongoing & (is_speaker_moderator | is_moderator),
 )
 
 

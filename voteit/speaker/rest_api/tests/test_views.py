@@ -1,6 +1,7 @@
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
+import random
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
@@ -237,6 +238,31 @@ class SpeakerListsViewTests(APITestCase):
             self.part_speaker.refresh_from_db()
         response = self.client.post(url)
         self.assertEqual(404, response.status_code)
+
+    def test_shuffle(self):
+        url = reverse("speaker-lists-shuffle", kwargs={"pk": self.slist.pk})
+        self.slist.speaker_items.create(user=self.moderator)
+        self.slist.speaker_items.create(user=self.list_moderator)
+        self.client.force_login(self.list_moderator)
+        random.seed(100)
+        response = self.client.post(url)
+        random.seed()
+        self.assertEqual(200, response.status_code)
+        self.slist.refresh_from_db()
+        self.assertEqual(
+            [self.list_moderator.pk, self.moderator.pk, self.participant.pk],
+            self.slist.order_list,
+        )
+
+    def test_shuffle_with_ongoing(self):
+        self.slist.speaker_items.create(user=self.moderator, started=now())
+        url = reverse("speaker-lists-shuffle", kwargs={"pk": self.slist.pk})
+        self.client.force_login(self.list_moderator)
+        response = self.client.post(url)
+        self.assertEqual(403, response.status_code)
+        self.assertEqual(
+            {"detail": "Shuffle isn't allowed with an active speaker."}, response.json()
+        )
 
     # def test_get_with_current(self):
     #     self.slist.start_speaker(self.part_speaker)
@@ -569,34 +595,40 @@ class HistoricSpeakerViewTests(APITestCase):
         # Speaker/Participant
         self.client.force_login(self.user_one)
         response = self.client.get(url)
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            {"speaker_system": ["This field is required."]}, response.json()
+        )
+        response = self.client.get(url, data={"speaker_system": self.system.pk})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(2, len(response.json()))
         # moderator
         self.client.force_login(self.moderator)
-        response = self.client.get(url)
+        response = self.client.get(url, data={"speaker_system": self.system.pk})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(2, len(response.json()))
         # list moderator
         self.client.force_login(self.list_moderator)
-        response = self.client.get(url)
+        response = self.client.get(url, data={"speaker_system": self.system.pk})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(2, len(response.json()))
         # outsider
         self.client.force_login(self.outsider)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
+        response = self.client.get(url, data={"speaker_system": self.system.pk})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            {
+                "speaker_system": [
+                    "Select a valid choice. That choice is not one of the available choices."
+                ]
+            },
+            response.json(),
+        )
 
-    def test_without_meeting(self):
+    def test_history(self):
         url = reverse("speaker-history-list")
         self.client.force_login(self.user_one)
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        self.assertEqual([], response.json())
-
-    def test_meeting_history(self):
-        url = reverse("speaker-history-list") + f"?meeting={self.meeting.pk}"
-        self.client.force_login(self.user_one)
-        response = self.client.get(url)
+        response = self.client.get(url, data={"speaker_system": self.system.pk})
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(

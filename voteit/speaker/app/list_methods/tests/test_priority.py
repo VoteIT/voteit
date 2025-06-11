@@ -1,7 +1,10 @@
+import random
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils.timezone import now
 
+from voteit.core.testing import SetSeed
 from voteit.meeting.models import Meeting
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
@@ -21,6 +24,7 @@ class PriorityTests(TestCase):
         cls.user_one = User.objects.create(username="one")
         cls.user_two = User.objects.create(username="two")
         cls.user_three = User.objects.create(username="three")
+        cls.user_four = User.objects.create(username="four")
         cls.speaker_one = cls.speaker_list.speaker_items.create(user=cls.user_one)
         cls.speaker_two = cls.speaker_list.speaker_items.create(user=cls.user_two)
         cls.speaker_three = cls.speaker_list.speaker_items.create(user=cls.user_three)
@@ -66,19 +70,11 @@ class PriorityTests(TestCase):
         )
 
     def test_safe_users_checked_with_current_order(self):
-        self.speaker_list.speaker_items.all().delete()  # Start fresh here
-        self.speaker_list.reorder()
         self.assertEqual([], self.speaker_list.order_list)
         self._mk_previous_spoken(self.user_two)
         self._mk_previous_spoken(self.user_one, count=2)
         self.system.safe_positions = 1
         self.system.save()
-        speaker_one = self.speaker_list.speaker_items.create(
-            user=self.user_one
-        )  # Enters safe pos
-        speaker_two = self.speaker_list.speaker_items.create(user=self.user_two)
-        # Passes no 2
-        speaker_three = self.speaker_list.speaker_items.create(user=self.user_three)
         self.assertEqual(
             [self.user_one.pk, self.user_three.pk, self.user_two.pk],
             self.speaker_list.reorder(),
@@ -98,3 +94,92 @@ class PriorityTests(TestCase):
             [self.user_three.pk, self.user_one.pk, self.user_two.pk],
             self.speaker_list.reorder(),
         )
+
+    def test_speaker_speaking_and_reordering_with_safe_pos(self):
+        """
+        1 safe pos.
+        User    Times spoken
+        1       (1) Speaking right now
+        2       (1) Safe pos
+        3       (0)
+        4       (0) Will enter and reorder
+        """
+        self.system.safe_positions = 1
+        self.system.save()
+        self._mk_previous_spoken(self.user_one)
+        self._mk_previous_spoken(self.user_two)
+        self.speaker_one.started = now()
+        self.speaker_one.save()
+        self.speaker_four = self.speaker_list.speaker_items.create(user=self.user_four)
+        self.assertEqual(
+            [self.user_one.pk, self.user_two.pk, self.user_three.pk, self.user_four.pk],
+            self.speaker_list.reorder(),
+        )
+
+    def test_speaker_further_down_and_reordering_with_safe_pos(self):
+        """
+        1 safe pos.
+        User    Times spoken
+        1       (1) Safe
+        2       (0)
+        3       (1) Speaking right now
+        4       (0) Will enter and reorder
+        """
+        self.system.safe_positions = 1
+        self._mk_previous_spoken(self.user_one)
+        self._mk_previous_spoken(self.user_three)
+        self.speaker_three.started = now()
+        self.speaker_three.save()
+        self.speaker_four = self.speaker_list.speaker_items.create(user=self.user_four)
+        self.assertEqual(
+            [self.user_one.pk, self.user_two.pk, self.user_four.pk, self.user_three.pk],
+            self.speaker_list.reorder(),
+        )
+
+    def test_shuffle(self):
+        """
+        1 safe pos.
+        User    Times spoken
+        1       (1)
+        2       (0)
+        3       (1)
+        4       (0)
+        """
+        self.system.safe_positions = 0
+        self.system.save()
+        self._mk_previous_spoken(self.user_one)
+        self._mk_previous_spoken(self.user_three)
+        self.speaker_four = self.speaker_list.speaker_items.create(user=self.user_four)
+        random.seed(1337)
+        self.speaker_list.shuffle()
+        self.assertEqual(
+            [self.user_two.pk, self.user_four.pk, self.user_one.pk, self.user_three.pk],
+            self.speaker_list.order_list,
+        )
+        random.seed(1)
+        self.speaker_list.shuffle()
+        self.assertEqual(
+            [self.user_two.pk, self.user_four.pk, self.user_three.pk, self.user_one.pk],
+            self.speaker_list.order_list,
+        )
+        random.seed()
+
+    def test_shuffle_safe_pos(self):
+        """
+        1 safe pos.
+        User    Times spoken
+        1       (0) Safe - nope
+        2       (0) Safe - nope
+        3       (0)
+        4       (0)
+        """
+        self.system.safe_positions = 2
+        self.system.save()
+        self.speaker_four = self.speaker_list.speaker_items.create(user=self.user_four)
+        random.seed(1337)
+        self.speaker_list.shuffle()
+        self.assertEqual(
+            [self.user_two.pk, self.user_one.pk, self.user_four.pk, self.user_three.pk],
+            self.speaker_list.order_list,
+        )
+        random.seed()

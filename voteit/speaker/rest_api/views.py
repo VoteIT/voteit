@@ -1,55 +1,38 @@
 import csv
-from crypt import methods
 from logging import getLogger
-from pickle import FALSE
 
 from django.db import models
 from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
+from django.utils.translation import gettext as _
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import exceptions
+from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
-from rest_framework.exceptions import ValidationError
-from rest_framework.mixins import DestroyModelMixin
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.mixins import ListModelMixin
-from rest_framework.mixins import RetrieveModelMixin
-from rest_framework.mixins import UpdateModelMixin
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from rest_framework import exceptions
-from rest_framework import permissions
 
 from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
-from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
-from voteit.room.models import Room
-from voteit.room.permissions import RoomPermissions
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
-from voteit.speaker.permissions import SpeakerListPermissions
 from voteit.speaker.permissions import SpeakerSystemPermissions
 from voteit.speaker.rest_api import serializers
 from voteit.speaker.rest_api.filters import SpeakerFilterSet
 
-
 logger = getLogger(__name__)
-
-# class CandidateRelationsFilter(django_filters.FilterSet):
-#     poll = django_filters.ModelChoiceFilter(
-#         field_name="polls", label="Poll", queryset=user_poll_qs
-#     )
-#     process = django_filters.ModelChoiceFilter(queryset=user_process_qs)
-#     mine = MineFilter(field_name="user", label="Mine")
-#     eligible = django_filters.BooleanFilter()
 
 
 @router.register("speaker-lists", basename="speaker-lists")
@@ -63,11 +46,12 @@ class SpeakerListViewSet(
     permission_type_map = {
         **AutoPermissionViewSetMixin.permission_type_map,
         "leave": None,  # No permission check required
+        "shuffle": "shuffle",
     }
 
     def get_queryset(self):
         if self.detail:
-            if self.action == "leave":
+            if self.action == ("leave", "shuffle"):
                 return self.queryset.select_for_update()
             return self.queryset
         return self.queryset.none()
@@ -85,10 +69,20 @@ class SpeakerListViewSet(
             return Response(status=204)
         raise NotFound()
 
+    @action(methods=["POST"], detail=True)
+    def shuffle(self, request, *args, **kwargs):
+        with transaction.atomic(durable=True):
+            instance: SpeakerList = self.get_object()
+            if instance.active_speaker():
+                raise PermissionDenied(
+                    _("Shuffle isn't allowed with an active speaker.")
+                )
+            instance.shuffle()
+        return Response(status=200)
+
 
 @router.register("speaker-history", basename="speaker-history")
 class HistoricSpeakerViewSet(
-    ModelContextMixin,
     ListModelMixin,
     GenericViewSet,
 ):
@@ -109,19 +103,6 @@ class HistoricSpeakerViewSet(
     filter_backends = (DjangoFilterBackend,)
     filterset_class = SpeakerFilterSet
     permission_classes = (permissions.IsAuthenticated,)
-    context_lookup_kwarg = "meeting"
-    context_queryset = Meeting.objects.all()
-
-    def get_queryset(self):
-        if self.detail:
-            return self.queryset
-        try:
-            meeting = self.get_context(self.request)
-        except exceptions.ValidationError:
-            meeting = None
-        if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
-            return self.queryset.filter(speaker_list__speaker_system__meeting=meeting)
-        return self.queryset.none()
 
 
 @router.register("speaker-list-systems", basename="speaker-list-systems")
