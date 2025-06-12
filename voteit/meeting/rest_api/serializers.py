@@ -169,18 +169,21 @@ class CreateMeetingSerializer(BaseModelSerializer):
             room_data = validated_data.pop("room", None)
             sls_data = validated_data.pop("sls", None)
             instance = super().create(validated_data)
+            instance.add_roles(user, ROLE_MODERATOR)
             if install_dialect:
                 handler = dialect_registry.get_merged_handler(install_dialect)
                 handler.install(instance)
             if room_data:
                 room_serializer = CreateRoomSerializer(
-                    data={"meeting": instance.pk, **room_data}
+                    data={"meeting": instance.pk, **room_data},
+                    context=self.context,
                 )
                 room_serializer.is_valid(raise_exception=True)
                 room = room_serializer.save()
                 if sls_data:
                     sls_serializer = CreateSpeakerListSystemSerializer(
-                        data={"meeting": instance.pk, "room": room.pk, **sls_data}
+                        data={"meeting": instance.pk, "room": room.pk, **sls_data},
+                        context=self.context,
                     )
                     sls_serializer.is_valid(raise_exception=True)
                     sls_serializer.save()

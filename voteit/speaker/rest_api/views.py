@@ -82,6 +82,7 @@ class HistoricSpeakerViewSet(
     ListModelMixin,
     GenericViewSet,
 ):
+    expected_default_http_status = 400
     model = Speaker
     queryset = (
         Speaker.objects.filter(

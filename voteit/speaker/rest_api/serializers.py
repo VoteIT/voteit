@@ -12,11 +12,12 @@ from rest_framework.exceptions import ValidationError
 from voteit.core.rest_api.fields import RolesField
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.core.rest_api.utils import perm_denied_msg
+from voteit.core.utils import get_model_shortname
+from voteit.core.utils import get_permission_registry
 from voteit.meeting.models import MeetingRoles
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
-from voteit.speaker.rules import is_speaker_moderator
 from voteit.speaker.utils import get_list_method_registry
 
 if TYPE_CHECKING:
@@ -27,11 +28,12 @@ User = get_user_model()
 
 
 def _validate_add(serializer, model: type, value):
-    # FIXME: Generalize later on
-    perm = serializer.context["view"].get_model_perm(model, "add")
+    # FIXME: Generalize later on / permission system will change
+    reg = get_permission_registry()
+    perms = reg.get_model_permissions(get_model_shortname(model))
     user = serializer.context["request"].user
-    if not user.has_perm(perm, value):
-        raise exceptions.PermissionDenied(perm_denied_msg(perm, value))
+    if not user.has_perm(perms.ADD, value):
+        raise exceptions.PermissionDenied(perm_denied_msg(perms.ADD, value))
 
 
 class CreateSpeakerListSerializer(serializers.ModelSerializer):

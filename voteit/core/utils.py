@@ -15,7 +15,7 @@ from django.utils.text import slugify
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
-    from voteit.core.permissions import PermissionRegistry
+    from voteit.core.registries import PermissionRegistry
     from voteit.core.registries import ContentRegistry
 
 

@@ -104,10 +104,6 @@ class MeetingViewSet(DefaultModelViewSet):
     def update(self, *args, **kwargs):
         return super().update(*args, **kwargs)
 
-    def perform_create(self, serializer):
-        instance: Meeting = serializer.save()
-        instance.add_roles(self.request.user, roles.ROLE_MODERATOR)
-
 
 @router.register("meeting-roles", basename="meeting-roles")
 class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
