@@ -255,7 +255,9 @@ class MeetingGroupViewSetTests(APITestCase):
         self.assertEqual(200, response.status_code)
         data = response.json()
         self.assertEqual(2, len(data))
-        self.assertEqual(self.meeting_group.pk, data[0]["pk"])
+        self.assertEqual(
+            {self.meeting_group.pk, self.meeting_group_two.pk}, {x["pk"] for x in data}
+        )
 
     def test_change(self):
         self.client.force_login(self.moderator)
