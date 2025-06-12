@@ -247,6 +247,10 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
 
         active_list_changed.send(sender=self.__class__, instance=self)
 
+    def refresh_from_db(self, **kwargs):
+        super().refresh_from_db(**kwargs)
+        self._initial_active_list_id = self.active_list_id
+
     def save(self, **kw):
         # Add meeting on create if not specified
         if self._state.adding:
@@ -258,7 +262,10 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
                 raise IntegrityError("SLS links to another meeting")
         super().save(**kw)
         if self.active_list_changed:
+            if self.active_list_id:
+                self.active_list.is_active_list = True  # Update cached value
             self.signal_active_list_changed()
+        self._initial_active_list_id = self.active_list_id
 
     @property
     def is_archived(self):
@@ -338,7 +345,7 @@ class Speaker(MeetingContext, SpeakerSystemContext):
         if self.started and self.seconds is None:
             self.started = None
             return True
-        return False
+        return False  # Pragma: no coverage
 
     @property
     def ended(self) -> datetime | None:
@@ -420,9 +427,21 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     @property
     def is_active_list(self) -> bool:
         """Is this the currently active list?"""
+        if hasattr(self, "_is_active_list"):
+            return self._is_active_list
+        self._is_active_list = False
         with suppress(SpeakerListSystem.DoesNotExist):
-            return self.active_in_system is not None
-        return False
+            self._is_active_list = bool(self.active_in_system)
+        return self._is_active_list
+
+    @is_active_list.setter
+    def is_active_list(self, value: bool):
+        self._is_active_list = value
+
+    @is_active_list.deleter
+    def is_active_list(self):
+        if hasattr(self, "_is_active_list"):
+            delattr(self, "_is_active_list")
 
     @property
     def order_list(self) -> list[int]:
@@ -505,12 +524,6 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         """
         return self.speaker_items.filter(seconds__isnull=True, started__isnull=True)
 
-    def historic_speakers(self) -> models.QuerySet[Speaker]:
-        return self.speaker_items.filter(seconds__isnull=False, started__isnull=False)
-
-    def started_or_historic_speakers(self) -> models.QuerySet[Speaker]:
-        return self.speaker_items.filter(started__isnull=False)
-
     def get_user_pk_in_queue_created_order(self) -> list[int]:
         return list(
             self.speakers_in_queue_or_speaking()
@@ -518,9 +531,13 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
             .values_list("user_id", flat=True)
         )
 
+    def refresh_from_db(self, **kwargs):
+        super().refresh_from_db(**kwargs)
+        del self.is_active_list
+        if hasattr(self, "_active_speaker"):
+            delattr(self, "_active_speaker")
+
     def save(self, **kw):
-        if self.title is None:
-            self.title = "list @ " + self.agenda_item.title
         if self._state.adding:
             with suppress(ObjectDoesNotExist):
                 if (

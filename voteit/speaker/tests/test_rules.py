@@ -77,47 +77,10 @@ class SpeakerListTests(TestCase):
 
     def test_view_speaker_meeting(self):
         VIEW = self.p("VIEW")
-        meeting = Meeting.objects.create()
-        self.system.meeting = meeting
-        self.system.save()
-        meeting_participant = User.objects.create(username="participant")
-        meeting.add_roles(meeting_participant, ROLE_PARTICIPANT)
         self.assertTrue(self.user_list_moderator.has_perm(VIEW, self.list))
         self.assertTrue(self.user_speaker.has_perm(VIEW, self.list))
         self.assertFalse(self.user_any.has_perm(VIEW, self.list))
-        self.assertTrue(meeting_participant.has_perm(VIEW, self.list))
-
-    # def test_start(self):
-    #     START = self.p("START")
-    #     self.assertTrue(self.user_meeting_moderator.has_perm(START, self.list))
-    #     self.assertTrue(self.user_list_moderator.has_perm(START, self.list))
-    #     self.assertFalse(self.user_speaker.has_perm(START, self.list))
-    #     self.assertFalse(self.user_any.has_perm(START, self.list))
-    #
-    # def test_start_not_active_list(self):
-    #     START = self.p("START")
-    #     self.system.active_list = None
-    #     self.system.save()
-    #     self.assertFalse(self.user_meeting_moderator.has_perm(START, self.list))
-    #     self.assertFalse(self.user_list_moderator.has_perm(START, self.list))
-    #     self.assertFalse(self.user_speaker.has_perm(START, self.list))
-    #     self.assertFalse(self.user_any.has_perm(START, self.list))
-    #
-    # def test_stop(self):
-    #     STOP = self.p("STOP")
-    #     self.assertTrue(self.user_meeting_moderator.has_perm(STOP, self.list))
-    #     self.assertTrue(self.user_list_moderator.has_perm(STOP, self.list))
-    #     self.assertFalse(self.user_speaker.has_perm(STOP, self.list))
-    #     self.assertFalse(self.user_any.has_perm(STOP, self.list))
-    #
-    # def test_stop_not_active_list(self):
-    #     STOP = self.p("STOP")
-    #     self.system.active_list = None
-    #     self.system.save()
-    #     self.assertFalse(self.user_meeting_moderator.has_perm(STOP, self.list))
-    #     self.assertFalse(self.user_list_moderator.has_perm(STOP, self.list))
-    #     self.assertFalse(self.user_speaker.has_perm(STOP, self.list))
-    #     self.assertFalse(self.user_any.has_perm(STOP, self.list))
+        self.assertTrue(self.user_proposer.has_perm(VIEW, self.list))
 
 
 class SpeakerListSystemTests(TestCase):

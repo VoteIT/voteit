@@ -7,7 +7,6 @@ from django.http import Http404
 from django.http import HttpResponse
 from django.utils.translation import gettext as _
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import exceptions
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -21,10 +20,7 @@ from rest_framework.viewsets import GenericViewSet
 from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
-from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.mixins import TransitionsMixin
-from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
@@ -51,7 +47,7 @@ class SpeakerListViewSet(
 
     def get_queryset(self):
         if self.detail:
-            if self.action == ("leave", "shuffle"):
+            if self.action in ("leave", "shuffle"):
                 return self.queryset.select_for_update()
             return self.queryset
         return self.queryset.none()
@@ -149,7 +145,7 @@ class SpeakerViewSet(
                 "speaker_list",
                 "user",
             )
-            if self.action == ("start", "leave"):
+            if self.action in ("start", "leave"):
                 return detail_qs.filter(seconds__isnull=True, started__isnull=True)
             elif self.action in ("stop", "undo"):
                 return detail_qs.filter(seconds__isnull=True, started__isnull=False)

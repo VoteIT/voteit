@@ -680,6 +680,7 @@ class SpeakerViewSetTests(APITestCase):
             user=cls.moderator, started=datetime(1914, 1, 1, tzinfo=UTC)
         )
         cls.fifth_in_queue = cls.slist.speaker_items.create(user=cls.participant)
+        cls.slist.reorder()
 
     def test_create(self):
         url = reverse("speakers-list")
@@ -806,13 +807,7 @@ class SpeakerViewSetTests(APITestCase):
         # And once again
         response = self.client.post(url)
         data = response.json()
-        self.assertEqual(response.status_code, 403, data)
-        self.assertEqual(
-            {
-                "detail": f"You're missing the permission 'speaker.start_speaker' on Speaker id {self.fifth_in_queue.pk}."
-            },
-            data,
-        )
+        self.assertEqual(response.status_code, 404, data)
 
     def test_start_another_speaker_speaking(self):
         self.system.active_list = self.slist

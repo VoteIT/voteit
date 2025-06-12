@@ -219,13 +219,24 @@ class SpeakerListSystemsTests(TestCase):
         self.system.inactivate()
         self.assertIsNone(self.system.active_list)
 
+    def test_archiving_causes_list_to_clear_order(self):
+        slist = self.system.speaker_lists.create(order="1,2,3")
+        self.system.active_list = slist
+        self.system.archive()
+        slist.refresh_from_db()
+        self.assertEqual("", slist.order)
+
     def test_inactivating_with_speaker_causes_error(self):
         user = User.objects.create(username="speaker")
         slist = self.system.speaker_lists.create()
         self.system.active_list = slist
-        slist.speaker_items.create(user=user, started=now())
+        self.system.save()
+        speaker = slist.speaker_items.create(user=user, started=now())
         with self.assertRaises(TransitionNotAllowed):
             self.system.inactivate()
+        speaker.delete()
+        slist.refresh_from_db()
+        self.system.inactivate()
 
 
 class DeletingMeetingTests(TestCase):

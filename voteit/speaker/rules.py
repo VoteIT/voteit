@@ -29,7 +29,9 @@ def is_speaker_moderator(user: User, context: SpeakerSystemContext) -> bool:
     """
     if isinstance(context, SpeakerSystemContext):
         return context.speaker_system.has_roles(user, ROLE_LIST_MODERATOR)
-    raise TypeError(f"{context} is not an instance of SpeakerSystemContext")
+    raise TypeError(
+        f"{context} is not an instance of SpeakerSystemContext"
+    )  # pragma: no coverage
 
 
 @predicate
@@ -47,14 +49,18 @@ def has_speaker_role(user: User, context: SpeakerSystemContext) -> bool:
         return context.speaker_system.has_any_roles(
             user, ROLE_SPEAKER, ROLE_LIST_MODERATOR
         )
-    raise TypeError(f"{context} is not an instance of SpeakerSystemContext")
+    raise TypeError(
+        f"{context} is not an instance of SpeakerSystemContext"
+    )  # pragma: no coverage
 
 
 @predicate
 def is_list_open(user: User, speaker_list: SpeakerList) -> bool:
     if isinstance(speaker_list, SpeakerList):
         return speaker_list.state == SpeakerListWf.OPEN
-    raise TypeError(f"{speaker_list} is not an instance of SpeakerList")
+    raise TypeError(
+        f"{speaker_list} is not an instance of SpeakerList"
+    )  # pragma: no coverage
 
 
 @predicate
@@ -63,14 +69,18 @@ def is_active_list(user: User, instance: SpeakerList | Speaker) -> bool:
         return instance.is_active_list
     elif isinstance(instance, Speaker):
         return instance.speaker_list.is_active_list
-    raise TypeError(f"{instance} is not an instance of SpeakerList | Speaker")
+    raise TypeError(
+        f"{instance} is not an instance of SpeakerList | Speaker"
+    )  # pragma: no coverage
 
 
 @predicate
 def is_system_active(user: User, context: SpeakerSystemContext) -> bool:
     if isinstance(context, SpeakerSystemContext):
         return context.speaker_system.is_active
-    raise TypeError(f"{context} is not an instance of SpeakerSystemContext")
+    raise TypeError(
+        f"{context} is not an instance of SpeakerSystemContext"
+    )  # pragma: no coverage
 
 
 @predicate
@@ -86,7 +96,7 @@ def is_system_not_archived(user: User, context: SpeakerSystemContext) -> bool:
 def has_no_active_list(user: User, context: SpeakerSystemContext) -> bool:
     if isinstance(context, SpeakerSystemContext):
         return context.speaker_system.active_list_id is None
-    raise TypeError(f"{context} is not a speaker_system context")
+    raise TypeError(f"{context} is not a speaker_system context")  # pragma: no coverage
 
 
 @predicate
@@ -95,7 +105,9 @@ def not_currently_speaking(user: User, speaker_list: SpeakerList) -> bool:
         if speaker := speaker_list.active_speaker():
             return speaker.user_id != user.id
         return True
-    raise TypeError(f"{speaker_list} is not an instance of SpeakerList")
+    raise TypeError(
+        f"{speaker_list} is not an instance of SpeakerList"
+    )  # pragma: no coverage
 
 
 @predicate
@@ -106,7 +118,7 @@ def has_active_speaker_in_same_list(user: User, speaker: Speaker):
             started__isnull=False,
             speaker_list_id=speaker.speaker_list_id,
         ).exists()
-    raise TypeError(f"{speaker} is not a Speaker instance")
+    raise TypeError(f"{speaker} is not a Speaker instance")  # pragma: no coverage
 
 
 # Speaker list permissions
@@ -124,8 +136,7 @@ rules.add_perm(
 )
 rules.add_perm(
     SpeakerListPermissions.VIEW,
-    # Due to possible contextless systems later on
-    can_view_meeting | is_speaker_moderator | has_speaker_role,
+    can_view_meeting,
 )
 rules.add_perm(
     SpeakerListPermissions.SHUFFLE,
@@ -139,7 +150,7 @@ rules.add_perm(
 )  # Checked against meeting
 rules.add_perm(
     SpeakerSystemPermissions.CHANGE,
-    is_moderator & meeting_upcoming_ongoing & is_system_not_archived,
+    is_moderator & is_system_not_archived,
 )
 rules.add_perm(
     SpeakerSystemPermissions.MANAGE,
@@ -154,17 +165,15 @@ rules.add_perm(
 )
 rules.add_perm(
     SpeakerSystemPermissions.VIEW,
-    # Due to possible contextless systems later on
-    can_view_meeting | is_speaker_moderator | has_speaker_role,
+    can_view_meeting,
 )
 rules.add_perm(
     SpeakerSystemPermissions.CHANGE_ROLES,
-    is_moderator & meeting_upcoming_ongoing & is_system_not_archived,
+    is_moderator & is_system_not_archived,
 )
 rules.add_perm(
     SpeakerSystemPermissions.VIEW_ROLES,
-    # Due to possible contextless systems later on
-    can_view_meeting | is_speaker_moderator | has_speaker_role,
+    can_view_meeting,
 )
 
 
