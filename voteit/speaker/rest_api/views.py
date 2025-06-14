@@ -186,9 +186,10 @@ class SpeakerViewSet(
             with transaction.atomic(durable=True):
                 speaker.save()
                 speaker_list = self._get_locked_sl(speaker.speaker_list_id)
-                if speaker.user_id in speaker_list.order_list:
-                    speaker_list.order_list.remove(speaker.user_id)
-                    speaker_list.save()
+                speaker_list.order_list = [
+                    u for u in speaker_list.order_list if u != speaker.user_id
+                ]
+                speaker_list.save()
                 return Response(status=200)
         return Response(status=400)  # pragma: no coverage
 
