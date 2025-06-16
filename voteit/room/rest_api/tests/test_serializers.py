@@ -27,7 +27,7 @@ class RoomDetailSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create()
-        cls.room: Room = cls.meeting.rooms.create()
+        cls.room: Room = cls.meeting.rooms.create(title="Hello")
         cls.sls = cls.meeting.speaker_systems.create(
             method_name="simple", room=cls.room
         )
@@ -36,7 +36,6 @@ class RoomDetailSerializerTests(TestCase):
         cls.prop2 = cls.ai.proposals.create()
         cls.prop2 = cls.ai.proposals.create()
         cls.prop3 = cls.ai.proposals.create()
-        cls.room = cls.meeting.rooms.create()
 
     @property
     def _cut(self):
@@ -45,8 +44,7 @@ class RoomDetailSerializerTests(TestCase):
         return RoomDetailSerializer
 
     def test_serialize(self):
-        instance = self.meeting.rooms.create(sls=self.sls, title="Hello")
-        serializer = self._cut(instance)
+        serializer = self._cut(self.room)
         data = serializer.data
         self.assertTrue(data.pop("pk"))
         self.assertTrue(data.pop("created", False))
