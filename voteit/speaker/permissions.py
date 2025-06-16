@@ -19,6 +19,7 @@ class SpeakerListPermissions(ModelPermissions):
     ADD = P("speaker.add_speakerlist", context="speaker_system")
     CHANGE = P("speaker.change_speakerlist")
     DELETE = P("speaker.delete_speakerlist")
+    ENTER = P("speaker.enter_speakerlist")
     VIEW = P("speaker.view_speakerlist")
     SHUFFLE = P("speaker.shuffle_speakerlist")
 
@@ -26,9 +27,6 @@ class SpeakerListPermissions(ModelPermissions):
 class SpeakerPermissions(ModelPermissions):
     model = "speaker"
     ADD = P("speaker.add_speaker", context="speaker_list")
-    ENTER = P(
-        "speaker.enter_speaker", context="speaker_list"
-    )  # Same as add, but only for acting user
     LEAVE = P("speaker.leave_speaker")
     CHANGE = P("speaker.change_speaker")
     DELETE = P("speaker.delete_speaker")

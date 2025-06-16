@@ -26,8 +26,11 @@ User = get_user_model()
 
 
 class SpeakerListsViewTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
+        cls.org: Organisation = Organisation.objects.get(pk=1)
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing"
         )
@@ -39,8 +42,10 @@ class SpeakerListsViewTests(APITestCase):
         )
         cls.slist = cls.system.speaker_lists.create()
         cls.list_moderator: User = User.objects.create_user("list_moderator")
-        cls.participant: User = User.objects.create_user("participant")
-        cls.moderator: User = User.objects.create_user("moderator")
+        cls.participant: User = User.objects.get(username="participant")
+        cls.moderator: User = User.objects.get(username="moderator")
+        cls.speaker_user: User = cls.org.users.create(username="speaker_user")
+        cls.system.add_roles(cls.speaker_user, ROLE_SPEAKER)
         cls.outsider: User = User.objects.create_user("outsider")
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
@@ -227,6 +232,79 @@ class SpeakerListsViewTests(APITestCase):
                 "queue": [self.participant.pk],
             },
             response.json(),
+        )
+
+    def test_enter_moderator(self):
+        url = reverse("speaker-lists-enter", args=[self.slist.pk])
+        self.client.force_login(self.list_moderator)
+        response = self.client.post(url)
+        data = response.json()
+        self.assertEqual(response.status_code, 201, data)
+        data.pop("pk")
+        self.assertEqual(
+            {
+                "seconds": None,
+                "speaker_list": self.slist.pk,
+                "started": None,
+                "user": self.list_moderator.pk,
+            },
+            data,
+        )
+
+    def test_enter_speaker(self):
+        url = reverse("speaker-lists-enter", args=[self.slist.pk])
+        self.client.force_login(self.speaker_user)
+        response = self.client.post(url)
+        data = response.json()
+        self.assertEqual(response.status_code, 201, data)
+        data.pop("pk")
+        self.assertEqual(
+            {
+                "seconds": None,
+                "speaker_list": self.slist.pk,
+                "started": None,
+                "user": self.speaker_user.pk,
+            },
+            data,
+        )
+
+    def test_enter_speaker_already_in_list(self):
+        url = reverse("speaker-lists-enter", args=[self.slist.pk])
+        self.client.force_login(self.moderator)
+        response = self.client.post(url)
+        data = response.json()
+        self.assertEqual(response.status_code, 201, data)
+        created_pk = data.pop("pk")
+        # Second call, user already in list
+        response = self.client.post(url, data={"speaker_list": self.slist.pk})
+        data = response.json()
+        self.assertEqual(data["pk"], created_pk)
+        self.assertEqual(response.status_code, 200, data)
+
+        # Third call, user is speaking
+        speaker = self.slist.speaker_items.get(
+            user=self.moderator, started__isnull=True
+        )
+        speaker.start()
+        speaker.save()
+        response = self.client.post(url, data={"speaker_list": self.slist.pk})
+        self.assertContains(
+            response,
+            f"You're missing the permission 'speaker.enter_speakerlist' on Speaker list {self.slist.pk}.",
+            status_code=403,
+        )
+
+    def test_enter_participant_not_speaker(self):
+        url = reverse("speaker-lists-enter", args=[self.slist.pk])
+        self.client.force_login(self.participant)
+        response = self.client.post(url)
+        data = response.json()
+        self.assertEqual(response.status_code, 403, data)
+        self.assertEqual(
+            {
+                "detail": f"You're missing the permission 'speaker.enter_speakerlist' on Speaker list {self.slist.pk}."
+            },
+            data,
         )
 
     def test_leave(self):
@@ -720,80 +798,6 @@ class SpeakerViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual(response.status_code, 400, data)
         self.assertEqual({"user": ["User already in list."]}, data)
-
-    def test_enter_moderator(self):
-        url = reverse("speakers-enter")
-        self.client.force_login(self.list_moderator)
-        response = self.client.post(url, data={"speaker_list": self.slist.pk})
-        data = response.json()
-        self.assertEqual(response.status_code, 201, data)
-        data.pop("pk")
-        self.assertEqual(
-            {
-                "seconds": None,
-                "speaker_list": self.slist.pk,
-                "started": None,
-                "user": self.list_moderator.pk,
-            },
-            data,
-        )
-
-    def test_enter_speaker(self):
-        url = reverse("speakers-enter")
-        self.client.force_login(self.speaker_user)
-        response = self.client.post(url, data={"speaker_list": self.slist.pk})
-        data = response.json()
-        self.assertEqual(response.status_code, 201, data)
-        data.pop("pk")
-        self.assertEqual(
-            {
-                "seconds": None,
-                "speaker_list": self.slist.pk,
-                "started": None,
-                "user": self.speaker_user.pk,
-            },
-            data,
-        )
-
-    def test_enter_speaker_already_in_list(self):
-        url = reverse("speakers-enter")
-        self.client.force_login(self.moderator)
-        response = self.client.post(url, data={"speaker_list": self.slist.pk})
-        data = response.json()
-        self.assertEqual(response.status_code, 403, data)
-        self.assertEqual(
-            {
-                "detail": f"You're missing the permission 'speaker.enter_speaker' on Speaker list {self.slist.pk}."
-            },
-            data,
-        )
-        self.fourth_ongoing.delete()
-        response = self.client.post(url, data={"speaker_list": self.slist.pk})
-        data = response.json()
-        self.assertEqual(response.status_code, 201, data)
-        data.pop("pk")
-        self.assertEqual(
-            {
-                "seconds": None,
-                "speaker_list": self.slist.pk,
-                "started": None,
-                "user": self.moderator.pk,
-            },
-            data,
-        )
-
-    def test_enter_participant_not_speaker(self):
-        url = reverse("speakers-enter")
-        self.client.force_login(self.participant)
-        response = self.client.post(url, data={"speaker_list": self.slist.pk})
-        data = response.json()
-        self.assertEqual(response.status_code, 403, data)
-        self.assertEqual(
-            {
-                "detail": f"You're missing the permission 'speaker.enter_speaker' on Speaker list {self.slist.pk}."
-            },
-            data,
-        )
 
     def test_start(self):
         self.fourth_ongoing.stop()

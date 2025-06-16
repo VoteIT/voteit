@@ -16,6 +16,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.mixins import ListModelMixin
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
+from rest_framework.serializers import Serializer
 from rest_framework.viewsets import GenericViewSet
 
 from voteit.core.decorators import has_perm_drf
@@ -42,6 +43,7 @@ class SpeakerListViewSet(
     serializer_classes = {"create": serializers.CreateSpeakerListSerializer}
     permission_type_map = {
         **AutoPermissionViewSetMixin.permission_type_map,
+        "enter": "enter",
         "leave": None,  # No permission check required
         "shuffle": "shuffle",
     }
@@ -57,7 +59,21 @@ class SpeakerListViewSet(
         )
         return get_object_or_404(queryset)
 
-    @action(methods=["POST"], detail=True)
+    @action(methods=["POST"], detail=True, serializer_class=Serializer)
+    @transaction.atomic(durable=True)
+    def enter(self, request, *args, **kwargs):
+        speaker_list: SpeakerList = self.get_update_object()
+        speaker, created = speaker_list.speaker_items.get_or_create(
+            user=request.user, started=None
+        )
+        if created:
+            speaker_list.reorder()
+        serializer = serializers.SpeakerSerializer(
+            speaker, context=self.get_serializer_context()
+        )
+        return Response(serializer.data, status=201 if created else 200)
+
+    @action(methods=["POST"], detail=True, serializer_class=Serializer)
     @transaction.atomic(durable=True)
     def leave(self, request, *args, **kwargs):
         instance: SpeakerList = self.get_update_object()
@@ -134,7 +150,6 @@ class SpeakerViewSet(
     }
     permission_type_map = {
         **AutoPermissionViewSetMixin.permission_type_map,
-        "enter": "enter",  # The normal user version of "add" speaker, user implicit. Also checked in serializer.
         "start": "start",
         "stop": "stop",
         "undo": "undo",
@@ -155,10 +170,6 @@ class SpeakerViewSet(
                 return detail_qs.filter(seconds__isnull=False, started__isnull=False)
             return detail_qs
         return self.queryset.none()
-
-    @action(methods=["POST"], detail=False)
-    def enter(self, request, *args, **kwargs):
-        return self.create(request, *args, **kwargs)
 
     def _get_locked_sl(self, pk: int) -> SpeakerList:
         return SpeakerList.objects.select_for_update().get(pk=pk)

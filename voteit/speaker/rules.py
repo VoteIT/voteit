@@ -135,6 +135,13 @@ rules.add_perm(
     is_system_not_archived & (is_speaker_moderator | is_moderator),
 )
 rules.add_perm(
+    SpeakerListPermissions.ENTER,
+    is_list_open
+    & not_currently_speaking
+    & meeting_upcoming_ongoing
+    & (has_speaker_role | is_moderator),
+)
+rules.add_perm(
     SpeakerListPermissions.VIEW,
     can_view_meeting,
 )
@@ -182,13 +189,6 @@ rules.add_perm(
 rules.add_perm(
     SpeakerPermissions.ADD,
     (is_speaker_moderator | is_moderator) & meeting_upcoming_ongoing & is_system_active,
-)
-rules.add_perm(
-    SpeakerPermissions.ENTER,
-    is_list_open
-    & not_currently_speaking
-    & meeting_upcoming_ongoing
-    & (has_speaker_role | is_moderator),
 )
 rules.add_perm(
     SpeakerPermissions.LEAVE,
