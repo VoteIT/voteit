@@ -51,6 +51,8 @@ class SpeakerListSerializerTests(TestCase):
                 "state": "open",
                 "queue": [self.participant.pk, self.moderator.pk],
                 "current": self.participant.pk,
+                "room": self.room.pk,
+                "meeting": self.meeting.pk,
             },
             data,
         )

@@ -42,7 +42,14 @@ class CreateSpeakerListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SpeakerList
-        read_only_fields = ["state", "pk", "queue", "current"]
+        read_only_fields = [
+            "state",
+            "pk",
+            "queue",
+            "current",
+            "meeting",
+            "room",
+        ]
         fields = read_only_fields + [
             "agenda_item",
             "speaker_system",
@@ -84,6 +91,8 @@ class SpeakerListSerializer(CreateSpeakerListSerializer):
             "state",
             "agenda_item",
             "speaker_system",
+            "meeting",
+            "room",
         ]
 
 
@@ -150,12 +159,17 @@ class CreateSpeakerUserImplicitSerializer(CreateSpeakerSerializer):
 
 
 class SpeakerSerializer(serializers.ModelSerializer):
+    room = serializers.PrimaryKeyRelatedField(
+        source="speaker_list.room", read_only=True
+    )
+
     class Meta:
         model = Speaker
         read_only_fields = [
             "user",
             "speaker_list",
             "started",
+            "room",
             "pk",
         ]
         fields = ["seconds"] + read_only_fields

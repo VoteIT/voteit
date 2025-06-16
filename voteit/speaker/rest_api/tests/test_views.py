@@ -231,6 +231,8 @@ class SpeakerListsViewTests(APITestCase):
                 "state": "open",
                 "queue": [self.participant.pk],
                 "current": None,
+                "room": self.room.pk,
+                "meeting": self.meeting.pk,
             },
             response.json(),
         )
@@ -248,6 +250,7 @@ class SpeakerListsViewTests(APITestCase):
                 "speaker_list": self.slist.pk,
                 "started": None,
                 "user": self.list_moderator.pk,
+                "room": self.room.pk,
             },
             data,
         )
@@ -265,6 +268,7 @@ class SpeakerListsViewTests(APITestCase):
                 "speaker_list": self.slist.pk,
                 "started": None,
                 "user": self.speaker_user.pk,
+                "room": self.room.pk,
             },
             data,
         )
@@ -342,28 +346,6 @@ class SpeakerListsViewTests(APITestCase):
         self.assertEqual(
             {"detail": "Shuffle isn't allowed with an active speaker."}, response.json()
         )
-
-    # def test_get_with_current(self):
-    #     self.slist.start_speaker(self.part_speaker)
-    #     url = reverse("speaker-lists-detail", kwargs={"pk": self.slist.pk})
-    #     self.client.force_login(self.list_moderator)
-    #     response = self.client.get(url)
-    #     self.assertEqual(
-    #         200,
-    #         response.status_code,
-    #     )
-    #     self.assertEqual(
-    #         {
-    #             "pk": self.slist.pk,
-    #             "title": "",
-    #             "speaker_system": self.system.pk,
-    #             "agenda_item": None,
-    #             "state": "open",
-    #             "queue": [],
-    #             "current": self.participant.pk,
-    #         },
-    #         response.json(),
-    #     )
 
 
 class SpeakerListSystemViewTests(APITestCase):

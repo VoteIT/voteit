@@ -213,6 +213,8 @@ class AppStateTests(TestCase):
                 "state": SpeakerListWf.OPEN,
                 "title": "Hello",
                 "pk": self.speaker_list.pk,
+                "room": self.room.pk,
+                "meeting": self.meeting.pk,
             },
             speaker_lists_added[0],
         )
@@ -257,6 +259,8 @@ class SendStateChangesTestsTests(TestCase):
                 "speaker_system": self.system.pk,
                 "state": "open",
                 "title": "Hello",
+                "room": self.room.pk,
+                "meeting": self.meeting.pk,
             },
             messages[0].data.dict(),
         )
@@ -359,6 +363,8 @@ class SendStateChangesTestsTests(TestCase):
                 "queue": [],
                 "current": None,
                 "title": "",
+                "room": self.room.pk,
+                "meeting": self.meeting.pk,
             },
             messages[0].data.dict(),
         )
@@ -378,6 +384,8 @@ class SendStateChangesTestsTests(TestCase):
                 "agenda_item": self.ai.pk,
                 "queue": [],
                 "current": None,
+                "room": self.room.pk,
+                "meeting": self.meeting.pk,
             },
             messages[0].data.dict(),
         )
@@ -422,6 +430,8 @@ class SendStateChangesTestsTests(TestCase):
                 "agenda_item": self.ai.pk,
                 "queue": [],
                 "current": None,
+                "room": self.room.pk,
+                "meeting": self.meeting.pk,
             },
             messages[0].data.dict(),
         )
