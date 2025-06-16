@@ -96,8 +96,10 @@ def notify_added_or_changed_speaker_system(
 @receiver(post_save, sender=Speaker)
 @disable_on_raw_save
 @on_transaction_commit
-def send_speaker_list_with_current_when_started_or_stopped(instance: Speaker, **kwargs):
-    if not instance.started:
+def send_speaker_list_with_current_when_changed(
+    instance: Speaker, created: bool, **kwargs
+):
+    if created:
         return
     speaker_list = instance.speaker_list
     if speaker_list.is_active_list:
