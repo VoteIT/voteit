@@ -399,6 +399,18 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     agenda_item: AgendaItem | None = models.ForeignKey(
         AgendaItem, on_delete=models.CASCADE, null=True, related_name="speaker_lists"
     )
+    meeting: Meeting = models.ForeignKey(
+        Meeting,
+        on_delete=models.CASCADE,
+        related_name="+",
+        editable=False,
+    )
+    room: Room = models.ForeignKey(
+        Room,
+        on_delete=models.CASCADE,
+        related_name="+",
+        editable=False,
+    )
     speakers = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through=Speaker, related_name="speaker_lists"
     )
@@ -412,13 +424,6 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         }
     }
     importers = {"meeting": {}, "organisation": {}}
-
-    @property
-    def meeting(self) -> Meeting:
-        """
-        While not directly related, it's still good to be able to do lookups this way
-        """
-        return self.speaker_system.meeting
 
     @property
     def method(self) -> ListMethod:
@@ -548,10 +553,13 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
                     raise IntegrityError(
                         "agenda item and list system attached to different meetings"
                     )
+            self.room_id = self.speaker_system.room_id
+            self.meeting_id = self.speaker_system.meeting_id
         super().save(**kw)
 
     # Type hinting
-    current_id: int | None
+    meeting_id: int
+    room_id: int
     agenda_item_id: int | None
     objects: models.Manager
     speaker_items: models.QuerySet[Speaker]

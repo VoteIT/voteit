@@ -216,6 +216,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
 
     # Annotations
     objects: models.Manager
+    meeting_id: int
     proposals: models.QuerySet
     polls: models.QuerySet
     discussions: models.QuerySet
