@@ -99,12 +99,13 @@ def notify_added_or_changed_speaker_system(
 def send_speaker_list_with_current_when_started_or_stopped(instance: Speaker, **kwargs):
     if not instance.started:
         return
-    if instance.speaker_list.is_active_list:
-        room_id = instance.speaker_list.room_id
-        data = SpeakerListSerializer(instance).data
+    speaker_list = instance.speaker_list
+    if speaker_list.is_active_list:
+        room_id = speaker_list.room_id
+        data = SpeakerListSerializer(speaker_list).data
         msg = SpeakerListChanged(**data)
         for ch in (
-            AgendaItemChannel(instance.speaker_list.agenda_item_id),
+            AgendaItemChannel(speaker_list.agenda_item_id),
             RoomChannel(room_id),
         ):
             # Already post transaction so send right away
