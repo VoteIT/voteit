@@ -29,6 +29,7 @@ from voteit.core.models import Roles
 from voteit.core.models import User
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.utils import relaxed_clean_html
+from voteit.core.workflows import EnabledWf
 from voteit.meeting import roles
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
@@ -247,6 +248,9 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
             obj = ap.objects.filter(meeting=self, **query).first()
             if obj:
                 yield obj  # All of them are 1-1 relations
+
+    def component_enabled(self, name: str) -> bool:
+        return self.components.filter(component_name=name, state=EnabledWf.ON).exists()
 
     def valid_er_policy_guard(self) -> bool:
         return self.er_policy_name in get_electoral_policy_registry()

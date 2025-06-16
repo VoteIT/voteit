@@ -15,9 +15,7 @@ if TYPE_CHECKING:
 
 
 def active_enabled_for_meeting(meeting: Meeting) -> bool:
-    return meeting.components.filter(
-        component_name=ActiveUsersComponent.name, state=EnabledWf.ON
-    ).exists()
+    return meeting.component_enabled(ActiveUsersComponent.name)
 
 
 def get_inactive_qs(meeting: Meeting, hours: int = 1) -> QuerySet[ActiveUser]:

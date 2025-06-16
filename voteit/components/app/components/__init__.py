@@ -1,5 +1,5 @@
 def register():
-    from . import dialects
-    from . import proposal_print
-    from . import message
-    from . import irv
+    from . import dialects  # noqa
+    from . import proposal_print  # noqa
+    from . import message  # noqa
+    from . import irv  # noqa
