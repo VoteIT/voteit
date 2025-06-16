@@ -50,6 +50,7 @@ class SpeakerListSerializerTests(TestCase):
                 "agenda_item": self.ai.pk,
                 "state": "open",
                 "queue": [self.participant.pk, self.moderator.pk],
+                "current": self.participant.pk,
             },
             data,
         )

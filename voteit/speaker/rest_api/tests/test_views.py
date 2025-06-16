@@ -230,6 +230,7 @@ class SpeakerListsViewTests(APITestCase):
                 "agenda_item": None,
                 "state": "open",
                 "queue": [self.participant.pk],
+                "current": None,
             },
             response.json(),
         )

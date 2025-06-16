@@ -93,6 +93,24 @@ def notify_added_or_changed_speaker_system(
         meeting_ch.sync_publish(msg)
 
 
+@receiver(post_save, sender=Speaker)
+@disable_on_raw_save
+@on_transaction_commit
+def send_speaker_list_with_current_when_started_or_stopped(instance: Speaker, **kwargs):
+    if not instance.started:
+        return
+    if instance.speaker_list.is_active_list:
+        room_id = instance.speaker_system.room_id
+        data = SpeakerListSerializer(instance).data
+        msg = SpeakerListChanged(**data)
+        for ch in (
+            AgendaItemChannel(instance.speaker_list.agenda_item_id),
+            RoomChannel(room_id),
+        ):
+            # Already post transaction so send right away
+            ch.sync_publish(msg, on_commit=False)
+
+
 @receiver(pre_delete, sender=SpeakerListSystem)
 def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
     """
@@ -147,16 +165,11 @@ def push_speaker_added_or_changed(instance: Speaker, created=False, **kwargs):
     # Speakers in the queue are sent as order on list - so we don't need to bother about lists that aren't active
     if instance.speaker_list.is_active_list:
         data = SpeakerSerializer(instance).data
+        room_id = instance.speaker_system.room_id
         if created:
-            msg = SpeakerAdded(**data)
+            msg = SpeakerAdded(**data, room=room_id)
         else:
-            # Might be ongoing or stopped, so we'll send it to agenda too
-            msg = SpeakerChanged(**data)
-            if instance.speaker_list.agenda_item_id:
-                # Only changes need to be sent to ai since they indicate that a speaker in the list might be speaking.
-                # And that's nice to show!
-                ai_ch = AgendaItemChannel(instance.speaker_list.agenda_item_id)
-                ai_ch.sync_publish(msg)
+            msg = SpeakerChanged(**data, room=room_id)
         room_ch = RoomChannel(instance.speaker_system.room_id)
         room_ch.sync_publish(msg)
 

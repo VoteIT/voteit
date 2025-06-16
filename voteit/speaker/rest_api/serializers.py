@@ -38,15 +38,23 @@ def _validate_add(serializer, model: type, value):
 
 class CreateSpeakerListSerializer(serializers.ModelSerializer):
     queue = serializers.SerializerMethodField()
+    current = serializers.SerializerMethodField()
 
     class Meta:
         model = SpeakerList
-        read_only_fields = ["state", "pk", "queue"]
+        read_only_fields = ["state", "pk", "queue", "current"]
         fields = read_only_fields + [
             "agenda_item",
             "speaker_system",
             "title",
         ]
+
+    def get_current(self, instance: SpeakerList) -> int | None:
+        """
+        Return User PK for currently speaking user.
+        """
+        if speaker := instance.active_speaker():
+            return speaker.user_id
 
     def validate_speaker_system(self, value: SpeakerListSystem):
         _validate_add(self, SpeakerList, value)
@@ -71,9 +79,9 @@ class CreateSpeakerListSerializer(serializers.ModelSerializer):
 class SpeakerListSerializer(CreateSpeakerListSerializer):
 
     class Meta(CreateSpeakerListSerializer.Meta):
+
         read_only_fields = [
             "state",
-            "pk",
             "agenda_item",
             "speaker_system",
         ]

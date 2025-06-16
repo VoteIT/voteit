@@ -209,6 +209,7 @@ class AppStateTests(TestCase):
                 "speaker_system": self.system.pk,
                 "agenda_item": self.ai.pk,
                 "queue": [],
+                "current": None,
                 "state": SpeakerListWf.OPEN,
                 "title": "Hello",
                 "pk": self.speaker_list.pk,
@@ -252,6 +253,7 @@ class SendStateChangesTestsTests(TestCase):
                 "agenda_item": self.ai.pk,
                 "pk": self.speaker_list.pk,
                 "queue": [],
+                "current": None,
                 "speaker_system": self.system.pk,
                 "state": "open",
                 "title": "Hello",
@@ -355,6 +357,7 @@ class SendStateChangesTestsTests(TestCase):
                 "pk": new_list.pk,
                 "state": SpeakerListWf.OPEN,
                 "queue": [],
+                "current": None,
                 "title": "",
             },
             messages[0].data.dict(),
@@ -374,6 +377,7 @@ class SendStateChangesTestsTests(TestCase):
                 "title": "Hello",
                 "agenda_item": self.ai.pk,
                 "queue": [],
+                "current": None,
             },
             messages[0].data.dict(),
         )
@@ -417,6 +421,7 @@ class SendStateChangesTestsTests(TestCase):
                 "title": "Hello",
                 "agenda_item": self.ai.pk,
                 "queue": [],
+                "current": None,
             },
             messages[0].data.dict(),
         )
@@ -440,6 +445,7 @@ class SendStateChangesTestsTests(TestCase):
                 "seconds": None,
                 "started": None,
                 "user": self.moderator.pk,
+                "room": self.room.pk,
             },
             messages[0].data.dict(),
         )
@@ -462,6 +468,7 @@ class SendStateChangesTestsTests(TestCase):
                 "seconds": None,
                 "started": None,
                 "user": self.participant.pk,
+                "room": self.room.pk,
             },
             messages[0].data.dict(),
         )
@@ -504,6 +511,7 @@ class SendStateChangesTestsTests(TestCase):
                 "seconds": None,
                 "started": None,
                 "user": self.participant.pk,
+                "room": self.room.pk,
             },
             messages[0].data.dict(),
         )

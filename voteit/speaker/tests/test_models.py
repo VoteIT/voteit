@@ -232,6 +232,7 @@ class SpeakerListSystemsTests(TestCase):
         self.system.active_list = slist
         self.system.save()
         speaker = slist.speaker_items.create(user=user, started=now())
+        slist.active_speaker(refresh=True)
         with self.assertRaises(TransitionNotAllowed):
             self.system.inactivate()
         speaker.delete()
