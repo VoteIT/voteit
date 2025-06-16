@@ -276,9 +276,9 @@ def send_active_speaker_list_speakers(context: Room, app_state: AppState, **kwar
         speaker_serializer = SpeakerSerializer(qs, many=True)
         # Inject sls?
         for item in speaker_serializer.data:
-            app_state.append(SpeakerAdded(**item))
-        list_serializer = SpeakerListSerializer(context.sls.active_list)
-        app_state.append(SpeakerListAdded(**list_serializer.data))
+            app_state.append(SpeakerAdded(**item, room=context.pk))
+        list_serializer = SpeakerListSerializer(active_list)
+        app_state.append(SpeakerListAdded(**list_serializer.data, room=context.pk))
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)
