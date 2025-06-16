@@ -159,7 +159,7 @@ class PriorityTests(TestCase):
         random.seed(1)
         self.speaker_list.shuffle()
         self.assertEqual(
-            [self.user_two.pk, self.user_four.pk, self.user_three.pk, self.user_one.pk],
+            [self.user_four.pk, self.user_two.pk, self.user_one.pk, self.user_three.pk],
             self.speaker_list.order_list,
         )
         random.seed()

@@ -67,7 +67,9 @@ class ListMethod(ABC):
 
         The reason for this somewhat odd solution: Keep order even when other methods may reorder later on.
         """
-        speakers = list(speaker_list.speakers_in_queue())
+
+        # Order by pk for seeded random to be deterministic
+        speakers = list(speaker_list.speakers_in_queue().order_by("pk"))
         shuffle(speakers)
         new_created_base = now() - timedelta(seconds=len(speakers))
         for i, speaker in enumerate(speakers, 1):
