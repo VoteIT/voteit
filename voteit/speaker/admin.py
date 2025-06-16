@@ -3,6 +3,7 @@ from django.db import models
 from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.meeting.admin import MeetingAdminMixin
+from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.models import SpeakerSystemRoles
@@ -51,7 +52,6 @@ class SLAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
     list_display = (
         "__str__",
         "meeting_link",
-        "is_current",
         "speakers_count",
     )
     list_filter = ("speaker_system__meeting__organisation",)
@@ -69,13 +69,40 @@ class SLAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
             pk_attr="speaker_system__meeting_id",
         )
 
-    @admin.display(description="Current", boolean=True)
-    def is_current(self, sl: SpeakerList):
-        return bool(sl.current)
-
     @admin.display(description="Speakers")
     def speakers_count(self, sl: SpeakerList):
         return sl.speaker_items.count()
+
+
+@admin.register(Speaker)
+class SpeakerAdmin(MeetingAdminMixin, admin.ModelAdmin):
+    autocomplete_fields = (
+        "speaker_list",
+        "user",
+    )
+    list_display = (
+        "__str__",
+        "speaker_list",
+        "user",
+        "started",
+        "seconds",
+        "meeting_link",
+    )
+    list_filter = ("speaker_list__speaker_system__meeting__organisation",)
+    # readonly_fields = ("order",)
+    search_fields = (
+        "user__first_name",
+        "user__last_name",
+        "speaker_list__title",
+    )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return self.annotate_meeting(
+            qs,
+            title_attr="speaker_list__speaker_system__meeting__title",
+            pk_attr="speaker_list__speaker_system__meeting_id",
+        )
 
 
 @admin.register(SpeakerSystemRoles)
