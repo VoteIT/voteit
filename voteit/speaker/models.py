@@ -515,9 +515,11 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     ) -> models.QuerySet[Speaker]:
         qs = self.speaker_items.filter(seconds__isnull=True)
         if spoken_count:
-            qs = qs.annotate(
+            return qs.annotate(
                 spoken_count=Speaker.objects.filter(
-                    seconds__isnull=False, user=models.OuterRef("user")
+                    speaker_list=self,
+                    seconds__isnull=False,
+                    user=models.OuterRef("user"),
                 )
                 .annotate(count=models.Func(models.F("id"), function="Count"))
                 .values("count")
