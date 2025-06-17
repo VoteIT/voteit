@@ -182,6 +182,12 @@ class SpeakerViewSet(
             serializer.save()
             speaker_list.reorder()
 
+    def perform_destroy(self, instance: Speaker):
+        with transaction.atomic(durable=True):
+            speaker_list = self._get_locked_sl(instance.speaker_list_id)
+            instance.delete()
+            speaker_list.reorder()
+
     @action(methods=["POST"], detail=True)
     def start(self, request, *args, **kwargs):
         speaker = self.get_object()

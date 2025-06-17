@@ -872,13 +872,31 @@ class SpeakerViewSetTests(APITestCase):
         response = self.client.patch(url, data)
         self.assertEqual(response.status_code, 404)
 
-    def test_delete(self):
-        url = reverse("speakers-detail", kwargs={"pk": self.third.pk})
+    def test_delete_ongoing(self):
+        self.assertEqual(
+            [self.moderator.pk, self.participant.pk], self.slist.order_list
+        )
+        url = reverse("speakers-detail", kwargs={"pk": self.fourth_ongoing.pk})
         self.client.force_login(self.list_moderator)
         response = self.client.delete(url)
         self.assertEqual(response.status_code, 204)
         with self.assertRaises(Speaker.DoesNotExist):
-            self.third.refresh_from_db()
+            self.fourth_ongoing.refresh_from_db()
+        self.slist.refresh_from_db()
+        self.assertEqual([self.participant.pk], self.slist.order_list)
+
+    def test_delete_in_queue(self):
+        self.assertEqual(
+            [self.moderator.pk, self.participant.pk], self.slist.order_list
+        )
+        url = reverse("speakers-detail", kwargs={"pk": self.fifth_in_queue.pk})
+        self.client.force_login(self.list_moderator)
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, 204)
+        with self.assertRaises(Speaker.DoesNotExist):
+            self.fifth_in_queue.refresh_from_db()
+        self.slist.refresh_from_db()
+        self.assertEqual([self.moderator.pk], self.slist.order_list)
 
     def test_get_outsider(self):
         url = reverse("speakers-detail", kwargs={"pk": self.third.pk})

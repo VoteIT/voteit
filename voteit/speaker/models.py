@@ -384,6 +384,7 @@ class Speaker(MeetingContext, SpeakerSystemContext):
     # Type hinting
     objects: models.Manager
     user_id: int
+    speaker_list_id: int
 
 
 class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
