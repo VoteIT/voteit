@@ -141,6 +141,18 @@ class AppStateTests(TestCase):
         self.assertIsInstance(msg, Subscribed)
         self.assertEqual(sum(x.t == SpeakerAdded.name for x in msg.data.app_state), 5)
 
+    def test_dont_kill_signal_when_room_changes(self):
+        self.system.delete()
+        self.room.refresh_from_db()
+        self.room.save()
+        command = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
+            pk=self.room.pk,
+            channel_type=RoomChannel.name,
+        )
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+
     def test_system_and_roles_sent_to_meeting(self):
         command = Subscribe(
             mm={"consumer_name": "abc", "user_pk": self.participant.pk},

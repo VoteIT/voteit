@@ -146,7 +146,6 @@ class SpeakerViewSet(
     serializer_class = serializers.SpeakerSerializer
     serializer_classes = {
         "create": serializers.CreateSpeakerSerializer,
-        "enter": serializers.CreateSpeakerUserImplicitSerializer,
     }
     permission_type_map = {
         **AutoPermissionViewSetMixin.permission_type_map,

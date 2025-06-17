@@ -137,27 +137,6 @@ class CreateSpeakerSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class CreateSpeakerUserImplicitSerializer(CreateSpeakerSerializer):
-
-    class Meta:
-        model = Speaker
-        read_only_fields = ["pk", "started", "seconds", "user"]
-        fields = [
-            "speaker_list",
-        ] + read_only_fields
-
-    def validate_speaker_list(self, value: SpeakerList):
-        perm = self.context["view"].get_model_perm(Speaker, "enter")
-        user = self.context["request"].user
-        if not user.has_perm(perm, value):
-            raise exceptions.PermissionDenied(perm_denied_msg(perm, value))
-        return value
-
-    def validate(self, attrs):
-        attrs["user"] = self.context["request"].user
-        return super().validate(attrs)
-
-
 class SpeakerSerializer(serializers.ModelSerializer):
     room = serializers.PrimaryKeyRelatedField(
         source="speaker_list.room", read_only=True
