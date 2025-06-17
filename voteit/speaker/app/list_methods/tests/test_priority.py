@@ -25,6 +25,8 @@ class PriorityTests(TestCase):
         cls.user_two = User.objects.create(username="two")
         cls.user_three = User.objects.create(username="three")
         cls.user_four = User.objects.create(username="four")
+        cls.user_five = User.objects.create(username="five")
+        cls.user_six = User.objects.create(username="six")
         cls.speaker_one = cls.speaker_list.speaker_items.create(user=cls.user_one)
         cls.speaker_two = cls.speaker_list.speaker_items.create(user=cls.user_two)
         cls.speaker_three = cls.speaker_list.speaker_items.create(user=cls.user_three)
@@ -93,6 +95,82 @@ class PriorityTests(TestCase):
         self.assertEqual(
             [self.user_three.pk, self.user_one.pk, self.user_two.pk],
             self.speaker_list.reorder(),
+        )
+
+    def test_multiple_speakers(self):
+        self.system.safe_positions = 1
+        self.system.settings = {"max_times": 4}
+        self.system.save()
+        self._mk_previous_spoken(self.user_two, 1)
+        self._mk_previous_spoken(self.user_three, 2)
+        self.speaker_list.reorder()
+        self.assertEqual(
+            [self.user_one.pk, self.user_two.pk, self.user_three.pk],
+            self.speaker_list.order_list,
+        )
+        speaker_four = self.speaker_list.speaker_items.create(user=self.user_four)
+        self.speaker_list.reorder()
+        self.assertEqual(
+            [self.user_one.pk, self.user_four.pk, self.user_two.pk, self.user_three.pk],
+            self.speaker_list.order_list,
+        )
+        speaker_five = self.speaker_list.speaker_items.create(user=self.user_five)
+        self._mk_previous_spoken(self.user_five, 1)
+        self.speaker_list.reorder()
+        self.assertEqual(
+            [
+                self.user_one.pk,
+                self.user_four.pk,
+                self.user_two.pk,
+                self.user_five.pk,
+                self.user_three.pk,
+            ],
+            self.speaker_list.order_list,
+        )
+
+    def test_multiple_speakers_no_max(self):
+        self.system.safe_positions = 1
+        self.system.settings = {"max_times": 0}
+        self.system.save()
+        self._mk_previous_spoken(self.user_two, 1)
+        self._mk_previous_spoken(self.user_three, 2)
+        self.speaker_list.reorder()
+        self.assertEqual(
+            [self.user_one.pk, self.user_two.pk, self.user_three.pk],
+            self.speaker_list.order_list,
+        )
+        speaker_four = self.speaker_list.speaker_items.create(user=self.user_four)
+        self.speaker_list.reorder()
+        self.assertEqual(
+            [self.user_one.pk, self.user_four.pk, self.user_two.pk, self.user_three.pk],
+            self.speaker_list.order_list,
+        )
+        speaker_five = self.speaker_list.speaker_items.create(user=self.user_five)
+        self._mk_previous_spoken(self.user_five, 1)
+        self.speaker_list.reorder()
+        self.assertEqual(
+            [
+                self.user_one.pk,
+                self.user_four.pk,
+                self.user_two.pk,
+                self.user_five.pk,
+                self.user_three.pk,
+            ],
+            self.speaker_list.order_list,
+        )
+        speaker_six = self.speaker_list.speaker_items.create(user=self.user_six)
+        self._mk_previous_spoken(self.user_six, 2)
+        self.speaker_list.reorder()
+        self.assertEqual(
+            [
+                self.user_one.pk,
+                self.user_four.pk,
+                self.user_two.pk,
+                self.user_five.pk,
+                self.user_three.pk,
+                self.user_six.pk,
+            ],
+            self.speaker_list.order_list,
         )
 
     def test_speaker_speaking_and_reordering_with_safe_pos(self):
