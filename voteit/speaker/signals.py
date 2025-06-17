@@ -97,9 +97,13 @@ def notify_added_or_changed_speaker_system(
 @disable_on_raw_save
 @on_transaction_commit
 def send_speaker_list_with_current_when_changed(
-    instance: Speaker, created: bool, **kwargs
+    instance: Speaker, created: bool, update_fields: frozenset[str] | None, **kwargs
 ):
-    if created:
+    started_and_seconds_unmodified = (
+        update_fields is not None
+        and not update_fields.intersection({"started", "seconds"})
+    )
+    if created or started_and_seconds_unmodified:
         return
     speaker_list = instance.speaker_list
     if speaker_list.is_active_list:

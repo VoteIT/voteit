@@ -74,7 +74,7 @@ class ListMethod(ABC):
         new_created_base = now() - timedelta(seconds=len(speakers))
         for i, speaker in enumerate(speakers, 1):
             speaker.created = new_created_base + timedelta(seconds=i)
-            speaker.save()
+            speaker.save(update_fields=["created"])
         return [x.user_id for x in speakers]  # For testing, not used
 
     @abstractmethod
