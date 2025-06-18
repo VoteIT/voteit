@@ -87,9 +87,9 @@ def is_system_active(user: User, context: SpeakerSystemContext) -> bool:
 def is_system_not_archived(user: User, context: SpeakerSystemContext) -> bool:
     if isinstance(context, SpeakerSystemContext):
         return not context.speaker_system.is_archived
-    # FIXME: This sometimes receives context as None?
-    # raise TypeError(f"{context} is not an instance of SpeakerSystemContext")
-    return False
+    raise TypeError(
+        f"{context} is not an instance of SpeakerSystemContext"
+    )  # pragma: no coverage
 
 
 @predicate

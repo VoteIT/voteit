@@ -31,6 +31,7 @@ class SpeakerListTests(TestCase):
         cls.user_speaker = User.objects.create(username="in")
         cls.user_proposer = User.objects.create(username="proposer")
         cls.system.add_roles(cls.user_speaker, ROLE_SPEAKER)
+        # Will have inherited role
         cls.meeting.add_roles(cls.user_proposer, ROLE_PROPOSER)
         cls.user_any = User.objects.create(username="jane")
         cls.list: SpeakerList = cls.system.speaker_lists.create()
@@ -81,6 +82,13 @@ class SpeakerListTests(TestCase):
         self.assertTrue(self.user_speaker.has_perm(VIEW, self.list))
         self.assertFalse(self.user_any.has_perm(VIEW, self.list))
         self.assertTrue(self.user_proposer.has_perm(VIEW, self.list))
+
+    def test_enter_speaker_list(self):
+        ENTER = self.p("ENTER")
+        self.assertTrue(self.user_list_moderator.has_perm(ENTER, self.list))
+        self.assertTrue(self.user_speaker.has_perm(ENTER, self.list))
+        self.assertFalse(self.user_any.has_perm(ENTER, self.list))
+        self.assertTrue(self.user_proposer.has_perm(ENTER, self.list))
 
 
 class SpeakerListSystemTests(TestCase):
