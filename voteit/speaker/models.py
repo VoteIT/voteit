@@ -4,6 +4,8 @@ import math
 from contextlib import suppress
 from datetime import datetime
 from datetime import timedelta
+from itertools import chain
+from random import sample
 from typing import TYPE_CHECKING
 
 from django.conf import settings
@@ -493,19 +495,41 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
         Randomize the order of the speakers. Run reorder after to make sure any other priorities gets applied.
         This method should lock speaker list first via queryset.select_for_update()
         """
-        self.method.shuffle(self)
-        self.order = ""  # Will cause reorder to save
-        self.reorder()
+        self.reorder(sample(self.order_list, len(self.order_list)))
 
     @ensure_atomic
-    def reorder(self):
+    def reorder(self, order_list: list[int] = None):
         """
         Something have changed within the list that makes reordering necessary.
         Usually when a user is added or removed, but it can be triggered for attribute changes on users too.
         """
-        order_list = self.order_list
-        new_order = self.method.reorder(self)
-        if order_list != new_order:
+        if order_list is None:
+            order_list = self.order_list
+
+        def order_key(speaker: Speaker) -> tuple[int, datetime]:
+            try:
+                index = order_list.index(speaker.user_id)
+            except ValueError:
+                # Anything not in the order_list will get same index and get ordered by created
+                index = len(order_list)
+            return index, speaker.created
+
+        incoming_order = sorted(
+            self.speakers_in_queue_or_speaking(spoken_count=True), key=order_key
+        )
+        safe_positions = self.speaker_system.safe_positions or 0  # Must not be None
+        # If current speaker is in safe position, reserve one more position as safe.
+        if any(speaker.started for speaker in incoming_order[:safe_positions]):
+            safe_positions += 1
+        safe_speakers = incoming_order[:safe_positions]
+        speakers_to_order = incoming_order[safe_positions:]
+        new_order = [
+            s.user_id
+            for s in chain(
+                safe_speakers, self.method.reorder(safe_speakers, speakers_to_order)
+            )
+        ]
+        if self.order_list != new_order:
             self.order_list = new_order
             self.save()
         return new_order

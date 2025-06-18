@@ -30,6 +30,7 @@ class PriorityTests(TestCase):
         cls.speaker_one = cls.speaker_list.speaker_items.create(user=cls.user_one)
         cls.speaker_two = cls.speaker_list.speaker_items.create(user=cls.user_two)
         cls.speaker_three = cls.speaker_list.speaker_items.create(user=cls.user_three)
+        cls.speaker_list.reorder()
 
     def _mk_previous_spoken(self, user, count=1):
         # Don't forget that this will reorder lists on create!
@@ -72,7 +73,7 @@ class PriorityTests(TestCase):
         )
 
     def test_safe_users_checked_with_current_order(self):
-        self.assertEqual([], self.speaker_list.order_list)
+        # self.assertEqual([], self.speaker_list.order_list)
         self._mk_previous_spoken(self.user_two)
         self._mk_previous_spoken(self.user_one, count=2)
         self.system.safe_positions = 1
@@ -231,13 +232,13 @@ class PriorityTests(TestCase):
         random.seed(1337)
         self.speaker_list.shuffle()
         self.assertEqual(
-            [self.user_two.pk, self.user_four.pk, self.user_one.pk, self.user_three.pk],
+            [self.user_two.pk, self.user_four.pk, self.user_three.pk, self.user_one.pk],
             self.speaker_list.order_list,
         )
         random.seed(1)
         self.speaker_list.shuffle()
         self.assertEqual(
-            [self.user_four.pk, self.user_two.pk, self.user_one.pk, self.user_three.pk],
+            [self.user_four.pk, self.user_two.pk, self.user_three.pk, self.user_one.pk],
             self.speaker_list.order_list,
         )
         random.seed()
@@ -257,7 +258,7 @@ class PriorityTests(TestCase):
         random.seed(1337)
         self.speaker_list.shuffle()
         self.assertEqual(
-            [self.user_two.pk, self.user_one.pk, self.user_four.pk, self.user_three.pk],
+            [self.user_three.pk, self.user_two.pk, self.user_one.pk, self.user_four.pk],
             self.speaker_list.order_list,
         )
         random.seed()

@@ -2,20 +2,15 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
-from datetime import timedelta
 from logging import getLogger
-from random import shuffle
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterator
 
-from django.utils.timezone import now
 from pydantic.main import BaseModel
 
 from voteit.core.abcs import ABCModel
 
 if TYPE_CHECKING:
-    from voteit.speaker.models import SpeakerListSystem
-    from voteit.speaker.models import SpeakerList
-    from django.contrib.auth.models import AbstractUser
+    from voteit.speaker.models import SpeakerListSystem, Speaker
 
 
 logger = getLogger(__name__)
@@ -60,25 +55,10 @@ class ListMethod(ABC):
         Human-readable explanation of what this does.
         """
 
-    def shuffle(self, speaker_list: SpeakerList) -> list[int]:
-        """
-        Shuffle order - should always be handled within an atomic transaction + the speaker list locked!
-        It fetches speaker objects and updates them rather than using the cached speaker_list.order.
-
-        The reason for this somewhat odd solution: Keep order even when other methods may reorder later on.
-        """
-
-        # Order by pk for seeded random to be deterministic
-        speakers = list(speaker_list.speakers_in_queue().order_by("pk"))
-        shuffle(speakers)
-        new_created_base = now() - timedelta(seconds=len(speakers))
-        for i, speaker in enumerate(speakers, 1):
-            speaker.created = new_created_base + timedelta(seconds=i)
-            speaker.save(update_fields=["created"])
-        return [x.user_id for x in speakers]  # For testing, not used
-
     @abstractmethod
-    def reorder(self, speaker_list: SpeakerList) -> list[int]:
+    def reorder(
+        self, previous_speakers: list[Speaker], incoming_order: list[Speaker]
+    ) -> Iterator[Speaker]:
         """
         Override this method to implement actual quotas or similar.
         The default one simply orders users according to the order they entered the list.

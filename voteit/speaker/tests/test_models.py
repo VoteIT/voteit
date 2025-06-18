@@ -124,6 +124,7 @@ class SpeakerListTests(TestCase):
         # Change timestamp...
         self.speaker_one.created = now()
         self.speaker_one.save()
+        self.speaker_list.order = ""
         self.assertEqual(
             [self.user_two.pk, self.user_three.pk, self.user_one.pk],
             self.speaker_list.reorder(),
@@ -165,6 +166,7 @@ class SpeakerListTests(TestCase):
         # Changing the order will send event
         self.speaker_one.created = now()
         self.speaker_one.save()
+        self.speaker_list.order = ""
         self.speaker_list.reorder()
 
         self.assertTrue(L)
