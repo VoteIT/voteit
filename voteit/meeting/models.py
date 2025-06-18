@@ -21,6 +21,7 @@ from django_fsm import transition
 
 from voteit.core.abcs import MeetingContext
 from voteit.core.abcs import OrganisationContext
+from voteit.core.decorators import ensure_atomic
 from voteit.core.fields import RichTextField
 from voteit.core.fields import RolesField
 from voteit.core.models import BaseContent
@@ -321,11 +322,11 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         target=MeetingWf.ARCHIVED,
         permission=NOT_ALLOWED,
     )
+    @ensure_atomic
     def archive(self):
         from voteit.meeting.signals import archive_meeting  # Avoid circular import
 
-        with transaction.atomic():
-            archive_meeting.send(sender=self.__class__, meeting=self)
+        archive_meeting.send(sender=self.__class__, meeting=self)
 
     @transition(
         field=state,
