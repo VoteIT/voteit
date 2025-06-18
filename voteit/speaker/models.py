@@ -234,6 +234,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         permission=NOT_ALLOWED,
         custom={"title": _("Archive")},
     )
+    @ensure_atomic
     def archive(self):
         self.active_list = None
         Speaker.objects.filter(
@@ -242,7 +243,6 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         for slist in self.speaker_lists.exclude(order=""):
             slist.order = ""
             slist.save()
-        self.save()
 
     def signal_active_list_changed(self):
         from voteit.speaker.signals import active_list_changed

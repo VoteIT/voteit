@@ -19,6 +19,7 @@ from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.workflows import MeetingWf
 from voteit.room.channels import RoomChannel
 from voteit.speaker.messages import SpeakerAdded
 from voteit.speaker.messages import SpeakerChanged
@@ -92,6 +93,13 @@ class WFEffectsTests(TestCase):
         self.assertFalse(self.speaker_list.is_active_list)
         self.assertEqual(SpeakerListWf.CLOSED, self.speaker_list.state)
         self.assertIsNone(self.system.active_list)
+
+    def test_archive_meeting_archives_systems(self):
+        self.meeting.archive()
+        self.meeting.save()
+        self.system.refresh_from_db()
+        self.assertEqual(MeetingWf.ARCHIVED, self.meeting.state)
+        self.assertEqual(SpeakerSystemWf.ARCHIVED, self.system.state)
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)

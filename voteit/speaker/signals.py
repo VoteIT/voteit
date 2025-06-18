@@ -305,6 +305,7 @@ def ai_channel_subscribed(
 def close_and_cleanup(meeting, **kw):
     for system in meeting.speaker_systems.all():
         system.archive()
+        system.save()
 
 
 # Roles
