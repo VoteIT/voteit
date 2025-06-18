@@ -31,9 +31,18 @@ class PriorityTests(TestCase):
         cls.speaker_two = cls.speaker_list.speaker_items.create(user=cls.user_two)
         cls.speaker_three = cls.speaker_list.speaker_items.create(user=cls.user_three)
         cls.speaker_list.reorder()
+        # And add some irrelevant speakers
+        cls.other_speaker_list = SpeakerList.objects.create(speaker_system=cls.system)
+        for i, user in enumerate(
+            [cls.user_six, cls.user_five, cls.user_four, cls.user_three, cls.user_two],
+            start=1,
+        ):
+            for _ in range(i):
+                cls.other_speaker_list.speaker_items.create(
+                    user=user, started=now(), seconds=10
+                )
 
     def _mk_previous_spoken(self, user, count=1):
-        # Don't forget that this will reorder lists on create!
         for i in range(count):
             self.speaker_list.speaker_items.create(user=user, started=now(), seconds=10)
 
