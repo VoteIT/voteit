@@ -144,13 +144,8 @@ class SpeakerListTests(TestCase):
                 user=self.user_three, started=now(), seconds=1
             )
         self.assertEqual(
-            {self.user_one.pk: 3, self.user_two.pk: 4, self.user_three.pk: 5},
-            {
-                x.user_id: x.spoken_count
-                for x in self.speaker_list.speakers_in_queue_or_speaking(
-                    spoken_count=True
-                )
-            },
+            {self.user_one.pk, self.user_two.pk, self.user_three.pk},
+            {x.user_id for x in self.speaker_list.speakers_in_queue_or_speaking()},
         )
 
     def test_reorder_signals_on_change(self):

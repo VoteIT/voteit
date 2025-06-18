@@ -514,9 +514,7 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
                 index = len(order_list)
             return index, speaker.created
 
-        incoming_order = sorted(
-            self.speakers_in_queue_or_speaking(spoken_count=True), key=order_key
-        )
+        incoming_order = sorted(self.method.get_queryset(self), key=order_key)
         safe_positions = self.speaker_system.safe_positions or 0  # Must not be None
         # If current speaker is in safe position, reserve one more position as safe.
         if any(speaker.started for speaker in incoming_order[:safe_positions]):
@@ -534,21 +532,8 @@ class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
             self.save()
         return new_order
 
-    def speakers_in_queue_or_speaking(
-        self, spoken_count: bool = False
-    ) -> models.QuerySet[Speaker]:
-        qs = self.speaker_items.filter(seconds__isnull=True)
-        if spoken_count:
-            return qs.annotate(
-                spoken_count=Speaker.objects.filter(
-                    speaker_list=self,
-                    seconds__isnull=False,
-                    user=models.OuterRef("user"),
-                )
-                .annotate(count=models.Func(models.F("id"), function="Count"))
-                .values("count")
-            )
-        return qs
+    def speakers_in_queue_or_speaking(self) -> models.QuerySet[Speaker]:
+        return self.speaker_items.filter(seconds__isnull=True)
 
     def speakers_in_queue(self) -> models.QuerySet[Speaker]:
         """

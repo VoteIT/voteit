@@ -1,8 +1,10 @@
+from django.db import models
 from pydantic import validator
 from pydantic.main import BaseModel
 
 from voteit.speaker.abcs import ListMethod
 from voteit.speaker.models import Speaker
+from voteit.speaker.models import SpeakerList
 from voteit.speaker.registries import list_method
 
 
@@ -51,3 +53,14 @@ class Priority(ListMethod):
             )
 
         yield from sorted(incoming_order, key=order_key)
+
+    def get_queryset(self, speaker_list: SpeakerList) -> models.QuerySet[Speaker]:
+        return speaker_list.speakers_in_queue_or_speaking().annotate(
+            spoken_count=Speaker.objects.filter(
+                speaker_list=speaker_list,
+                seconds__isnull=False,
+                user=models.OuterRef("user"),
+            )
+            .annotate(count=models.Func(models.F("id"), function="Count"))
+            .values("count")
+        )

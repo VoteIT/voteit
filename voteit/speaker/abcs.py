@@ -5,13 +5,15 @@ from abc import abstractmethod
 from logging import getLogger
 from typing import TYPE_CHECKING, Iterator
 
+from django.db import models
 from pydantic.main import BaseModel
 
 from voteit.core.abcs import ABCModel
 
 if TYPE_CHECKING:
-    from voteit.speaker.models import SpeakerListSystem, Speaker
-
+    from voteit.speaker.models import Speaker
+    from voteit.speaker.models import SpeakerList
+    from voteit.speaker.models import SpeakerListSystem
 
 logger = getLogger(__name__)
 
@@ -68,3 +70,9 @@ class ListMethod(ABC):
 
         Handle within an atomic transaction.
         """
+
+    def get_queryset(self, speaker_list: SpeakerList) -> models.QuerySet[Speaker]:
+        """
+        Return a queryset suitable for the reorder method.
+        """
+        return speaker_list.speakers_in_queue_or_speaking()
