@@ -69,7 +69,7 @@ class AccessTokenTests(TestCase):
             token_type="Bearer",
             refresh_token="123_refresh",
             scope=["invites"],
-            expires_at=1618295980.7482638,
+            expires_at=99999999999,
         )
         mock_profile = {"abc": 1}
         oauth_session = access_token.get_session()
