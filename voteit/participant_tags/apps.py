@@ -12,3 +12,4 @@ class ParticipantTagConfig(AppConfig):
 
     def ready(self):
         from . import components  # noqa
+        from .rest_api import views  # noqa
