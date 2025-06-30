@@ -21,12 +21,7 @@ class ParticipantTags(MeetingContext):
     tags = models.JSONField(default=dict)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                ["meeting", "user"],
-                name="unique_user_in_meeting",
-            ),
-        ]
+        unique_together = (("user", "meeting"),)
 
     objects: models.Manager
     user_id: int

@@ -13,6 +13,7 @@ class ParticipantTagTests(TestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.participant = cls.meeting.participants.get(username="participant")
+        cls.moderator = cls.meeting.participants.get(username="moderator")
         cls.component = cls.meeting.components.create(
             component_name=GenderTags.name,
             state=EnabledWf.ON,
@@ -26,5 +27,6 @@ class ParticipantTagTests(TestCase):
 
     def test_duplicate_constraint(self):
         one = self.meeting.participant_tags.create(user=self.participant)
+        other = self.meeting.participant_tags.create(user=self.moderator)
         with self.assertRaises(IntegrityError):
             two = self.meeting.participant_tags.create(user=self.participant)
