@@ -13,8 +13,8 @@ def get_nst_class_from_ns(ns: str) -> type[NamespacedTags] | None:
 def get_adapted_from_ns(meeting: Meeting, ns: str) -> NamespacedTags | None:
     # Get in a saner way later on
     if adapter := get_nst_class_from_ns(ns):
-        component = meeting.components.get(
+        if component := meeting.components.filter(
             component_name=adapter.name, state=EnabledWf.ON
-        )
-        if component.is_valid:
-            return component.adapted
+        ).first():
+            if component.is_valid:
+                return component.adapted

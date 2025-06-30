@@ -182,6 +182,16 @@ class ParticipantTagsViewSetTests(APITestCase):
         )
         self.assertEqual(response.status_code, 400, data)
 
+    def test_set_component_disabled(self):
+        self.gender_component.disable()
+        self.gender_component.save()
+        url = reverse("ptags-set", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.participant)
+        response = self.client.post(url, data={"tags": {GenderTags.namespace: "f"}})
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertEqual({"tags": [f"No tag namespace '{GenderTags.namespace}'"]}, data)
+
     def test_remove_ns(self):
         url = reverse("ptags-remove-ns", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.participant)

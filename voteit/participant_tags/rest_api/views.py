@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
 @router.register("ptags", basename="ptags")
 class ParticipantTagsViewSet(
-    # AutoPermissionViewSetMixin,
     mixins.ListModelMixin,
     GenericViewSet,
 ):
