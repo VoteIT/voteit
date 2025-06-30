@@ -43,10 +43,14 @@ class Component(ABCModel):
         """
 
     @cached_property
-    def adapter(self) -> ComponentAdapter:
+    def adapter(self) -> type[ComponentAdapter]:
         reg = self.get_registry()
         with suppress(KeyError):
             return reg[self.component_name]
+
+    @property
+    def adapted(self) -> ComponentAdapter:
+        return self.adapter(self)
 
     @property
     def is_valid(self):
