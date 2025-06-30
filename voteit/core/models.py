@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from requests_oauthlib import OAuth2Session
     from voteit.organisation.models import Organisation
     from voteit.organisation.models import AccessToken
-
+    from voteit.participant_tags.models import ParticipantTags
 
 __all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
 
@@ -132,6 +132,7 @@ class User(AbstractUser):
     access_tokens: models.QuerySet
     organisation_id: int | None
     meeting_roles: models.QuerySet
+    meeting_tags: models.QuerySet[ParticipantTags]
 
 
 def real_user_only(method):

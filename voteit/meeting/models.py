@@ -55,6 +55,7 @@ if TYPE_CHECKING:
     from voteit.proposal.models import Proposal
     from voteit.speaker.models import SpeakerListSystem
     from voteit.room.models import Room
+    from voteit.participant_tags.models import ParticipantTags
 
 __all__ = (
     "Meeting",
@@ -415,6 +416,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     group_roles: models.QuerySet[GroupRole]
     active_users: models.QuerySet[ActiveUser]
     rooms: models.QuerySet[Room]
+    participant_tags: models.QuerySet[ParticipantTags]
 
 
 class MeetingGroup(BaseContent, MeetingContext):

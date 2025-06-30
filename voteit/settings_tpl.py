@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "voteit.participant_number",
     "voteit.reactions",
     "voteit.room",
+    "voteit.participant_tags",
 ]
 
 
