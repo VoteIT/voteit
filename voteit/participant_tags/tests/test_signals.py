@@ -1,49 +1,21 @@
-from datetime import datetime
-from unittest.mock import patch
-
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from django.utils.timezone import now
-from django_fsm import TransitionNotAllowed
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
-from envelope.channels.models import ContextChannel
 from envelope.testing import ChannelMessageCatcher
 from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
-from voteit.agenda.channels import AgendaItemChannel
-from voteit.core.messages.role_updates import RolesAdded
-from voteit.core.testing import FakeCommit
 from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
-from voteit.meeting.roles import ROLE_PARTICIPANT
-from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.models import Organisation
 from voteit.participant_tags.components import GenderTags
 from voteit.participant_tags.components import NamespacedTags
 from voteit.participant_tags.components import PronounTags
 from voteit.participant_tags.messages import AllParticipantTags
 from voteit.participant_tags.messages import ParticipantTagsChanged
-from voteit.room.channels import RoomChannel
-from voteit.speaker.messages import SpeakerAdded
-from voteit.speaker.messages import SpeakerChanged
-from voteit.speaker.messages import SpeakerDeleted
-
-from voteit.speaker.messages import SpeakerListAdded
-from voteit.speaker.messages import SpeakerListChanged
-from voteit.speaker.messages import SpeakerListDeleted
-from voteit.speaker.messages import SpeakerSystemAdded
-from voteit.speaker.messages import SpeakerSystemChanged
-from voteit.speaker.messages import SpeakerSystemDeleted
-from voteit.speaker.models import SpeakerList
-from voteit.speaker.models import SpeakerListSystem
-from voteit.speaker.roles import ROLE_LIST_MODERATOR
-from voteit.speaker.roles import ROLE_SPEAKER
-from voteit.speaker.workflows import SpeakerListWf
-from voteit.speaker.workflows import SpeakerSystemWf
 
 User = get_user_model()
 
