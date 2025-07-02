@@ -1,4 +1,6 @@
 from pydantic import BaseModel
+from pydantic import Field
+from pydantic import conint
 from pydantic import conlist
 from pydantic import constr
 from pydantic import validator
@@ -6,11 +8,13 @@ from pydantic import validator
 from voteit.components.utils import get_meeting_component_adapters
 from voteit.core.role import Role
 from voteit.core.validators import root_validate_roles_and_model
+from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.speaker.registries import list_method
 
 _DIALECT_ROLE_COMPAT = {
     "participant": str(ROLE_PARTICIPANT),
@@ -93,6 +97,83 @@ class ComponentSettings(BaseModel):
         return v
 
 
+class SpeakerListSystemSchema(BaseModel):
+    """
+    >>> _ = SpeakerListSystemSchema(method_name='simple')
+    >>> _ = SpeakerListSystemSchema(method_name='404')
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError:
+
+    >>> _ = SpeakerListSystemSchema(method_name='simple',  safe_positions=1)
+    >>> _ = SpeakerListSystemSchema(method_name='simple',  safe_positions=5)
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError:
+
+    >>> _ = SpeakerListSystemSchema(method_name='simple', meeting_roles_to_speaker=[ROLE_DISCUSSER])
+    >>> SpeakerListSystemSchema(method_name='simple', meeting_roles_to_speaker=['404'])
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError:
+
+    >>> _ = SpeakerListSystemSchema(method_name='simple', settings=None)
+    >>> _ = SpeakerListSystemSchema(method_name='simple', settings={'hello': 1})
+    Traceback (most recent call last):
+    ...
+    pydantic.error_wrappers.ValidationError:
+
+    >>> _ = SpeakerListSystemSchema(method_name='priority', settings={'max_times': 1})
+    >>> _ = SpeakerListSystemSchema(method_name='priority', settings={})
+    >>> _ = SpeakerListSystemSchema(method_name='priority', settings=None)
+    """
+
+    method_name: str
+    settings: dict | None = None
+    safe_positions: conint(ge=1, le=3) | None = None
+    show_time: bool = False  # Will be removed?
+    meeting_roles_to_speaker: list[str] = []
+
+    @validator("method_name")
+    def validate_method_name(cls, v: str):
+        if v not in list_method:
+            raise ValueError(f"{v} is not a valid speaker list method.")
+        return v
+
+    @validator("meeting_roles_to_speaker", pre=True, each_item=True)
+    def transform_role(cls, v):
+        if isinstance(v, Role):
+            return str(v)
+        return v
+
+    @validator("meeting_roles_to_speaker", each_item=True)
+    def validate_roles(cls, v: str):
+        if v not in MeetingRoles.valid_roles.values():
+            raise ValueError(f"{v} is not a valid meeting role.")
+        return v
+
+    @validator("settings")
+    def check_settings(cls, v: dict | None, values: dict):
+        method = list_method[values["method_name"]]
+        if method.settings_schema:
+            if v is None:
+                v = {}
+            method.settings_schema(**v)
+        else:
+            if v:
+                raise ValueError(f"{method.name} has no settings")
+        return v
+
+
+class RoomSchema(BaseModel):
+    title: constr(strip_whitespace=True, max_length=100) = ""
+    open: bool = False
+    send_sls: bool = False
+    send_proposals: bool = False
+    show_time: bool = False
+    sls: SpeakerListSystemSchema | None = None
+
+
 class DialectSchema(BaseModel):
     """
     Settings for a meeting dialect
@@ -146,6 +227,7 @@ class DialectSchema(BaseModel):
         constr(strip_whitespace=True),
         unique_items=True,
     ) = []
+    rooms: list[RoomSchema] = []
 
     @validator("block_roles")
     def validate_roles(cls, v):

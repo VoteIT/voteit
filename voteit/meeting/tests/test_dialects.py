@@ -15,6 +15,12 @@ from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.tests.fixtures import CYCLIC_DIALECT_FIXTURES
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 from voteit.organisation.models import Organisation
+from voteit.participant_tags.components import GenderTags
+from voteit.participant_tags.components import PronounTags
+from voteit.room.models import Room
+from voteit.speaker.app.list_methods.gender import GenderAndPriority
+from voteit.speaker.app.list_methods.priority import Priority
+from voteit.speaker.models import SpeakerListSystem
 
 User = get_user_model()
 
@@ -45,6 +51,63 @@ dialect_with_component.update(
 )
 dialect_minimal = {"title": "Mini", "name": "mini"}
 dialect_minimal_requires_test = {"title": "Req", "name": "req", "requires": ["test"]}
+dialect_with_tags_component = {
+    **dialect_named_test,
+    "configure_components": [
+        {
+            "name": GenderTags.name,
+            "settings": {"tags": ["f", "m", "nb"]},
+        },
+        {
+            "name": PronounTags.name,
+            "settings": {"tags": ["he", "she", "ze"], "many": True},
+        },
+    ],
+}
+dialect_with_room = {**dialect_named_test, "rooms": [{}]}
+dialect_with_room_settings = {
+    **dialect_named_test,
+    "rooms": [
+        {
+            "open": True,
+            "title": "Hello",
+            "send_sls": True,
+            "send_proposals": True,
+            "show_time": True,
+        }
+    ],
+}
+
+dialect_with_speaker_list = {
+    **dialect_named_test,
+    "rooms": [
+        {
+            "sls": {
+                "method_name": Priority.name,
+                "settings": {"max_times": 1},
+                "safe_positions": 2,
+            }
+        }
+    ],
+}
+dialect_with_gender_speaker_list = {
+    **dialect_named_test,
+    "configure_components": [
+        {
+            "name": GenderTags.name,
+            "settings": {"tags": ["f", "m", "nb"]},
+        }
+    ],
+    "rooms": [
+        {
+            "sls": {
+                "method_name": GenderAndPriority.name,
+                "settings": {"max_times": 3, "priority_genders": ["f", "nb"]},
+                "safe_positions": 2,
+            }
+        }
+    ],
+}
 
 
 class DialectHandlerTests(TestCase):
@@ -166,6 +229,50 @@ class DialectHandlerTests(TestCase):
         self.assertEqual(EnabledWf.ON, component.state)
         component_to_block.refresh_from_db()
         self.assertEqual(EnabledWf.OFF, component_to_block.state)
+
+    def test_install_participant_tags(self):
+        handler = self._cut.load_from_dict(dialect_with_tags_component)
+        handler.install(self.meeting)
+        gender_component = self.meeting.components.filter(
+            component_name=GenderTags.name
+        ).first()
+        self.assertEqual({"tags": ["f", "m", "nb"]}, gender_component.settings_data)
+        self.assertEqual(EnabledWf.ON, gender_component.state)
+        pronoun_component = self.meeting.components.filter(
+            component_name=PronounTags.name
+        ).first()
+        self.assertEqual(
+            {"tags": ["he", "she", "ze"], "many": True}, pronoun_component.settings_data
+        )
+        self.assertEqual(EnabledWf.ON, pronoun_component.state)
+
+    def test_install_empty_room(self):
+        handler = self._cut.load_from_dict(dialect_with_room)
+        handler.install(self.meeting)
+        room = self.meeting.rooms.first()
+        self.assertIsInstance(room, Room)
+        self.assertEqual("", room.title)
+
+    def test_install_room_with_settings(self):
+        handler = self._cut.load_from_dict(dialect_with_room_settings)
+        handler.install(self.meeting)
+        room = self.meeting.rooms.first()
+        self.assertIsInstance(room, Room)
+        self.assertEqual("Hello", room.title)
+        self.assertTrue(room.open)
+        self.assertTrue(room.send_sls)
+        self.assertTrue(room.send_proposals)
+        self.assertTrue(room.show_time)
+
+    def test_install_room_with_list_system(self):
+        handler = self._cut.load_from_dict(dialect_with_speaker_list)
+        handler.install(self.meeting)
+        room = self.meeting.rooms.first()
+        self.assertIsInstance(room, Room)
+        self.assertIsInstance(room.sls, SpeakerListSystem)
+        self.assertEqual({"max_times": 1}, room.sls.settings_data)
+        self.assertEqual(2, room.sls.safe_positions)
+        self.assertEqual(Priority.name, room.sls.method_name)
 
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)

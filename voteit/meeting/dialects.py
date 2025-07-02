@@ -7,6 +7,7 @@ from itertools import chain
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from attr.filters import exclude
 from django.conf import settings
 from django.utils.module_loading import import_string
 from pydantic import BaseModel
@@ -208,6 +209,11 @@ class DialectHandler:
             )
             component.enable()
             component.save()
+        # Configure rooms and speaker lists
+        for roomdata in self.data.rooms:
+            room = meeting.rooms.create(**roomdata.dict(exclude={"sls"}))
+            if roomdata.sls:
+                meeting.speaker_systems.create(room=room, **roomdata.sls.dict())
         # GroupRoles
         for gr_data in self.data.roles:
             group_role = meeting.group_roles.filter(role_id=gr_data.role_id).first()

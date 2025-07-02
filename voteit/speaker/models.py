@@ -133,6 +133,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     meeting_roles_to_speaker: list[Role] = RolesField(
         role_choices=MeetingRoles.valid_roles.values(), max_length=60
     )
+    # FIXME: This is on room too, remove one of them
     show_time: bool = models.BooleanField(
         verbose_name="Show time spoken for all", default=False
     )
