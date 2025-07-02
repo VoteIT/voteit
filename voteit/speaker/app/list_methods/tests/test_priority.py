@@ -4,8 +4,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils.timezone import now
 
-from voteit.core.testing import SetSeed
 from voteit.meeting.models import Meeting
+from voteit.speaker.app.list_methods.priority import Priority
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 
@@ -18,7 +18,7 @@ class PriorityTests(TestCase):
         cls.meeting = Meeting.objects.create()
         cls.room = cls.meeting.rooms.create()
         cls.system = SpeakerListSystem.objects.create(
-            method_name="priority", room=cls.room
+            method_name=Priority.name, room=cls.room
         )
         cls.speaker_list = SpeakerList.objects.create(speaker_system=cls.system)
         cls.user_one = User.objects.create(username="one")

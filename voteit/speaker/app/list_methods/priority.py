@@ -40,9 +40,9 @@ class Priority(ListMethod):
     )
     settings_schema = PrioritySettingsSchema
 
-    def reorder(self, previous_speakers, incoming_order):
+    def reorder(self, safe_speakers, incoming_order):
         """
-        Prioritise according to spoken times. Just return the items, don't touch any data
+        Prioritise according to spoken times up to a max limit.
         """
         max_priority = self.speaker_system.settings.max_times or 1_000_000
 

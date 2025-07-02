@@ -10,5 +10,5 @@ class Simple(ListMethod):
     title = "Simple flat list that maintains order chronologically"
     description = "It's just a queue with no settings. It won't prioritise speakers."
 
-    def reorder(self, previous_speakers, incoming_order):
+    def reorder(self, safe_speakers, incoming_order):
         yield from incoming_order

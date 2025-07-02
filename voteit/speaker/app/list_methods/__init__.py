@@ -1,4 +1,4 @@
 def register():
-    # Something odd happens with models and tests, no clue why
-    from .simple import Simple
-    from .priority import Priority
+    from .simple import Simple  # noqa
+    from .priority import Priority  # noqa
+    from .gender import GenderAndPriority  # noqa

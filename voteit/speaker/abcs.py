@@ -59,14 +59,11 @@ class ListMethod(ABC):
 
     @abstractmethod
     def reorder(
-        self, previous_speakers: list[Speaker], incoming_order: list[Speaker]
+        self, safe_speakers: list[Speaker], incoming_order: list[Speaker]
     ) -> Iterator[Speaker]:
         """
         Override this method to implement actual quotas or similar.
         The default one simply orders users according to the order they entered the list.
-
-        This method returns the primary keys of the users according to the new order.
-        Make sure to include the safe speakers!
 
         Handle within an atomic transaction.
         """
