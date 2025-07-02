@@ -1,13 +1,11 @@
 import re
 from abc import ABC
 from abc import abstractmethod
-from random import choices
 
-from django.conf import settings
 from pydantic import conlist
 from pydantic import validator
 from pydantic.main import BaseModel
-from django.utils.translation import gettext_lazy as _
+
 from voteit.components.abcs import ComponentAdapter
 from voteit.components.registries import meeting_components
 
