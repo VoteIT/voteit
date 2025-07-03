@@ -281,7 +281,7 @@ class GenderAndPriorityTests(TestCase):
         4       (0) Not moved (nb)
         ...
         """
-        self.skipTest("This doesn't work as expected")
+        # self.skipTest("This doesn't work as expected")
         self.system.safe_positions = 1
         self.system.save()
         self._mk_previous_spoken(self.user_one)

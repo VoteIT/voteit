@@ -1,11 +1,12 @@
 from contextlib import suppress
+from itertools import groupby
 
 from django.db import models
 
 from voteit.participant_tags.components import GenderTags
 from voteit.participant_tags.models import ParticipantTags
 from voteit.speaker.abcs import ListMethod
-from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema
+from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema, Priority
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.registries import list_method
@@ -29,57 +30,29 @@ class GenderAndPriority(ListMethod):
     settings_schema = GenderAndPrioritySchema
 
     def reorder(self, safe_speakers, incoming_order):
-        max_priority = self.speaker_system.settings.max_times or 1_000_000
         priority_genders = self.speaker_system.settings.priority_genders
 
-        def order_key(speaker: Speaker) -> tuple[int, int]:
-            return (
-                min(speaker.spoken_count, max_priority),
-                incoming_order.index(speaker),
-            )
+        def is_prio(sp: Speaker):
+            return sp.gender_tag in priority_genders
 
-        initially_sorted = sorted(incoming_order, key=order_key)
-
-        # See if any of the speakers should pass within their ordering
-        new_order = []
-
-        while initially_sorted:
-            speaker = initially_sorted.pop(0)
-            insert_pos = len(new_order)
-            curr_spoken_cmp = min(speaker.spoken_count, max_priority)
-            while insert_pos:
-                previous = new_order[insert_pos - 1]
-                # if previous in safe_speakers:
-                #    break
-                # Break if previous user has spoken less
-                previous_spoken_cmp = min(previous.spoken_count, max_priority)
-                if curr_spoken_cmp > previous_spoken_cmp:
-                    break
-                if curr_spoken_cmp < previous_spoken_cmp:  # pragma: no cover
-                    raise Exception("Something went wrong with sorting?")
-                if curr_spoken_cmp == previous_spoken_cmp:
-                    if speaker.gender_tag not in priority_genders:
-                        break
-                    if previous.gender_tag in priority_genders:
-                        break
-                    # And the one before the previous one...
-                    earlier = None
-                    with suppress(IndexError):
-                        earlier = new_order[insert_pos - 2]
-                    if earlier is None:
-                        with suppress(IndexError):
-                            earlier = safe_speakers[-1]
-                    if (
-                        not earlier
-                        or earlier.gender_tag in priority_genders
-                        or earlier in safe_speakers
-                    ):
-                        break
-
-                insert_pos -= 1
-
-            new_order.insert(insert_pos, speaker)
-        return new_order
+        should_prioritize = bool(safe_speakers) and not is_prio(safe_speakers[-1])
+        spoken_count_order = Priority(self.speaker_system).reorder(
+            safe_speakers, incoming_order
+        )
+        # Go through each list and yield in prio order
+        for _, speakers in groupby(spoken_count_order, lambda sp: sp.spoken_count):
+            speakers = list(speakers)
+            while speakers:
+                # Preliminary choice is next speaker in list
+                speaker = speakers[0]
+                if should_prioritize:
+                    # See if there is a speaker to prioritize
+                    speaker = next(filter(is_prio, speakers), speaker)
+                # Whether next should be prioritized (i.e. if this speaker is not prioritized gender)
+                should_prioritize = not is_prio(speaker)
+                # Remove and yield
+                speakers.remove(speaker)
+                yield speaker
 
     def get_queryset(self, speaker_list: SpeakerList) -> models.QuerySet[Speaker]:
         return speaker_list.speakers_in_queue_or_speaking().annotate(
