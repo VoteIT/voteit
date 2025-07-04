@@ -1,11 +1,9 @@
-from contextlib import suppress
 from itertools import groupby
 
 from django.db import models
 
 from voteit.participant_tags.components import GenderTags
 from voteit.participant_tags.models import ParticipantTags
-from voteit.speaker.abcs import ListMethod
 from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema, Priority
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
@@ -20,7 +18,7 @@ class GenderAndPrioritySchema(PrioritySettingsSchema):
 
 
 @list_method
-class GenderAndPriority(ListMethod):
+class GenderAndPriority(Priority):
     name = "gender_prio"
     title = "Gender and priority"
     description = (
@@ -36,9 +34,7 @@ class GenderAndPriority(ListMethod):
             return sp.gender_tag in priority_genders
 
         should_prioritize = bool(safe_speakers) and not is_prio(safe_speakers[-1])
-        spoken_count_order = Priority(self.speaker_system).reorder(
-            safe_speakers, incoming_order
-        )
+        spoken_count_order = super().reorder(safe_speakers, incoming_order)
         # Go through each list and yield in prio order
         for _, speakers in groupby(spoken_count_order, lambda sp: sp.spoken_count):
             speakers = list(speakers)
