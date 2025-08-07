@@ -1,6 +1,3 @@
-from datetime import datetime
-from unittest.mock import patch
-
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
@@ -8,14 +5,13 @@ from django.utils.timezone import now
 from django_fsm import TransitionNotAllowed
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
-from envelope.channels.models import ContextChannel
+from envelope.messages.common import Batch
 from envelope.testing import ChannelMessageCatcher
 from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.messages.role_updates import RolesAdded
-from voteit.core.testing import FakeCommit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -24,7 +20,6 @@ from voteit.room.channels import RoomChannel
 from voteit.speaker.messages import SpeakerAdded
 from voteit.speaker.messages import SpeakerChanged
 from voteit.speaker.messages import SpeakerDeleted
-
 from voteit.speaker.messages import SpeakerListAdded
 from voteit.speaker.messages import SpeakerListChanged
 from voteit.speaker.messages import SpeakerListDeleted
@@ -266,10 +261,10 @@ class SendStateChangesTestsTests(TestCase):
             self.system.active_list = None
             self.system.save()
         self.assertFalse(messages)
-        with ChannelMessageCatcher(RoomChannel, SpeakerListChanged) as messages:
+        with ChannelMessageCatcher(RoomChannel, SpeakerListChanged, Batch) as messages:
             self.system.active_list = self.speaker_list
             self.system.save()
-        self.assertEqual(1, len(messages))
+        self.assertEqual(2, len(messages))
         self.assertEqual(
             {
                 "agenda_item": self.ai.pk,
@@ -283,6 +278,22 @@ class SendStateChangesTestsTests(TestCase):
                 "meeting": self.meeting.pk,
             },
             messages[0].data.dict(),
+        )
+        self.assertDictEqual(
+            {
+                "t": SpeakerAdded.name,
+                "payloads": [
+                    {
+                        "user": self.participant.pk,
+                        "pk": self.speaker.pk,
+                        "room": self.room.pk,
+                        "started": None,
+                        "seconds": None,
+                        "speaker_list": self.speaker_list.pk,
+                    }
+                ],
+            },
+            messages[1].data.dict(),
         )
         with ChannelMessageCatcher(RoomChannel, SpeakerListChanged) as messages:
             # Same list

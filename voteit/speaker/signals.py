@@ -11,6 +11,7 @@ from django_fsm import TransitionNotAllowed
 from django_fsm import post_transition
 from django_fsm import pre_transition
 from envelope.app.user_channel.channel import UserChannel
+from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
@@ -71,6 +72,24 @@ def notify_active_list_changed(instance: SpeakerListSystem, **kwargs):
         msg = SpeakerListChanged(**serializer.data)
         room_ch = RoomChannel(instance.room_id)
         room_ch.sync_publish(msg)
+        speaker_qs = Speaker.objects.filter(
+            # speaker_list__room=context,
+            speaker_list=instance.active_list,
+        ).values("user_id", "started", "pk", "seconds")
+        if speaker_qs:
+            batch = Batch(t=SpeakerAdded.name, payloads=[])
+            for item in speaker_qs:
+                batch.append(
+                    SpeakerAdded(
+                        room=instance.room_id,
+                        user=item["user_id"],
+                        speaker_list=instance.active_list_id,
+                        started=item["started"],
+                        pk=item["pk"],
+                        seconds=item["seconds"],
+                    )
+                )
+            room_ch.sync_publish(batch)
 
 
 # System signals
