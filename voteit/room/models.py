@@ -78,6 +78,7 @@ class Room(MeetingContext):
     send_proposals: bool = models.BooleanField(
         verbose_name="Send proposals?", default=False
     )
+    # I.E. the clock when meeting is paused - not related to the speaker list!
     show_time: bool = models.BooleanField(
         verbose_name="Show time?",
         default=True,
