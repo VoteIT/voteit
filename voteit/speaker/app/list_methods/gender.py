@@ -11,7 +11,7 @@ from voteit.speaker.registries import list_method
 
 
 class GenderAndPrioritySchema(PrioritySettingsSchema):
-    priority_genders: list[str]
+    priority_genders: list[str] = ["f", "nb"]
 
     class Config:
         allow_mutation = False
