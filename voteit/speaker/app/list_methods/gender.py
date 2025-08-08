@@ -74,11 +74,9 @@ class GenderAndPriority(Priority):
 def check_component_on_enable(instance: SpeakerListSystem, **kwargs):
     component, _ = instance.meeting.components.update_or_create(
         component_name=GenderTags.name,
-        defaults={"settings_data": {"tags": ["m", "f", "nb"]}},
+        defaults={"settings_data": {"tags": ["m", "f", "nb"]}, "state": EnabledWf.ON},
     )
-    if component.state == EnabledWf.OFF:
-        component.enable()
-        component.save()
+    assert component.is_valid
 
 
 @receiver(sender=GenderAndPriority, signal=list_method_removed)

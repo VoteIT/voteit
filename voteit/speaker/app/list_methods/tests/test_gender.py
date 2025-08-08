@@ -1,5 +1,3 @@
-import random
-
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils.timezone import now
@@ -9,6 +7,7 @@ from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import Meeting
 from voteit.participant_tags.components import GenderTags
 from voteit.speaker.app.list_methods.gender import GenderAndPriority
+from voteit.speaker.app.list_methods.simple import Simple
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 
@@ -20,12 +19,6 @@ class GenderAndPriorityTests(TestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
         cls.PRIORITY_GENDERS = ["f", "nb"]
-        cls.gender_component: MeetingComponent = cls.meeting.components.create(
-            component_name=GenderTags.name,
-            state=EnabledWf.ON,
-            settings_data={"tags": cls.PRIORITY_GENDERS},
-        )
-        assert cls.gender_component.is_valid
         cls.room = cls.meeting.rooms.create()
         cls.system: SpeakerListSystem = SpeakerListSystem.objects.create(
             method_name=GenderAndPriority.name,
@@ -304,3 +297,39 @@ class GenderAndPriorityTests(TestCase):
             ],
             self._pks_to_usernames(*self.speaker_list.order_list),
         )
+
+    def test_automatic_settings_on_add(self):
+        component = self.meeting.components.filter(
+            component_name=GenderTags.name
+        ).first()
+        self.assertIsInstance(component, MeetingComponent)
+        self.assertEqual({"tags": ["m", "f", "nb"]}, component.settings_data)
+        self.assertEqual(EnabledWf.ON, component.state)
+
+    def test_automatic_disable_on_delete(self):
+        self.system.delete()
+        component = self.meeting.components.filter(
+            component_name=GenderTags.name
+        ).first()
+        self.assertIsInstance(component, MeetingComponent)
+        self.assertEqual(EnabledWf.OFF, component.state)
+
+    def test_automatic_disable_on_change(self):
+        self.system.method_name = Simple.name
+        self.system.save()
+        component = self.meeting.components.filter(
+            component_name=GenderTags.name
+        ).first()
+        self.assertIsInstance(component, MeetingComponent)
+        self.assertEqual(EnabledWf.OFF, component.state)
+
+    def test_keep_component_when_multiple_lists_exist(self):
+        room2 = self.meeting.rooms.create()
+        self.meeting.speaker_systems.create(
+            room=room2, method_name=GenderAndPriority.name
+        )
+        self.system.delete()
+        component = self.meeting.components.filter(
+            component_name=GenderTags.name
+        ).first()
+        self.assertEqual(EnabledWf.ON, component.state)

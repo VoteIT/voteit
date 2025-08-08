@@ -255,16 +255,16 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
 
         active_list_changed.send(sender=self.__class__, instance=self)
 
-    def signal_list_method_added(self):
+    def signal_list_method_added(self, force=False):
         from voteit.speaker.signals import list_method_added
 
-        if self.method_name_changed and self.method_name:
+        if (self.method_name_changed or force) and self.method_name:
             list_method_added.send(sender=self.get_method_class(), instance=self)
 
     def signal_list_method_removed(self, force=False):
         from voteit.speaker.signals import list_method_removed
 
-        if self.method_name_changed and self._initial_method_name:
+        if (self.method_name_changed or force) and self._initial_method_name:
             reg = get_list_method_registry()
             if method_class := reg.get(self._initial_method_name):
                 list_method_removed.send(sender=method_class, instance=self)
@@ -276,7 +276,9 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
 
     def save(self, **kw):
         # Add meeting on create if not specified
+        adding = False
         if self._state.adding:
+            adding = True
             if self.meeting_id is None and self.room_id is not None:
                 if self.room.meeting_id:
                     self.meeting_id = self.room.meeting_id
@@ -292,6 +294,8 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         if self.method_name_changed:
             self.signal_list_method_removed()
             self.signal_list_method_added()
+        elif adding:
+            self.signal_list_method_added(force=True)
         self._initial_method_name = self.method_name
 
     @property

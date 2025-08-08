@@ -152,9 +152,7 @@ def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
         ch.sync_publish(msg)
     # Notify in case method needs any other cleanup
     if instance.method_name:
-        with suppress(KeyError):
-            sender = instance.get_method_class()
-            list_method_removed.send(sender=sender, instance=instance)
+        instance.signal_list_method_removed(force=True)
 
 
 # List signals
