@@ -11,9 +11,12 @@ from django_fsm import TransitionNotAllowed
 from voteit.meeting.models import Meeting
 from voteit.speaker.app.list_methods.priority import Priority
 from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema
+from voteit.speaker.app.list_methods.simple import Simple
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.models import SpeakerList
+from voteit.speaker.signals import list_method_added
+from voteit.speaker.signals import list_method_removed
 from voteit.speaker.workflows import SpeakerSystemWf
 
 User = get_user_model()
@@ -235,6 +238,55 @@ class SpeakerListSystemsTests(TestCase):
         speaker.delete()
         slist.refresh_from_db()
         self.system.inactivate()
+
+    def test_adding_method_triggers_add_signal(self):
+        self.system.method_name = ""
+        self.system.save()
+        L = []
+
+        @receiver(list_method_added, sender=Simple)
+        def listener(instance, **kw):
+            L.append(instance)
+
+        self.system.method_name = Simple.name
+        self.system.save()
+        self.assertEqual([self.system], L)
+
+    def test_changing_method_triggers_remove_signal(self):
+        L = []
+
+        @receiver(list_method_removed, sender=Simple)
+        def listener(instance, **kw):
+            L.append(instance)
+
+        self.system.method_name = Priority.name
+        self.system.save()
+        self.assertEqual([self.system], L)
+
+    def test_delete_triggers_remove_signal(self):
+        L = []
+
+        @receiver(list_method_removed, sender=Simple)
+        def listener(instance, **kw):
+            L.append(instance)
+
+        self.system.delete()
+        self.assertEqual([self.system], L)
+
+    def test_change_with_bad_name(self):
+        self.system.method_name = "broken"
+        self.system._initial_method_name = "broken"
+        self.system.save_base()
+        L = []
+
+        @receiver(list_method_removed)
+        def listener(instance, **kw):
+            L.append(instance)
+
+        self.system.method_name = Simple.name
+        self.system.save()
+        # No errors please
+        self.assertEqual([], L)
 
 
 class DeletingMeetingTests(TestCase):

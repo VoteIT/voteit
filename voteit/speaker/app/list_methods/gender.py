@@ -1,13 +1,18 @@
 from itertools import groupby
 
 from django.db import models
+from django.dispatch import receiver
 
+from voteit.core.workflows import EnabledWf
 from voteit.participant_tags.components import GenderTags
 from voteit.participant_tags.models import ParticipantTags
 from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema, Priority
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
+from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.registries import list_method
+from voteit.speaker.signals import list_method_added
+from voteit.speaker.signals import list_method_removed
 
 
 class GenderAndPrioritySchema(PrioritySettingsSchema):
@@ -63,3 +68,30 @@ class GenderAndPriority(Priority):
                 meeting_id=speaker_list.meeting_id, user=models.OuterRef("user")
             ).values(f"tags__{GenderTags.namespace}"),
         )
+
+
+@receiver(sender=GenderAndPriority, signal=list_method_added)
+def check_component_on_enable(instance: SpeakerListSystem, **kwargs):
+    component, _ = instance.meeting.components.update_or_create(
+        component_name=GenderTags.name,
+        defaults={"settings_data": {"tags": ["m", "f", "nb"]}},
+    )
+    if component.state == EnabledWf.OFF:
+        component.enable()
+        component.save()
+
+
+@receiver(sender=GenderAndPriority, signal=list_method_removed)
+def maybe_remove_component_on_disable(instance: SpeakerListSystem, **kwargs):
+    # TODO: This needs to be handled differently in case this component is reused later on.
+    # Remove component if no other speaker lists use it
+    if (
+        not instance.meeting.speaker_systems.exclude(pk=instance.pk)
+        .filter(method_name=GenderAndPriority.name)
+        .exists()
+    ):
+        if component := instance.meeting.components.filter(
+            component_name=GenderTags.name, state=EnabledWf.ON
+        ).first():
+            component.disable()
+            component.save()

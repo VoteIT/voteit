@@ -145,6 +145,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._initial_active_list_id = self.active_list_id
+        self._initial_method_name = self.method_name
 
     def get_method_class(self) -> type[ListMethod]:
         """Fetch the poll method class, a django proxy model."""
@@ -154,6 +155,10 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     @property
     def active_list_changed(self) -> bool:
         return self.active_list_id != self._initial_active_list_id
+
+    @property
+    def method_name_changed(self) -> bool:
+        return self.method_name != self._initial_method_name
 
     @property
     def speaker_system(self) -> SpeakerListSystem:
@@ -250,9 +255,24 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
 
         active_list_changed.send(sender=self.__class__, instance=self)
 
+    def signal_list_method_added(self):
+        from voteit.speaker.signals import list_method_added
+
+        if self.method_name_changed and self.method_name:
+            list_method_added.send(sender=self.get_method_class(), instance=self)
+
+    def signal_list_method_removed(self, force=False):
+        from voteit.speaker.signals import list_method_removed
+
+        if self.method_name_changed and self._initial_method_name:
+            reg = get_list_method_registry()
+            if method_class := reg.get(self._initial_method_name):
+                list_method_removed.send(sender=method_class, instance=self)
+
     def refresh_from_db(self, **kwargs):
         super().refresh_from_db(**kwargs)
         self._initial_active_list_id = self.active_list_id
+        self._initial_method_name = self.method_name
 
     def save(self, **kw):
         # Add meeting on create if not specified
@@ -269,6 +289,10 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
                 self.active_list.is_active_list = True  # Update cached value
             self.signal_active_list_changed()
         self._initial_active_list_id = self.active_list_id
+        if self.method_name_changed:
+            self.signal_list_method_removed()
+            self.signal_list_method_added()
+        self._initial_method_name = self.method_name
 
     @property
     def is_archived(self):

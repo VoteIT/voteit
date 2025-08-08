@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -59,6 +60,9 @@ if TYPE_CHECKING:
 
 # instance
 active_list_changed = Signal()
+# instance, sender (class of list method)
+list_method_added = Signal()
+list_method_removed = Signal()
 
 
 @receiver(active_list_changed)
@@ -146,6 +150,11 @@ def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
         msg = SpeakerSystemDeleted(pk=instance.pk)
         ch = MeetingChannel(instance.meeting_id)
         ch.sync_publish(msg)
+    # Notify in case method needs any other cleanup
+    if instance.method_name:
+        with suppress(KeyError):
+            sender = instance.get_method_class()
+            list_method_removed.send(sender=sender, instance=instance)
 
 
 # List signals
