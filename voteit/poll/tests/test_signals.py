@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.test import TestCase
 from django.test import override_settings
 
@@ -9,26 +10,29 @@ from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
 from envelope.channels.models import AppState
 from envelope.testing import MessageCatcher
+from envelope.testing import testing_channel_layers_setting
+
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.poll.abcs import VoteTransferPolicy
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.messages import PollStatus
 from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import VoteTransfer
+from voteit.poll.registries import er_policy
+from voteit.poll.registries import vote_transfer_policies
+from voteit.poll.testing import UnrestrictedVoteTransferER
+from voteit.poll.testing import UnrestrictedVoteTransferPolicy
 from voteit.poll.workflows import PollWf
 
 User = get_user_model()
 
 
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
-
-
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class MeetingSubscribedTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -266,7 +270,7 @@ class MeetingSubscribedTests(TestCase):
         self.assertIn({"pk": self.poll2.pk, "voted": 2, "total": 2}, messages)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class PollChangedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -362,7 +366,7 @@ class PollChangedTests(TestCase):
         self.assertFalse(mock_publish.called)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class PrivateAIPublishedTests(TestCase):
     def setUp(self):
         self.er = ElectoralRegister.objects.create()
@@ -401,7 +405,7 @@ class PrivateAIPublishedTests(TestCase):
         self.assertEqual(1, len([x for x in messages if isinstance(x, PollAdded)]))
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class NewERSentToMeetingTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -426,7 +430,7 @@ class NewERSentToMeetingTests(TestCase):
         self.assertEqual([{"user": self.user.pk, "weight": 5}], msg.data.weights)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class VoteSignalsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -495,3 +499,40 @@ class VoteSignalsTests(TestCase):
         self.assertEqual(1, len(messages))
         msg = messages[0]
         self.assertEqual(1, msg.data.voted)
+
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+@patch.dict(
+    vote_transfer_policies,
+    {UnrestrictedVoteTransferPolicy.name: UnrestrictedVoteTransferPolicy},
+)
+@patch.dict(
+    er_policy,
+    {UnrestrictedVoteTransferER.name: UnrestrictedVoteTransferER},
+)
+class VoteTransferSignalsTests(TestCase):
+
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.meeting.er_policy_name = UnrestrictedVoteTransferER.name
+        cls.meeting.save()
+        cls.participant = cls.meeting.participants.get(username="participant")
+        cls.moderator = cls.meeting.participants.get(username="moderator")
+        cls.transfer = cls.meeting.vote_transfers.create(
+            source=cls.moderator, target=cls.participant
+        )
+
+    def test_cleanup_target(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.meeting.roles.filter(user=self.moderator).delete()
+        with self.assertRaises(ObjectDoesNotExist):
+            self.transfer.refresh_from_db()
+
+    def test_cleanup_source(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.meeting.roles.filter(user=self.participant).delete()
+        with self.assertRaises(ObjectDoesNotExist):
+            self.transfer.refresh_from_db()

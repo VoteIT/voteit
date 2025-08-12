@@ -1,4 +1,9 @@
+from unittest.mock import patch
+
+from django.core.exceptions import ObjectDoesNotExist
+from django.test import override_settings
 from django.contrib.auth import get_user_model
+from envelope.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
@@ -10,6 +15,10 @@ from voteit.meeting.workflows import MeetingWf
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.polls.combined_simple import CombinedSimple
 from voteit.poll.models import ElectoralRegister
+from voteit.poll.registries import er_policy
+from voteit.poll.registries import vote_transfer_policies
+from voteit.poll.testing import UnrestrictedVoteTransferER
+from voteit.poll.testing import UnrestrictedVoteTransferPolicy
 from voteit.poll.workflows import PollWf
 from voteit.proposal.workflows import ProposalWf
 
@@ -402,6 +411,258 @@ class ElectoralRegisterPolicyViewSetTests(APITestCase):
                 "handles_delegate_to": False,
                 "name": "auto_always",
                 "title": "Automatic always",
+                "vote_transfer_policy": None,
             },
             first,
         )
+
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+@patch.dict(
+    vote_transfer_policies,
+    {UnrestrictedVoteTransferPolicy.name: UnrestrictedVoteTransferPolicy},
+)
+@patch.dict(
+    er_policy,
+    {UnrestrictedVoteTransferER.name: UnrestrictedVoteTransferER},
+)
+class VoteTransferViewSetTests(APITestCase):
+
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.meeting.er_policy_name = UnrestrictedVoteTransferER.name
+        cls.meeting.save()
+        cls.participant = cls.meeting.participants.get(username="participant")
+        cls.voter = cls.meeting.participants.create(username="voter")
+        cls.other_participant = cls.meeting.participants.create(username="other")
+        cls.moderator = cls.meeting.participants.get(username="moderator")
+        cls.meeting.add_roles(cls.voter, ROLE_POTENTIAL_VOTER)
+        # And another meeting
+        cls.other_meeting = Meeting.objects.create()
+        cls.user_in_another_meeting = cls.other_meeting.participants.create(
+            username="user_in_another_meeting"
+        )
+
+    def test_transfer_own(self):
+        self.client.force_login(self.voter)
+        url = reverse("vote-transfer-list")
+        data = {
+            "meeting": self.meeting.pk,
+            "source": self.voter.pk,
+            "target": self.other_participant.pk,
+        }
+        response = self.client.post(
+            url,
+            data=data,
+        )
+        response_data = response.json()
+        response_data.pop("pk")
+        self.assertEqual(data, response_data)
+        self.assertEqual(201, response.status_code)
+
+    def test_transfer_own_non_voter(self):
+        self.client.force_login(self.participant)
+        url = reverse("vote-transfer-list")
+        data = {
+            "meeting": self.meeting.pk,
+            "source": self.participant.pk,
+            "target": self.other_participant.pk,
+        }
+        response = self.client.post(url, data=data)
+        self.assertEqual(
+            {
+                "detail": "You lack the required permission to add (assign) vote transfer in this meeting."
+            },
+            response.json(),
+        )
+        self.assertEqual(403, response.status_code)
+
+    def test_transfer_others_regular_user(self):
+        self.client.force_login(self.voter)
+        url = reverse("vote-transfer-list")
+        data = {
+            "meeting": self.meeting.pk,
+            "source": self.participant.pk,
+            "target": self.other_participant.pk,
+        }
+        response = self.client.post(url, data=data)
+        self.assertEqual(
+            {"source": ["You can't delegate votes unless you're a moderator"]},
+            response.json(),
+        )
+        self.assertEqual(400, response.status_code)
+
+    def test_transfer_others_moderator(self):
+        self.client.force_login(self.moderator)
+        url = reverse("vote-transfer-list")
+        data = {
+            "meeting": self.meeting.pk,
+            "source": self.voter.pk,
+            "target": self.other_participant.pk,
+        }
+        response = self.client.post(url, data=data)
+        response_data = response.json()
+        response_data.pop("pk")
+        self.assertEqual(
+            response_data,
+            response.json(),
+        )
+        self.assertEqual(201, response.status_code)
+
+    def test_transfer_source_duplicate(self):
+        self.client.force_login(self.voter)
+        url = reverse("vote-transfer-list")
+        data = {
+            "meeting": self.meeting.pk,
+            "source": self.voter.pk,
+            "target": self.participant.pk,
+        }
+        response = self.client.post(url, data=data)
+        response_data = response.json()
+        response_data.pop("pk")
+        self.assertEqual(data, response_data)
+        self.assertEqual(201, response.status_code)
+        # And again to other user
+        data = {
+            "meeting": self.meeting.pk,
+            "source": self.voter.pk,
+            "target": self.other_participant.pk,
+        }
+        response = self.client.post(url, data=data)
+        self.assertEqual(
+            {
+                "non_field_errors": [
+                    "The fields source, meeting must make a unique set."
+                ]
+            },
+            response.json(),
+        )
+        self.assertEqual(400, response.status_code)
+
+    def test_transfer_to_self(self):
+        self.client.force_login(self.voter)
+        url = reverse("vote-transfer-list")
+        data = {
+            "meeting": self.meeting.pk,
+            "source": self.voter.pk,
+            "target": self.voter.pk,
+        }
+        response = self.client.post(url, data=data)
+        self.assertEqual({"target": ["target is same as source"]}, response.json())
+        self.assertEqual(400, response.status_code)
+
+    def test_delete_own(self):
+        self.client.force_login(self.voter)
+        transfer = self.meeting.vote_transfers.create(
+            source=self.voter, target=self.participant
+        )
+        url = reverse("vote-transfer-detail", kwargs={"pk": transfer.pk})
+        response = self.client.delete(url)
+        self.assertEqual(204, response.status_code)
+        with self.assertRaises(ObjectDoesNotExist):
+            transfer.refresh_from_db()
+
+    def test_delete_others(self):
+        self.client.force_login(self.other_participant)
+        transfer = self.meeting.vote_transfers.create(
+            source=self.voter, target=self.participant
+        )
+        url = reverse("vote-transfer-detail", kwargs={"pk": transfer.pk})
+        response = self.client.delete(url)
+        self.assertEqual(403, response.status_code)
+
+    def test_delete_others_moderator(self):
+        self.client.force_login(self.moderator)
+        transfer = self.meeting.vote_transfers.create(
+            source=self.voter, target=self.participant
+        )
+        url = reverse("vote-transfer-detail", kwargs={"pk": transfer.pk})
+        response = self.client.delete(url)
+        self.assertEqual(204, response.status_code)
+
+    def test_target_from_another_meeting_where_source_isnt(self):
+        self.client.force_login(self.voter)
+        url = reverse("vote-transfer-list")
+        data = {
+            "meeting": self.meeting.pk,
+            "source": self.voter.pk,
+            "target": self.user_in_another_meeting.pk,
+        }
+        response = self.client.post(url, data=data)
+        self.assertEqual(
+            {
+                "target": [
+                    f'Invalid pk "{self.user_in_another_meeting.pk}" - object does not exist.'
+                ]
+            },
+            response.json(),
+        )
+        self.assertEqual(400, response.status_code)
+
+    def test_target_from_another_meeting(self):
+        self.client.force_login(self.voter)
+        self.other_meeting.add_roles(self.voter, ROLE_POTENTIAL_VOTER)
+        url = reverse("vote-transfer-list")
+        data = {
+            "meeting": self.meeting.pk,
+            "source": self.voter.pk,
+            "target": self.user_in_another_meeting.pk,
+        }
+        response = self.client.post(url, data=data)
+        self.assertEqual(
+            {"target": ["target user isn't in the same meeting as the source user"]},
+            response.json(),
+        )
+        self.assertEqual(400, response.status_code)
+
+    def test_target_delegates_to_other(self):
+        transfer = self.meeting.vote_transfers.create(
+            source=self.voter, target=self.participant
+        )
+        self.client.force_login(self.participant)
+        url = reverse("vote-transfer-detail", kwargs={"pk": transfer.pk})
+        response = self.client.patch(url, data={"target": self.other_participant.pk})
+        self.assertEqual(self.other_participant.pk, response.json()["target"])
+        self.assertEqual(200, response.status_code)
+
+    def test_source_delegates_to_other(self):
+        transfer = self.meeting.vote_transfers.create(
+            source=self.voter, target=self.participant
+        )
+        self.client.force_login(self.voter)
+        url = reverse("vote-transfer-detail", kwargs={"pk": transfer.pk})
+        response = self.client.patch(url, data={"target": self.other_participant.pk})
+        self.assertEqual(self.other_participant.pk, response.json()["target"])
+        self.assertEqual(200, response.status_code)
+
+    def test_moderator_delegates_to_other(self):
+        transfer = self.meeting.vote_transfers.create(
+            source=self.voter, target=self.participant
+        )
+        self.client.force_login(self.moderator)
+        url = reverse("vote-transfer-detail", kwargs={"pk": transfer.pk})
+        response = self.client.patch(url, data={"target": self.other_participant.pk})
+        self.assertEqual(self.other_participant.pk, response.json()["target"])
+        self.assertEqual(200, response.status_code)
+
+    def test_moderator_delegates_to_user_from_another_meeting(self):
+        transfer = self.meeting.vote_transfers.create(
+            source=self.voter, target=self.participant
+        )
+        self.client.force_login(self.moderator)
+        url = reverse("vote-transfer-detail", kwargs={"pk": transfer.pk})
+        response = self.client.patch(
+            url, data={"target": self.user_in_another_meeting.pk}
+        )
+        self.assertEqual(
+            {
+                "target": [
+                    f'Invalid pk "{self.user_in_another_meeting.pk}" - object does not exist.'
+                ]
+            },
+            response.json(),
+        )
+        self.assertEqual(400, response.status_code)

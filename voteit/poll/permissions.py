@@ -22,3 +22,11 @@ class ElectoralRegisterPermissions(ModelPermissions):
     model = "electoral_register"
     ADD = P("poll.add_electoralregister", context="meeting")
     VIEW = P("poll.view_electoralregister")
+
+
+class VoteTransferPermissions(ModelPermissions):
+    model = "vote_transfer"
+    ADD = P("poll.add_votetransfer", context="meeting")
+    DELETE = P("poll.delete_votetransfer")
+    CHANGE = P("poll.change_votetransfer")  # Really reassign
+    VIEW = P("poll.view_votetransfer")

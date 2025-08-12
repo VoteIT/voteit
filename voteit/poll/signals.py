@@ -25,6 +25,7 @@ from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingRoles
 from voteit.poll.messages import ElectoralRegisterAdded
 from voteit.poll.messages import ElectoralRegisterDeleted
 from voteit.poll.messages import GenericVoteResponse
@@ -35,6 +36,7 @@ from voteit.poll.messages import PollStatus
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
+from voteit.poll.models import VoteTransfer
 from voteit.poll.rest_api.serializers import ElectoralRegisterSerializer
 from voteit.poll.rest_api.serializers import PollDetailSerializer
 from voteit.poll.rest_api.serializers import VoteSerializer
@@ -284,3 +286,13 @@ def vote_added(instance: Vote, *, created: bool, **kw):
     serializer = VoteSerializer(instance)
     msg = GenericVoteResponse(**serializer.data)
     user_ch.sync_publish(msg)
+
+
+@receiver(pre_delete, sender=MeetingRoles)
+def remove_vote_transfers(instance: MeetingRoles, **kwargs):
+    """
+    User was removed from meeting, so transfer can't exist.
+    """
+    VoteTransfer.objects.filter(meeting=instance.context).filter(
+        models.Q(target=instance.user) | models.Q(source=instance.user)
+    ).delete()

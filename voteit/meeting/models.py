@@ -36,6 +36,7 @@ from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.permissions import OrgPermissions
 from voteit.poll.utils import get_electoral_policy_registry
+from voteit.poll.utils import get_vote_transfer_policy_registry
 from voteit.proposal import DEFAULT_PROPOSAL_ID_POLICY
 from voteit.proposal.utils import get_proposal_id_registry
 
@@ -46,8 +47,10 @@ if TYPE_CHECKING:
     from voteit.core.role import Role
     from voteit.discussion.models import DiscussionPost
     from voteit.organisation.models import Organisation
-    from voteit.poll.models import ElectoralRegister
     from voteit.poll.abcs import ElectoralRegisterPolicy
+    from voteit.poll.abcs import VoteTransferPolicy
+    from voteit.poll.models import ElectoralRegister
+    from voteit.poll.models import VoteTransfer
     from voteit.participant_number.models import PNSystem
     from voteit.proposal.models import Proposal
     from voteit.presence.models import PresenceCheck
@@ -247,9 +250,15 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
         if only_active:
             query["active"] = True
         for ap in access_policies.values():
-            obj = ap.objects.filter(meeting=self, **query).first()
-            if obj:
+            if obj := ap.objects.filter(meeting=self, **query).first():
                 yield obj  # All of them are 1-1 relations
+
+    @property
+    def vote_transfer_policy(self) -> VoteTransferPolicy | None:
+        if vtp := self.er_policy.vote_transfer_policy:
+            reg = get_vote_transfer_policy_registry()
+            if klass := reg.get(vtp):
+                return klass(self)
 
     def component_enabled(self, name: str) -> bool:
         return self.components.filter(component_name=name, state=EnabledWf.ON).exists()
@@ -417,6 +426,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     active_users: models.QuerySet[ActiveUser]
     rooms: models.QuerySet[Room]
     participant_tags: models.QuerySet[ParticipantTags]
+    vote_transfers: models.QuerySet[VoteTransfer]
 
 
 class MeetingGroup(BaseContent, MeetingContext):

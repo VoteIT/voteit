@@ -210,6 +210,7 @@ class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
             "dialect",
             "group_roles_active",
             "group_votes_active",
+            "vote_transfer_policy",
         ]
         fields = read_only_fields + [
             "title",

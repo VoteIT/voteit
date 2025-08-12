@@ -1,13 +1,32 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from django.db import transaction
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import ValidationError
 
 from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.core.rest_api.utils import drf_do_transition
 from voteit.core.rest_api.utils import get_valid_transitions_dict
-from voteit.poll import models
+from voteit.meeting.models import MeetingRoles
+from voteit.meeting.rest_api.fields import UserInMeetingContextField
+from voteit.meeting.rest_api.fields import UserInSameMeetingsField
+from voteit.meeting.rest_api.fields import UserMeetingField
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.poll.abcs import PollMethod
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.poll.models import Vote
+from voteit.poll.models import VoteTransfer
+from voteit.poll.models import VoterWeight
+from voteit.poll.permissions import VoteTransferPermissions
 from voteit.poll.utils import get_poll_method_registry
+
+if TYPE_CHECKING:
+    from voteit.meeting.models import Meeting
 
 __all__ = (
     "ElectoralRegisterSerializer",
@@ -25,7 +44,7 @@ class PollDetailSerializer(serializers.ModelSerializer):
     abstain_count = serializers.SerializerMethodField()
 
     class Meta:
-        model = models.Poll
+        model = Poll
         read_only_fields = (
             "abstain_count",
             "agenda_item",
@@ -48,18 +67,15 @@ class PollDetailSerializer(serializers.ModelSerializer):
         )
         fields = read_only_fields
 
-    def get_abstain_count(self, instance: models.Poll) -> int | None:
+    def get_abstain_count(self, instance: Poll) -> int | None:
         if instance.is_finished:
             return instance.abstains
 
-    def get_result(self, instance: models.Poll):
+    def get_result(self, instance: Poll):
         if instance.is_finished and (
             self.context.get("show_withheld", False) or not instance.withheld_result
         ):
             return instance.result_data
-
-
-# FIXME: This should be removed?
 
 
 class PollListSerializer(PollDetailSerializer):
@@ -151,7 +167,7 @@ class PollCreateSerializer(serializers.ModelSerializer):
         return poll
 
     class Meta:
-        model = models.Poll
+        model = Poll
         read_only_fields = [
             "closed",
             "electoral_register",
@@ -183,7 +199,7 @@ class ElectoralRegisterSerializer(serializers.ModelSerializer):
     weights = serializers.SerializerMethodField()
 
     class Meta:
-        model = models.ElectoralRegister
+        model = ElectoralRegister
         fields = read_only_fields = (
             "created",
             "pk",
@@ -192,7 +208,7 @@ class ElectoralRegisterSerializer(serializers.ModelSerializer):
             "source",
         )
 
-    def get_weights(self, er: models.ElectoralRegister) -> list[dict[str, int]]:
+    def get_weights(self, er: ElectoralRegister) -> list[dict[str, int]]:
         results = []
         for user_pk, weight in er.weight_dict.items():
             results.append({"user": user_pk, "weight": weight})
@@ -206,7 +222,7 @@ class VoterExportSerializer(serializers.ModelSerializer):
     userid = serializers.CharField(source="user.userid")
 
     class Meta:
-        model = models.VoterWeight
+        model = VoterWeight
         exclude = ("id", "register", "user")
 
 
@@ -214,7 +230,7 @@ class VoteSerializer(serializers.ModelSerializer):
     vote = PydanticFieldSerializer(allow_null=True)
 
     class Meta:
-        model = models.Vote
+        model = Vote
         fields = read_only_fields = (
             "pk",
             "user",
@@ -224,3 +240,77 @@ class VoteSerializer(serializers.ModelSerializer):
             "abstain",
             "vote",
         )
+
+
+class VoteTransferSerializer(serializers.ModelSerializer):
+    meeting = UserMeetingField()
+    source = UserInSameMeetingsField()
+    target = UserInSameMeetingsField()
+
+    class Meta:
+        model = VoteTransfer
+        fields = [
+            "pk",
+            "meeting",
+            "source",
+            "target",
+        ]
+
+    def validate_meeting(self, value: Meeting):
+        if not self.context["request"].user.has_perm(
+            VoteTransferPermissions.ADD, value
+        ):
+            raise PermissionDenied(
+                "You lack the required permission to add (assign) vote transfer in this meeting."
+            )
+        return value
+
+    def validate(self, attrs):
+        actor = self.context["request"].user
+        meeting = attrs["meeting"]
+        source = attrs["source"]
+        target = attrs["target"]
+        if source == target:
+            raise ValidationError({"target": "target is same as source"})
+        # Must exist in meeting
+        if (
+            MeetingRoles.objects.filter(
+                user__in=[source, target], context=meeting
+            ).count()
+            != 2
+        ):
+            raise ValidationError(
+                {"target": "target user isn't in the same meeting as the source user"}
+            )
+        # validate source
+        if actor != source and not meeting.has_roles(actor, ROLE_MODERATOR):
+            raise ValidationError(
+                {"source": "You can't delegate votes unless you're a moderator"}
+            )
+        meeting.vote_transfer_policy.check(source, target)
+        return attrs
+
+
+class VoteTransferReassignSerializer(serializers.ModelSerializer):
+    target = UserInMeetingContextField()
+
+    class Meta:
+        model = VoteTransfer
+        read_only_fields = [
+            "meeting",
+            "source",
+            "pk",
+        ]
+        fields = read_only_fields + [
+            "target",
+        ]
+
+    def validate(self, attrs):
+        target = attrs["target"]
+        if self.instance.source == target:
+            raise ValidationError("Can't transfer to self")
+
+        self.instance.meeting.vote_transfer_policy.check(
+            source=self.instance.source, target=target, modifying=self.instance
+        )
+        return attrs

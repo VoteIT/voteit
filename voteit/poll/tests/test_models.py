@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
+from django.test import override_settings
 from django.test import TestCase
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import Meeting
@@ -17,6 +21,10 @@ from voteit.poll.exceptions import NotAllowedToVote
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import VoterWeight
+from voteit.poll.registries import er_policy
+from voteit.poll.registries import vote_transfer_policies
+from voteit.poll.testing import UnrestrictedVoteTransferER
+from voteit.poll.testing import UnrestrictedVoteTransferPolicy
 from voteit.poll.workflows import PollWf
 from voteit.proposal.models import Proposal
 from voteit.proposal.workflows import ProposalWf
@@ -449,3 +457,43 @@ class VoteTests(TestCase):
             user=self.voter,
             vote="yes",
         )
+
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+@patch.dict(
+    vote_transfer_policies,
+    {UnrestrictedVoteTransferPolicy.name: UnrestrictedVoteTransferPolicy},
+)
+@patch.dict(
+    er_policy,
+    {UnrestrictedVoteTransferER.name: UnrestrictedVoteTransferER},
+)
+class VoteTransferTests(TestCase):
+
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.meeting.er_policy_name = UnrestrictedVoteTransferER.name
+        cls.meeting.save()
+        cls.participant = cls.meeting.participants.get(username="participant")
+        cls.other_participant = cls.meeting.participants.create(username="other")
+        cls.moderator = cls.meeting.participants.get(username="moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_POTENTIAL_VOTER)
+        cls.transfer = cls.meeting.vote_transfers.create(
+            source=cls.moderator, target=cls.participant
+        )
+
+    def test_trigger_er(self):
+        er = self.meeting.er_policy.create_er()
+        self.assertEqual({self.participant.pk: 1}, er.weight_dict)
+        self.transfer.delete()
+        er = self.meeting.er_policy.create_er()
+        self.assertEqual({self.moderator.pk: 1}, er.weight_dict)
+
+    def test_duplicate_source(self):
+        with self.assertRaises(IntegrityError):
+            self.meeting.vote_transfers.create(
+                source=self.moderator, target=self.other_participant
+            )

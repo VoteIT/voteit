@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 from pydantic.main import BaseModel
 
 from voteit.core.decorators import ensure_atomic
-from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.exceptions import ElectoralRegisterError
 
@@ -18,6 +17,8 @@ if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
     from voteit.poll.messages import VoteBase
     from voteit.poll.schemas import PollResult
+    from voteit.core.models import User
+    from voteit.poll.models import VoteTransfer
 
 logger = getLogger(__name__)
 
@@ -104,6 +105,8 @@ class ElectoralRegisterPolicy(ABC):
     group_votes_active: bool | None = None
     # Can this method handle group votes delegated to other groups?
     handles_delegate_to: bool = False
+    # Allow users to transfer their vote to another user?
+    vote_transfer_policy: str | None = None
 
     def __init__(self, meeting: Meeting):
         self.meeting = meeting
@@ -205,3 +208,25 @@ class ElectoralRegisterPolicy(ABC):
             new_er_created.send(instance=er, sender=er.__class__)
             return er
         return self.meeting.latest_er
+
+
+class VoteTransferPolicy(ABC):
+    meeting: Meeting
+
+    @property
+    @abstractmethod
+    def name(self) -> str: ...
+
+    def __init__(self, meeting: Meeting):
+        self.meeting = meeting
+
+    @abstractmethod
+    def check(self, source: User, target: User, modifying: VoteTransfer | None = None):
+        """
+        Check transfer, raise DRF ValidationError on source or target.
+        This should only check dialect requirements for transfer, not basic things
+        Checked before this is run:
+        - transfer enabled
+        - source != target
+        - source and target in meeting
+        """

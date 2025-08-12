@@ -5,6 +5,7 @@ from django.contrib.auth.models import AbstractUser
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
+from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_not_archived
 from voteit.core.rules import is_not_finished
@@ -13,11 +14,15 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.rules import can_view_meeting
 from voteit.meeting.rules import is_moderator
+from voteit.meeting.rules import is_potential_voter
+from voteit.meeting.rules import meeting_upcoming_ongoing
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
+from voteit.poll.models import VoteTransfer
 from voteit.poll.permissions import ElectoralRegisterPermissions
 from voteit.poll.permissions import PollPermissions
 from voteit.poll.permissions import VotePermissions
+from voteit.poll.permissions import VoteTransferPermissions
 from voteit.poll.workflows import PollWf
 
 
@@ -99,6 +104,25 @@ def vote_is_poll_ongoing(user: AbstractUser, vote: Vote):
     return isinstance(vote, Vote) and is_poll_ongoing(user, vote.poll)
 
 
+@predicate
+def is_vote_transfer_enabled(user: AbstractUser, context: MeetingContext):
+    return context.meeting.vote_transfer_policy is not None
+
+
+@predicate
+def is_transfer_source_user(user: AbstractUser, vt: VoteTransfer):
+    if isinstance(vt, VoteTransfer):
+        return user.pk == vt.source_id
+    raise TypeError(f"{vt} is not a VoteTransfer instance")
+
+
+@predicate
+def is_transfer_target_user(user: AbstractUser, vt: VoteTransfer):
+    if isinstance(vt, VoteTransfer):
+        return user.pk == vt.target_id
+    raise TypeError(f"{vt} is not a VoteTransfer instance")
+
+
 # Vote
 rules.add_perm(VotePermissions.ADD, is_poll_ongoing & is_voter)  # Checked against poll.
 rules.add_perm(VotePermissions.DELETE, is_vote_owner & vote_is_poll_ongoing)
@@ -108,3 +132,27 @@ rules.add_perm(VotePermissions.VIEW, is_vote_owner)
 # Electoral register
 rules.add_perm(ElectoralRegisterPermissions.VIEW, can_view_meeting)
 rules.add_perm(ElectoralRegisterPermissions.ADD, is_moderator & is_not_archived)
+
+# Vote transfer
+rules.add_perm(
+    VoteTransferPermissions.ADD,
+    is_vote_transfer_enabled
+    & meeting_upcoming_ongoing
+    & (is_potential_voter | is_moderator),
+)  # Checked against meeting.
+rules.add_perm(
+    VoteTransferPermissions.DELETE,
+    is_vote_transfer_enabled
+    & meeting_upcoming_ongoing
+    & (is_transfer_source_user | is_transfer_target_user | is_moderator),
+)
+rules.add_perm(
+    VoteTransferPermissions.CHANGE,
+    is_vote_transfer_enabled
+    & meeting_upcoming_ongoing
+    & (is_transfer_source_user | is_transfer_target_user | is_moderator),
+)
+rules.add_perm(
+    VoteTransferPermissions.VIEW,
+    is_transfer_source_user | is_transfer_target_user | is_moderator,
+)

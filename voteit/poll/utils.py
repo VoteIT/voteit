@@ -15,3 +15,9 @@ def get_electoral_policy_registry() -> Registry:
     from .registries import er_policy
 
     return er_policy
+
+
+def get_vote_transfer_policy_registry() -> Registry:
+    from .registries import vote_transfer_policies
+
+    return vote_transfer_policies

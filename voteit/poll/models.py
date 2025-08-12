@@ -26,12 +26,12 @@ from django_fsm import post_transition
 from django_fsm import transition
 from pydantic import ValidationError
 from pydantic.main import BaseModel
+from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
 from voteit.core.permissions import NOT_ALLOWED
-from voteit.meeting.models import Meeting
 from voteit.poll.exceptions import BallotChecksumError
 from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidPollMethod
@@ -47,9 +47,15 @@ from voteit.proposal.workflows import ProposalWf
 if TYPE_CHECKING:
     from voteit.poll.abcs import PollMethod
     from voteit.agenda.models import AgendaItem
+    from voteit.meeting.models import Meeting
 
-
-__all__ = "VoterWeight", "ElectoralRegister", "Poll", "Vote"
+__all__ = (
+    "ElectoralRegister",
+    "Poll",
+    "Vote",
+    "VoteTransfer",
+    "VoterWeight",
+)
 
 logger = getLogger(__name__)
 
@@ -87,7 +93,10 @@ class ElectoralRegister(MeetingContext):
         related_name="electoral_registers",
     )
     meeting: Meeting | None = models.ForeignKey(
-        Meeting, on_delete=models.CASCADE, related_name="electoral_registers", null=True
+        "meeting.Meeting",
+        on_delete=models.CASCADE,
+        related_name="electoral_registers",
+        null=True,
     )
 
     importers = {
@@ -162,7 +171,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     )
     title: str = models.CharField(max_length=70)
     meeting: Meeting | None = models.ForeignKey(
-        Meeting, on_delete=models.CASCADE, related_name="polls", null=True
+        "meeting.Meeting", on_delete=models.CASCADE, related_name="polls", null=True
     )
     agenda_item: AgendaItem | None = models.ForeignKey(
         "agenda.AgendaItem", on_delete=models.CASCADE, null=True, related_name="polls"
@@ -674,6 +683,57 @@ class Vote(models.Model):
 
     # Annotations
     objects: models.Manager
+
+
+class VoteTransfer(MeetingContext, RulesModelMixin):
+    """
+    Transfer voting rights to another user.
+
+    """
+
+    name = "vote_transfer"
+    meeting: Meeting = models.ForeignKey(
+        "meeting.Meeting",
+        on_delete=models.CASCADE,
+        related_name="vote_transfers",
+    )
+    source: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+    target: AbstractUser = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+
+    class Meta:
+        constraints = [
+            # Not true for liquid
+            # UniqueConstraint(
+            #    fields=["target", "meeting"],
+            #    name="%(app_label)s_%(class)s_meeting_target",
+            # ),
+            # A user can only give away their vote once
+            UniqueConstraint(
+                fields=["source", "meeting"],
+                name="%(app_label)s_%(class)s_meeting_source",
+            ),
+        ]
+
+    def save(self, **kwargs):
+        # if self.target == self.source:
+        #    raise IntegrityError("Can't transfer to self")
+        if self.meeting.roles.filter(user__in=[self.target, self.source]).count() != 2:
+            raise IntegrityError(
+                "Both source and target user must exist within meeting."
+            )
+        return super().save(**kwargs)
+
+    objects: models.Manager
+    source_id: int
+    target_id: int
 
 
 @receiver(post_transition, sender=Poll)

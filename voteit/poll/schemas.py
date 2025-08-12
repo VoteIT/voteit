@@ -99,6 +99,7 @@ class ElectoralRegistryPolicySchema(BaseModel):
     handles_active_check: bool
     group_votes_active: bool | None
     handles_delegate_to: bool
+    vote_transfer_policy: str | None
 
     @validator("title", "description", pre=True)
     def translate(cls, v):

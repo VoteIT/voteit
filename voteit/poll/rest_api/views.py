@@ -1,10 +1,14 @@
 import csv
 
+import django_filters
+from django.contrib.auth import get_user_model
+from django.db import models
 from django.http import Http404
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -12,6 +16,8 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
+from rest_framework.viewsets import ModelViewSet
 from rest_framework.viewsets import ViewSet
 
 from voteit.agenda.models import AgendaItem
@@ -19,9 +25,13 @@ from voteit.agenda.permissions import AgendaPermissions
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.base import ReadonlyModelViewSet
+from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
+from voteit.core.rest_api.mixins import SerializerClassesMixin
+from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
+from voteit.poll.models import VoteTransfer
 from voteit.poll.rest_api import serializers
 from voteit.poll.schemas import ElectoralRegistryPolicySchema
 from voteit.poll.utils import get_electoral_policy_registry
@@ -32,6 +42,8 @@ __all__ = (
     "ElectoralRegisterPoliciesViewSet",
     "ExportERViewSet",
 )
+
+User = get_user_model()
 
 
 @router.register("polls")
@@ -77,6 +89,37 @@ class ElectoralRegisterViewSet(ReadonlyModelViewSet):
     @method_decorator(cache_page(60 * 60 * 24 * 7))
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
+
+
+# def users_meetings(request):
+#    return Meeting.objects.filter(roles__user=request.user)
+
+
+# def same_meeting_users(request):
+#    return User.objects.filter(meeting_roles__context__in=users_meetings(request))
+
+
+@router.register("vote-transfer", basename="vote-transfer")
+class VoteTransferViewSet(
+    AutoPermissionViewSetMixin,
+    SerializerClassesMixin,
+    ModelViewSet,
+):
+    serializer_class = serializers.VoteTransferSerializer
+    serializer_classes = {
+        "update": serializers.VoteTransferReassignSerializer,
+        "partial_update": serializers.VoteTransferReassignSerializer,
+    }
+    model = VoteTransfer
+    queryset = VoteTransfer.objects.all()
+
+    def get_queryset(self):
+        if self.action == "list":
+            return VoteTransfer.objects.filter(
+                models.Q(source=self.request.user) | models.Q(target=self.request.user)
+            )
+        # Perms handle the rest
+        return VoteTransfer.objects.select_related("source", "target", "meeting").all()
 
 
 @router.register("electoral-register-policies", basename="electoral-register-policies")
