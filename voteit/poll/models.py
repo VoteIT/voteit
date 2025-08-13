@@ -155,6 +155,7 @@ class ElectoralRegister(MeetingContext):
     voterweight_set: models.QuerySet
     polls: models.QuerySet
     polls_initial: models.QuerySet
+    meeting_id: int | None
 
     def __str__(self):
         return (
@@ -732,6 +733,7 @@ class VoteTransfer(MeetingContext, RulesModelMixin):
         return super().save(**kwargs)
 
     objects: models.Manager
+    meeting_id: int
     source_id: int
     target_id: int
 

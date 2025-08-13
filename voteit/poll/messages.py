@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABC
 
 from auditlog.context import set_actor
-from django.db import transaction
 from pydantic.main import BaseModel
 
 from envelope.deferred_jobs.message import ContextAction
@@ -21,7 +20,6 @@ from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.poll.app.er_policies.manual import Manual
 from voteit.poll.models import Poll
-from voteit.poll.models import Vote
 from voteit.poll.permissions import ElectoralRegisterPermissions
 from voteit.poll.permissions import VotePermissions
 from voteit.poll.schemas import AddedVoteSchema
@@ -51,6 +49,21 @@ class ElectoralRegisterAdded(BaseObjectAdded):
 @outgoing
 class ElectoralRegisterDeleted(BaseObjectDeleted):
     name = "er.deleted"
+
+
+@outgoing
+class VoteTransferAdded(BaseObjectAdded):
+    name = "vt.added"
+
+
+@outgoing
+class VoteTransferChanged(BaseObjectChanged):
+    name = "vt.changed"
+
+
+@outgoing
+class VoteTransferDeleted(BaseObjectDeleted):
+    name = "vt.deleted"
 
 
 class PollStatusSchema(BaseModel):

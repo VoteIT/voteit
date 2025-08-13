@@ -33,6 +33,9 @@ from voteit.poll.messages import PollAdded
 from voteit.poll.messages import PollChanged
 from voteit.poll.messages import PollDeleted
 from voteit.poll.messages import PollStatus
+from voteit.poll.messages import VoteTransferAdded
+from voteit.poll.messages import VoteTransferChanged
+from voteit.poll.messages import VoteTransferDeleted
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
@@ -40,6 +43,7 @@ from voteit.poll.models import VoteTransfer
 from voteit.poll.rest_api.serializers import ElectoralRegisterSerializer
 from voteit.poll.rest_api.serializers import PollDetailSerializer
 from voteit.poll.rest_api.serializers import VoteSerializer
+from voteit.poll.rest_api.serializers import VoteTransferSerializer
 from voteit.poll.workflows import PollWf
 
 if TYPE_CHECKING:
@@ -109,6 +113,13 @@ def meeting_subscribed(context: Meeting, app_state: AppState, user: AbstractUser
                 **ElectoralRegisterSerializer(context.latest_er).data
             )
         )
+    if context.vote_transfer_policy is not None:
+        vt_serializer = VoteTransferSerializer(context.vote_transfers.all(), many=True)
+        if vt_serializer.data:
+            batch = Batch(t=VoteTransferAdded.name, payloads=[])
+            for item in vt_serializer.data:
+                batch.append(VoteTransferAdded(data=item))
+            app_state.append(batch)
 
 
 @receiver(channel_subscribed, sender=ModeratorsChannel)
@@ -215,7 +226,7 @@ def push_new_er(instance: ElectoralRegister, **kwargs):
     """
     Special signals for ER since they have M2M relations that are updated after post_save signal is sent.
     """
-    meeting_ch = MeetingChannel.from_instance(instance.meeting)
+    meeting_ch = MeetingChannel(instance.meeting_id)
     data = ElectoralRegisterSerializer(instance).data
     msg = ElectoralRegisterAdded(data=data)
     meeting_ch.sync_publish(msg)
@@ -227,9 +238,9 @@ def er_deleted(*, instance: ElectoralRegister, **kw):
     """
     Electoral registers usually aren't deleted, but there are some special cases mostly for demo meetings.
     """
-    if instance.meeting is not None:
+    if instance.meeting_id is not None:
         # We can't really do anything if it is!
-        meeting_ch = MeetingChannel.from_instance(instance.meeting)
+        meeting_ch = MeetingChannel(instance.meeting_id)
         msg = ElectoralRegisterDeleted(pk=instance.pk)
         meeting_ch.sync_publish(msg)
 
@@ -296,3 +307,22 @@ def remove_vote_transfers(instance: MeetingRoles, **kwargs):
     VoteTransfer.objects.filter(meeting=instance.context).filter(
         models.Q(target=instance.user) | models.Q(source=instance.user)
     ).delete()
+
+
+@receiver(post_save, sender=VoteTransfer)
+@disable_on_raw_save
+def send_vote_transfer(instance: VoteTransfer, *, created, **kwargs):
+    serializer = VoteTransferSerializer(instance)
+    if created:
+        msg = VoteTransferAdded(**serializer.data)
+    else:
+        msg = VoteTransferChanged(**serializer.data)
+    meeting_ch = MeetingChannel(instance.meeting_id)
+    meeting_ch.sync_publish(msg)
+
+
+@receiver(pre_delete, sender=VoteTransfer)
+def send_vote_transfer_deleted(instance: VoteTransfer, **kwargs):
+    meeting_ch = MeetingChannel(instance.meeting_id)
+    msg = VoteTransferDeleted(pk=instance.pk)
+    meeting_ch.sync_publish(msg)
