@@ -255,10 +255,11 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
 
     @property
     def vote_transfer_policy(self) -> VoteTransferPolicy | None:
-        if vtp := self.er_policy.vote_transfer_policy:
-            reg = get_vote_transfer_policy_registry()
-            if klass := reg.get(vtp):
-                return klass(self)
+        if self.er_policy_name:
+            if vtp := self.er_policy.vote_transfer_policy:
+                reg = get_vote_transfer_policy_registry()
+                if klass := reg.get(vtp):
+                    return klass(self)
 
     def component_enabled(self, name: str) -> bool:
         return self.components.filter(component_name=name, state=EnabledWf.ON).exists()
