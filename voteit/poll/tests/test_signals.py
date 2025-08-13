@@ -9,6 +9,7 @@ from envelope.app.user_channel.channel import UserChannel
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
 from envelope.channels.models import AppState
+from envelope.testing import ChannelMessageCatcher
 from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
@@ -21,6 +22,9 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.abcs import VoteTransferPolicy
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.messages import PollStatus
+from voteit.poll.messages import VoteTransferAdded
+from voteit.poll.messages import VoteTransferChanged
+from voteit.poll.messages import VoteTransferDeleted
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import VoteTransfer
 from voteit.poll.registries import er_policy
@@ -520,6 +524,7 @@ class VoteTransferSignalsTests(TestCase):
         cls.meeting.er_policy_name = UnrestrictedVoteTransferER.name
         cls.meeting.save()
         cls.participant = cls.meeting.participants.get(username="participant")
+        cls.other = cls.meeting.participants.create(username="other")
         cls.moderator = cls.meeting.participants.get(username="moderator")
         cls.transfer = cls.meeting.vote_transfers.create(
             source=cls.moderator, target=cls.participant
@@ -536,3 +541,97 @@ class VoteTransferSignalsTests(TestCase):
             self.meeting.roles.filter(user=self.participant).delete()
         with self.assertRaises(ObjectDoesNotExist):
             self.transfer.refresh_from_db()
+
+    def test_add_message_sent(self):
+        self.transfer.delete()
+        with ChannelMessageCatcher(MeetingChannel) as messages:
+            transfer = self.meeting.vote_transfers.create(
+                source=self.moderator, target=self.participant
+            )
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, VoteTransferAdded)
+        self.assertEqual(
+            {
+                "meeting": self.meeting.pk,
+                "pk": transfer.pk,
+                "source": self.moderator.pk,
+                "target": self.participant.pk,
+            },
+            msg.data.dict(),
+        )
+
+    def test_change_message_sent(self):
+        with ChannelMessageCatcher(MeetingChannel) as messages:
+            self.transfer.target = self.other
+            self.transfer.save()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, VoteTransferChanged)
+        self.assertEqual(
+            {
+                "meeting": self.meeting.pk,
+                "pk": self.transfer.pk,
+                "source": self.moderator.pk,
+                "target": self.other.pk,
+            },
+            msg.data.dict(),
+        )
+
+    def test_delete_message_sent(self):
+        transfer_pk = self.transfer.pk
+        with ChannelMessageCatcher(MeetingChannel) as messages:
+            self.transfer.delete()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertIsInstance(msg, VoteTransferDeleted)
+        self.assertEqual({"pk": transfer_pk}, msg.data.dict())
+
+    def test_subscribe_message_sent(self):
+        command = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.participant.pk},
+            pk=self.meeting.pk,
+            channel_type=MeetingChannel.name,
+        )
+
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        payloads = []
+        for x in msg.data.app_state:
+            if x.t == "s.batch" and x.p["t"] == VoteTransferAdded.name:
+                payloads = x.p["payloads"]
+                break
+        self.assertEqual(1, len(payloads))
+        self.assertDictEqual(
+            {
+                "meeting": self.meeting.pk,
+                "pk": self.transfer.pk,
+                "source": self.moderator.pk,
+                "target": self.participant.pk,
+            },
+            payloads[0].dict(),
+        )
+
+    def test_subscribe_message_not_sent_if_not_active(self):
+        self.meeting.er_policy_name = AutoAlways.name
+        self.meeting.save()
+        command = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.participant.pk},
+            pk=self.meeting.pk,
+            channel_type=MeetingChannel.name,
+        )
+
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertEqual(
+            [],
+            [
+                x
+                for x in msg.data.app_state
+                if x.t == "s.batch" and x.p["t"] == VoteTransferAdded.name
+            ],
+        )
