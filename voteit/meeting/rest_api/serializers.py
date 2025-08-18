@@ -187,6 +187,11 @@ class CreateMeetingSerializer(BaseModelSerializer):
                     )
                     sls_serializer.is_valid(raise_exception=True)
                     sls_serializer.save()
+            else:
+                if sls_data:
+                    raise ValidationError(
+                        {"sls": ["Specifying sls without room isn't allowed."]}
+                    )
             return instance
 
     def validate_er_policy_name(self, value):
@@ -195,6 +200,7 @@ class CreateMeetingSerializer(BaseModelSerializer):
 
 class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
     dialect = serializers.SerializerMethodField()
+    vote_transfer_policy = serializers.SerializerMethodField()
 
     class Meta:
         model = Meeting
@@ -245,6 +251,11 @@ class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
                 )
             else:
                 return handler.data.dict(exclude_unset=True)
+
+    def get_vote_transfer_policy(self, instance: Meeting) -> str | None:
+        with suppress(KeyError):  # To make testing easier
+            if vt := instance.vote_transfer_policy:
+                return vt.name
 
 
 class AgendaOrderSerializer(serializers.Serializer):

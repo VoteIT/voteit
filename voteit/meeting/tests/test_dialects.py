@@ -397,7 +397,8 @@ class UtilsTests(TestCase):
     @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
     def test_get_named_path_dict(self):
         self.assertEqual(
-            {"two", "one", "three", "main_subst"}, {k for k, v in get_named_paths()}
+            {"two", "one", "three", "main_subst", "unrestricted_vote_transfer"},
+            {k for k, v in get_named_paths()},
         )
 
     @override_settings(MEETING_DIALECTS_DIR=None)

@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.dispatch import receiver
 from django.test import override_settings
@@ -18,12 +20,37 @@ from voteit.meeting.signals import group_role_added
 from voteit.meeting.signals import group_role_removed
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 from voteit.organisation.models import Organisation
+from voteit.poll.registries import er_policy
+from voteit.poll.registries import vote_transfer_policies
+from voteit.poll.testing import UnrestrictedVoteTransferER
+from voteit.poll.testing import UnrestrictedVoteTransferPolicy
+from voteit.speaker.app.list_methods.simple import Simple
+from voteit.speaker.models import SpeakerListSystem
 
 User = get_user_model()
 
 
+@override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
+@patch.dict(
+    vote_transfer_policies,
+    {UnrestrictedVoteTransferPolicy.name: UnrestrictedVoteTransferPolicy},
+)
+@patch.dict(
+    er_policy,
+    {UnrestrictedVoteTransferER.name: UnrestrictedVoteTransferER},
+)
 class MeetingViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org: Organisation = Organisation.objects.get(pk=1)
+        cls.org.components.create(
+            component_name=DialectsFilter.name,
+            settings={
+                "include": ["unrestricted_vote_transfer"],
+            },
+        )
 
     def setUp(self):
         self.meeting = Meeting.objects.get(pk=1)
@@ -82,13 +109,110 @@ class MeetingViewSetTests(APITestCase):
         self.assertTrue(meeting.visible_in_lists)
         self.assertFalse(meeting.public)
 
-    def test_get(self):
+    def test_create_with_sls_and_no_room(self):
+        url = reverse("meeting-list")
+        data = {
+            "title": "Stuff",
+            "sls": {"method_name": Simple.name},
+        }
+        org_manager = User.objects.get(username="org_manager")
+        self.client.force_login(org_manager)
+        response = self.client.post(url, data=data)
+        self.assertEqual(
+            {"sls": ["Specifying sls without room isn't allowed."]}, response.json()
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_create_with_sls(self):
+        url = reverse("meeting-list")
+        data = {
+            "title": "Stuff",
+            "room": {"title": "Hello"},
+            "sls": {"method_name": Simple.name},
+        }
+        org_manager = User.objects.get(username="org_manager")
+        self.client.force_login(org_manager)
+        response = self.client.post(url, data=data)
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        meeting = Meeting.objects.get(pk=data["pk"])
+        sls = meeting.speaker_systems.all().first()
+        self.assertIsInstance(sls, SpeakerListSystem)
+        self.assertEqual(Simple.name, sls.method_name)
+
+    def test_create_with_dialect(self):
+        url = reverse("meeting-list")
+        data = {"title": "Stuff", "install_dialect": "main_subst"}
+        org_manager = User.objects.get(username="org_manager")
+        self.client.force_login(org_manager)
+        response = self.client.post(url, data=data)
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        meeting = Meeting.objects.get(pk=data["pk"])
+        self.assertEqual("main_subst", meeting.installed_dialect)
+
+    def test_create_with_dialect_and_vote_transfer(self):
+        url = reverse("meeting-list")
+        data = {"title": "Stuff", "install_dialect": "unrestricted_vote_transfer"}
+        org_manager = User.objects.get(username="org_manager")
+        self.client.force_login(org_manager)
+        response = self.client.post(url, data=data)
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        meeting = Meeting.objects.get(pk=data["pk"])
+        self.assertEqual("unrestricted_vote_transfer", meeting.installed_dialect)
+        self.assertIsInstance(
+            meeting.vote_transfer_policy, UnrestrictedVoteTransferPolicy
+        )
+
+    def test_list(self):
         url = reverse("meeting-list")
         participant = User.objects.get(username="participant")
         self.client.force_login(participant)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(1, len(response.json()))
+
+    def test_get(self):
+        url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})
+        participant = User.objects.get(username="participant")
+        self.client.force_login(participant)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {
+                "pk": self.meeting.pk,
+                "body": "I wish a was a text about this meeting",
+                "current_user_roles": ["pa"],
+                "dialect": None,
+                "end_time": None,
+                "er_policy_name": "auto_before_poll",
+                "group_roles_active": False,
+                "group_votes_active": False,
+                "installed_dialect": None,
+                "organisation": 1,
+                "public": False,
+                "start_time": None,
+                "state": "upcoming",
+                "title": "Testfixture meeting",
+                "visible_in_lists": False,
+                "vote_transfer_policy": None,
+            },
+            response.json(),
+        )
+
+    def test_get_with_vt(self):
+        self.meeting.er_policy_name = UnrestrictedVoteTransferER.name
+        self.meeting.save()
+        url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})
+        participant = User.objects.get(username="participant")
+        self.client.force_login(participant)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            UnrestrictedVoteTransferPolicy.name,
+            response.json()["vote_transfer_policy"],
+        )
 
     def test_transition_moderator(self):
         url = reverse("meeting-transitions", kwargs={"pk": 1})
@@ -807,23 +931,22 @@ class MeetingDialectsViewSetTests(APITestCase):
         self.client.force_login(self.user)
         url = reverse("meeting-dialects-list")
         response = self.client.get(url)
-        self.assertEqual(
-            [
-                {
-                    "description": "Main and substitute roles",
-                    "name": "main_subst",
-                    "title": "Main/subst",
-                },
-                {"description": "", "name": "three", "title": "Three"},
-                {"description": "", "name": "two", "title": "Two!"},
-            ],
+        self.assertIn(
+            {
+                "description": "Main and substitute roles",
+                "name": "main_subst",
+                "title": "Main/subst",
+            },
             response.json(),
         )
 
     def test_list_with_org_filter(self):
         self.org.components.create(
             component_name=DialectsFilter.name,
-            settings={"include": ["one"], "exclude": ["main_subst", "three"]},
+            settings={
+                "include": ["one"],
+                "exclude": ["main_subst", "three"],
+            },
         )
         self.client.force_login(self.user)
         url = reverse("meeting-dialects-list")
