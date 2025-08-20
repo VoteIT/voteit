@@ -638,6 +638,9 @@ class GroupMembership(MeetingContext):
 
     # Annotations
     objects: models.Manager[GroupMembership]
+    user_id: int
+    role_id: int | None
+    meeting_group_id: int
 
     def __str__(self):
         return f"{self.user} in {self.meeting_group.groupid} pk:{self.pk}"
