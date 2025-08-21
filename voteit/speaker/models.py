@@ -8,6 +8,7 @@ from itertools import chain
 from random import sample
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ObjectDoesNotExist
@@ -54,6 +55,9 @@ __all__ = (
 )
 
 
+@auditlog.register(
+    exclude_fields=["id"],
+)
 class SpeakerSystemRoles(Roles, MeetingContext):
     name = "speaker_roles"
     valid_roles = {
@@ -82,6 +86,17 @@ class SpeakerSystemRoles(Roles, MeetingContext):
         return f"{self.user} roles @ {self.context}"
 
 
+@auditlog.register(
+    include_fields=[
+        "state",
+        "room",
+        "meeting",
+        "method_name",
+        "settings_data",
+        "safe_positions",
+        "meeting_roles_to_speaker",
+    ],
+)
 class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
     """
     All speaker list things relate here, while this in turn might relate to a meeting.
@@ -418,6 +433,15 @@ class Speaker(MeetingContext, SpeakerSystemContext):
     speaker_list_id: int
 
 
+@auditlog.register(
+    include_fields=[
+        "title",
+        "state",
+        "speaker_system",
+        "meeting",
+        "room",
+    ],
+)
 class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
     name = "speaker_list"
     _active_speaker: Speaker | None

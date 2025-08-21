@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from datetime import timedelta
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -26,6 +27,17 @@ from voteit.poll.workflows import PollWf
 __all__ = ("AgendaItem", "LastRead")
 
 
+@auditlog.register(
+    include_fields=[
+        "state",
+        "title",
+        "meeting",
+        "body",
+        "block_discussion",
+        "block_proposals",
+        "tags",
+    ],
+)
 class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     name: str = "agenda_item"
     body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)

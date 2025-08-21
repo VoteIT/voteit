@@ -7,6 +7,7 @@ from logging import getLogger
 from operator import or_
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import UserManager
@@ -42,6 +43,22 @@ __all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
 logger = getLogger(__name__)
 
 
+@auditlog.register(
+    include_fields=[
+        "state",
+        "organisation",
+        "userid",
+        "username",
+        "identity_id",
+        "first_name",
+        "last_name",
+        "email",
+        "last_login",
+        "is_staff",
+        "is_active",
+        "is_superuser",
+    ],
+)
 class User(AbstractUser):
     """Custom user model linked to organisation"""
 

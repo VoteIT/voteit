@@ -110,7 +110,4 @@ class SetSeed:
         random.seed(seed)
 
     def __exit__(self, exc_type, exc_value, traceback):
-        """
-        Execute all on_commit hooks and cleanup.
-        """
         random.seed()

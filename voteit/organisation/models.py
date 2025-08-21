@@ -4,6 +4,7 @@ from datetime import UTC
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
@@ -33,6 +34,9 @@ if TYPE_CHECKING:
 _marker = object()
 
 
+@auditlog.register(
+    exclude_fields=["id"],
+)
 class OrganisationRoles(OrganisationContext, Roles):
     """
     Contains assigned meeting roles for a specific meeting and user
@@ -70,6 +74,17 @@ class OrganisationRoles(OrganisationContext, Roles):
         return {"o": self.context_id}
 
 
+@auditlog.register(
+    include_fields=[
+        "title",
+        "body",
+        "page_title",
+        "body",
+        "host",
+        "active",
+        "help_info",
+    ],
+)
 class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     name = "organisation"
     roles_cls = OrganisationRoles

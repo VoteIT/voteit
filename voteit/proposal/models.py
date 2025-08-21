@@ -6,6 +6,7 @@ from random import sample
 from string import ascii_lowercase
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.db import models
 from django.db import transaction
@@ -37,7 +38,21 @@ __all__ = (
 
 logger = getLogger(__name__)
 
+_PROP_LOG_FIELDS = [
+    "state",
+    "author",
+    "meeting_group",
+    "prop_id",
+    "agenda_item",
+    "as_group",
+    "body",
+    "tags",
+]
 
+
+@auditlog.register(
+    include_fields=_PROP_LOG_FIELDS,
+)
 class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     name = "proposal"
     state: str = FSMField(default=ProposalWf.initial, choices=ProposalWf.choices())
@@ -183,6 +198,14 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     author_id: None | int
 
 
+@auditlog.register(
+    include_fields=[
+        "title",
+        "body",
+        "base_tag",
+        "agenda_item",
+    ],
+)
 class TextDocument(AgendaItemContext, MeetingContext):
     """
     The full text that's the basis for diff proposals.
@@ -348,6 +371,12 @@ class TextParagraph(AgendaItemContext, MeetingContext):
     proposals: models.QuerySet
 
 
+@auditlog.register(
+    include_fields=_PROP_LOG_FIELDS
+    + [
+        "paragraph",
+    ],
+)
 class DiffProposal(Proposal):
     name = "diff_proposal"
     paragraph: TextParagraph = models.ForeignKey(

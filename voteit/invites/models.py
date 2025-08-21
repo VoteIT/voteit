@@ -11,6 +11,7 @@ from logging import getLogger
 from operator import or_
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
@@ -236,6 +237,15 @@ class MeetingInviteManager(models.Manager):
         )
 
 
+@auditlog.register(
+    include_fields=[
+        "state",
+        "used_by",
+        "meeting",
+        "roles",
+        "user_data",
+    ],
+)
 class MeetingInvite(MeetingContext):
     name = "meeting_invite"
     state: str = FSMField(
@@ -353,6 +363,13 @@ class MeetingInvite(MeetingContext):
     meeting_id: int
 
 
+@auditlog.register(
+    include_fields=[
+        "meeting_group",
+        "meeting_invite",
+        "group_role",
+    ],
+)
 class MeetingGroupAnnotation(models.Model):
     meeting_group: MeetingGroup = models.ForeignKey(
         MeetingGroup,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
@@ -14,6 +15,12 @@ if TYPE_CHECKING:
     from voteit.core.models import User as UserType
 
 
+@auditlog.register(
+    include_fields=[
+        "meeting",
+        "user",
+    ],
+)
 class ActiveUser(MeetingContext):
     name = "active_user"
     meeting: Meeting = models.ForeignKey(

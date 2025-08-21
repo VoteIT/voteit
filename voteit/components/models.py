@@ -3,6 +3,7 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
@@ -28,6 +29,14 @@ __all__ = ("MeetingComponent", "OrganisationComponent")
 logger = getLogger(__name__)
 
 
+@auditlog.register(
+    include_fields=[
+        "component_name",
+        "settings_data",
+        "state",
+        "meeting",
+    ],
+)
 class MeetingComponent(Component, MeetingContext):
     name: str = "meeting_component"
     state: str = FSMField(
@@ -66,6 +75,14 @@ class MeetingComponent(Component, MeetingContext):
         pass
 
 
+@auditlog.register(
+    include_fields=[
+        "component_name",
+        "settings_data",
+        "state",
+        "organisation",
+    ],
+)
 class OrganisationComponent(Component, OrganisationContext):
     name: str = "organisation_component"
     state: str = FSMField(

@@ -9,6 +9,7 @@ from json import dumps
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.serializers.json import DjangoJSONEncoder
@@ -83,6 +84,12 @@ class VoterWeight(MeetingContext):
         return f"{self.__class__.__name__}:{self.pk} for {self.user.userid}"
 
 
+@auditlog.register(
+    include_fields=[
+        "source",
+        "meeting",
+    ],
+)
 class ElectoralRegister(MeetingContext):
     name = "electoral_register"
     created: datetime = models.DateTimeField(editable=False, default=now)
@@ -163,6 +170,17 @@ class ElectoralRegister(MeetingContext):
         )
 
 
+@auditlog.register(
+    include_fields=[
+        "state",
+        "title",
+        "meeting",
+        "agenda_item",
+        "method_name",
+        "p_ord",
+        "withheld_result",
+    ],
+)
 class Poll(BaseContent, MeetingContext, AgendaItemContext):
     P_ORD_CHOICES = (("c", "Chronological"), ("a", "Alphabetical"), ("r", "Random"))
 
@@ -623,6 +641,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     meeting_id: int | None
 
 
+# FIXME: We don't log votes right now, but that might be a good idea, at least the actor?
 class Vote(models.Model):
     """Contains data on the users vote in a specific poll."""
 
@@ -686,6 +705,9 @@ class Vote(models.Model):
     objects: models.Manager
 
 
+@auditlog.register(
+    exclude_fields=["id"],
+)
 class VoteTransfer(MeetingContext, RulesModelMixin):
     """
     Transfer voting rights to another user.

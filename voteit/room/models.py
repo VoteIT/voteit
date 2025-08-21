@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
@@ -20,6 +21,18 @@ if TYPE_CHECKING:
     from voteit.speaker.models import SpeakerListSystem
 
 
+@auditlog.register(
+    include_fields=[
+        "title",
+        "open",
+        "handler",
+        "meeting",
+        "body",
+        "send_sls",
+        "send_proposals",
+        "show_time",
+    ],
+)
 class Room(MeetingContext):
     _initial_poll_value = None
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -27,6 +28,21 @@ def _default_allowed_models():
     return ["proposal", "discussion_post"]
 
 
+@auditlog.register(
+    include_fields=[
+        "title",
+        "meeting",
+        "target",
+        "change_roles",
+        "list_roles",
+        "active",
+        "allowed_models",
+        "on_presentation",
+        "on_vote",
+        "vote_template",
+        "flag_mode",
+    ],
+)
 class ReactionButton(MeetingContext):
     name = "reaction_button"
     title: str = models.CharField(verbose_name="Display name", max_length=80)

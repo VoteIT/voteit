@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.db import models
 
@@ -16,6 +17,15 @@ if TYPE_CHECKING:
     from voteit.meeting.models import MeetingGroup
 
 
+@auditlog.register(
+    include_fields=[
+        "agenda_item",
+        "author",
+        "meeting_group",
+        "as_group",
+        "body",
+    ],
+)
 class DiscussionPost(
     BaseContent,
     AgendaItemContext,

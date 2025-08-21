@@ -8,9 +8,9 @@ from string import ascii_lowercase
 from typing import Generator
 from typing import TYPE_CHECKING
 
+from auditlog.registry import auditlog
 from django.conf import settings
 from django.db import models
-from django.db import transaction
 from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.text import slugify
@@ -76,6 +76,13 @@ def _rnd_role_id():
     return "".join(sample(ascii_lowercase, 8))
 
 
+@auditlog.register(
+    include_fields=[
+        "user",
+        "context",
+        "assigned",
+    ],
+)
 class MeetingRoles(Roles, MeetingContext):
     """
     Contains assigned meeting roles for a specific meeting and user
@@ -126,6 +133,21 @@ class MeetingRoles(Roles, MeetingContext):
     }
 
 
+@auditlog.register(
+    include_fields=[
+        "title",
+        "body",
+        "state",
+        "public",
+        "visible_in_lists",
+        "group_votes_active",
+        "group_roles_active",
+        "er_policy_name",
+        "proposal_id_policy_name",
+        "installed_dialect",
+        "organisation",
+    ],
+)
 class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext):
     name = "meeting"
     _er_policy_name = None
@@ -430,6 +452,18 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     vote_transfers: models.QuerySet[VoteTransfer]
 
 
+@auditlog.register(
+    include_fields=[
+        "title",
+        "body",
+        "groupid",
+        "meeting",
+        "votes",
+        "delegate_to",
+        "show_on_speaker",
+        "post_as",
+    ],
+)
 class MeetingGroup(BaseContent, MeetingContext):
     name: str = "meeting_group"
     title: str = models.CharField(max_length=100, default="")
@@ -512,6 +546,14 @@ class MeetingGroup(BaseContent, MeetingContext):
     objects: models.Manager[MeetingGroup]
 
 
+@auditlog.register(
+    include_fields=[
+        "title",
+        "role_id",
+        "meeting",
+        "roles",
+    ],
+)
 class GroupRole(MeetingContext):
     """
     Dynamic group roles for a meeting. These can be automatically created from a meeting dialect,
@@ -574,6 +616,14 @@ class GroupRole(MeetingContext):
     objects: models.Manager[GroupRole]
 
 
+@auditlog.register(
+    include_fields=[
+        "user",
+        "meeting_group",
+        "role",
+        "votes",
+    ],
+)
 class GroupMembership(MeetingContext):
     """
     Join table for users and group roles.

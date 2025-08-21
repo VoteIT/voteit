@@ -1,6 +1,7 @@
 from __future__ import annotations
 from logging import getLogger
 
+from auditlog.registry import auditlog
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -21,6 +22,11 @@ logger = getLogger(__name__)
 
 
 @access_policies
+@auditlog.register(
+    exclude_fields=[
+        "id",
+    ],
+)
 class AutomaticAccess(AccessPolicy):
     """
     Give access to any user that requests access.
