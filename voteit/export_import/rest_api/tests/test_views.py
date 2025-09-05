@@ -95,6 +95,8 @@ class MeetingDataImportViewTests(APITestCase):
                 "text_documents": 0,
                 "reactions": 0,
                 "buttons": 0,
+                "buttons_reused": 0,
+                "groups_reused": 0,
             },
             response.json(),
         )
@@ -129,6 +131,8 @@ class MeetingDataImportViewTests(APITestCase):
                 "text_documents": 0,
                 "buttons": 0,
                 "reactions": 0,
+                "buttons_reused": 0,
+                "groups_reused": 0,
             },
             response.json(),
         )
