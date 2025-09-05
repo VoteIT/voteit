@@ -9,6 +9,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
 from django.db import IntegrityError
 from django.db import models
+from django.db.models.functions import Lower
 
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
@@ -91,6 +92,15 @@ class ReactionButton(MeetingContext):
         verbose_name = "Reaction button"
         verbose_name_plural = "Reaction buttons"
         ordering = ["order"]
+        constraints = [
+            models.UniqueConstraint(
+                "meeting",
+                Lower("title"),
+                Lower("icon"),
+                Lower("color"),
+                name="unique_buttons_per_meeting",
+            ),
+        ]
 
     def save(self, **kw):
         if self.order == 0:
@@ -138,6 +148,7 @@ class Reaction(AgendaItemContext, MeetingContext):
     Essentially users never have reactions if they haven't marked something.
     """
 
+    name = "reaction"
     content_type: ContentType = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id: int = models.PositiveIntegerField()
     object: BaseContent = GenericForeignKey()

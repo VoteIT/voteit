@@ -39,7 +39,7 @@ class SignalButtonTests(TestCase):
     def test_button_added(self, mock_publish):
         from voteit.reactions.messages import ButtonAdded
 
-        button = self.meeting.reaction_buttons.create()
+        button = self.meeting.reaction_buttons.create(title="Btn")
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ButtonAdded)
@@ -120,11 +120,11 @@ class SignalButtonTests(TestCase):
     def test_ai_channel_subscribed_n1_problem(self):
         from voteit.reactions.signals import ai_channel_subscribed
 
-        button2: ReactionButton = self.meeting.reaction_buttons.create()
-        button3 = self.meeting.reaction_buttons.create()
-        flag1 = self.meeting.reaction_buttons.create(flag_mode=True)
-        flag2 = self.meeting.reaction_buttons.create(flag_mode=True)
-        flag3 = self.meeting.reaction_buttons.create(flag_mode=True)
+        button2: ReactionButton = self.meeting.reaction_buttons.create(title="2")
+        button3 = self.meeting.reaction_buttons.create(title="3")
+        flag1 = self.meeting.reaction_buttons.create(flag_mode=True, title="f1")
+        flag2 = self.meeting.reaction_buttons.create(flag_mode=True, title="f2")
+        flag3 = self.meeting.reaction_buttons.create(flag_mode=True, title="f3")
         for btn in (self.button, button2, button3, flag1, flag2, flag3):
             btn.reactions.create(object=self.prop, user=self.moderator)
             btn.reactions.create(object=self.disc, user=self.moderator)

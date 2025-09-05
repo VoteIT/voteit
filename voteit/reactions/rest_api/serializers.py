@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
+from rest_framework.validators import UniqueTogetherValidator
 
 from voteit.core.rest_api.fields import RolesField
 from voteit.core.utils import get_model_shortname
@@ -30,6 +32,22 @@ class ButtonDetailSerializer(serializers.ModelSerializer):
             "on_presentation",
             "on_vote",
         ]
+
+    def validate(self, attrs):
+        query = {}
+        for fname in ("color", "icon", "title"):
+            query[f"{fname}__iexact"] = attrs.get(
+                fname, getattr(self.instance, fname, "")
+            )
+        meeting = attrs.get("meeting", getattr(self.instance, "meeting", None))
+        btn_qs = meeting.reaction_buttons.filter(**query)
+        if self.instance:
+            btn_qs = btn_qs.exclude(pk=self.instance.pk)
+        if btn_qs.exists():
+            raise ValidationError(
+                {"title": "Duplicate title, change at least color or icon."}
+            )
+        return attrs
 
 
 class ButtonCreateSerializer(ButtonDetailSerializer):

@@ -1,18 +1,12 @@
-from copy import deepcopy
 from itertools import chain
-from uuid import uuid4
 
 import yaml
-from django.conf import settings
 from django.contrib.auth import get_user_model
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import ensure_atomic
 from voteit.export_import.exceptions import ImportFileError
-from voteit.export_import.exceptions import SignatureVerificationFailed
 from voteit.export_import.schemas import ImportMeetingStructure
-from voteit.export_import.utils import sign_payload
-from voteit.export_import.utils import verify_signature
 from voteit.export_import.utils import verify_stream
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -35,7 +29,7 @@ class Importer:
         self,
         meeting: Meeting,
         schema: type[ImportMeetingStructure] = ImportMeetingStructure,
-        user_map_attr="email",
+        user_map_attr="username",
         missing_user: str = MissingUser.RAISE,
         add_participants: bool = True,
         use_existing_groups: bool = True,
@@ -44,7 +38,7 @@ class Importer:
     ):
         assert missing_user in (
             MissingUser.RAISE,
-            MissingUser.CREATE,
+            # MissingUser.CREATE,
             MissingUser.BLANK,
         )
         assert isinstance(meeting, Meeting)
@@ -60,11 +54,20 @@ class Importer:
         # Internal data
         self.mg_map = {}
         self.user_map = {}
+        self.ai_map = {}
+        self.prop_map = {}
+        self.diff_prop_map = {}
+        self.disc_map = {}
+        self.button_map = {}
         self._verify = verify
+        self.groups_reused = 0
+        self.buttons_reused = 0
 
     def run(self):
         self.collect_users()
         self.populate()
+
+    __call__ = run
 
     def from_file(self, fn):
         with open(fn, "r") as fs:
@@ -83,42 +86,38 @@ class Importer:
             raise ImportFileError("yaml file malformed, lacks meta version")
         if version != self.version:
             raise ImportFileError("Wrong file version, must be %s" % self.version)
+        self.prep_data(data)
+
+    def prep_data(self, data: dict):
+        if self.data is not None:
+            raise Exception("Already prepped")
         with schemas.schema_context(**self.export_schema_kwargs):
             self.data = self.schema(**data)
 
     @ensure_atomic
     def collect_users(self):
-        users = set()
+        user_identifiers = set()
         for mgd in self.data.groups:
-            users.update(mgd.members)
+            user_identifiers.update(mgd.members)
         for aid in self.data.agenda_items:
             for obj in chain(aid.proposals, aid.discussions):
                 if obj.author:
-                    users.add(obj.author)
-        user_search_attrs = {getattr(x, self.user_map_attr) for x in users}
+                    user_identifiers.add(obj.author)
+
+        for btn_data in self.data.reaction_buttons:
+            user_identifiers.update(
+                x.username for x in btn_data.reactions if x.username
+            )
         user_qs = (
             self.organisation.users.exclude(is_active=False)
-            .filter(**{f"{self.user_map_attr}__in": user_search_attrs})
+            .filter(**{f"{self.user_map_attr}__in": user_identifiers})
             .order_by("-last_login")
         )
         # Order by last_login to fetch active users first in case of duplicates
         existing_vals = set(user_qs.values_list(self.user_map_attr, flat=True))
-        missing = user_search_attrs - existing_vals
+        missing = user_identifiers - existing_vals
         if missing:
-            if self.missing_user_strategy == MissingUser.CREATE:
-                create_users = {
-                    x for x in users if getattr(x, self.user_map_attr) in missing
-                }
-                for userd in create_users:
-                    user_kwargs = userd.dict(exclude={"pk"})
-                    if userd.email:
-                        user_kwargs.setdefault(
-                            "first_name", userd.email.split("@")[0].title()
-                        )
-                    user_kwargs.setdefault("username", str(uuid4()))
-                    user = self.organisation.users.create(**user_kwargs)
-                    self.user_map[getattr(user, self.user_map_attr)] = user
-            elif self.missing_user_strategy == MissingUser.BLANK:
+            if self.missing_user_strategy == MissingUser.BLANK:
                 for v in missing:
                     self.user_map[v] = None
             else:
@@ -132,8 +131,8 @@ class Importer:
     def convert_fks(self, data: dict) -> dict:
         if meeting_group_id := data.get("meeting_group"):
             data["meeting_group"] = self.mg_map[meeting_group_id]
-        if user_data := data.get("author"):
-            data["author"] = self.user_map[user_data[self.user_map_attr]]
+        if user_identifier := data.get("author"):
+            data["author"] = self.user_map[user_identifier]
         return data
 
     @ensure_atomic
@@ -142,53 +141,62 @@ class Importer:
         # Groups
         for mgd in self.data.groups:
             if self.use_existing_groups:
-                group, _ = self.meeting.groups.update_or_create(
+                group, _created = self.meeting.groups.update_or_create(
                     groupid=mgd.groupid,
                     defaults=mgd.dict(
-                        exclude={"members", "groupid"}, exclude_none=True
+                        exclude={"members", "groupid", "pk"}, exclude_none=True
                     ),
                 )
                 group: MeetingGroup
+                if not _created:
+                    self.groups_reused += 1
+
             else:
                 group: MeetingGroup = self.meeting.groups.create(
-                    **mgd.dict(exclude={"members"}, exclude_none=True)
+                    **mgd.dict(exclude={"members", "pk"}, exclude_none=True)
                 )
             self.mg_map[group.groupid] = group
             if mgd.members:
                 members = set()
                 for userd in mgd.members:
-                    if user := self.user_map[getattr(userd, self.user_map_attr)]:
+                    if user := self.user_map[userd]:
                         members.add(user.pk)
                 if members:
                     group.members.add(*members)
-        aid_exclude = {"text_documents", "proposals", "discussions"}
         for aid in self.data.agenda_items:
             ai: AgendaItem = self.meeting.agenda_items.create(
-                **aid.dict(exclude=aid_exclude, exclude_none=True)
+                **aid.dict(
+                    exclude={"text_documents", "proposals", "discussions", "pk"},
+                    exclude_none=True,
+                )
             )
+            self.ai_map[aid.pk] = ai
             ai_text_base_tag_map = {}
             # Text documents
             for tdd in aid.text_documents:
-                td_data = self.convert_fks(tdd.dict())
+                td_data = self.convert_fks(tdd.dict(exclude={"pk"}))
                 text_document: TextDocument = ai.text_documents.create(**td_data)
                 ai_text_base_tag_map[text_document.base_tag] = text_document
             # Proposals
             for propd in aid.proposals:
                 prop_data = self.convert_fks(
-                    propd.dict(exclude={"text_document"}, exclude_none=True)
+                    propd.dict(exclude={"text_document", "pk"}, exclude_none=True)
                 )
                 if isinstance(propd, schemas.DiffProposalData):
                     text_document = ai_text_base_tag_map[propd.text_document]
                     prop_data["paragraph"] = text_document.text_paragraphs.get(
                         paragraph_id=propd.paragraph
                     )
-                    DiffProposal.objects.create(agenda_item=ai, **prop_data)
+                    prop = DiffProposal.objects.create(agenda_item=ai, **prop_data)
+                    self.diff_prop_map[propd.pk] = prop
                 else:
-                    ai.proposals.create(**prop_data)
+                    prop = ai.proposals.create(**prop_data)
+                    self.prop_map[propd.pk] = prop
             # Discussions
             for discd in aid.discussions:
-                disc_data = self.convert_fks(discd.dict())
-                ai.discussions.create(**disc_data)
+                disc_data = self.convert_fks(discd.dict(exclude={"pk"}))
+                disc = ai.discussions.create(**disc_data)
+                self.disc_map[discd.pk] = disc
         if self.add_participants:
             users = {
                 x for x in self.user_map.values() if x
@@ -202,6 +210,54 @@ class Importer:
                 if user.pk in existing_participant_pks:
                     continue
                 self.meeting.add_roles(user, ROLE_PARTICIPANT)
+        # Buttons
+        for btnd in self.data.reaction_buttons:
+            if button := self.meeting.reaction_buttons.filter(
+                title__iexact=btnd.title,
+                color__iexact=btnd.color,
+                icon__iexact=btnd.icon,
+            ).first():
+                if button.flag_mode != btnd.flag_mode:
+                    raise ValueError("Flag mode doesn't match")
+                changed = False
+                for k, v in btnd.dict(
+                    exclude={"pk", "reactions", "title", "color", "icon"}
+                ).items():
+                    if getattr(button, k) != v:
+                        changed = True
+                        setattr(button, k, v)
+                if changed:
+                    button.save()
+                self.buttons_reused += 1
+            else:
+                button = self.meeting.reaction_buttons.create(
+                    **btnd.dict(exclude={"pk", "reactions"})
+                )
+
+            for reactd in btnd.reactions:
+                # FIXME: Die on missing reactions?
+                if obj := self.resolve_reaction_generic(
+                    reactd.object_id, reactd.content_type
+                ):
+                    button.reactions.create(
+                        agenda_item=self.ai_map[reactd.agenda_item_id],
+                        user=self.user_map[reactd.username],
+                        object=obj,
+                    )
+                else:
+                    raise Exception(
+                        "Can't find object id %s with natural key %s"
+                        % (reactd.object_id, reactd.content_type)
+                    )
+
+    def resolve_reaction_generic(self, fk: str, natural_key: tuple[str, str]):
+        match natural_key:
+            case ("proposal", "proposal"):
+                return self.prop_map.get(fk)
+            case ("proposal", "diffproposal"):
+                return self.diff_prop_map.get(fk)
+            case ("discussion", "discussionpost"):
+                return self.disc_map.get(fk)
 
     def __len__(self):
         if self.data:
@@ -210,7 +266,11 @@ class Importer:
 
     def stats(self) -> schemas.ImportStats:
         stats = schemas.ImportStats(
-            agenda_items=len(self.data.agenda_items), groups=len(self.data.groups)
+            agenda_items=len(self.data.agenda_items),
+            groups=len(self.data.groups),
+            buttons=len(self.data.reaction_buttons),
+            buttons_reused=self.buttons_reused,
+            groups_reused=self.groups_reused,
         )
         for ai in self.data.agenda_items:
             stats.diff_proposals += len(
@@ -221,4 +281,6 @@ class Importer:
             )
             stats.discussion_posts += len(ai.discussions)
             stats.text_documents += len(ai.text_documents)
+        for btn in self.data.reaction_buttons:
+            stats.reactions += len(btn.reactions)
         return stats

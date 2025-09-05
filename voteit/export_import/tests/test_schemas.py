@@ -4,6 +4,7 @@ from django.test import TestCase
 
 from voteit.agenda.rest_api.serializers import AgendaItemSerializer
 from voteit.discussion.rest_api.serializers import DiscussionPostDetailSerializer
+from voteit.export_import.schemas import schema_context
 from voteit.meeting.models import Meeting
 from voteit.export_import.tests import read_fixture
 from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
@@ -11,6 +12,7 @@ from voteit.proposal.rest_api.serializers import DiffProposalDetailSerializer
 from voteit.proposal.rest_api.serializers import GenericProposalSerializer
 from voteit.proposal.rest_api.serializers import ProposalDetailSerializer
 from voteit.proposal.rest_api.serializers import TextDocumentSerializer
+from voteit.export_import.schemas import MeetingStructure
 
 
 class ExportImportMeetingTests(TestCase):
@@ -37,9 +39,11 @@ class ExportImportMeetingTests(TestCase):
         self.assertEqual(self.meeting.agenda_items.count(), len(data.agenda_items))
 
     def test_import_export_cmp(self):
+        self.maxDiff = 0
         import_dict = read_fixture("combined_meeting_fixture.yaml")
-        import_data = self._cut(**import_dict)
-        export_data = self._cut.from_orm(self.meeting)
+        with schema_context(include_reactions=True):
+            import_data = self._cut(**import_dict, include_reactions=True)
+            export_data = self._cut.from_orm(self.meeting)
         self.assertEqual(import_data, export_data)
         import_agenda_data = import_data.agenda_items[0].dict()
         export_agenda_data = export_data.agenda_items[0].dict()
@@ -55,8 +59,6 @@ class SchemasMatchCommonSerializersTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.export_import.schemas import MeetingStructure
-
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.export_data: MeetingStructure = MeetingStructure.from_orm(cls.meeting)
         cls.proposals = tuple(
@@ -70,7 +72,7 @@ class SchemasMatchCommonSerializersTests(TestCase):
             {
                 x
                 for x in serializer.data[0]
-                if x not in {"pk", "order", "meeting", "related_modified"}
+                if x not in {"order", "meeting", "related_modified"}
             },
             set(
                 self.export_data.agenda_items[0].dict(
@@ -83,7 +85,7 @@ class SchemasMatchCommonSerializersTests(TestCase):
         serializer = MeetingGroupSerializer(self.meeting.groups.all(), many=True)
         self.assertEqual(1, len(serializer.data))
         self.assertSetEqual(
-            {x for x in serializer.data[0] if x not in {"pk", "meeting"}},
+            {x for x in serializer.data[0] if x not in {"meeting"}},
             set(
                 self.export_data.groups[0].dict(
                     exclude={"members", "created", "modified"}
@@ -114,9 +116,13 @@ class SchemasMatchCommonSerializersTests(TestCase):
             {
                 x
                 for x in serializer.data
-                if x not in {"pk", "agenda_item", "shortname", "mentions"}
+                if x not in {"agenda_item", "shortname", "mentions"}
             },
-            set(self.export_data.agenda_items[0].proposals[1].dict()),
+            set(
+                self.export_data.agenda_items[0]
+                .proposals[1]
+                .dict(exclude={"reaction_set"})
+            ),
         )
 
     def test_serializer_to_schema_for_diff_proposal(self):
@@ -128,12 +134,17 @@ class SchemasMatchCommonSerializersTests(TestCase):
                 x
                 for x in serializer.data
                 if x
-                not in {"pk", "agenda_item", "shortname", "mentions", "body_diff_brief"}
+                not in {
+                    "agenda_item",
+                    "shortname",
+                    "mentions",
+                    "body_diff_brief",
+                }
             },
             set(
                 self.export_data.agenda_items[0]
                 .proposals[0]
-                .dict(exclude={"text_document"})
+                .dict(exclude={"text_document", "reaction_set"})
             ),
         )
 
@@ -144,14 +155,10 @@ class SchemasMatchCommonSerializersTests(TestCase):
         self.assertEqual(2, len(serializer.data))
         # FIXME: Mentions
         self.assertSetEqual(
-            {
-                x
-                for x in serializer.data[0]
-                if x not in {"pk", "agenda_item", "mentions"}
-            },
+            {x for x in serializer.data[0] if x not in {"agenda_item", "mentions"}},
             set(
                 self.export_data.agenda_items[0]
                 .discussions[0]
-                .dict(exclude={"modified"})
+                .dict(exclude={"modified", "reaction_set"})
             ),
         )

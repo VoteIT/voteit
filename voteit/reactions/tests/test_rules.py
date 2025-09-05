@@ -109,7 +109,7 @@ class ReactionPermissionTests(TestCase):
         cls.button = cls.meeting.reaction_buttons.create(
             change_roles=[ROLE_PARTICIPANT], list_roles=[ROLE_PARTICIPANT]
         )
-        cls.flag = cls.meeting.reaction_buttons.create(flag_mode=True)
+        cls.flag = cls.meeting.reaction_buttons.create(flag_mode=True, title="Flag")
         cls.disc = cls.ai.discussions.create()
         cls.reaction = cls.disc.reaction_set.create(
             user=cls.moderator, object=cls.disc, button=cls.button

@@ -1,8 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
+from django.db import models
 from django.test import TestCase
 
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.models import Meeting
+from voteit.reactions.models import ReactionButton
 
 User = get_user_model()
 
@@ -10,9 +13,6 @@ User = get_user_model()
 class ModelsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.reactions.models import ReactionButton
-
         cls.meeting: Meeting = Meeting.objects.create(title="Test meeting")
         cls.ai = cls.meeting.agenda_items.create()
         cls.prop1 = cls.ai.proposals.create()
@@ -22,7 +22,7 @@ class ModelsTestCase(TestCase):
             title="Like", icon="thumb_up", color="success", meeting=cls.meeting
         )
         cls.dislike_button: ReactionButton = ReactionButton.objects.create(
-            title="Dislike", icon="thumb_up", color="danger", meeting=cls.meeting
+            title="Dislike", icon="thumb_down", color="danger", meeting=cls.meeting
         )
         cls.accessible_button: ReactionButton = ReactionButton.objects.create(
             title="Accessible", icon="accessible", color="primary", meeting=cls.meeting
@@ -93,3 +93,12 @@ class ModelsTestCase(TestCase):
     def test_invalid_list_roles(self):
         self.like_button.list_roles = ["404"]
         self.assertRaises(ValueError, self.like_button.save)
+
+    def test_uniqueish_buttons_required(self):
+        self.dislike_button.title = "like"
+        self.dislike_button.save()
+        self.dislike_button.color = self.like_button.color.upper()
+        self.dislike_button.save()
+        self.dislike_button.icon = self.like_button.icon
+        with self.assertRaises(IntegrityError):
+            self.dislike_button.save()

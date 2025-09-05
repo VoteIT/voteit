@@ -12,6 +12,12 @@ class BaseExpImpCommand(BaseCommand):
             "--skip-prop", help="Skip proposals", default=False, action="store_true"
         )
         parser.add_argument(
+            "--skip-btn",
+            help="Skip reaction buttons",
+            default=False,
+            action="store_true",
+        )
+        parser.add_argument(
             "--clear-group-authors",
             help="Clear group authors",
             default=False,
@@ -38,6 +44,12 @@ class BaseExpImpCommand(BaseCommand):
         parser.add_argument(
             "--clear-proposal-ids",
             help="Clear proposal ids",
+            default=False,
+            action="store_true",
+        )
+        parser.add_argument(
+            "--include-reactions",
+            help="Include reactions",
             default=False,
             action="store_true",
         )

@@ -1,3 +1,4 @@
+from attr.filters import exclude
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from dolly.utils import get_data_id_struct
@@ -28,7 +29,7 @@ class MeetingCloneTests(TestCase):
         cls.user = User.objects.get(pk=1)
 
     def test_collect_without_restrictions(self):
-        data = collect_meeting(self.meeting)
+        data = collect_meeting(self.meeting, exclude=["reaction"])
         items = get_data_id_struct(data)
         self.assertEqual({1}, items.pop(get_model_by_shortname("organisation")))
         self.assertEqual({1}, items.pop(get_model_by_shortname("organisation_roles")))
@@ -37,7 +38,7 @@ class MeetingCloneTests(TestCase):
         self.assertEqual({1}, items.pop(get_model_by_shortname("meeting_group")))
         self.assertEqual({1, 2, 3}, items.pop(get_model_by_shortname("agenda_item")))
         self.assertEqual({1, 2}, items.pop(get_model_by_shortname("discussion_post")))
-        self.assertEqual({1, 2, 3}, items.pop(get_model_by_shortname("proposal")))
+        self.assertEqual({1, 2, 3, 4}, items.pop(get_model_by_shortname("proposal")))
         self.assertEqual({1}, items.pop(get_model_by_shortname("electoral_register")))
         self.assertEqual({1}, items.pop(get_model_by_shortname("text_document")))
         self.assertEqual({1}, items.pop(get_model_by_shortname("text_paragraph")))
@@ -48,6 +49,7 @@ class MeetingCloneTests(TestCase):
         self.assertEqual({1, 2}, items.pop(get_model_by_shortname("vote")))
         self.assertEqual({1, 2, 3}, items.pop(get_model_by_shortname("user")))
         self.assertEqual(1, len(items.pop(get_model_by_shortname("group_membership"))))
+        self.assertEqual(2, len(items.pop(get_model_by_shortname("reaction_button"))))
         self.assertFalse(items)
 
     def test_collect_with_default_ignored(self):

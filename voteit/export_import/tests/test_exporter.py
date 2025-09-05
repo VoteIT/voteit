@@ -4,10 +4,8 @@ from django.test import override_settings
 from pydantic import ValidationError
 
 from voteit.agenda.workflows import AgendaItemWf
-from voteit.export_import.utils import verify_signature
 from voteit.meeting.models import Meeting
 from voteit.proposal.workflows import ProposalWf
-from voteit.export_import import schemas
 
 User = get_user_model()
 
@@ -41,13 +39,34 @@ class ExporterTests(TestCase):
             "loeksas-1", exporter.data.agenda_items[0].proposals[0].prop_id
         )
         self.assertTrue(exporter.data.groups)
-        self.assertEqual(
-            schemas.UserData(email="participant@voteit.se", pk=2),
-            exporter.data.agenda_items[0].discussions[0].author,
-        )
         self.assertEqual("The Hellos", exporter.data.groups[0].title)
         self.assertEqual(
             "the-hellos", exporter.data.agenda_items[0].discussions[0].meeting_group
+        )
+        self.assertEqual(2, len(exporter.data.reaction_buttons))
+        self.assertEqual("Gilla", exporter.data.reaction_buttons[0].title)
+        self.assertEqual(
+            "Valberedningens förslag", exporter.data.reaction_buttons[1].title
+        )
+        self.assertSetEqual(
+            {
+                "title",
+                "vote_template",
+                "active",
+                "icon",
+                "list_roles",
+                "flag_mode",
+                "on_presentation",
+                "target",
+                "order",
+                "on_vote",
+                "color",
+                "description",
+                "change_roles",
+                "allowed_models",
+                "reactions",
+            },
+            set(exporter.data.reaction_buttons[1].dict()),
         )
 
     def test_bad_kwargs(self):
@@ -77,6 +96,66 @@ class ExporterTests(TestCase):
         exporter = self._cut(self.meeting, include_proposals=False)
         exporter()
         self.assertFalse(exporter.data.agenda_items[0].proposals)
+
+    def test_no_buttons(self):
+        exporter = self._cut(self.meeting, include_buttons=False)
+        exporter()
+        self.assertFalse(exporter.data.reaction_buttons)
+
+    def test_with_reactions(self):
+        exporter = self._cut(self.meeting, include_reactions=True)
+        exporter()
+        # Button 1
+        self.assertEqual("Gilla", exporter.data.reaction_buttons[0].title)
+        self.assertEqual(3, len(exporter.data.reaction_buttons[0].reactions))
+        self.assertDictEqual(
+            {
+                "agenda_item_id": "_1",
+                "content_type": ["proposal", "proposal"],
+                "object_id": "_2",
+                "username": "participant",
+            },
+            exporter.data.reaction_buttons[0].reactions[0].dict(),
+        )
+        self.assertDictEqual(
+            {
+                "agenda_item_id": "_1",
+                "content_type": ["proposal", "proposal"],
+                "object_id": "_2",
+                "username": "moderator",
+            },
+            exporter.data.reaction_buttons[0].reactions[1].dict(),
+        )
+        self.assertDictEqual(
+            {
+                "agenda_item_id": "_1",
+                "content_type": ["discussion", "discussionpost"],
+                "object_id": "_1",
+                "username": "moderator",
+            },
+            exporter.data.reaction_buttons[0].reactions[2].dict(),
+        )
+        # Button 2
+        self.assertEqual(
+            "Valberedningens förslag", exporter.data.reaction_buttons[1].title
+        )
+        self.assertEqual(1, len(exporter.data.reaction_buttons[1].reactions))
+
+    def test_with_reactions_no_discussions(self):
+        exporter = self._cut(
+            self.meeting, include_reactions=True, include_discussions=False
+        )
+        exporter()
+        # Button 1
+        self.assertEqual(2, len(exporter.data.reaction_buttons[0].reactions))
+
+    def test_with_reactions_no_proposals(self):
+        exporter = self._cut(
+            self.meeting, include_reactions=True, include_proposals=False
+        )
+        exporter()
+        # Button 1
+        self.assertEqual(1, len(exporter.data.reaction_buttons[0].reactions))
 
     def test_clear_ai_states(self):
         exporter = self._cut(self.meeting, clear_ai_states=True)

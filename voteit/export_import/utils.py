@@ -1,9 +1,16 @@
+from __future__ import annotations
 import hashlib
 import secrets
+from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.db import transaction
 
 from voteit.export_import.exceptions import SignatureVerificationFailed
+
+
+if TYPE_CHECKING:
+    from voteit.meeting.models import Meeting
 
 
 def get_export_secret(raise_exception=True) -> str | None:
@@ -111,3 +118,30 @@ def stream_signature(stream):
     if "sign:" not in first:
         stream.seek(0)
     return sign_payload(stream.read())
+
+
+def direct_clone(*, source: Meeting, target: Meeting, commit=False, **kwargs):
+    from voteit.export_import.exporter import Exporter
+    from voteit.export_import.importer import Importer
+
+    import_only_kwargs = {
+        x: kwargs.pop(x)
+        for x in ["use_existing_groups", "add_participants"]
+        if x in kwargs
+    }
+    exporter = Exporter(source, **kwargs)
+    exporter()
+    data = exporter.data.dict(exclude_none=True)
+    importer = Importer(
+        target,
+        **kwargs,
+        **import_only_kwargs,
+    )
+    importer.prep_data(data)
+
+    with transaction.atomic(durable=True):
+        importer()
+        if not commit:
+            transaction.set_rollback(True)
+
+    return importer

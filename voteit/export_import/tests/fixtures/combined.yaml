@@ -1,9 +1,3 @@
-sign: 2d36263ad0b864d53ad64a5ca464439a116ca67c49479485f55e1761ab862443
-meta:
-  title: Hello world!
-  description: Not much
-  version: 1
-  created: '2023-12-05T14:54:00.000000+01:00'
 agenda_items:
 - block_discussion: false
   block_proposals: false

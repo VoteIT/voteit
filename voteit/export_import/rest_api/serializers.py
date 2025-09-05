@@ -1,5 +1,3 @@
-from email.policy import default
-
 from rest_framework import fields
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -44,7 +42,6 @@ class ImportFileSerializer(serializers.Serializer):
     >>> from voteit.export_import.schemas import BaseContext
     >>> schema_fields = set(BaseContext.schema()['properties'])
     >>> _ = schema_fields.remove('model_to_schema')
-
     >>> serializer = ImportFileSerializer()
     >>> ser_fields = set(serializer.fields)
     >>> _ = ser_fields.remove('file'), ser_fields.remove('add_participants')  # Not in schema
@@ -64,6 +61,8 @@ class ImportFileSerializer(serializers.Serializer):
     include_groups = fields.BooleanField(default=True)
     include_proposals = fields.BooleanField(default=True)
     include_discussions = fields.BooleanField(default=True)
+    include_buttons = fields.BooleanField(default=True)
+    include_reactions = fields.BooleanField(default=False)
 
 
 class ExportFileSerializer(serializers.Serializer):
@@ -75,3 +74,5 @@ class ExportFileSerializer(serializers.Serializer):
     include_groups = fields.BooleanField(default=True)
     include_proposals = fields.BooleanField(default=True)
     include_discussions = fields.BooleanField(default=True)
+    include_buttons = fields.BooleanField(default=True)
+    include_reactions = fields.BooleanField(default=False)

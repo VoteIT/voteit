@@ -57,6 +57,25 @@ class ReactionButtonViewSetTests(APITestCase):
         )
         self.assertTrue(self.meeting.reaction_buttons.exists())
 
+    def test_create_duplicate(self):
+        one = self._mk_one()
+        one.title = "Hello"
+        one.save()
+        two = self._mk_one()
+        url = reverse("reaction-buttons-detail", kwargs={"pk": two.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.patch(
+            url,
+            data={
+                "title": "hello",  # Case-insensitive!
+            },
+        )
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertEqual(
+            {"title": ["Duplicate title, change at least color or icon."]}, data
+        )
+
     def test_create_bad_users(self):
         url = reverse("reaction-buttons-list")
         data = {
@@ -127,4 +146,25 @@ class ReactionButtonViewSetTests(APITestCase):
         self.assertEqual(
             response.status_code,
             403,
+        )
+
+    def test_edit_causes_duplicate(self):
+        self._mk_one()
+        url = reverse("reaction-buttons-list")
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            url,
+            data={
+                "meeting": self.meeting.pk,
+                "title": "Thumbs up",
+                "color": "primary",
+                "icon": "mdi-thumb-up",
+                "change_roles": [],
+                "list_roles": [],
+            },
+        )
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertEqual(
+            {"title": ["Duplicate title, change at least color or icon."]}, data
         )

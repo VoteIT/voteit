@@ -1,0 +1,8 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    {% for extra_btn in extra_btns %}
+        <li>{{ extra_btn|safe }}</li>
+    {% endfor %}
+{% endblock %}

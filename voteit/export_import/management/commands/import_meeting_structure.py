@@ -48,6 +48,7 @@ class Command(BaseExpImpCommand):
             missing_user=options["missing"],
             include_discussions=not options["skip_disc"],
             include_proposals=not options["skip_prop"],
+            include_buttons=not options["skip_btn"],
             add_participants=not options["no_part"],
             use_existing_groups=not options["no_reuse_groups"],
             clear_group_authors=options["clear_group_authors"],
@@ -55,6 +56,7 @@ class Command(BaseExpImpCommand):
             clear_ai_states=options["clear_ai_states"],
             clear_proposal_states=options["clear_proposal_states"],
             clear_proposal_id=options["clear_proposal_ids"],
+            include_reactions=options["include_reactions"],
             verify=not options["skip_verify"],
         )
         with transaction.atomic(durable=True):

@@ -85,9 +85,9 @@
     agenda_item: 1
 
 - model: proposal.proposal
-  pk: 2
+  pk: 3
   fields:
-    body: För övrigt anser jag att Karthago ska förströras
+    body: För övrigt anser jag att Karthago ska förstöras
     created: 2022-03-29 09:30:58.356396+00:00
     modified: 2022-03-29 09:30:58.356404+00:00
     last_modified_by: null
@@ -98,7 +98,7 @@
     agenda_item: 1
 
 - model: proposal.proposal
-  pk: 3
+  pk: 4
   fields:
     body: I don't even want to be here
     created: 2022-03-29 09:30:58.356396+00:00
@@ -185,4 +185,59 @@
     modified: 2022-03-29 09:31:51.432424+00:00
     paragraph_id: 1
     text_document: 1
+    agenda_item: 1
+
+- model: reactions.reactionbutton
+  pk: 1
+  fields:
+    title: Gilla
+    color: "#ccc"
+    meeting: 1
+- model: reactions.reactionbutton
+  pk: 2
+  fields:
+    title: Valberedningens förslag
+    color: red
+    meeting: 1
+    flag_mode: true
+
+- model: reactions.reaction
+  pk: 1
+  fields:
+    content_type:
+      - proposal
+      - proposal
+    object_id: 2
+    button: 1
+    user: 2
+    agenda_item: 1
+- model: reactions.reaction
+  pk: 2
+  fields:
+    content_type:
+      - proposal
+      - proposal
+    object_id: 2
+    button: 1
+    user: 1
+    agenda_item: 1
+- model: reactions.reaction
+  pk: 3
+  fields:
+    content_type:
+      - proposal
+      - diffproposal
+    object_id: 1
+    button: 2
+    user: 1
+    agenda_item: 1
+- model: reactions.reaction
+  pk: 4
+  fields:
+    content_type:
+      - discussion
+      - discussionpost
+    object_id: 1
+    button: 1
+    user: 1
     agenda_item: 1

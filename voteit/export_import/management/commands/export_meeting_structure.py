@@ -28,11 +28,13 @@ class Command(BaseExpImpCommand):
             meeting,
             include_discussions=not options["skip_disc"],
             include_proposals=not options["skip_prop"],
+            include_buttons=not options["skip_btn"],
             clear_group_authors=options["clear_group_authors"],
             clear_authors=options["clear_authors"],
             clear_ai_states=options["clear_ai_states"],
             clear_proposal_states=options["clear_proposal_states"],
             clear_proposal_id=options["clear_proposal_ids"],
+            include_reactions=options["include_reactions"],
         )
         conn = get_connection()
         with CaptureQueriesContext(connection=conn) as cqc:

@@ -110,7 +110,7 @@ class AddReactionTests(TestCase):
         msg = self._mk_one(self.prop, self.moderator)
         msg.run_job()
         self.assertEqual(1, self.prop.reaction_set.count())
-        new_button = self.meeting.reaction_buttons.create(flag_mode=True)
+        new_button = self.meeting.reaction_buttons.create(flag_mode=True, title="Hello")
         msg = self._mk_one(self.prop, self.moderator, button=new_button.pk)
         msg.run_job()
         self.assertEqual(2, self.prop.reaction_set.count())

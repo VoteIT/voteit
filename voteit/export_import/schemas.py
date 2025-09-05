@@ -6,6 +6,7 @@ from itertools import chain
 from typing import Any
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils.text import slugify
 from django.utils.timezone import now
@@ -24,6 +25,8 @@ from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
 from voteit.proposal.models import TextParagraph
 from voteit.proposal.workflows import ProposalWf
+from voteit.reactions.models import Reaction
+from voteit.reactions.models import ReactionButton
 
 User = get_user_model()
 
@@ -46,6 +49,8 @@ class BaseContext(BaseModel, extra=Extra.forbid):
     include_groups: bool = True
     include_proposals: bool = True
     include_discussions: bool = True
+    include_buttons: bool = True
+    include_reactions: bool = False
 
     @validator("include_groups", allow_reuse=True)
     def validate_include_groups(cls, v: bool, values: dict):
@@ -63,6 +68,25 @@ class BaseContext(BaseModel, extra=Extra.forbid):
         if not v and not values.get("clear_group_authors", False):
             raise ValueError(
                 "Groups are needed to set group authors - change 'clear_group_authors' or 'include_groups'"
+            )
+        return v
+
+    @validator("include_reactions", allow_reuse=True)
+    def validate_include_reactions(cls, v: bool, values: dict):
+        """
+        >>> _ = BaseContext()
+        >>> _ = BaseContext(include_reactions=True)
+        >>> _ = BaseContext(include_reactions=False)
+        >>> _ = BaseContext(include_buttons=False, include_reactions=True)
+        Traceback (most recent call last):
+        ...
+        pydantic.error_wrappers.ValidationError: 1 validation error for BaseContext
+        include_reactions
+          Buttons are needed to set reactions - change 'include_buttons'
+        """
+        if v and not values.get("include_buttons", False):
+            raise ValueError(
+                "Buttons are needed to set reactions - change 'include_buttons'"
             )
         return v
 
@@ -94,9 +118,21 @@ class BaseContentData(BaseModel):
     modified: datetime | None
     # mentions:list[int] FIXME: how do we handle this?
     tags: list[constr(max_length=100, strip_whitespace=True)] = []
+    pk: str | None
 
     class Config:
         orm_mode = True
+
+    @validator("pk", pre=True)
+    def convert_pk(cls, v):
+        """
+        Change to an unusable form to avoid mistakes later on.
+        """
+        if isinstance(v, int):
+            v = str(v)
+        if isinstance(v, str) and not v.startswith("_"):
+            v = "_" + v
+        return v
 
 
 class GroupMixin(BaseModel):
@@ -123,30 +159,15 @@ class GroupMixin(BaseModel):
         return v
 
 
-class UserData(BaseModel):
-    email: str | None
-    pk: int | None
-
-    class Config:
-        orm_mode = True
-        frozen = True
-
-    @validator("email", pre=True, allow_reuse=True)
-    def transform_email(cls, v: str | None):
-        if v:
-            return v.strip().lower()
-        return v
-
-
 class AuthorMixin(BaseModel):
-    author: UserData | None
+    author: str | None
 
     @validator("author", pre=True, allow_reuse=True)
     def author_user(cls, v):
         """
-        >>> user=User(pk=111, email='john@doe.com')
+        >>> user=User(pk=111, email='john@doe.com', username="john")
         >>> AuthorMixin.author_user(user)
-        UserData(email='john@doe.com', pk=111)
+        'john'
         >>> with schema_context(clear_authors=True):
         ...     AuthorMixin.author_user(user) == None
         True
@@ -155,7 +176,7 @@ class AuthorMixin(BaseModel):
         if ctx.clear_authors:
             return None
         if isinstance(v, User):
-            return ctx.model_to_schema[v.__class__].from_orm(v)
+            return v.username
         return v
 
 
@@ -253,11 +274,89 @@ class DiscussionPostData(BaseContentData, AuthorMixin, GroupMixin):
     body: str
 
 
+class ReactionData(BaseModel):
+    username: str
+    agenda_item_id: str
+    content_type: list[str]
+    object_id: str
+
+    class Config:
+        orm_mode = True
+
+    @validator("content_type", pre=True)
+    def ct_to_natural_key(cls, v):
+        if not isinstance(v, list):
+            # Consistent behaviour + json friendly
+            return list(v.natural_key())
+        if len(v) != 2:
+            raise ValueError("Not a list with 2 items")
+        return v
+
+    @validator("object_id", "agenda_item_id", pre=True)
+    def convert_ids(cls, v):
+        """
+        Change to an unusable form to avoid mistakes later on.
+        """
+        if isinstance(v, int):
+            v = str(v)
+        if isinstance(v, str) and not v.startswith("_"):
+            v = "_" + v
+        return v
+
+
+class ReactionButtonData(BaseModel):
+    title: constr(max_length=80, strip_whitespace=True) = ""
+    description: constr(max_length=100, strip_whitespace=True) = ""
+    icon: constr(max_length=30, strip_whitespace=True) = ""
+    color: constr(max_length=15, strip_whitespace=True)
+    target: int | None
+    order: int = 0
+    change_roles: list[str]
+    list_roles: list[str]
+    active: bool = True
+    allowed_models: list[str] = []
+    on_presentation: bool = False
+    on_vote: bool = False
+    vote_template: bool = False
+    flag_mode: bool = False
+    reactions: list[ReactionData] = []
+
+    class Config:
+        orm_mode = True
+
+    @validator("reactions", pre=True)
+    def resolve_reactions(cls, v):
+        ctx = get_context()
+        if ctx.include_reactions:
+            if isinstance(v, (models.QuerySet, models.Manager)):
+                v = v.annotate(username=models.F("user__username"))
+                if not ctx.include_discussions:
+                    v = v.exclude(
+                        content_type=ContentType.objects.get_for_model(DiscussionPost)
+                    )
+                if not ctx.include_proposals:
+                    v = v.exclude(
+                        content_type__in=ContentType.objects.get_for_models(
+                            Proposal, DiffProposal
+                        ).values()
+                    )
+            else:
+                # Not a manager
+                allowed_type = set()
+                if ctx.include_proposals:
+                    allowed_type.add("proposal")
+                if ctx.include_discussions:
+                    allowed_type.add("discussion")
+                v = [x for x in v if x["content_type"][0] in allowed_type]
+            return resolve_potential_manager(v)
+        return []
+
+
 class MeetingGroupData(BaseContentData):
     title: constr(max_length=100, strip_whitespace=True) = ""
     groupid: constr(max_length=100, strip_whitespace=True)
     votes: int | None
-    members: list[UserData] = []
+    members: list[str] = []
     post_as: bool = False
     show_on_speaker: bool = True
     delegate_to: int | None = None
@@ -270,7 +369,9 @@ class MeetingGroupData(BaseContentData):
 
     @validator("members", pre=True)
     def fetch_members(cls, v):
-        return resolve_potential_manager(v)
+        if isinstance(v, (models.QuerySet, models.Manager)):
+            return list(v.values_list("username", flat=True))
+        return v
 
     @validator("delegate_to", pre=True)
     def resolve_delegate_to(cls, v):
@@ -302,34 +403,34 @@ class AgendaItemData(BaseContentData):
 
     @validator("text_documents", pre=True)
     def fetch_related_text(cls, v):
-        v = resolve_potential_manager(v)
-        return v
+        return resolve_potential_manager(v)
 
     @validator("proposals", pre=True)
     def fetch_related_proposals(cls, v):
         ctx = get_context()
         if not ctx.include_proposals:
             return []
-        v = resolve_potential_manager(v, select={"meeting_group", "author"})
-        return v
+        return resolve_potential_manager(v, select={"meeting_group", "author"})
 
     @validator("discussions", pre=True)
     def fetch_related_qs(cls, v):
         ctx = get_context()
         if not ctx.include_discussions:
             return []
-        v = resolve_potential_manager(v, select={"meeting_group", "author"})
-        return v
+        return resolve_potential_manager(v, select={"meeting_group", "author"})
 
     @validator("proposals", pre=True)
     def select_proposal_type(cls, v: list[dict | ProposalData | DiffProposalData]):
         """
         Duck-type dict data as a proposal
         >>> f = AgendaItemData.select_proposal_type
-        >>> f([{'body': 'Hello'}, {'body': 'World', 'text_document': 'hi', 'paragraph': 2}, ProposalData(body="Unchanged")])
-        [ProposalData(meeting_group=None, as_group=False, author=None, body='Hello', created=None, modified=None, tags=[], state=None, prop_id=None),\
-            DiffProposalData(meeting_group=None, as_group=False, author=None, body='World', created=None, modified=None, tags=[], state=None, prop_id=None, text_document='hi', paragraph=2), \
-            ProposalData(meeting_group=None, as_group=False, author=None, body='Unchanged', created=None, modified=None, tags=[], state=None, prop_id=None)]
+        >>> result = f([{'body': 'Hello', 'pk': 3}, {'body': 'World', 'text_document': 'hi', 'paragraph': 2}, ProposalData(body="Unchanged")])
+        >>> result[0]
+        ProposalData(meeting_group=None, as_group=False, author=None, body='Hello', created=None, modified=None, tags=[], pk='_3', state=None, prop_id=None)
+        >>> result[1]
+        DiffProposalData(meeting_group=None, as_group=False, author=None, body='World', created=None, modified=None, tags=[], pk=None, state=None, prop_id=None, text_document='hi', paragraph=2)
+        >>> result[2]
+        ProposalData(meeting_group=None, as_group=False, author=None, body='Unchanged', created=None, modified=None, tags=[], pk=None, state=None, prop_id=None)
         """
         checked = []
         while v:
@@ -411,12 +512,10 @@ class AgendaItemData(BaseContentData):
         return v
 
 
-# Reactions?
-
-
 class MeetingStructure(BaseModel):
     groups: list[MeetingGroupData] = []
     agenda_items: list[AgendaItemData] = []
+    reaction_buttons: list[ReactionButtonData] = []
 
     class Config:
         orm_mode = True
@@ -436,6 +535,13 @@ class MeetingStructure(BaseModel):
     def fetch_groups(cls, v):
         ctx = get_context()
         if not ctx.include_groups:
+            return []
+        return resolve_potential_manager(v)
+
+    @validator("reaction_buttons", pre=True)
+    def fetch_reaction_buttons(cls, v):
+        ctx = get_context()
+        if not ctx.include_buttons:
             return []
         return resolve_potential_manager(v)
 
@@ -486,7 +592,7 @@ class MeetingStructure(BaseModel):
 
 
 def resolve_potential_manager(v: models.Manager | Any, prefetch=(), select=()):
-    if isinstance(v, models.Manager):
+    if isinstance(v, (models.Manager, models.QuerySet)):
         if hasattr(v, "select_subclasses"):
             v = v.select_subclasses()
         if prefetch:
@@ -507,7 +613,8 @@ model_to_schema = {
     Proposal: ProposalData,
     DiffProposal: DiffProposalData,
     DiscussionPost: DiscussionPostData,
-    User: UserData,
+    ReactionButton: ReactionButtonData,
+    Reaction: ReactionData,
 }
 
 
@@ -518,6 +625,10 @@ class ImportStats(BaseModel):
     diff_proposals: int = 0
     discussion_posts: int = 0
     text_documents: int = 0
+    buttons: int = 0
+    reactions: int = 0
+    groups_reused: int = 0
+    buttons_reused: int = 0
 
 
 class ImportMeetingMeta(BaseModel):
