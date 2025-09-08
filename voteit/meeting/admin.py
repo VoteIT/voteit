@@ -39,7 +39,7 @@ class CloneMeetingForm(forms.ModelForm):
     clear_authors = forms.BooleanField(required=False)
     clear_ai_states = forms.BooleanField(required=False, initial=True)
     clear_proposal_states = forms.BooleanField(required=False, initial=True)
-    clear_proposal_id = forms.BooleanField(required=False, initial=True)
+    clear_proposal_id = forms.BooleanField(required=False)
     use_existing_groups = forms.BooleanField(required=False, initial=True)
     add_participants = forms.BooleanField(required=False)
     commit = forms.BooleanField(required=False)
