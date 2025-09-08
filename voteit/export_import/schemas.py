@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from pydantic import Extra
 from pydantic import Field
 from pydantic import constr
+from pydantic import root_validator
 from pydantic import validator
 
 from voteit.agenda.models import AgendaItem
@@ -234,6 +235,23 @@ class ProposalData(BaseContentData, AuthorMixin, GroupMixin):
         if v and v not in ProposalWf.states:
             raise ValueError(f"{v} is not a valid proposal state")
         return v
+
+    @root_validator(pre=True)  # Before validate_prop_id
+    def maybe_clear_prop_id_from_tags(cls, values):
+        """
+        >>> ProposalData(prop_id='hello', tags=['hello','world'], body="").dict(include={'tags'})
+        {'tags': ['hello', 'world']}
+        >>> with schema_context(clear_proposal_id=True):
+        ...     ProposalData(prop_id='hello', tags=['hello','world'], body="").dict(include={'tags'})
+        {'tags': ['world']}
+        """
+        ctx = get_context()
+        if ctx.clear_proposal_id:
+            if tags := values.get("tags"):
+                if prop_id := values.get("prop_id"):
+                    if prop_id in tags:
+                        tags.remove(prop_id)
+        return values
 
     @validator("prop_id")
     def validate_prop_id(cls, v: str | None):
