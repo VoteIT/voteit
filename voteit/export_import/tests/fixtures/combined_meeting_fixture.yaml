@@ -1,4 +1,4 @@
-sign: 2d36263ad0b864d53ad64a5ca464439a116ca67c49479485f55e1761ab862443
+sign: 08c018f3dd320a27843884ba8fa5a51e1125e1155f56980e0a632ed4073bc5b1
 meta:
   title: Hello world!
   description: Not much
@@ -185,7 +185,7 @@ reaction_buttons:
   - agenda_item_id: _1
     content_type:
     - proposal
-    - diffproposal
+    - proposal
     object_id: _1
     username: moderator
   title: "Valberedningens f\xF6rslag"

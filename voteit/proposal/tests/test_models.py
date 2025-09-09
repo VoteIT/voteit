@@ -2,7 +2,11 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.db.models import RestrictedError
 from django.test import TestCase
+
 from voteit.meeting.models import Meeting
+from voteit.agenda.models import AgendaItem
+from voteit.proposal.models import TextDocument
+from voteit.proposal.models import DiffProposal
 
 User = get_user_model()
 
@@ -76,11 +80,6 @@ class ProposalTests(TestCase):
 class DiffProposalTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.agenda.models import AgendaItem
-        from voteit.proposal.models import TextDocument
-        from voteit.proposal.models import DiffProposal
-
         cls.meeting: Meeting = Meeting.objects.create()
         cls.ai: AgendaItem = cls.meeting.agenda_items.create()
         cls.text_doc: TextDocument = TextDocument.objects.create(
@@ -109,8 +108,6 @@ class TextDocumentTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.agenda.models import AgendaItem
-
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai: AgendaItem = cls.meeting.agenda_items.create()
 

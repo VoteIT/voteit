@@ -56,7 +56,6 @@ class Importer:
         self.user_map = {}
         self.ai_map = {}
         self.prop_map = {}
-        self.diff_prop_map = {}
         self.disc_map = {}
         self.button_map = {}
         self._verify = verify
@@ -188,10 +187,9 @@ class Importer:
                         paragraph_id=propd.paragraph
                     )
                     prop = DiffProposal.objects.create(agenda_item=ai, **prop_data)
-                    self.diff_prop_map[propd.pk] = prop
                 else:
                     prop = ai.proposals.create(**prop_data)
-                    self.prop_map[propd.pk] = prop
+                self.prop_map[propd.pk] = prop
             # Discussions
             for discd in aid.discussions:
                 disc_data = self.convert_fks(discd.dict(exclude={"pk"}))
@@ -255,7 +253,7 @@ class Importer:
             case ("proposal", "proposal"):
                 return self.prop_map.get(fk)
             case ("proposal", "diffproposal"):
-                return self.diff_prop_map.get(fk)
+                raise TypeError("Don't point to diff proposals!")
             case ("discussion", "discussionpost"):
                 return self.disc_map.get(fk)
 

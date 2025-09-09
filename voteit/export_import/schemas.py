@@ -305,7 +305,11 @@ class ReactionData(BaseModel):
     def ct_to_natural_key(cls, v):
         if not isinstance(v, list):
             # Consistent behaviour + json friendly
-            return list(v.natural_key())
+            # We always point to base object. Mistake or not, but that's what we've been doing...
+            nat_key = list(v.natural_key())
+            if nat_key[1] == "diffproposal":
+                nat_key[1] = "proposal"
+            return nat_key
         if len(v) != 2:
             raise ValueError("Not a list with 2 items")
         return v
