@@ -2,9 +2,11 @@ from itertools import chain
 
 import yaml
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.decorators import ensure_atomic
+from voteit.discussion.models import DiscussionPost
 from voteit.export_import.exceptions import ImportFileError
 from voteit.export_import.schemas import ImportMeetingStructure
 from voteit.export_import.utils import verify_stream
@@ -12,6 +14,7 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.proposal.models import DiffProposal
+from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
 from voteit.export_import import MissingUser
 from voteit.export_import import schemas
@@ -237,10 +240,16 @@ class Importer:
                 if obj := self.resolve_reaction_generic(
                     reactd.object_id, reactd.content_type
                 ):
+                    # Always link to base proposal
+                    if isinstance(obj, DiscussionPost):
+                        ct = ContentType.objects.get_for_model(DiscussionPost)
+                    else:
+                        ct = ContentType.objects.get_for_model(Proposal)
                     button.reactions.create(
                         agenda_item=self.ai_map[reactd.agenda_item_id],
                         user=self.user_map[reactd.username],
-                        object=obj,
+                        object_id=obj.pk,
+                        content_type=ct,
                     )
                 else:
                     raise Exception(

@@ -121,7 +121,7 @@ class ImporterTests(TestCase):
         self.assertEqual(
             {
                 "agenda_item": ai.pk,
-                "content_type": ContentType.objects.get_for_model(DiffProposal).pk,
+                "content_type": ContentType.objects.get_for_model(Proposal).pk,
                 "object_id": proposals["loeksas-1"].pk,
                 "user": self.moderator.pk,
             },
