@@ -181,3 +181,8 @@ class Reaction(AgendaItemContext, MeetingContext):
 
     def __repr__(self):
         return f"{self.button.title} from {self.user}"
+
+    objects: models.Manager
+    button_id: int
+    agenda_item_id: int | None
+    user_id: int

@@ -1,6 +1,8 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist
 from django.test import TestCase
 from django.test import override_settings
 from envelope.app.user_channel.channel import UserChannel
@@ -10,9 +12,14 @@ from envelope.channels.models import AppState
 from envelope.testing import MessageCatcher
 
 from voteit.agenda.channels import AgendaItemChannel
+from voteit.discussion.models import DiscussionPost
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.proposal.models import DiffProposal
+from voteit.proposal.models import Proposal
+from voteit.proposal.models import TextDocument
+from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
 
 User = get_user_model()
@@ -141,10 +148,13 @@ class SignalReactionTests(TestCase):
         cls.prop = cls.ai.proposals.create()
         cls.button = cls.meeting.reaction_buttons.create()
         cls.user = User.objects.create(username="hej")
+        cls.text_doc: TextDocument = TextDocument.objects.create(
+            body="Hello", base_tag="hi"
+        )
+        cls.para = cls.text_doc.text_paragraphs.first()
+        cls.disc = cls.ai.discussions.create()
 
     def _mk_reaction(self, **kw):
-        from voteit.reactions.models import Reaction
-
         kw.setdefault("object", self.prop)
         kw.setdefault("button", self.button)
         kw.setdefault("user", self.user)
@@ -202,3 +212,41 @@ class SignalReactionTests(TestCase):
         msg = mock_publish.mock_calls[-1].args[0]
         self.assertIsInstance(msg, UserReactionDeleted)
         self.assertEqual(reaction_pk, msg.data.pk)
+
+    def test_deleting_context_kills_reaction(self):
+        # Due to historic reasons, reactions are linked to base object
+
+        prop_ct = ContentType.objects.get_for_model(Proposal)
+        disc_ct = ContentType.objects.get_for_model(DiscussionPost)
+        diff_prop = DiffProposal.objects.create(
+            agenda_item=self.ai, paragraph=self.para
+        )
+        diff_react = self.button.reactions.create(
+            content_type=prop_ct,
+            object_id=diff_prop.pk,
+            agenda_item=self.ai,
+            user=self.user,
+        )
+        prop_react = self.button.reactions.create(
+            content_type=prop_ct,
+            object_id=self.prop.pk,
+            agenda_item=self.ai,
+            user=self.user,
+        )
+        disc_react = self.button.reactions.create(
+            content_type=disc_ct,
+            object_id=self.disc.pk,
+            agenda_item=self.ai,
+            user=self.user,
+        )
+        for target, reaction in (
+            (self.prop, prop_react),
+            (self.disc, disc_react),
+            (diff_prop, diff_react),
+        ):
+            with self.subTest(f"Reaction should disappear when {target} is deleted"):
+                target.delete()
+                self.assertRaises(
+                    ObjectDoesNotExist,
+                    reaction.refresh_from_db,
+                )

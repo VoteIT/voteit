@@ -15,6 +15,8 @@ from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
+from voteit.proposal.models import DiffProposal
+from voteit.proposal.models import Proposal
 from voteit.reactions.messages import ButtonAdded
 from voteit.reactions.messages import ButtonChanged
 from voteit.reactions.messages import ButtonDeleted
@@ -152,3 +154,13 @@ def send_deleted_to_user(instance: Reaction = None, **kw):
     msg = UserReactionDeleted(pk=instance.pk)
     user_ch = UserChannel.from_instance(instance.user)
     user_ch.sync_publish(msg)
+
+
+# FIXME: The reactions point to the wrong object,they should be mapped to the DiffProposal instead.
+# Until this is fixed, keep this.
+# See https://github.com/VoteIT/voteit/issues/340
+@receiver(pre_delete, sender=DiffProposal)
+def cleanup_reactions(instance, **kwargs):
+    Reaction.objects.filter(
+        content_type=ContentType.objects.get_for_model(Proposal), object_id=instance.pk
+    ).delete()
