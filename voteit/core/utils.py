@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import re
+from contextlib import contextmanager
 from copy import deepcopy
 from inspect import isclass
 from random import randint
+from time import perf_counter
 from typing import TYPE_CHECKING
 
 from bleach import ALLOWED_ATTRIBUTES
@@ -332,3 +334,9 @@ def generate_valid_userid(user: AbstractUser) -> str | None:
         ):
             return suggestion
         suggestion = f"{slugified_name}-{randint(1, 9999)}"
+
+
+@contextmanager
+def exectime() -> float:
+    start = perf_counter()
+    yield lambda: perf_counter() - start

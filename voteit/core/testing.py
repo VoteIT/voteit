@@ -3,13 +3,14 @@
 from __future__ import annotations
 import doctest
 import random
-from contextlib import contextmanager
 from pkgutil import walk_packages
-from time import perf_counter
 
+from envelope.testing import testing_channel_layers_setting  # noqa
 from django.contrib.auth import get_user_model
 from django.db.transaction import get_connection
-from envelope.testing import testing_channel_layers_setting  # noqa
+
+from voteit.core.utils import exectime  # noqa
+
 
 user_tag = """
 <span class="mention" data-index="0" data-denotation-char="@" data-id="{user_pk}" data-value="{name}">
@@ -93,12 +94,6 @@ class FakeCommit:
             items = current_run_on_commit.pop(0)
             # Django 4.2 has 3 args, <4.2 only 2
             items[1]()
-
-
-@contextmanager
-def exectime() -> float:
-    start = perf_counter()
-    yield lambda: perf_counter() - start
 
 
 class SetSeed:

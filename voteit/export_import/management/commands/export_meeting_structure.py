@@ -1,7 +1,7 @@
 import yaml
 from django.db.transaction import get_connection
 
-from voteit.core.testing import exectime
+from voteit.core.utils import exectime
 from voteit.export_import.management.base_cmds import BaseExpImpCommand
 from voteit.export_import.utils import sign_payload
 from voteit.meeting.models import Meeting

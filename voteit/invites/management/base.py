@@ -8,7 +8,7 @@ from django.core.management import CommandError
 from django.db.transaction import get_connection
 from django.test.utils import CaptureQueriesContext
 
-from voteit.core.testing import exectime
+from voteit.core.utils import exectime
 from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
