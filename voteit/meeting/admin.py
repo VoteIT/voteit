@@ -290,16 +290,9 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
             if form.is_valid():
                 instance = form.save()
                 out = "\n".join([f"{k}:\t{v}" for k, v in form.stats.items() if v])
-                if form.cleaned_data.get("commit"):
-                    self.message_user(
-                        request, f"{instance.title} uppdaterades med:\n" + out
-                    )
-                else:
-                    self.message_user(
-                        request,
-                        f"Testkörning, hade lagt till:\n" + out,
-                        level=messages.INFO,
-                    )
+                self.message_user(
+                    request, f"{instance.title} uppdaterades med:\n" + out
+                )
                 # Nya
                 return redirect("admin:meeting_meeting_change", instance.pk)
         else:
