@@ -4,6 +4,8 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from django.contrib.contenttypes.models import ContentType
+from django.db import models
+from django.db.models.functions import Collate
 from django_fsm import FSMField
 from dolly.core import LiveCloner
 from dolly.utils import get_inf_collector
@@ -17,6 +19,7 @@ if TYPE_CHECKING:
     from django.db.models import Model
     from voteit.meeting.models import Meeting
     from voteit.core.models import User
+    from voteit.agenda.models import AgendaItem
 
 logger = getLogger(__name__)
 
@@ -137,3 +140,15 @@ def clone_meeting(
             f"User {user} doesn't belong to organisation {meeting.organisation} so that user won't be added as moderator."
         )
     return meeting
+
+
+def sort_agenda_items(
+    meeting: Meeting, locale_name: str = "sv-x-icu", reorder=False
+) -> models.QuerySet[AgendaItem]:
+    qs = meeting.agenda_items.order_by(Collate(models.F("title"), locale_name))
+    if reorder:
+        for i, ai in enumerate(qs, 1):
+            if ai.order != i:
+                ai.order = i
+                ai.save()
+    return qs

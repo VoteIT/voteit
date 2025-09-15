@@ -39,7 +39,7 @@ class AgendaAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
         "body",
         "meeting__title",
     )
-    exclude = ("order",)
+    readonly_fields = ("order",)
 
     @admin.display(description="Proposals")
     def proposal_count(self, obj: AgendaItem):

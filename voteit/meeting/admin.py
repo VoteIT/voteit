@@ -23,6 +23,7 @@ from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
+from voteit.meeting.utils import sort_agenda_items
 from voteit.meeting.workflows import MeetingWf
 from voteit.proposal.models import Proposal
 
@@ -129,6 +130,18 @@ class MeetingDialectForm(forms.ModelForm):
         return super().save(commit=commit)
 
 
+class MeetingReorderForm(forms.ModelForm):
+
+    class Meta:
+        model = Meeting
+        fields = []
+
+    def save(self, commit=True):
+        if commit:
+            sort_agenda_items(self.instance, reorder=True)
+        return super().save(commit=commit)
+
+
 class DialectFilter(admin.SimpleListFilter):
     title = "Dialect"
 
@@ -195,6 +208,7 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
             for urlname, title in [
                 ("admin:meeting_meeting_clone_form", "Clone"),
                 ("admin:meeting_meeting_dialect_form", "Hantera dialekter"),
+                ("admin:meeting_meeting_reorder_ais", "Sortera AIs"),
             ]:
                 context["extra_btns"].append(
                     format_html(
@@ -234,8 +248,39 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.meeting_dialect_form),
                 name="meeting_meeting_dialect_form",
             ),
+            path(
+                "<int:object_id>/meeting-reoder-form/",
+                self.admin_site.admin_view(self.reoder_meeting_ais_form),
+                name="meeting_meeting_reorder_ais",
+            ),
         ]
         return custom_urls + urls
+
+    def reoder_meeting_ais_form(self, request, object_id):
+        obj = get_object_or_404(Meeting, pk=object_id)
+
+        if request.method == "POST":
+            form = MeetingReorderForm(data=request.POST, instance=obj)
+            if form.is_valid():
+                instance = form.save()
+                self.message_user(
+                    request,
+                    f"Mötet {instance.title} sorterades om",
+                    level=messages.SUCCESS,
+                )
+                return redirect("admin:meeting_meeting_change", object_id)
+        else:
+            form = MeetingReorderForm(instance=obj)
+        context = dict(
+            self.admin_site.each_context(request),
+            title="Sortera dagordningspunkter alfabetiskt",
+            form=form,
+            instance=obj,
+            orig_form_url=reverse(
+                "admin:meeting_meeting_change", kwargs={"object_id": object_id}
+            ),
+        )
+        return render(request, "admin/meeting/special_meeting_form.html", context)
 
     def clone_meeting_form(self, request, object_id):
         obj = get_object_or_404(Meeting, pk=object_id)
