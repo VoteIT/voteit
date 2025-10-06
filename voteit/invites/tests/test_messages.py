@@ -10,6 +10,8 @@ from django.test import TestCase
 from django.test import override_settings
 
 from envelope.messages.errors import BadRequestError
+from envelope.testing import testing_channel_layers_setting
+
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteAdded
 from voteit.invites.messages import MeetingInviteChanged
@@ -27,12 +29,9 @@ if TYPE_CHECKING:
     from voteit.invites.messages import AddInvites
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AddInvitesTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -191,8 +190,29 @@ class AddInvitesTests(TestCase):
             str(cm.exception.data.msg),
         )
 
+    def test_add_with_existing_invites_and_cleared_user(self):
+        invite: MeetingInvite = self.meeting.invites.create(
+            user_data={"email": "one@betahaus.net"},
+            roles=[ROLE_POTENTIAL_VOTER],
+        )
+        user = User.objects.create(username="one")
+        invite.accept(user)
+        invite.save()
+        self.assertTrue(self.meeting.roles.filter(user=user).exists())
+        self.meeting.roles.filter(user=user).delete()
+        msg = self._mk_one(
+            user_pk=self.moderator.pk,
+            rows=["one@betahaus.net"],
+            columns=["email"],
+            roles=[str(ROLE_PARTICIPANT)],
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = msg.run_job()
+        self.assertEqual({"added": 0, "changed": 1, "existed": 0}, response.data.dict())
+        self.assertTrue(self.meeting.roles.filter(user=user).exists())
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class ClearInviteAnnotationsTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -263,7 +283,7 @@ class ClearInviteAnnotationsTests(TestCase):
         self.assertEqual({self.inv_din.pk, self.inv_luke.pk, self.inv_vader.pk}, pks)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class AddInviteAnnotationsTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
