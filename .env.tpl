@@ -1,0 +1,17 @@
+DJANGO_SECRET_KEY=
+POSTGRES_PASSWORD=
+POSTGRES_VERSION=14-alpine
+HOST=voteit
+ID_HOST=https://
+ID_HOST_BACKEND=
+ID_PROXY_API_KEY=
+ALLOWED_HOSTS=localhost
+OAUTHLIB_INSECURE_TRANSPORT=1
+FRONTEND_VERSION=latest
+BACKEND_VERSION=dev
+DEBUG=1
+ID_PROXY_API_KEY=
+EMAIL_HOST=
+DEFAULT_FROM_EMAIL=VoteIT <noreply@mailout.voteit.se>
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+#EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend

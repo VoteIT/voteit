@@ -6,6 +6,7 @@ from django.test import TestCase
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation.models import Organisation
+from voteit.poll.app.er_policies.auto_always import AutoAlways
 
 User = get_user_model()
 
@@ -20,19 +21,24 @@ class AuditlogIntegrationTests(TestCase):
 
     def test_create(self):
         with set_actor(self.org_manager):
-            meeting: Meeting = self.org.meetings.create(title="Hello")
+            meeting: Meeting = self.org.meetings.create(
+                title="Hello",
+                installed_dialect="bonkers",
+                er_policy_name=AutoAlways.name,
+                proposal_id_policy_name="404",
+            )
         entry = LogEntry.objects.get_for_object(meeting).last()
         self.maxDiff = None
         self.assertEqual(
             {
                 "title": ["None", "Hello"],
                 "body": ["None", ""],
-                "er_policy_name": ["None", "None"],
+                "er_policy_name": ["None", AutoAlways.name],
                 "group_roles_active": ["None", "False"],
                 "group_votes_active": ["None", "False"],
-                "installed_dialect": ["None", "None"],
+                "installed_dialect": ["None", "bonkers"],
                 "organisation": ["None", "1"],
-                "proposal_id_policy_name": ["None", "None"],
+                "proposal_id_policy_name": ["None", "404"],
                 "public": ["None", "False"],
                 "state": ["None", "upcoming"],
                 "visible_in_lists": ["None", "False"],

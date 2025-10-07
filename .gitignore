@@ -1,6 +1,13 @@
 .coverage
+.env
+.idea
 *.pyc
 *.egg-info
 .DS_Store
 venv
 build
+src
+volumes
+var
+static
+dist

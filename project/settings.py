@@ -1,45 +1,73 @@
-"""
-Test settings
-"""
-
 import os
+import sys
+from pathlib import Path
+
 from voteit.settings_tpl import *
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "change-me"
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-ALLOWED_HOSTS = ["*"]
+DEBUG = False
 
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    from hashlib import md5
 
-ID_HOST = "http://example.com"  # Required setting by organisation app
+    SECRET_KEY = md5().hexdigest()
+
+_marker = object()
+for env_setting in (
+    "EXPORT_SECRET_KEY",
+    "ID_HOST",
+    "ID_HOST_BACKEND",
+    "ID_PROXY_API_KEY",
+    "EMAIL_HOST",
+    "DEFAULT_FROM_EMAIL",
+    "EMAIL_PORT",
+    "EMAIL_HOST_USER",
+    "EMAIL_HOST_PASSWORD",
+    "EMAIL_USE_TLS",
+    "EMAIL_USE_SSL",
+    "EMAIL_TIMEOUT",
+    "EMAIL_SSL_KEYFILE",
+    "EMAIL_SSL_CERTFILE",
+    "AUDITLOG_TWO_STEP_MIGRATION",
+    "AUDITLOG_USE_TEXT_CHANGES_IF_JSON_IS_NOT_PRESENT",
+):
+    val = os.getenv(env_setting, _marker)
+    if val is not _marker:
+        setattr(sys.modules[__name__], env_setting, val)
+
+
+# Application definition
+INSTALLED_APPS = (
+    INSTALLED_APPS
+    + [
+        # Other dependencies related to voteit and our org
+        # "dialects",
+        # "voteit_org",
+    ]
+)
+# Enable tools if there's a mounted volume with that name
+if os.path.isdir(os.path.join(BASE_DIR, "voteit_tools")):
+    INSTALLED_APPS.append("voteit_tools")
 
 ROOT_URLCONF = "project.urls"
-
-
-WSGI_APPLICATION = "voteit_project.wsgi.application"
-ASGI_APPLICATION = "voteit_project.routing.application"
-CHANNEL_LAYERS = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
-}
-
+WSGI_APPLICATION = "project.wsgi.application"
+ASGI_APPLICATION = "project.routing.application"
 
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "postgres",
         "USER": "postgres",
-        "PASSWORD": "postgres",
-        "HOST": "127.0.0.1",
-        "PORT": "5432",
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
+        "HOST": os.getenv("POSTGRES_HOST", "db"),
     }
 }
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
@@ -49,11 +77,10 @@ USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/3.0/howto/static-files/
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
+MEETING_DIALECTS_DIR = os.path.join(BASE_DIR, "dialects")
 
 
 LOGGING = {
@@ -64,18 +91,18 @@ LOGGING = {
             "format": "%(asctime)s %(message)s",
             "datefmt": "%H:%M:%S",
         },
-        # "json": {
-        #     # Must be () otherwise timestamp won't be passed along!
-        #     "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
-        #     "format": "%(message)s",
-        #     "datefmt": "%H:%M:%S",
-        #     "timestamp": True,
-        # },
+        "json": {
+            # Must be () otherwise timestamp won't be passed along!
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(message)s",
+            "datefmt": "%H:%M:%S",
+            "timestamp": True,
+        },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "rq_console",
+            "formatter": "json",
         },
         "rq_console": {
             "level": "DEBUG",
@@ -83,11 +110,11 @@ LOGGING = {
             "formatter": "rq_console",
             "exclude": ["%(asctime)s"],
         },
-        # "json": {
-        #     "level": "DEBUG",
-        #     "class": "logging.StreamHandler",
-        #     "formatter": "json",
-        # },
+        "json": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
     },
     "root": {
         "handlers": ["console"],
@@ -96,14 +123,14 @@ LOGGING = {
     "loggers": {
         "django": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
             "propagate": False,
         },
         "voteit": {"handlers": ["console"], "level": "WARNING", "propagate": False},
         "envelope": {"handlers": ["console"], "level": "WARNING", "propagate": False},
         "envelope.consumers.websocket.event": {
-            "handlers": ["console"],
-            "level": "INFO",
+            "handlers": ["json"],
+            "level": "DEBUG",
             "propagate": False,
         },
         "rq.worker": {
@@ -120,3 +147,62 @@ LOGGING = {
         # },
     },
 }
+
+if SLACK_WEBHOOK_URL := os.getenv("SLACK_LOGGER_WEBHOOK"):
+    LOGGING["formatters"]["slack"] = {
+        "()": "slack_logger.SlackFormatter",
+    }
+    LOGGING["handlers"]["slack"] = {
+        "()": "slack_logger.SlackHandler",
+        "level": "DEBUG",
+        "formatter": "slack",
+        "username": "logger",
+        "icon_emoji": ":robot_face:",
+        "url": SLACK_WEBHOOK_URL,
+    }
+    LOGGING["loggers"]["voteit.notification"] = {
+        "handlers": ["slack"],
+        "level": "INFO",
+        "propagate": False,
+    }
+
+
+# Set SENTRY_DSN env variable to enable sentry logging.
+if SENTRY_DSN := os.getenv("SENTRY_DSN"):  # pragma: no cover
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    SENTRY_TRACES_SAMPLERATE = float(os.getenv("SENTRY_TRACES_SAMPLERATE", 1.0))
+    SENTRY_PROFILES_SAMPLERATE = float(os.getenv("SENTRY_PROFILES_SAMPLERATE", 1.0))
+    # Remember trailing slash!
+    SENTRY_IGNORE_PATHS = os.getenv("SENTRY_IGNORE_PATHS", "/api/health/").split(",")
+    SENTRY_PII = os.getenv("SENTRY_PII", "false").lower() == "true"
+    SENTRY_ENVIRONMENT = os.getenv("SENTRY_ENVIRONMENT", "local_dev")
+    SENTRY_RELEASE = os.getenv("BACKEND_VERSION", "local_dev")
+
+    def traces_sampler(sampling_context: dict):
+        if (
+            sampling_context.get("wsgi_environ", {}).get("PATH_INFO")
+            in SENTRY_IGNORE_PATHS
+        ):
+            return 0
+        return SENTRY_TRACES_SAMPLERATE
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for performance monitoring.
+        # We recommend adjusting this value in production.
+        traces_sample_rate=SENTRY_TRACES_SAMPLERATE,
+        profiles_sample_rate=SENTRY_PROFILES_SAMPLERATE,
+        # If you wish to associate users to errors (assuming you are using
+        # django.contrib.auth) you may enable sending PII data.
+        send_default_pii=SENTRY_PII,
+        # Filter out specific endpoints to avoid spamming
+        traces_sampler=traces_sampler,
+        # Env tag
+        environment=SENTRY_ENVIRONMENT,
+        # Release tag
+        release=SENTRY_RELEASE,
+    )

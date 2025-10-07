@@ -10,14 +10,15 @@ User = get_user_model()
 
 
 class AuditlogIntegrationTests(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.superuser = User.objects.create(username="superuser")
 
     def test_create(self):
         with set_actor(self.superuser):
-            org: Organisation = Organisation.objects.create(title="Hello")
+            org: Organisation = Organisation.objects.create(
+                title="Hello", host="localhost"
+            )
         entry = LogEntry.objects.get_for_object(org).last()
         self.maxDiff = None
         self.assertEqual(
@@ -26,7 +27,7 @@ class AuditlogIntegrationTests(TestCase):
                 "active": ["None", "True"],
                 "body": ["None", ""],
                 "help_info": ["None", ""],
-                "host": ["None", "None"],
+                "host": ["None", "localhost"],
                 "page_title": ["None", "Hello"],
             },
             entry.changes_dict,

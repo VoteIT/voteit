@@ -14,7 +14,7 @@ from envelope.messages.errors import UnauthorizedError
 from envelope.utils import websocket_send
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
-from voteit.meeting.utils import clone_meeting
+#from voteit.meeting.utils import clone_meeting
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
@@ -85,35 +85,35 @@ class CopyMeetingSchema(BaseModel):
     # Settings etc later on
 
 
-@incoming
-class CopyMeeting(ContextAction):
-    name = "meeting.create_copy"
-    permission = MeetingPermissions.VIEW
-    schema = CopyMeetingSchema
-    data: CopyMeetingSchema
-    model = Meeting
-    context_schema_attr = "meeting"
-
-    def run_job(self):
-        # Read meeting
-        self.assert_perm()
-        organisation = self.user.organisation
-        assert organisation
-        # Double permission check here, since add is needed too
-        if not self.user.has_perm(MeetingPermissions.ADD, organisation):
-            raise UnauthorizedError.from_message(
-                self,
-                model=organisation.__class__,
-                key="pk",
-                value=organisation.pk,
-                permission=MeetingPermissions.ADD,
-            )
-        meeting: Meeting = self.context
-        update = Status.from_message(self)
-        websocket_send(update, state=update.RUNNING, on_commit=False)
-        with set_actor(self.user):
-            clone_meeting(meeting, user=self.user)
-        websocket_send(update, state=update.SUCCESS)
+# @incoming
+# class CopyMeeting(ContextAction):
+#     name = "meeting.create_copy"
+#     permission = MeetingPermissions.VIEW
+#     schema = CopyMeetingSchema
+#     data: CopyMeetingSchema
+#     model = Meeting
+#     context_schema_attr = "meeting"
+#
+#     def run_job(self):
+#         # Read meeting
+#         self.assert_perm()
+#         organisation = self.user.organisation
+#         assert organisation
+#         # Double permission check here, since add is needed too
+#         if not self.user.has_perm(MeetingPermissions.ADD, organisation):
+#             raise UnauthorizedError.from_message(
+#                 self,
+#                 model=organisation.__class__,
+#                 key="pk",
+#                 value=organisation.pk,
+#                 permission=MeetingPermissions.ADD,
+#             )
+#         meeting: Meeting = self.context
+#         update = Status.from_message(self)
+#         websocket_send(update, state=update.RUNNING, on_commit=False)
+#         with set_actor(self.user):
+#             clone_meeting(meeting, user=self.user)
+#         websocket_send(update, state=update.SUCCESS)
 
 
 class MeetingGroupSchema(BaseModel):

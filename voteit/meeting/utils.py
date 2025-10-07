@@ -7,12 +7,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models.functions import Collate
 from django_fsm import FSMField
-from dolly.core import LiveCloner
-from dolly.utils import get_inf_collector
-from dolly.utils import get_model_formatted_dict
+# from dolly.core import LiveCloner
+# from dolly.utils import get_inf_collector
+# from dolly.utils import get_model_formatted_dict
 
 from voteit.core.decorators import ensure_atomic
-from voteit.core.utils import get_content_registry
 from voteit.core.utils import get_model_by_shortname
 
 if TYPE_CHECKING:
@@ -24,18 +23,18 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-def collect_meeting(meeting: Meeting, *, exclude: list[type[Model]] = ()):
-    content_reg = get_content_registry()
-    collector = get_inf_collector()
-    collector.EXCLUDE_MODELS = []
-    for m in exclude:
-        nat_key = content_reg.get_natural_key(m)
-        if not nat_key:
-            raise ValueError(f"{m} got bad natural key")
-        collector.EXCLUDE_MODELS.append(nat_key)
-    collector.collect(meeting)
-    related_objects = collector.get_collected_objects()
-    return get_model_formatted_dict(related_objects)
+# def collect_meeting(meeting: Meeting, *, exclude: list[type[Model]] = ()):
+#     content_reg = get_content_registry()
+#     collector = get_inf_collector()
+#     collector.EXCLUDE_MODELS = []
+#     for m in exclude:
+#         nat_key = content_reg.get_natural_key(m)
+#         if not nat_key:
+#             raise ValueError(f"{m} got bad natural key")
+#         collector.EXCLUDE_MODELS.append(nat_key)
+#     collector.collect(meeting)
+#     related_objects = collector.get_collected_objects()
+#     return get_model_formatted_dict(related_objects)
 
 
 def get_default_ignored_on_clone() -> set[str]:
@@ -92,54 +91,54 @@ class _WFResetter:
                 field.set_state(obj, field.default)
 
 
-@ensure_atomic
-def clone_meeting(
-    meeting: Meeting,
-    exclude=None,
-    *,
-    user: User,
-    prefix: str = "Copy of",
-    reset_wf: bool = True,
-) -> Meeting:
-    """
-    Clone meeting and return the newly cloned. Will also add cloning user as moderator.
-
-    """
-    from voteit.meeting.models import Meeting
-    from voteit.meeting.roles import ROLE_MODERATOR
-    from voteit.speaker.models import SpeakerListSystem
-    from voteit.room.models import Room
-
-    assert user is not None
-    if exclude is None:
-        exclude = get_default_models_ignored_on_clone()
-    data = collect_meeting(meeting, exclude=exclude)
-    cloner = LiveCloner(data=data)
-    # This should never be copied
-    cloner.add_clear_attrs(SpeakerListSystem, "active_list")
-    cloner.add_clear_attrs(Meeting, "participants")
-    cloner.add_clear_attrs(Room, "agenda_item", "handler", "poll")
-    if reset_wf:
-        for mod in cloner.data:
-            wf_fields = set()
-            for field in mod._meta.get_fields():
-                if isinstance(field, FSMField):
-                    wf_fields.add(field)
-            if wf_fields:
-                resetter = _WFResetter(wf_fields)
-                cloner.add_pre_save(mod, resetter)
-    cloner()
-    # Note: Meeting is now the clone!!!
-    if prefix:
-        meeting.title = f"{prefix} {meeting.title}"[:100]
-        meeting.save()
-    if user.organisation == meeting.organisation:
-        meeting.add_roles(user, ROLE_MODERATOR)
-    else:
-        logger.warning(
-            f"User {user} doesn't belong to organisation {meeting.organisation} so that user won't be added as moderator."
-        )
-    return meeting
+# @ensure_atomic
+# def clone_meeting(
+#     meeting: Meeting,
+#     exclude=None,
+#     *,
+#     user: User,
+#     prefix: str = "Copy of",
+#     reset_wf: bool = True,
+# ) -> Meeting:
+#     """
+#     Clone meeting and return the newly cloned. Will also add cloning user as moderator.
+#
+#     """
+#     from voteit.meeting.models import Meeting
+#     from voteit.meeting.roles import ROLE_MODERATOR
+#     from voteit.speaker.models import SpeakerListSystem
+#     from voteit.room.models import Room
+#
+#     assert user is not None
+#     if exclude is None:
+#         exclude = get_default_models_ignored_on_clone()
+#     data = collect_meeting(meeting, exclude=exclude)
+#     cloner = LiveCloner(data=data)
+#     # This should never be copied
+#     cloner.add_clear_attrs(SpeakerListSystem, "active_list")
+#     cloner.add_clear_attrs(Meeting, "participants")
+#     cloner.add_clear_attrs(Room, "agenda_item", "handler", "poll")
+#     if reset_wf:
+#         for mod in cloner.data:
+#             wf_fields = set()
+#             for field in mod._meta.get_fields():
+#                 if isinstance(field, FSMField):
+#                     wf_fields.add(field)
+#             if wf_fields:
+#                 resetter = _WFResetter(wf_fields)
+#                 cloner.add_pre_save(mod, resetter)
+#     cloner()
+#     # Note: Meeting is now the clone!!!
+#     if prefix:
+#         meeting.title = f"{prefix} {meeting.title}"[:100]
+#         meeting.save()
+#     if user.organisation == meeting.organisation:
+#         meeting.add_roles(user, ROLE_MODERATOR)
+#     else:
+#         logger.warning(
+#             f"User {user} doesn't belong to organisation {meeting.organisation} so that user won't be added as moderator."
+#         )
+#     return meeting
 
 
 def sort_agenda_items(
