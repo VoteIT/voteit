@@ -1,0 +1,14 @@
+.*
+benchmarks
+docker
+venv
+volumes
+scripts
+db.sqlite3
+var
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/*.cover
+**/*.log

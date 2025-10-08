@@ -42,3 +42,10 @@ jobs:
     - name: Django testrunner
       run: |
         ./manage.py test voteit
+      env:
+        DJANGO_DEBUG: 1
+        DJANGO_SETTINGS_MODULE: project.settings
+        POSTGRES_HOST: 127.0.0.1
+        ID_HOST: https://id.voteit.se
+        OAUTHLIB_INSECURE_TRANSPORT: 1
+        HOST: voteit.se

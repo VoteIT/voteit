@@ -7,7 +7,15 @@ from voteit.settings_tpl import *
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DEBUG = False
+DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() in ("true", "1")
+
+STATIC_ROOT = "/app/static/"
+ALLOWED_HOSTS = ["127.0.0.1"] + os.getenv("HOST", "").split()
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://\w+\.voteit\.se$",
+    r"^https://\w+\.betahaus\.net$",
+]
+
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
@@ -56,8 +64,29 @@ ROOT_URLCONF = "project.urls"
 WSGI_APPLICATION = "project.wsgi.application"
 ASGI_APPLICATION = "project.routing.application"
 
+
+# RQ
+RQ_QUEUES["default"]["HOST"] = "redis_rq"
+RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["DB"] = 2
+RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["HOST"] = "redis_rq"
+RQ_QUEUES[ENVELOPE_TIMESTAMP_QUEUE]["DB"] = 3
+RQ_QUEUES[ENVELOPE_TIMESTAMP_QUEUE]["HOST"] = "redis_rq"
+
+# Channels
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis", 6379)],
+            "capacity": 1500,  # default 100
+            "expiry": 60,  # default 60
+            "group_expiry": 86400,  # default 86400
+        },
+    },
+}
+
+
 # Database
-# https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -70,7 +99,6 @@ DATABASES = {
 
 
 # Internationalization
-# https://docs.djangoproject.com/en/3.0/topics/i18n/
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Europe/Stockholm"
 USE_I18N = True
@@ -81,7 +109,6 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 MEETING_DIALECTS_DIR = os.path.join(BASE_DIR, "dialects")
-
 
 LOGGING = {
     "version": 1,
