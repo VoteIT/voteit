@@ -41,7 +41,7 @@ jobs:
 
     - name: Django testrunner
       run: |
-        poetry run manage.py test voteit
+        poetry run ./manage.py test voteit
       env:
         DJANGO_DEBUG: 1
         DJANGO_SETTINGS_MODULE: project.settings
