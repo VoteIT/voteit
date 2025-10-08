@@ -36,8 +36,8 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install -r requirements.txt
-        pip freeze
+        pip install poetry
+        poetry install --with dev
 
     - name: Django testrunner
       run: |
