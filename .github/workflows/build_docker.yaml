@@ -40,7 +40,7 @@ jobs:
 
       - name: Build wheels
         run: |
-          pip install build
+          pip install poetry
           python -m build -w .
           python -m build -w src/voteit_org -o dist
           python -m build -w src/member_dialects -o dist

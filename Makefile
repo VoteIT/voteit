@@ -25,11 +25,13 @@ run:
 	python -W once manage.py runserver
 test:
 	./manage.py test voteit voteit_org dialect_tests voteit_tools --keepdb --failfast
-dev:
+build:
 	set -e
-	python -m build -w .
-	python -m build -w src/voteit_org -o dist
-	python -m build -w src/member_dialects -o dist
+	poetry build --format wheel
+	poetry build --format wheel -o ../../dist -P src/voteit_org
+	poetry build --format wheel -o ../../dist -P src/member_dialects
+dev: build
+	set -e
 	docker pull python:3.12-slim
 	docker build . -t voteit/voteit4dev:dev
 envtest:
