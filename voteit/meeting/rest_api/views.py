@@ -72,9 +72,11 @@ class MeetingViewSet(DefaultModelViewSet):
 
     @property
     def permission_type_map(self):
-        data = super().permission_type_map.copy()
-        data["set_agenda_order"] = "change"
-        return data
+        return {
+            **super().permission_type_map,
+            "set_agenda_order": "change",
+            "retrieve": "preview",
+        }
 
     @action(methods=["post"], detail=True)
     def set_agenda_order(self, request, pk):

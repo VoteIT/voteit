@@ -166,6 +166,7 @@ rules.add_perm(MeetingPermissions.DELETE, is_moderator)
 rules.add_perm(
     MeetingPermissions.CHANGE_ROLES, meeting_not_archived & (is_moderator | is_manager)
 )
+rules.add_perm(MeetingPermissions.PREVIEW, visible_in_lists | can_view_meeting)
 rules.add_perm(MeetingPermissions.VIEW_ROLES, can_view_meeting | is_manager)
 
 
