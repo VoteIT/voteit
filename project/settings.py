@@ -6,7 +6,7 @@ from voteit.settings_tpl import *
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+MEETING_DIALECTS_DIR = os.path.join(BASE_DIR, "dialects")
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() in ("true", "1")
 
 STATIC_ROOT = "/app/static/"
@@ -46,16 +46,13 @@ for env_setting in (
     if val is not _marker:
         setattr(sys.modules[__name__], env_setting, val)
 
-
+# from importlib.util import find_spec
 # Application definition
-INSTALLED_APPS = (
-    INSTALLED_APPS
-    + [
-        # Other dependencies related to voteit and our org
-        # "dialects",
-        # "voteit_org",
-    ]
-)
+INSTALLED_APPS += [
+    # Other dependencies related to voteit and our org
+    "dialects",
+    "voteit_org",
+]
 # Enable tools if there's a mounted volume with that name
 if os.path.isdir(os.path.join(BASE_DIR, "voteit_tools")):
     INSTALLED_APPS.append("voteit_tools")

@@ -1,21 +1,19 @@
 .DEFAULT_GOAL := install
+.ONESHELL:
 
-install: venv
-	poetry install --with dev
-venv:
-	test -d venv || virtualenv -p python3 venv
-	. venv/bin/activate
+install:
+	cat INSTALL.md
 requirements:
 	poetry export -o requirements.txt --with docker --without-hashes
-coverage: venv
+coverage:
 	coverage run && coverage report
-migrations: venv
+migrations:
 	python manage.py makemigrations
-migrate: venv
+migrate:
 	python manage.py migrate
-rqworker: venv
+rqworker:
 	python manage.py devrqworker default ts conn --with-scheduler
-up: venv
+up:
 	docker compose up -d
 	python manage.py rqworker --with-scheduler default ts conn &
 	python -W once manage.py runserver
@@ -24,7 +22,9 @@ down:
 run:
 	python -W once manage.py runserver
 test:
-	./manage.py test voteit voteit_org dialect_tests voteit_tools --keepdb --failfast
+	python manage.py test voteit --keepdb --failfast
+test-deps:
+	python manage.py test dialect_tests voteit_org --keepdb --failfast
 build:
 	set -e
 	poetry build --format wheel
@@ -41,4 +41,4 @@ envtest:
 	ID_HOST=http://localhost:8001 \
 	DJANGO_SETTINGS_MODULE=project.settings \
 	HOST=.voteit.se \
-	&& ./manage.py test voteit --keepdb --failfast
+	&& python manage.py test voteit --keepdb --failfast

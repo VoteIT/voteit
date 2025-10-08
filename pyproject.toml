@@ -12,7 +12,7 @@ dependencies = [
     "channels-envelope (>=1.1.0,<2.0.0)",
     "requests-oauthlib (>=2.0.0,<3.0.0)",
     "python3-vote-core (>=20170329.0,<20170330.0)",
-    "stvpoll (>=0.4.5,<0.5.0)",
+    "stvpoll (>=0.4.6,<0.5.0)",
     "rules (>=3.5,<4.0)",
     "pyyaml (>=6.0.3,<7.0.0)",
     "pydantic[email] (<2)",
@@ -32,17 +32,9 @@ dependencies = [
     "bleach (>=6.2.0,<7.0.0)",
     "bs4 (>=0.0.2,<0.0.3)",
     "python-json-logger (>=4.0.0,<5.0.0)",
-    "lxml (>=6.0.2,<7.0.0)"
+    "lxml (>=6.0.2,<7.0.0)",
 ]
 
-classifiers = [
-  "Development Status :: 5 - Stable",
-    #Todo...
-  # "Intended Audience :: Developers",
-
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.12",
-]
 [project.urls]
 Homepage = "https://www.voteit.se/"
 #Documentation = "https://readthedocs.org"
@@ -63,10 +55,16 @@ dev = [
     "responses (>=0.25.8,<0.26.0)",
     "pre-commit (>=4.3.0,<5.0.0)",
 ]
+
 docker = [
     "sentry-sdk (>=2.40.0,<3.0.0)",
     "slack-logger (>=0.3.1,<0.4.0)",
     "personnummer (>=3.2.1,<4.0.0)"
+]
+
+internal = [
+    "voteit-org @ file:///Users/robin/PycharmProjects/voteit/src/voteit_org",
+    "member-dialects @ file:///Users/robin/PycharmProjects/voteit/src/member_dialects"
 ]
 
 [tool.poetry]
@@ -77,6 +75,9 @@ exclude = [
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
 
+[tool.poetry.dependencies]
+voteit-org = {develop = true}
+member-dialects = {develop = true}
 [tool.coverage.run]
 command_line = "manage.py test voteit --keepdb"
 source = ["voteit"]
