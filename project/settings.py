@@ -48,11 +48,8 @@ for env_setting in (
 
 # from importlib.util import find_spec
 # Application definition
-INSTALLED_APPS += [
-    # Other dependencies related to voteit and our org
-    "dialects",
-    "voteit_org",
-]
+INSTALLED_APPS += os.getenv("DJANGO_INSTALLED_APPS", "").split()
+
 # Enable tools if there's a mounted volume with that name
 if os.path.isdir(os.path.join(BASE_DIR, "voteit_tools")):
     INSTALLED_APPS.append("voteit_tools")
