@@ -48,4 +48,4 @@ jobs:
         POSTGRES_HOST: 127.0.0.1
         ID_HOST: https://id.voteit.se
         OAUTHLIB_INSECURE_TRANSPORT: 1
-        HOST: voteit.se
+        HOST: .voteit.se
