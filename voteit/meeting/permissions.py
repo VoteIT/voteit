@@ -6,14 +6,15 @@ class MeetingPermissions(ModelPermissions):
     model = "meeting"
 
     ADD = P("meeting.add_meeting", context="organisation")
+    ARCHIVE = P("meeting.archive_meeting")
     CHANGE = P("meeting.change_meeting")
     CHANGE_DIALECT = P("meeting.change_dialect_meeting")
+    CHANGE_ROLES = P("meeting.change_roles_meeting")
     DELETE = P("meeting.delete_meeting")
-    VIEW = P("meeting.view_meeting")
     LIST = P("meeting.list_meeting")  # Include basic meeting details in listings
     MODERATE = P("meeting.moderate_meeting")
-    ARCHIVE = P("meeting.archive_meeting")
-    CHANGE_ROLES = P("meeting.change_roles_meeting")
+    PREVIEW = P("meeting.preview_meeting")
+    VIEW = P("meeting.view_meeting")
     VIEW_ROLES = P("meeting.view_roles_meeting")
 
 

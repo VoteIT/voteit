@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -200,6 +201,20 @@ class MeetingViewSetTests(APITestCase):
             },
             response.json(),
         )
+
+    def test_get_visible_in_lists(self):
+        url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})
+        participant = User.objects.get(username="participant")
+        self.client.force_login(participant)
+        # Check that user can't view details if not participant and not visible in lists
+        self.meeting.participants.remove(participant)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
+        # Check that user can view details if not participant, but visible in lists
+        self.meeting.visible_in_lists = True
+        self.meeting.save()
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_get_with_vt(self):
         self.meeting.er_policy_name = UnrestrictedVoteTransferER.name
