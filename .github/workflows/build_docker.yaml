@@ -31,14 +31,12 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: voteit/voteit_org
-          token: ${{ secrets.GITHUB_TOKEN }}
           path: src/voteit_org
 
       - name: Checkout / member_dialects
         uses: actions/checkout@v5
         with:
           repository: voteit/member_dialects
-          token: ${{ secrets.GITHUB_TOKEN }}
           path: src/member_dialects
 
       - name: Build wheels
