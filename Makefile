@@ -5,6 +5,8 @@ install:
 	cat INSTALL.md
 requirements:
 	poetry export -o requirements.txt --with docker --without-hashes
+shell:
+	python manage.py shell
 coverage:
 	coverage run && coverage report
 migrations:
