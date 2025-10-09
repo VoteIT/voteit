@@ -642,6 +642,17 @@ class HistoricSpeakerViewTests(APITestCase):
                 started=now() - timedelta(seconds=10 - i),
             )
         cls.slist.speaker_items.create(user=cls.user_two_nospeaker, seconds=11)
+        # And a second system
+        cls.room2 = cls.meeting.rooms.create()
+        cls.system2: SpeakerListSystem = cls.meeting.speaker_systems.create(
+            method_name="simple", room=cls.room2
+        )
+        cls.slist2: SpeakerList = cls.system2.speaker_lists.create(agenda_item=cls.ai)
+        cls.slist2.speaker_items.create(
+            user=cls.user_one,
+            seconds=5,
+            started=now(),
+        )
 
     @property
     def _cut(self):
@@ -656,31 +667,35 @@ class HistoricSpeakerViewTests(APITestCase):
         self.assertEqual(response.status_code, 401)
         # Speaker/Participant
         self.client.force_login(self.user_one)
-        response = self.client.get(url)
+        response = self.client.get(reverse("speaker-history-list"))
         self.assertEqual(400, response.status_code)
-        self.assertEqual(
-            {"speaker_system": ["This field is required."]}, response.json()
+        self.assertEqual({"meeting": ["This field is required."]}, response.json())
+        response = self.client.get(
+            url, data={"speaker_system": self.system.pk, "meeting": self.meeting.pk}
         )
-        response = self.client.get(url, data={"speaker_system": self.system.pk})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(2, len(response.json()))
         # moderator
         self.client.force_login(self.moderator)
-        response = self.client.get(url, data={"speaker_system": self.system.pk})
+        response = self.client.get(
+            url, data={"speaker_system": self.system.pk, "meeting": self.meeting.pk}
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(2, len(response.json()))
         # list moderator
         self.client.force_login(self.list_moderator)
-        response = self.client.get(url, data={"speaker_system": self.system.pk})
+        response = self.client.get(
+            url, data={"speaker_system": self.system.pk, "meeting": self.meeting.pk}
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(2, len(response.json()))
         # outsider
         self.client.force_login(self.outsider)
-        response = self.client.get(url, data={"speaker_system": self.system.pk})
+        response = self.client.get(url, data={"meeting": self.meeting.pk})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             {
-                "speaker_system": [
+                "meeting": [
                     "Select a valid choice. That choice is not one of the available choices."
                 ]
             },
@@ -690,13 +705,36 @@ class HistoricSpeakerViewTests(APITestCase):
     def test_history(self):
         url = reverse("speaker-history-list")
         self.client.force_login(self.user_one)
-        response = self.client.get(url, data={"speaker_system": self.system.pk})
-        self.assertEqual(response.status_code, 200)
+        response = self.client.get(
+            url, data={"speaker_system": self.system.pk, "meeting": self.meeting.pk}
+        )
         data = response.json()
+        self.assertEqual(response.status_code, 200, data)
         self.assertEqual(
             sorted(
                 [
                     {"user": self.user_one.pk, "times_spoken": 3, "seconds_spoken": 30},
+                    {
+                        "user": self.user_two_nospeaker.pk,
+                        "times_spoken": 1,
+                        "seconds_spoken": 11,
+                    },
+                ],
+                key=lambda x: x["user"],
+            ),
+            sorted(data, key=lambda x: x["user"]),
+        )
+
+    def test_history_global_for_meeting(self):
+        url = reverse("speaker-history-list")
+        self.client.force_login(self.user_one)
+        response = self.client.get(url, data={"meeting": self.meeting.pk})
+        data = response.json()
+        self.assertEqual(response.status_code, 200, data)
+        self.assertEqual(
+            sorted(
+                [
+                    {"user": self.user_one.pk, "times_spoken": 4, "seconds_spoken": 35},
                     {
                         "user": self.user_two_nospeaker.pk,
                         "times_spoken": 1,
