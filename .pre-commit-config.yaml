@@ -9,17 +9,18 @@ repos:
   - id: check-yaml
   - id: check-added-large-files
 
-#-   repo: https://github.com/python-poetry/poetry
-#    rev: 2.2.1
-#    hooks:
-#    -   id: poetry-check
+-   repo: https://github.com/python-poetry/poetry
+    rev: 2.2.1
+    hooks:
+    -   id: poetry-check
 #    -   id: poetry-lock
 
-#- repo: https://github.com/python-poetry/poetry-plugin-export
-#  rev: 1.9.0
-#  hooks:
-#    -   id: poetry-export
-#        args: [ "-o", "requirements.txt", "--with", "docker", "--without-hashes"]
+- repo: https://github.com/python-poetry/poetry-plugin-export
+  rev: 1.9.0
+  hooks:
+    -   id: poetry-export
+        args: [ "-o", "requirements.txt", "--with", "docker", "--without-hashes"]
+        verbose: true
 
 #- repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
