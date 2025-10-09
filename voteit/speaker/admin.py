@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.db import models
 from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.meeting.admin import MeetingAdminMixin
@@ -66,7 +65,6 @@ class SLAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
         return self.annotate_meeting(
             qs,
             title_attr="speaker_system__meeting__title",
-            pk_attr="speaker_system__meeting_id",
         )
 
     @admin.display(description="Speakers")
