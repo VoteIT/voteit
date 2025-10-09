@@ -6,13 +6,6 @@ load_dotenv()
 from .settings import *
 
 
-INSTALLED_APPS += [
-    "hijack",
-    "hijack.contrib.admin",
-]
-MIDDLEWARE += [
-    "hijack.middleware.HijackUserMiddleware",
-]
 CSRF_TRUSTED_ORIGINS = ["http://localhost:8080", "http://voteit.localhost:8080"]
 CHANNEL_LAYERS["default"]["CONFIG"]["hosts"] = [("127.0.0.1", 6379)]
 DATABASES["default"]["HOST"] = "localhost"
