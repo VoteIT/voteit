@@ -6,7 +6,7 @@ if [[ "$1" == "run" ]]; then
   echo "Starting Daphne"
   exec ./wait-for-it.sh db:5432 -s -- \
     ./wait-for-it.sh redis:6379 -s -- \
-    daphne --access-log - -p 8000 -b 0.0.0.0 --ping-interval 10 --proxy-headers voteit_project.routing:application
+    daphne --access-log - -p 8000 -b 0.0.0.0 --ping-interval 10 --proxy-headers project.routing:application
 elif [[ "$1" == "worker" ]]; then
   if [[ ! $2 ]]; then
     $2 = default
