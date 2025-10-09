@@ -46,7 +46,6 @@ for env_setting in (
     if val is not _marker:
         setattr(sys.modules[__name__], env_setting, val)
 
-# from importlib.util import find_spec
 # Application definition
 INSTALLED_APPS += os.getenv("DJANGO_INSTALLED_APPS", "").split()
 
