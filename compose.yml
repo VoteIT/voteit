@@ -17,6 +17,13 @@ services:
       - ./volumes/redis:/data
     ports:
       - "6379:6379"
+#  django:
+#    image:  ghcr.io/voteit/voteit:latest
+#    command: run
+#    env_file:
+#      - .env
+#    ports:
+#      - "8050:8000"
 #  rqmonitor:
 #    image: pranavgupta1234/rqmonitor
 #    environment:
@@ -40,18 +47,6 @@ services:
 #      - "8025:8025"
 #      - "1025:1025"
 
-#  django:
-#    image:  voteit/voteit4dev:latest
-#    command: run
-#    env_file:
-#      - .env
-#    ports:
-#      - "8050:8000"
-#  testing:
-#    restart: 'no'
-#    image: voteit/voteit4dev_test:latest
-#    env_file:
-#      - .env
 
 
 #  pgadmin:
