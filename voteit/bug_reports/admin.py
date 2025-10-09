@@ -27,8 +27,8 @@ class BugReportAdmin(FSMTransitionMixin, admin.ModelAdmin):
     )
 
     def get_readonly_fields(self, request, obj=None):
-        return [field.name for field in obj._meta.fields] + [
-            field.name for field in obj._meta.many_to_many
+        return [field.name for field in BugReport._meta.fields] + [
+            field.name for field in BugReport._meta.many_to_many
         ]
 
     def organisation(self, instance: BugReport):
