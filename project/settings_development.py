@@ -16,9 +16,11 @@ MIDDLEWARE += [
 CSRF_TRUSTED_ORIGINS = ["http://localhost:8080", "http://voteit.localhost:8080"]
 CHANNEL_LAYERS["default"]["CONFIG"]["hosts"] = [("127.0.0.1", 6379)]
 DATABASES["default"]["HOST"] = "localhost"
-RQ_QUEUES["default"]["HOST"] = "localhost"
-RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["HOST"] = "localhost"
-RQ_QUEUES[ENVELOPE_TIMESTAMP_QUEUE]["HOST"] = "localhost"
+
+# Make sure all use same connection to enable us to use one worker when developing
+for qname in {"default", ENVELOPE_TIMESTAMP_QUEUE, ENVELOPE_CONNECTIONS_QUEUE}:
+    RQ_QUEUES[qname] = {"HOST": "localhost", "DB": 1, "PORT": 6379}
+
 
 if platform.system() == "Darwin":
     RQ = {"WORKER_CLASS": "rq.SimpleWorker"}
