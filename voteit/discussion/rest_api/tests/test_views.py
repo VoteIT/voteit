@@ -75,10 +75,7 @@ class DiscussionPostAPITests(APITestCase):
             "body": '<img name="currentScript" src="https://attacker.controlled.server/"></img>',
         }
         response = self.client.post(url, data)
-        self.assertEqual(
-            '&lt;img name="currentScript" src="https://attacker.controlled.server/"&gt;&lt;/img&gt;',
-            response.json().get("body"),
-        )
+        self.assertEqual("", response.json().get("body"))
 
     def test_list(self):
         url = reverse("discussion-posts-list")

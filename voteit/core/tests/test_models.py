@@ -189,12 +189,12 @@ class BaseContentTests(TestCase):
         self.assertIn("data-value", text)
         self.assertIn("data-id", text)
         self.assertIn("data-denotation-char", text)
-        self.assertEqual(len(text), len(self.meeting.body))
+        self.assertEqual(len(text.strip()), len(self.meeting.body))
 
     def test_body_with_bad_stuff(self):
         self.meeting.body = "<javascript>is annoying"
         self.meeting.save()
-        self.assertEqual("&lt;javascript&gt;is annoying", self.meeting.body)
+        self.assertEqual("is annoying", self.meeting.body)
 
     def test_weird_list_fetish(self):
         body = '<ol><li data-list="bullet">.</li><li data-list="ordered">.</li><li data-list="checked">.</li></ol>'

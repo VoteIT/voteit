@@ -8,9 +8,7 @@ from random import randint
 from time import perf_counter
 from typing import TYPE_CHECKING
 
-from bleach import ALLOWED_ATTRIBUTES
-from bleach import ALLOWED_TAGS
-from bleach import Cleaner
+import nh3
 from bs4 import BeautifulSoup
 from django.db.models import Model
 from django.utils.text import slugify
@@ -24,6 +22,80 @@ if TYPE_CHECKING:
 _tag_pattern = re.compile(r"#([\w\-]+)")
 # FIXME: Do a proper regex. I'm crappy with this /rho
 _userid_pattern = re.compile(r"@([\w\d]+)")
+
+
+STRICT_ALLOWED_ATTRIBUTES = deepcopy(nh3.ALLOWED_ATTRIBUTES)
+STRICT_ALLOWED_ATTRIBUTES["a"].update({"data-userid", "data-tag"})
+STRICT_ALLOWED_ATTRIBUTES.setdefault("span", set())
+STRICT_ALLOWED_ATTRIBUTES["span"].update(
+    {
+        "class",
+        "contenteditable",
+        "data-denotation-char",
+        "data-id",
+        "data-index",
+        "data-value",
+        "ql-mention-denotation-char",
+    }
+)
+
+STRICT_ALLOWED_TAGS = {
+    "h2",
+    "abbr",
+    "li",
+    "p",
+    "em",
+    "acronym",
+    "span",
+    "ol",
+    "sub",
+    "strike",
+    "h1",
+    "h4",
+    "blockquote",
+    "del",
+    "small",
+    "u",
+    "hgroup",
+    "br",
+    "i",
+    "strong",
+    "sup",
+    "b",
+    "a",
+    "h3",
+    "s",
+    "h5",
+    "h6",
+    "div",
+}
+
+
+RELAXED_ALLOWED_ATTRIBUTES = deepcopy(STRICT_ALLOWED_ATTRIBUTES)
+RELAXED_ALLOWED_ATTRIBUTES.setdefault("li", set())
+RELAXED_ALLOWED_ATTRIBUTES.setdefault("ol", set())
+RELAXED_ALLOWED_ATTRIBUTES["li"].add("data-list")
+RELAXED_ALLOWED_ATTRIBUTES["ol"].add("data-list")
+for tag in "h2", "h3", "h4", "p", "blockquote":
+    tagattrs = RELAXED_ALLOWED_ATTRIBUTES.setdefault(tag, set())
+    tagattrs.add("class")
+RELAXED_ALLOWED_ATTRIBUTES["img"] = {
+    "src",
+    "alt",
+    "title",
+    "width",
+    "height",
+    "class",
+}
+RELAXED_ALLOWED_ATTRIBUTES["iframe"] = {
+    "class",
+    "frameborder",
+    "allowfullscreen",
+    "src",
+    "height",
+    "width",
+}
+RELAXED_ALLOWED_TAGS = deepcopy(nh3.ALLOWED_TAGS)
 
 
 def get_tags(text: str, lower=True) -> set[str]:
@@ -155,24 +227,6 @@ def get_tagged_hashtags(text: str, lower=True) -> set:
     return found
 
 
-_STRICT = {
-    "attributes": deepcopy(ALLOWED_ATTRIBUTES),
-    "tags": set(ALLOWED_TAGS) | {"p", "span", "br"},
-}
-_STRICT["attributes"]["a"].extend(["data-userid", "data-tag"])
-_STRICT["attributes"].setdefault("span", []).extend(
-    [
-        "class",
-        "contenteditable",
-        "data-denotation-char",
-        "data-id",
-        "data-index",
-        "data-value",
-        "ql-mention-denotation-char",
-    ]
-)
-
-
 def strict_clean_html(text: str):
     """
     Clean HTML for non-trusted users, for instance anonymous.
@@ -184,30 +238,27 @@ def strict_clean_html(text: str):
     >>> strict_clean_html('Hello <a data-userid="1">!</a>')
     'Hello <a data-userid="1">!</a>'
 
+    >>> strict_clean_html('Hello <img src="//bad.com/friendly_face.jpeg" />')
+    'Hello'
     """
-    # The cleaner instance isn't thread-safe
-    # https://bleach.readthedocs.io/en/latest/clean.html
-    cleaner = Cleaner(strip=False, **_STRICT)
-    # FIXME: The cleaned version of this moves exclamation mark inside the tag? '<a data-userid="1"/>!'
-    return cleaner.clean(text)
-
-
-_relaxed = deepcopy(_STRICT)
-_relaxed["tags"].update(["h2", "h3", "h4", "sup", "sub", "img", "iframe"])
-for tag in "h2", "h3", "h4", "p", "blockquote":
-    _relaxed["attributes"].setdefault(tag, []).append("class")
-_relaxed["attributes"].setdefault("img", []).append("src")
-_relaxed["attributes"].setdefault("iframe", []).extend(
-    ["class", "frameborder", "allowfullscreen", "src"]
-)
-_relaxed["attributes"].setdefault("li", []).append("data-list")
+    return nh3.clean(
+        text,
+        link_rel=None,
+        attributes=STRICT_ALLOWED_ATTRIBUTES,
+        tags=STRICT_ALLOWED_TAGS,
+    ).strip()
 
 
 def relaxed_clean_html(text: str):
-    """Clean HTML for moderators and trusted users. Note that trusted users may have viruses too..."""
-    cleaner = Cleaner(strip=False, **_relaxed)
-    # FIXME: The cleaned version of this moves exclamation mark inside the tag? '<a data-userid="1"/>!'
-    return cleaner.clean(text)
+    """
+    Clean HTML for moderators and trusted users. Note that trusted users may have viruses too...
+    """
+    return nh3.clean(
+        text,
+        link_rel=None,
+        attributes=RELAXED_ALLOWED_ATTRIBUTES,
+        tags=RELAXED_ALLOWED_TAGS,
+    ).strip()
 
 
 def get_content_registry() -> ContentRegistry:
