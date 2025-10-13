@@ -24,7 +24,7 @@ jobs:
       memcached:
         image: memcached
         options: >-
-          --health-cmd 'echo "version" | nc -vn -w 1 127.0.0.1 11211'
+          --health-cmd "nc -vn -w 1 127.0.0.1 11211"
           --health-interval 4s
           --health-timeout 2s
           --health-retries 5
