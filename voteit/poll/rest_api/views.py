@@ -1,6 +1,5 @@
 import csv
 
-import django_filters
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.http import Http404
@@ -8,7 +7,6 @@ from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -16,7 +14,6 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.viewsets import ViewSet
 
@@ -27,7 +24,6 @@ from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.base import ReadonlyModelViewSet
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.mixins import SerializerClassesMixin
-from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
@@ -126,7 +122,6 @@ class VoteTransferViewSet(
 class ElectoralRegisterPoliciesViewSet(ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
-    @method_decorator(cache_page(60 * 60 * 2))
     def list(self, request):
         reg = get_electoral_policy_registry()
         results = []
