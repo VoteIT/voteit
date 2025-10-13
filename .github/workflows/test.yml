@@ -24,9 +24,9 @@ jobs:
       memcached:
         image: memcached
         options: >-
-          --health-cmd "memcached-tool 127.0.0.1:11211 stats"
-          --health-interval 10s
-          --health-timeout 5s
+          --health-cmd 'echo "version" | nc -vn -w 1 127.0.0.1 11211'
+          --health-interval 4s
+          --health-timeout 2s
           --health-retries 5
     steps:
     - uses: actions/checkout@v3
