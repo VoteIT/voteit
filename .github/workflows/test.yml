@@ -44,8 +44,8 @@ jobs:
       env:
         DJANGO_DEBUG: 1
         DJANGO_SETTINGS_MODULE: project.settings
-        POSTGRES_HOST: 127.0.0.1
+        POSTGRES_HOST: postgres
         ID_HOST: https://id.voteit.se
         OAUTHLIB_INSECURE_TRANSPORT: 1
         HOST: .voteit.se
-        MEMCACHE_LOCATION: 127.0.0.1:11211
+        MEMCACHE_LOCATION: memcached:11211
