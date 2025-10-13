@@ -23,11 +23,6 @@ jobs:
           --health-retries 5
       memcached:
         image: memcached
-        options: >-
-          --health-cmd "nc -vn -w 1 127.0.0.1 11211"
-          --health-interval 4s
-          --health-timeout 2s
-          --health-retries 5
     steps:
     - uses: actions/checkout@v3
 
