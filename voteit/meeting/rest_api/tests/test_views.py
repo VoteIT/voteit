@@ -9,6 +9,8 @@ from rest_framework.test import APITestCase
 
 from voteit.agenda.models import AgendaItem
 from voteit.components.app.components.dialects import DialectsFilter
+from voteit.meeting.dialects import DialectHandler
+from voteit.meeting.dialects import get_named_paths
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -21,6 +23,7 @@ from voteit.meeting.signals import group_role_added
 from voteit.meeting.signals import group_role_removed
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 from voteit.organisation.models import Organisation
+from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.registries import er_policy
 from voteit.poll.registries import vote_transfer_policies
 from voteit.poll.testing import UnrestrictedVoteTransferER
@@ -52,19 +55,18 @@ class MeetingViewSetTests(APITestCase):
                 "include": ["unrestricted_vote_transfer"],
             },
         )
-
-    def setUp(self):
-        self.meeting = Meeting.objects.get(pk=1)
+        cls.meeting = cls.org.meetings.get(pk=1)
+        cls.participant = User.objects.get(username="participant")
+        cls.org_manager = User.objects.get(username="org_manager")
+        cls.moderator = User.objects.get(username="moderator")
 
     def test_create(self):
         url = reverse("meeting-list")
         data = {"title": "Hello world"}
-        participant = User.objects.get(username="participant")
-        org_manager = User.objects.get(username="org_manager")
         for user, status in (
             (None, 401),
-            (org_manager, 201),
-            (participant, 403),
+            (self.org_manager, 201),
+            (self.participant, 403),
         ):
             if user:
                 self.client.force_login(user)
@@ -81,8 +83,7 @@ class MeetingViewSetTests(APITestCase):
             "title": "Stuff",
             "organisation": -1,
         }
-        org_manager = User.objects.get(username="org_manager")
-        self.client.force_login(org_manager)
+        self.client.force_login(self.org_manager)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 201)
         data = response.json()
@@ -92,18 +93,16 @@ class MeetingViewSetTests(APITestCase):
     def test_create_creator_becomes_moderator(self):
         url = reverse("meeting-list")
         data = {"title": "Hello world"}
-        org_manager = User.objects.get(username="org_manager")
-        self.client.force_login(org_manager)
+        self.client.force_login(self.org_manager)
         response = self.client.post(url, data)
         data = response.json()
         meeting = Meeting.objects.get(pk=data["pk"])
-        self.assertTrue(meeting.has_roles(org_manager, ROLE_MODERATOR))
+        self.assertTrue(meeting.has_roles(self.org_manager, ROLE_MODERATOR))
 
     def test_create_public_ignored_but_visible_in_lists_works(self):
         url = reverse("meeting-list")
         data = {"title": "Hello world", "visible_in_lists": True, "public": True}
-        org_manager = User.objects.get(username="org_manager")
-        self.client.force_login(org_manager)
+        self.client.force_login(self.org_manager)
         response = self.client.post(url, data)
         data = response.json()
         meeting = Meeting.objects.get(pk=data["pk"])
@@ -116,8 +115,7 @@ class MeetingViewSetTests(APITestCase):
             "title": "Stuff",
             "sls": {"method_name": Simple.name},
         }
-        org_manager = User.objects.get(username="org_manager")
-        self.client.force_login(org_manager)
+        self.client.force_login(self.org_manager)
         response = self.client.post(url, data=data)
         self.assertEqual(
             {"sls": ["Specifying sls without room isn't allowed."]}, response.json()
@@ -131,8 +129,7 @@ class MeetingViewSetTests(APITestCase):
             "room": {"title": "Hello"},
             "sls": {"method_name": Simple.name},
         }
-        org_manager = User.objects.get(username="org_manager")
-        self.client.force_login(org_manager)
+        self.client.force_login(self.org_manager)
         response = self.client.post(url, data=data)
         self.assertEqual(response.status_code, 201)
         data = response.json()
@@ -144,8 +141,7 @@ class MeetingViewSetTests(APITestCase):
     def test_create_with_dialect(self):
         url = reverse("meeting-list")
         data = {"title": "Stuff", "install_dialect": "main_subst"}
-        org_manager = User.objects.get(username="org_manager")
-        self.client.force_login(org_manager)
+        self.client.force_login(self.org_manager)
         response = self.client.post(url, data=data)
         self.assertEqual(response.status_code, 201)
         data = response.json()
@@ -155,8 +151,7 @@ class MeetingViewSetTests(APITestCase):
     def test_create_with_dialect_and_vote_transfer(self):
         url = reverse("meeting-list")
         data = {"title": "Stuff", "install_dialect": "unrestricted_vote_transfer"}
-        org_manager = User.objects.get(username="org_manager")
-        self.client.force_login(org_manager)
+        self.client.force_login(self.org_manager)
         response = self.client.post(url, data=data)
         self.assertEqual(response.status_code, 201)
         data = response.json()
@@ -168,16 +163,14 @@ class MeetingViewSetTests(APITestCase):
 
     def test_list(self):
         url = reverse("meeting-list")
-        participant = User.objects.get(username="participant")
-        self.client.force_login(participant)
+        self.client.force_login(self.participant)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(1, len(response.json()))
 
     def test_get(self):
         url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})
-        participant = User.objects.get(username="participant")
-        self.client.force_login(participant)
+        self.client.force_login(self.participant)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -204,10 +197,9 @@ class MeetingViewSetTests(APITestCase):
 
     def test_get_visible_in_lists(self):
         url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})
-        participant = User.objects.get(username="participant")
-        self.client.force_login(participant)
+        self.client.force_login(self.participant)
         # Check that user can't view details if not participant and not visible in lists
-        self.meeting.participants.remove(participant)
+        self.meeting.participants.remove(self.participant)
         response = self.client.get(url)
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
         # Check that user can view details if not participant, but visible in lists
@@ -220,8 +212,7 @@ class MeetingViewSetTests(APITestCase):
         self.meeting.er_policy_name = UnrestrictedVoteTransferER.name
         self.meeting.save()
         url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})
-        participant = User.objects.get(username="participant")
-        self.client.force_login(participant)
+        self.client.force_login(self.participant)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -231,17 +222,15 @@ class MeetingViewSetTests(APITestCase):
 
     def test_transition_moderator(self):
         url = reverse("meeting-transitions", kwargs={"pk": 1})
-        moderator = User.objects.get(username="moderator")
         data = {"transition": "ongoing"}
-        self.client.force_login(moderator)
+        self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 201)
 
     def test_bad_transition_moderator(self):
         url = reverse("meeting-transitions", kwargs={"pk": 1})
-        moderator = User.objects.get(username="moderator")
         data = {"transition": "wooohoooo"}
-        self.client.force_login(moderator)
+        self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 400)
 
@@ -253,22 +242,19 @@ class MeetingViewSetTests(APITestCase):
             response.status_code,
             401,
         )
-        participant = User.objects.get(username="participant")
-        self.client.force_login(participant)
+        self.client.force_login(self.participant)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 403)
 
     def test_delete(self):
         url = reverse("meeting-detail", kwargs={"pk": 1})
-        moderator = User.objects.get(username="moderator")
-        self.client.force_login(moderator)
+        self.client.force_login(self.moderator)
         response = self.client.delete(url)
         self.assertEqual(response.status_code, 204)
 
     def test_delete_participant(self):
         url = reverse("meeting-detail", kwargs={"pk": 1})
-        participant = User.objects.get(username="participant")
-        self.client.force_login(participant)
+        self.client.force_login(self.participant)
         response = self.client.delete(url)
         self.assertEqual(response.status_code, 403)
 
@@ -276,33 +262,48 @@ class MeetingViewSetTests(APITestCase):
         self.meeting.archive()
         self.meeting.save()
         url = reverse("meeting-detail", kwargs={"pk": 1})
-        moderator = User.objects.get(username="moderator")
-        self.client.force_login(moderator)
+        self.client.force_login(self.moderator)
         response = self.client.delete(url)
         self.assertEqual(response.status_code, 204)
 
     def test_change(self):
         url = reverse("meeting-detail", kwargs={"pk": 1})
-        moderator = User.objects.get(username="moderator")
-        self.client.force_login(moderator)
+        self.client.force_login(self.moderator)
         response = self.client.patch(url, {"title": "A brave new title"})
         self.assertEqual(response.status_code, 200)
         self.meeting.refresh_from_db()
         self.assertEqual("A brave new title", self.meeting.title)
 
+    def test_er_policy_with_locked_dialect(self):
+        path = None
+        for name, path in get_named_paths():
+            if name == "unrestricted_vote_transfer":
+                break
+        if not path:
+            self.fail("Could not find dialect 'unrestricted_vote_transfer'")
+        handler = DialectHandler.load_from_file("unrestricted_vote_transfer", path)
+        handler.install(self.meeting)
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-detail", kwargs={"pk": 1})
+        response = self.client.patch(url, {"er_policy_name": AutoAlways.name})
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertEqual(
+            {"er_policy_name": ["Meeting dialect locks electoral register policy"]},
+            data,
+        )
+
     def test_change_archived(self):
         self.meeting.archive()
         self.meeting.save()
         url = reverse("meeting-detail", kwargs={"pk": 1})
-        moderator = User.objects.get(username="moderator")
-        self.client.force_login(moderator)
+        self.client.force_login(self.moderator)
         response = self.client.patch(url, {"title": "Not allowed"})
         self.assertEqual(response.status_code, 403)
 
     def test_change_agenda_order(self):
         url = reverse("meeting-set-agenda-order", kwargs={"pk": 1})
-        moderator = User.objects.get(username="moderator")
-        self.client.force_login(moderator)
+        self.client.force_login(self.moderator)
         response = self.client.post(url, {"order": [3, 1, 2]})
         self.assertEqual(201, response.status_code)
         one = AgendaItem.objects.get(pk=1)
@@ -871,10 +872,10 @@ class ExportMeetingGroupsViewSetTests(APITestCase):
         rows = {x.decode() for x in response.content.splitlines()}
         self.assertEqual(
             {
-                f"title,groupid,votes",
-                f"Özgür,ozgur,5",
-                f"好,ni-hao,8",
-                f"Fika nu kör vi,fika-nu-kor-vi,",
+                "title,groupid,votes",
+                "Özgür,ozgur,5",
+                "好,ni-hao,8",
+                "Fika nu kör vi,fika-nu-kor-vi,",
             },
             set(rows),
         )

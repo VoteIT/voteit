@@ -7,7 +7,6 @@ from itertools import chain
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-from attr.filters import exclude
 from django.conf import settings
 from django.utils.module_loading import import_string
 from pydantic import BaseModel
@@ -184,7 +183,7 @@ class DialectHandler:
     def install(self, meeting: Meeting):
         # Basics
         if meeting.installed_dialect:
-            raise DialectError(f"Meeting already has an installed dialect")
+            raise DialectError("Meeting already has an installed dialect")
         meeting.installed_dialect = self.data.name
         # Optionals
         for k in chain(self.optional_nullable, self.optional_default_false):

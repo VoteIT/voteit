@@ -96,10 +96,11 @@ def validate_er_policy_name(instance: Meeting | None, value: str | None):
             # If meeting has no dialect, ER policy isn't available
             if instance is None or instance.installed_dialect is None:
                 raise_dialect_only(value)
+        if instance.installed_dialect:
             handler = dialect_registry.get_merged_handler(instance.installed_dialect)
             # Check if meeting dialect suggests selected ER policy
             if handler.data.er_policy_name != value:
-                raise_dialect_only(value)
+                raise ValidationError("Meeting dialect locks electoral register policy")
         # ER policy requiring group_votes_active must have a meeting
         if er_policy.group_votes_active and instance is None:
             raise_dialect_only(value)
@@ -112,6 +113,7 @@ def validate_er_policy_name(instance: Meeting | None, value: str | None):
             raise ValidationError(
                 f"Policy '{value}' is not compatible with the meetings group votes setting"
             )
+
         return value
 
 
