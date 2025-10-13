@@ -92,6 +92,16 @@ DATABASES = {
     }
 }
 
+# Cache
+if MEMCACHE_LOCATION := os.getenv("MEMCACHE_LOCATION"):
+    SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.memcached.PyMemcacheCache",
+            "LOCATION": MEMCACHE_LOCATION,
+        }
+    }
+
 
 # Internationalization
 LANGUAGE_CODE = "en-us"

@@ -778,7 +778,7 @@ class MeetingRolesViewSetTests(APITestCase):
         # n+1 participants
         for i in range(5):
             self.meeting.participants.create(username=f"participant_{i}")
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(5):
             self.client.get(self.roles_url, data={"meeting": self.meeting.pk})
 
     def test_participant_name_search(self):

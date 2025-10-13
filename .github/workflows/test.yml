@@ -16,14 +16,18 @@ jobs:
         image: postgres:14
         env:
           POSTGRES_HOST_AUTH_METHOD: trust
-        ports:
-        - "5432:5432"
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
+      memcached:
+        image: memcached
+        options: >-
+          --health-cmd "memcached-tool 127.0.0.1:11211 stats"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
     - uses: actions/checkout@v3
 
@@ -49,3 +53,4 @@ jobs:
         ID_HOST: https://id.voteit.se
         OAUTHLIB_INSECURE_TRANSPORT: 1
         HOST: .voteit.se
+        MEMCACHE_LOCATION: 127.0.0.1:11211

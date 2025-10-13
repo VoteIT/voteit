@@ -17,6 +17,16 @@ services:
       - ./volumes/redis:/data
     ports:
       - "6379:6379"
+  memcache:
+    image: memcached:alpine3.22
+    ports:
+      - "11211:11211"
+    command:
+      - --conn-limit=1024
+      - --memory-limit=64
+      - --threads=4
+      - -vv
+
 #  django:
 #    image:  ghcr.io/voteit/voteit:latest
 #    command: run
