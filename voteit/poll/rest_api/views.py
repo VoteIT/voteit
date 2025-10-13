@@ -87,14 +87,6 @@ class ElectoralRegisterViewSet(ReadonlyModelViewSet):
         return super().retrieve(request, *args, **kwargs)
 
 
-# def users_meetings(request):
-#    return Meeting.objects.filter(roles__user=request.user)
-
-
-# def same_meeting_users(request):
-#    return User.objects.filter(meeting_roles__context__in=users_meetings(request))
-
-
 @router.register("vote-transfer", basename="vote-transfer")
 class VoteTransferViewSet(
     AutoPermissionViewSetMixin,
