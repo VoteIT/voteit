@@ -1,5 +1,6 @@
 import os
 import sys
+from importlib.util import find_spec
 from pathlib import Path
 
 from voteit.settings_tpl import *
@@ -49,8 +50,9 @@ for env_setting in (
 # Application definition
 INSTALLED_APPS += os.getenv("DJANGO_INSTALLED_APPS", "").split()
 
+
 # Enable tools if there's a mounted volume with that name
-if os.path.isdir(os.path.join(BASE_DIR, "voteit_tools")):
+if find_spec("voteit_tools"):
     INSTALLED_APPS.append("voteit_tools")
 
 ROOT_URLCONF = "project.urls"

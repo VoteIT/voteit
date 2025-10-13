@@ -9,6 +9,7 @@ from .settings import *
 CSRF_TRUSTED_ORIGINS = ["http://localhost:8080", "http://voteit.localhost:8080"]
 CHANNEL_LAYERS["default"]["CONFIG"]["hosts"] = [("127.0.0.1", 6379)]
 DATABASES["default"]["HOST"] = "localhost"
+MEETING_DIALECTS_DIR = os.path.join(BASE_DIR, "src", "dialect_configs", "dialects")
 
 # Make sure all use same connection to enable us to use one worker when developing
 for qname in {"default", ENVELOPE_TIMESTAMP_QUEUE, ENVELOPE_CONNECTIONS_QUEUE}:
