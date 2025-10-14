@@ -1,19 +1,29 @@
 from __future__ import annotations
 
+from voteit.messaging.base import AddedOrUpdatedSchema
 from voteit.messaging.decorators import outgoing
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
 
 
+class ProposalAddedOrUpdatedSchema(AddedOrUpdatedSchema):
+    created: str
+    modified: str | None
+
+
 @outgoing
 class ProposalAdded(BaseObjectAdded):
     name = "proposal.added"
+    schema = ProposalAddedOrUpdatedSchema
+    data: ProposalAddedOrUpdatedSchema
 
 
 @outgoing
 class ProposalChanged(BaseObjectChanged):
     name = "proposal.changed"
+    schema = ProposalAddedOrUpdatedSchema
+    data: ProposalAddedOrUpdatedSchema
 
 
 @outgoing
