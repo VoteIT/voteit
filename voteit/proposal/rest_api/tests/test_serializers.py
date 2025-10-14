@@ -96,6 +96,7 @@ class ProposalDetailSerializerTests(TestCase):
         dt = datetime.strptime(data.pop("modified"), "%Y-%m-%dT%H:%M:%S.%f%z")
         self.assertIsInstance(dt, datetime)
         self.assertFalse(data.pop("as_group"))
+        self.assertEqual("proposal", data.pop("shortname"))
         # Make sure we checked everything
         self.assertFalse(data.keys())
 
@@ -199,6 +200,7 @@ class DiffProposalDetailSerializerTests(TestCase):
         self.assertEqual(self.diff_prop.pk, data["pk"])
         self.assertEqual(self.diff_prop.body, data["body"])
         self.assertEqual(self.diff_prop.as_group, data["as_group"])
+        self.assertEqual("diff_proposal", data["shortname"])
         self.assertEqual(
             'I am the eggman <br/> I am <span class="text-diff-removed">the walrus</span> <span class="text-diff-added">some kind of mamal</span>',
             data["body_diff_brief"],

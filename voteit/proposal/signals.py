@@ -15,6 +15,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import receiver_all_subclasses
+from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.proposal.diff import Changes
@@ -47,9 +48,13 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
     batch = Batch(t=ProposalAdded.name, payloads=[])
-    for item in qs.values(*ProposalDetailSerializer.Meta.fields):
+    shortname = get_model_shortname(Proposal)
+    for item in qs.values(
+        *{x for x in ProposalDetailSerializer.Meta.fields if x not in {"shortname"}}
+    ):
         # Inject meeting attr
         item["m"] = meeting.pk
+        item["shortname"] = shortname
         batch.append(ProposalAdded(data=item))
     qs = (
         DiffProposal.objects.filter(agenda_item__meeting=meeting)
@@ -61,12 +66,14 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
     diff_fields = {
         x
         for x in DiffProposalDetailSerializer.Meta.fields
-        if x not in ["body_diff_brief", "body_diff"]
+        if x not in {"body_diff_brief", "body_diff", "shortname"}
     }
     diff_fields.add("para_body")
+    shortname = get_model_shortname(DiffProposal)
     for item in qs.values(*diff_fields):
         para_body = item.pop("para_body")
-        item["body_diff"] = Changes(para_body, item["body"]).get_html(brief=True)
+        item["body_diff_brief"] = Changes(para_body, item["body"]).get_html(brief=True)
+        item["shortname"] = shortname
         # Inject meeting attr
         item["m"] = meeting.pk
         batch.append(ProposalAdded(data=item))

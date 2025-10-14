@@ -98,6 +98,8 @@ class GenericProposalSerializer(serializers.Serializer):
 
 
 class ProposalDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
+    shortname = serializers.SerializerMethodField()
+
     class Meta:
         model = Proposal
         read_only_fields = [
@@ -108,6 +110,7 @@ class ProposalDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "state",
             "pk",
             "agenda_item",
+            "shortname",
         ]
         fields = read_only_fields + [
             "author",
@@ -117,6 +120,9 @@ class ProposalDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "tags",
             "as_group",
         ]
+
+    def get_shortname(self, instance):
+        return get_model_shortname(instance)
 
 
 class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):

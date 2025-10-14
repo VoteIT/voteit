@@ -563,6 +563,7 @@ class ExportProposalsViewSetTests(APITestCase):
                 "state",
                 "pk",
                 "agenda_item",
+                "shortname",
                 "author",
                 "body",
                 "meeting_group",
