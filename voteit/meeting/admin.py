@@ -25,7 +25,6 @@ from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.utils import sort_agenda_items
 from voteit.meeting.workflows import MeetingWf
-from voteit.proposal.models import Proposal
 
 if TYPE_CHECKING:
     from voteit.core.abcs import MeetingContext
@@ -225,20 +224,28 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
 
         return super().render_change_form(request, context, *args, **kwargs)
 
-    @admin.display(description="Agenda items")
+    @admin.display(description="Agenda items", ordering="_ai_count")
     def ai_count(self, obj: Meeting):
-        return obj.agenda_items.count()
+        return obj._ai_count
 
-    @admin.display(description="Proposals")
+    @admin.display(description="Proposals", ordering="_proposal_count")
     def proposal_count(self, obj: Meeting):
-        return Proposal.objects.filter(agenda_item__meeting=obj).count()
+        return obj._proposal_count
 
-    @admin.display(description="Organisation")
+    @admin.display(description="Organisation", ordering="organisation__title")
     def meeting_org(self, obj: Meeting):
         return obj.organisation
 
     def get_queryset(self, request):
-        return super().get_queryset(request)
+        qs = super().get_queryset(request)
+        # Select organisation in one query
+        qs = qs.select_related("organisation")
+        # Annotate agenda item count
+        qs = qs.annotate(
+            _ai_count=models.Count("agenda_items", distinct=True),
+            _proposal_count=models.Count("agenda_items__proposals", distinct=True),
+        )
+        return qs
 
     def get_urls(self):
         urls = super().get_urls()
