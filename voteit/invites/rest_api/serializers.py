@@ -6,7 +6,9 @@ from rest_framework import serializers
 from voteit.invites.models import MeetingInvite
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.core.rest_api.serializers import BaseModelSerializer
-
+from voteit.meeting import roles
+from voteit.meeting.models import Meeting
+from voteit.meeting.workflows import MeetingWf
 
 logger = getLogger(__name__)
 
@@ -93,3 +95,27 @@ class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
 
     def get_meeting_title(self, instance: MeetingInvite) -> str:
         return instance.meeting.title
+
+
+class ModeratorMeetingField(serializers.PrimaryKeyRelatedField):
+    def get_queryset(self):
+        return Meeting.objects.filter(
+            roles__user=self.context["request"].user,
+            roles__assigned__contains=roles.ROLE_MODERATOR,
+        ).exclude(state__in=MeetingWf.archived_states)
+
+
+class InviteBulkSerializer(serializers.Serializer):
+    invites = serializers.ListSerializer(child=serializers.IntegerField())
+    meeting = ModeratorMeetingField()
+
+    def validate(self, attrs):
+        invites: list[int] = attrs["invites"]
+        meeting: Meeting = attrs["meeting"]
+        if MeetingInvite.objects.filter(id__in=invites, meeting=meeting).count() != len(
+            invites
+        ):
+            raise serializers.ValidationError(
+                {"invites": "Invites don't match meeting."}
+            )
+        return attrs
