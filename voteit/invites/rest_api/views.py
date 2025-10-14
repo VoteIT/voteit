@@ -84,8 +84,8 @@ class MeetingInviteViewSet(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         invites: list[int] = serializer.validated_data["invites"]
-        MeetingInvite.objects.filter(id__in=invites).delete()
-        return Response([])
+        count = MeetingInvite.objects.filter(id__in=invites).delete()[0]
+        return Response({"deleted": count})
 
     @transaction.atomic(durable=True)
     @action(
@@ -98,10 +98,12 @@ class MeetingInviteViewSet(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         invites: list[int] = serializer.validated_data["invites"]
-        for invite in MeetingInvite.objects.filter(id__in=invites):
+        qs = MeetingInvite.objects.filter(id__in=invites)
+        count = qs.count()
+        for invite in qs:
             invite.revoke()
             invite.save()
-        return Response([])
+        return Response({"revoked": count})
 
 
 @router.register("match-invites", basename="match-invites")
