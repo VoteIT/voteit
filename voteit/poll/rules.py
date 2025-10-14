@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import rules
 from django.contrib.auth.models import AbstractUser
+from rules import is_authenticated
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.permissions import AgendaPermissions
@@ -12,7 +13,6 @@ from voteit.core.rules import is_not_finished
 from voteit.core.rules import is_not_private
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
-from voteit.meeting.rules import can_view_meeting
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import is_potential_voter
 from voteit.meeting.rules import meeting_upcoming_ongoing
@@ -130,7 +130,7 @@ rules.add_perm(VotePermissions.VIEW, is_vote_owner)
 
 
 # Electoral register
-rules.add_perm(ElectoralRegisterPermissions.VIEW, can_view_meeting)
+rules.add_perm(ElectoralRegisterPermissions.VIEW, is_authenticated)
 rules.add_perm(ElectoralRegisterPermissions.ADD, is_moderator & is_not_archived)
 
 # Vote transfer
