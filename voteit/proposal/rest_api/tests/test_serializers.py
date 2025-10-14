@@ -46,8 +46,8 @@ class GenericProposalSerializerTests(TestCase):
         self.assertEqual(2, len(results))
         diff_result = results[0]
         prop_result = results[1]
-        self.assertEqual("diff_proposal", diff_result["shortname"])
-        self.assertEqual("proposal", prop_result["shortname"])
+        self.assertEqual(self.prop.pk, prop_result["pk"])
+        self.assertEqual(self.diff_prop.pk, diff_result["pk"])
         self.assertEqual(self.paragraph.pk, diff_result["paragraph"])
         self.assertNotIn("paragraph", prop_result)
 
@@ -93,7 +93,6 @@ class ProposalDetailSerializerTests(TestCase):
         self.assertEqual("published", data.pop("state"))
         self.assertEqual(self.group.pk, data.pop("meeting_group"))
         self.assertEqual([], data.pop("mentions"))
-        self.assertEqual("proposal", data.pop("shortname"))
         dt = datetime.strptime(data.pop("modified"), "%Y-%m-%dT%H:%M:%S.%f%z")
         self.assertIsInstance(dt, datetime)
         self.assertFalse(data.pop("as_group"))

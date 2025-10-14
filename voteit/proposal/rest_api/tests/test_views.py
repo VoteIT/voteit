@@ -282,7 +282,6 @@ class ProposalsAPITests(APITestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalChanged)
         self.assertEqual(diff_prop.pk, msg.data.pk)
-        self.assertEqual("diff_proposal", msg.data.shortname)
         self.assertEqual(self.para.pk, msg.data.paragraph)
 
     def test_patch_author_normal_user(self):
@@ -541,7 +540,6 @@ class ExportProposalsViewSetTests(APITestCase):
         response = self.client.get(url)
         data = response.json()
         self.assertEqual(3, len(data))
-        self.assertEqual({"proposal", "diff_proposal"}, {x["shortname"] for x in data})
 
     def test_csv(self):
         url = reverse("export-proposals-csv", kwargs={"pk": self.meeting.pk})
@@ -565,7 +563,6 @@ class ExportProposalsViewSetTests(APITestCase):
                 "state",
                 "pk",
                 "agenda_item",
-                "shortname",
                 "author",
                 "body",
                 "meeting_group",

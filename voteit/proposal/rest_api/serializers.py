@@ -98,8 +98,6 @@ class GenericProposalSerializer(serializers.Serializer):
 
 
 class ProposalDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
-    shortname = serializers.SerializerMethodField()
-
     class Meta:
         model = Proposal
         read_only_fields = [
@@ -110,7 +108,6 @@ class ProposalDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "state",
             "pk",
             "agenda_item",
-            "shortname",
         ]
         fields = read_only_fields + [
             "author",
@@ -120,9 +117,6 @@ class ProposalDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "tags",
             "as_group",
         ]
-
-    def get_shortname(self, instance):
-        return get_model_shortname(instance)
 
 
 class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
@@ -200,21 +194,15 @@ class DiffProposalCreateSerializer(ProposalCreateSerializer):
 
 
 class DiffProposalDetailSerializer(ProposalDetailSerializer):
-    # body_diff = serializers.SerializerMethodField()
     body_diff_brief = serializers.SerializerMethodField()
 
     class Meta(ProposalDetailSerializer.Meta):
         model = DiffProposal
         read_only_fields = [
             "paragraph",
-            # "body_diff",
             "body_diff_brief",
         ] + ProposalDetailSerializer.Meta.read_only_fields
         fields = read_only_fields + ProposalDetailSerializer.Meta.fields
-
-    def get_body_diff(self, instance: DiffProposal) -> str:
-        ch = Changes(instance.paragraph.body, instance.body)
-        return ch.get_html()
 
     def get_body_diff_brief(self, instance: DiffProposal) -> str:
         ch = Changes(instance.paragraph.body, instance.body)

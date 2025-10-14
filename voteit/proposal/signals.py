@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.db import models
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -16,6 +17,7 @@ from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import receiver_all_subclasses
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
+from voteit.proposal.diff import Changes
 from voteit.proposal.messages import ProposalAdded
 from voteit.proposal.messages import ProposalChanged
 from voteit.proposal.messages import ProposalDeleted
@@ -45,18 +47,26 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
     batch = Batch(t=ProposalAdded.name, payloads=[])
-    serializer = ProposalDetailSerializer(qs, many=True)
-    for item in serializer.data:
+    for item in qs.values(*ProposalDetailSerializer.Meta.fields):
         # Inject meeting attr
         item["m"] = meeting.pk
         batch.append(ProposalAdded(data=item))
-    qs = DiffProposal.objects.filter(agenda_item__meeting=meeting).prefetch_related(
-        "mentions", "paragraph"
+    qs = (
+        DiffProposal.objects.filter(agenda_item__meeting=meeting)
+        .prefetch_related("mentions")
+        .annotate(para_body=models.F("paragraph__body"))
     )
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
-    serializer = DiffProposalDetailSerializer(qs, many=True)
-    for item in serializer.data:
+    diff_fields = {
+        x
+        for x in DiffProposalDetailSerializer.Meta.fields
+        if x not in ["body_diff_brief", "body_diff"]
+    }
+    diff_fields.add("para_body")
+    for item in qs.values(*diff_fields):
+        para_body = item.pop("para_body")
+        item["body_diff"] = Changes(para_body, item["body"]).get_html(brief=True)
         # Inject meeting attr
         item["m"] = meeting.pk
         batch.append(ProposalAdded(data=item))
