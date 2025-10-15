@@ -152,13 +152,6 @@ class PollCreateSerializer(serializers.ModelSerializer):
                 valid_transitions = get_valid_transitions_dict(poll)
                 drf_do_transition(
                     instance=poll,
-                    transition_name="upcoming",
-                    valid_transitions=valid_transitions,
-                    user=user,
-                )
-                valid_transitions = get_valid_transitions_dict(poll)
-                drf_do_transition(
-                    instance=poll,
                     transition_name="ongoing",
                     valid_transitions=valid_transitions,
                     user=user,

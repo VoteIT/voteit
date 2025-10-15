@@ -342,7 +342,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             method = self.method  # Will raise exception if doesn't exist
             # And check the specifics for the poll method
             method.start_check()
-        except PollError as exc:
+        except PollError:
             logger.exception("Poll can't start")
             return False
         return True
@@ -417,7 +417,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
     @transition(
         field=state,
-        source=PollWf.UPCOMING,
+        source=[PollWf.UPCOMING, PollWf.PRIVATE],
         target=PollWf.ONGOING,
         conditions=[
             validate_settings_guard,
