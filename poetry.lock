@@ -695,6 +695,18 @@ files = [
 ]
 
 [[package]]
+name = "defusedxml"
+version = "0.7.1"
+description = "XML bomb protection for Python stdlib modules"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+groups = ["main"]
+files = [
+    {file = "defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61"},
+    {file = "defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69"},
+]
+
+[[package]]
 name = "distlib"
 version = "0.4.0"
 description = "Distribution utilities"
@@ -1749,6 +1761,27 @@ files = [
 windows-terminal = ["colorama (>=0.4.6)"]
 
 [[package]]
+name = "pyjwt"
+version = "2.10.1"
+description = "JSON Web Token implementation in Python"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "PyJWT-2.10.1-py3-none-any.whl", hash = "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb"},
+    {file = "pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953"},
+]
+
+[package.dependencies]
+cryptography = {version = ">=3.4.0", optional = true, markers = "extra == \"crypto\""}
+
+[package.extras]
+crypto = ["cryptography (>=3.4.0)"]
+dev = ["coverage[toml] (==5.0.4)", "cryptography (>=3.4.0)", "pre-commit", "pytest (>=6.0.0,<7.0.0)", "sphinx", "sphinx-rtd-theme", "zope.interface"]
+docs = ["sphinx", "sphinx-rtd-theme", "zope.interface"]
+tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
+
+[[package]]
 name = "pymemcache"
 version = "4.0.0"
 description = "A comprehensive, fast, pure Python memcached client"
@@ -1835,6 +1868,25 @@ files = [
 
 [package.extras]
 dev = ["backports.zoneinfo ; python_version < \"3.9\"", "black", "build", "freezegun", "mdx_truly_sane_lists", "mike", "mkdocs", "mkdocs-awesome-pages-plugin", "mkdocs-gen-files", "mkdocs-literate-nav", "mkdocs-material (>=8.5)", "mkdocstrings[python]", "msgspec ; implementation_name != \"pypy\"", "mypy", "orjson ; implementation_name != \"pypy\"", "pylint", "pytest", "tzdata", "validate-pyproject[all]"]
+
+[[package]]
+name = "python3-openid"
+version = "3.2.0"
+description = "OpenID support for modern servers and consumers."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "python3-openid-3.2.0.tar.gz", hash = "sha256:33fbf6928f401e0b790151ed2b5290b02545e8775f982485205a066f874aaeaf"},
+    {file = "python3_openid-3.2.0-py3-none-any.whl", hash = "sha256:6626f771e0417486701e0b4daff762e7212e820ca5b29fcc0d05f6f8736dfa6b"},
+]
+
+[package.dependencies]
+defusedxml = "*"
+
+[package.extras]
+mysql = ["mysql-connector-python"]
+postgresql = ["psycopg2"]
 
 [[package]]
 name = "python3-vote-core"
@@ -2204,6 +2256,54 @@ files = [
 ]
 
 [[package]]
+name = "social-auth-app-django"
+version = "5.6.0"
+description = "Python Social Authentication, Django integration."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "social_auth_app_django-5.6.0-py3-none-any.whl", hash = "sha256:43ca88cc5cd9161710896165ced58b3155e8aafaaff847e859879194770f138d"},
+    {file = "social_auth_app_django-5.6.0.tar.gz", hash = "sha256:c695501fcbf6fe87f68f5a79e379abe853662f5129e7ec6cb758a75d5b28c888"},
+]
+
+[package.dependencies]
+Django = ">=5.1"
+social-auth-core = ">=4.4,<5.0"
+
+[package.extras]
+dev = ["coverage (>=3.6)", "django-stubs (==5.2.7)", "django-stubs-ext (==5.2.7)", "mypy (==1.18.2)", "pre-commit", "pyright (==1.1.406)", "tox"]
+
+[[package]]
+name = "social-auth-core"
+version = "4.8.1"
+description = "Python social authentication made simple."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "social_auth_core-4.8.1-py3-none-any.whl", hash = "sha256:9fe54f7c7d566465ae34b165bfe1c0d3ba8fa1f7042dc17df5e7dcef8675f3a0"},
+    {file = "social_auth_core-4.8.1.tar.gz", hash = "sha256:6186576eb4e9f25c789d0ce19b942cc668a3a714a246f9e688c0fb93f65bf111"},
+]
+
+[package.dependencies]
+defusedxml = ">=0.7.1"
+oauthlib = ">=3.3.1"
+PyJWT = {version = ">=2.10.1", extras = ["crypto"]}
+python3-openid = ">=3.2.0"
+requests = ">=2.32.5"
+requests-oauthlib = ">=2.0.0"
+
+[package.extras]
+all = ["social-auth-core[azuread]", "social-auth-core[google-onetap]", "social-auth-core[saml]", "social-auth-core[shopify]"]
+allpy3 = ["social-auth-core[all]"]
+azuread = ["cryptography (>=42.0.8)"]
+dev = ["coverage (==7.10.7)", "flake8 (==7.3.0)", "google-auth-stubs (==0.3.0)", "mypy (==1.18.2)", "pyright (==1.1.406)", "pytest (==8.4.2)", "pytest-cov (==7.0.0)", "pytest-github-actions-annotate-failures (==0.3.0)", "pytest-profiling (==1.8.1)", "pytest-xdist (==3.8.0)", "responses (==0.25.8)", "ty (==0.0.1a21)", "types-defusedxml (==0.7.0.20250822)", "types-oauthlib (==3.3.0.20250822)", "types-requests (==2.32.4.20250913)", "types-requests-oauthlib (==2.0.0.20250809)"]
+google-onetap = ["google-auth (>=2.40.0,<2.42)"]
+saml = ["python3-saml (>=1.16.0)"]
+shopify = ["ShopifyAPI"]
+
+[[package]]
 name = "sortedcontainers"
 version = "2.4.0"
 description = "Sorted Containers -- Sorted List, Sorted Dict, Sorted Set"
@@ -2490,4 +2590,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "27a59d252e9c43c09400fd252218692df8203d0e698e8a4309e0be2d5e6c377a"
+content-hash = "cf245c69ed704ae6d9b456d6591c3f5507abfe31c9af1f3dc64f68485f428e51"
