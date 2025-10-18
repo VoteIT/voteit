@@ -3,12 +3,12 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
 from envelope.testing import MessageCatcher
 
-from ..channels import OrganisationChannel
+from voteit.organisation.channels import OrganisationChannel
+from voteit.organisation.models import Organisation
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -19,8 +19,6 @@ _channel_layers_setting = {
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class OrganisationChangedTests(TestCase):
     def setUp(self):
-        from ..models import Organisation
-
         self.org = Organisation.objects.create(title="Test org")
 
     # We don't handle added right now
@@ -40,8 +38,6 @@ class OrganisationChangedTests(TestCase):
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
 class OrganisationChannelSubscribedTests(TestCase):
     def setUp(self):
-        from ..models import Organisation
-
         self.org: Organisation = Organisation.objects.create(title="Test org")
         self.user: User = self.org.users.create(username="user")
         self.org.add_roles(self.user, "org_manager")
@@ -73,8 +69,6 @@ class OrganisationChannelSubscribedTests(TestCase):
 class RoleChangesPublishedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.organisation.models import Organisation
-
         cls.org: Organisation = Organisation.objects.create()
         cls.user = cls.org.users.create(username="user")
         cls.org.add_roles(cls.user, "org_manager")
@@ -104,3 +98,23 @@ class RoleChangesPublishedTests(TestCase):
         self.assertEqual(self.org.pk, msg.data.pk)
         self.assertEqual(msg.data.model, "organisation")
         self.assertEqual({"org_manager"}, set(msg.data.roles))
+
+
+class ExtraDataCleanedOnLogoutTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.organisation: Organisation = Organisation.objects.get(pk=1)
+        cls.user = cls.organisation.users.create(username="user")
+        cls.usa = cls.user.social_auth.create(
+            provider="dummy",
+            uid="abc",
+            extra_data={"access_token": "123", "sensitive_data": True},
+        )
+
+    def test_logout_cleans_extra_data(self):
+        self.client.force_login(self.user)
+        self.client.logout()
+        self.usa.refresh_from_db()
+        self.assertEqual({}, self.usa.extra_data)
