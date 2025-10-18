@@ -12,4 +12,5 @@ urlpatterns = [
     path("django-rq/", include("django_rq.urls")),
     path("finish-auth/", finish_auth, name="finish-auth"),
     path("begin-auth/", begin_auth, name="begin-auth"),
+    path("", include("social_django.urls")),
 ]

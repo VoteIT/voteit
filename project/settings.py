@@ -60,6 +60,39 @@ WSGI_APPLICATION = "project.wsgi.application"
 ASGI_APPLICATION = "project.routing.application"
 
 
+# Auth & "social" auth
+SITE_ID = 1
+SOCIAL_AUTH_JSONFIELD_ENABLED = True
+SOCIAL_AUTH_FIELDS_STORED_IN_SESSION = ["next"]
+SOCIAL_AUTH_USERNAME_IS_FULL_EMAIL = False
+# Load all SOCIAL_AUTH__
+for env_k, env_v in os.environ.items():
+    if env_k.startswith("SOCIAL_AUTH_"):
+        if env_k.endswith("_SCOPE"):
+            env_v = env_v.split()
+        setattr(sys.modules[__name__], env_k, env_v)
+
+SOCIAL_AUTH_PIPELINE = [
+    "voteit.organisation.pipeline.org_active",
+    "social_core.pipeline.social_auth.social_details",
+    "social_core.pipeline.social_auth.social_uid",
+    # "social_core.pipeline.social_auth.auth_allowed",
+    # "social_core.pipeline.social_auth.social_user",
+    "voteit.organisation.pipeline.social_user",
+    "social_core.pipeline.user.get_username",
+    "voteit.organisation.pipeline.create_user",
+    "social_core.pipeline.social_auth.associate_user",
+    "social_core.pipeline.social_auth.load_extra_data",
+    "social_core.pipeline.user.user_details",
+]
+
+
+AUTHENTICATION_BACKENDS = [
+    "voteit.organisation.backends.IDProxyOAuth2",
+] + AUTHENTICATION_BACKENDS
+LOGIN_REDIRECT_URL = "/"
+LOGIN_ERROR_URL = "/error"
+
 # RQ
 RQ_QUEUES["default"]["HOST"] = "redis_rq"
 RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["DB"] = 2

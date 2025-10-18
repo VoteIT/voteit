@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "auditlog",
     "django_rq",
+    "social_django",
     "voteit.core",
     "voteit.meeting",
     "voteit.export_import",
@@ -96,10 +97,10 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Auth backends
-AUTHENTICATION_BACKENDS = (
+AUTHENTICATION_BACKENDS = [
     "voteit.core.permissions.VerbosePermissionBackend",
     "django.contrib.auth.backends.ModelBackend",
-)
+]
 CHECK_PERMISSION_CONTEXT = True
 
 # Channels / Envelope / RQ
