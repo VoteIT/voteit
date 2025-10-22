@@ -16,6 +16,7 @@ from django_fsm.signals import post_transition
 from envelope.app.user_channel.channel import UserChannel
 from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
+from sql_util.aggregates import SubqueryCount
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
@@ -64,16 +65,19 @@ def send_ongoing_meeting_poll_stats(context: Meeting, app_state: AppState, **kw)
     """
     Populate app_state with current poll status
     """
+    batch = Batch(t=PollStatus.name, payloads=[])
     for poll in context.polls.filter(state=PollWf.ONGOING).annotate(
-        voted=models.Count("votes", distinct=True),
-        total=models.Count("electoral_register__voters", distinct=True),
+        voted=SubqueryCount("votes"),
+        total=SubqueryCount("electoral_register__voters"),
     ):
-        msg = PollStatus(
-            pk=poll.pk,
-            voted=poll.voted,
-            total=poll.total,
+        batch.append(
+            PollStatus(
+                pk=poll.pk,
+                voted=poll.voted,
+                total=poll.total,
+            )
         )
-        app_state.append(msg)
+    app_state.append(batch)
 
 
 @receiver(channel_subscribed, sender=ParticipantsChannel)

@@ -148,6 +148,16 @@ class MeetingViewSetTests(APITestCase):
         meeting = Meeting.objects.get(pk=data["pk"])
         self.assertEqual("main_subst", meeting.installed_dialect)
 
+    def test_create_with_er_policy(self):
+        url = reverse("meeting-list")
+        data = {"title": "Stuff", "er_policy_name": AutoAlways.name}
+        self.client.force_login(self.org_manager)
+        response = self.client.post(url, data=data)
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        meeting = Meeting.objects.get(pk=data["pk"])
+        self.assertEqual(AutoAlways.name, meeting.er_policy_name)
+
     def test_create_with_dialect_and_vote_transfer(self):
         url = reverse("meeting-list")
         data = {"title": "Stuff", "install_dialect": "unrestricted_vote_transfer"}

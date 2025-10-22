@@ -40,6 +40,11 @@ class MeetingInviteViewSet(
     context_queryset = Meeting.objects.all()
     context_lookup_kwarg = "meeting"
     model = MeetingInvite
+    permission_type_map = {
+        **AutoPermissionViewSetMixin.permission_type_map,
+        "bulk_delete": None,
+        "bulk_revoke": None,
+    }
 
     def get_queryset(self):
         """
@@ -67,6 +72,38 @@ class MeetingInviteViewSet(
 
     def list(self, *args, **kwargs):
         return Response([])
+
+    @transaction.atomic(durable=True)
+    @action(
+        methods=["post"],
+        detail=False,
+        serializer_class=serializers.InviteBulkSerializer,
+        url_path="bulk-delete",
+    )
+    def bulk_delete(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invites: list[int] = serializer.validated_data["invites"]
+        count = MeetingInvite.objects.filter(id__in=invites).delete()[0]
+        return Response({"deleted": count})
+
+    @transaction.atomic(durable=True)
+    @action(
+        methods=["post"],
+        detail=False,
+        serializer_class=serializers.InviteBulkSerializer,
+        url_path="bulk-revoke",
+    )
+    def bulk_revoke(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invites: list[int] = serializer.validated_data["invites"]
+        qs = MeetingInvite.objects.filter(id__in=invites)
+        count = qs.count()
+        for invite in qs:
+            invite.revoke()
+            invite.save()
+        return Response({"revoked": count})
 
 
 @router.register("match-invites", basename="match-invites")

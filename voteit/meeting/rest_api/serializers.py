@@ -96,7 +96,7 @@ def validate_er_policy_name(instance: Meeting | None, value: str | None):
             # If meeting has no dialect, ER policy isn't available
             if instance is None or instance.installed_dialect is None:
                 raise_dialect_only(value)
-        if instance.installed_dialect:
+        if instance is not None and instance.installed_dialect:
             handler = dialect_registry.get_merged_handler(instance.installed_dialect)
             # Check if meeting dialect suggests selected ER policy
             if handler.data.er_policy_name != value:

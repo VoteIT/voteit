@@ -1,11 +1,10 @@
-from typing import TYPE_CHECKING
-
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
-if TYPE_CHECKING:
-    from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.meeting.models import Meeting
+from voteit.speaker.app.list_methods.simple import Simple
+
 
 User = get_user_model()
 
@@ -19,16 +18,16 @@ class TransitionsMixinTests(APITestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.moderator = cls.meeting.participants.get(username="moderator")
         cls.participant = cls.meeting.participants.get(username="participant")
         cls.ai = cls.meeting.agenda_items.create()
-
-    def setUp(self):
-        self.meeting.refresh_from_db()
-        self.ai.refresh_from_db()
+        cls.room = cls.meeting.rooms.create()
+        cls.sls = cls.meeting.speaker_systems.create(
+            room=cls.room, method_name=Simple.name
+        )
+        cls.slist = cls.sls.speaker_lists.create(agenda_item=cls.ai)
+        cls.speaker = cls.slist.speaker_items.create(user=cls.participant)
 
     @property
     def _cut(self):
@@ -153,6 +152,20 @@ class TransitionsMixinTests(APITestCase):
         response = self.client.post(url, data={"transition": "upcoming"})
         self.assertEqual(400, response.status_code)
         self.assertIn("transition", response.json())
+
+    def test_transition_with_exception(self):
+        self.meeting.ongoing()
+        self.meeting.save()
+        self.ai.ongoing()
+        self.ai.save()
+        self.speaker.start()
+        self.speaker.save()
+        self.client.force_login(self.moderator)
+        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
+        response = self.client.post(url, data={"transition": "close"})
+        data = response.json()
+        self.assertEqual(400, response.status_code, data)
+        self.assertEqual({"transition": ["Finish active speaker first"]}, data)
 
 
 class TransitionMixinAgendaTest(APITestCase):

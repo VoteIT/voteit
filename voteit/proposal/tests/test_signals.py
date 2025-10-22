@@ -18,6 +18,7 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.proposal.models import TextDocument
+from voteit.proposal.rest_api.serializers import ProposalDetailSerializer
 
 if TYPE_CHECKING:
     from voteit.proposal.models import DiffProposal
@@ -80,6 +81,27 @@ class MeetingSubscribedTests(TestCase):
             if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
                 pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
+
+    def test_date_of_proposals_on_subscribe(self):
+        command = Subscribe(
+            mm={"consumer_name": "abc", "user_pk": self.user.pk},
+            pk=self.meeting.pk,
+            channel_type="moderators",
+        )
+        with MessageCatcher(Subscribed) as messages:
+            command.run_job()
+        self.assertEqual(1, len(messages))
+        response = messages[0]
+        self.assertIsInstance(response, Subscribed)
+        pks = set()
+        for msg in response.data.app_state:
+            if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
+                break
+        first = msg.p["payloads"][0]
+        self.assertIsInstance(first.created, str)
+        self.assertEqual(
+            ProposalDetailSerializer(self.prop1).data["created"], first.created
+        )
 
     def test_app_state_sent_participants(self):
         command = Subscribe(

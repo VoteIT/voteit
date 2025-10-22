@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.db import models
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -14,8 +15,10 @@ from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import receiver_all_subclasses
+from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
+from voteit.proposal.diff import Changes
 from voteit.proposal.messages import ProposalAdded
 from voteit.proposal.messages import ProposalChanged
 from voteit.proposal.messages import ProposalDeleted
@@ -45,18 +48,32 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
     batch = Batch(t=ProposalAdded.name, payloads=[])
-    serializer = ProposalDetailSerializer(qs, many=True)
-    for item in serializer.data:
+    shortname = get_model_shortname(Proposal)
+    for item in qs.values(
+        *{x for x in ProposalDetailSerializer.Meta.fields if x not in {"shortname"}}
+    ):
         # Inject meeting attr
         item["m"] = meeting.pk
+        item["shortname"] = shortname
         batch.append(ProposalAdded(data=item))
-    qs = DiffProposal.objects.filter(agenda_item__meeting=meeting).prefetch_related(
-        "mentions", "paragraph"
+    qs = (
+        DiffProposal.objects.filter(agenda_item__meeting=meeting)
+        .prefetch_related("mentions")
+        .annotate(para_body=models.F("paragraph__body"))
     )
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
-    serializer = DiffProposalDetailSerializer(qs, many=True)
-    for item in serializer.data:
+    diff_fields = {
+        x
+        for x in DiffProposalDetailSerializer.Meta.fields
+        if x not in {"body_diff_brief", "body_diff", "shortname"}
+    }
+    diff_fields.add("para_body")
+    shortname = get_model_shortname(DiffProposal)
+    for item in qs.values(*diff_fields):
+        para_body = item.pop("para_body")
+        item["body_diff_brief"] = Changes(para_body, item["body"]).get_html(brief=True)
+        item["shortname"] = shortname
         # Inject meeting attr
         item["m"] = meeting.pk
         batch.append(ProposalAdded(data=item))

@@ -33,6 +33,7 @@ class GenderAndPriority(Priority):
     settings_schema = GenderAndPrioritySchema
 
     def reorder(self, safe_speakers, incoming_order):
+        max_priority = self.speaker_system.settings.max_times or 1_000_000
         priority_genders = self.speaker_system.settings.priority_genders
 
         def is_prio(sp: Speaker):
@@ -41,7 +42,9 @@ class GenderAndPriority(Priority):
         should_prioritize = bool(safe_speakers) and not is_prio(safe_speakers[-1])
         spoken_count_order = super().reorder(safe_speakers, incoming_order)
         # Go through each list and yield in prio order
-        for _, speakers in groupby(spoken_count_order, lambda sp: sp.spoken_count):
+        for _, speakers in groupby(
+            spoken_count_order, lambda sp: min(sp.spoken_count, max_priority)
+        ):
             speakers = list(speakers)
             while speakers:
                 # Preliminary choice is next speaker in list

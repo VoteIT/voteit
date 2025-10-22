@@ -1,4 +1,4 @@
-""" REST-specific utils"""
+"""REST-specific utils"""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
+from django_fsm import TransitionNotAllowed
 from oauthlib.oauth2 import InvalidGrantError
 from requests.exceptions import ConnectionError as RConnectionError
 from requests.exceptions import JSONDecodeError
@@ -163,7 +164,10 @@ def drf_do_transition(
             raise ValidationError(detail={"transition": [msg]})
     if not transition.has_perm(instance, user):
         raise PermissionDenied(perm_denied_msg(transition.permission, instance))
-    getattr(instance, transition_name)()
+    try:
+        getattr(instance, transition_name)()
+    except TransitionNotAllowed as exc:
+        raise ValidationError(detail={"transition": [str(exc)]})
 
 
 def _pos_int_or_validation_error(value) -> int:

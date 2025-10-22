@@ -364,24 +364,7 @@ class ElectoralRegisterTests(TestCase):
         cls.VIEW_PERM = ElectoralRegisterPermissions.VIEW
         cls.ADD_PERM = ElectoralRegisterPermissions.ADD
 
-    def test_view_normal_meeting(self):
-        self.assertTrue(self.participant.has_perm(self.VIEW_PERM, self.er))
-        self.assertFalse(self.outsider.has_perm(self.VIEW_PERM, self.er))
-        self.assertFalse(self.anon.has_perm(self.VIEW_PERM, self.er))
-
-    def test_view_public_meeting(self):
-        self.meeting.public = True
-        self.meeting.save()
-        self.assertTrue(self.participant.has_perm(self.VIEW_PERM, self.er))
-        self.assertTrue(self.outsider.has_perm(self.VIEW_PERM, self.er))
-        self.assertFalse(self.anon.has_perm(self.VIEW_PERM, self.er))
-
-    def test_unattached_er(self):
-        self.er.meeting = None
-        self.er.save()
-        self.assertFalse(self.participant.has_perm(self.VIEW_PERM, self.er))
-        self.assertFalse(self.outsider.has_perm(self.VIEW_PERM, self.er))
-        self.assertFalse(self.anon.has_perm(self.VIEW_PERM, self.er))
+    #Note: View tests removed, queryset handles that
 
     def test_add(self):
         self.assertFalse(self.participant.has_perm(self.ADD_PERM, self.meeting))

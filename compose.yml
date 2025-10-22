@@ -18,7 +18,7 @@ services:
     ports:
       - "6379:6379"
   memcache:
-    image: memcached:alpine3.22
+    image: memcached:1-alpine
     ports:
       - "11211:11211"
     command:

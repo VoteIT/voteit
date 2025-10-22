@@ -200,21 +200,15 @@ class DiffProposalCreateSerializer(ProposalCreateSerializer):
 
 
 class DiffProposalDetailSerializer(ProposalDetailSerializer):
-    # body_diff = serializers.SerializerMethodField()
     body_diff_brief = serializers.SerializerMethodField()
 
     class Meta(ProposalDetailSerializer.Meta):
         model = DiffProposal
         read_only_fields = [
             "paragraph",
-            # "body_diff",
             "body_diff_brief",
         ] + ProposalDetailSerializer.Meta.read_only_fields
         fields = read_only_fields + ProposalDetailSerializer.Meta.fields
-
-    def get_body_diff(self, instance: DiffProposal) -> str:
-        ch = Changes(instance.paragraph.body, instance.body)
-        return ch.get_html()
 
     def get_body_diff_brief(self, instance: DiffProposal) -> str:
         ch = Changes(instance.paragraph.body, instance.body)

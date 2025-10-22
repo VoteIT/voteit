@@ -25,13 +25,12 @@ from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.utils import sort_agenda_items
 from voteit.meeting.workflows import MeetingWf
-from voteit.proposal.models import Proposal
 
 if TYPE_CHECKING:
     from voteit.core.abcs import MeetingContext
 
 
-class CloneMeetingForm(forms.ModelForm):
+class ExportMeetingForm(forms.ModelForm):
     include_discussions = forms.BooleanField(required=False, initial=True)
     include_proposals = forms.BooleanField(required=False, initial=True)
     include_buttons = forms.BooleanField(required=False, initial=True)
@@ -41,14 +40,19 @@ class CloneMeetingForm(forms.ModelForm):
     clear_ai_states = forms.BooleanField(required=False, initial=True)
     clear_proposal_states = forms.BooleanField(required=False, initial=True)
     clear_proposal_id = forms.BooleanField(required=False)
-    use_existing_groups = forms.BooleanField(required=False, initial=True)
-    add_participants = forms.BooleanField(required=False)
-    commit = forms.BooleanField(required=False)
 
     class Meta:
         model = Meeting
         fields = []
 
+
+class ImportMeetingForm(ExportMeetingForm):
+    use_existing_groups = forms.BooleanField(required=False, initial=True)
+    add_participants = forms.BooleanField(required=False)
+    commit = forms.BooleanField(required=False)
+
+
+class CloneMeetingForm(ImportMeetingForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["target_meeting"] = forms.ModelChoiceField(
@@ -131,7 +135,6 @@ class MeetingDialectForm(forms.ModelForm):
 
 
 class MeetingReorderForm(forms.ModelForm):
-
     class Meta:
         model = Meeting
         fields = []
@@ -207,6 +210,7 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
         if obj:
             for urlname, title in [
                 ("admin:meeting_meeting_clone_form", "Clone"),
+                ("admin:meeting_meeting_export_form", "Export"),
                 ("admin:meeting_meeting_dialect_form", "Hantera dialekter"),
                 ("admin:meeting_meeting_reorder_ais", "Sortera AIs"),
             ]:
@@ -220,20 +224,28 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
 
         return super().render_change_form(request, context, *args, **kwargs)
 
-    @admin.display(description="Agenda items")
+    @admin.display(description="Agenda items", ordering="_ai_count")
     def ai_count(self, obj: Meeting):
-        return obj.agenda_items.count()
+        return obj._ai_count
 
-    @admin.display(description="Proposals")
+    @admin.display(description="Proposals", ordering="_proposal_count")
     def proposal_count(self, obj: Meeting):
-        return Proposal.objects.filter(agenda_item__meeting=obj).count()
+        return obj._proposal_count
 
-    @admin.display(description="Organisation")
+    @admin.display(description="Organisation", ordering="organisation__title")
     def meeting_org(self, obj: Meeting):
         return obj.organisation
 
     def get_queryset(self, request):
-        return super().get_queryset(request)
+        qs = super().get_queryset(request)
+        # Select organisation in one query
+        qs = qs.select_related("organisation")
+        # Annotate agenda item count
+        qs = qs.annotate(
+            _ai_count=models.Count("agenda_items", distinct=True),
+            _proposal_count=models.Count("agenda_items__proposals", distinct=True),
+        )
+        return qs
 
     def get_urls(self):
         urls = super().get_urls()
@@ -252,6 +264,11 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
                 "<int:object_id>/meeting-reoder-form/",
                 self.admin_site.admin_view(self.reoder_meeting_ais_form),
                 name="meeting_meeting_reorder_ais",
+            ),
+            path(
+                "<int:object_id>/meeting-export-form/",
+                self.admin_site.admin_view(self.meeting_export_form),
+                name="meeting_meeting_export_form",
             ),
         ]
         return custom_urls + urls
@@ -308,6 +325,30 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
         )
         return render(request, "admin/meeting/special_meeting_form.html", context)
 
+    def meeting_export_form(self, request, object_id):
+        obj = get_object_or_404(Meeting, pk=object_id)
+
+        if request.method == "POST":
+            form = ExportMeetingForm(data=request.POST, instance=obj)
+            if form.is_valid():
+                url = reverse(
+                    "meeting-data-yaml", kwargs={"pk": object_id}, query=form.clean()
+                )
+                return redirect(url)
+
+        else:
+            form = ExportMeetingForm(instance=obj)
+        context = dict(
+            self.admin_site.each_context(request),
+            title="Exportera möte",
+            form=form,
+            instance=obj,
+            orig_form_url=reverse(
+                "admin:meeting_meeting_change", kwargs={"object_id": object_id}
+            ),
+        )
+        return render(request, "admin/meeting/special_meeting_form.html", context)
+
     def meeting_dialect_form(self, request, object_id):
         obj = get_object_or_404(Meeting, pk=object_id)
 
@@ -325,7 +366,7 @@ class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
                     else:
                         self.message_user(
                             request,
-                            f"Avinstallerade dialekten",
+                            "Avinstallerade dialekten",
                             level=messages.INFO,
                         )
                 return redirect("admin:meeting_meeting_change", object_id)
