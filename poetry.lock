@@ -861,6 +861,22 @@ prometheus = ["prometheus-client (>=0.4.0)"]
 sentry = ["sentry-sdk (>=1.0.0)"]
 
 [[package]]
+name = "django-sql-utils"
+version = "0.7.0"
+description = "Improved API for aggregating using Subquery"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "django_sql_utils-0.7.0-py3-none-any.whl", hash = "sha256:fefc40c826896b60fcf33e35b6e30b523fc958955a16006438cd3ba6d795a532"},
+    {file = "django_sql_utils-0.7.0.tar.gz", hash = "sha256:9371ff28eaf326836a7c52887259123cdd3fbffb7b738e42ae1a21258be0feb6"},
+]
+
+[package.dependencies]
+django = ">=3.2"
+sqlparse = "*"
+
+[[package]]
 name = "djangorestframework"
 version = "3.16.1"
 description = "Web APIs for Django, made easy."
@@ -2490,4 +2506,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "27a59d252e9c43c09400fd252218692df8203d0e698e8a4309e0be2d5e6c377a"
+content-hash = "74e0234134a20f7c99280760ac1ee6da2b6b880990d24c5bb518e59a17061be7"

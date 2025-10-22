@@ -9,6 +9,7 @@ from envelope.app.user_channel.channel import UserChannel
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
 from envelope.channels.models import AppState
+from envelope.messages.common import Batch
 from envelope.testing import ChannelMessageCatcher
 from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
@@ -19,14 +20,12 @@ from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-from voteit.poll.abcs import VoteTransferPolicy
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.messages import PollStatus
 from voteit.poll.messages import VoteTransferAdded
 from voteit.poll.messages import VoteTransferChanged
 from voteit.poll.messages import VoteTransferDeleted
 from voteit.poll.models import ElectoralRegister
-from voteit.poll.models import VoteTransfer
 from voteit.poll.registries import er_policy
 from voteit.poll.registries import vote_transfer_policies
 from voteit.poll.testing import UnrestrictedVoteTransferER
@@ -248,11 +247,12 @@ class MeetingSubscribedTests(TestCase):
         with MessageCatcher(Subscribed) as messages:
             command.run_job()
         self.assertEqual(1, len(messages))
-        msg = messages[0]
-        messages = [x.p for x in msg.data.app_state if x.t == PollStatus.name]
-        self.assertEqual(1, len(messages))
-        payload = messages[0]
-        self.assertEqual({"pk": self.poll2.pk, "voted": 1, "total": 2}, payload)
+        subscribe_msg = messages[0]
+        message = [x.p for x in subscribe_msg.data.app_state if x.t == Batch.name][0]
+        self.assertEqual(1, len(message["payloads"]))
+        self.assertEqual(
+            {"pk": self.poll2.pk, "voted": 1, "total": 2}, message["payloads"][0].dict()
+        )
 
     def test_app_state_multiple_ongoing_poll(self):
         command = Subscribe(
@@ -267,11 +267,11 @@ class MeetingSubscribedTests(TestCase):
         with MessageCatcher(Subscribed) as messages:
             command.run_job()
         self.assertEqual(1, len(messages))
-        msg = messages[0]
-        messages = [x.p for x in msg.data.app_state if x.t == PollStatus.name]
-        self.assertEqual(2, len(messages))
-        self.assertIn({"pk": self.poll.pk, "voted": 2, "total": 2}, messages)
-        self.assertIn({"pk": self.poll2.pk, "voted": 2, "total": 2}, messages)
+        subscribe_msg = messages[0]
+        message = [x.p for x in subscribe_msg.data.app_state if x.t == Batch.name][0]
+        dict_payloads = [x.dict() for x in message["payloads"]]
+        self.assertIn({"pk": self.poll.pk, "voted": 2, "total": 2}, dict_payloads)
+        self.assertIn({"pk": self.poll2.pk, "voted": 2, "total": 2}, dict_payloads)
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
@@ -490,8 +490,6 @@ class VoteSignalsTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_count_sent_to_meeting_ch(self, mock_publish):
-        from voteit.poll.messages import PollStatus
-
         with self.captureOnCommitCallbacks(execute=True):
             self.poll.votes.create(user=self.user, vote="yes")
         self.assertTrue(mock_publish.called)
@@ -515,7 +513,6 @@ class VoteSignalsTests(TestCase):
     {UnrestrictedVoteTransferER.name: UnrestrictedVoteTransferER},
 )
 class VoteTransferSignalsTests(TestCase):
-
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
