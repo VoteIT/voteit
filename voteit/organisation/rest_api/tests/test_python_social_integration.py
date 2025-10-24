@@ -1,14 +1,17 @@
+from datetime import timedelta
 from urllib.parse import parse_qs
 
 import responses
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import override_settings
+from django.utils.timezone import now
 from rest_framework.test import APITestCase
 from social_core.exceptions import AuthException
 
 from voteit.organisation.backends import IDProxyOAuth2
 from voteit.organisation.models import Organisation
+from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 User = get_user_model()
 _IDENTITY_RESPONSE_JSON = {
@@ -112,11 +115,13 @@ class SocialIntegrationTests(APITestCase):
             {"email": ["admin@betahaus.net", "new@betahaus.net"]},
             usa.extra_data.get("user_data"),
         )
+        self.assertEqual(usa.uid, user.identity_id)
+        self.assertEqual("admin@betahaus.net", user.email)
 
     @responses.activate
     def test_complete_existing_user(self):
         user = User.objects.create(username="adminer", email="admin@betahaus.net")
-        user.social_auth.create(uid="123", provider="idproxy")
+        usa = user.social_auth.create(uid="123", provider="idproxy")
         response = self.client.get("/login/idproxy/")
         location = response.get("Location")
         parsed = parse_qs(location)
@@ -144,6 +149,7 @@ class SocialIntegrationTests(APITestCase):
         self.assertEqual("with pass 'admin'", user.last_name)
         self.assertEqual("admin@betahaus.net", user.email)
         self.assertEqual("https://image/picture.png", user.img_url)
+        self.assertEqual(usa.uid, user.identity_id)
 
     @responses.activate
     def test_complete_existing_user_but_authenticated_as_other(self):
@@ -230,3 +236,141 @@ class SocialIntegrationTests(APITestCase):
         with self.assertRaises(AuthException) as cm:
             response = self.client.get("/complete/idproxy/", data={"state": state})
         self.assertEqual("This organisation is no longer active.", str(cm.exception))
+
+    @responses.activate
+    def test_bump_permission(self):
+        user = User.objects.create(username="adminer", email="admin@betahaus.net")
+        user.social_auth.create(uid="123", provider="idproxy")
+        response = self.client.get("/login/idproxy/")
+        location = response.get("Location")
+        parsed = parse_qs(location)
+        state = parsed["state"][0]
+        self.assertTrue(state)
+        # Mocked response
+        token_response = responses.Response(
+            method="POST",
+            url="https://idproxy/o/token/",
+            json={"access_token": "knock knock"},
+        )
+        responses.add(token_response)
+        identity_response = responses.Response(
+            method="GET",
+            url="https://idproxy/api/identity/",
+            json={"is_superuser": True, **_IDENTITY_RESPONSE_JSON},
+        )
+        responses.add(identity_response)
+        response = self.client.get("/complete/idproxy/", data={"state": state})
+        self.assertEqual(302, response.status_code)
+        self.assertEqual({ROLE_ORG_MANAGER}, self.organisation.get_roles(user))
+
+    @responses.activate
+    def test_attach_from_identity_id(self):
+        user = self.organisation.users.create(
+            username="good_user",
+            email="good@betahaus.net",
+            identity_id="123",
+            last_login=now(),
+        )
+        forgotten_user = self.organisation.users.create(
+            username="forgotten",
+            email="forgotten@betahaus.net",
+            identity_id="123",
+        )
+        old_user = self.organisation.users.create(
+            username="old",
+            email="old@betahaus.net",
+            identity_id="123",
+            last_login=now() - timedelta(days=100),
+        )
+        response = self.client.get("/login/idproxy/")
+        location = response.get("Location")
+        parsed = parse_qs(location)
+        state = parsed["state"][0]
+        self.assertTrue(state)
+        # Mocked response
+        token_response = responses.Response(
+            method="POST",
+            url="https://idproxy/o/token/",
+            json={"access_token": "knock knock"},
+        )
+        responses.add(token_response)
+        identity_response = responses.Response(
+            method="GET",
+            url="https://idproxy/api/identity/",
+            json=_IDENTITY_RESPONSE_JSON,
+        )
+        responses.add(identity_response)
+        response = self.client.get("/complete/idproxy/", data={"state": state})
+        self.assertEqual(302, response.status_code)
+        self.assertTrue(user.social_auth.filter(uid="123", provider="idproxy").first())
+        self.assertFalse(forgotten_user.social_auth.all())
+        self.assertFalse(old_user.social_auth.all())
+
+    @responses.activate
+    def test_attach_from_identity_id_no_last_login(self):
+        forgotten_user = self.organisation.users.create(
+            username="forgotten",
+            email="forgotten@betahaus.net",
+            identity_id="123",
+        )
+        response = self.client.get("/login/idproxy/")
+        location = response.get("Location")
+        parsed = parse_qs(location)
+        state = parsed["state"][0]
+        self.assertTrue(state)
+        # Mocked response
+        token_response = responses.Response(
+            method="POST",
+            url="https://idproxy/o/token/",
+            json={"access_token": "knock knock"},
+        )
+        responses.add(token_response)
+        identity_response = responses.Response(
+            method="GET",
+            url="https://idproxy/api/identity/",
+            json=_IDENTITY_RESPONSE_JSON,
+        )
+        responses.add(identity_response)
+        response = self.client.get("/complete/idproxy/", data={"state": state})
+        self.assertEqual(302, response.status_code)
+        self.assertTrue(
+            forgotten_user.social_auth.filter(uid="123", provider="idproxy").first()
+        )
+
+    @responses.activate
+    def test_inherit_other_users_and_identity_id_update(self):
+        user = User.objects.create(username="adminer", email="admin@betahaus.net")
+        forgotten_user_wrong_org = User.objects.create(
+            username="wrong_user", email="forgotten@betahaus.net", identity_id="def"
+        )
+        forgotten_user = self.organisation.users.create(
+            username="old_user", email="forgotten@betahaus.net", identity_id="def"
+        )
+        user.social_auth.create(uid="123", provider="idproxy")
+        response = self.client.get("/login/idproxy/")
+        location = response.get("Location")
+        parsed = parse_qs(location)
+        state = parsed["state"][0]
+        self.assertTrue(state)
+        # Mocked response
+        token_response = responses.Response(
+            method="POST",
+            url="https://idproxy/o/token/",
+            json={"access_token": "knock knock"},
+        )
+        responses.add(token_response)
+        identity_response = responses.Response(
+            method="GET",
+            url="https://idproxy/api/identity/",
+            json={
+                "extra_identity_ids": ["def"],
+                **_IDENTITY_RESPONSE_JSON,
+            },
+        )
+        responses.add(identity_response)
+        response = self.client.get("/complete/idproxy/", data={"state": state})
+        self.assertEqual(302, response.status_code)
+        user.refresh_from_db()
+        forgotten_user.refresh_from_db()
+        self.assertEqual("123", user.identity_id)
+        self.assertEqual("123", forgotten_user.identity_id)

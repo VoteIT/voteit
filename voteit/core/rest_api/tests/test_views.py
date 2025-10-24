@@ -1,9 +1,5 @@
-from datetime import timedelta
-
-import responses
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
 from voteit.meeting.models import Meeting
@@ -125,36 +121,8 @@ class UserViewSetTests(APITestCase):
         cls.participant = User.objects.get(username="participant")
         cls.participant.identity_id = "abc"
         cls.participant.save()
-        cls.mock_api_return = {
-            "pk": 1,
-            "application": 1,
-            "given_name": "Hello",
-            "family_name": "Is it me you are looking for?",
-            "identity_id": "123",
-            "user_data": [
-                {
-                    "pk": 1,
-                    "scope": "email",
-                    "data": "hello@betahaus.net",
-                    "validated": "2021-03-24T15:56:00.043000Z",
-                },
-                {
-                    "pk": 2,
-                    "scope": "email",
-                    "data": "world@betahaus.net",
-                    "validated": "2021-03-24T15:56:00.043000Z",
-                },
-            ],
-        }
         cls.provider: OAuth2Provider = OAuth2Provider.objects.get(pk=1)
         cls.participant = User.objects.get(username="participant")
-        cls.participant.access_tokens.create(
-            expires_at=now() + timedelta(hours=1),
-            expires_in=3600,
-            provider=cls.provider,
-            access_token="abc",
-            refresh_token="123",
-        )
 
     def test_list(self):
         self.client.force_login(self.participant)
@@ -262,18 +230,6 @@ class UserViewSetTests(APITestCase):
             data,
         )
 
-    def test_switch_authenticated_attaches_same_auth_info(self):
-        self.assertFalse(
-            self.moderator.access_tokens.filter(access_token="abc").exists()
-        )
-        self.client.force_login(self.participant)
-        url = reverse("user-switch", kwargs={"pk": self.moderator.pk})
-        response = self.client.post(url)
-        self.assertEqual(200, response.status_code)
-        self.assertTrue(
-            self.moderator.access_tokens.filter(access_token="abc").exists()
-        )
-
     def test_switch_authenticated_non_allowed_user(self):
         self.client.force_login(self.participant)
         url = reverse("user-switch", kwargs={"pk": 3})
@@ -284,17 +240,20 @@ class UserViewSetTests(APITestCase):
         self.client.force_login(self.participant)
         url = reverse("user-logout")
         response = self.client.post(url)
-        # FIXME: Check destroyed session?
 
     def test_email_choices(self):
         self.client.force_login(self.participant)
+        self.participant.social_auth.create(
+            uid="abc",
+            provider="idproxy",
+            extra_data={
+                "user_data": {"email": ["hello@betahaus.net", "world@betahaus.net"]}
+            },
+        )
         url = reverse("user-email-choices")
-        resp = responses.RequestsMock()
-        resp.start()
-        resp.add(responses.GET, self.provider.identity_url, json=self.mock_api_return)
         response = self.client.get(url)
         data = response.json()
-        self.assertEqual(200, response.status_code)
+        self.assertEqual(200, response.status_code, data)
         self.assertEqual({"emails": ["hello@betahaus.net", "world@betahaus.net"]}, data)
 
 

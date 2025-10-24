@@ -17,13 +17,13 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 
 from voteit.core.abcs import MeetingContext
-from voteit.core.rest_api.utils import get_identity_data
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
 from voteit.core.validators import get_invalid_tags
 from voteit.core.validators import valid_userid
 from voteit.meeting.permissions import MeetingPermissions
+from voteit.organisation.utils import get_idproxy_user_data
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -190,10 +190,7 @@ class UserSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         if user.email == value:
             return value
-        identity_data = get_identity_data(user)
-        valid_emails = {
-            x["data"] for x in identity_data["user_data"] if x["scope"] == "email"
-        }
+        valid_emails = get_idproxy_user_data(user).get("email", [])
         if value not in valid_emails:
             raise ValidationError(
                 _("Email you specified isn't validated. It must exist on your profile.")

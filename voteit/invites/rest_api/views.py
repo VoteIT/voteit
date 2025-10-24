@@ -16,13 +16,13 @@ from rest_framework.viewsets import ViewSet
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import TransitionsMixin
 from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
-from voteit.core.rest_api.utils import get_identity_data
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api import serializers
 from voteit.invites.schemas import InviteDataTypesSchema
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.meeting.models import Meeting
+from voteit.organisation.utils import get_idproxy_user_data
 
 if TYPE_CHECKING:
     pass
@@ -171,26 +171,18 @@ class HandleMatchedInvitesViewSet(
     Note that the data must match returned data from their identity_url
     """
 
-    expected_default_http_status = 403
     serializer_class = serializers.ExternalMeetingInviteSerializer
     permission_classes = [IsAuthenticated]
 
-    @cached_property
-    def identity_data(self) -> dict:
-        return get_identity_data(self.request.user)
-
     def get_queryset(self):
-        # bad request if no user org
         organisation = self.request.user.organisation
         if organisation is None:
             raise ValidationError("Organisation required")
-        sdata = {}
-        for item in self.identity_data["user_data"]:
-            values = sdata.setdefault(item["scope"], set())
-            values.add(item["data"])
-        return MeetingInvite.objects.find_open_invites(
-            organisation=organisation, **sdata
-        )
+        if matched := get_idproxy_user_data(self.request.user):
+            return MeetingInvite.objects.find_open_invites(
+                organisation=organisation, **matched
+            )
+        return MeetingInvite.objects.none()
 
     @action(
         methods=["post"],

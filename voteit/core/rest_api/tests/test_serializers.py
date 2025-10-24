@@ -1,18 +1,15 @@
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
-import responses
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.test import TestCase
-from django.utils.timezone import now
 from rest_framework.serializers import ModelSerializer
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.testing import mk_hashtag
 from voteit.core.testing import mk_usertag
 from voteit.meeting.models import Meeting
-from voteit.organisation.models import OAuth2Provider
+from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
 
 User = get_user_model()
@@ -188,52 +185,14 @@ class UpdateUserSerializerTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.mock_api_return = {
-            "pk": 1,
-            "application": 1,
-            "given_name": "Hello",
-            "family_name": "Is it me you are looking for?",
-            "identity_id": "123",
-            "user_data": [
-                {
-                    "pk": 1,
-                    "scope": "email",
-                    "data": "hello@betahaus.net",
-                    "validated": "2021-03-24T15:56:00.043000Z",
-                },
-                {
-                    "pk": 2,
-                    "scope": "cell_phone",
-                    "data": "+123-123-123",
-                    "validated": "2021-03-24T15:56:00.043000Z",
-                },
-            ],
-        }
-
-        cls.provider: OAuth2Provider = OAuth2Provider.objects.get(pk=1)
         cls.user: UserType = User.objects.get(pk=1)
-        cls.user.access_tokens.create(
-            expires_at=now() + timedelta(hours=1),
-            expires_in=3600,
-            provider=cls.provider,
-            access_token="abc",
-            refresh_token="123",
+        cls.user.identity_id = "abc"
+        cls.user.save()
+        cls.user.social_auth.create(
+            uid=cls.user.identity_id,
+            provider=IDPROXY_PROVIDER,
+            extra_data={"user_data": {"email": ["hello@betahaus.net"]}},
         )
-
-        cls.responses = responses.RequestsMock()
-        cls.responses.start()
-        cls.responses.add(
-            responses.GET, cls.provider.identity_url, json=cls.mock_api_return
-        )
-
-    def setUp(self):
-        self.user.refresh_from_db()
-
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-        cls.responses.stop()
-        cls.responses.reset()
 
     @property
     def _cut(self):

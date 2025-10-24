@@ -19,7 +19,7 @@ from voteit.agenda.workflows import AgendaItemWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
-from voteit.organisation.views import begin_auth
+
 
 User = get_user_model()
 

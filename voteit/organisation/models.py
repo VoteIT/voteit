@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-from datetime import UTC
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from auditlog.registry import auditlog
 from django.conf import settings
-from django.contrib.postgres.fields import ArrayField
 from django.db import models
-from django.urls import reverse
 from django.utils.timezone import now
-from requests_oauthlib import OAuth2Session
 
 from voteit.core.abcs import OrganisationContext
 from voteit.core.fields import RichTextField
@@ -19,16 +15,12 @@ from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.utils import relaxed_clean_html
-from voteit.core.utils import strict_clean_html
 from voteit.core.workflows import EnabledWf
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
-from voteit.organisation.schemas import OAuthTokenSchema
-from voteit.organisation.utils import get_provider_response_adapters
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
-    from voteit.organisation.abcs import ProviderResponseAdapter
     from voteit.components.models import OrganisationComponent
 
 _marker = object()
@@ -159,7 +151,6 @@ class OAuth2Provider(OrganisationContext):
     """
 
     name = "oauth2_provider"
-    provider_id: str = models.CharField(max_length=30)
     organisation: Organisation | None = models.OneToOneField(
         "organisation.Organisation",
         on_delete=models.CASCADE,
@@ -175,33 +166,12 @@ class OAuth2Provider(OrganisationContext):
     client_id: str = models.CharField(max_length=100)
     client_secret: str = models.CharField(max_length=200)
 
-    # redirect_url: http://127.0.0.1:8000/finish-auth/
-    # auth_url: http://id.localhost:8001/o/authorize/
-    # token_url: http://localhost:8001/o/token/
-    # identity_url: http://localhost:8001/api/identity/
-
-    def redirect_url(self, request) -> str:
-        path = reverse("finish-auth")
-        return request.build_absolute_uri(path)
-
     @property
     def id_backend_host(self):
         """
         ID_BACKEND_HOST only needed in dev
         """
         return getattr(settings, "ID_HOST_BACKEND", settings.ID_HOST)
-
-    @property
-    def auth_url(self) -> str:
-        return f"{self.id_backend_host}/o/authorize/"
-
-    @property
-    def token_url(self) -> str:
-        return f"{self.id_backend_host}/o/token/"
-
-    @property
-    def identity_url(self) -> str:
-        return f"{self.id_backend_host}/api/identity/"
 
     @property
     def title(self):
@@ -213,20 +183,6 @@ class OAuth2Provider(OrganisationContext):
         verbose_name = "OAuth2Provider"
         verbose_name_plural = "OAuth2Providers"
 
-    @property
-    def response_adapter(self) -> type[ProviderResponseAdapter]:
-        return get_provider_response_adapters()[self.provider_id]
-
-    def save(self, **kw):
-        if not self.provider_id:
-            self.provider_id = "idproxy"
-        adapters = get_provider_response_adapters()
-        if self.provider_id not in adapters:
-            raise ValueError(
-                f"{self.provider_id} is not registered in provider_response_adapters",
-            )
-        super().save(**kw)
-
     def __str__(self):
         return self.title
 
@@ -235,123 +191,6 @@ class OAuth2Provider(OrganisationContext):
 
     # Type annotations
     objects: models.Manager
-    access_tokens: models.QuerySet
-
-
-class AccessTokenManager(models.Manager):
-    def from_response(
-        self,
-        response: dict,
-        user: AbstractUser,
-        provider: OAuth2Provider,
-    ) -> AccessToken:
-        """
-        Create or update an access token from response
-        """
-        token = OAuthTokenSchema(**response)
-        access_token: AccessToken | None = AccessToken.objects.filter(
-            user=user,
-            provider=provider,
-        ).first()
-        # We could use get or create but we would still need to touch all attributes
-        if access_token is None:
-            return self.create_from_pydantic(token, user=user, provider=provider)
-        else:
-            access_token.save_from_pydantic(token)
-            return access_token
-
-    def create_from_pydantic(
-        self,
-        token: OAuthTokenSchema,
-        user: AbstractUser = None,
-        provider: OAuth2Provider = None,
-    ) -> AccessToken:
-        # FIXME: This should use the already filtered user as default
-        return AccessToken.objects.create(
-            scope=token.scope,
-            expires_at=datetime.fromtimestamp(token.expires_at, tz=UTC),
-            expires_in=token.expires_in,
-            access_token=token.access_token,
-            refresh_token=token.refresh_token,
-            user=user,
-            provider=provider,
-        )
-
-
-class AccessToken(models.Model):
-    """
-    OAuth AccessToken
-
-    Note that we're not authenticating these ourselves but they're for other resources.
-    """
-
-    name: str = "access_token"
-    user: AbstractUser = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="access_tokens",
-    )
-    provider: OAuth2Provider = models.ForeignKey(
-        OAuth2Provider,
-        on_delete=models.CASCADE,
-        related_name="access_tokens",
-    )
-    created: datetime = models.DateTimeField(auto_now_add=True)
-    updated: datetime = models.DateTimeField(auto_now=True)
-    scope: list[str] = ArrayField(models.CharField(max_length=50), default=list)
-    expires_at: datetime = models.DateTimeField()
-    expires_in: int = models.PositiveIntegerField()
-    access_token: str = models.CharField(max_length=100)
-    refresh_token: str = models.CharField(max_length=100)
-
-    @property
-    def is_expired(self) -> bool:
-        """
-        Essentially if it should refresh
-        """
-        return now() > self.expires_at
-
-    def save_from_pydantic(self, token: OAuthTokenSchema):
-        self.scope = token.scope
-        self.expires_at = datetime.fromtimestamp(token.expires_at, tz=UTC)
-        self.expires_in = token.expires_in
-        self.access_token = token.access_token
-        self.refresh_token = token.refresh_token
-        self.save()
-
-    def as_dict(self) -> dict:
-        """
-        This dict is what OAuthLib expects as "token" kwarg
-        """
-        return OAuthTokenSchema(
-            scope=self.scope,
-            expires_at=self.expires_at,
-            expires_in=self.expires_in,
-            access_token=self.access_token,
-            refresh_token=self.refresh_token,
-        ).dict()
-
-    def token_handler(self, response: dict):
-        token = OAuthTokenSchema(**response)
-        self.save_from_pydantic(token)
-
-    def get_session(self) -> OAuth2Session:
-        refresh_kwargs = {
-            "client_id": self.provider.client_id,
-            "client_secret": self.provider.client_secret,
-        }
-        return OAuth2Session(
-            self.provider.client_id,
-            token=self.as_dict(),
-            auto_refresh_url=self.provider.token_url,
-            auto_refresh_kwargs=refresh_kwargs,
-            token_updater=self.token_handler,
-        )
-
-    def __str__(self):
-        return f"Access token for {self.user.userid}"
-
-    objects = AccessTokenManager()
 
 
 class TermsOfService(BaseContent, OrganisationContext):

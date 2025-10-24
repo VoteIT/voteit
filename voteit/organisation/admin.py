@@ -8,7 +8,6 @@ from django.utils.functional import cached_property
 from django.utils.timezone import now
 from envelope.models import Connection
 
-from voteit.organisation.models import AccessToken
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
@@ -161,13 +160,6 @@ class OrganisationRolesAdmin(admin.ModelAdmin):
 
     def get_assigned(self, instance):
         return instance.assigned
-
-
-@admin.register(AccessToken)
-class AccessTokenAdmin(admin.ModelAdmin):
-    autocomplete_fields = ("user",)
-    list_display = "user", "updated"
-    list_filter = ("user__organisation",)
 
 
 @admin.register(TermsOfService)

@@ -1,5 +1,10 @@
+from django.contrib.auth import get_user_model
 from social_core.exceptions import AuthException
 from django.utils.translation import gettext as _
+
+from voteit.organisation.roles import ROLE_ORG_MANAGER
+
+User = get_user_model()
 
 
 def org_active(strategy, details, backend, user=None, *args, **kwargs):
@@ -21,6 +26,26 @@ def social_user(backend, uid, user=None, *args, **kwargs):
             )
         if not user:
             user = social.user
+        if user.identity_id != uid:
+            user.identity_id = uid
+            user.save()
+    elif existing_user_qs := backend.organisation.users.filter(identity_id=uid):
+        if (
+            existing_user := existing_user_qs.exclude(last_login__isnull=True)
+            .order_by("-last_login")
+            .first()
+        ):
+            user = existing_user
+        elif existing_user := existing_user_qs.first():
+            # Match users without login?
+            user = existing_user
+        if user and existing_user != user:
+            # FIXME: We want to reauthenticate as that user instead.
+            raise AuthException(
+                backend, _("You're logged in as another user, logout first.")
+            )
+        user = existing_user
+
     return {
         "social": social,
         "user": user,
@@ -29,7 +54,7 @@ def social_user(backend, uid, user=None, *args, **kwargs):
     }
 
 
-def create_user(strategy, details, backend, user=None, *args, **kwargs):
+def create_user(strategy, details, backend, uid, user=None, *args, **kwargs):
     if user:
         return {"is_new": False}
     fields = {
@@ -41,58 +66,20 @@ def create_user(strategy, details, backend, user=None, *args, **kwargs):
     organisation = backend.organisation
     return {
         "is_new": True,
-        "user": strategy.create_user(organisation=organisation, **fields),
+        "user": strategy.create_user(
+            organisation=organisation, identity_id=uid, **fields
+        ),
     }
 
 
-# def associate_user(backend, uid, user=None, social=None, *args, **kwargs):
-#     if user and not social:
-#         try:
-#             social = backend.strategy.storage.user.create_social_auth(
-#                 user, uid, backend.name
-#             )
-#         except Exception as err:
-#             if not backend.strategy.storage.is_integrity_error(err):
-#                 raise
-#             # Protect for possible race condition, those bastard with FTL
-#             # clicking capabilities, check issue #131:
-#             #   https://github.com/omab/django-social-auth/issues/131
-#             result = social_user(backend, uid, user, *args, **kwargs)
-#             # Check if matching social auth really exists. In case it does
-#             # not, the integrity error probably had different cause than
-#             # existing entry and should not be hidden.
-#             if not result["social"]:
-#                 raise
-#             return result
-#         else:
-#             return {"social": social, "user": social.user, "new_association": True}
-#     return None
+def inherit_users(details, backend, user, response, *args, **kwargs):
+    if extra_identity_ids := response.get("extra_identity_ids"):
+        backend.organisation.users.filter(
+            identity_id__in=extra_identity_ids, is_active=True
+        ).update(identity_id=user.identity_id)
 
 
-# def associate_by_email(backend, details, user=None, *args, **kwargs):
-#     """
-#     Associate current auth with a user with the same email address in the DB.
-#
-#     This pipeline entry is not 100% secure unless you know that the providers
-#     enabled enforce email verification on their side, otherwise a user can
-#     attempt to take over another user account by using the same (not validated)
-#     email address on some provider.  This pipeline entry is disabled by
-#     default.
-#     """
-#     if user:
-#         return None
-#
-#     email = details.get("email")
-#     if email:
-#         # Try to associate accounts registered with the same email address,
-#         # only if it's a single object. AuthException is raised if multiple
-#         # objects are returned.
-#         users = list(backend.strategy.storage.user.get_users_by_email(email))
-#         if len(users) == 0:
-#             return None
-#         if len(users) > 1:
-#             raise AuthException(
-#                 backend, "The given email address is associated with another account"
-#             )
-#         return {"user": users[0], "is_new": False}
-#     return None
+def bump_permissions(backend, user, social, *args, **kwargs):
+    # No not Djangos!
+    if social.extra_data.get("is_superuser", False):
+        backend.organisation.add_roles(user, ROLE_ORG_MANAGER)

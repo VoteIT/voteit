@@ -12,7 +12,6 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import UserManager
 from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db import models
@@ -32,9 +31,8 @@ from voteit.core.validators import UserIDValidator
 from voteit.core.workflows import UserWf
 
 if TYPE_CHECKING:
-    from requests_oauthlib import OAuth2Session
+    from social_django.models import UserSocialAuth
     from voteit.organisation.models import Organisation
-    from voteit.organisation.models import AccessToken
     from voteit.participant_tags.models import ParticipantTags
 
 __all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
@@ -134,22 +132,14 @@ class User(AbstractUser):
     def incomplete(self):
         pass
 
-    def oauth_session(self) -> OAuth2Session:
-        access_token: AccessToken | None = self.access_tokens.filter(
-            provider=self.organisation.provider
-        ).first()
-        if access_token is None:
-            raise PermissionDenied("No access token. Please login again.")
-        return access_token.get_session()
-
     objects = UserManager()
 
     # Annotations
     last_read_set: models.QuerySet
-    access_tokens: models.QuerySet
     organisation_id: int | None
     meeting_roles: models.QuerySet
     meeting_tags: models.QuerySet[ParticipantTags]
+    social_auth: models.QuerySet[UserSocialAuth]
 
 
 def real_user_only(method):

@@ -10,18 +10,15 @@ class OrganisationConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        # Make sure code is imported + registered
-        from voteit.organisation import roles
-        from voteit.organisation import rules
-        from .rest_api import views
-        from . import channels
-        from . import messages
-        from . import signals
-        from voteit.organisation import providers
+        from voteit.organisation import roles  # noqa
+        from .rest_api import views  # noqa
+        from . import channels  # noqa
+        from . import messages  # noqa
+        from . import signals  # noqa
 
-        assert getattr(
-            settings, "ID_HOST", None
-        ), "ID_HOST required in settings. Specify as http://<url to id server>"
+        assert getattr(settings, "ID_HOST", None), (
+            "ID_HOST required in settings. Specify as http://<url to id server>"
+        )
         parsed = urlparse(settings.ID_HOST)
         assert parsed.scheme in (
             "http",

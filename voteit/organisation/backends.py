@@ -45,6 +45,7 @@ class IDProxyOAuth2(BaseOAuth2):
     EXTRA_DATA = [
         ("expires_in", "expires"),
         ("user_data",),
+        ("is_superuser", "is_superuser", True),
     ]
     DEFAULT_SCOPE = ["identity"]
 

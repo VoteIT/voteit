@@ -69,7 +69,6 @@
 - model: organisation.oauth2provider
   pk: 1
   fields:
-    provider_id: idproxy
     organisation: 1
     scope: email
     client_id: cid_org1

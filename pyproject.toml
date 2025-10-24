@@ -10,7 +10,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "channels-envelope (>=1.1.0,<2.0.0)",
-    "requests-oauthlib (>=2.0.0,<3.0.0)",
     "python3-vote-core (>=20170329.0,<20170330.0)",
     "stvpoll (>=0.4.6,<0.5.0)",
     "rules (>=3.5,<4.0)",

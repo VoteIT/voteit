@@ -1,9 +1,6 @@
-from contextlib import suppress
-
 from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth import logout
-from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
@@ -24,10 +21,10 @@ from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.serializers import UserAndRolesSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
-from voteit.core.rest_api.utils import get_identity_data
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation.permissions import OrgPermissions
+from voteit.organisation.utils import get_idproxy_user_data
 
 UserModel = get_user_model()
 
@@ -117,21 +114,6 @@ class UserView(
     @transaction.atomic
     def switch(self, request, pk):
         user = self.get_object()
-        inherit_oauth = True
-        with suppress(PermissionDenied):
-            user.oauth_session()
-            inherit_oauth = False
-        if inherit_oauth:
-            if curr_token := request.user.access_tokens.order_by("expires_at").first():
-                # We don't really know what to do if it doesn't exist, and we don't have to care
-                # since it won't happen when logged in via oauth
-                user.access_tokens.create(
-                    expires_at=curr_token.expires_at,
-                    expires_in=curr_token.expires_in,
-                    provider=curr_token.provider,
-                    access_token=curr_token.access_token,
-                    refresh_token=curr_token.refresh_token,
-                )
         log_auth("Switch user", for_user=user, request=request)
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         serializer = self.get_serializer(user)
@@ -148,11 +130,8 @@ class UserView(
 
     @action(methods=["GET"], detail=False)
     def email_choices(self, request):
-        identity_data = get_identity_data(request.user)
-        valid_emails = {
-            x["data"] for x in identity_data["user_data"] if x["scope"] == "email"
-        }
-        return Response(data={"emails": sorted(valid_emails)})
+        emails = get_idproxy_user_data(request.user).get("email", [])
+        return Response(data={"emails": sorted(emails)})
 
 
 @router.register("health", basename="health")

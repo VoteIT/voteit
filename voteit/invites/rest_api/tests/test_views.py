@@ -1,23 +1,20 @@
 from __future__ import annotations
 
-from datetime import timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
-import responses
 from django.contrib.auth import get_user_model
 from django.test import override_settings
-from django.utils.timezone import now
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
+from social_django.models import UserSocialAuth
 
 from voteit.invites.models import MeetingInvite
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
-from voteit.organisation.models import OAuth2Provider
+from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
-from voteit.organisation.schemas import OAuthTokenSchema
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
@@ -212,86 +209,28 @@ class MatchInvitesViewSetTests(APITestCase):
 
 
 class UserMatchedInviteViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.organisation: Organisation = Organisation.objects.create()
-        cls.provider = OAuth2Provider.objects.create(
-            provider_id="idproxy",
-            organisation=cls.organisation,
-            client_id="client_id",
-            client_secret="client_secret",
-        )
+        cls.organisation: Organisation = Organisation.objects.get(pk=1)
         cls.meeting: Meeting = Meeting.objects.create(
             title="Test meeting", state="ongoing", organisation=cls.organisation
-        )
-        cls.moderator: User = User.objects.create_user(
-            "moderator", organisation=cls.organisation
         )
         cls.outsider: User = User.objects.create_user(
             "outsider", organisation=cls.organisation
         )
-        later = now() + timedelta(hours=1)
-        token_mod = OAuthTokenSchema(
-            access_token="123",
-            expires_in=3600,
-            scope=["identity", "email"],
-            refresh_token="abc",
-            expires_at=later,
-        )
-        token_outsider = OAuthTokenSchema(**token_mod.dict())
-        token_outsider.access_token = "1234"
-        token_outsider.refresh_token = "abcd"
-        cls.mod_access_token = cls.moderator.access_tokens.create_from_pydantic(
-            token_mod, provider=cls.provider, user=cls.moderator
-        )
-        cls.outsider_access_token = cls.outsider.access_tokens.create_from_pydantic(
-            token_outsider, provider=cls.provider, user=cls.outsider
-        )
-        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
-        cls.invite: MeetingInvite = cls.meeting.invites.create(
+        cls.invite_matching: MeetingInvite = cls.meeting.invites.create(
             user_data={"email": "hello@betahaus.net"},
         )
-        cls.invite2: MeetingInvite = cls.meeting.invites.create(
+        cls.invite_other: MeetingInvite = cls.meeting.invites.create(
             user_data={"email": "goodbye@betahaus.net"},
         )
-
-        cls.mock_api_return = {
-            "pk": 1,
-            "application": 1,
-            "given_name": "Hello",
-            "family_name": "Is it me you are looking for?",
-            "identity_id": "123",
-            "user_data": [
-                {
-                    "pk": 1,
-                    "scope": "email",
-                    "data": "hello@betahaus.net",
-                    "validated": "2021-03-24T15:56:00.043000Z",
-                },
-                {
-                    "pk": 2,
-                    "scope": "cell_phone",
-                    "data": "+123-123-123",
-                    "validated": "2021-03-24T15:56:00.043000Z",
-                },
-            ],
-        }
-
-        cls.responses = responses.RequestsMock()
-        cls.responses.start()
-        cls.responses.add(
-            responses.GET, cls.provider.identity_url, json=cls.mock_api_return
+        cls.usa: UserSocialAuth = cls.outsider.social_auth.create(
+            provider=IDPROXY_PROVIDER,
+            uid="abc",
+            extra_data={"user_data": {"email": ["hello@betahaus.net"]}},
         )
-
-    def setUp(self):
-        self.invite.refresh_from_db()
-        self.invite2.refresh_from_db()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.responses.stop()
-        cls.responses.reset()
-        super().tearDownClass()
 
     def test_match(self):
         self.client.force_login(self.outsider)
@@ -300,63 +239,72 @@ class UserMatchedInviteViewSetTests(APITestCase):
         self.assertEqual(200, response.status_code)
         data = response.json()
         self.assertEqual(1, len(data))
-        self.assertEqual(self.invite.pk, data[0]["pk"])
+        self.assertEqual(self.invite_matching.pk, data[0]["pk"])
 
     def test_not_open(self):
-        self.invite.revoke()
-        self.invite.save()
+        self.invite_matching.revoke()
+        self.invite_matching.save()
         self.client.force_login(self.outsider)
         url = reverse("handle-matched-invites-list")
         response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
         data = response.json()
+        self.assertEqual(200, response.status_code, data)
         self.assertEqual(0, len(data))
 
     def test_accept_matched_invite(self):
         self.client.force_login(self.outsider)
-        url = reverse("handle-matched-invites-accept", kwargs={"pk": self.invite.pk})
+        url = reverse(
+            "handle-matched-invites-accept", kwargs={"pk": self.invite_matching.pk}
+        )
         response = self.client.post(url)
-        self.assertEqual(200, response.status_code)
         data = response.json()
-        self.assertEqual(self.invite.pk, data["pk"])
+        self.assertEqual(200, response.status_code, data)
+        self.assertEqual(self.invite_matching.pk, data["pk"])
         self.assertEqual("accepted", data["state"])
-        self.invite.refresh_from_db()
-        self.assertEqual("accepted", self.invite.state)
+        self.invite_matching.refresh_from_db()
+        self.assertEqual("accepted", self.invite_matching.state)
 
     def test_accept_not_matched(self):
         self.client.force_login(self.outsider)
-        url = reverse("handle-matched-invites-accept", kwargs={"pk": self.invite2.pk})
+        url = reverse(
+            "handle-matched-invites-accept", kwargs={"pk": self.invite_other.pk}
+        )
         response = self.client.post(url)
         self.assertEqual(404, response.status_code)
 
     def test_reject(self):
         self.client.force_login(self.outsider)
-        url = reverse("handle-matched-invites-reject", kwargs={"pk": self.invite.pk})
+        url = reverse(
+            "handle-matched-invites-reject", kwargs={"pk": self.invite_matching.pk}
+        )
         response = self.client.post(url)
-        self.assertEqual(200, response.status_code)
         data = response.json()
-        self.assertEqual(self.invite.pk, data["pk"])
+        self.assertEqual(200, response.status_code, data)
+        self.assertEqual(self.invite_matching.pk, data["pk"])
         self.assertEqual("rejected", data["state"])
 
     def test_reject_not_matched(self):
         self.client.force_login(self.outsider)
-        url = reverse("handle-matched-invites-reject", kwargs={"pk": self.invite2.pk})
+        url = reverse(
+            "handle-matched-invites-reject", kwargs={"pk": self.invite_other.pk}
+        )
         response = self.client.post(url)
         self.assertEqual(404, response.status_code)
 
     def test_match_organisation(self):
         org = Organisation.objects.create()
         meeting = org.meetings.create()
+        # Won't match
         meeting.invites.create(
             user_data={"email": "hello@betahaus.net"},
         )
         self.client.force_login(self.outsider)
         url = reverse("handle-matched-invites-list")
         response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
         data = response.json()
+        self.assertEqual(200, response.status_code, data)
         self.assertEqual(1, len(data))
-        self.assertEqual(self.invite.pk, data[0]["pk"])
+        self.assertEqual(self.invite_matching.pk, data[0]["pk"])
 
     def test_no_organisation(self):
         self.client.force_login(User.objects.create_user("virginia"))

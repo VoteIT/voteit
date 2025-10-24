@@ -1,7 +1,6 @@
-from datetime import datetime
-
-from django.test import RequestFactory
 from django.test import TestCase
+
+from voteit.organisation.models import Organisation
 
 
 class OrganisationSerializerTests(TestCase):
@@ -9,8 +8,6 @@ class OrganisationSerializerTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.organisation.models import Organisation
-
         cls.org = Organisation.objects.get(pk=1)
 
     @property
@@ -24,7 +21,7 @@ class OrganisationSerializerTests(TestCase):
         data = serializer.data
         self.assertEqual(data.pop("pk"), self.org.pk)
         self.assertEqual(data.pop("title"), self.org.title)
-        self.assertEqual(data.pop("login_url"), "/begin-auth/")
+        self.assertEqual(data.pop("login_url"), "/login/idproxy/")
         self.assertEqual(data.pop("scope"), ["email"])
         self.assertIsNotNone(data.pop("id_host"))
         self.assertIsNotNone(data.pop("page_title"))
@@ -35,12 +32,14 @@ class OrganisationSerializerTests(TestCase):
         self.assertFalse(data, "Not everything was checked")
 
     def test_get_with_provider(self):
-        from voteit.organisation.models import OAuth2Provider
-
-        OAuth2Provider(organisation=self.org)
         serializer = self._cut(self.org)
         data = serializer.data
-        self.assertEqual(data.pop("login_url"), f"/begin-auth/")
+        self.assertEqual(data.pop("login_url"), "/login/idproxy/")
+        self.org.provider = None
+        self.org.save()
+        serializer = self._cut(self.org)
+        data = serializer.data
+        self.assertEqual(data.pop("login_url"), None)
 
     def test_patch(self):
         serializer = self._cut(self.org, {"body": "Bye!"}, partial=True)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Callable
 from typing import Generator
 from typing import TYPE_CHECKING
@@ -10,11 +9,6 @@ from typing import TYPE_CHECKING
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
 from django_fsm import TransitionNotAllowed
-from oauthlib.oauth2 import InvalidGrantError
-from requests.exceptions import ConnectionError as RConnectionError
-from requests.exceptions import JSONDecodeError
-from rest_framework.exceptions import APIException
-from rest_framework.exceptions import NotAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 
@@ -24,53 +18,8 @@ if TYPE_CHECKING:
     from pydantic import ValidationError as PydanticValidationError
     from django.db.models import Model
     from voteit.core.models import User
-    from voteit.organisation.models import OAuth2Provider
-    from voteit.organisation.models import Organisation
     from voteit.meeting.models import Meeting
     from django_fsm import Transition
-
-
-def get_identity_data(user: User) -> dict:
-    """
-    Returns users identity data from identity server
-    """
-
-    try:
-        organisation: Organisation = user.organisation
-    except AttributeError:
-        raise ValidationError(
-            "Your user isn't attached to an organisation so login this way will never work"
-        )
-    try:
-        provider: OAuth2Provider = organisation.provider
-    except AttributeError:
-        raise ValidationError(
-            "The organisation you belong to has no login provider, so login will never work"
-        )
-    oauth_session = user.oauth_session()
-    try:
-        response = oauth_session.get(provider.identity_url)
-    except RConnectionError:
-        # Proper exception later?
-        exc = APIException(
-            detail=_("Identity service not available right now"),
-            code="service_unavailable",
-        )
-        exc.status_code = 503
-        raise exc
-    except InvalidGrantError:
-        raise NotAuthenticated(
-            detail=_("You need to login again to use invites"),
-        )
-    # Not the correct serializer exception, but this is kind of the crash and burn...
-    if not response.ok:
-        try:
-            err_data = response.json()
-        except JSONDecodeError:
-            logging.exception("Identity provider json error")
-            err_data = "Unknown error while fetching invites"
-        raise ValidationError(err_data)
-    return response.json()
 
 
 def perm_denied_msg(perm, obj):

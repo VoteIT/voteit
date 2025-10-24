@@ -7,23 +7,17 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import transaction
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
 from rest_framework.reverse import reverse
 
 from voteit.components.rest_api.serializers import OrganisationComponentSerializer
-from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserSerializer
-from voteit.organisation.models import OAuth2Provider
+from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
-from voteit.organisation.models import TermsOfService
-from voteit.organisation.models import UserConsent
-from voteit.organisation.utils import get_provider_response_adapters
 
 if TYPE_CHECKING:
-    from voteit.core.models import User as UserType
+    pass
 
 
 class OrganisationSerializer(serializers.ModelSerializer):
@@ -54,10 +48,13 @@ class OrganisationSerializer(serializers.ModelSerializer):
     def get_login_url(self, instance: Organisation) -> Optional[str]:
         with suppress(ObjectDoesNotExist):
             if instance.provider:
-                return reverse(
-                    "begin-auth",
-                    request=self.context.get("request"),
-                )
+                return f"/login/{IDPROXY_PROVIDER}/"
+                # FIXME:
+                return reverse("login", kwargs={"backend": IDPROXY_PROVIDER})
+                # return reverse(
+                #     "begin-auth",
+                #     request=self.context.get("request"),
+                # )
 
     @staticmethod
     def get_id_host(instance: Organisation) -> Optional[str]:
