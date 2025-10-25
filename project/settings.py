@@ -3,6 +3,8 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
+from sentry_sdk.scrubber import EventScrubber, DEFAULT_PII_DENYLIST
+
 from voteit.settings_tpl import *
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -231,6 +233,10 @@ if SENTRY_DSN := os.getenv("SENTRY_DSN"):  # pragma: no cover
         # If you wish to associate users to errors (assuming you are using
         # django.contrib.auth) you may enable sending PII data.
         send_default_pii=SENTRY_PII,
+        # Should report only user primary key, no other user info
+        event_scrubber=EventScrubber(
+            pii_denylist=[*DEFAULT_PII_DENYLIST, "email", "username"]
+        ),
         # Filter out specific endpoints to avoid spamming
         traces_sampler=traces_sampler,
         # Env tag
