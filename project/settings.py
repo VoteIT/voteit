@@ -3,8 +3,6 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from sentry_sdk.scrubber import EventScrubber, DEFAULT_PII_DENYLIST
-
 from voteit.settings_tpl import *
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -205,6 +203,7 @@ if SLACK_WEBHOOK_URL := os.getenv("SLACK_LOGGER_WEBHOOK"):
 if SENTRY_DSN := os.getenv("SENTRY_DSN"):  # pragma: no cover
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.scrubber import EventScrubber, DEFAULT_PII_DENYLIST
 
     SENTRY_TRACES_SAMPLERATE = float(os.getenv("SENTRY_TRACES_SAMPLERATE", 1.0))
     SENTRY_PROFILES_SAMPLERATE = float(os.getenv("SENTRY_PROFILES_SAMPLERATE", 1.0))
