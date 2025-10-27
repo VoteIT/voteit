@@ -29,10 +29,7 @@ class MeetingInviteAdmin(FSMTransitionMixin, MeetingAdminMixin, admin.ModelAdmin
         "user_data__swedish_ssn",
         "meeting__title",
     )
-    readonly_fields = (
-        "state",
-        "created_by",
-    )
+    readonly_fields = ("state",)
     list_display = (
         "__str__",
         "meeting_link",
@@ -48,7 +45,6 @@ class MeetingInviteAdmin(FSMTransitionMixin, MeetingAdminMixin, admin.ModelAdmin
     autocomplete_fields = (
         "meeting",
         "used_by",
-        "created_by",
     )
     inlines = (MeetingGroupAnnotationInline,)
 
