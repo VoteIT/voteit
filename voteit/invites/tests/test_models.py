@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from auditlog.models import LogEntry
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
@@ -282,3 +283,42 @@ class MeetingInviteTests(TestCase):
         self.invite.accept(self.user)
         self.assertEqual(self.user, self.invite.used_by)
         self.assertEqual({ROLE_PARTICIPANT}, self.meeting.get_roles(self.user))
+
+    def test_constraint(self):
+        with self.assertRaises(IntegrityError) as cm:
+            self.meeting.invites.create(
+                user_data={"email": "a@betahaus.net"},
+                roles=[ROLE_PARTICIPANT],
+            )
+        self.assertIn(
+            'duplicate key value violates unique constraint "unique_meeting_invite_user_data"',
+            str(cm.exception),
+        )
+
+    def test_constraint_only_active_with_data(self):
+        self.meeting.invites.create(
+            user_data={},
+            roles=[ROLE_PARTICIPANT],
+        )
+        self.meeting.invites.create(
+            user_data={},
+            roles=[ROLE_PARTICIPANT],
+        )
+        self.assertEqual(2, self.meeting.invites.filter(user_data={}).count())
+
+    def test_mask_sentive_user_data(self):
+        invite = self.meeting.invites.create(
+            user_data={
+                "shoes": "47",
+                "email": "somewhere@betahaus.net",
+                "swedish_ssn": "121212-1212",
+            }
+        )
+        log = LogEntry.objects.get_for_object(invite).first()
+        self.assertEqual(
+            [
+                "None",
+                '{"email": "*where@*us.net", "shoes": "47", "swedish_ssn": "121212*"}',
+            ],
+            log.changes_dict["user_data"],
+        )

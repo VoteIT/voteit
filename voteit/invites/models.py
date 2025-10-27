@@ -132,7 +132,9 @@ class MeetingInviteManager(models.Manager):
         return result
 
     @has_exact_filter("meeting")
-    def find_mixed_user_data(self, *items: dict[str, str]) -> Sequence[
+    def find_mixed_user_data(
+        self, *items: dict[str, str]
+    ) -> Sequence[
         models.QuerySet[MeetingInvite],
         dict[str, models.QuerySet[MeetingInvite]],
     ]:
@@ -245,6 +247,8 @@ class MeetingInviteManager(models.Manager):
         "roles",
         "user_data",
     ],
+    mask_fields=["user_data"],
+    mask_callable="voteit.invites.utils.user_data_mask",
 )
 class MeetingInvite(MeetingContext):
     name = "meeting_invite"
@@ -287,6 +291,8 @@ class MeetingInvite(MeetingContext):
     )
     user_data: dict = models.JSONField(
         encoder=DjangoJSONEncoder,
+        blank=True,
+        default=dict,
     )
 
     class Meta:
@@ -294,6 +300,7 @@ class MeetingInvite(MeetingContext):
             models.UniqueConstraint(
                 fields=["meeting", "user_data"],
                 name="unique_meeting_invite_user_data",
+                condition=~models.Q(user_data__exact={}),
             ),
         )
 
