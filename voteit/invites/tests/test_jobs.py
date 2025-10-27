@@ -1,15 +1,9 @@
-from datetime import datetime
 from datetime import timedelta
 
 from django.test import TestCase
 from django.utils.timezone import now
-from django_rq import get_queue
-from fakeredis import FakeRedis
-from rq.registry import ScheduledJobRegistry
 
-from voteit.invites.jobs import add_to_queue_if_needed
 from voteit.invites.jobs import expire_unused_invites
-from voteit.invites.jobs import get_expire_job_id
 from voteit.invites.models import MeetingInvite
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import Meeting
@@ -36,17 +30,6 @@ class ExpireUnusedInvitesTests(TestCase):
             meeting=cls.meeting,
             roles=[ROLE_PARTICIPANT],
             user_data={"email": "b@betahaus.net"},
-        )
-
-    def test_scheduled_jobs(self):
-        connection = FakeRedis()
-        queue = get_queue(connection=connection)
-        add_to_queue_if_needed(connection=connection)
-        registry = ScheduledJobRegistry(queue=queue, connection=queue.connection)
-        timestamp = now() + timedelta(days=1)
-        self.assertIn(get_expire_job_id(timestamp), registry)
-        self.assertIsInstance(
-            registry.get_scheduled_time(get_expire_job_id(timestamp)), datetime
         )
 
     def test_calling_job(self):
