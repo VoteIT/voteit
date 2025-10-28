@@ -45,7 +45,8 @@ class OrganisationSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_login_url(instance: Organisation) -> Optional[str]:
-        return f"{settings.ID_HOST}/login-to/{instance.host}"
+        with suppress(ObjectDoesNotExist):
+            return instance.provider and f"{settings.ID_HOST}/login-to/{instance.host}"
 
     @staticmethod
     def get_id_host(instance: Organisation) -> Optional[str]:

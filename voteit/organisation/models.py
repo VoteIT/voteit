@@ -135,7 +135,7 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
         super().save(**kwargs)
 
     # Type annotations
-    provider: OAuth2Provider | None
+    provider: OAuth2Provider  # May raise ObjectDoesNotExist
     objects: models.Manager
     tos: models.QuerySet
     users: models.QuerySet
