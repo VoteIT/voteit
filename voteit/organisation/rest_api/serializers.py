@@ -8,7 +8,6 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
-from rest_framework.reverse import reverse
 
 from voteit.components.rest_api.serializers import OrganisationComponentSerializer
 from voteit.core.rest_api.serializers import UserSerializer
@@ -46,15 +45,10 @@ class OrganisationSerializer(serializers.ModelSerializer):
         ]
 
     def get_login_url(self, instance: Organisation) -> Optional[str]:
+        # Note: the actual login url via IDProxy is <host to id>/login-to/<domain>
         with suppress(ObjectDoesNotExist):
             if instance.provider:
                 return f"/login/{IDPROXY_PROVIDER}/"
-                # FIXME:
-                return reverse("login", kwargs={"backend": IDPROXY_PROVIDER})
-                # return reverse(
-                #     "begin-auth",
-                #     request=self.context.get("request"),
-                # )
 
     @staticmethod
     def get_id_host(instance: Organisation) -> Optional[str]:

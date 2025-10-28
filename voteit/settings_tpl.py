@@ -44,7 +44,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rules",
     "rest_framework",
-    "rest_framework.authtoken",
     "django_filters",
     "django_fsm",
     "fsm_admin",
