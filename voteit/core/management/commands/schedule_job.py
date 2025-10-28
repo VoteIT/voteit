@@ -26,7 +26,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "timestamp",
-            help="When the job should be scheduled the first time, specified as YY-MM-DD HH:MM",
+            help="When the job should be scheduled the first time, specified as YYYY-MM-DD HH:MM",
             type=_get_dt_with_tz,
         )
         parser.add_argument(
