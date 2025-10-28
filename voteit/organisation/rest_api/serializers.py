@@ -11,7 +11,6 @@ from rest_framework import serializers
 
 from voteit.components.rest_api.serializers import OrganisationComponentSerializer
 from voteit.core.rest_api.serializers import UserSerializer
-from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
 
@@ -44,11 +43,9 @@ class OrganisationSerializer(serializers.ModelSerializer):
             "page_title",
         ]
 
-    def get_login_url(self, instance: Organisation) -> Optional[str]:
-        # Note: the actual login url via IDProxy is <host to id>/login-to/<domain>
-        with suppress(ObjectDoesNotExist):
-            if instance.provider:
-                return f"/login/{IDPROXY_PROVIDER}/"
+    @staticmethod
+    def get_login_url(instance: Organisation) -> Optional[str]:
+        return f"{settings.ID_HOST}/login-to/{instance.host}"
 
     @staticmethod
     def get_id_host(instance: Organisation) -> Optional[str]:
