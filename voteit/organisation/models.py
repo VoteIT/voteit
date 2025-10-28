@@ -19,7 +19,6 @@ from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.utils import relaxed_clean_html
-from voteit.core.utils import strict_clean_html
 from voteit.core.workflows import EnabledWf
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
@@ -149,6 +148,7 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     users: models.QuerySet
     meetings: models.QuerySet
     components: models.QuerySet[OrganisationComponent]
+    roles: models.QuerySet[OrganisationRoles]
 
 
 class OAuth2Provider(OrganisationContext):

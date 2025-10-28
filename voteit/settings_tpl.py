@@ -121,6 +121,13 @@ RQ_QUEUES = {
         "PORT": 6379,
         "DB": 1,
     },
+    "long": {
+        "HOST": "redis",
+        "PORT": 6379,
+        "DB": 1,
+        "DEFAULT_TIMEOUT": 600,
+        "DEFAULT_RESULT_TTL": 3600 * 24 * 7,
+    },
     ENVELOPE_CONNECTIONS_QUEUE: {
         "HOST": "redis",
         "PORT": 6379,

@@ -1,0 +1,50 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+{% load i18n %}
+<html lang="en">
+<head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta content="IE=edge" http-equiv="X-UA-Compatible">
+    <title>{{title}}</title>
+    <style type="text/css">
+        body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        color: rgba(0, 0, 0, 0.87);
+        background-color: #563661;
+        font-family: Roboto, sans-serif;
+        font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+<div style="background-color:#F2F2F2; max-width: 640px; margin: auto;">
+    <table align="center" bgcolor="#FFFFFF" border="0" cellpadding="0" cellspacing="0"
+           style="max-width:640px; width:100%;" width="640">
+        <tr>
+            <td align="center" style="padding:10px;" valign="top">
+                <table align="center" border="0" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%;"
+                       width="600">
+                    <tr>
+                        <td align="left" style="padding:10px;" valign="top">
+                            {% block body %}{% endblock %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;" valign="top">
+{% block footer %}
+<p style="border-top: 1px solid #ccc; color: #aaa;  text-align: left; padding-top: 10px; margin-top: 0;">
+{% translate "This email was sent from:" %}
+<a href="{{ site_url }}">{{ site_url }}</a>
+</p>
+{% endblock %}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</div>
+</body>
+</html>

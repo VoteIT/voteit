@@ -62,6 +62,7 @@ ASGI_APPLICATION = "project.routing.application"
 
 # RQ
 RQ_QUEUES["default"]["HOST"] = "redis_rq"
+RQ_QUEUES["long"]["HOST"] = "redis_rq"
 RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["DB"] = 2
 RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["HOST"] = "redis_rq"
 RQ_QUEUES[ENVELOPE_TIMESTAMP_QUEUE]["DB"] = 3
