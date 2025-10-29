@@ -1,8 +1,13 @@
 from django.test import TestCase
+from django.test import override_settings
 
 from voteit.organisation.models import Organisation
 
 
+@override_settings(
+    LANGUAGE_CODE="en-us",
+    ID_HOST="https://idproxy",
+)
 class OrganisationSerializerTests(TestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -21,9 +26,7 @@ class OrganisationSerializerTests(TestCase):
         data = serializer.data
         self.assertEqual(data.pop("pk"), self.org.pk)
         self.assertEqual(data.pop("title"), self.org.title)
-        self.assertEqual(
-            data.pop("login_url"), "https://id.betahaus.net/login-to/127.0.0.1"
-        )
+        self.assertEqual(data.pop("login_url"), "https://idproxy/login-to/127.0.0.1")
         self.assertEqual(data.pop("scope"), ["email"])
         self.assertIsNotNone(data.pop("id_host"))
         self.assertIsNotNone(data.pop("page_title"))
@@ -36,9 +39,7 @@ class OrganisationSerializerTests(TestCase):
     def test_get_with_provider(self):
         serializer = self._cut(self.org)
         data = serializer.data
-        self.assertEqual(
-            data.pop("login_url"), "https://id.betahaus.net/login-to/127.0.0.1"
-        )
+        self.assertEqual(data.pop("login_url"), "https://idproxy/login-to/127.0.0.1")
         self.org.provider = None
         self.org.save()
         serializer = self._cut(self.org)
