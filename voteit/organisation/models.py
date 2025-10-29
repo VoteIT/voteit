@@ -141,6 +141,7 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     users: models.QuerySet
     meetings: models.QuerySet
     components: models.QuerySet[OrganisationComponent]
+    roles: models.QuerySet[OrganisationRoles]
 
 
 class OAuth2Provider(OrganisationContext):

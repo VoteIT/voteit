@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from logging import getLogger
 from typing import TYPE_CHECKING
 
@@ -40,3 +41,35 @@ def send_updated_invites(
     for data in serializer.data:
         msg = MeetingInviteChanged(data=data)
         ch.sync_publish(msg)
+
+
+def _mask_email(value: str) -> str:
+    if "@" in value:
+        parts = value.split("@")
+
+        return "@".join(f"*{x[int(len(x) / 2) :]}" for x in parts)
+    return value
+
+
+def _mask_swedish_ssn(value: str) -> str:
+    return f"{value[0:6]}*"
+
+
+_DICT_MASKERS = {
+    "email": _mask_email,
+    "swedish_ssn": _mask_swedish_ssn,
+}
+
+
+def user_data_mask(value: str) -> str:
+    """
+    >>> user_data_mask('{"email":"someone@betahaus.net", "swedish_ssn":"121212-1212", "otherstuff": "HelloWorld"}')
+    '{"email": "*eone@*us.net", "swedish_ssn": "121212*", "otherstuff": "HelloWorld"}'
+    """
+    if any(f'"{x}"' in value for x in _DICT_MASKERS):
+        data = json.loads(value)
+        for k, func in _DICT_MASKERS.items():
+            if k in data:
+                data[k] = func(data[k])
+        return json.dumps(data)
+    return value

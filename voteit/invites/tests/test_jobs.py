@@ -1,21 +1,21 @@
-from datetime import datetime
 from datetime import timedelta
+from unittest.mock import patch
 
+from auditlog.models import LogEntry
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils.timezone import now
-from django_rq import get_queue
-from fakeredis import FakeRedis
-from rq.registry import ScheduledJobRegistry
 
-from voteit.invites.jobs import add_to_queue_if_needed
+from voteit.invites.jobs import cleanup_invites
 from voteit.invites.jobs import expire_unused_invites
-from voteit.invites.jobs import get_expire_job_id
 from voteit.invites.models import MeetingInvite
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
+
+User = get_user_model()
 
 
 class ExpireUnusedInvitesTests(TestCase):
@@ -25,31 +25,68 @@ class ExpireUnusedInvitesTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.create(
             er_policy_name=AutoBeforePoll.name, state=MeetingWf.CLOSED, end_time=before
         )
-        # cls.user = cls.org.users.create(username="someone")
-        cls.inv_old: MeetingInvite = MeetingInvite.objects.create(
-            meeting=cls.meeting,
+        cls.inv_old: MeetingInvite = cls.meeting.invites.create(
             roles=[ROLE_PARTICIPANT],
             user_data={"email": "a@betahaus.net", "swedish_ssn": "121212-1212"},
             created=before,
         )
-        cls.inv_recent: MeetingInvite = MeetingInvite.objects.create(
-            meeting=cls.meeting,
+        cls.inv_recent: MeetingInvite = cls.meeting.invites.create(
             roles=[ROLE_PARTICIPANT],
             user_data={"email": "b@betahaus.net"},
         )
-
-    def test_scheduled_jobs(self):
-        connection = FakeRedis()
-        queue = get_queue(connection=connection)
-        add_to_queue_if_needed(connection=connection)
-        registry = ScheduledJobRegistry(queue=queue, connection=queue.connection)
-        timestamp = now() + timedelta(days=1)
-        self.assertIn(get_expire_job_id(timestamp), registry)
-        self.assertIsInstance(
-            registry.get_scheduled_time(get_expire_job_id(timestamp)), datetime
+        cls.user_one = User.objects.create_user("one")
+        cls.user_two = User.objects.create_user("two")
+        cls.user_three = User.objects.create_user("three")
+        cls.inv_recently_used = cls.meeting.invites.create(
+            roles=[ROLE_PARTICIPANT],
+            user_data={},
         )
+        cls.inv_recently_used.accept(cls.user_one)
+        cls.inv_recently_used.save()
 
-    def test_calling_job(self):
+        # This will cause the method auto_now to produce a suitable test result
+        really_old_ts = now() - timedelta(days=1000)
+        with patch("django.utils.timezone.now") as mock_now:
+            mock_now.return_value = really_old_ts
+
+            cls.really_old_used = cls.meeting.invites.create(
+                roles=[ROLE_PARTICIPANT],
+                user_data={},
+            )
+            cls.really_old_used.accept(cls.user_two)
+            cls.really_old_used.save()
+
+            cls.old_revoked = cls.meeting.invites.create(
+                roles=[ROLE_PARTICIPANT],
+                user_data={},
+                state=InviteWf.REVOKED,
+            )
+
+    def test_expire_unused_invites(self):
         self.assertEqual(1, expire_unused_invites())
         self.inv_old.refresh_from_db()
         self.assertEqual(InviteWf.EXPIRED, self.inv_old.state)
+
+    def test_cleanup_unused_invites(self):
+        recent_revoked = self.meeting.invites.create(
+            roles=[ROLE_PARTICIPANT],
+            user_data={},
+            state=InviteWf.REVOKED,
+        )
+        self.assertEqual(
+            {"expired_revoked_count": 1, "other_states_count": 1},
+            cleanup_invites(),
+        )
+        recent_revoked.refresh_from_db()
+        with self.assertRaises(MeetingInvite.DoesNotExist):
+            self.really_old_used.refresh_from_db()
+        with self.assertRaises(MeetingInvite.DoesNotExist):
+            self.old_revoked.refresh_from_db()
+
+    def test_cleanups_effect_on_logs(self):
+        LogEntry.objects.all().delete()
+        self.assertEqual(
+            {"expired_revoked_count": 1, "other_states_count": 1},
+            cleanup_invites(),
+        )
+        self.assertEqual(2, LogEntry.objects.count())

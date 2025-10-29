@@ -97,6 +97,7 @@ LOGIN_ERROR_URL = "/error"
 
 # RQ
 RQ_QUEUES["default"]["HOST"] = "redis_rq"
+RQ_QUEUES["long"]["HOST"] = "redis_rq"
 RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["DB"] = 2
 RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["HOST"] = "redis_rq"
 RQ_QUEUES[ENVELOPE_TIMESTAMP_QUEUE]["DB"] = 3
@@ -238,6 +239,7 @@ if SLACK_WEBHOOK_URL := os.getenv("SLACK_LOGGER_WEBHOOK"):
 if SENTRY_DSN := os.getenv("SENTRY_DSN"):  # pragma: no cover
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.scrubber import EventScrubber, DEFAULT_PII_DENYLIST
 
     SENTRY_TRACES_SAMPLERATE = float(os.getenv("SENTRY_TRACES_SAMPLERATE", 1.0))
     SENTRY_PROFILES_SAMPLERATE = float(os.getenv("SENTRY_PROFILES_SAMPLERATE", 1.0))
@@ -266,6 +268,10 @@ if SENTRY_DSN := os.getenv("SENTRY_DSN"):  # pragma: no cover
         # If you wish to associate users to errors (assuming you are using
         # django.contrib.auth) you may enable sending PII data.
         send_default_pii=SENTRY_PII,
+        # Should report only user primary key, no other user info
+        event_scrubber=EventScrubber(
+            pii_denylist=[*DEFAULT_PII_DENYLIST, "email", "username"]
+        ),
         # Filter out specific endpoints to avoid spamming
         traces_sampler=traces_sampler,
         # Env tag
