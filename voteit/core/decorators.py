@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 from functools import wraps
+from logging import getLogger
 from typing import TYPE_CHECKING
 
+import django_rq
 from django.apps import apps
 from django.db import IntegrityError
 from django.db.transaction import get_connection
 from django.db.transaction import on_commit
 from rest_framework.exceptions import PermissionDenied
+from redis.exceptions import ConnectionError
 
+from voteit.core import RQ_LONG_QUEUE
 from voteit.core.permissions import Permission
 
 if TYPE_CHECKING:
@@ -16,6 +20,8 @@ if TYPE_CHECKING:
     from rest_framework.viewsets import GenericAPIView
     from voteit.core.role import Role
     from voteit.core.predicate import Predicate
+
+logger = getLogger(__name__)
 
 
 def predicate(*args, role: Role | None = None, **kwargs) -> Predicate:
@@ -190,5 +196,56 @@ def has_exact_filter(*names: str):
             raise IntegrityError(f"Queryset doesn't contain {name} filter")
 
         return wrapped
+
+    return wrapper
+
+
+def schedule_job(
+    cron_string: str,  # Cron string,
+    *,
+    queue_name: str = RQ_LONG_QUEUE,
+    result_ttl=3600 * 24 * 7,
+    ttl=600,
+    timeout=600,
+    id: str = None,
+    **kwargs,
+):
+    """
+    Refresher on cron strings:
+    minute (0-59)	hour (0 - 23)	day of the month (1 - 31)	month (1 - 12)	day of the week (0 - 6)
+
+
+    >>> from fakeredis import FakeRedis
+    >>> from unittest.mock import patch
+    >>> fakeredis = FakeRedis()
+    >>> with patch("django_rq.queues.get_redis_connection", return_value=fakeredis):
+    ...     @schedule_job("1 1 * * 1-5")
+    ...     def foo():
+    ...         pass
+    ...
+    >>> scheduler = django_rq.get_scheduler('long', connection=fakeredis)
+    >>> scheduler.count()
+    1
+    >>> 'foo' in scheduler
+    True
+    """
+
+    def wrapper(f):
+        scheduler = django_rq.get_scheduler(queue_name)
+        # FIXME: django_rqs wrapper of scheduler doesn't really respect the default values,
+        try:
+            scheduler.cron(
+                cron_string,
+                func=f,
+                id=id or f.__name__,
+                use_local_timezone=True,
+                result_ttl=result_ttl,
+                ttl=ttl,
+                timeout=timeout,
+                **kwargs,
+            )
+        except ConnectionError:
+            logger.warning("Connection error from redis when scheduling %s", f)
+        return f
 
     return wrapper

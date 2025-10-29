@@ -5,8 +5,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from django.utils.timezone import now
-from django_rq import job
-
+from voteit.core.decorators import schedule_job
 from voteit.invites.models import MeetingInvite
 from voteit.invites.workflows import InviteWf
 
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-@job("default", result_ttl=3600 * 72, ttl=600, timeout=600)
+@schedule_job("30 3 * * *")
 def expire_unused_invites() -> int:
     """
     Expire invites if:
@@ -30,7 +29,7 @@ def expire_unused_invites() -> int:
     return invites_qs.update(state=InviteWf.EXPIRED)
 
 
-@job("default", result_ttl=3600 * 72, ttl=600, timeout=600)
+@schedule_job("50 3 * * *")
 def cleanup_invites():
     """
     - 200 days from modification date
