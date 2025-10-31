@@ -19,8 +19,14 @@ for qname in {"default", "long", ENVELOPE_TIMESTAMP_QUEUE, ENVELOPE_CONNECTIONS_
 if platform.system() == "Darwin":
     RQ = {"WORKER_CLASS": "rq.SimpleWorker"}
 
-SOCIAL_AUTH_RAISE_EXCEPTIONS = True
-SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = ["localhost:8080", "localhost:8000"]
+# Change this to debug PSA-backends!
+SOCIAL_AUTH_RAISE_EXCEPTIONS = False
+SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [
+    "voteit.localhost:8000",
+    "voteit.localhost:8080",
+    "localhost:8080",
+    "localhost:8000",
+]
 
 VERBOSE_PERMISSION_LOG = True
 PERMISSON_LOG_FAIL_ONLY = True

@@ -17,7 +17,6 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://\w+\.betahaus\.net$",
 ]
 
-
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
     from hashlib import md5

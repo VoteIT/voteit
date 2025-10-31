@@ -29,6 +29,7 @@ MIDDLEWARE = [
     "django.middleware.locale.LocaleMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "social_django.middleware.SocialAuthExceptionMiddleware",
     "auditlog.middleware.AuditlogMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
