@@ -46,6 +46,7 @@ _IDENTITY_RESPONSE_JSON = {
     SOCIAL_AUTH_IDPROXY_ACCESS_TOKEN_URL="https://idproxy/o/token/",
     SOCIAL_AUTH_IDPROXY_IDENTITY_URL="https://idproxy/api/identity/",
     SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS=["testing"],
+    SOCIAL_AUTH_RAISE_EXCEPTIONS=True,
 )
 class SocialIntegrationTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
