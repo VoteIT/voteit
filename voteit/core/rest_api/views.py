@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth import logout
+from django.contrib.messages import get_messages
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
@@ -10,6 +11,7 @@ from rest_framework import serializers
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
@@ -18,6 +20,7 @@ from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.mixins import SerializerClassesMixin
 from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.serializers import MessageSerializer
 from voteit.core.rest_api.serializers import UserAndRolesSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
@@ -132,6 +135,17 @@ class UserView(
     def email_choices(self, request):
         emails = get_idproxy_user_data(request.user).get("email", [])
         return Response(data={"emails": sorted(emails)})
+
+    @action(
+        ["get"],
+        detail=False,
+        serializer_class=MessageSerializer,
+        permission_classes=[AllowAny],
+    )
+    def messages(self, request, *args, **kwargs):
+        messages = get_messages(request)
+        serializer = self.get_serializer(messages, many=True)
+        return Response(data=serializer.data)
 
 
 @router.register("health", basename="health")

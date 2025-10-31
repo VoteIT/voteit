@@ -213,6 +213,13 @@ class UserAndRolesSerializer(UserSerializer):
         fields = UserSerializer.Meta.fields + ("organisation_roles",)
 
 
+class MessageSerializer(serializers.Serializer):
+    level = serializers.IntegerField()
+    level_tag = serializers.CharField()
+    message = serializers.CharField()
+    tags = serializers.CharField()
+
+
 class TransitionSerializer(serializers.Serializer):
     transition = serializers.CharField(max_length=20)
 

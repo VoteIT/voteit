@@ -1,4 +1,7 @@
 from django.contrib.auth import get_user_model
+from django.contrib.messages import success
+from django.contrib.messages.storage import default_storage
+from django.test import RequestFactory
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
@@ -255,6 +258,34 @@ class UserViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual(200, response.status_code, data)
         self.assertEqual({"emails": ["hello@betahaus.net", "world@betahaus.net"]}, data)
+
+    def test_messages(self):
+        request = RequestFactory().request()
+        request.session = self.client.session
+        request._messages = default_storage(request)
+        success(request, "Hello there!")
+        request._messages.update(None)
+        request.session.save()
+        url = reverse("user-messages")
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            [
+                {
+                    "level": 25,
+                    "level_tag": "success",
+                    "message": "Hello there!",
+                    "tags": "success",
+                }
+            ],
+            response.json(),
+        )
+        # Message consumed
+        response = self.client.get(url)
+        self.assertEqual(
+            [],
+            response.json(),
+        )
 
 
 class HealthTests(APITestCase):
