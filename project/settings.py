@@ -124,6 +124,9 @@ DATABASES = {
         "USER": "postgres",
         "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
         "HOST": os.getenv("POSTGRES_HOST", "db"),
+        "OPTIONS": {
+            "pool": True,
+        },
     }
 }
 
