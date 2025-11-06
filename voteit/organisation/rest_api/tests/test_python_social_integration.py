@@ -375,3 +375,37 @@ class SocialIntegrationTests(APITestCase):
         forgotten_user.refresh_from_db()
         self.assertEqual("123", user.identity_id)
         self.assertEqual("123", forgotten_user.identity_id)
+
+    @responses.activate
+    def test_several_users_and_authenticated_as_other(self):
+        social_user = self.organisation.users.create(
+            username="social_user",
+            email="admin@betahaus.net",
+        )
+        usa = social_user.social_auth.create(uid="123", provider="idproxy")
+        authenticated_user = self.organisation.users.create(
+            username="auth", email="admin@betahaus.net", identity_id="123"
+        )
+        self.client.force_login(authenticated_user)
+        response = self.client.get("/login/idproxy/")
+        location = response.get("Location")
+        parsed = parse_qs(location)
+        state = parsed["state"][0]
+        self.assertTrue(state)
+        # Mocked response
+        token_response = responses.Response(
+            method="POST",
+            url="https://idproxy/o/token/",
+            json={"access_token": "knock knock"},
+        )
+        responses.add(token_response)
+        identity_response = responses.Response(
+            method="GET",
+            url="https://idproxy/api/identity/",
+            json=_IDENTITY_RESPONSE_JSON,
+        )
+        responses.add(identity_response)
+        response = self.client.get("/complete/idproxy/", data={"state": state})
+        self.assertEqual(302, response.status_code)
+        usa.refresh_from_db()
+        self.assertEqual(usa.user, authenticated_user)

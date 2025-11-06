@@ -20,10 +20,15 @@ def social_user(backend, uid, user=None, *args, **kwargs):
     social = backend.strategy.storage.user.get_social_auth(provider, uid)
     if social:
         if user and social.user != user:
-            # FIXME: We want to reauthenticate as that user instead.
-            raise AuthException(
-                backend, _("You're logged in as another user, logout first.")
-            )
+            # Odd case, this is a duplicate user that's authenticated, we may want to move the social auth...
+            if user.is_active and user.identity_id == uid:
+                social.user = user
+                social.save()
+            else:
+                # FIXME: We want to reauthenticate as that user instead.
+                raise AuthException(
+                    backend, _("You're logged in as another user, logout first.")
+                )
         if not user:
             user = social.user
         if user.identity_id != uid:
