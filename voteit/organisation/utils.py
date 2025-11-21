@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from collections import defaultdict
 from typing import Generator
 from typing import TYPE_CHECKING
 
@@ -46,20 +48,27 @@ def get_psa_backends() -> Generator[BaseAuth, None, None]:
         yield backend()
 
 
-def get_idproxy_user_data(user: User) -> dict:
+def get_idproxy_user_data(user: User) -> dict[str, set[str]]:
     """
     Fetch user_data from attached idproxy provider. But since for historic reasons,
     there might be duplicate users that we need to handle.
     """
     if user.is_anonymous:
         return {}
-    # Fetch users social auth or related linked user
-    if (
-        usa := UserSocialAuth.objects.filter(
+    # Build validated data based on one or many PSA logins
+    results = defaultdict(set)
+    for extra_data in (
+        UserSocialAuth.objects.filter(
             provider=IDPROXY_PROVIDER,
         )
-        .filter(models.Q(uid=user.identity_id) | models.Q(user=user))
-        .first()
+        .exclude(extra_data={})
+        .filter(
+            models.Q(uid=user.identity_id)
+            | models.Q(user=user)
+            | models.Q(user__identity_id=user.identity_id)
+        )
+        .values_list("extra_data", flat=True)
     ):
-        return usa.extra_data.get("user_data", {})
-    return {}
+        for k, values in extra_data.get("user_data", {}).items():
+            results[k].update(values)
+    return dict(results)

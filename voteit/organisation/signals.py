@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.contrib.auth import user_logged_out
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from envelope.app.user_channel.channel import UserChannel
 from envelope.signals import channel_subscribed
-from social_django.models import UserSocialAuth
 
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.messages.role_updates import RolesAdded
@@ -87,15 +85,4 @@ def push_roles_removed(instance: OrganisationRoles, roles: list[Role], **kwargs)
             model=get_model_shortname(instance.context),
             user_pk=instance.user.pk,
         ),
-    )
-
-
-@receiver(user_logged_out)
-def cleanup_extra_data(*, user, **kwargs):
-    """
-    Cleanup sensitive data from user on logout.
-    """
-    # Maybe revoke token here
-    UserSocialAuth.objects.filter(user=user).exclude(extra_data={}).update(
-        extra_data={}
     )

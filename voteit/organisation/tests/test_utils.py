@@ -30,7 +30,29 @@ class UtilsTests(TestCase):
         )
 
     def test_get_idproxy_user_data(self):
-        self.assertEqual({"email": ["a@hi.se"]}, get_idproxy_user_data(self.user))
+        self.assertEqual({"email": {"a@hi.se"}}, get_idproxy_user_data(self.user))
         self.assertEqual(
-            {"email": ["a@hi.se"]}, get_idproxy_user_data(self.duplicate_user)
+            {"email": {"a@hi.se"}}, get_idproxy_user_data(self.duplicate_user)
+        )
+
+    def test_get_idproxy_user_data_several_items(self):
+        self.duplicate_user.social_auth.create(
+            provider=IDPROXY_PROVIDER,
+            uid="abcd",
+            extra_data={
+                "access_token": "1234",
+                "sensitive_data": True,
+                "user_data": {
+                    "email": ["a@hi.se", "b@hi.se"],
+                    "swedish_ssn": ["121212-1212"],
+                },
+            },
+        )
+        self.assertEqual(
+            {"email": {"a@hi.se", "b@hi.se"}, "swedish_ssn": {"121212-1212"}},
+            get_idproxy_user_data(self.user),
+        )
+        self.assertEqual(
+            {"email": {"a@hi.se", "b@hi.se"}, "swedish_ssn": {"121212-1212"}},
+            get_idproxy_user_data(self.duplicate_user),
         )

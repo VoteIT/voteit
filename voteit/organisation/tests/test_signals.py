@@ -98,23 +98,3 @@ class RoleChangesPublishedTests(TestCase):
         self.assertEqual(self.org.pk, msg.data.pk)
         self.assertEqual(msg.data.model, "organisation")
         self.assertEqual({"org_manager"}, set(msg.data.roles))
-
-
-class ExtraDataCleanedOnLogoutTests(TestCase):
-    fixtures = ["meeting_test_fixture"]
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.organisation: Organisation = Organisation.objects.get(pk=1)
-        cls.user = cls.organisation.users.create(username="user")
-        cls.usa = cls.user.social_auth.create(
-            provider="dummy",
-            uid="abc",
-            extra_data={"access_token": "123", "sensitive_data": True},
-        )
-
-    def test_logout_cleans_extra_data(self):
-        self.client.force_login(self.user)
-        self.client.logout()
-        self.usa.refresh_from_db()
-        self.assertEqual({}, self.usa.extra_data)
