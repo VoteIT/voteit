@@ -10,3 +10,6 @@ pip install -U pip poetry
 poetry install --with dev
 
 ```
+
+Notes:
+setuptools is a temp dependency, we need to refactor python3-vote-core
