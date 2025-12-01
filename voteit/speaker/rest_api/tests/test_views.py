@@ -1015,6 +1015,7 @@ class ExportSpeakersViewSetTests(APITestCase):
         self.assertEqual("hello@world.se", first_speaker.pop("email"))
         self.assertEqual("hao", first_speaker.pop("userid"))
         self.assertEqual(12, first_speaker.pop("seconds"))
+        self.assertEqual("", first_speaker.pop("agenda_item"))
         self.assertFalse(first_speaker.keys())
 
     def test_csv(self):

@@ -231,13 +231,8 @@ class ExportSpeakersViewSet(viewsets.GenericViewSet):
         return (
             Speaker.objects.filter(speaker_list__speaker_system=sls)
             .exclude(seconds__isnull=True)
+            .select_related("speaker_list", "user", "speaker_list__agenda_item")
             .order_by("started")
-            .annotate(
-                first_name=models.F("user__first_name"),
-                last_name=models.F("user__last_name"),
-                email=models.F("user__email"),
-                userid=models.F("user__userid"),
-            )
         )
 
     @action(

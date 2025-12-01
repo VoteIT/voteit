@@ -84,9 +84,7 @@ class CreateSpeakerListSerializer(serializers.ModelSerializer):
 
 
 class SpeakerListSerializer(CreateSpeakerListSerializer):
-
     class Meta(CreateSpeakerListSerializer.Meta):
-
         read_only_fields = [
             "state",
             "agenda_item",
@@ -108,7 +106,6 @@ class HistoricSpeakerListSerializer(serializers.Serializer):
 
 
 class CreateSpeakerSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Speaker
         read_only_fields = [
@@ -229,11 +226,18 @@ class SpeakerListSystemSerializer(CreateSpeakerListSystemSerializer):
 
 
 class SpeakerExportSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField()
-    last_name = serializers.CharField()
-    email = serializers.CharField()
-    userid = serializers.CharField()
+    first_name = serializers.CharField(source="user.first_name")
+    last_name = serializers.CharField(source="user.last_name")
+    email = serializers.CharField(source="user.email")
+    userid = serializers.CharField(source="user.userid")
+    agenda_item = serializers.SerializerMethodField()
+    speaker_list = serializers.CharField(source="speaker_list.title")
 
     class Meta:
         model = Speaker
         exclude = ("id", "user")
+
+    def get_agenda_item(self, obj) -> str:
+        if obj.speaker_list.agenda_item_id:
+            return obj.speaker_list.agenda_item.title
+        return ""
