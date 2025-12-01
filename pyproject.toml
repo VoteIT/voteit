@@ -36,6 +36,8 @@ dependencies = [
     "social-auth-app-django (>=5.6.0,<6.0.0)",
     "django-sql-utils (>=0.7.0,<0.8.0)",
     "rq-scheduler (>=0.14.0,<0.15.0)",
+    "python-graph-core (>=1.8.2,<2.0.0)",
+    "setuptools (>=80.9.0,<81.0.0)",
 ]
 
 [project.urls]
