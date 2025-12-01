@@ -218,7 +218,7 @@ def schedule_job(
     >>> from fakeredis import FakeRedis
     >>> from unittest.mock import patch
     >>> fakeredis = FakeRedis()
-    >>> with patch("django_rq.queues.get_redis_connection", return_value=fakeredis):
+    >>> with patch("django_rq.connection_utils.get_redis_connection", return_value=fakeredis):
     ...     @schedule_job("1 1 * * 1-5")
     ...     def foo():
     ...         pass
