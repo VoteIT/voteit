@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.utils.timezone import now
+from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 from social_core.exceptions import AuthException
 
@@ -180,10 +181,59 @@ class SocialIntegrationTests(APITestCase):
             json=_IDENTITY_RESPONSE_JSON,
         )
         responses.add(identity_response)
-        with self.assertRaises(AuthException) as cm:
-            self.client.get("/complete/idproxy/", data={"state": state})
-        self.assertEqual(
-            "You're logged in as another user, logout first.", str(cm.exception)
+        response = self.client.get("/complete/idproxy/", data={"state": state})
+        self.assertEqual(302, response.status_code)
+        response = self.client.get(reverse("user-list"))
+        data = response.json()
+        self.assertEqual(200, response.status_code, data)
+        self.assertDictEqual(
+            {k: v for k, v in data.items() if k in ["pk", "email"]},
+            {
+                "pk": user.pk,
+                "email": "admin@betahaus.net",
+            },
+        )
+
+    @responses.activate
+    def test_complete_existing_user_but_authenticated_as_other_with_no_association(
+        self,
+    ):
+        initial_user = self.organisation.users.create(
+            username="initial", email="initial@betahaus.net"
+        )
+        self.client.force_login(initial_user)
+        user = self.organisation.users.create(
+            username="adminer", email="admin@betahaus.net", identity_id="123"
+        )
+        response = self.client.get("/login/idproxy/")
+        location = response.get("Location")
+        parsed = parse_qs(location)
+        state = parsed["state"][0]
+        self.assertTrue(state)
+        # Mocked response
+        token_response = responses.Response(
+            method="POST",
+            url="https://idproxy/o/token/",
+            json={"access_token": "knock knock"},
+        )
+        responses.add(token_response)
+        identity_response = responses.Response(
+            method="GET",
+            url="https://idproxy/api/identity/",
+            json=_IDENTITY_RESPONSE_JSON,
+        )
+        responses.add(identity_response)
+        response = self.client.get("/complete/idproxy/", data={"state": state})
+        self.assertEqual(302, response.status_code)
+        response = self.client.get(reverse("user-list"))
+        data = response.json()
+        self.assertEqual(200, response.status_code, data)
+        self.assertDictEqual(
+            {k: v for k, v in data.items() if k in ["pk", "email"]},
+            {
+                "pk": user.pk,
+                "email": "admin@betahaus.net",
+            },
         )
 
     @responses.activate
