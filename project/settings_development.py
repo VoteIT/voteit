@@ -16,7 +16,7 @@ for qname in {"default", "long", ENVELOPE_TIMESTAMP_QUEUE, ENVELOPE_CONNECTIONS_
     RQ_QUEUES[qname] = {"HOST": "localhost", "DB": 1, "PORT": 6379}
 
 
-if platform.system() == "Darwin":
+if platform.system() == ("Darwin", "Windows"):
     RQ = {"WORKER_CLASS": "rq.SimpleWorker"}
 
 # Change this to debug PSA-backends!
