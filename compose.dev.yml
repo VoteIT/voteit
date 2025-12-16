@@ -1,0 +1,15 @@
+# Link this file as compose.override.yml to use Docker for development
+services:
+  django:
+    build:
+      dockerfile: ./dev.Dockerfile
+    command: |
+      python manage.py runserver
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./voteit:/app/voteit:ro
+      - ./project:/app/project:ro
+      - ./src/dialect_configs/dialects:/app/dialects:ro

@@ -7,7 +7,6 @@ from voteit.settings_tpl import *
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = Path(__file__).resolve().parent.parent
-MEETING_DIALECTS_DIR = os.path.join(BASE_DIR, "dialects")
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() in ("true", "1")
 
 STATIC_ROOT = "/app/static/"
