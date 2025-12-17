@@ -14,9 +14,12 @@ def org_active(strategy, details, backend, user=None, *args, **kwargs):
 
 
 def _reauth_user(backend, user):
-    # This is a bit silly, there must be a better way
-    packend_path = f"{backend.__class__.__module__}.{backend.__class__.__name__}"
-    login(backend.strategy.request, user=user, backend=packend_path)
+    login(
+        backend.strategy.request,
+        user=user,
+        # This is a bit silly, there must be a better way
+        backend=f"{backend.__class__.__module__}.{backend.__class__.__name__}",
+    )
 
 
 def social_user(backend, uid, user=None, *args, **kwargs):
