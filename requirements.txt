@@ -1,12 +1,12 @@
-asgiref==3.11.0
+asgiref==3.11.1
 async-signals==0.3.1
 attrs==25.4.0
 autobahn==25.12.2
 automat==25.4.16
 beautifulsoup4==4.14.3
 bs4==0.0.2
-cbor2==5.7.1
-certifi==2025.11.12
+cbor2==5.8.0
+certifi==2026.1.4
 cffi==2.0.0
 channels==4.3.2
 channels-envelope==1.1.0
@@ -17,17 +17,17 @@ colorama==0.4.6 ; sys_platform == 'win32'
 constantly==23.10.4
 croniter==6.0.0
 crontab==1.0.5
-cryptography==46.0.3
+cryptography==46.0.4
 daphne==4.2.1
 defusedxml==0.7.1
-django==5.2.9
-django-auditlog==3.4.0
+django==5.2.11
+django-auditlog==3.4.1
 django-cors-headers==4.9.0
 django-filter==25.2
 django-fsm==2.8.2
 django-fsm-admin-django-4==1.2.7
 django-model-utils==5.0.0
-django-rq==3.2.1
+django-rq==3.2.2
 django-sql-utils==0.7.0
 djangorestframework==3.16.1
 dnspython==2.8.0
@@ -40,17 +40,17 @@ lxml==6.0.2
 msgpack==1.1.2
 nh3==0.3.2
 oauthlib==3.3.1
-packaging==25.0
+packaging==26.0
 personnummer==3.2.1
 psycopg==3.3.2
 psycopg-binary==3.3.2 ; implementation_name != 'pypy'
 psycopg-pool==3.3.0
 py-ubjson==0.16.1
-pyasn1==0.6.1
+pyasn1==0.6.2
 pyasn1-modules==0.4.2
-pycparser==2.23 ; implementation_name != 'PyPy'
-pydantic==1.10.24
-pyjwt==2.10.1
+pycparser==3.0 ; implementation_name != 'PyPy'
+pydantic==1.10.26
+pyjwt==2.11.0
 pymemcache==4.0.0
 pyopenssl==25.3.0
 python-dateutil==2.9.0.post0
@@ -66,15 +66,15 @@ requests-oauthlib==2.0.0
 rq==2.6.1
 rq-scheduler==0.14.0
 rules==3.5
-sentry-sdk==2.48.0
+sentry-sdk==2.52.0
 service-identity==24.2.0
-setuptools==80.9.0
+setuptools==80.10.2
 six==1.17.0
 slack-logger==0.3.1
-social-auth-app-django==5.6.0
-social-auth-core==4.8.1
-soupsieve==2.8
-sqlparse==0.5.4
+social-auth-app-django==5.7.0
+social-auth-core==4.8.3
+soupsieve==2.8.3
+sqlparse==0.5.5
 stvpoll==0.4.7
 tarjan==0.2.4
 twisted==25.5.0
@@ -83,5 +83,5 @@ typing-extensions==4.15.0
 tzdata==2025.3 ; sys_platform == 'win32'
 u-msgpack-python==2.8.0 ; platform_python_implementation != 'CPython'
 ujson==5.11.0
-urllib3==2.6.2
-zope-interface==8.1.1
+urllib3==2.6.3
+zope-interface==8.2
