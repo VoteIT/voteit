@@ -4,7 +4,7 @@
 install:
 	cat INSTALL.md
 requirements:
-	poetry export -o requirements.txt --with docker --without-hashes
+	uv export --no-dev --frozen --no-install-workspace --group docker --no-hashes --no-annotate --no-header -q -o requirements.txt
 shell:
 	python manage.py shell
 coverage:
@@ -29,9 +29,9 @@ test-deps:
 	python manage.py test dialect_tests voteit_org --keepdb --failfast
 build:
 	set -e
-	poetry build --format wheel
-	poetry build --format wheel -o ../../dist -P src/voteit_org
-	poetry build --format wheel -o ../../dist -P src/member_dialects
+	uv build --wheel
+	uv build --wheel src/voteit_org -o ./dist
+	uv build --wheel src/member_dialects -o ./dist
 dev: build
 	set -e
 	docker pull python:3.12-slim

@@ -1,14 +1,11 @@
 # Dev installation
 
-Typical installation with venv and poetry for development.
+Typical installation with uv for development.
+
+Install uv first then run:
 
 ``` python
-
-python3.12 -m venv venv
-source venv/bin/activate
-pip install -U pip poetry
-poetry install --with dev
-
+uv sync
 ```
 
 Notes:

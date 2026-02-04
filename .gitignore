@@ -5,6 +5,7 @@
 *.egg-info
 .DS_Store
 venv
+.venv
 build
 dialects
 src

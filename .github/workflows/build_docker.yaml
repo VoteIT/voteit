@@ -24,26 +24,28 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Checkout / voteit_org
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: voteit/voteit_org
           path: src/voteit_org
 
       - name: Checkout / member_dialects
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: voteit/member_dialects
           path: src/member_dialects
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
       - name: Build wheels
         run: |
-          pip install poetry
-          poetry build --format wheel
-          poetry build --format wheel -o ../../dist -P src/voteit_org
-          poetry build --format wheel -o ../../dist -P src/member_dialects
+          uv build --wheel
+          uv build --wheel src/voteit_org -o ./dist
+          uv build --wheel src/member_dialects -o ./dist
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3

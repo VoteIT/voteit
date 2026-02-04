@@ -9,25 +9,24 @@ repos:
   - id: check-yaml
   - id: check-added-large-files
 
--   repo: https://github.com/python-poetry/poetry
-    rev: 2.2.1
-    hooks:
-    -   id: poetry-check
-#    -   id: poetry-lock
-
-- repo: https://github.com/python-poetry/poetry-plugin-export
-  rev: 1.9.0
+- repo: https://github.com/astral-sh/uv-pre-commit
+  # uv version.
+  rev: 0.9.29
   hooks:
-    -   id: poetry-export
-        args: [ "-o", "requirements.txt", "--with", "docker", "--without-hashes"]
-        verbose: true
-
-#- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
- #rev: v0.13.3
- # hooks:
-    # Run the linter.
-   # - id: ruff-check
-      #args: [ --fix ]
-    # Run the formatter.
-#    - id: ruff-format
+    - id: uv-export
+      args:
+        - "--frozen"
+        - "--no-install-workspace"
+        - "--no-dev"
+        - "--group=docker"
+        - "--no-hashes"
+        - "--no-annotate"
+        - "--no-header"
+        - "-o=requirements.txt"
+        - "-q"
+- repo: https://github.com/astral-sh/uv-pre-commit
+  # uv version.
+  rev: 0.9.29
+  hooks:
+    # Update the uv lockfile
+    - id: uv-lock

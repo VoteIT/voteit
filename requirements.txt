@@ -1,87 +1,87 @@
-asgiref==3.11.0 ; python_version >= "3.12"
-async-signals==0.3.1 ; python_version >= "3.12"
-attrs==25.4.0 ; python_version >= "3.12"
-autobahn==25.12.2 ; python_version >= "3.12"
-automat==25.4.16 ; python_version >= "3.12"
-beautifulsoup4==4.14.3 ; python_version >= "3.12"
-bs4==0.0.2 ; python_version >= "3.12"
-cbor2==5.7.1 ; python_version >= "3.12"
-certifi==2025.11.12 ; python_version >= "3.12"
-cffi==2.0.0 ; python_version >= "3.12"
-channels-envelope==1.1.0 ; python_version >= "3.12"
-channels-redis==4.3.0 ; python_version >= "3.12"
-channels==4.3.2 ; python_version >= "3.12"
-charset-normalizer==3.4.4 ; python_version >= "3.12"
-click==8.3.1 ; python_version >= "3.12"
-colorama==0.4.6 ; python_version >= "3.12" and platform_system == "Windows"
-constantly==23.10.4 ; python_version >= "3.12"
-croniter==6.0.0 ; python_version >= "3.12"
-crontab==1.0.5 ; python_version >= "3.12"
-cryptography==46.0.3 ; python_version >= "3.12"
-daphne==4.2.1 ; python_version >= "3.12"
-defusedxml==0.7.1 ; python_version >= "3.12"
-django-auditlog==3.4.0 ; python_version >= "3.12"
-django-cors-headers==4.9.0 ; python_version >= "3.12"
-django-filter==25.2 ; python_version >= "3.12"
-django-fsm-admin-django-4==1.2.7 ; python_version >= "3.12"
-django-fsm==2.8.2 ; python_version >= "3.12"
-django-model-utils==5.0.0 ; python_version >= "3.12"
-django-rq==3.2.1 ; python_version >= "3.12"
-django-sql-utils==0.7.0 ; python_version >= "3.12"
-django==5.2.9 ; python_version >= "3.12"
-djangorestframework==3.16.1 ; python_version >= "3.12"
-dnspython==2.8.0 ; python_version >= "3.12"
-email-validator==2.3.0 ; python_version >= "3.12"
-freezegun==1.5.5 ; python_version >= "3.12"
-hyperlink==21.0.0 ; python_version >= "3.12"
-idna==3.11 ; python_version >= "3.12"
-incremental==24.11.0 ; python_version >= "3.12"
-lxml==6.0.2 ; python_version >= "3.12"
-msgpack==1.1.2 ; python_version >= "3.12"
-nh3==0.3.2 ; python_version >= "3.12"
-oauthlib==3.3.1 ; python_version >= "3.12"
-packaging==25.0 ; python_version >= "3.12"
-personnummer==3.2.1 ; python_version >= "3.12"
-psycopg-binary==3.3.2 ; python_version >= "3.12" and implementation_name != "pypy"
-psycopg-pool==3.3.0 ; python_version >= "3.12"
-psycopg==3.3.2 ; python_version >= "3.12"
-py-ubjson==0.16.1 ; python_version >= "3.12"
-pyasn1-modules==0.4.2 ; python_version >= "3.12"
-pyasn1==0.6.1 ; python_version >= "3.12"
-pycparser==2.23 ; python_version >= "3.12" and implementation_name != "PyPy"
-pydantic==1.10.24 ; python_version >= "3.12"
-pyjwt==2.10.1 ; python_version >= "3.12"
-pymemcache==4.0.0 ; python_version >= "3.12"
-pyopenssl==25.3.0 ; python_version >= "3.12"
-python-dateutil==2.9.0.post0 ; python_version >= "3.12"
-python-graph-core==1.8.2 ; python_version >= "3.12"
-python-json-logger==4.0.0 ; python_version >= "3.12"
-python3-openid==3.2.0 ; python_version >= "3.12"
-python3-vote-core==20170329.0 ; python_version >= "3.12"
-pytz==2025.2 ; python_version >= "3.12"
-pyyaml==6.0.3 ; python_version >= "3.12"
-redis==7.1.0 ; python_version >= "3.12"
-requests-oauthlib==2.0.0 ; python_version >= "3.12"
-requests==2.32.5 ; python_version >= "3.12"
-rq-scheduler==0.14.0 ; python_version >= "3.12"
-rq==2.6.1 ; python_version >= "3.12"
-rules==3.5 ; python_version >= "3.12"
-sentry-sdk==2.48.0 ; python_version >= "3.12"
-service-identity==24.2.0 ; python_version >= "3.12"
-setuptools==80.9.0 ; python_version >= "3.12"
-six==1.17.0 ; python_version >= "3.12"
-slack-logger==0.3.1 ; python_version >= "3.12"
-social-auth-app-django==5.6.0 ; python_version >= "3.12"
-social-auth-core==4.8.1 ; python_version >= "3.12"
-soupsieve==2.8 ; python_version >= "3.12"
-sqlparse==0.5.4 ; python_version >= "3.12"
-stvpoll==0.4.7 ; python_version >= "3.12"
-tarjan==0.2.4 ; python_version >= "3.12"
-twisted==25.5.0 ; python_version >= "3.12"
-txaio==25.12.2 ; python_version >= "3.12"
-typing-extensions==4.15.0 ; python_version >= "3.12"
-tzdata==2025.3 ; python_version >= "3.12" and sys_platform == "win32"
-u-msgpack-python==2.8.0 ; python_version >= "3.12" and platform_python_implementation != "CPython"
-ujson==5.11.0 ; python_version >= "3.12"
-urllib3==2.6.2 ; python_version >= "3.12"
-zope-interface==8.1.1 ; python_version >= "3.12"
+asgiref==3.11.0
+async-signals==0.3.1
+attrs==25.4.0
+autobahn==25.12.2
+automat==25.4.16
+beautifulsoup4==4.14.3
+bs4==0.0.2
+cbor2==5.7.1
+certifi==2025.11.12
+cffi==2.0.0
+channels==4.3.2
+channels-envelope==1.1.0
+channels-redis==4.3.0
+charset-normalizer==3.4.4
+click==8.3.1
+colorama==0.4.6 ; sys_platform == 'win32'
+constantly==23.10.4
+croniter==6.0.0
+crontab==1.0.5
+cryptography==46.0.3
+daphne==4.2.1
+defusedxml==0.7.1
+django==5.2.9
+django-auditlog==3.4.0
+django-cors-headers==4.9.0
+django-filter==25.2
+django-fsm==2.8.2
+django-fsm-admin-django-4==1.2.7
+django-model-utils==5.0.0
+django-rq==3.2.1
+django-sql-utils==0.7.0
+djangorestframework==3.16.1
+dnspython==2.8.0
+email-validator==2.3.0
+freezegun==1.5.5
+hyperlink==21.0.0
+idna==3.11
+incremental==24.11.0
+lxml==6.0.2
+msgpack==1.1.2
+nh3==0.3.2
+oauthlib==3.3.1
+packaging==25.0
+personnummer==3.2.1
+psycopg==3.3.2
+psycopg-binary==3.3.2 ; implementation_name != 'pypy'
+psycopg-pool==3.3.0
+py-ubjson==0.16.1
+pyasn1==0.6.1
+pyasn1-modules==0.4.2
+pycparser==2.23 ; implementation_name != 'PyPy'
+pydantic==1.10.24
+pyjwt==2.10.1
+pymemcache==4.0.0
+pyopenssl==25.3.0
+python-dateutil==2.9.0.post0
+python-graph-core==1.8.2
+python-json-logger==4.0.0
+python3-openid==3.2.0
+python3-vote-core==20170329.0
+pytz==2025.2
+pyyaml==6.0.3
+redis==7.1.0
+requests==2.32.5
+requests-oauthlib==2.0.0
+rq==2.6.1
+rq-scheduler==0.14.0
+rules==3.5
+sentry-sdk==2.48.0
+service-identity==24.2.0
+setuptools==80.9.0
+six==1.17.0
+slack-logger==0.3.1
+social-auth-app-django==5.6.0
+social-auth-core==4.8.1
+soupsieve==2.8
+sqlparse==0.5.4
+stvpoll==0.4.7
+tarjan==0.2.4
+twisted==25.5.0
+txaio==25.12.2
+typing-extensions==4.15.0
+tzdata==2025.3 ; sys_platform == 'win32'
+u-msgpack-python==2.8.0 ; platform_python_implementation != 'CPython'
+ujson==5.11.0
+urllib3==2.6.2
+zope-interface==8.1.1
