@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "voteit.discussion",
     "voteit.poll",
     "voteit.speaker",
+    "voteit.stats",
     "voteit.organisation",
     "voteit.participant_number",
     "voteit.reactions",
