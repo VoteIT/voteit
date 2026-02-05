@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import datetime, timedelta
 
 from auditlog.models import LogEntry
@@ -36,8 +37,13 @@ def populate_history_log(date: datetime = None):
     """
     if date is None:
         date = timezone.now() - timedelta(days=1)
+    proposal_ct = ContentType.objects.get_by_natural_key("proposal", "proposal")
+    user_ct = ContentType.objects.get_for_model(User)
 
     for org in Organisation.objects.all():
+        org_logentries = LogEntry.objects.filter(
+            actor__organisation=org, **mk_daterange_filter("timestamp", date)
+        )
         HistoryLog.objects.create(
             date=date,
             org=org,
@@ -45,19 +51,18 @@ def populate_history_log(date: datetime = None):
             accepted_invitation_count=MeetingInvite.objects.filter(
                 used_by__organisation=org, **mk_daterange_filter("used_at", date)
             ).count(),
-            action_count=LogEntry.objects.filter(
-                actor__organisation=org, **mk_daterange_filter("timestamp", date)
-            ).count(),
-            login_count=LogEntry.objects.filter(
-                actor__organisation=org,
-                **mk_daterange_filter("timestamp", date),
+            action_count=org_logentries.count(),
+            # Unique users that logged in
+            login_count=org_logentries.filter(
                 action=LogEntry.Action.UPDATE,
-                content_type=ContentType.objects.get_for_model(User),
+                content_type=user_ct,
                 changes__has_key="last_login",
             ).count(),
+            # Total connections made (WebSocket)
             connection_count=Connection.objects.filter(
                 user__organisation=org, **mk_daterange_filter("last_action", date)
             ).count(),
+            # Estimated online time for all users
             online_duration=Connection.objects.filter(
                 user__organisation=org, **mk_daterange_filter("last_action", date)
             )
@@ -69,6 +74,18 @@ def populate_history_log(date: datetime = None):
             )
             .aggregate(total=models.Sum("duration"))["total"]
             or timedelta(0),
+            # Last proposal outcome for all proposal with changed state
+            proposal_outcomes=Counter(
+                org_logentries.filter(
+                    action=LogEntry.Action.UPDATE,
+                    changes__has_key="state",
+                    content_type=proposal_ct,
+                )
+                .order_by("object_id", "-timestamp")
+                .distinct("object_id")
+                .values_list("changes__state__1", flat=True)
+            ),
+            # Unique speakers
             speaker_count=org.users.annotate(
                 spoken=models.Exists(
                     Speaker.objects.filter(
@@ -85,6 +102,7 @@ def populate_history_log(date: datetime = None):
                 ).aggregate(secs=models.Sum("seconds"))["secs"]
                 or 0
             ),
+            # Unique users that made a connection
             user_online_count=org.users.annotate(
                 conn=models.Exists(
                     Connection.objects.filter(
@@ -96,7 +114,6 @@ def populate_history_log(date: datetime = None):
             .filter(conn=True)
             .count(),
             # FIXME fields below
-            proposal_outcomes={},
             action_types={},
             content_types={},
         )

@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from ...meeting.models import Meeting
+from ...proposal.workflows import ProposalWf
 from ..models import HistoryLog
 
 User = get_user_model()
@@ -110,3 +111,31 @@ class PopulateJobTests(TestCase):
                 user.save()
         entry = self._do_job()
         self.assertEqual(entry.login_count, 1)
+
+    def test_proposal_outcomes(self):
+        ai = self.meeting.agenda_items.create(title="An agenda item")
+        with set_actor(self.moderator):
+            for i, states in enumerate(
+                (
+                    (ProposalWf.VOTING, ProposalWf.APPROVED),
+                    (ProposalWf.VOTING, ProposalWf.DENIED),
+                    (ProposalWf.VOTING, ProposalWf.DENIED, ProposalWf.UNHANDLED),
+                    (ProposalWf.VOTING,),
+                ),
+                1,
+            ):
+                for _ in range(i):
+                    prop = ai.proposals.create(body="<p>A proposal</p>")
+                    for state in states:
+                        prop.state = state
+                        prop.save()
+        entry = self._do_job()
+        self.assertDictEqual(
+            entry.proposal_outcomes,
+            {
+                "approved": 1,
+                "denied": 2,
+                "unhandled": 3,
+                "voting": 4,
+            },
+        )
