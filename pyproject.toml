@@ -2,12 +2,16 @@
 name = "voteit"
 version = "0.1.dev"
 description = "Decisions online or in general assemblies, realtime or async"
-authors = [
-    {name = "VoteIT dev team", email = "info@voteit.se"}
-]
-license = {text = "AGPL"}
-readme = "README.md"
+authors = [{ name = "VoteIT dev team", email = "info@voteit.se" }]
 requires-python = ">=3.12"
+readme = "README.md"
+license = { text = "AGPL" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
 dependencies = [
     "channels-envelope (>=1.1.0,<2.0.0)",
     "python3-vote-core (>=20170329.0,<20170330.0)",
@@ -42,11 +46,31 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://www.voteit.se/"
-#Documentation = "https://readthedocs.org"
 Repository = "https://github.com/voteit/voteit.git"
 Issues = "https://github.com/voteit/voteit/issues"
 Changelog = "https://github.com/voteit/voteit/blob/main/CHANGELOG.md"
 
+[tool.uv.sources]
+member_dialects = { path = "src/member_dialects", editable = true }
+voteit_org = { path = "src/voteit_org", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["voteit"]
+exclude = [
+    "**/tests/**",
+    "**/tests.py",
+]
+
+[tool.hatch.build.targets.sdist]
+packages = ["voteit"]
+exclude = [
+    "**/tests/**",
+    "**/tests.py",
+]
 
 [dependency-groups]
 dev = [
@@ -59,21 +83,16 @@ dev = [
     "personnummer (>=3.2.1,<4.0.0)",
     "responses (>=0.25.8,<0.26.0)",
     "pre-commit (>=4.3.0,<5.0.0)",
+    "voteit-org>=1.0.0",
+    "member-dialects>=1.0.0",
 ]
 
 docker = [
     "sentry-sdk (>=2.40.0,<3.0.0)",
     "slack-logger (>=0.3.1,<0.4.0)",
-    "personnummer (>=3.2.1,<4.0.0)"
+    "personnummer (>=3.2.1,<4.0.0)",
 ]
 
-[tool.poetry]
-exclude = [
-    "**/tests/*"
-]
-
-[tool.poetry.requires-plugins]
-poetry-plugin-export = ">=1.8"
 
 [tool.coverage.run]
 command_line = "manage.py test voteit --keepdb"
@@ -133,8 +152,3 @@ exclude = [
     "venv",
     "migrations"
 ]
-
-
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"

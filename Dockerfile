@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt --no-cache-dir
 COPY dist dist
-RUN pip install dist/* --no-cache-dir --no-deps
+RUN pip install dist/*.whl --no-cache-dir --no-deps
 
 # Clean stage
 FROM python:3.12-slim
