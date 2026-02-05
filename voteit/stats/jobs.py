@@ -22,7 +22,10 @@ User = get_user_model()
 
 def mk_daterange_filter(field_name: str, start: datetime = None) -> dict:
     """
-    Creates a date range filter for named DateTimeField. Faster than filtering on field_name__date.
+    Creates a date range filter for named DateTimeField. Faster than filtering on <field_name>__date.
+
+    >>> mk_daterange_filter("created", datetime(2020, 1, 1, 12, 34))
+    {'created__gte': datetime.datetime(2020, 1, 1, 0, 0), 'created__lt': datetime.datetime(2020, 1, 2, 0, 0)}
     """
     if start is None:
         start = timezone.now()
@@ -37,16 +40,14 @@ def translate_action_keys(counter: Counter[str]) -> Iterator[tuple[str, int]]:
     """
     Translates a Counter of strings like agenda.agendaitem:0 -> agenda.agendaitem:create.
     Use to create a dict.
+
+    >>> dict(translate_action_keys(Counter(["agenda.agendaitem:0", "agenda.agendaitem:1", "agenda.agendaitem:1"])))
+    {'agenda.agendaitem:create': 1, 'agenda.agendaitem:update': 2}
     """
-    lookup = dict[int, str](LogEntry.Action.choices)
+    lookup = dict(LogEntry.Action.choices)
     for key, count in counter.items():
         model, action = key.split(":")
         yield f"{model}:{lookup[int(action)]}", count
-
-
-def get_content_type_count(cta: ContentTypeAccessor, org: Organisation) -> int:
-    ct = ContentType.objects.get_by_natural_key(*cta.label.split("."))
-    return ct.model_class().objects.filter(**{cta.org_path: org}).count()
 
 
 @schedule_job("0 4 * * *")
@@ -94,7 +95,7 @@ def populate_history_log(date: datetime = None):
             ).count(),
             # Count of different kinds of content types
             content_types={
-                cta.label: get_content_type_count(cta, org)
+                cta.label: cta.get_organisation_count(org)
                 for cta in history_content_type_registry
             },
             # Unique users that logged in
