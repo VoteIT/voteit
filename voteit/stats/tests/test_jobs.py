@@ -30,9 +30,8 @@ class PopulateJobTests(TestCase):
         populate_history_log(timezone.now())
         return HistoryLog.objects.get()
 
-    def test_populate(self):
-        entry = self._do_job()
-
+    def test_unique(self):
+        self._do_job()
         self.assertEqual(HistoryLog.objects.all().count(), 1)
         with self.assertRaises(IntegrityError):
             self._do_job()
@@ -45,6 +44,7 @@ class PopulateJobTests(TestCase):
         Connection.objects.create(
             channel_name="other", user=self.moderator, last_action=timezone.now()
         )
+        Connection.objects.create(user=self.outsider, last_action=timezone.now())
         entry = self._do_job()
 
         self.assertEqual(entry.connection_count, 3)
