@@ -1,10 +1,12 @@
 from collections import Counter
+from collections.abc import Iterator
 from datetime import datetime, timedelta
 
 from auditlog.models import LogEntry
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
+from django.db.models.functions import Concat
 from django.utils import timezone
 from envelope.models import Connection
 
@@ -13,6 +15,7 @@ from voteit.invites.models import MeetingInvite
 from voteit.organisation.models import Organisation
 from voteit.speaker.models import Speaker
 from voteit.stats.models import HistoryLog
+from voteit.stats.registry import ContentTypeAccessor, history_content_type_registry
 
 User = get_user_model()
 
@@ -28,6 +31,22 @@ def mk_daterange_filter(field_name: str, start: datetime = None) -> dict:
         f"{field_name}__gte": start,
         f"{field_name}__lt": start + timedelta(days=1),
     }
+
+
+def translate_action_keys(counter: Counter[str]) -> Iterator[tuple[str, int]]:
+    """
+    Translates a Counter of strings like agenda_agendaitem:0 -> agenda_agendaitem:create.
+    Use to create a dict.
+    """
+    lookup = dict[int, str](LogEntry.Action.choices)
+    for key, count in counter.items():
+        model, action = key.split(":")
+        yield f"{model}:{lookup[int(action)]}", count
+
+
+def get_content_type_count(cta: ContentTypeAccessor, org: Organisation) -> int:
+    ct = ContentType.objects.get_by_natural_key(*cta.label.split("."))
+    return ct.model_class().objects.filter(**{cta.org_path: org}).count()
 
 
 @schedule_job("0 4 * * *")
@@ -52,15 +71,37 @@ def populate_history_log(date: datetime = None):
                 used_by__organisation=org, **mk_daterange_filter("used_at", date)
             ).count(),
             action_count=org_logentries.count(),
+            # Different types of actions from auditlog
+            action_types=dict(
+                translate_action_keys(
+                    Counter(
+                        org_logentries.annotate(
+                            key=Concat(
+                                "content_type__app_label",
+                                models.Value("."),
+                                "content_type__model",
+                                models.Value(":"),
+                                "action",
+                                output_field=models.CharField(),
+                            )
+                        ).values_list("key", flat=True)
+                    )
+                )
+            ),
+            # Total connections made (WebSocket)
+            connection_count=Connection.objects.filter(
+                user__organisation=org, **mk_daterange_filter("last_action", date)
+            ).count(),
+            # Count of different kinds of content types
+            content_types={
+                cta.label: get_content_type_count(cta, org)
+                for cta in history_content_type_registry
+            },
             # Unique users that logged in
             login_count=org_logentries.filter(
                 action=LogEntry.Action.UPDATE,
                 content_type=user_ct,
                 changes__has_key="last_login",
-            ).count(),
-            # Total connections made (WebSocket)
-            connection_count=Connection.objects.filter(
-                user__organisation=org, **mk_daterange_filter("last_action", date)
             ).count(),
             # Estimated online time for all users
             online_duration=Connection.objects.filter(
@@ -113,7 +154,4 @@ def populate_history_log(date: datetime = None):
             )
             .filter(conn=True)
             .count(),
-            # FIXME fields below
-            action_types={},
-            content_types={},
         )

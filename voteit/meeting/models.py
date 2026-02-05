@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 from logging import getLogger
 from random import sample
 from string import ascii_lowercase
-from typing import Generator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generator
 
 from auditlog.registry import auditlog
 from django.conf import settings
@@ -16,18 +14,12 @@ from django.utils.functional import cached_property
 from django.utils.text import slugify
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField
-from django_fsm import transition
+from django_fsm import FSMField, transition
 
-from voteit.core.abcs import MeetingContext
-from voteit.core.abcs import OrganisationContext
+from voteit.core.abcs import MeetingContext, OrganisationContext
 from voteit.core.decorators import ensure_atomic
-from voteit.core.fields import RichTextField
-from voteit.core.fields import RolesField
-from voteit.core.models import BaseContent
-from voteit.core.models import RoleContextMixin
-from voteit.core.models import Roles
-from voteit.core.models import User
+from voteit.core.fields import RichTextField, RolesField
+from voteit.core.models import BaseContent, RoleContextMixin, Roles, User
 from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.utils import relaxed_clean_html
 from voteit.core.workflows import EnabledWf
@@ -35,10 +27,13 @@ from voteit.meeting import roles
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.permissions import OrgPermissions
-from voteit.poll.utils import get_electoral_policy_registry
-from voteit.poll.utils import get_vote_transfer_policy_registry
+from voteit.poll.utils import (
+    get_electoral_policy_registry,
+    get_vote_transfer_policy_registry,
+)
 from voteit.proposal import DEFAULT_PROPOSAL_ID_POLICY
 from voteit.proposal.utils import get_proposal_id_registry
+from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
     from voteit.access_policy.models import AccessPolicy
@@ -47,18 +42,15 @@ if TYPE_CHECKING:
     from voteit.core.role import Role
     from voteit.discussion.models import DiscussionPost
     from voteit.organisation.models import Organisation
-    from voteit.poll.abcs import ElectoralRegisterPolicy
-    from voteit.poll.abcs import VoteTransferPolicy
-    from voteit.poll.models import ElectoralRegister
-    from voteit.poll.models import VoteTransfer
     from voteit.participant_number.models import PNSystem
-    from voteit.proposal.models import Proposal
+    from voteit.participant_tags.models import ParticipantTags
+    from voteit.poll.abcs import ElectoralRegisterPolicy, VoteTransferPolicy
+    from voteit.poll.models import ElectoralRegister, VoteTransfer
     from voteit.presence.models import PresenceCheck
     from voteit.proposal.abcs import ProposalIDPolicy
     from voteit.proposal.models import Proposal
-    from voteit.speaker.models import SpeakerListSystem
     from voteit.room.models import Room
-    from voteit.participant_tags.models import ParticipantTags
+    from voteit.speaker.models import SpeakerListSystem
 
 __all__ = (
     "Meeting",
@@ -133,6 +125,7 @@ class MeetingRoles(Roles, MeetingContext):
     }
 
 
+@history_log('organisation')
 @auditlog.register(
     include_fields=[
         "title",

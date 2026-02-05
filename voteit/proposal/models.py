@@ -8,26 +8,23 @@ from typing import TYPE_CHECKING
 
 from auditlog.registry import auditlog
 from django.conf import settings
-from django.db import models
-from django.db import transaction
+from django.db import models, transaction
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField
-from django_fsm import transition
+from django_fsm import FSMField, transition
 from model_utils.managers import InheritanceManager
 
-from voteit.core.abcs import AgendaItemContext
-from voteit.core.abcs import MeetingContext
+from voteit.core.abcs import AgendaItemContext, MeetingContext
 from voteit.core.models import BaseContent
 from voteit.proposal.permissions import ProposalPermissions
 from voteit.proposal.workflows import ProposalWf
 from voteit.reactions.mixins import Reactable
+from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
-    from voteit.core.models import User
     from voteit.agenda.models import AgendaItem
-    from voteit.meeting.models import Meeting
-    from voteit.meeting.models import MeetingGroup
+    from voteit.core.models import User
+    from voteit.meeting.models import Meeting, MeetingGroup
 
 __all__ = (
     "Proposal",
@@ -50,6 +47,7 @@ _PROP_LOG_FIELDS = [
 ]
 
 
+@history_log("agenda_item__meeting__organisation")
 @auditlog.register(
     include_fields=_PROP_LOG_FIELDS,
 )

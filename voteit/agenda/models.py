@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from auditlog.registry import auditlog
 from django.conf import settings
@@ -9,13 +8,11 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField
-from django_fsm import transition
+from django_fsm import FSMField, transition
 
 from voteit.agenda.permissions import AgendaPermissions
 from voteit.agenda.workflows import AgendaItemWf
-from voteit.core.abcs import AgendaItemContext
-from voteit.core.abcs import MeetingContext
+from voteit.core.abcs import AgendaItemContext, MeetingContext
 from voteit.core.fields import RichTextField
 from voteit.core.models import BaseContent
 from voteit.core.permissions import NOT_ALLOWED
@@ -26,7 +23,10 @@ from voteit.poll.workflows import PollWf
 
 __all__ = ("AgendaItem", "LastRead")
 
+from voteit.stats.registry import history_log
 
+
+@history_log("meeting__organisation")
 @auditlog.register(
     include_fields=[
         "state",

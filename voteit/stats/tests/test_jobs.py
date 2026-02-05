@@ -139,3 +139,26 @@ class PopulateJobTests(TestCase):
                 "voting": 4,
             },
         )
+
+    def test_action_types(self):
+        with set_actor(self.moderator):
+            ai = self.meeting.agenda_items.create(title="An agenda item")
+            ai.body = "<p>Some content</p>"
+            ai.save()
+            ai.body = "<p>Other content</p>"
+            ai.save()
+        entry = self._do_job()
+        self.assertDictEqual(
+            entry.action_types,
+            {"agenda.agendaitem:create": 1, "agenda.agendaitem:update": 2},
+        )
+
+    def test_content_types(self):
+        ai = self.meeting.agenda_items.create(title="An agenda item")
+        ai.proposals.create(body="<p>Some content</p>")
+        ai.proposals.create(body="<p>Some other content</p>")
+        entry = self._do_job()
+        self.assertDictEqual(
+            entry.content_types,
+            {"meeting.meeting": 1, "agenda.agendaitem": 1, "proposal.proposal": 2},
+        )
