@@ -1,4 +1,4 @@
-import datetime
+from datetime import timedelta
 
 from django.db import models
 
@@ -30,12 +30,12 @@ class HistoryLog(models.Model):
         default=dict, verbose_name="Total count of different content types"
     )
     online_duration = models.DurationField(
-        default=datetime.timedelta, verbose_name="Total time online"
+        default=timedelta, verbose_name="Total time online"
     )
     mean_online_duration = models.GeneratedField(
         db_persist=True,
         expression=models.Case(
-            models.When(user_online_count=0, then=datetime.timedelta()),
+            models.When(user_online_count=0, then=timedelta()),
             default=models.ExpressionWrapper(
                 models.F("online_duration") / models.F("user_online_count"),
                 output_field=models.DurationField(),
@@ -48,14 +48,14 @@ class HistoryLog(models.Model):
         default=0, verbose_name="Accepted invitations"
     )
     login_count = models.IntegerField(default=0, verbose_name="User login count")
-    spoken_duration = models.DurationField(
-        default=datetime.timedelta, verbose_name="Total time spoken"
+    spoken_duration: timedelta = models.DurationField(
+        default=timedelta, verbose_name="Total time spoken"
     )
     speaker_count = models.IntegerField(default=0, verbose_name="Unique speaker count")
     mean_spoken_duration = models.GeneratedField(
         db_persist=True,
         expression=models.Case(
-            models.When(speaker_count=0, then=datetime.timedelta()),
+            models.When(speaker_count=0, then=timedelta()),
             default=models.ExpressionWrapper(
                 models.F("spoken_duration") / models.F("speaker_count"),
                 output_field=models.DurationField(),

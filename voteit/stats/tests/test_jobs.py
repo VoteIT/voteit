@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from auditlog.context import set_actor
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
@@ -18,6 +20,7 @@ class PopulateJobTests(TestCase):
         cls.moderator = User.objects.get(username="moderator")
         cls.outsider = User.objects.create(username="outsider")
         cls.participant = User.objects.get(username="participant")
+        cls.meeting = Meeting.objects.get()
 
     @staticmethod
     def _do_job() -> HistoryLog:
@@ -47,10 +50,8 @@ class PopulateJobTests(TestCase):
         self.assertEqual(entry.user_online_count, 2)
 
     def test_action_count(self):
-        # TODO: Check with another org, so we know that org filtering works
-        meeting = Meeting.objects.get()
         with set_actor(self.moderator):
-            ai = meeting.agenda_items.create(title="An agenda item")
+            ai = self.meeting.agenda_items.create(title="An agenda item")
             ai.body = "<p>Some content</p>"
             ai.save()
         with set_actor(self.outsider):
@@ -58,3 +59,54 @@ class PopulateJobTests(TestCase):
             ai.save()
         entry = self._do_job()
         self.assertEqual(entry.action_count, 2)
+
+    def _mk_speaker_list(self):
+        return self.meeting.speaker_systems.create(
+            room=self.meeting.rooms.create(title="Room 1")
+        ).speaker_lists.create(
+            title="Speaker list 1",
+            agenda_item=self.meeting.agenda_items.create(title="An agenda item"),
+        )
+
+    def test_time_spoken(self):
+        sl = self._mk_speaker_list()
+        sl.speaker_items.create(seconds=10, started=timezone.now(), user=self.moderator)
+        sl.speaker_items.create(
+            seconds=20, started=timezone.now(), user=self.participant
+        )
+        sl.speaker_items.create(
+            seconds=30, started=timezone.now(), user=self.outsider
+        )  # filtered on user org...
+        entry = self._do_job()
+        self.assertEqual(entry.spoken_duration.seconds, 30)
+        self.assertEqual(entry.speaker_count, 2)
+        self.assertEqual(entry.mean_spoken_duration.seconds, 15)
+
+    def test_invitation_use_count(self):
+        for user in (self.moderator, self.participant, self.outsider):
+            inv = self.meeting.invites.create()
+            inv.accept(user=user)
+            inv.save()
+
+        entry = self._do_job()
+        self.assertEqual(entry.accepted_invitation_count, 2)
+
+    def test_online_duration(self):
+        for user in (self.moderator, self.participant, self.outsider):
+            user.connections.create(
+                online_at=timezone.now() - timedelta(minutes=30),
+                last_action=timezone.now(),
+            )
+
+        entry = self._do_job()
+        self.assertEqual(entry.connection_count, 2)
+        self.assertEqual(entry.online_duration.seconds, 3600)
+        self.assertEqual(entry.mean_online_duration.seconds, 1800)
+
+    def test_login_count(self):
+        for user in (self.participant, self.outsider):
+            with set_actor(user):
+                user.last_login = timezone.now()
+                user.save()
+        entry = self._do_job()
+        self.assertEqual(entry.login_count, 1)
