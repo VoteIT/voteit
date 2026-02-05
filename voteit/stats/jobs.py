@@ -35,7 +35,7 @@ def mk_daterange_filter(field_name: str, start: datetime = None) -> dict:
 
 def translate_action_keys(counter: Counter[str]) -> Iterator[tuple[str, int]]:
     """
-    Translates a Counter of strings like agenda_agendaitem:0 -> agenda_agendaitem:create.
+    Translates a Counter of strings like agenda.agendaitem:0 -> agenda.agendaitem:create.
     Use to create a dict.
     """
     lookup = dict[int, str](LogEntry.Action.choices)
