@@ -163,7 +163,23 @@ class PopulateJobTests(TestCase):
         entry = self._do_job()
         self.assertDictEqual(
             entry.content_types,
-            {"meeting.meeting": 1, "agenda.agendaitem": 1, "proposal.proposal": 2},
+            {
+                "agenda.agendaitem": 1,
+                "core.user": 3,
+                "discussion.discussionpost": 0,
+                "invites.meetinginvite": 0,
+                "meeting.meeting": 1,
+                "meeting.meetinggroup": 0,
+                "poll.electoralregister": 0,
+                "poll.poll": 0,
+                "poll.vote": 0,
+                "proposal.proposal": 2,
+                "reactions.reactionbutton": 0,
+                "room.room": 0,
+                "speaker.speaker": 0,
+                "speaker.speakerlist": 0,
+                "speaker.speakerlistsystem": 0,
+            },
         )
 
     def test_user_online_count(self):
