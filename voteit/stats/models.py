@@ -1,8 +1,12 @@
+from __future__ import annotations
 from datetime import timedelta
+from datetime import date
+from typing import TYPE_CHECKING
 
 from django.db import models
 
-from voteit.organisation.models import Organisation
+if TYPE_CHECKING:
+    from voteit.organisation.models import Organisation
 
 
 class HistoryLog(models.Model):
@@ -12,27 +16,31 @@ class HistoryLog(models.Model):
     """
 
     # Unique together
-    date = models.DateField()
-    org = models.ForeignKey(Organisation, on_delete=models.PROTECT)
+    date:date = models.DateField()
+    org: Organisation = models.ForeignKey(
+        "organisation.Organisation", on_delete=models.PROTECT
+    )
 
     # Statistics fields
-    user_online_count = models.IntegerField(
+    user_online_count: int = models.IntegerField(
         default=0, verbose_name="Unique users online"
     )
-    connection_count = models.IntegerField(
+    connection_count: int = models.IntegerField(
         default=0, verbose_name="Socket connections made"
     )
-    action_count = models.IntegerField(default=0, verbose_name="Logged action count")
-    action_types = models.JSONField(
+    action_count: int = models.IntegerField(
+        default=0, verbose_name="Logged action count"
+    )
+    action_types: dict = models.JSONField(
         default=dict, verbose_name="Actions on different content types"
     )
-    content_types = models.JSONField(
+    content_types: dict = models.JSONField(
         default=dict, verbose_name="Total count of different content types"
     )
-    online_duration = models.DurationField(
+    online_duration: timedelta = models.DurationField(
         default=timedelta, verbose_name="Total time online"
     )
-    mean_online_duration = models.GeneratedField(
+    mean_online_duration: timedelta = models.GeneratedField(
         db_persist=True,
         expression=models.Case(
             models.When(user_online_count=0, then=timedelta()),
@@ -44,15 +52,17 @@ class HistoryLog(models.Model):
         output_field=models.DurationField(),
         verbose_name="Mean time online",
     )
-    accepted_invitation_count = models.IntegerField(
+    accepted_invitation_count: int = models.IntegerField(
         default=0, verbose_name="Accepted invitations"
     )
-    login_count = models.IntegerField(default=0, verbose_name="User login count")
+    login_count: int = models.IntegerField(default=0, verbose_name="User login count")
     spoken_duration: timedelta = models.DurationField(
         default=timedelta, verbose_name="Total time spoken"
     )
-    speaker_count = models.IntegerField(default=0, verbose_name="Unique speaker count")
-    mean_spoken_duration = models.GeneratedField(
+    speaker_count: int = models.IntegerField(
+        default=0, verbose_name="Unique speaker count"
+    )
+    mean_spoken_duration: timedelta = models.GeneratedField(
         db_persist=True,
         expression=models.Case(
             models.When(speaker_count=0, then=timedelta()),
@@ -65,7 +75,9 @@ class HistoryLog(models.Model):
         verbose_name="Mean time spoken",
     )
     # Latest outcome of every changed proposal
-    proposal_outcomes = models.JSONField(default=dict, verbose_name="Proposal outcomes")
+    proposal_outcomes: dict = models.JSONField(
+        default=dict, verbose_name="Proposal outcomes"
+    )
 
     class Meta:
         constraints = [

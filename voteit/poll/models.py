@@ -44,6 +44,7 @@ from voteit.poll.schemas import PollResult
 from voteit.poll.utils import get_poll_method_registry
 from voteit.poll.workflows import PollWf
 from voteit.proposal.workflows import ProposalWf
+from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
     from voteit.poll.abcs import PollMethod
@@ -90,6 +91,7 @@ class VoterWeight(MeetingContext):
         "meeting",
     ],
 )
+@history_log("meeting__organisation")
 class ElectoralRegister(MeetingContext):
     name = "electoral_register"
     created: datetime = models.DateTimeField(editable=False, default=now)
@@ -170,6 +172,7 @@ class ElectoralRegister(MeetingContext):
         )
 
 
+@history_log("meeting__organisation")
 @auditlog.register(
     include_fields=[
         "state",
@@ -642,6 +645,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
 
 # FIXME: We don't log votes right now, but that might be a good idea, at least the actor?
+@history_log("poll__meeting__organisation")
 class Vote(models.Model):
     """Contains data on the users vote in a specific poll."""
 

@@ -33,6 +33,7 @@ from voteit.meeting.models import MeetingRoles
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.workflows import MeetingWf
 from voteit.meeting.models import Meeting
+from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
@@ -239,6 +240,7 @@ class MeetingInviteManager(models.Manager):
         )
 
 
+@history_log("meeting__organisation")
 @auditlog.register(
     include_fields=[
         "state",

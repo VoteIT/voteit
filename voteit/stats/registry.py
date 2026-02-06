@@ -1,8 +1,11 @@
+from __future__ import annotations
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from django.contrib.contenttypes.models import ContentType
 
-from voteit.organisation.models import Organisation
+if TYPE_CHECKING:
+    from voteit.organisation.models import Organisation
 
 
 @dataclass

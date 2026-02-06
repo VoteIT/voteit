@@ -15,12 +15,14 @@ from voteit.core.utils import relaxed_clean_html
 from voteit.meeting.models import Meeting
 from voteit.poll.models import Poll
 from voteit.proposal.models import Proposal
+from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
     from voteit.speaker.models import SpeakerListSystem
 
 
+@history_log("meeting__organisation")
 @auditlog.register(
     include_fields=[
         "title",

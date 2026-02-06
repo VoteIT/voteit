@@ -11,12 +11,8 @@ from django.utils import timezone
 from envelope.models import Connection
 
 from voteit.core.decorators import schedule_job
-from voteit.invites.models import MeetingInvite
-from voteit.organisation.models import Organisation
-from voteit.proposal.workflows import ProposalWf
-from voteit.speaker.models import Speaker
 from voteit.stats.models import HistoryLog
-from voteit.stats.registry import ContentTypeAccessor, history_content_type_registry
+from voteit.stats.registry import history_content_type_registry
 
 User = get_user_model()
 
@@ -56,6 +52,12 @@ def populate_history_log(date: datetime = None):
     """
     Creates HistoryLog entry for a date (default yesterday) for each organization.
     """
+    # Circular import funzies
+    from voteit.organisation.models import Organisation
+    from voteit.invites.models import MeetingInvite
+    from voteit.proposal.workflows import ProposalWf
+    from voteit.speaker.models import Speaker
+
     if date is None:
         date = timezone.now() - timedelta(days=1)
     proposal_ct = ContentType.objects.get_by_natural_key("proposal", "proposal")

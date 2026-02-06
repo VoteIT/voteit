@@ -125,7 +125,7 @@ class MeetingRoles(Roles, MeetingContext):
     }
 
 
-@history_log('organisation')
+@history_log("organisation")
 @auditlog.register(
     include_fields=[
         "title",
@@ -445,6 +445,7 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
     vote_transfers: models.QuerySet[VoteTransfer]
 
 
+@history_log("meeting__organisation")
 @auditlog.register(
     include_fields=[
         "title",
@@ -501,7 +502,7 @@ class MeetingGroup(BaseContent, MeetingContext):
                 if groupid not in existing_groupids:
                     self.groupid = groupid
                     break
-                groupid = f"{base}-{i+1}"
+                groupid = f"{base}-{i + 1}"
         if not self.title:
             self.title = self.groupid
         super().save(**kwargs)

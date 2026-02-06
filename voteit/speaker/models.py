@@ -41,6 +41,7 @@ from voteit.speaker.utils import get_list_method_registry
 from voteit.speaker.workflows import SpeakerListWf
 from voteit.speaker.workflows import SpeakerSystemWf
 from voteit.room.models import Room
+from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
     from voteit.organisation.models import Organisation
@@ -86,6 +87,7 @@ class SpeakerSystemRoles(Roles, MeetingContext):
         return f"{self.user} roles @ {self.context}"
 
 
+@history_log("meeting__organisation")
 @auditlog.register(
     include_fields=[
         "state",
@@ -338,6 +340,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
         return f"SLS {self.pk}"
 
 
+@history_log("user__organisation")
 class Speaker(MeetingContext, SpeakerSystemContext):
     """
     Information about a user who's entered a speaker list.
@@ -433,6 +436,7 @@ class Speaker(MeetingContext, SpeakerSystemContext):
     speaker_list_id: int
 
 
+@history_log("meeting__organisation")
 @auditlog.register(
     include_fields=[
         "title",

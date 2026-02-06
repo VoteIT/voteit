@@ -29,6 +29,7 @@ from voteit.core.signals import roles_removed
 from voteit.core.utils import strict_clean_html
 from voteit.core.validators import UserIDValidator
 from voteit.core.workflows import UserWf
+from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
     from social_django.models import UserSocialAuth
@@ -41,6 +42,7 @@ __all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
 logger = getLogger(__name__)
 
 
+@history_log("organisation")
 @auditlog.register(
     include_fields=[
         "state",

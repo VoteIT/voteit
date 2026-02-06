@@ -18,6 +18,7 @@ from voteit.core.role import Role
 from voteit.core.utils import get_model_by_shortname
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
+from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -29,6 +30,7 @@ def _default_allowed_models():
     return ["proposal", "discussion_post"]
 
 
+@history_log("meeting__organisation")
 @auditlog.register(
     include_fields=[
         "title",

@@ -10,6 +10,7 @@ from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
 from voteit.reactions.mixins import Reactable
+from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
     from voteit.meeting.models import MeetingGroup
 
 
+@history_log("agenda_item__meeting__organisation")
 @auditlog.register(
     include_fields=[
         "agenda_item",
