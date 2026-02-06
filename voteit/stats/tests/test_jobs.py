@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
+from envelope.models import Connection
 
 from ...meeting.models import Meeting
 from ...proposal.workflows import ProposalWf
@@ -37,8 +38,6 @@ class PopulateJobTests(TestCase):
             self._do_job()
 
     def test_connections(self):
-        from envelope.models import Connection
-
         Connection.objects.create(user=self.moderator, last_action=timezone.now())
         Connection.objects.create(user=self.participant, last_action=timezone.now())
         Connection.objects.create(
@@ -109,18 +108,22 @@ class PopulateJobTests(TestCase):
             with set_actor(user):
                 user.last_login = timezone.now()
                 user.save()
+                user.last_login = timezone.now()
+                user.save()
         entry = self._do_job()
-        self.assertEqual(entry.login_count, 1)
+        self.assertEqual(entry.login_count, 2)
 
     def test_proposal_outcomes(self):
         ai = self.meeting.agenda_items.create(title="An agenda item")
         with set_actor(self.moderator):
+            ai.proposals.create(body="<p>Unchanged content</p>")
             for i, states in enumerate(
                 (
-                    (ProposalWf.VOTING, ProposalWf.APPROVED),
-                    (ProposalWf.VOTING, ProposalWf.DENIED),
-                    (ProposalWf.VOTING, ProposalWf.DENIED, ProposalWf.UNHANDLED),
+                    (ProposalWf.VOTING, ProposalWf.APPROVED),  # Once
+                    (ProposalWf.VOTING, ProposalWf.DENIED),  # Twice
+                    (ProposalWf.VOTING, ProposalWf.DENIED, ProposalWf.UNHANDLED),  # ...
                     (ProposalWf.VOTING,),
+                    (ProposalWf.VOTING, ProposalWf.PUBLISHED),  # Not an outcome
                 ),
                 1,
             ):
@@ -162,3 +165,12 @@ class PopulateJobTests(TestCase):
             entry.content_types,
             {"meeting.meeting": 1, "agenda.agendaitem": 1, "proposal.proposal": 2},
         )
+
+    def test_user_online_count(self):
+        for user in (self.moderator, self.participant, self.outsider):
+            for n in range(2):
+                Connection.objects.create(
+                    user=user, online_at=timezone.now(), channel_name=str(n)
+                )
+        entry = self._do_job()
+        self.assertEqual(entry.user_online_count, 2)

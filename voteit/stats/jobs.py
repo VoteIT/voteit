@@ -13,6 +13,7 @@ from envelope.models import Connection
 from voteit.core.decorators import schedule_job
 from voteit.invites.models import MeetingInvite
 from voteit.organisation.models import Organisation
+from voteit.proposal.workflows import ProposalWf
 from voteit.speaker.models import Speaker
 from voteit.stats.models import HistoryLog
 from voteit.stats.registry import ContentTypeAccessor, history_content_type_registry
@@ -64,6 +65,21 @@ def populate_history_log(date: datetime = None):
         org_logentries = LogEntry.objects.filter(
             actor__organisation=org, **mk_daterange_filter("timestamp", date)
         )
+
+        # Last proposal outcome for all proposal with changed state
+        proposal_outcome_counter = Counter(
+            org_logentries.filter(
+                action=LogEntry.Action.UPDATE,
+                changes__has_key="state",
+                content_type=proposal_ct,
+            )
+            .order_by("object_id", "-timestamp")
+            .distinct("object_id")
+            .values_list("changes__state__1", flat=True)
+        )
+        # Published not an outcome
+        proposal_outcome_counter.pop(ProposalWf.PUBLISHED, None)
+
         HistoryLog.objects.create(
             date=date,
             org=org,
@@ -116,17 +132,7 @@ def populate_history_log(date: datetime = None):
             )
             .aggregate(total=models.Sum("duration"))["total"]
             or timedelta(0),
-            # Last proposal outcome for all proposal with changed state
-            proposal_outcomes=Counter(
-                org_logentries.filter(
-                    action=LogEntry.Action.UPDATE,
-                    changes__has_key="state",
-                    content_type=proposal_ct,
-                )
-                .order_by("object_id", "-timestamp")
-                .distinct("object_id")
-                .values_list("changes__state__1", flat=True)
-            ),
+            proposal_outcomes=proposal_outcome_counter,
             # Unique speakers
             speaker_count=org.users.annotate(
                 spoken=models.Exists(
@@ -149,7 +155,7 @@ def populate_history_log(date: datetime = None):
                 conn=models.Exists(
                     Connection.objects.filter(
                         user=models.OuterRef("id"),
-                        **mk_daterange_filter("last_action", date),
+                        **mk_daterange_filter("online_at", date),
                     )
                 )
             )
