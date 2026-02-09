@@ -25,17 +25,23 @@ class PopulateJobTests(TestCase):
         cls.meeting = Meeting.objects.get()
 
     @staticmethod
-    def _do_job() -> HistoryLog:
+    def _do_job(date=None) -> HistoryLog:
         from ..jobs import populate_history_log
 
-        populate_history_log(timezone.now())
-        return HistoryLog.objects.get()
+        if date is None:
+            date = timezone.now()
+        populate_history_log(date=date)
+        return HistoryLog.objects.get(date=date)
 
     def test_unique(self):
+        Connection.objects.create(
+            user=self.moderator, online_at=timezone.now(), last_action=timezone.now()
+        )
         self._do_job()
         self.assertEqual(HistoryLog.objects.all().count(), 1)
+        self._do_job()  # Ignores existing log...
         with self.assertRaises(IntegrityError):
-            self._do_job()
+            HistoryLog.objects.create(date=timezone.now())
 
     def test_connections(self):
         Connection.objects.create(user=self.moderator, last_action=timezone.now())
@@ -69,14 +75,17 @@ class PopulateJobTests(TestCase):
         )
 
     def test_time_spoken(self):
-        sl = self._mk_speaker_list()
-        sl.speaker_items.create(seconds=10, started=timezone.now(), user=self.moderator)
-        sl.speaker_items.create(
-            seconds=20, started=timezone.now(), user=self.participant
-        )
-        sl.speaker_items.create(
-            seconds=30, started=timezone.now(), user=self.outsider
-        )  # filtered on user org...
+        with set_actor(self.moderator):
+            sl = self._mk_speaker_list()
+            sl.speaker_items.create(
+                seconds=10, started=timezone.now(), user=self.moderator
+            )
+            sl.speaker_items.create(
+                seconds=20, started=timezone.now(), user=self.participant
+            )
+            sl.speaker_items.create(
+                seconds=30, started=timezone.now(), user=self.outsider
+            )  # filtered on user org...
         entry = self._do_job()
         self.assertEqual(entry.spoken_duration.seconds, 30)
         self.assertEqual(entry.speaker_count, 2)
@@ -84,20 +93,21 @@ class PopulateJobTests(TestCase):
 
     def test_invitation_use_count(self):
         for user in (self.moderator, self.participant, self.outsider):
-            inv = self.meeting.invites.create()
-            inv.accept(user=user)
-            inv.save()
+            with set_actor(user):
+                inv = self.meeting.invites.create()
+                inv.accept(user=user)
+                inv.save()
 
         entry = self._do_job()
         self.assertEqual(entry.accepted_invitation_count, 2)
 
     def test_online_duration(self):
         for user in (self.moderator, self.participant, self.outsider):
-            user.connections.create(
-                online_at=timezone.now() - timedelta(minutes=30),
-                last_action=timezone.now(),
-            )
-
+            with set_actor(user):
+                user.connections.create(
+                    online_at=timezone.now() - timedelta(minutes=30),
+                    last_action=timezone.now(),
+                )
         entry = self._do_job()
         self.assertEqual(entry.connection_count, 2)
         self.assertEqual(entry.online_duration.seconds, 3600)
@@ -157,9 +167,10 @@ class PopulateJobTests(TestCase):
         )
 
     def test_content_types(self):
-        ai = self.meeting.agenda_items.create(title="An agenda item")
-        ai.proposals.create(body="<p>Some content</p>")
-        ai.proposals.create(body="<p>Some other content</p>")
+        with set_actor(self.moderator):
+            ai = self.meeting.agenda_items.create(title="An agenda item")
+            ai.proposals.create(body="<p>Some content</p>")
+            ai.proposals.create(body="<p>Some other content</p>")
         entry = self._do_job()
         self.assertDictEqual(
             entry.content_types,
@@ -190,3 +201,24 @@ class PopulateJobTests(TestCase):
                 )
         entry = self._do_job()
         self.assertEqual(entry.user_online_count, 2)
+
+    def test_some_days_are_interesting(self):
+        # Connections or logentrys are things we look at
+        today = timezone.now()
+        # Today we changed a meeting
+        with set_actor(self.moderator):
+            self.meeting.title = "More intensity"
+            self.meeting.save()
+        # Yesterday nothing happened!
+
+        # 2 days ago someone was online
+        Connection.objects.create(
+            user=self.moderator,
+            online_at=timezone.now() - timedelta(days=2),
+        )
+        for i, has_log in ((0, True), (1, False), (2, True)):
+            if has_log:
+                entry = self._do_job(date=today - timedelta(days=i))
+            else:
+                with self.assertRaises(HistoryLog.DoesNotExist):
+                    self._do_job(date=today - timedelta(days=i))

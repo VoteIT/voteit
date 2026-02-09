@@ -48,7 +48,9 @@ def translate_action_keys(counter: Counter[str]) -> Iterator[tuple[str, int]]:
 
 
 @schedule_job("0 4 * * *")
-def populate_history_log(date: datetime = None):
+def populate_history_log(
+    date: datetime = None,
+):
     """
     Creates HistoryLog entry for a date (default yesterday) for each organization.
     """
@@ -63,7 +65,29 @@ def populate_history_log(date: datetime = None):
     proposal_ct = ContentType.objects.get_by_natural_key("proposal", "proposal")
     user_ct = ContentType.objects.get_for_model(User)
 
-    for org in Organisation.objects.all():
+    logentry_exists = LogEntry.objects.filter(
+        actor__organisation_id=models.OuterRef("pk"),
+        **mk_daterange_filter("timestamp", date),
+    )
+
+    connection_exists = Connection.objects.filter(
+        user__organisation_id=models.OuterRef("pk"),
+        **mk_daterange_filter("online_at", date),
+    )
+
+    # HistoryLog already exists
+    history_exists = HistoryLog.objects.filter(
+        org_id=models.OuterRef("pk"),
+        date=date,
+    )
+
+    for org in Organisation.objects.filter(
+        (
+            models.Q(models.Exists(logentry_exists))
+            | models.Q(models.Exists(connection_exists))
+        )
+        & ~models.Q(models.Exists(history_exists))
+    ):
         org_logentries = LogEntry.objects.filter(
             actor__organisation=org, **mk_daterange_filter("timestamp", date)
         )
