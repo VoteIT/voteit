@@ -130,12 +130,12 @@ DATABASES = {
 }
 
 # Cache
-if MEMCACHE_LOCATION := os.getenv("MEMCACHE_LOCATION"):
-    SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
+if REDIS_CACHE_LOCATION := os.getenv("REDIS_CACHE_LOCATION"):
+    SESSION_ENGINE = "django.contrib.sessions.backends.cache"
     CACHES = {
         "default": {
-            "BACKEND": "django.core.cache.backends.memcached.PyMemcacheCache",
-            "LOCATION": MEMCACHE_LOCATION,
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_CACHE_LOCATION,  # "redis://127.0.0.1:6379"
         }
     }
 

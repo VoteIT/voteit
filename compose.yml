@@ -1,34 +1,26 @@
-version: '3'
-
 services:
   db:
     image: postgres:${POSTGRES_VERSION}
     #command: -c 'max_connections=300'
     environment:
-      POSTGRES_HOST_AUTH_METHOD: trust
+      - POSTGRES_PASSWORD
+    #  POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - ./volumes/postgres:/var/lib/postgresql/data
       - ./volumes/backup:/var/backup
     ports:
       - "5432:5432"
   redis:
-    image: redis:8
+    image: redis:7
     volumes:
       - ./volumes/redis:/data
     ports:
       - "6379:6379"
-  memcache:
-    image: memcached:1-alpine
-    ports:
-      - "11211:11211"
-    command:
-      - --conn-limit=1024
-      - --memory-limit=64
-      - --threads=4
-      - -vv
+
+
 
 #  django:
-#    image:  ghcr.io/voteit/voteit:latest
+#    image:  ghcr.io/voteit/voteit:${BACKEND_VERSION}
 #    command: run
 #    env_file:
 #      - .env

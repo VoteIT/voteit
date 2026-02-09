@@ -1276,15 +1276,6 @@ crypto = [
 ]
 
 [[package]]
-name = "pymemcache"
-version = "4.0.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d9/b6/4541b664aeaad025dfb8e851dcddf8e25ab22607e674dd2b562ea3e3586f/pymemcache-4.0.0.tar.gz", hash = "sha256:27bf9bd1bbc1e20f83633208620d56de50f14185055e49504f4f5e94e94aff94", size = 70176, upload-time = "2022-10-17T16:53:07.726Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/41/ba/2f7b22d8135b51c4fefb041461f8431e1908778e6539ff5af6eeaaee367a/pymemcache-4.0.0-py2.py3-none-any.whl", hash = "sha256:f507bc20e0dc8d562f8df9d872107a278df049fa496805c1431b926f3ddd0eab", size = 60772, upload-time = "2022-10-17T16:53:04.388Z" },
-]
-
-[[package]]
 name = "pyopenssl"
 version = "25.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1838,7 +1829,6 @@ dependencies = [
     { name = "nh3" },
     { name = "psycopg", extra = ["binary", "pool"] },
     { name = "pydantic", extra = ["email"] },
-    { name = "pymemcache" },
     { name = "python-graph-core" },
     { name = "python-json-logger" },
     { name = "python3-vote-core" },
@@ -1891,7 +1881,6 @@ requires-dist = [
     { name = "nh3", specifier = ">=0.3.1,<0.4.0" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2.12,<4.0.0" },
     { name = "pydantic", extras = ["email"], specifier = "<2" },
-    { name = "pymemcache", specifier = ">=4.0.0,<5.0.0" },
     { name = "python-graph-core", specifier = ">=1.8.2,<2.0.0" },
     { name = "python-json-logger", specifier = ">=4.0.0,<5.0.0" },
     { name = "python3-vote-core", specifier = ">=20170329.0,<20170330.0" },
