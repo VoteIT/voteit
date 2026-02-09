@@ -16,6 +16,7 @@ class HistoryLogAdmin(admin.ModelAdmin):
         "login_count",
     )
     list_filter = ("org", "date")
+    readonly_fields = "mean_online_duration", "mean_spoken_duration"
 
     def has_add_permission(self, request):
         return False
