@@ -13,28 +13,32 @@ from auditlog.registry import auditlog
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import IntegrityError, models
-from django.db.models import Sum, UniqueConstraint
+from django.db import IntegrityError
+from django.db import models
+from django.db.models import Sum
+from django.db.models import UniqueConstraint
 from django.dispatch import receiver
 from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField, TransitionNotAllowed, post_transition, transition
+from django_fsm import FSMField
+from django_fsm import TransitionNotAllowed
+from django_fsm import post_transition
+from django_fsm import transition
 from pydantic import ValidationError
 from pydantic.main import BaseModel
 from rules.contrib.models import RulesModelMixin
 
-from voteit.core.abcs import AgendaItemContext, MeetingContext
+from voteit.core.abcs import AgendaItemContext
+from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
 from voteit.core.permissions import NOT_ALLOWED
-from voteit.poll.exceptions import (
-    BallotChecksumError,
-    ElectoralRegisterMissing,
-    InvalidPollMethod,
-    NotAllowedToVote,
-    PollError,
-    PollNotFinished,
-)
+from voteit.poll.exceptions import BallotChecksumError
+from voteit.poll.exceptions import ElectoralRegisterMissing
+from voteit.poll.exceptions import InvalidPollMethod
+from voteit.poll.exceptions import NotAllowedToVote
+from voteit.poll.exceptions import PollError
+from voteit.poll.exceptions import PollNotFinished
 from voteit.poll.permissions import PollPermissions
 from voteit.poll.schemas import PollResult
 from voteit.poll.utils import get_poll_method_registry

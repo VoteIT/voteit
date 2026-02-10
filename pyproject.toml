@@ -120,6 +120,7 @@ exclude_also = [
 
 [tool.ruff]
 include = ["pyproject.toml", "voteit/**/*.py", "src/**/*.py"]
+lint.isort.force-single-line = true
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
