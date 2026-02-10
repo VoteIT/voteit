@@ -55,8 +55,8 @@ def populate_history_log(
     Creates HistoryLog entry for a date (default yesterday) for each organization.
     """
     # Circular import funzies
-    from voteit.organisation.models import Organisation
     from voteit.invites.models import MeetingInvite
+    from voteit.organisation.models import Organisation
     from voteit.proposal.workflows import ProposalWf
     from voteit.speaker.models import Speaker
 
@@ -82,11 +82,8 @@ def populate_history_log(
     )
 
     for org in Organisation.objects.filter(
-        (
-            models.Q(models.Exists(logentry_exists))
-            | models.Q(models.Exists(connection_exists))
-        )
-        & ~models.Q(models.Exists(history_exists))
+        (models.Exists(logentry_exists) | models.Exists(connection_exists))
+        & ~models.Exists(history_exists)
     ):
         org_logentries = LogEntry.objects.filter(
             actor__organisation=org, **mk_daterange_filter("timestamp", date)
