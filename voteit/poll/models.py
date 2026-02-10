@@ -13,32 +13,28 @@ from auditlog.registry import auditlog
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import IntegrityError
-from django.db import models
-from django.db.models import Sum
-from django.db.models import UniqueConstraint
+from django.db import IntegrityError, models
+from django.db.models import Sum, UniqueConstraint
 from django.dispatch import receiver
 from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField
-from django_fsm import TransitionNotAllowed
-from django_fsm import post_transition
-from django_fsm import transition
+from django_fsm import FSMField, TransitionNotAllowed, post_transition, transition
 from pydantic import ValidationError
 from pydantic.main import BaseModel
 from rules.contrib.models import RulesModelMixin
 
-from voteit.core.abcs import AgendaItemContext
-from voteit.core.abcs import MeetingContext
+from voteit.core.abcs import AgendaItemContext, MeetingContext
 from voteit.core.models import BaseContent
 from voteit.core.permissions import NOT_ALLOWED
-from voteit.poll.exceptions import BallotChecksumError
-from voteit.poll.exceptions import ElectoralRegisterMissing
-from voteit.poll.exceptions import InvalidPollMethod
-from voteit.poll.exceptions import NotAllowedToVote
-from voteit.poll.exceptions import PollError
-from voteit.poll.exceptions import PollNotFinished
+from voteit.poll.exceptions import (
+    BallotChecksumError,
+    ElectoralRegisterMissing,
+    InvalidPollMethod,
+    NotAllowedToVote,
+    PollError,
+    PollNotFinished,
+)
 from voteit.poll.permissions import PollPermissions
 from voteit.poll.schemas import PollResult
 from voteit.poll.utils import get_poll_method_registry
@@ -47,9 +43,9 @@ from voteit.proposal.workflows import ProposalWf
 from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
-    from voteit.poll.abcs import PollMethod
     from voteit.agenda.models import AgendaItem
     from voteit.meeting.models import Meeting
+    from voteit.poll.abcs import PollMethod
 
 __all__ = (
     "ElectoralRegister",
@@ -562,7 +558,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             raise PollError("Poll already finalized")
         counter = Counter()
         abstains = 0
-        for v in self.votes.all().order_by("pk"):
+        for v in self.votes.annotate_weight().order_by("pk"):
             if v.abstain:
                 abstains += v.weight
             else:
@@ -640,7 +636,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
     # Annotations
     objects: models.Manager
-    votes: models.QuerySet
+    votes: Vote.QuerySet
     meeting_id: int | None
 
 
@@ -691,10 +687,6 @@ class Vote(models.Model):
     def __str__(self):  # pragma: no cover
         return f"{self.__class__.__name__} from {self.user}"
 
-    @property
-    def weight(self) -> int:
-        return self.poll.electoral_register.get_voter_weight(self.user)
-
     def save(self, **kw):
         er = self.poll.electoral_register
         if not er:
@@ -705,8 +697,19 @@ class Vote(models.Model):
             self.vote_data = None
         super().save(**kw)
 
-    # Annotations
-    objects: models.Manager
+    class QuerySet(models.QuerySet):
+        def annotate_weight(self):
+            """Add vote weight using subquery."""
+            return self.annotate(
+                weight=models.Subquery(
+                    VoterWeight.objects.filter(
+                        register=models.OuterRef("poll__electoral_register"),
+                        user=models.OuterRef("user"),
+                    )[:1].values_list("weight", flat=True)
+                )
+            )
+
+    objects = QuerySet.as_manager()
 
 
 @auditlog.register(

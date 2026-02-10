@@ -4,8 +4,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
-from django.test import override_settings
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.agenda.models import AgendaItem
@@ -15,20 +14,20 @@ from voteit.meeting.workflows import MeetingWf
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 from voteit.poll.app.polls.simple import Simple
-from voteit.poll.exceptions import ElectoralRegisterMissing
-from voteit.poll.exceptions import InvalidPollMethod
-from voteit.poll.exceptions import NotAllowedToVote
-from voteit.poll.models import ElectoralRegister
-from voteit.poll.models import Poll
-from voteit.poll.models import VoterWeight
-from voteit.poll.registries import er_policy
-from voteit.poll.registries import vote_transfer_policies
-from voteit.poll.testing import UnrestrictedVoteTransferER
-from voteit.poll.testing import UnrestrictedVoteTransferPolicy
+from voteit.poll.exceptions import (
+    ElectoralRegisterMissing,
+    InvalidPollMethod,
+    NotAllowedToVote,
+)
+from voteit.poll.models import ElectoralRegister, Poll, VoterWeight
+from voteit.poll.registries import er_policy, vote_transfer_policies
+from voteit.poll.testing import (
+    UnrestrictedVoteTransferER,
+    UnrestrictedVoteTransferPolicy,
+)
 from voteit.poll.workflows import PollWf
 from voteit.proposal.models import Proposal
 from voteit.proposal.workflows import ProposalWf
-
 
 User = get_user_model()
 
@@ -284,7 +283,9 @@ class VoteWeightTests(TestCase):
         self.poll.votes.create(user=self.user1, vote_data="yes")
         self.poll.votes.create(user=self.user2, vote_data="yes")
         self.poll.votes.create(user=self.user3, vote_data="no")
-        self.poll.close()
+        # Would be 14 if no annotation of weight
+        with self.assertNumQueries(8):
+            self.poll.close()
         self.assertEqual(
             self.poll.result.dict(),
             {
@@ -469,7 +470,6 @@ class VoteTests(TestCase):
     {UnrestrictedVoteTransferER.name: UnrestrictedVoteTransferER},
 )
 class VoteTransferTests(TestCase):
-
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
