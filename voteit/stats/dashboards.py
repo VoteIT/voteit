@@ -1,0 +1,275 @@
+from datetime import timedelta
+
+from auditlog.models import LogEntry
+from controlcenter import Dashboard
+from controlcenter import widgets
+from django.contrib.auth import get_user_model
+from django.db.models import Count
+from django.db.models import OuterRef
+from django.db.models import Q
+from django.db.models import Subquery
+from django.utils import timezone
+from envelope.models import Connection
+from sql_util.aggregates import SubqueryCount
+from sql_util.aggregates import SubquerySum
+
+from ..organisation.models import Organisation
+from ..poll.models import Vote
+from .models import HistoryLog
+
+User = get_user_model()
+
+
+def format_wo_seconds(duration: timedelta):
+    return str(duration).rsplit(":", 1)[0]
+
+
+class DailyChart(widgets.LineChart):
+    days = 10
+
+    @property
+    def start_date(self):
+        return timezone.now().date() - timedelta(days=self.days)
+
+    def iter_dates(self):
+        today = timezone.now().date()
+        for n in range(1, self.days + 1):
+            yield today - timedelta(days=n)
+
+    def labels(self):
+        return list(self.iter_dates())
+
+
+class ActiveOrgs(DailyChart):
+    default_value = 0
+    field = "action_count"
+    title = "Organisation activity (logged actions)"
+
+    def to_int(self, value):
+        # Override to support timedelta
+        return value
+
+    @property
+    def top_orgs(self):
+        return (
+            Organisation.objects.annotate(
+                sum=SubquerySum(
+                    f"historylog__{self.field}",
+                    filter=Q(date__gte=self.start_date),
+                )
+            )
+            .filter(sum__gt=self.default_value)  # No need to show these
+            .order_by("-sum")[:10]
+        )
+
+    def get_queryset(self):
+        return HistoryLog.objects.filter(
+            org__in=self.top_orgs, date__gte=self.start_date
+        ).values("date", "org", self.field)
+
+    def series(self):
+        data = self.get_queryset()
+        lookup = {
+            org: {
+                entry["date"]: entry[self.field]
+                for entry in data
+                if entry["org"] == org.id
+            }
+            for org in self.top_orgs
+        }
+        return [
+            [
+                self.to_int(lookup[org].get(date, self.default_value))
+                for date in self.iter_dates()
+            ]
+            for org in self.top_orgs
+        ]
+
+    def legend(self):
+        return list(self.top_orgs)
+
+
+class ActiveOrgsOnline(ActiveOrgs):
+    default_value = timedelta()
+    field = "online_duration"
+    title = "Organisation activity (hours online)"
+
+    def to_int(self, value: timedelta):
+        return value.total_seconds() / 3600
+
+
+class ActionsLast24(widgets.LineChart):
+    title = "Actions last 24 hours"
+
+    @property
+    def start_time(self):
+        return timezone.now().replace(minute=0, second=0, microsecond=0) - timedelta(
+            hours=24
+        )
+
+    def iter_hours(self):
+        this_hour = timezone.now().hour
+        for n in range(24):
+            yield (this_hour - n) % 24
+
+    def get_queryset(self):
+        return (
+            LogEntry.objects.filter(timestamp__gte=self.start_time)
+            .values("timestamp__hour")
+            .annotate(sum=Count("pk"))
+            .order_by("timestamp__hour")
+        )
+
+    def labels(self):
+        return [f"{h:02d}" for h in self.iter_hours()]
+
+    def series(self):
+        lookup = {
+            entry["timestamp__hour"]: entry["sum"] for entry in self.get_queryset()
+        }
+        return [[lookup.get(hour, 0) for hour in self.iter_hours()]]
+
+
+class DailyVoteChart(DailyChart):
+    title = "Total votes per day"
+
+    def get_queryset(self):
+        return (
+            Vote.objects.filter(created__date__gte=self.start_date)
+            .values("created__date")
+            .annotate(sum=Count("pk"))
+            .order_by("created__date")
+        )
+
+    def series(self):
+        lookup = {entry["created__date"]: entry["sum"] for entry in self.get_queryset()}
+        return [[lookup.get(day, 0) for day in self.iter_dates()]]
+
+
+class DailyOrgVoteChart(DailyChart):
+    title = "Organisations, votes per day"
+
+    @property
+    def top_orgs(self):
+        return (
+            Organisation.objects.annotate(
+                sum=Subquery(
+                    Vote.objects.filter(
+                        poll__meeting__organisation=OuterRef("pk"),
+                        created__date__gte=self.start_date,
+                    )
+                    .annotate(sum=Count("pk"))
+                    .values_list("sum", flat=True)[:1]
+                ),
+            )
+            .filter(sum__gt=0)  # No need to show these
+            .order_by("-sum")[:10]
+        )
+
+    def get_queryset(self):
+        return (
+            Vote.objects.filter(
+                poll__meeting__organisation__in=self.top_orgs,
+                created__date__gte=self.start_date,
+            )
+            .values("created__date", "poll__meeting__organisation")
+            .annotate(count=Count("pk"))
+            .order_by("created__date", "poll__meeting__organisation")
+        )
+
+    def series(self):
+        data = self.get_queryset()
+        lookup = {
+            org: {
+                entry["created__date"]: entry["count"]
+                for entry in data
+                if entry["poll__meeting__organisation"] == org.id
+            }
+            for org in self.top_orgs
+        }
+        return [
+            [lookup[org].get(date, 0) for date in self.iter_dates()]
+            for org in self.top_orgs
+        ]
+
+    def legend(self):
+        return list(self.top_orgs)
+
+
+class OnlineYesterdayChart(widgets.PieChart):
+    """
+    Skips organizations with less than one hou online time
+    """
+
+    title = "Online time yesterday (>1h)"
+
+    @property
+    def yesterday(self):
+        return timezone.now().date() - timedelta(days=0)
+
+    @property
+    def orgs(self):
+        return (
+            Organisation.objects.annotate(
+                duration=Subquery(
+                    HistoryLog.objects.filter(
+                        org=OuterRef("pk"), date=self.yesterday
+                    ).values("online_duration")
+                )
+            )
+            .exclude(duration__lt=timedelta(hours=1))
+            .order_by("title")
+        )
+
+    def labels(self):
+        return [f"{o.title}: {format_wo_seconds(o.duration)}" for o in self.orgs]
+
+    def series(self):
+        return [o.duration.total_seconds() for o in self.orgs]
+
+
+class OnlineUserChart(widgets.BarChart):
+    action_time = timedelta(minutes=20)
+    title = "Online users (last 20 min)"
+
+    @property
+    def recent_qs(self):
+        return Connection.objects.filter(
+            online=True,
+            last_action__gt=timezone.now() - self.action_time,
+        )
+
+    @property
+    def top_orgs(self):
+        return (
+            Organisation.objects.annotate(
+                conns=SubqueryCount(
+                    "users", distinct=True, filter=Q(connections__in=self.recent_qs)
+                )
+            )
+            .exclude(conns=0)
+            .order_by("-conns")
+        )
+
+    def labels(self):
+        return ["All", *(o.title for o in self.top_orgs)]
+
+    def series(self):
+        return [
+            [
+                self.recent_qs.distinct("user").count(),
+                *(o.conns for o in self.top_orgs),
+            ]
+        ]
+
+
+class LatestStats(Dashboard):
+    widgets = (
+        OnlineUserChart,
+        OnlineYesterdayChart,
+        ActiveOrgs,
+        ActiveOrgsOnline,
+        DailyVoteChart,
+        DailyOrgVoteChart,
+        ActionsLast24,
+    )

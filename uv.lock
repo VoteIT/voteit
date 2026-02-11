@@ -557,6 +557,18 @@ wheels = [
 ]
 
 [[package]]
+name = "django-controlcenter"
+version = "0.3.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django-pkgconf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/84/1e/047466fec2635c180bdbd59de1a09f3c986f95b294df919f5dcd293e573d/django_controlcenter-0.3.3.tar.gz", hash = "sha256:ffc982455a54c79c98df70180c549c79ba067f74f208cc9657418a7fc735aa6c", size = 120173, upload-time = "2025-03-25T19:41:32.704Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/08/00/6a8225e705688e6e1a7e7740bd2928ed495174fac77a5cd51a84b78215a0/django_controlcenter-0.3.3-py3-none-any.whl", hash = "sha256:260df66632c4e6924b02d5a30a36a7fb2ac1d41dc4619ff167bfb7f4c86c30af", size = 129188, upload-time = "2025-03-25T19:41:30.986Z" },
+]
+
+[[package]]
 name = "django-cors-headers"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -623,6 +635,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/81/60/5e232c32a2c977cc1
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/13/87a42048700c54bfce35900a34e2031245132775fb24363fc0e33664aa9c/django_model_utils-5.0.0-py3-none-any.whl", hash = "sha256:fec78e6c323d565a221f7c4edc703f4567d7bb1caeafe1acd16a80c5ff82056b", size = 42630, upload-time = "2024-09-04T11:36:23.166Z" },
 ]
+
+[[package]]
+name = "django-pkgconf"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/54/9d/c9527722de1f04f5cf3f814a57ccc7d7603374e2b5f8072201b16c181d5e/django-pkgconf-0.4.0.tar.gz", hash = "sha256:117afcc934dd6fdf4204155901182649bed27e9c3acc71f8b92728f009d4f53b", size = 6835, upload-time = "2020-03-18T23:34:32.376Z" }
 
 [[package]]
 name = "django-rq"
@@ -1817,6 +1835,7 @@ dependencies = [
     { name = "channels-redis" },
     { name = "django" },
     { name = "django-auditlog" },
+    { name = "django-controlcenter" },
     { name = "django-cors-headers" },
     { name = "django-filter" },
     { name = "django-fsm" },
@@ -1869,6 +1888,7 @@ requires-dist = [
     { name = "channels-redis", specifier = ">=4.3.0,<5.0.0" },
     { name = "django", specifier = ">=5.2.7,<6.0.0" },
     { name = "django-auditlog", specifier = ">=3.3.0,<4.0.0" },
+    { name = "django-controlcenter", specifier = ">=0.3.3" },
     { name = "django-cors-headers", specifier = ">=4.9.0,<5.0.0" },
     { name = "django-filter", specifier = ">=25.2,<26.0" },
     { name = "django-fsm", specifier = "<3" },

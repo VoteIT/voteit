@@ -76,7 +76,10 @@ INSTALLED_APPS = [
     "voteit.reactions",
     "voteit.room",
     "voteit.participant_tags",
+    "controlcenter",
 ]
+
+CONTROLCENTER_DASHBOARDS = (("latest", "voteit.stats.dashboards.LatestStats"),)
 
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 

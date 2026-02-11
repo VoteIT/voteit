@@ -41,6 +41,7 @@ dependencies = [
     "rq-scheduler (>=0.14.0,<0.15.0)",
     "python-graph-core (>=1.8.2,<2.0.0)",
     "setuptools (>=80.9.0,<81.0.0)",
+    "django-controlcenter>=0.3.3",
 ]
 
 [project.urls]
