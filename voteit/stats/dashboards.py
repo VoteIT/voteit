@@ -34,9 +34,7 @@ class DailyChart(widgets.LineChart):
     @property
     def start_time(self):
         """00:00:00 at start of first day"""
-        return timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        ) - timedelta(days=self.days)
+        return self.start_today - timedelta(days=self.days)
 
     @property
     def start_today(self):
@@ -117,9 +115,11 @@ class ActionsLast24(widgets.LineChart):
 
     @property
     def start_time(self):
-        return timezone.now().replace(minute=0, second=0, microsecond=0) - timedelta(
-            hours=24
-        )
+        return self.start_this_hour - timedelta(hours=24)
+
+    @property
+    def start_this_hour(self):
+        return timezone.now().replace(minute=0, second=0, microsecond=0)
 
     @staticmethod
     def iter_hours():
@@ -129,7 +129,9 @@ class ActionsLast24(widgets.LineChart):
 
     def get_queryset(self):
         return (
-            LogEntry.objects.filter(timestamp__gte=self.start_time)
+            LogEntry.objects.filter(
+                timestamp__gte=self.start_time, timestamp__lt=self.start_this_hour
+            )
             .values("timestamp__hour")
             .annotate(sum=Count("pk"))
             .order_by("timestamp__hour")
