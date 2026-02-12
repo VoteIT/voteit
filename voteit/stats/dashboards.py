@@ -74,7 +74,7 @@ class ActiveOrgs[T](DailyChart):
                 )
             )
             .exclude(sum=self.default_value)  # No need to show these
-            .order_by("-sum")[:10]
+            .order_by("-sum")[:5]
         )
 
     def get_queryset(self):
@@ -184,7 +184,7 @@ class DailyOrgVoteChart(DailyChart):
                 ),
             )
             .exclude(vote_count=0)  # No need to show orgs with no votes
-            .order_by("-vote_count")[:10]
+            .order_by("-vote_count")[:5]
         )
 
     def get_queryset(self):
