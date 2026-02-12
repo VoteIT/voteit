@@ -40,12 +40,13 @@ class DailyChart(widgets.LineChart):
         return list(self.iter_dates())
 
 
-class ActiveOrgs(DailyChart):
-    default_value = 0
+class ActiveOrgs[T](DailyChart):
+    default_value: T = 0
     field = "action_count"
     title = "Organisation activity (logged actions)"
 
-    def to_int(self, value):
+    @staticmethod
+    def convert_value(value: T) -> int | float:
         # Override to support timedelta
         return value
 
@@ -79,7 +80,7 @@ class ActiveOrgs(DailyChart):
         }
         return [
             [
-                self.to_int(lookup[org].get(date, self.default_value))
+                self.convert_value(lookup[org].get(date, self.default_value))
                 for date in self.iter_dates()
             ]
             for org in self.top_orgs
@@ -94,8 +95,9 @@ class ActiveOrgsOnline(ActiveOrgs):
     field = "online_duration"
     title = "Organisation activity (hours online)"
 
-    def to_int(self, value: timedelta):
-        return value.total_seconds() / 3600
+    @staticmethod
+    def convert_value(value: timedelta):
+        return round(value.total_seconds() / 3600, 1)
 
 
 class ActionsLast24(widgets.LineChart):
@@ -107,7 +109,8 @@ class ActionsLast24(widgets.LineChart):
             hours=24
         )
 
-    def iter_hours(self):
+    @staticmethod
+    def iter_hours():
         this_hour = timezone.now().hour
         for n in range(24):
             yield (this_hour - n) % 24
