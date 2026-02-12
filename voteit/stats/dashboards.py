@@ -9,6 +9,7 @@ from django.db.models import OuterRef
 from django.db.models import Q
 from django.db.models import Subquery
 from django.utils import timezone
+from django.utils.functional import cached_property
 from envelope.models import Connection
 from sql_util.aggregates import SubqueryCount
 from sql_util.aggregates import SubquerySum
@@ -69,7 +70,7 @@ class ActiveOrgs[T](DailyChart):
                     filter=Q(date__gte=self.start_date),
                 )
             )
-            .filter(sum__gt=self.default_value)  # No need to show these
+            .exclude(sum=self.default_value)  # No need to show these
             .order_by("-sum")[:10]
         )
 
@@ -168,48 +169,43 @@ class DailyVoteChart(DailyChart):
 class DailyOrgVoteChart(DailyChart):
     title = "Organisations, votes per day"
 
-    @property
+    @cached_property
     def top_orgs(self):
         return (
             Organisation.objects.annotate(
-                sum=Subquery(
-                    Vote.objects.filter(
-                        poll__meeting__organisation=OuterRef("pk"),
-                        created__gte=self.start_time,
-                        created__lt=self.start_today,
-                    )
-                    .annotate(sum=Count("pk"))
-                    .values_list("sum", flat=True)[:1]
+                vote_count=SubqueryCount(
+                    "users__vote",
+                    filter=Q(
+                        created__gte=self.start_time, created__lt=self.start_today
+                    ),
                 ),
             )
-            .filter(sum__gt=0)  # No need to show these
-            .order_by("-sum")[:10]
+            .exclude(vote_count=0)  # No need to show orgs with no votes
+            .order_by("-vote_count")[:10]
         )
 
     def get_queryset(self):
         return (
             Vote.objects.filter(
-                poll__meeting__organisation__in=self.top_orgs,
-                created__gte=self.start_time,
-                created__lt=self.start_today,
+                created__gte=self.start_time, created__lt=self.start_today
             )
-            .values("created__date", "poll__meeting__organisation")
+            .values("created__date", "user__organisation")
             .annotate(count=Count("pk"))
-            .order_by("created__date", "poll__meeting__organisation")
+            .order_by("created__date", "user__organisation")
         )
 
     def series(self):
         data = self.get_queryset()
         lookup = {
-            org: {
+            org.id: {
                 entry["created__date"]: entry["count"]
                 for entry in data
-                if entry["poll__meeting__organisation"] == org.id
+                if entry["user__organisation"] == org.id
             }
             for org in self.top_orgs
         }
         return [
-            [lookup[org].get(date, 0) for date in self.iter_dates()]
+            [lookup[org.id].get(date, 0) for date in self.iter_dates()]
             for org in self.top_orgs
         ]
 
