@@ -151,7 +151,7 @@ class DailyVoteChart(DailyChart):
     def get_queryset(self):
         return (
             Vote.objects.filter(
-                created__gte=self.start_time, created_lt=self.start_today
+                created__gte=self.start_time, created__lt=self.start_today
             )
             .values("created__date")
             .annotate(sum=Count("pk"))
@@ -174,7 +174,7 @@ class DailyOrgVoteChart(DailyChart):
                     Vote.objects.filter(
                         poll__meeting__organisation=OuterRef("pk"),
                         created__gte=self.start_time,
-                        created_lt=self.start_today,
+                        created__lt=self.start_today,
                     )
                     .annotate(sum=Count("pk"))
                     .values_list("sum", flat=True)[:1]
@@ -189,7 +189,7 @@ class DailyOrgVoteChart(DailyChart):
             Vote.objects.filter(
                 poll__meeting__organisation__in=self.top_orgs,
                 created__gte=self.start_time,
-                created_lt=self.start_today,
+                created__lt=self.start_today,
             )
             .values("created__date", "poll__meeting__organisation")
             .annotate(count=Count("pk"))
