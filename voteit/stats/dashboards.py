@@ -208,7 +208,7 @@ class OnlineYesterdayChart(widgets.PieChart):
 
     @property
     def yesterday(self):
-        return timezone.now().date() - timedelta(days=0)
+        return timezone.now().date() - timedelta(days=1)
 
     @property
     def orgs(self):
