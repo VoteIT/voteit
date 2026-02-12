@@ -31,6 +31,18 @@ class DailyChart(widgets.LineChart):
     def start_date(self):
         return timezone.now().date() - timedelta(days=self.days)
 
+    @property
+    def start_time(self):
+        """00:00:00 at start of first day"""
+        return timezone.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ) - timedelta(days=self.days)
+
+    @property
+    def start_today(self):
+        """00:00:00 at start of current day"""
+        return timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
     def iter_dates(self):
         today = timezone.now().date()
         for n in range(1, self.days + 1):
@@ -138,7 +150,9 @@ class DailyVoteChart(DailyChart):
 
     def get_queryset(self):
         return (
-            Vote.objects.filter(created__date__gte=self.start_date)
+            Vote.objects.filter(
+                created__gte=self.start_time, created_lt=self.start_today
+            )
             .values("created__date")
             .annotate(sum=Count("pk"))
             .order_by("created__date")
@@ -159,7 +173,8 @@ class DailyOrgVoteChart(DailyChart):
                 sum=Subquery(
                     Vote.objects.filter(
                         poll__meeting__organisation=OuterRef("pk"),
-                        created__date__gte=self.start_date,
+                        created__gte=self.start_time,
+                        created_lt=self.start_today,
                     )
                     .annotate(sum=Count("pk"))
                     .values_list("sum", flat=True)[:1]
@@ -173,7 +188,8 @@ class DailyOrgVoteChart(DailyChart):
         return (
             Vote.objects.filter(
                 poll__meeting__organisation__in=self.top_orgs,
-                created__date__gte=self.start_date,
+                created__gte=self.start_time,
+                created_lt=self.start_today,
             )
             .values("created__date", "poll__meeting__organisation")
             .annotate(count=Count("pk"))
