@@ -28,6 +28,9 @@ def format_wo_seconds(duration: timedelta):
 class DailyChart(widgets.LineChart):
     days = 10
 
+    class Chartist:
+        options = {"reverseData": False}
+
     @property
     def start_date(self):
         return timezone.now().date() - timedelta(days=self.days)
@@ -44,7 +47,7 @@ class DailyChart(widgets.LineChart):
 
     def iter_dates(self):
         today = timezone.now().date()
-        for n in range(1, self.days + 1):
+        for n in reversed(range(1, self.days + 1)):
             yield today - timedelta(days=n)
 
     def labels(self):
