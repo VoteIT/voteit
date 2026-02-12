@@ -80,6 +80,7 @@ INSTALLED_APPS = [
 ]
 
 CONTROLCENTER_DASHBOARDS = (("latest", "voteit.stats.dashboards.LatestStats"),)
+CONTROLCENTER_CHARTIST_COLORS = "material"  # Easier to tell apart
 
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 
