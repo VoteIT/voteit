@@ -37,6 +37,7 @@ MIDDLEWARE = [
 # Installed apps
 INSTALLED_APPS = [
     "daphne",
+    "voteit.stats",  # Before admin, to override templates
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -70,7 +71,6 @@ INSTALLED_APPS = [
     "voteit.discussion",
     "voteit.poll",
     "voteit.speaker",
-    "voteit.stats",
     "voteit.organisation",
     "voteit.participant_number",
     "voteit.reactions",
