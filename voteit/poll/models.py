@@ -644,13 +644,21 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     meeting_id: int | None
 
 
+def _remove_all_mask(value: str) -> str:
+    return "*"
+
+
 # FIXME: We don't log votes right now, but that might be a good idea, at least the actor?
 @history_log("poll__meeting__organisation")
 @auditlog.register(
     include_fields=[
         "user",
         "poll",
+        "vote_data",
+        "abstain",
     ],
+    mask_fields=["vote_data", "abstain"],
+    mask_callable="voteit.poll.models._remove_all_mask",
 )
 class Vote(models.Model):
     """Contains data on the users vote in a specific poll."""

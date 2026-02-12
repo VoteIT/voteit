@@ -50,6 +50,8 @@ class AuditlogIntegrationTests(TestCase):
             {
                 "poll": ["None", f"{poll.pk}"],
                 "user": ["None", f"{self.moderator.pk}"],
+                "abstain": ["*", "*"],
+                "vote_data": ["*", "*"],
             },
             entry.changes_dict,
         )
