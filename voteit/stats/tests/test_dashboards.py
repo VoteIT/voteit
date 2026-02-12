@@ -44,6 +44,6 @@ class DashboardTests(TestCase):
         chart = DailyOrgVoteChart(request=request)
         self.assertEqual(chart.top_orgs.count(), 2)
         self.assertEqual(chart.legend[0].title, "Testfixture organisation")
-        self.assertEqual(chart.series[0][0], 2)
+        self.assertEqual(chart.series[0][-1], 2)
         self.assertEqual(chart.legend[1].title, "Other")
-        self.assertEqual(chart.series[1][0], 1)
+        self.assertEqual(chart.series[1][-1], 1)
