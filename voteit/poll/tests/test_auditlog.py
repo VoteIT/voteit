@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
 User = get_user_model()
 
@@ -31,6 +32,24 @@ class AuditlogIntegrationTests(TestCase):
                 "state": ["None", "private"],
                 "title": ["None", " 1"],
                 "withheld_result": ["None", "False"],
+            },
+            entry.changes_dict,
+        )
+
+    def test_create_vote(self):
+        with set_actor(self.moderator):
+            self.meeting.add_roles(self.moderator, ROLE_POTENTIAL_VOTER)
+            poll = self.ai.polls.create(method_name="simple")
+            poll.proposals.add(self.prop)
+            poll.upcoming()
+            poll.ongoing()
+            poll.save()
+            vote = poll.votes.create(vote_data="", user=self.moderator)
+        entry = LogEntry.objects.get_for_object(vote).last()
+        self.assertDictEqual(
+            {
+                "poll": ["None", f"{poll.pk}"],
+                "user": ["None", f"{self.moderator.pk}"],
             },
             entry.changes_dict,
         )

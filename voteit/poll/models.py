@@ -646,6 +646,12 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
 # FIXME: We don't log votes right now, but that might be a good idea, at least the actor?
 @history_log("poll__meeting__organisation")
+@auditlog.register(
+    include_fields=[
+        "user",
+        "poll",
+    ],
+)
 class Vote(models.Model):
     """Contains data on the users vote in a specific poll."""
 
