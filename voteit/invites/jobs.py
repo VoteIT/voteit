@@ -4,6 +4,7 @@ from datetime import timedelta
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from auditlog.context import disable_auditlog
 from django.utils.timezone import now
 from voteit.core.decorators import schedule_job
 from voteit.invites.models import MeetingInvite
@@ -41,13 +42,15 @@ def cleanup_invites():
         modified__lt=now() - timedelta(days=30),
     )
     expired_revoked_count = expired_revoked_qs.count()
-    expired_revoked_qs.delete()
+    with disable_auditlog():
+        expired_revoked_qs.delete()
     # Other invite states may be deleted too, lets set 6 months to be on the safe side
     other_states_qs = MeetingInvite.objects.filter(
         modified__lt=now() - timedelta(days=200),
     )
     other_states_count = other_states_qs.count()
-    other_states_qs.delete()
+    with disable_auditlog():
+        other_states_qs.delete()
     return {
         "expired_revoked_count": expired_revoked_count,
         "other_states_count": other_states_count,

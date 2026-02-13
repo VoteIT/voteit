@@ -89,4 +89,5 @@ class ExpireUnusedInvitesTests(TestCase):
             {"expired_revoked_count": 1, "other_states_count": 1},
             cleanup_invites(),
         )
-        self.assertEqual(2, LogEntry.objects.count())
+        # We're disabling the logs for automated jobs now!
+        self.assertEqual(0, LogEntry.objects.count())
