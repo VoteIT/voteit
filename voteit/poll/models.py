@@ -649,7 +649,7 @@ def _remove_all_mask(value: str) -> str:
 
 
 # FIXME: We don't log votes right now, but that might be a good idea, at least the actor?
-@history_log("poll__meeting__organisation")
+@history_log("user__organisation")
 @auditlog.register(
     include_fields=[
         "user",
