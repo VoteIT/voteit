@@ -284,12 +284,19 @@ class OnlineUserChart(widgets.BarChart):
 
 
 class LatestStats(Dashboard):
+    title = "Recent"
     widgets = (
-        OnlineUserChart,
-        OnlineYesterdayChart,
         ActiveOrgs,
         ActiveOrgsOnline,
         DailyVoteChart,
         DailyOrgVoteChart,
+        OnlineYesterdayChart,
+    )
+
+
+class NowStats(Dashboard):
+    title = "Now"
+    widgets = (
+        OnlineUserChart,
         ActionsLast24,
     )
