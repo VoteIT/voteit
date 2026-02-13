@@ -21,10 +21,6 @@ from .models import HistoryLog
 User = get_user_model()
 
 
-def format_wo_seconds(duration: timedelta):
-    return str(duration).rsplit(":", 1)[0]
-
-
 class DailyChart(widgets.LineChart):
     days = 10
 
@@ -216,9 +212,9 @@ class DailyOrgVoteChart(DailyChart):
         return list(self.top_orgs)
 
 
-class OnlineYesterdayChart(widgets.PieChart):
+class OnlineYesterdayChart(widgets.BarChart):
     """
-    Skips organizations with less than one hou online time
+    Skips organizations with less than one hour online time
     """
 
     title = "Online time yesterday (>1h)"
@@ -242,10 +238,10 @@ class OnlineYesterdayChart(widgets.PieChart):
         )
 
     def labels(self):
-        return [f"{o.title}: {format_wo_seconds(o.duration)}" for o in self.orgs]
+        return [o.title for o in self.orgs]
 
     def series(self):
-        return [o.duration.total_seconds() for o in self.orgs]
+        return [[o.duration.total_seconds() / 3600 for o in self.orgs]]
 
 
 class OnlineUserChart(widgets.BarChart):
@@ -284,12 +280,19 @@ class OnlineUserChart(widgets.BarChart):
 
 
 class LatestStats(Dashboard):
+    title = "Recent"
     widgets = (
-        OnlineUserChart,
-        OnlineYesterdayChart,
         ActiveOrgs,
         ActiveOrgsOnline,
         DailyVoteChart,
         DailyOrgVoteChart,
+        OnlineYesterdayChart,
+    )
+
+
+class NowStats(Dashboard):
+    title = "Now"
+    widgets = (
+        OnlineUserChart,
         ActionsLast24,
     )
