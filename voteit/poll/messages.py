@@ -92,15 +92,16 @@ class AddVote(VoteBase, ABC):
     model = Poll
     context: Poll
     context_schema_attr = "poll"
-    atomic = False
+    atomic = True
 
     def run_job(self):
         self.assert_perm()
         poll = self.context
         poll.method.validate_vote(self)
-        poll.votes.update_or_create(
-            user=self.user, defaults={"vote": self.data.vote, "abstain": False}
-        )
+        with set_actor(self.user):
+            poll.votes.update_or_create(
+                user=self.user, defaults={"vote": self.data.vote, "abstain": False}
+            )
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
 
@@ -120,14 +121,15 @@ class AbstainVote(VoteBase):
     data: AbstainSchema
     context: Poll
     context_schema_attr = "poll"
-    atomic = False
+    atomic = True
 
     def run_job(self):
         self.assert_perm()
         poll = self.context
-        poll.votes.update_or_create(
-            user=self.user, defaults={"abstain": True, "vote": None}
-        )
+        with set_actor(self.user):
+            poll.votes.update_or_create(
+                user=self.user, defaults={"abstain": True, "vote": None}
+            )
         msg = Status.from_message(self)
         websocket_send(msg, state=msg.SUCCESS)
 
