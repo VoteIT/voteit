@@ -4,7 +4,8 @@
 install:
 	cat INSTALL.md
 requirements:
-	uv export --no-dev --frozen --no-install-workspace --group docker --no-hashes --no-annotate --no-header -q -o requirements.txt
+	uv export --no-dev --frozen --no-install-workspace --group docker --no-annotate --no-header -q -o requirements.txt
+	uvx pip-audit -r requirements.txt --disable-pip
 shell:
 	python manage.py shell
 coverage:
