@@ -25,7 +25,10 @@ class DailyChart(widgets.LineChart):
     days = 10
 
     class Chartist:
-        options = {"reverseData": False}
+        options = {
+            "reverseData": False,
+            "onlyInteger": True,
+        }
 
     @property
     def start_date(self):
@@ -112,6 +115,11 @@ class ActiveOrgsOnline(ActiveOrgs):
 
 class ActionsLast24(widgets.LineChart):
     title = "Actions last 24 hours"
+
+    class Chartist:
+        options = {
+            "onlyInteger": True,
+        }
 
     @property
     def start_time(self):
@@ -247,6 +255,11 @@ class OnlineYesterdayChart(widgets.BarChart):
 class OnlineUserChart(widgets.BarChart):
     action_time = timedelta(minutes=20)
     title = "Online users (last 20 min)"
+
+    class Chartist:
+        options = {
+            "onlyInteger": True,
+        }
 
     @property
     def recent_qs(self):
