@@ -34,6 +34,7 @@ class NoteViewSet(ModelViewSet):
     serializer_class = NoteSerializer
     filterset_class = MeetingFilter
     filter_backends = (ActionAnnotatedDjangoFilterBackend,)
+    expected_default_http_status = 400
 
     def get_serializer_class(self):
         if self.action == "create":
