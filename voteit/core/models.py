@@ -33,8 +33,10 @@ from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
     from social_django.models import UserSocialAuth
+    from voteit.notes.models import Note
     from voteit.organisation.models import Organisation
     from voteit.participant_tags.models import ParticipantTags
+
 
 __all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
 
@@ -142,6 +144,7 @@ class User(AbstractUser):
     meeting_roles: models.QuerySet
     meeting_tags: models.QuerySet[ParticipantTags]
     social_auth: models.QuerySet[UserSocialAuth]
+    notes: models.QuerySet[Note]
 
 
 def real_user_only(method):
