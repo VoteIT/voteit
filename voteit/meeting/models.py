@@ -276,8 +276,14 @@ class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext
                 if klass := reg.get(vtp):
                     return klass(self)
 
-    def component_enabled(self, name: str) -> bool:
-        return self.components.filter(component_name=name, state=EnabledWf.ON).exists()
+    def component_enabled(self, name: str, refresh=False) -> bool:
+        if not hasattr(self, "_enabled_components") or refresh:
+            self._enabled_components = set(
+                self.components.filter(state=EnabledWf.ON).values_list(
+                    "component_name", flat=True
+                )
+            )
+        return name in self._enabled_components
 
     def valid_er_policy_guard(self) -> bool:
         return self.er_policy_name in get_electoral_policy_registry()

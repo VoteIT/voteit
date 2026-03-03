@@ -2,6 +2,9 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
 
+from voteit.active.components import ActiveUsersComponent
+from voteit.components.app.components.proposal_print import ProposalPrint
+from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_DISCUSSER
@@ -16,8 +19,14 @@ User = get_user_model()
 
 
 class MeetingTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+
     def test_workflow_transitions(self):
-        meeting: Meeting = Meeting.objects.create(er_policy_name="auto_before_poll")
+        meeting = self.meeting
         meeting.ongoing()
         meeting.upcoming()
         meeting.ongoing()
@@ -32,13 +41,14 @@ class MeetingTests(TestCase):
     def test_er_policy(self):
         from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 
-        meeting = Meeting.objects.create(er_policy_name=AutoBeforePoll.name)
-        self.assertIsInstance(meeting.er_policy, AutoBeforePoll)
+        self.meeting.er_policy_name = AutoBeforePoll.name
+        self.meeting.save()
+        self.assertIsInstance(self.meeting.er_policy, AutoBeforePoll)
 
     def test_get_latest_er(self):
         from voteit.poll.models import ElectoralRegister
 
-        meeting = Meeting.objects.create()
+        meeting = self.meeting
         self.assertIsNone(meeting.get_latest_er())
         er1 = ElectoralRegister.objects.create(meeting=meeting)
         self.assertEqual(er1, meeting.get_latest_er())
@@ -48,7 +58,7 @@ class MeetingTests(TestCase):
     def test_get_access_policies(self):
         from voteit.access_policy.app.policies.automatic import AutomaticAccess
 
-        meeting = Meeting.objects.create()
+        meeting = self.meeting
         self.assertEqual(set(), set(meeting.get_access_policies()))
         AutomaticAccess.objects.create(meeting=meeting, active=True)
         found = list(meeting.get_access_policies())
@@ -61,25 +71,39 @@ class MeetingTests(TestCase):
         self.assertTrue(list(meeting.get_access_policies(only_active=False)))
 
     def test_archive_archives_ais(self):
-        meeting = Meeting.objects.create()
+        meeting = self.meeting
         meeting.agenda_items.create()
         meeting.archive()
         ai = meeting.agenda_items.first()
         self.assertEqual("archived", ai.state)
 
     def test_valid_er_policy_guard(self):
-        meeting = Meeting.objects.create()
-        self.assertFalse(meeting.valid_er_policy_guard())
-        meeting.er_policy_name = AutoAlways.name
-        self.assertTrue(meeting.valid_er_policy_guard())
+        self.meeting.er_policy_name = None
+        self.assertFalse(self.meeting.valid_er_policy_guard())
+        self.meeting.er_policy_name = AutoAlways.name
+        self.assertTrue(self.meeting.valid_er_policy_guard())
 
     def test_no_ongoing_polls_guard(self):
-        meeting = Meeting.objects.create()
+        meeting = self.meeting
         poll: Poll = meeting.polls.create(method_name="simple")
         self.assertTrue(meeting.no_ongoing_polls_guard())
         poll.state = "ongoing"
         poll.save()
         self.assertFalse(meeting.no_ongoing_polls_guard())
+
+    def test_component_enabled(self):
+        self.meeting.components.create(
+            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+        )
+        self.meeting.components.create(
+            component_name=ProposalPrint.name, state=EnabledWf.ON
+        )
+        with self.assertNumQueries(1):
+            self.meeting.component_enabled(ProposalPrint.name)
+        with self.assertNumQueries(0):
+            self.meeting.component_enabled(ActiveUsersComponent.name)
+        with self.assertNumQueries(1):
+            self.meeting.component_enabled(ActiveUsersComponent.name, refresh=True)
 
 
 class ManagerTests(TestCase):
