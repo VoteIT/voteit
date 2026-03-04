@@ -94,9 +94,9 @@ def _send_created_updated(*, instance: Note, created: bool, **kwargs):
     ch = UserChannel(instance.user_id)
     data = {
         "pk": instance.pk,
-        "p": instance.proposal_id,
-        "ai": instance.proposal.agenda_item_id,
-        "m": instance.meeting_id,
+        "proposal": instance.proposal_id,
+        "agenda_item": instance.proposal.agenda_item_id,
+        "meeting": instance.meeting_id,
         "user": instance.user_id,
         "body": instance.body,
         "intent": instance.intent,
@@ -128,10 +128,10 @@ def send_notes_appstruct(*, context: AgendaItem, app_state: AppState, user, **kw
             batch.append(
                 NoteAdded(
                     **item,
-                    p=proposal_id,
+                    proposal=proposal_id,
                     user=user.id,
-                    m=context.meeting_id,
-                    ai=agenda_item_id,
+                    meeting=context.meeting_id,
+                    agenda_item=agenda_item_id,
                 )
             )
         if batch.data.payloads:

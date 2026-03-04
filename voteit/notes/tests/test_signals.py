@@ -57,10 +57,10 @@ class SignalTests(TestCase):
         self.assertIsInstance(data.pop("created"), str)
         self.assertEqual(
             {
-                "m": self.meeting.pk,
-                "ai": self.ai.pk,
+                "meeting": self.meeting.pk,
+                "agenda_item": self.ai.pk,
                 "user": self.participant.pk,
-                "p": self.prop2.pk,
+                "proposal": self.prop2.pk,
                 "intent": NoteIntent.APPROVE,
                 "body": "",
             },
@@ -78,10 +78,10 @@ class SignalTests(TestCase):
         self.assertEqual(
             {
                 "pk": self.note.pk,
-                "m": self.meeting.pk,
-                "ai": self.ai.pk,
+                "meeting": self.meeting.pk,
+                "agenda_item": self.ai.pk,
                 "user": self.participant.pk,
-                "p": self.prop.pk,
+                "proposal": self.prop.pk,
                 "intent": str(NoteIntent.APPROVE),
                 "body": "I really don't know about this",
             },
@@ -113,9 +113,9 @@ class SignalTests(TestCase):
         self.assertIsInstance(data_one.pop("created"), str)
         self.assertEqual(
             {
-                "p": self.prop.pk,
-                "m": self.meeting.pk,
-                "ai": self.ai.pk,
+                "proposal": self.prop.pk,
+                "meeting": self.meeting.pk,
+                "agenda_item": self.ai.pk,
                 "pk": self.note.pk,
                 "body": "",
                 "user": self.participant.pk,

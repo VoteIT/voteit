@@ -13,10 +13,15 @@ __all__ = (
 
 
 class NoteSerializer(serializers.ModelSerializer):
+    agenda_item = serializers.PrimaryKeyRelatedField(
+        source="proposal.agenda_item", read_only=True
+    )
+
     class Meta:
         model = Note
         read_only_fields = [
             "pk",
+            "agenda_item",
             "meeting",
             "created",
             "proposal",
@@ -28,7 +33,7 @@ class NoteSerializer(serializers.ModelSerializer):
         ]
 
 
-class CreateNoteSerializer(serializers.ModelSerializer):
+class CreateNoteSerializer(NoteSerializer):
     user = serializers.PrimaryKeyRelatedField(
         read_only=True, required=False, default=serializers.CurrentUserDefault()
     )
@@ -38,6 +43,7 @@ class CreateNoteSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "pk",
             "meeting",
+            "agenda_item",
             "created",
             "user",
         ]

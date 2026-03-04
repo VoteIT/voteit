@@ -54,6 +54,7 @@ class NoteViewSetTests(APITestCase):
             {
                 "proposal": self.prop2.pk,
                 "meeting": self.meeting.pk,
+                "agenda_item": self.ai.pk,
                 "user": self.participant.pk,
                 "intent": "",
                 "body": "I <b>dig</b> this!",
