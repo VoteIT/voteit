@@ -58,6 +58,7 @@ class SignalTests(TestCase):
         self.assertEqual(
             {
                 "m": self.meeting.pk,
+                "ai": self.ai.pk,
                 "user": self.participant.pk,
                 "p": self.prop2.pk,
                 "intent": NoteIntent.APPROVE,
@@ -78,6 +79,7 @@ class SignalTests(TestCase):
             {
                 "pk": self.note.pk,
                 "m": self.meeting.pk,
+                "ai": self.ai.pk,
                 "user": self.participant.pk,
                 "p": self.prop.pk,
                 "intent": str(NoteIntent.APPROVE),
@@ -113,6 +115,7 @@ class SignalTests(TestCase):
             {
                 "p": self.prop.pk,
                 "m": self.meeting.pk,
+                "ai": self.ai.pk,
                 "pk": self.note.pk,
                 "body": "",
                 "user": self.participant.pk,

@@ -95,6 +95,7 @@ def _send_created_updated(*, instance: Note, created: bool, **kwargs):
     data = {
         "pk": instance.pk,
         "p": instance.proposal_id,
+        "ai": instance.proposal.agenda_item_id,
         "m": instance.meeting_id,
         "user": instance.user_id,
         "body": instance.body,
@@ -120,15 +121,17 @@ def send_notes_appstruct(*, context: AgendaItem, app_state: AppState, user, **kw
     if context.meeting.component_enabled(NotesComponent.name):
         batch = Batch(t=NoteAdded.name, payloads=[])
         for item in user.notes.filter(proposal__agenda_item=context).values(
-            "pk", "proposal_id", "body", "intent", "created"
+            "pk", "proposal_id", "body", "intent", "created", "proposal__agenda_item_id"
         ):
             proposal_id = item.pop("proposal_id")
+            agenda_item_id = item.pop("proposal__agenda_item_id")
             batch.append(
                 NoteAdded(
                     **item,
                     p=proposal_id,
                     user=user.id,
                     m=context.meeting_id,
+                    ai=agenda_item_id,
                 )
             )
         if batch.data.payloads:
