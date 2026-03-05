@@ -19,7 +19,6 @@ repos:
         - "--no-install-workspace"
         - "--no-dev"
         - "--group=docker"
-        - "--no-hashes"
         - "--no-annotate"
         - "--no-header"
         - "-o=requirements.txt"
