@@ -189,7 +189,10 @@ class BaseContentTests(TestCase):
         self.assertIn("data-value", text)
         self.assertIn("data-id", text)
         self.assertIn("data-denotation-char", text)
-        self.assertEqual(len(text.strip()), len(self.meeting.body))
+        self.assertEqual(
+            '<span class="mention" data-index="0" data-denotation-char="#" data-id="KörVi" data-value="KörVi">\n<span contenteditable="false"><span class="ql-mention-denotation-char">#</span>KörVi</span></span>\n!',
+            self.meeting.body,
+        )
 
     def test_body_with_bad_stuff(self):
         self.meeting.body = "<javascript>is annoying"

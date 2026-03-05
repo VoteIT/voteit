@@ -76,6 +76,22 @@ class NoteViewSetTests(APITestCase):
             data,
         )
 
+    def test_create_with_messy_html(self):
+        url = reverse("notes-list")
+        self.client.force_login(self.participant)
+        response = self.client.post(
+            url,
+            data={
+                "proposal": self.prop2.pk,
+                "body": '<p>I <b>dig</b> this!</p>\n     <p>Maybe a <a href="javascript:"">button</a>?</p><p>&nbsp;&nbsp;&nbsp;</p>\n<p> </p>',
+            },
+        )
+        data = response.json()
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, data)
+        self.assertEqual(
+            "<p>I <b>dig</b> this!</p>\n<p>Maybe a <a>button</a>?</p>", data["body"]
+        )
+
     def test_update(self):
         url = reverse("notes-detail", kwargs={"pk": self.note.pk})
         self.client.force_login(self.participant)

@@ -1,4 +1,4 @@
-""" Testing helpers"""
+"""Testing helpers"""
 
 from __future__ import annotations
 import doctest
@@ -35,7 +35,7 @@ def mk_usertag(value, name="Jane Doe", any=False) -> str:
 
 hashtag_tag = """
 <span class="mention" data-index="0" data-denotation-char="#" data-id="{tag}" data-value="{tag}">
-<span contenteditable="false"><span class="ql-mention-denotation-char">#</span>{tag}</span></span> 
+<span contenteditable="false"><span class="ql-mention-denotation-char">#</span>{tag}</span></span>
 """
 
 

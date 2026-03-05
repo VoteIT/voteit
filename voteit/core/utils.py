@@ -227,6 +227,33 @@ def get_tagged_hashtags(text: str, lower=True) -> set:
     return found
 
 
+def adjust_nl_and_spaces(text: str) -> str:
+    """
+    Cleanup text part of html,
+    >>> adjust_nl_and_spaces('''<p> ---  </p><p>&nbsp;  </p>  <P>What's up?        </P>   ''')
+    "<p>---</p><p>&nbsp;</p><p>What's up?</p>"
+    >>> adjust_nl_and_spaces('''<p> ---  </p><p>&nbsp;  </p> <P>&nbsp;  </p>  <P>&nbsp; &NBSP; </P> <P>What's up?        </P>   ''')
+    "<p>---</p><p>&nbsp;</p><p>What's up?</p>"
+    >>> adjust_nl_and_spaces('''<p>  </p><p>&nbsp;  </p> <P>  &nbsp;     &nbsp;  </p>  <P>&nbsp; &NBSP; </P> <P>What's up?        </P>  <p></p> ''')
+    "<p>What's up?</p>"
+    """
+    # Remove junk
+    for pattern, repl in [
+        # Normalize things that really are empty paragraphs...
+        (r"(<p>(?:\s|&nbsp;|<br\s*/?>)*</p>\s*)", "<p>&nbsp;</p>"),
+        # Clean up duplicated, must be after normalization.
+        (r"(<p>&nbsp;</p>\s*){2,}", "<p>&nbsp;</p>"),
+        # Remove trailing or leading empty
+        (r"^(<p>&nbsp;</p>)+|(<p>&nbsp;</p>)+$", ""),
+        # Remove space within paragraphs
+        (r"<p>\s*(.*?)\s*</p>", r"<p>\1</p>"),
+    ]:
+        text = re.sub(pattern, repl, text, flags=re.DOTALL | re.UNICODE | re.IGNORECASE)
+    # Cleanup trailing/leading spaces
+    text = "\n".join(line.strip() for line in text.splitlines())
+    return text.strip()
+
+
 def strict_clean_html(text: str):
     """
     Clean HTML for non-trusted users, for instance anonymous.
@@ -240,25 +267,33 @@ def strict_clean_html(text: str):
 
     >>> strict_clean_html('Hello <img src="//bad.com/friendly_face.jpeg" />')
     'Hello'
+
+    >>> strict_clean_html('''<p>   </p><p>&nbsp;      </p>   <p></P>
+    ... <p>Hi       </p>''')
+    '<p>Hi</p>'
+    >>> strict_clean_html('''<p>   </p><p>&nbsp;  </p>  <P>What's up?        </P>   ''')
+    "<p>What's up?</p>"
     """
-    return nh3.clean(
+    text = nh3.clean(
         text,
         link_rel=None,
         attributes=STRICT_ALLOWED_ATTRIBUTES,
         tags=STRICT_ALLOWED_TAGS,
-    ).strip()
+    )
+    return adjust_nl_and_spaces(text)
 
 
 def relaxed_clean_html(text: str):
     """
     Clean HTML for moderators and trusted users. Note that trusted users may have viruses too...
     """
-    return nh3.clean(
+    text = nh3.clean(
         text,
         link_rel=None,
         attributes=RELAXED_ALLOWED_ATTRIBUTES,
         tags=RELAXED_ALLOWED_TAGS,
-    ).strip()
+    )
+    return adjust_nl_and_spaces(text)
 
 
 def get_content_registry() -> ContentRegistry:
