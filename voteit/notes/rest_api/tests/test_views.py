@@ -34,6 +34,7 @@ class NoteViewSetTests(APITestCase):
         cls.another_meeting = Meeting.objects.create()
         cls.another_ai = cls.another_meeting.agenda_items.create()
         cls.another_prop = cls.another_ai.proposals.create()
+        cls.another_note = cls.participant.notes.create(proposal=cls.another_prop)
 
     def test_create(self):
         url = reverse("notes-list")
@@ -136,3 +137,14 @@ class NoteViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, data)
         self.assertEqual({"meeting": ["Required field 'meeting' is missing."]}, data)
+
+    def test_delete_all(self):
+        self.assertEqual(1, self.participant.notes.filter(meeting=self.meeting).count())
+        url = reverse("notes-delete-all")
+        self.client.force_login(self.participant)
+        response = self.client.post(url, data={"meeting": self.meeting.pk})
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(0, self.participant.notes.filter(meeting=self.meeting).count())
+        self.assertEqual(
+            1, self.participant.notes.filter(meeting=self.another_meeting).count()
+        )
