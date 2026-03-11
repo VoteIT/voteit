@@ -176,7 +176,7 @@ class DailyVoteChart(DailyChart):
         )
 
     def series(self):
-        lookup = {entry["date"]: entry["sum"] for entry in self.get_queryset()}
+        lookup = {entry["date"]: entry["sum"] or 0 for entry in self.get_queryset()}
         return [[lookup.get(day, 0) for day in self.iter_dates()]]
 
 
@@ -214,7 +214,9 @@ class DailyOrgVoteChart(DailyChart):
         data = self.get_queryset()
         lookup = {
             org.id: {
-                entry.date: entry.vote_count for entry in data if entry.org_id == org.id
+                entry.date: entry.vote_count or 0
+                for entry in data
+                if entry.org_id == org.id
             }
             for org in self.top_orgs
         }
