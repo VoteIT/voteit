@@ -18,7 +18,6 @@ from envelope.models import Connection
 from sql_util.aggregates import SubquerySum
 
 from ..organisation.models import Organisation
-from ..poll.models import Vote
 from .models import HistoryLog
 
 User = get_user_model()
