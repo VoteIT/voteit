@@ -261,22 +261,14 @@ class OnlineUserChart(widgets.BarChart):
             "onlyInteger": True,
         }
 
-    @property
-    def recent_qs(self):
-        return Connection.objects.filter(
-            online=True,
-            last_action__gt=timezone.now() - self.action_time,
-        )
-
-    @property
+    @cached_property
     def top_orgs(self):
         return (
-            Organisation.objects.annotate(
-                conns=SubqueryCount(
-                    "users", distinct=True, filter=Q(connections__in=self.recent_qs)
-                )
+            Organisation.objects.filter(
+                users__connections__online=True,
+                users__connections__last_action__gt=timezone.now() - self.action_time,
             )
-            .exclude(conns=0)
+            .annotate(conns=Count("users", distinct=True))
             .order_by("-conns")
         )
 
@@ -286,7 +278,12 @@ class OnlineUserChart(widgets.BarChart):
     def series(self):
         return [
             [
-                self.recent_qs.distinct("user").count(),
+                Connection.objects.filter(
+                    online=True,
+                    last_action__gt=timezone.now() - self.action_time,
+                )
+                .distinct("user")
+                .count(),
                 *(o.conns for o in self.top_orgs),
             ]
         ]
