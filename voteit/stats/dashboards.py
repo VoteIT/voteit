@@ -5,13 +5,16 @@ from controlcenter import Dashboard
 from controlcenter import widgets
 from django.contrib.auth import get_user_model
 from django.db.models import Count
+from django.db.models import IntegerField
 from django.db.models import OuterRef
 from django.db.models import Q
 from django.db.models import Subquery
+from django.db.models import Sum
+from django.db.models.fields.json import KeyTransform
+from django.db.models.functions import Cast
 from django.utils import timezone
 from django.utils.functional import cached_property
 from envelope.models import Connection
-from sql_util.aggregates import SubqueryCount
 from sql_util.aggregates import SubquerySum
 
 from ..organisation.models import Organisation
@@ -160,54 +163,59 @@ class DailyVoteChart(DailyChart):
 
     def get_queryset(self):
         return (
-            Vote.objects.filter(
-                created__gte=self.start_time, created__lt=self.start_today
+            HistoryLog.objects.filter(date__gte=self.start_date)
+            .values("date")
+            .annotate(
+                sum=Sum(
+                    Cast(
+                        KeyTransform("poll.vote:create", "action_types"),
+                        output_field=IntegerField(),
+                    )
+                )
             )
-            .values("created__date")
-            .annotate(sum=Count("pk"))
-            .order_by("created__date")
+            .order_by("date")
         )
 
     def series(self):
-        lookup = {entry["created__date"]: entry["sum"] for entry in self.get_queryset()}
+        lookup = {entry["date"]: entry["sum"] for entry in self.get_queryset()}
         return [[lookup.get(day, 0) for day in self.iter_dates()]]
 
 
 class DailyOrgVoteChart(DailyChart):
     title = "Organisations, votes per day"
 
+    vote_create_field = Cast(
+        KeyTransform("poll.vote:create", "action_types"),
+        output_field=IntegerField(),
+    )
+
     @cached_property
     def top_orgs(self):
-        return (
-            Organisation.objects.annotate(
-                vote_count=SubqueryCount(
-                    "users__vote",
-                    filter=Q(
-                        created__gte=self.start_time, created__lt=self.start_today
-                    ),
-                ),
-            )
-            .exclude(vote_count=0)  # No need to show orgs with no votes
+        # Note: There must be a better way, but this should be fast enough
+        # First get org ids for the organisations with the most votes during this period
+        top_org_ids = (
+            HistoryLog.objects.filter(date__gte=self.start_date)
+            .values("org")
+            .annotate(vote_count=Sum(self.vote_create_field))
+            .exclude(vote_count=0)
             .order_by("-vote_count")[:5]
+            .values_list("org", flat=True)
         )
+        # Return the actual Organisation objects for these orgs
+        return Organisation.objects.filter(id__in=top_org_ids)
 
     def get_queryset(self):
         return (
-            Vote.objects.filter(
-                created__gte=self.start_time, created__lt=self.start_today
-            )
-            .values("created__date", "user__organisation")
-            .annotate(count=Count("pk"))
-            .order_by("created__date", "user__organisation")
+            HistoryLog.objects.filter(date__gte=self.start_date, org__in=self.top_orgs)
+            .annotate(vote_count=Sum(self.vote_create_field))
+            .order_by()
         )
 
     def series(self):
         data = self.get_queryset()
         lookup = {
             org.id: {
-                entry["created__date"]: entry["count"]
-                for entry in data
-                if entry["user__organisation"] == org.id
+                entry.date: entry.vote_count for entry in data if entry.org_id == org.id
             }
             for org in self.top_orgs
         }
