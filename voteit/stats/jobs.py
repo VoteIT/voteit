@@ -1,6 +1,7 @@
 from collections import Counter
 from collections.abc import Iterator
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
 from auditlog.models import LogEntry
 from django.contrib.auth import get_user_model

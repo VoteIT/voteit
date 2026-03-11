@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+from auditlog.context import set_actor
+from auditlog.models import LogEntry
 from django.test import RequestFactory
 from django.test import TestCase
 from django.utils import timezone
@@ -9,6 +11,7 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.organisation.models import Organisation
 from voteit.poll.models import Poll
 from voteit.stats.dashboards import DailyOrgVoteChart
+from voteit.stats.jobs import populate_history_log
 
 
 class DashboardTests(TestCase):
@@ -22,28 +25,33 @@ class DashboardTests(TestCase):
         cls.poll = Poll.objects.get()
 
     def test_daily_org_votes(self):
-        yesterday = timezone.now() - timedelta(days=1)
-        self.poll.votes.update(created=yesterday)
-        other_org = Organisation.objects.create(title="Other")
-        other_user = other_org.users.create(username="other_user")
-        other_poll = (
-            other_org.meetings.create(
-                title="First meeting ever", er_policy_name="auto_always"
+        for n, name in enumerate(("One", "Other"), 1):
+            org = Organisation.objects.create(title=name)
+            poll = (
+                org.meetings.create(
+                    title="First meeting ever", er_policy_name="auto_always"
+                )
+                .agenda_items.create(title="First on agenda")
+                .polls.create(title="Vote me!", method_name="simple")
             )
-            .agenda_items.create(title="First on agenda")
-            .polls.create(title="Vote me!", method_name="simple")
-        )
-        other_poll.proposals.create(
-            body="First proposal ever", agenda_item=other_poll.agenda_item
-        )
-        other_poll.meeting.add_roles(other_user, ROLE_POTENTIAL_VOTER)
-        other_poll.ongoing()
-        other_poll.save()
-        other_poll.votes.create(user=other_user, created=yesterday)
+            poll.proposals.create(
+                body="First proposal ever", agenda_item=poll.agenda_item
+            )
+            users = [org.users.create(username=f"{name}-user-{n}") for n in range(n)]
+            for user in users:
+                poll.meeting.add_roles(user, ROLE_POTENTIAL_VOTER)
+            poll.ongoing()
+            poll.save()
+            for user in users:
+                with set_actor(user):
+                    poll.votes.create(user=user)
+        # Logentries needs to be set to yesterday
+        LogEntry.objects.update(timestamp=timezone.now() - timedelta(days=1))
+        populate_history_log()
         request = RequestFactory().get("/")
         chart = DailyOrgVoteChart(request=request)
         self.assertEqual(chart.top_orgs.count(), 2)
-        self.assertEqual(chart.legend[0].title, "Testfixture organisation")
-        self.assertEqual(chart.series[0][-1], 2)
+        self.assertEqual(chart.legend[0].title, "One")
+        self.assertEqual(chart.series[0][-1], 1)
         self.assertEqual(chart.legend[1].title, "Other")
-        self.assertEqual(chart.series[1][-1], 1)
+        self.assertEqual(chart.series[1][-1], 2)
