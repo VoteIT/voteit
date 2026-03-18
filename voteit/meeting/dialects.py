@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from collections import UserDict
 from collections import defaultdict
+from datetime import datetime
+from datetime import timedelta
 from itertools import chain
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -30,13 +32,12 @@ def refresh(method):
     """
     This is a somewhat silly method of refreshing data.
     Replace it with saner caching invalidation later on.
-    We don't need to bother with caching right now since we have very few dialects
+    We don't need to bother with more extensive caching
     """
 
     def inner(ref: DialectRegistry, *args, **kwargs):
-        ref.data.clear()
-        for name, path in get_named_paths():
-            ref[name] = DialectHandler.load_from_file(name, path)
+        if ref.should_reload:
+            ref.load()
         return method(ref, *args, **kwargs)
 
     return inner
@@ -48,9 +49,24 @@ class DialectRegistry(UserDict):
     """
 
     data: dict[str, DialectHandler]
+    _loaded_ts: datetime | None = None
+    _loaded_dir: str | None = None
 
-    @refresh
-    def load(self): ...
+    def load(self):
+        self.data.clear()
+        for name, path in get_named_paths():
+            self[name] = DialectHandler.load_from_file(name, path)
+        self._loaded_ts = datetime.now()
+
+    @property
+    def should_reload(self) -> bool:
+        if dialects_dir := getattr(settings, "MEETING_DIALECTS_DIR", None):
+            if self._loaded_dir != dialects_dir:
+                return True
+            return not self._loaded_ts or self._loaded_ts < datetime.now() - timedelta(
+                minutes=1
+            )
+        return False
 
     def get_partial_dialect(self, dialect: DialectSchema) -> dict[str, str]:
         return {
@@ -100,6 +116,7 @@ class DialectRegistry(UserDict):
             return self[name].data.title or name
         return default
 
+    @refresh
     def get_merged_handler(self, name) -> DialectHandler:
         """
         Load a dialect handler + any requirements and merge the required dialects data into the first one.
