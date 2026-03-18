@@ -292,6 +292,10 @@ class DialectRegistryTests(TestCase):
 
         cls.registry = DialectRegistry()
 
+    def setUp(self):
+        super().setUp()
+        self.registry.load()
+
     def test_get_installable(self):
         self.assertEqual(
             {"two": self.two, "three": self.three, "main_subst": self.main_subst},
@@ -334,6 +338,7 @@ class DialectRegistryTests(TestCase):
 
     @override_settings(MEETING_DIALECTS_DIR=CYCLIC_DIALECT_FIXTURES)
     def test_cyclic_dependency(self):
+        self.registry.load()
         with self.assertRaises(DialectError):
             self.registry.get_dependent_dialects("one")
 

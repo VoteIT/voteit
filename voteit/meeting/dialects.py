@@ -74,7 +74,6 @@ class DialectRegistry(UserDict):
             for k, v in filter(dialect_filter, self.items())
         }
 
-    @refresh
     def get_dependent_dialects(self, name: str) -> list[DialectHandler]:
         """
         Returns any required dialects with the name specified first.
