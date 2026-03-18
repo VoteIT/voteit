@@ -361,6 +361,22 @@ class DialectRegistryTests(TestCase):
             self.registry.get_org_installable(org),
         )
 
+    def test_should_reload(self):
+        from voteit.meeting.dialects import DialectRegistry
+
+        reg = DialectRegistry()
+
+        self.assertEqual(reg.should_reload, True)
+        self.assertFalse(reg.keys())
+        reg.get_installable()  # Trigger reload
+        self.assertTrue(reg.keys())
+
+    def test_initially_loaded(self):
+        self.registry._loaded_ts = None
+        self.registry._loaded_dir = None
+        self.registry.data.clear()
+        self.assertTrue(self.registry.get_merged_handler("main_subst"))
+
     #
     # @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
     # def test_install_fixture_with_component(self):
