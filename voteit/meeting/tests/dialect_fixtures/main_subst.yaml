@@ -19,3 +19,5 @@ configure_components:
   - name: active_users
 block_components:
   - presence_check
+block_roles:
+  - potential_voter

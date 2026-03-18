@@ -28,6 +28,7 @@ from voteit.core.permissions import NOT_ALLOWED
 from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.workflows import InviteWf
+from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.models import MeetingGroup
@@ -92,8 +93,18 @@ class MeetingInviteManager(models.Manager):
             return qs
         return MeetingInvite.objects.none()
 
+    def _ignore_roles(self, meeting: Meeting):
+        if meeting.installed_dialect:
+            handler = dialect_registry.get_merged_handler(meeting.installed_dialect)
+            return set(handler.data.block_roles)
+        return set()
+
     def _update_assigned_roles(
-        self, meeting: Meeting, invites: Collection[MeetingInvite]
+        self,
+        meeting: Meeting,
+        invites: Collection[MeetingInvite],
+        *,
+        ignore_roles: set[Role],
     ):
         invites = {x for x in invites if x.used_by_id}
         assigned_user_pks = {x.used_by_id for x in invites if x.used_by_id}
@@ -106,9 +117,9 @@ class MeetingInviteManager(models.Manager):
         for invite in invites:
             current_roles = set(meeting_roles_dict.get(invite.used_by_id, set()))
             set_roles = set(invite.roles)
-            if remove_roles := current_roles - set_roles:
+            if remove_roles := current_roles - set_roles - ignore_roles:
                 meeting.remove_roles(invite.used_by, *remove_roles)
-            if add_roles := set_roles - current_roles:
+            if add_roles := set_roles - current_roles - ignore_roles:
                 meeting.add_roles(invite.used_by, *add_roles)
 
     @ensure_atomic
@@ -178,7 +189,8 @@ class MeetingInviteManager(models.Manager):
         if conflicting_single_match:
             # FIXME: How do we handle this?
             raise IntegrityError("Partial invites found")
-        roles = sorted(str(x) for x in roles)
+        ignore_roles = self._ignore_roles(meeting)
+        roles = sorted(str(x) for x in roles if x not in ignore_roles)
         total_existing = exact_qs.count()
         # This prefetch and the role update is very inefficient. It should be refactored when we have time.
         invite_pks = set(exact_qs.values_list("pk", flat=True))
@@ -195,7 +207,9 @@ class MeetingInviteManager(models.Manager):
         ).exclude(pk__in=needs_role_update_qs):
             invite.state = InviteWf.OPEN
             invite.save()
-        self._update_assigned_roles(meeting, needs_role_update_qs)
+        self._update_assigned_roles(
+            meeting, needs_role_update_qs, ignore_roles=ignore_roles
+        )
         already_correct_count = total_existing - needs_role_update_qs.count()
         already_handled_user_data = list(exact_qs.values_list("user_data", flat=True))
         # Filter any intersecting user_data,

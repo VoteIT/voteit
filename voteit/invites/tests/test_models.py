@@ -3,13 +3,17 @@ from datetime import timedelta
 from auditlog.models import LogEntry
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
+from django.test import override_settings
 from django.test import TestCase
 
+from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import Meeting
 from voteit.invites.models import MeetingInvite
 from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
+from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
 from voteit.organisation.models import Organisation
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 
@@ -148,6 +152,87 @@ class MeetingInviteManagerTests(TestCase):
         self.assertEqual(0, result.existed)
         self.assertEqual(
             {ROLE_PARTICIPANT, ROLE_DISCUSSER}, self.meeting.get_roles(self.user)
+        )
+
+    @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
+    def test_create_or_update_with_dialect_ignored_roles_should_not_clear_assigned_role(
+        self,
+    ):
+        dialect_registry.load()  # Force refresh
+        dialect_registry["main_subst"].install(self.meeting)
+        self.meeting.add_roles(
+            self.user, ROLE_DISCUSSER, ROLE_PROPOSER, ROLE_POTENTIAL_VOTER
+        )
+        self.assertEqual(
+            {ROLE_PARTICIPANT, ROLE_DISCUSSER, ROLE_PROPOSER, ROLE_POTENTIAL_VOTER},
+            self.meeting.get_roles(self.user),
+        )
+        self.inv2.used_by = self.user
+        self.inv2.save()
+        result = self.meeting.invites.create_or_update_typed(
+            invite_type="email",
+            meeting=self.meeting,
+            values=["b@betahaus.net"],
+            roles=[ROLE_PARTICIPANT, ROLE_DISCUSSER],
+        )
+        self.assertEqual(1, result.changed)
+        # Proposer is not blocked by dialect, potential voter is and shouldn't be touched
+        self.assertEqual(
+            {ROLE_PARTICIPANT, ROLE_DISCUSSER, ROLE_POTENTIAL_VOTER},
+            self.meeting.get_roles(self.user),
+        )
+
+    @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
+    def test_create_or_update_with_dialect_ignored_roles_should_block_role_on_invite(
+        self,
+    ):
+        self.inv1.roles = [ROLE_PARTICIPANT, ROLE_DISCUSSER, ROLE_POTENTIAL_VOTER]
+        self.inv1.user_data = {"email": "a@betahaus.net"}
+        self.inv1.save()
+        self.inv2.roles = [ROLE_PARTICIPANT]
+        self.inv2.user_data = {"email": "b@betahaus.net"}
+        self.inv2.save()
+        dialect_registry.load()  # Force refresh
+        dialect_registry["main_subst"].install(self.meeting)
+        result = self.meeting.invites.create_or_update_typed(
+            invite_type="email",
+            meeting=self.meeting,
+            values=["a@betahaus.net", "b@betahaus.net", "c@betahaus.net"],
+            roles=[ROLE_PARTICIPANT, ROLE_DISCUSSER, ROLE_POTENTIAL_VOTER],
+        )
+        self.assertEqual(2, result.changed)
+        self.assertEqual(1, result.added)
+        # Proposer is not blocked by dialect, potential voter is and shouldn't be touched
+        self.inv1.refresh_from_db()
+        self.inv2.refresh_from_db()
+        inv3 = MeetingInvite.objects.get(user_data={"email": "c@betahaus.net"})
+        self.assertSetEqual({"di", "pa"}, set(self.inv1.roles))
+        self.assertSetEqual({"di", "pa"}, set(self.inv2.roles))
+        self.assertSetEqual({"di", "pa"}, set(inv3.roles))
+
+    @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
+    def test_create_or_update_with_dialect_ignored_roles_should_not_add_role_to_existing_user(
+        self,
+    ):
+        dialect_registry.load()  # Force refresh
+        dialect_registry["main_subst"].install(self.meeting)
+        self.inv2.used_by = self.user
+        self.inv2.save()
+        result = self.meeting.invites.create_or_update_typed(
+            invite_type="email",
+            meeting=self.meeting,
+            values=["b@betahaus.net"],
+            roles=[
+                ROLE_PARTICIPANT,
+                ROLE_DISCUSSER,
+                ROLE_POTENTIAL_VOTER,
+            ],  # Not allowed in interface, but could exist for some reason
+        )
+        self.assertEqual(1, result.changed)
+        # Proposer is not blocked by dialect, potential voter is and shouldn't be touched
+        self.assertEqual(
+            {ROLE_PARTICIPANT, ROLE_DISCUSSER},
+            self.meeting.get_roles(self.user),
         )
 
     def test_find_mixed_user_data_exact(self):
