@@ -5,11 +5,9 @@ from django.test import TestCase
 from django.test import override_settings
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
-from envelope.messages.common import Batch
 from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
-from voteit.core.testing import FakeCommit
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteAdded
 from voteit.invites.messages import MeetingInviteChanged
@@ -26,25 +24,33 @@ User = get_user_model()
 
 @override_settings(
     CHANNEL_LAYERS=testing_channel_layers_setting,
-    #    ENVELOPE_CONNECTIONS_QUEUE=None,
 )
-class AutoUseInviteTests(TestCase):
-    def setUp(self):
-        self.meeting = Meeting.objects.create()
-        self.user = User.objects.create(username="a", email="a@betahaus.net")
-        self.inv1: MeetingInvite = MeetingInvite.objects.create(
-            meeting=self.meeting,
+class InviteTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.create()
+        cls.user = User.objects.create(username="a", email="a@betahaus.net")
+        cls.inv1: MeetingInvite = MeetingInvite.objects.create(
+            meeting=cls.meeting,
             user_data={"email": "a@betahaus.net"},
             roles=[ROLE_DISCUSSER, ROLE_POTENTIAL_VOTER],
         )
 
     def test_auto_use(self):
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
         self.assertEqual(
             {ROLE_PARTICIPANT, ROLE_DISCUSSER, ROLE_POTENTIAL_VOTER},
             set(self.meeting.get_roles(self.user)),
         )
+
+    def test_kicking_user_removes_invite(self):
+        self.inv1.accept(self.user)
+        self.inv1.save()
+        self.meeting.remove_roles(self.user, ROLE_PARTICIPANT)
+        self.assertIsNone(self.meeting.get_roles(self.user))
+        with self.assertRaises(MeetingInvite.DoesNotExist):
+            self.inv1.refresh_from_db()
 
 
 class InvitesExpireWhenMeetingArchivedTests(TestCase):
@@ -130,7 +136,7 @@ class MeetingInviteSignalTests(TestCase):
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_added(self, mock_publish):
         self.assertFalse(mock_publish.called)
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             invite = self.meeting.invites.create(
                 user_data={"email": "bye@betahaus.net"}
             )
@@ -143,7 +149,7 @@ class MeetingInviteSignalTests(TestCase):
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_changed(self, mock_publish):
         self.assertFalse(mock_publish.called)
-        with FakeCommit():
+        with self.captureOnCommitCallbacks(execute=True):
             self.invite.roles = [ROLE_PARTICIPANT, ROLE_MODERATOR]
             self.invite.save()
         self.assertTrue(mock_publish.called)

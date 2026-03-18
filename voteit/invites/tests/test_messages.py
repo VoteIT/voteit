@@ -208,8 +208,9 @@ class AddInvitesTests(TestCase):
         )
         with self.captureOnCommitCallbacks(execute=True):
             response = msg.run_job()
-        self.assertEqual({"added": 0, "changed": 1, "existed": 0}, response.data.dict())
-        self.assertTrue(self.meeting.roles.filter(user=user).exists())
+        # This test was modified since invites get removed when a user is cleared from the meeting
+        self.assertEqual({"added": 1, "changed": 0, "existed": 0}, response.data.dict())
+        self.assertFalse(self.meeting.roles.filter(user=user).exists())
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)

@@ -17,6 +17,7 @@ from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api.serializers import MeetingInviteSerializer
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.workflows import InviteWf
+from voteit.meeting.models import MeetingRoles
 from voteit.meeting.signals import archive_meeting
 from voteit.meeting.signals import meeting_joined
 
@@ -74,3 +75,10 @@ def agenda_delete(instance: MeetingInvite = None, **kw):
     ch = MeetingInvitesChannel(instance.meeting_id)
     msg = MeetingInviteDeleted(pk=instance.pk)
     ch.sync_publish(msg)
+
+
+@receiver(pre_delete, sender=MeetingRoles)
+def cleanup_invites_when_user_removed_from_meeting(instance: MeetingRoles, **kw):
+    MeetingInvite.objects.filter(
+        used_by=instance.user, meeting=instance.context
+    ).delete()
