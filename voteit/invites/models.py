@@ -240,7 +240,7 @@ class MeetingInviteManager(models.Manager):
             existed=already_correct_count,
         )
 
-    def should_expire(self, days: int = 3) -> models.QuerySet[MeetingInvite]:
+    def should_expire(self, days: int = 30) -> models.QuerySet[MeetingInvite]:
         """
         We care about both close time for meeting and created time for invites,
         since creating invites for closed meetings should be possible.

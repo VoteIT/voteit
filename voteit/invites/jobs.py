@@ -21,8 +21,8 @@ logger = getLogger(__name__)
 def expire_unused_invites() -> int:
     """
     Expire invites if:
-    - Meeting was closed more than 3 days ago
-    - Invite was created more than 3 days ago and is open
+    - Meeting was closed more than 30 days ago
+    - Invite was created more than 30 days ago and is open
     (invites for closed meetings is still a valid use case!)
     """
     invites_qs = MeetingInvite.objects.should_expire()
