@@ -338,7 +338,7 @@ class MeetingInviteManagerTests(TestCase):
     def test_should_expire(self):
         self.assertFalse(self.meeting.invites.should_expire())
         self.assertFalse(MeetingInvite.objects.should_expire())
-        self.inv1.created = self.inv1.created - timedelta(days=10)
+        self.inv1.created = self.inv1.created - timedelta(days=40)
         self.inv1.save()
         self.assertFalse(self.meeting.invites.should_expire())
         self.assertFalse(MeetingInvite.objects.should_expire())
@@ -347,7 +347,7 @@ class MeetingInviteManagerTests(TestCase):
         self.meeting.save()
         self.assertFalse(self.meeting.invites.should_expire())
         self.assertFalse(MeetingInvite.objects.should_expire())
-        self.meeting.end_time = self.meeting.end_time - timedelta(days=10)
+        self.meeting.end_time = self.meeting.end_time - timedelta(days=40)
         self.meeting.save()
         self.assertSetEqual({self.inv1}, set(self.meeting.invites.should_expire()))
         self.assertSetEqual({self.inv1}, set(MeetingInvite.objects.should_expire()))

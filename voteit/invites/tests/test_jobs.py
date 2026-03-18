@@ -21,7 +21,7 @@ User = get_user_model()
 class ExpireUnusedInvitesTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        before = now() - timedelta(days=10)
+        before = now() - timedelta(days=40)
         cls.meeting: Meeting = Meeting.objects.create(
             er_policy_name=AutoBeforePoll.name, state=MeetingWf.CLOSED, end_time=before
         )
