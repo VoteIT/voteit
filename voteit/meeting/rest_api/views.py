@@ -1,5 +1,6 @@
 import csv
 
+from auditlog.context import disable_auditlog
 from django.db import models
 from django.db import transaction
 from django.db.models import QuerySet
@@ -21,7 +22,6 @@ from rest_framework.response import Response
 from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
-from voteit.meeting import roles
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
@@ -67,7 +67,7 @@ class MeetingViewSet(DefaultModelViewSet):
         """Override to fetch organisation from the user directly"""
         organisation = request.user.organisation
         if organisation is None:
-            raise ValidationError(detail=f"User has no related organisation")
+            raise ValidationError(detail="User has no related organisation")
         return organisation
 
     @property
@@ -86,9 +86,12 @@ class MeetingViewSet(DefaultModelViewSet):
         meeting: Meeting = self.get_object()
         agenda_items = meeting.agenda_items.filter(pk__in=order)
         with transaction.atomic():
-            for ai in agenda_items:
-                ai.order = order.index(ai.pk) + 1
-                ai.save()
+            with (
+                disable_auditlog()
+            ):  # Will load every object once again otherwise, and we don't log order.
+                for ai in agenda_items:
+                    ai.order = order.index(ai.pk) + 1
+                    ai.save()
         return Response(status=201)
 
     def get_queryset(self) -> QuerySet:
