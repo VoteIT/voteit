@@ -5,8 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from .settings import *
 
-
-CSRF_TRUSTED_ORIGINS = ["http://localhost:8080", "http://voteit.localhost:8080"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://voteit.localhost:3000"]
 CHANNEL_LAYERS["default"]["CONFIG"]["hosts"] = [("127.0.0.1", 6379)]
 DATABASES["default"]["HOST"] = "localhost"
 MEETING_DIALECTS_DIR = os.path.join(BASE_DIR, "src", "dialect_configs", "dialects")
@@ -23,9 +22,9 @@ if platform.system() == ("Darwin", "Windows"):
 SOCIAL_AUTH_RAISE_EXCEPTIONS = False
 SOCIAL_AUTH_ALLOWED_REDIRECT_HOSTS = [
     "voteit.localhost:8000",
-    "voteit.localhost:8080",
-    "localhost:8080",
+    "voteit.localhost:3000",
     "localhost:8000",
+    "localhost:3000",
 ]
 
 VERBOSE_PERMISSION_LOG = True
