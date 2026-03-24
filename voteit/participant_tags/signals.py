@@ -10,6 +10,8 @@ from envelope.channels.models import AppState
 from envelope.signals import channel_subscribed
 
 from voteit.meeting.channels import MeetingChannel
+from voteit.participant_tags.components import GenderTags
+from voteit.participant_tags.components import PronounTags
 from voteit.participant_tags.messages import AllParticipantTags
 from voteit.participant_tags.messages import ParticipantTagsChanged
 from voteit.participant_tags.models import ParticipantTags
@@ -46,14 +48,19 @@ def send_tags_removed(instance: ParticipantTags, **kwargs):
 
 @receiver(channel_subscribed, sender=MeetingChannel)
 def send_all_tags(context: Meeting, app_state: AppState, **kw):
-    tags = defaultdict(list)
-    # FIXME: Only send enabled components?
-    # Note on order_by, it's mostly for testing
-    for row in context.participant_tags.order_by("user_id").values("user_id", "tags"):
-        for ns, tag_vals in row["tags"].items():
-            if isinstance(tag_vals, str):
-                tag_vals = [tag_vals]
-            for v in tag_vals:
-                tags[f"{ns}:{v}"].append(row["user_id"])
-    msg = AllParticipantTags(meeting=context.pk, tags=tags)
-    app_state.append(msg)
+    # FIXME: These are the only two existing adapters. If we create more, fetch this differently.
+    if context.meeting.component_enabled(
+        GenderTags.name
+    ) or context.meeting.component_enabled(PronounTags.name):
+        tags = defaultdict(list)
+        # Note on order_by, it's mostly for testing
+        for row in context.participant_tags.order_by("user_id").values(
+            "user_id", "tags"
+        ):
+            for ns, tag_vals in row["tags"].items():
+                if isinstance(tag_vals, str):
+                    tag_vals = [tag_vals]
+                for v in tag_vals:
+                    tags[f"{ns}:{v}"].append(row["user_id"])
+        msg = AllParticipantTags(meeting=context.pk, tags=tags)
+        app_state.append(msg)
