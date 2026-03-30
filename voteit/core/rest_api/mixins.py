@@ -2,10 +2,13 @@ from abc import ABC
 from abc import abstractmethod
 from logging import getLogger
 from typing import Dict
+from warnings import deprecated
 
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models.query import QuerySet
 from rest_framework import exceptions
@@ -14,6 +17,9 @@ from rest_framework.decorators import action
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
+from rules.contrib.rest_framework import (
+    AutoPermissionViewSetMixin as RulesAutoPermissionViewSetMixin,
+)
 
 from voteit.core.rest_api.serializers import FSMTransitionSerializer
 from voteit.core.rest_api.serializers import TransitionSerializer
@@ -26,6 +32,21 @@ from voteit.core.utils import get_permission_registry
 logger = getLogger(__name__)
 
 
+class VerboseAutoPermissionViewSetMixin(RulesAutoPermissionViewSetMixin):
+    def initial(self, *args, **kwargs):
+        try:
+            return super().initial(*args, **kwargs)
+        except PermissionDenied as exc:
+            if self.detail and getattr(settings, "VERBOSE_PERMISSIONS", False):
+                obj = self.get_object()
+                perm_type = self.permission_type_map[self.action]
+                perm = self.get_queryset().model.get_perm(perm_type)
+                raise exceptions.PermissionDenied(perm_denied_msg(perm, obj)) from exc
+            else:
+                raise
+
+
+@deprecated("Use voteit.core.rest_api.mixins.VerboseAutoPermissionViewSetMixin")
 class AutoPermissionViewSetMixin:
     """
     Modified from rules.contrib.rest_framework

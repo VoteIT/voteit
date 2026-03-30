@@ -3,12 +3,6 @@
 Meant to show the purpose of models and how they relate to each other.
 This file is part of the regular test suite too.
 
-Since most things relate to user, we'll create a user first.
-
-    >>> from django.contrib.auth import get_user_model
-    >>> User = get_user_model()
-    >>> jane = User.objects.create(username="jane")
-
 ## Organisations
 
 Several may exist in one instance. Every meeting has a relation
@@ -17,7 +11,7 @@ and API-points for things that the organisation might need.
 
     >>> from voteit.organisation.models import Organisation
     >>> org = Organisation.objects.create(title="VoteIT")
-
+    >>> jane = org.users.create(username="jane")
 
 Meeting creators should only have the option to create a meeting
 but can't touch anything else.
@@ -90,4 +84,3 @@ To be continued...
 ## Proposals
 
 # Polls
-

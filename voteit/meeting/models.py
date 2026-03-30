@@ -15,6 +15,7 @@ from django.utils.text import slugify
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField, transition
+from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import MeetingContext, OrganisationContext
 from voteit.core.decorators import ensure_atomic
@@ -141,7 +142,9 @@ class MeetingRoles(Roles, MeetingContext):
         "organisation",
     ],
 )
-class Meeting(BaseContent, RoleContextMixin, MeetingContext, OrganisationContext):
+class Meeting(
+    BaseContent, RoleContextMixin, MeetingContext, OrganisationContext, RulesModelMixin
+):
     name = "meeting"
     _er_policy_name = None
     title: str = models.CharField(max_length=100)

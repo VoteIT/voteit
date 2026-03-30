@@ -22,6 +22,8 @@ from rest_framework.response import Response
 from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
@@ -33,7 +35,6 @@ from voteit.meeting.rest_api import serializers
 from voteit.meeting.rest_api.filters import MeetingRolesFilter
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
-from voteit.organisation.models import Organisation
 
 __all__ = (
     "MeetingViewSet",
@@ -45,7 +46,11 @@ __all__ = (
 
 
 @router.register("meetings", basename="meeting")
-class MeetingViewSet(DefaultModelViewSet):
+class MeetingViewSet(
+    VerboseAutoPermissionViewSetMixin,
+    TransitionsMixin,
+    viewsets.ModelViewSet,
+):
     model = Meeting
     serializer_class = serializers.MeetingDetailSerializer
     serializer_classes = {
@@ -59,23 +64,15 @@ class MeetingViewSet(DefaultModelViewSet):
     )
     search_fields = ("title",)
     filterset_fields = ("public",)
-    context_queryset = (
-        Organisation.objects.none()
-    )  # We've overridden get_context instead
-
-    def get_context(self, request):
-        """Override to fetch organisation from the user directly"""
-        organisation = request.user.organisation
-        if organisation is None:
-            raise ValidationError(detail="User has no related organisation")
-        return organisation
 
     @property
     def permission_type_map(self):
         return {
             **super().permission_type_map,
             "set_agenda_order": "change",
-            "retrieve": "preview",
+            # "retrieve": "preview",
+            "retrieve": None,  # Handled by queryset
+            "transitions": None,  # Checked in transitions
         }
 
     @action(methods=["post"], detail=True)
@@ -96,12 +93,11 @@ class MeetingViewSet(DefaultModelViewSet):
 
     def get_queryset(self) -> QuerySet:
         qs = Meeting.objects.for_user(self.request.user)
-        if self.action == "list":
-            meeting_roles_q = MeetingRoles.objects.filter(
-                context_id=models.OuterRef("pk"),
-                user=self.request.user,
-            ).values("assigned")
-            qs = qs.annotate(user_roles=models.Subquery(meeting_roles_q))
+        meeting_roles_q = MeetingRoles.objects.filter(
+            context_id=models.OuterRef("pk"),
+            user=self.request.user,
+        ).values("assigned")
+        qs = qs.annotate(user_roles=models.Subquery(meeting_roles_q))
         return qs
 
     # Note: Create already has an atomic block within the serializer

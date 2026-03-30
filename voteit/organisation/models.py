@@ -22,6 +22,7 @@ from voteit.organisation.roles import ROLE_ORG_MANAGER
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from voteit.components.models import OrganisationComponent
+    from voteit.meeting.models import Meeting
 
 _marker = object()
 
@@ -139,7 +140,7 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     objects: models.Manager
     tos: models.QuerySet
     users: models.QuerySet
-    meetings: models.QuerySet
+    meetings: models.QuerySet[Meeting]
     components: models.QuerySet[OrganisationComponent]
     roles: models.QuerySet[OrganisationRoles]
 

@@ -7,8 +7,11 @@ from django.test import override_settings
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
+from voteit.active.components import ActiveUsersComponent
 from voteit.agenda.models import AgendaItem
 from voteit.components.app.components.dialects import DialectsFilter
+from voteit.components.app.components.proposal_print import ProposalPrint
+from voteit.core.workflows import EnabledWf
 from voteit.meeting.dialects import DialectHandler
 from voteit.meeting.dialects import get_named_paths
 from voteit.meeting.models import GroupMembership
@@ -22,6 +25,7 @@ from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.signals import group_role_added
 from voteit.meeting.signals import group_role_removed
 from voteit.meeting.tests.fixtures import DIALECT_FIXTURES
+from voteit.notes.components import NotesComponent
 from voteit.organisation.models import Organisation
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.registries import er_policy
@@ -56,6 +60,15 @@ class MeetingViewSetTests(APITestCase):
             },
         )
         cls.meeting = cls.org.meetings.get(pk=1)
+        cls.meeting.components.create(
+            component_name=ProposalPrint.name, state=EnabledWf.ON
+        )
+        cls.meeting.components.create(
+            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+        )
+        cls.meeting.components.create(
+            component_name=NotesComponent.name, state=EnabledWf.ON
+        )
         cls.participant = User.objects.get(username="participant")
         cls.org_manager = User.objects.get(username="org_manager")
         cls.moderator = User.objects.get(username="moderator")
@@ -178,6 +191,16 @@ class MeetingViewSetTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(1, len(response.json()))
 
+    def test_list_n1(self):
+        self.org.meetings.create(er_policy_name=AutoAlways.name, public=True)
+        self.org.meetings.create(er_policy_name=AutoAlways.name, public=True)
+        url = reverse("meeting-list")
+        self.client.force_login(self.participant)
+        with self.assertNumQueries(4):
+            response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(3, len(response.json()))
+
     def test_get(self):
         url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.participant)
@@ -204,6 +227,13 @@ class MeetingViewSetTests(APITestCase):
             },
             response.json(),
         )
+
+    def test_get_n1(self):
+        url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.participant)
+        with self.assertNumQueries(4):  # Way too high!
+            response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
 
     def test_get_visible_in_lists(self):
         url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})

@@ -11,7 +11,6 @@ class MeetingPermissions(ModelPermissions):
     CHANGE_DIALECT = P("meeting.change_dialect_meeting")
     CHANGE_ROLES = P("meeting.change_roles_meeting")
     DELETE = P("meeting.delete_meeting")
-    LIST = P("meeting.list_meeting")  # Include basic meeting details in listings
     MODERATE = P("meeting.moderate_meeting")
     PREVIEW = P("meeting.preview_meeting")
     VIEW = P("meeting.view_meeting")

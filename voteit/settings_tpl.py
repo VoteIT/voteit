@@ -108,10 +108,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Auth backends
 AUTHENTICATION_BACKENDS = [
-    "voteit.core.permissions.VerbosePermissionBackend",
+    "rules.permissions.ObjectPermissionBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
-CHECK_PERMISSION_CONTEXT = True
 
 # Channels / Envelope / RQ
 CHANNEL_LAYERS = {

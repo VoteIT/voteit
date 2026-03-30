@@ -8,6 +8,7 @@ from voteit.settings_tpl import *
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() in ("true", "1")
+VERBOSE_PERMISSIONS = DEBUG
 
 STATIC_ROOT = "/app/static/"
 ALLOWED_HOSTS = ["127.0.0.1"] + os.getenv("HOST", "").split()

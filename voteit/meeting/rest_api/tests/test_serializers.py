@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.test import override_settings
 from django.test import TestCase
-from rest_framework.exceptions import ValidationError
 
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
