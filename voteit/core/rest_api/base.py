@@ -1,3 +1,4 @@
+import warnings
 from abc import ABC
 
 from rest_framework import viewsets
@@ -9,6 +10,9 @@ from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.mixins import TransitionsMixin
 
 
+@warnings.deprecated(
+    "Replace this model with generics from DRF + VerboseAutoPermissionViewSetMixin"
+)
 class DefaultModelViewSet(
     DefaultQS,
     CreateModelPermissionsMixin,
@@ -21,6 +25,9 @@ class DefaultModelViewSet(
     """
 
 
+@warnings.deprecated(
+    "Replace this model with generics from DRF + VerboseAutoPermissionViewSetMixin"
+)
 class ReadonlyModelViewSet(
     DefaultQS,
     AutoPermissionViewSetMixin,
