@@ -33,6 +33,12 @@ logger = getLogger(__name__)
 
 
 class VerboseAutoPermissionViewSetMixin(RulesAutoPermissionViewSetMixin):
+    permission_type_map = {
+        **RulesAutoPermissionViewSetMixin.permission_type_map,
+        "metadata": None,
+        "transitions": None,
+    }
+
     def initial(self, *args, **kwargs):
         try:
             return super().initial(*args, **kwargs)

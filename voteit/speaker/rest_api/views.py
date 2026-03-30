@@ -21,8 +21,8 @@ from rest_framework.viewsets import GenericViewSet
 
 from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
-from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
 from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
@@ -35,14 +35,14 @@ logger = getLogger(__name__)
 
 @router.register("speaker-lists", basename="speaker-lists")
 class SpeakerListViewSet(
-    AutoPermissionViewSetMixin, TransitionsMixin, viewsets.ModelViewSet
+    VerboseAutoPermissionViewSetMixin, TransitionsMixin, viewsets.ModelViewSet
 ):
     model = SpeakerList
-    queryset = SpeakerList.objects.all()
     serializer_class = serializers.SpeakerListSerializer
     serializer_classes = {"create": serializers.CreateSpeakerListSerializer}
     permission_type_map = {
-        **AutoPermissionViewSetMixin.permission_type_map,
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "create": None,  # In serializer
         "enter": "enter",
         "leave": None,  # No permission check required
         "shuffle": "shuffle",
@@ -50,8 +50,10 @@ class SpeakerListViewSet(
 
     def get_queryset(self):
         if self.detail:
-            return self.queryset
-        return self.queryset.none()
+            return SpeakerList.objects.filter(
+                meeting__participants=self.request.user,
+            )
+        return SpeakerList.objects.none()
 
     def get_update_object(self):
         queryset = self.filter_queryset(
@@ -120,7 +122,7 @@ class HistoricSpeakerViewSet(
 
 @router.register("speaker-list-systems", basename="speaker-list-systems")
 class SpeakerListSystemViewSet(
-    AutoPermissionViewSetMixin,
+    VerboseAutoPermissionViewSetMixin,
     TransitionsMixin,
     viewsets.ModelViewSet,
 ):
@@ -128,6 +130,11 @@ class SpeakerListSystemViewSet(
     queryset = SpeakerListSystem.objects.all()
     serializer_class = serializers.SpeakerListSystemSerializer
     serializer_classes = {"create": serializers.CreateSpeakerListSystemSerializer}
+
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "create": None,  # Handled in serializer
+    }
 
     def get_queryset(self):
         if self.action == "list":
@@ -137,7 +144,7 @@ class SpeakerListSystemViewSet(
 
 @router.register("speakers", basename="speakers")
 class SpeakerViewSet(
-    AutoPermissionViewSetMixin,
+    VerboseAutoPermissionViewSetMixin,
     TransitionsMixin,
     viewsets.ModelViewSet,
 ):
@@ -148,7 +155,8 @@ class SpeakerViewSet(
         "create": serializers.CreateSpeakerSerializer,
     }
     permission_type_map = {
-        **AutoPermissionViewSetMixin.permission_type_map,
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "create": None,  # In serializer
         "start": "start",
         "stop": "stop",
         "undo": "undo",

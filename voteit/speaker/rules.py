@@ -123,7 +123,7 @@ def has_active_speaker_in_same_list(user: User, speaker: Speaker):
 
 # Speaker list permissions
 rules.add_perm(
-    SpeakerListPermissions.ADD,
+    SpeakerListPermissions.ADD,  # Checked in serializer, not via perm
     meeting_upcoming_ongoing & (is_speaker_moderator | is_moderator),
 )
 rules.add_perm(
@@ -143,7 +143,7 @@ rules.add_perm(
 )
 rules.add_perm(
     SpeakerListPermissions.VIEW,
-    can_view_meeting,
+    can_view_meeting,  # Handle via qs!
 )
 rules.add_perm(
     SpeakerListPermissions.SHUFFLE,

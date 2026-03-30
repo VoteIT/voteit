@@ -16,8 +16,7 @@ from rest_framework.viewsets import GenericViewSet
 
 from voteit.core.loggers import notification_logger
 from voteit.core.rest_api import router
-from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
-from voteit.core.rest_api.mixins import SerializerClassesMixin
+from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
@@ -33,7 +32,7 @@ if TYPE_CHECKING:
 
 @router.register("organisations", basename="organisations")
 class OrganisationViewSet(
-    AutoPermissionViewSetMixin,
+    VerboseAutoPermissionViewSetMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
     mixins.ListModelMixin,
@@ -45,7 +44,6 @@ class OrganisationViewSet(
     serializer_class = serializers.OrganisationSerializer
     expected_default_http_status = 401
     allow_unauthenticated = True
-    # TODO: Not decided how to host multiple organisations. For now, always return a list of one.
 
     def get_queryset(self):
         # Host is forced for authenticated too

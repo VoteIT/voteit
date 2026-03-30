@@ -11,9 +11,7 @@ from rest_framework.exceptions import ValidationError
 
 from voteit.core.rest_api.fields import RolesField
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
-from voteit.core.rest_api.utils import perm_denied_msg
-from voteit.core.utils import get_model_shortname
-from voteit.core.utils import get_permission_registry
+from voteit.core.rest_api.utils import validate_model_add
 from voteit.meeting.models import MeetingRoles
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
@@ -25,15 +23,6 @@ if TYPE_CHECKING:
     from voteit.room.models import Room
 
 User = get_user_model()
-
-
-def _validate_add(serializer, model: type, value):
-    # FIXME: Generalize later on / permission system will change
-    reg = get_permission_registry()
-    perms = reg.get_model_permissions(get_model_shortname(model))
-    user = serializer.context["request"].user
-    if not user.has_perm(perms.ADD, value):
-        raise exceptions.PermissionDenied(perm_denied_msg(perms.ADD, value))
 
 
 class CreateSpeakerListSerializer(serializers.ModelSerializer):
@@ -64,7 +53,7 @@ class CreateSpeakerListSerializer(serializers.ModelSerializer):
             return speaker.user_id
 
     def validate_speaker_system(self, value: SpeakerListSystem):
-        _validate_add(self, SpeakerList, value)
+        validate_model_add(self, SpeakerList, value)
         return value
 
     def validate(self, attrs):
@@ -119,7 +108,7 @@ class CreateSpeakerSerializer(serializers.ModelSerializer):
         ] + read_only_fields
 
     def validate_speaker_list(self, value: SpeakerList):
-        _validate_add(self, Speaker, value)
+        validate_model_add(self, Speaker, value)
         return value
 
     def validate(self, attrs):
@@ -180,7 +169,7 @@ class CreateSpeakerListSystemSerializer(serializers.ModelSerializer):
         return value
 
     def validate_room(self, value: Room):
-        _validate_add(self, SpeakerListSystem, value)
+        validate_model_add(self, SpeakerListSystem, value)
         return value
 
     def validate(self, attrs):

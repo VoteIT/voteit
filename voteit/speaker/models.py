@@ -20,6 +20,7 @@ from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
 from pydantic.main import BaseModel
+from rules.contrib.models import RulesModelMixin
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.abcs import AgendaItemContext
@@ -99,7 +100,9 @@ class SpeakerSystemRoles(Roles, MeetingContext):
         "meeting_roles_to_speaker",
     ],
 )
-class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
+class SpeakerListSystem(
+    RulesModelMixin, RoleContextMixin, MeetingContext, SpeakerSystemContext
+):
     """
     All speaker list things relate here, while this in turn might relate to a meeting.
     A list system has its own rules and moderators.
@@ -341,7 +344,7 @@ class SpeakerListSystem(RoleContextMixin, MeetingContext, SpeakerSystemContext):
 
 
 @history_log("user__organisation")
-class Speaker(MeetingContext, SpeakerSystemContext):
+class Speaker(RulesModelMixin, MeetingContext, SpeakerSystemContext):
     """
     Information about a user who's entered a speaker list.
     """
@@ -446,7 +449,9 @@ class Speaker(MeetingContext, SpeakerSystemContext):
         "room",
     ],
 )
-class SpeakerList(AgendaItemContext, MeetingContext, SpeakerSystemContext):
+class SpeakerList(
+    RulesModelMixin, AgendaItemContext, MeetingContext, SpeakerSystemContext
+):
     name = "speaker_list"
     _active_speaker: Speaker | None
     title = models.CharField(max_length=200)

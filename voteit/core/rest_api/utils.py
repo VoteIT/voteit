@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+from typing import Any
 from typing import Callable
 from typing import Generator
 from typing import TYPE_CHECKING
+from typing import TypeVar
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
 from django_fsm import TransitionNotAllowed
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
+from rules.contrib.models import RulesModelMixin
 
+from voteit.core import PERM
 from voteit.core.permissions import NOT_ALLOWED
 
 if TYPE_CHECKING:
@@ -21,12 +25,21 @@ if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
     from django_fsm import Transition
 
+T = TypeVar("T", bound=RulesModelMixin)
+
 
 def perm_denied_msg(perm, obj):
     return _("You're missing the permission '%(perm)s' on %(obj)s.") % {
         "perm": perm,
         "obj": obj,
     }
+
+
+def validate_model_add(serializer, model: T | type[T], context: Any = None) -> None:
+    user = serializer.context["request"].user
+    model_perm = model.get_perm(PERM.ADD)
+    if not user.has_perm(model_perm, context):
+        raise PermissionDenied(perm_denied_msg(model_perm, context))
 
 
 def get_valid_transitions(

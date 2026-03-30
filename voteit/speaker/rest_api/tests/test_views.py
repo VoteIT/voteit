@@ -31,9 +31,7 @@ class SpeakerListsViewTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.org: Organisation = Organisation.objects.get(pk=1)
-        cls.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
         cls.ai_private = cls.meeting.agenda_items.create(title="Private")
         cls.room = cls.meeting.rooms.create()
@@ -41,7 +39,9 @@ class SpeakerListsViewTests(APITestCase):
             method_name="simple", room=cls.room
         )
         cls.slist = cls.system.speaker_lists.create()
-        cls.list_moderator: User = User.objects.create_user("list_moderator")
+        cls.list_moderator: User = cls.meeting.participants.create_user(
+            "list_moderator"
+        )
         cls.participant: User = User.objects.get(username="participant")
         cls.moderator: User = User.objects.get(username="moderator")
         cls.speaker_user: User = cls.org.users.create(username="speaker_user")
@@ -350,21 +350,22 @@ class SpeakerListsViewTests(APITestCase):
 
 
 class SpeakerListSystemViewTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.room = cls.meeting.rooms.create()
         cls.system = cls.meeting.speaker_systems.create(
             method_name="simple", state=SpeakerSystemWf.INACTIVE, room=cls.room
         )
         cls.slist = cls.system.speaker_lists.create()
-        cls.participant: User = User.objects.create_user("participant")
-        cls.moderator: User = User.objects.create_user("moderator")
+        cls.participant: User = cls.meeting.participants.get(username="participant")
+        cls.moderator: User = cls.meeting.participants.get(username="moderator")
         cls.outsider: User = User.objects.create_user("outsider")
-        cls.list_moderator: User = User.objects.create_user("list_moderator")
-        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.list_moderator: User = cls.meeting.participants.create_user(
+            "list_moderator"
+        )
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.system.add_roles(cls.list_moderator, ROLE_LIST_MODERATOR)
         # And the bad parts
@@ -381,11 +382,8 @@ class SpeakerListSystemViewTests(APITestCase):
         data = {"method_name": "simple", "room": room.pk}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(
-            response.status_code,
-            201,
-        )
         data = response.json()
+        self.assertEqual(response.status_code, 201, data)
         self.assertIn("room", data)
         system = self.meeting.speaker_systems.get(pk=response.data.get("pk"))
         self.assertEqual(room.pk, data["room"])
