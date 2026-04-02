@@ -18,16 +18,16 @@ from rest_framework.response import Response
 from rest_framework.serializers import Serializer
 from rest_framework.viewsets import GenericViewSet
 
-from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
-from voteit.speaker.permissions import SpeakerSystemPermissions
 from voteit.speaker.rest_api import serializers
 from voteit.speaker.rest_api.filters import SpeakerFilterSet
+from voteit.speaker.roles import ROLE_LIST_MODERATOR
 
 logger = getLogger(__name__)
 
@@ -45,6 +45,7 @@ class SpeakerListViewSet(
         "enter": "enter",
         "leave": None,  # No permission check required
         "shuffle": "shuffle",
+        "retrieve": None,  # Checked via qs
     }
 
     def get_queryset(self):
@@ -125,19 +126,20 @@ class SpeakerListSystemViewSet(
     viewsets.ModelViewSet,
 ):
     model = SpeakerListSystem
-    queryset = SpeakerListSystem.objects.all()
     serializer_class = serializers.SpeakerListSystemSerializer
     serializer_classes = {"create": serializers.CreateSpeakerListSystemSerializer}
-
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "create": None,  # Handled in serializer
+        "retrieve": None,  # Already checked in qs
     }
 
     def get_queryset(self):
-        if self.action == "list":
-            return self.queryset.none()
-        return self.queryset
+        if self.detail:
+            return SpeakerListSystem.objects.filter(
+                meeting__participants=self.request.user,
+            )
+        return SpeakerListSystem.objects.none()
 
 
 @router.register("speakers", basename="speakers")
@@ -147,7 +149,6 @@ class SpeakerViewSet(
     viewsets.ModelViewSet,
 ):
     model = Speaker
-    queryset = Speaker.objects.all()
     serializer_class = serializers.SpeakerSerializer
     serializer_classes = {
         "create": serializers.CreateSpeakerSerializer,
@@ -155,26 +156,40 @@ class SpeakerViewSet(
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "create": None,  # In serializer
-        "start": "start",
-        "stop": "stop",
-        "undo": "undo",
+        "start": "start",  # Handled by qs
+        "stop": None,  # Handled by qs
+        "undo": None,  # Handled by qs
+        "retrieve": None,  # Handled by qs
     }
 
     def get_queryset(self):
         if self.detail:
-            detail_qs = self.queryset.select_related(
-                "speaker_list",
-                "user",
+            qs = (
+                Speaker.objects.filter(
+                    models.Q(
+                        speaker_list__meeting__roles__user=self.request.user,
+                        speaker_list__meeting__roles__assigned__contains=ROLE_MODERATOR,
+                    )
+                    | models.Q(
+                        speaker_list__speaker_system__speakersystemroles__user=self.request.user,
+                        speaker_list__speaker_system__speakersystemroles__assigned__contains=ROLE_LIST_MODERATOR,
+                    )
+                )
+                .select_related(
+                    "speaker_list",
+                    "user",
+                )
+                .distinct()
             )
             if self.action in ("start", "leave"):
-                return detail_qs.filter(seconds__isnull=True, started__isnull=True)
+                return qs.filter(seconds__isnull=True, started__isnull=True)
             elif self.action in ("stop", "undo"):
-                return detail_qs.filter(seconds__isnull=True, started__isnull=False)
+                return qs.filter(seconds__isnull=True, started__isnull=False)
             elif self.action in ("update", "partial_update"):
                 # Only modify closed speakers
-                return detail_qs.filter(seconds__isnull=False, started__isnull=False)
-            return detail_qs
-        return self.queryset.none()
+                return qs.filter(seconds__isnull=False, started__isnull=False)
+            return qs
+        return Speaker.objects.none()
 
     def _get_locked_sl(self, pk: int) -> SpeakerList:
         return SpeakerList.objects.select_for_update().get(pk=pk)
@@ -228,7 +243,18 @@ class SpeakerViewSet(
 class ExportSpeakersViewSet(viewsets.GenericViewSet):
     model = SpeakerListSystem
     permission_classes = [permissions.IsAuthenticated]
-    queryset = SpeakerListSystem.objects.all()
+
+    def get_queryset(self):
+        return SpeakerListSystem.objects.filter(
+            models.Q(
+                meeting__roles__user=self.request.user,
+                meeting__roles__assigned__contains=ROLE_MODERATOR,
+            )
+            | models.Q(
+                speakersystemroles__user=self.request.user,
+                speakersystemroles__assigned__contains=ROLE_LIST_MODERATOR,
+            )
+        ).distinct()
 
     def list(self, request):  # pragma: no coverage
         return Response(data=[])
@@ -246,7 +272,6 @@ class ExportSpeakersViewSet(viewsets.GenericViewSet):
         detail=True,
         serializer_class=serializers.SpeakerExportSerializer,
     )
-    @has_perm_drf(SpeakerSystemPermissions.MANAGE)
     def csv(self, request, *args, **kwargs):
         sls = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(sls), many=True)
@@ -268,7 +293,6 @@ class ExportSpeakersViewSet(viewsets.GenericViewSet):
         serializer_class=serializers.SpeakerExportSerializer,
         renderer_classes=[JSONRenderer],
     )
-    @has_perm_drf(SpeakerSystemPermissions.MANAGE)
     def json(self, request, *args, **kwargs):
         sls = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(sls), many=True)

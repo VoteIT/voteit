@@ -4,12 +4,17 @@ from __future__ import annotations
 import doctest
 import random
 from pkgutil import walk_packages
+from typing import TYPE_CHECKING
 
+from django.db import transaction
 from envelope.testing import testing_channel_layers_setting  # noqa
 from django.contrib.auth import get_user_model
 from django.db.transaction import get_connection
 
 from voteit.core.utils import exectime  # noqa
+
+if TYPE_CHECKING:
+    from voteit.core.models import User
 
 
 user_tag = """
@@ -106,3 +111,50 @@ class SetSeed:
 
     def __exit__(self, exc_type, exc_value, traceback):
         random.seed()
+
+
+class PermissionTesterMixin:
+    def run_permission_tests(
+        self,
+        *,
+        url: str,
+        data: dict = None,
+        method: str = "get",
+        expected: list[
+            list[User | int | dict | None]
+        ],  # FIXME: Typing is either [User, int] or [User, int, dict]
+    ):
+        if data is None:
+            data = {}
+        for row in expected:
+            if len(row) == 2:
+                row.append(None)
+        for user, expected_status, check_response in expected:
+            if user:
+                self.client.force_login(user)
+            else:
+                self.client.logout()
+
+            sid = transaction.savepoint()
+            with self.subTest(
+                user=user,
+                expected_status=expected_status,
+                url=url,
+                data=data,
+                check_response=check_response,
+            ):
+                response = getattr(self.client, method.lower())(
+                    url, data, format="json"
+                )
+                try:
+                    json_response = response.json()
+                except TypeError:
+                    json_response = None
+                self.assertEqual(
+                    response.status_code,
+                    expected_status,
+                    f"{url}: {user} got {response.status_code} instead of {expected_status}.\n{json_response}",
+                )
+                if check_response:
+                    self.assertDictEqual(check_response, response.json())
+            transaction.savepoint_rollback(sid)

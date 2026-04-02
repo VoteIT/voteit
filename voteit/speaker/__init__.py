@@ -1,0 +1,5 @@
+PERM_START = "start"
+PERM_STOP = "stop"
+PERM_UNDO = "undo"
+PERM_ENTER = "enter"
+PERM_SHUFFLE = "shuffle"

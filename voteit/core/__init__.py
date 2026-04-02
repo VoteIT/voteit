@@ -14,3 +14,5 @@ class PERM:
     CHANGE = "change"
     DELETE = "delete"
     HANDLE = "handle"
+    CHANGE_ROLES = "change_roles"
+    VIEW_ROLES = "view_roles"

@@ -3,17 +3,18 @@ from typing import TYPE_CHECKING
 
 import rules
 
+from voteit.core import PERM
 from voteit.core.decorators import predicate
-from voteit.core.rules import is_user
 from voteit.meeting.rules import can_view_meeting
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import meeting_upcoming_ongoing
+from voteit.speaker import PERM_ENTER
+from voteit.speaker import PERM_SHUFFLE
+from voteit.speaker import PERM_START
 from voteit.speaker.abcs import SpeakerSystemContext
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
-from voteit.speaker.permissions import SpeakerListPermissions
-from voteit.speaker.permissions import SpeakerPermissions
-from voteit.speaker.permissions import SpeakerSystemPermissions
+from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 from voteit.speaker.roles import ROLE_SPEAKER
 from voteit.speaker.workflows import SpeakerListWf
@@ -43,7 +44,7 @@ def has_speaker_role(user: User, context: SpeakerSystemContext) -> bool:
     """
     if isinstance(context, SpeakerSystemContext):
         # More likely query first
-        if context.speaker_system is None:
+        if context.speaker_system is None:  # pragma: no cover
             return False
         if context.speaker_system.meeting_roles_to_speaker:
             if context.speaker_system.meeting.has_any_roles(
@@ -127,63 +128,52 @@ def has_active_speaker_in_same_list(user: User, speaker: Speaker):
 
 # Speaker list permissions
 rules.add_perm(
-    SpeakerListPermissions.ADD,  # Checked in serializer, not via perm
+    SpeakerList.get_perm(PERM.ADD),  # Checked in serializer, not via perm
     meeting_upcoming_ongoing & (is_speaker_moderator | is_moderator),
 )
 rules.add_perm(
-    SpeakerListPermissions.CHANGE,
+    SpeakerList.get_perm(PERM.CHANGE),
     meeting_upcoming_ongoing & (is_speaker_moderator | is_moderator),
 )
 rules.add_perm(
-    SpeakerListPermissions.DELETE,
+    SpeakerList.get_perm(PERM.DELETE),
     is_system_not_archived & (is_speaker_moderator | is_moderator),
 )
 rules.add_perm(
-    SpeakerListPermissions.ENTER,
+    SpeakerList.get_perm(PERM_ENTER),
     is_list_open
     & not_currently_speaking
     & meeting_upcoming_ongoing
     & (has_speaker_role | is_moderator),
 )
 rules.add_perm(
-    SpeakerListPermissions.VIEW,
-    can_view_meeting,  # Handle via qs!
-)
-rules.add_perm(
-    SpeakerListPermissions.SHUFFLE,
+    SpeakerList.get_perm(PERM_SHUFFLE),
     meeting_upcoming_ongoing & (is_speaker_moderator | is_moderator),
 )
 
 
 # Speaker system permissions
 rules.add_perm(
-    SpeakerSystemPermissions.ADD, is_moderator & meeting_upcoming_ongoing
+    SpeakerListSystem.get_perm(PERM.ADD), is_moderator & meeting_upcoming_ongoing
 )  # Checked against meeting
 rules.add_perm(
-    SpeakerSystemPermissions.CHANGE,
+    SpeakerListSystem.get_perm(PERM.CHANGE),
     is_moderator & is_system_not_archived,
 )
 rules.add_perm(
-    SpeakerSystemPermissions.MANAGE,
-    is_moderator | is_speaker_moderator,
-)
-rules.add_perm(
-    SpeakerSystemPermissions.DELETE,
+    SpeakerListSystem.get_perm(PERM.DELETE),
     is_moderator
     & meeting_upcoming_ongoing
     & is_system_not_archived
     & has_no_active_list,
 )
 rules.add_perm(
-    SpeakerSystemPermissions.VIEW,
-    can_view_meeting,
-)
-rules.add_perm(
-    SpeakerSystemPermissions.CHANGE_ROLES,
+    SpeakerListSystem.get_perm(PERM.CHANGE_ROLES),
     is_moderator & is_system_not_archived,
 )
+# This is related to roles.get message
 rules.add_perm(
-    SpeakerSystemPermissions.VIEW_ROLES,
+    SpeakerListSystem.get_perm(PERM.VIEW_ROLES),
     can_view_meeting,
 )
 
@@ -191,31 +181,20 @@ rules.add_perm(
 # Speaker objects themselves
 # Note: Some checks moved to serializer rather than as a permission check
 rules.add_perm(
-    SpeakerPermissions.ADD,
+    Speaker.get_perm(PERM.ADD),
     (is_speaker_moderator | is_moderator) & meeting_upcoming_ongoing & is_system_active,
 )
+# The is_speaker_moderator | is_moderator check is done on the queryset
 rules.add_perm(
-    SpeakerPermissions.LEAVE,
-    is_user,
+    Speaker.get_perm(PERM.CHANGE),
+    is_system_not_archived,
 )
 rules.add_perm(
-    SpeakerPermissions.CHANGE,
-    (is_speaker_moderator | is_moderator) & is_system_not_archived,
-)
-rules.add_perm(
-    SpeakerPermissions.DELETE,
-    (is_speaker_moderator | is_moderator) & is_system_not_archived,
-)
-rules.add_perm(
-    SpeakerPermissions.VIEW,
-    is_speaker_moderator | is_moderator,
+    Speaker.get_perm(PERM.DELETE),
+    is_system_not_archived,
 )
 # We won't check validation stuff here, just permissions
 rules.add_perm(
-    SpeakerPermissions.START,
-    (is_speaker_moderator | is_moderator)
-    & is_active_list
-    & ~has_active_speaker_in_same_list,
+    Speaker.get_perm(PERM_START),
+    is_active_list & ~has_active_speaker_in_same_list,
 )
-rules.add_perm(SpeakerPermissions.STOP, is_speaker_moderator | is_moderator)
-rules.add_perm(SpeakerPermissions.UNDO, is_speaker_moderator | is_moderator)

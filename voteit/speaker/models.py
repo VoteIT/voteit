@@ -23,6 +23,7 @@ from pydantic.main import BaseModel
 from rules.contrib.models import RulesModelMixin
 
 from voteit.agenda.models import AgendaItem
+from voteit.core import PERM
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import ensure_atomic
@@ -34,8 +35,6 @@ from voteit.core.role import Role
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.speaker.abcs import SpeakerSystemContext
-from voteit.speaker.permissions import SpeakerListPermissions
-from voteit.speaker.permissions import SpeakerSystemPermissions
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 from voteit.speaker.roles import ROLE_SPEAKER
 from voteit.speaker.utils import get_list_method_registry
@@ -228,7 +227,7 @@ class SpeakerListSystem(
         field=state,
         source=SpeakerSystemWf.INACTIVE,
         target=SpeakerSystemWf.ACTIVE,
-        permission=SpeakerSystemPermissions.CHANGE,
+        permission=f"speaker.{PERM.CHANGE}_speakerlistsystem",
         custom={"title": _("Make active")},
     )
     def activate(self):
@@ -240,7 +239,7 @@ class SpeakerListSystem(
         field=state,
         source=SpeakerSystemWf.ACTIVE,
         target=SpeakerSystemWf.INACTIVE,
-        permission=SpeakerSystemPermissions.CHANGE,
+        permission=f"speaker.{PERM.CHANGE}_speakerlistsystem",
         conditions=[no_active_speaker_guard],
         custom={"title": _("Inactivate")},
     )
@@ -528,7 +527,7 @@ class SpeakerList(
         field=state,
         source=SpeakerListWf.CLOSED,
         target=SpeakerListWf.OPEN,
-        permission=SpeakerListPermissions.CHANGE,
+        permission=f"speaker.{PERM.CHANGE}_speakerlist",
         custom={"title": _("Open")},
     )
     def open(self):
@@ -538,7 +537,7 @@ class SpeakerList(
         field=state,
         source=SpeakerListWf.OPEN,
         target=SpeakerListWf.CLOSED,
-        permission=SpeakerListPermissions.CHANGE,
+        permission=f"speaker.{PERM.CHANGE}_speakerlist",
         custom={"title": _("Close")},
     )
     def close(self):
@@ -602,13 +601,6 @@ class SpeakerList(
         Unsorted speaker models in queue. Normally there's no need to touch these.
         """
         return self.speaker_items.filter(seconds__isnull=True, started__isnull=True)
-
-    def get_user_pk_in_queue_created_order(self) -> list[int]:
-        return list(
-            self.speakers_in_queue_or_speaking()
-            .order_by("created")
-            .values_list("user_id", flat=True)
-        )
 
     def refresh_from_db(self, **kwargs):
         super().refresh_from_db(**kwargs)
