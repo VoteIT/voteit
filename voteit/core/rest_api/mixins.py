@@ -1,8 +1,8 @@
+import warnings
 from abc import ABC
 from abc import abstractmethod
 from logging import getLogger
 from typing import Dict
-from warnings import deprecated
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
@@ -52,7 +52,9 @@ class VerboseAutoPermissionViewSetMixin(RulesAutoPermissionViewSetMixin):
                 raise
 
 
-@deprecated("Use voteit.core.rest_api.mixins.VerboseAutoPermissionViewSetMixin")
+@warnings.deprecated(
+    "Use voteit.core.rest_api.mixins.VerboseAutoPermissionViewSetMixin"
+)
 class AutoPermissionViewSetMixin:
     """
     Modified from rules.contrib.rest_framework
