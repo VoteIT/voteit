@@ -2,7 +2,6 @@ import csv
 
 from django.http import Http404
 from django.http import HttpResponse
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -39,7 +38,6 @@ class ProposalViewSet(DefaultModelViewSet):
         "preview": serializers.GenericCreateProposalSerializer,
         "list": serializers.ProposalDetailSerializer,
     }
-    filter_backends = (DjangoFilterBackend,)
     filterset_fields = (
         "agenda_item",
         "agenda_item__meeting",
@@ -75,7 +73,6 @@ class TextDocumentViewSet(DefaultModelViewSet):
     queryset = TextDocument.objects.all()
     serializer_class = serializers.TextDocumentSerializer
     serializer_classes = {"create": serializers.CreateTextDocumentSerializer}
-    filter_backends = (DjangoFilterBackend,)
     filterset_fields = (
         "agenda_item",
         "agenda_item__meeting",

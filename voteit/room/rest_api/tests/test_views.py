@@ -3,7 +3,6 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
 from voteit.meeting.models import Meeting
-from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.speaker.app.list_methods.simple import Simple
 from voteit.speaker.models import Speaker
@@ -14,11 +13,11 @@ User = get_user_model()
 
 
 class RoomsViewTestCase(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai = cls.meeting.agenda_items.create()
         cls.other_meeting: Meeting = Meeting.objects.create()
         # Props
@@ -26,11 +25,9 @@ class RoomsViewTestCase(APITestCase):
         cls.prop2 = cls.ai.proposals.create()
         cls.prop3 = cls.ai.proposals.create()
         # Users
-        cls.participant: User = User.objects.create_user("participant")
-        cls.moderator: User = User.objects.create_user("moderator")
+        cls.participant: User = User.objects.get(username="participant")
+        cls.moderator: User = User.objects.get(username="moderator")
         cls.outsider: User = User.objects.create_user("outsider")
-        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
-        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         # Default room
         cls.room = cls.meeting.rooms.create(title="Room", handler=cls.moderator)
         cls.room.highlighted_proposals.create(proposal=cls.prop1)
@@ -39,9 +36,6 @@ class RoomsViewTestCase(APITestCase):
         cls.sls = cls.meeting.speaker_systems.create(
             method_name=Simple.name, room=cls.room
         )
-
-    def setUp(self):
-        self.meeting.refresh_from_db()
 
     def test_create(self):
         url = reverse("rooms-list")
@@ -88,8 +82,26 @@ class RoomsViewTestCase(APITestCase):
             "meeting": self.meeting.pk,
         }
         response = self.client.get(url, data)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual([], response.json())
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertDictEqual(
+            {
+                "meeting": [
+                    "Select a valid choice. That choice is not one of the available choices."
+                ]
+            },
+            data,
+        )
+
+    def test_list_force_meeting(self):
+        url = reverse("rooms-list")
+        self.client.force_login(self.participant)
+        response = self.client.get(url)
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertDictEqual(
+            {"meeting": ["Required argument for action 'list'."]}, data
+        )
 
     def test_patch_change_meeting(self):
         url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
@@ -100,11 +112,14 @@ class RoomsViewTestCase(APITestCase):
         data = response.json()
         self.assertEqual(self.meeting.pk, data["meeting"])
 
-    def test_patch_change_as_speaker_manager(self):
-        url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
+    def test_handle_as_speaker_manager(self):
+        url = reverse("rooms-handle-speaker", kwargs={"pk": self.room.pk})
         speaker_manager = User.objects.create_user("speaker_manager")
         self.client.force_login(speaker_manager)
         data = {"body": "How about that?", "title": "Not changed"}
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 404)
+        self.meeting.add_roles(speaker_manager, ROLE_PARTICIPANT)
         response = self.client.patch(url, data)
         self.assertEqual(response.status_code, 403)
         self.sls.add_roles(speaker_manager, ROLE_LIST_MODERATOR)
@@ -217,25 +232,9 @@ class RoomsViewTestCase(APITestCase):
         self.client.force_login(self.moderator)
         url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
         response = self.client.delete(url)
-        self.assertEqual(400, response.status_code)
-        self.assertEqual(
-            {
-                "force": [
-                    "Room contains 1 speaker items which would be deleted, set force=true to delete"
-                ]
-            },
-            response.json(),
-        )
-        response = self.client.delete(url, data={"force": True})
         self.assertEqual(204, response.status_code)
         with self.assertRaises(Speaker.DoesNotExist):
             speaker.refresh_from_db()
-
-    def test_delete_with_sls_no_speaker(self):
-        self.client.force_login(self.moderator)
-        url = reverse("rooms-detail", kwargs={"pk": self.room.pk})
-        response = self.client.delete(url)
-        self.assertEqual(204, response.status_code)
 
     def test_delete_without_sls(self):
         self.client.force_login(self.moderator)

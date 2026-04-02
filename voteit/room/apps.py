@@ -7,7 +7,6 @@ class RoomConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        from . import permissions
-        from . import rules
-        from . import signals
-        from .rest_api import views
+        from . import rules  # noqa
+        from . import signals  # noqa
+        from .rest_api import views  # noqa

@@ -4,9 +4,9 @@ from logging import getLogger
 
 from envelope.channels.models import ContextChannel
 
+from voteit.core import PERM
 from voteit.messaging.decorators import channel
 from voteit.room.models import Room
-from voteit.room.permissions import RoomPermissions
 
 logger = getLogger(__name__)
 
@@ -20,4 +20,4 @@ class RoomChannel(ContextChannel):
     name = "room"
     logger = logger
     model = Room
-    permission = RoomPermissions.VIEW
+    permission = Room.get_perm(PERM.VIEW)

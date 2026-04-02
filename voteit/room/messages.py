@@ -3,6 +3,8 @@ from pydantic import validator
 
 from envelope.core import Message
 from envelope.deferred_jobs.message import ContextAction
+
+from voteit.core import PERM
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
@@ -10,7 +12,6 @@ from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.room.channels import RoomChannel
 from voteit.room.models import Room
-from voteit.room.permissions import RoomPermissions
 
 
 @outgoing
@@ -23,9 +24,16 @@ class RoomChanged(BaseObjectChanged):
     name = "room.changed"
 
 
+class RoomHighlightedSchema(BaseModel):
+    pk: int
+    highlighted: list[int]
+
+
 @outgoing
-class RoomHighlighted(BaseObjectChanged):
+class RoomHighlighted(Message):
     name = "room.highlighted"
+    schema = RoomHighlightedSchema
+    data: RoomHighlightedSchema
 
 
 @outgoing
@@ -82,7 +90,7 @@ class RoomMarkTextSchema(BaseModel):
 class RoomMarkText(ContextAction):
     context_schema_attr = "room"
     name = "room.mark_text"
-    permission = RoomPermissions.HANDLE
+    permission = Room.get_perm(PERM.HANDLE)
     model = Room
     schema = RoomMarkTextSchema
     data: RoomMarkTextSchema

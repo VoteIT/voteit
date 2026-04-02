@@ -1,12 +1,41 @@
 import functools
 from operator import or_
 
+import django_filters
 from django.db.models import Q
 from django.forms import MultipleChoiceField
 from django_filters import rest_framework as filters
 from django_filters.constants import EMPTY_VALUES
 
+from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
+
+
+def _meeting_with_role_qs(request):
+    return Meeting.objects.filter(roles__user=request.user)
+
+
+class ForceMeetingWithRoleFilter(filters.FilterSet):
+    """
+    Use with ActionAnnotatedDjangoFilterBackend
+    """
+
+    view_action: str
+    view_detail: bool
+    meeting = django_filters.ModelChoiceFilter(queryset=_meeting_with_role_qs)
+    required_on: list[str] | set[str] = {"list"}
+
+    def is_valid(self):
+        if (
+            self.view_action in self.required_on
+            and self.is_bound
+            and self.form.is_valid()
+        ):
+            if not isinstance(self.form.cleaned_data.get("meeting"), Meeting):
+                self.form.add_error(
+                    "meeting", f"Required argument for action '{self.view_action}'."
+                )
+        return super().is_valid()
 
 
 class NumberInFilter(filters.BaseInFilter, filters.NumberFilter):

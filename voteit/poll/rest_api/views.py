@@ -6,7 +6,6 @@ from django.http import Http404
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -53,7 +52,6 @@ class PollViewSet(DefaultModelViewSet):
     context_lookup_kwarg = "agenda_item"
     model = Poll
     queryset = Poll.objects.all()
-    filter_backends = (DjangoFilterBackend,)
     filterset_fields = (
         "agenda_item",
         "meeting",
@@ -76,7 +74,6 @@ class PollViewSet(DefaultModelViewSet):
 class ElectoralRegisterViewSet(ReadonlyModelViewSet):
     model = ElectoralRegister
     serializer_class = serializers.ElectoralRegisterSerializer
-    filter_backends = (DjangoFilterBackend,)
     filterset_fields = ("meeting",)
 
     def get_queryset(self):

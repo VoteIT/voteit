@@ -5,7 +5,12 @@ RQ_LONG_QUEUE = "long"
 
 
 class PERM:
+    """
+    Common base permission names. Use together with rules
+    """
+
     VIEW = "view"
     ADD = "add"
     CHANGE = "change"
     DELETE = "delete"
+    HANDLE = "handle"

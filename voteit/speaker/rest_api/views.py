@@ -6,7 +6,6 @@ from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
 from django.utils.translation import gettext as _
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -115,7 +114,6 @@ class HistoricSpeakerViewSet(
         )
     )
     serializer_class = serializers.HistoricSpeakerListSerializer
-    filter_backends = (DjangoFilterBackend,)
     filterset_class = SpeakerFilterSet
     permission_classes = (permissions.IsAuthenticated,)
 

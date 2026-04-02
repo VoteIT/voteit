@@ -136,7 +136,7 @@ class NoteViewSetTests(APITestCase):
         response = self.client.get(url)
         data = response.json()
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, data)
-        self.assertEqual({"meeting": ["Required field 'meeting' is missing."]}, data)
+        self.assertEqual({"meeting": ["Required argument for action 'list'."]}, data)
 
     def test_delete_all(self):
         self.assertEqual(1, self.participant.notes.filter(meeting=self.meeting).count())

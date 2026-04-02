@@ -1,9 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.core import PERM
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.room.models import Room
 
 
 class RulesTests(TestCase):
@@ -23,19 +25,8 @@ class RulesTests(TestCase):
     def setUp(self):
         self.meeting.refresh_from_db()
 
-    def p(self, perm):
-        from voteit.room.permissions import RoomPermissions
-
-        return getattr(RoomPermissions, perm)
-
-    def test_view_upcoming(self):
-        VIEW = self.p("VIEW")
-        self.assertFalse(self.anon_user.has_perm(VIEW, self.room))
-        self.assertTrue(self.participant.has_perm(VIEW, self.room))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.room))
-
     def test_add(self):
-        ADD = self.p("ADD")
+        ADD = Room.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.meeting))
         self.assertFalse(self.participant.has_perm(ADD, self.meeting))
         self.assertTrue(self.moderator.has_perm(ADD, self.meeting))
@@ -43,13 +34,13 @@ class RulesTests(TestCase):
     def test_add_archived_meeting(self):
         self.meeting.archive()
         self.meeting.save()
-        ADD = self.p("ADD")
+        ADD = Room.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.meeting))
         self.assertFalse(self.participant.has_perm(ADD, self.meeting))
         self.assertFalse(self.moderator.has_perm(ADD, self.meeting))
 
     def test_change(self):
-        CHANGE = self.p("CHANGE")
+        CHANGE = Room.get_perm(PERM.CHANGE)
         # Maybe we want to allow changes for authors later on...
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.room))
         self.assertFalse(self.participant.has_perm(CHANGE, self.room))
@@ -58,19 +49,19 @@ class RulesTests(TestCase):
     def test_change_archived_meeting(self):
         self.meeting.archive()
         self.meeting.save()
-        CHANGE = self.p("CHANGE")
+        CHANGE = Room.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.room))
         self.assertFalse(self.participant.has_perm(CHANGE, self.room))
         self.assertFalse(self.moderator.has_perm(CHANGE, self.room))
 
     def test_delete(self):
-        DELETE = self.p("DELETE")
+        DELETE = Room.get_perm(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.room))
         self.assertFalse(self.participant.has_perm(DELETE, self.room))
         self.assertTrue(self.moderator.has_perm(DELETE, self.room))
 
     def test_handle_no_handler_set(self):
-        HANDLE = self.p("HANDLE")
+        HANDLE = Room.get_perm(PERM.HANDLE)
         self.assertFalse(self.anon_user.has_perm(HANDLE, self.room))
         self.assertFalse(self.participant.has_perm(HANDLE, self.room))
         self.assertFalse(self.moderator.has_perm(HANDLE, self.room))
@@ -79,6 +70,6 @@ class RulesTests(TestCase):
     def test_handle(self):
         self.room.handler = self.moderator
         self.room.save()
-        HANDLE = self.p("HANDLE")
+        HANDLE = Room.get_perm(PERM.HANDLE)
         self.assertTrue(self.moderator.has_perm(HANDLE, self.room))
         self.assertFalse(self.moderator2.has_perm(HANDLE, self.room))

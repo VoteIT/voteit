@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
 from voteit.core.decorators import ensure_atomic
+from voteit.core.rest_api.utils import validate_model_add
+from voteit.proposal.models import Proposal
 from voteit.room.models import Room
-from voteit.room.rest_api.validators import HighlightedValidator
 
 
 class RoomSerializer(ModelSerializer):
@@ -17,12 +19,12 @@ class RoomSerializer(ModelSerializer):
 
     class Meta:
         model = Room
-        fields = [
+        fields = read_only_fields = [
             "pk",
         ] + [x.name for x in Room._meta.fields if x.name not in ("id",)]
 
 
-class RoomHandleSerializer(RoomSerializer):
+class RoomHandleSerializer(ModelSerializer):
     """
     For highlighting and handling rooms
     """
@@ -31,7 +33,8 @@ class RoomHandleSerializer(RoomSerializer):
         child=serializers.IntegerField(), required=False
     )
 
-    class Meta(RoomSerializer.Meta):
+    class Meta:
+        model = Room
         fields = [
             "pk",
             "highlighted",
@@ -39,9 +42,24 @@ class RoomHandleSerializer(RoomSerializer):
             "agenda_item",
             "show_ballot",
         ]
-        validators = [
-            HighlightedValidator(),
-        ]
+
+    def validate(self, attrs):
+        if highlighted := attrs.get("highlighted"):
+            prop_pks = set(
+                Proposal.objects.filter(
+                    agenda_item__meeting_id=self.instance.meeting_id
+                ).values_list("pk", flat=True)
+            )
+            if missing := set(highlighted) - prop_pks:
+                raise ValidationError(
+                    {
+                        "highlighted": [
+                            "The following proposals don't exist withing this "
+                            "meeting: %s" % ", ".join(str(x) for x in missing)
+                        ]
+                    }
+                )
+        return attrs
 
     def update(self, instance, validated_data):
         highlighted = validated_data.get("highlighted", None)
@@ -68,9 +86,9 @@ class RoomHandleSerializer(RoomSerializer):
 
 
 class CreateRoomSerializer(RoomSerializer):
-    class Meta(RoomSerializer.Meta):
+    class Meta:
         # WARNING! UniqueTogetherValidator doesn't work if we don't specify fieldnames explicitly.
-        # This is a bug in DRF and should be fixed upstreams. Hence, this bs
+        model = Room
         fields = [
             "pk",
         ] + [
@@ -83,6 +101,10 @@ class CreateRoomSerializer(RoomSerializer):
             )
         ]
 
+    def validate_meeting(self, value):
+        validate_model_add(self, Room, value)
+        return value
+
     @ensure_atomic
     def create(self, validated_data) -> Room:
         return super().create(validated_data)
@@ -93,9 +115,9 @@ class RoomDetailSerializer(RoomSerializer):
     Used for update and full read
     """
 
-    class Meta(RoomSerializer.Meta):
+    class Meta:
+        model = Room
         # WARNING! UniqueTogetherValidator doesn't work if we don't specify fieldnames explicitly.
-        # This is a bug in DRF and should be fixed upstreams. Hence, this bs
         fields = [
             "pk",
         ] + [x.name for x in Room._meta.fields if x.name not in ("id",)]
@@ -110,27 +132,11 @@ class RoomDetailSerializer(RoomSerializer):
 
 
 class SpeakerManagerRoomDetailSerializer(RoomDetailSerializer):
-    class Meta(RoomDetailSerializer.Meta):
+    class Meta:
+        model = Room
         fields = [
             "body",
             "open",
             "show_time",
             "send_sls",
         ]
-
-
-class RoomHighlightedSerializer(RoomSerializer):
-    """
-    Used when highlighted proposals change
-    """
-
-    highlighted = serializers.SerializerMethodField(read_only=True)
-
-    class Meta(RoomSerializer.Meta):
-        fields = (
-            "pk",
-            "highlighted",
-        )
-
-    def get_highlighted(self, instance: Room):
-        return list(instance.highlighted_proposal_pks)

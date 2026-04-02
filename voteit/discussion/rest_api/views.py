@@ -2,7 +2,6 @@ import csv
 
 from django.http import Http404
 from django.http import HttpResponse
-from django_filters.rest_framework import DjangoFilterBackend
 from django.db import models
 from rest_framework import permissions
 from rest_framework import viewsets
@@ -33,7 +32,6 @@ class DiscussionPostViewSet(DefaultModelViewSet):
     serializer_classes = {
         "create": serializers.DiscussionPostCreateSerializer,
     }
-    filter_backends = (DjangoFilterBackend,)
     filterset_fields = (
         "agenda_item",
         "agenda_item__meeting",

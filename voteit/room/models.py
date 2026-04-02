@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from auditlog.registry import auditlog
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils.timezone import now
+from rules.contrib.models import RulesModelMixin
 
 from voteit.agenda.models import AgendaItem
 from voteit.core.abcs import MeetingContext
@@ -15,6 +18,7 @@ from voteit.core.utils import relaxed_clean_html
 from voteit.meeting.models import Meeting
 from voteit.poll.models import Poll
 from voteit.proposal.models import Proposal
+from voteit.speaker.abcs import SpeakerSystemContext
 from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
@@ -35,7 +39,7 @@ if TYPE_CHECKING:
         "show_time",
     ],
 )
-class Room(MeetingContext):
+class Room(RulesModelMixin, SpeakerSystemContext, MeetingContext):
     _initial_poll_value = None
 
     def __init__(self, *args, **kwargs):
@@ -101,7 +105,7 @@ class Room(MeetingContext):
 
     @property
     def highlighted_proposal_pks(self):
-        return (
+        return list(
             self.highlighted_proposals.all()
             .order_by("order")
             .values_list("proposal", flat=True)
@@ -111,6 +115,11 @@ class Room(MeetingContext):
         from voteit.room.signals import highlighted_proposals_changed
 
         highlighted_proposals_changed.send(sender=self.__class__, instance=self)
+
+    @property
+    def speaker_system(self) -> SpeakerListSystem | None:
+        with suppress(ObjectDoesNotExist):
+            return self.sls
 
     def save(self, **kwargs):
         if self.poll != self._initial_poll_value and self._initial_show_ballot:

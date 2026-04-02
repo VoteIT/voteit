@@ -21,7 +21,7 @@ logger = getLogger(__name__)
 class SpeakerSystemContext(ABCModel):
     @property
     @abstractmethod
-    def speaker_system(self) -> SpeakerListSystem:
+    def speaker_system(self) -> SpeakerListSystem | None:
         """
         Return the speaker_system object. It could be a ForeignKey relation or something that gets the object.
         """

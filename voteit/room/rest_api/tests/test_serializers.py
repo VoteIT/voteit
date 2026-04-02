@@ -4,25 +4,6 @@ from voteit.meeting.models import Meeting
 from voteit.room.models import Room
 
 
-class CreateRoomSerializerTests(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.meeting = Meeting.objects.create()
-
-    @property
-    def _cut(self):
-        from voteit.room.rest_api.serializers import CreateRoomSerializer
-
-        return CreateRoomSerializer
-
-    def test_create(self):
-        serializer = self._cut(data={"meeting": self.meeting.pk})
-        serializer.is_valid()
-        self.assertFalse(serializer.errors)
-        instance = serializer.save()
-        self.assertIsInstance(instance, Room)
-
-
 class RoomDetailSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -135,43 +116,4 @@ class RoomHandleSerializerTests(TestCase):
         self.assertEqual(
             f"The following proposals don't exist withing this meeting: {new_prop.pk}",
             str(serializer.errors["highlighted"][0]),
-        )
-
-
-class RoomHighlightedSerializerTests(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.meeting = Meeting.objects.create()
-        cls.ai = cls.meeting.agenda_items.create()
-        cls.prop1 = cls.ai.proposals.create()
-        cls.prop2 = cls.ai.proposals.create()
-        cls.prop3 = cls.ai.proposals.create()
-        cls.room = cls.meeting.rooms.create()
-        cls.sls = cls.meeting.speaker_systems.create(
-            method_name="simple", room=cls.room
-        )
-        cls.room = cls.meeting.rooms.create()
-
-    @property
-    def _cut(self):
-        from voteit.room.rest_api.serializers import RoomHighlightedSerializer
-
-        return RoomHighlightedSerializer
-
-    def test_no_highlighted(self):
-        self.assertEqual(
-            {"pk": self.room.pk, "highlighted": []},
-            self._cut(self.room).data,
-        )
-
-    def test_some_selected(self):
-        self.room.highlighted_proposals.create(proposal=self.prop2)
-        self.room.highlighted_proposals.create(proposal=self.prop1)
-        self.room.save()
-        self.assertEqual(
-            {
-                "pk": self.room.pk,
-                "highlighted": [self.prop2.pk, self.prop1.pk],
-            },
-            self._cut(self.room).data,
         )

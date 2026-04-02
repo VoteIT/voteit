@@ -28,7 +28,9 @@ def is_speaker_moderator(user: User, context: SpeakerSystemContext) -> bool:
     Check if a user has list moderator status within this speaker list system.
     """
     if isinstance(context, SpeakerSystemContext):
-        return context.speaker_system.has_roles(user, ROLE_LIST_MODERATOR)
+        return context.speaker_system and context.speaker_system.has_roles(
+            user, ROLE_LIST_MODERATOR
+        )
     raise TypeError(
         f"{context} is not an instance of SpeakerSystemContext"
     )  # pragma: no coverage
@@ -41,6 +43,8 @@ def has_speaker_role(user: User, context: SpeakerSystemContext) -> bool:
     """
     if isinstance(context, SpeakerSystemContext):
         # More likely query first
+        if context.speaker_system is None:
+            return False
         if context.speaker_system.meeting_roles_to_speaker:
             if context.speaker_system.meeting.has_any_roles(
                 user, *context.speaker_system.meeting_roles_to_speaker
@@ -77,7 +81,7 @@ def is_active_list(user: User, instance: SpeakerList | Speaker) -> bool:
 @predicate
 def is_system_active(user: User, context: SpeakerSystemContext) -> bool:
     if isinstance(context, SpeakerSystemContext):
-        return context.speaker_system.is_active
+        return context.speaker_system and context.speaker_system.is_active
     raise TypeError(
         f"{context} is not an instance of SpeakerSystemContext"
     )  # pragma: no coverage
@@ -86,7 +90,7 @@ def is_system_active(user: User, context: SpeakerSystemContext) -> bool:
 @predicate
 def is_system_not_archived(user: User, context: SpeakerSystemContext) -> bool:
     if isinstance(context, SpeakerSystemContext):
-        return not context.speaker_system.is_archived
+        return context.speaker_system and not context.speaker_system.is_archived
     raise TypeError(
         f"{context} is not an instance of SpeakerSystemContext"
     )  # pragma: no coverage
@@ -95,7 +99,7 @@ def is_system_not_archived(user: User, context: SpeakerSystemContext) -> bool:
 @predicate
 def has_no_active_list(user: User, context: SpeakerSystemContext) -> bool:
     if isinstance(context, SpeakerSystemContext):
-        return context.speaker_system.active_list_id is None
+        return context.speaker_system and context.speaker_system.active_list_id is None
     raise TypeError(f"{context} is not a speaker_system context")  # pragma: no coverage
 
 

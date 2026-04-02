@@ -1,4 +1,3 @@
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
 
 from voteit.core.rest_api import router
@@ -19,7 +18,6 @@ class ReactionButtonViewSet(DefaultModelViewSet):
     context_lookup_kwarg = "meeting"
     model = ReactionButton
     queryset = ReactionButton.objects.all()
-    filter_backends = (DjangoFilterBackend,)
     filterset_fields = ("meeting",)
 
     def get_queryset(self):

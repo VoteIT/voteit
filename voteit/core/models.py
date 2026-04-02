@@ -19,6 +19,7 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
 from django_fsm import transition
+from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import ABCModel
 from voteit.core.abcs import OrganisationContext
@@ -339,7 +340,7 @@ class Roles(ABCModel):
     objects: models.Manager
 
 
-class BaseContent(ABCModel):
+class BaseContent(RulesModelMixin, ABCModel):
     body: str = RichTextField(blank=True, default="", html_cleaner=strict_clean_html)
     created: datetime = models.DateTimeField(editable=False, default=now)
     author: User | None = models.ForeignKey(
