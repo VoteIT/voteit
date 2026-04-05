@@ -7,7 +7,7 @@ class DiscussionConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        from voteit.discussion import rules
-        from .rest_api import views
-        from voteit.discussion import messages
-        from voteit.discussion import signals
+        from voteit.discussion import rules  # noqa
+        from voteit.discussion.rest_api import views  # noqa
+        from voteit.discussion import messages  # noqa
+        from voteit.discussion import signals  # noqa

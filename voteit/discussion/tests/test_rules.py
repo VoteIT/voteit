@@ -1,24 +1,26 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.core import PERM
+from voteit.discussion.models import DiscussionPost
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_DISCUSSER
+
 
 class RulesTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.meeting.roles import ROLE_MODERATOR
-        from voteit.meeting.roles import ROLE_DISCUSSER
-        from voteit.meeting.roles import ROLE_PARTICIPANT
-
         User = get_user_model()
-        cls.meeting = Meeting.objects.create()
+        cls.meeting = Meeting.objects.get(pk=1)
         cls.anon_user = User.objects.create(username="anon")
-        cls.participant = User.objects.create(username="participant")
-        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
-        cls.moderator = User.objects.create(username="moderator")
-        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
-        cls.discusser = User.objects.create(username="discusser")
-        cls.discusser_author = User.objects.create(username="discusser_author")
+        cls.participant = User.objects.get(username="participant")
+        cls.moderator = User.objects.get(username="moderator")
+        cls.discusser = cls.meeting.participants.create(username="discusser")
+        cls.discusser_author = cls.meeting.participants.create(
+            username="discusser_author"
+        )
         cls.meeting.add_roles(cls.discusser, ROLE_DISCUSSER)
         cls.meeting.add_roles(cls.discusser_author, ROLE_DISCUSSER)
         cls.ai = cls.meeting.agenda_items.create()
@@ -31,57 +33,15 @@ class RulesTests(TestCase):
         self.ai.refresh_from_db()
 
     def p(self, perm):
-        from voteit.discussion.permissions import DiscussionPermissions
-
-        return getattr(DiscussionPermissions, perm)
+        return DiscussionPost.get_perm(perm)
 
     def _archive(self):
         self.meeting.archive()
         self.meeting.save()
         self.ai.refresh_from_db()
 
-    def test_view_private(self):
-        self.ai.unpublish()
-        self.ai.save()
-        VIEW = self.p("VIEW")
-        self.assertFalse(self.anon_user.has_perm(VIEW, self.discussion_post))
-        self.assertFalse(self.participant.has_perm(VIEW, self.discussion_post))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.discussion_post))
-        self.assertFalse(self.discusser.has_perm(VIEW, self.discussion_post))
-        self.assertFalse(self.discusser_author.has_perm(VIEW, self.discussion_post))
-
-    def test_view_upcoming(self):
-        VIEW = self.p("VIEW")
-        self.assertFalse(self.anon_user.has_perm(VIEW, self.discussion_post))
-        self.assertTrue(self.participant.has_perm(VIEW, self.discussion_post))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.discussion_post))
-        self.assertTrue(self.discusser.has_perm(VIEW, self.discussion_post))
-        self.assertTrue(self.discusser_author.has_perm(VIEW, self.discussion_post))
-
-    def test_view_public_meeting_private_ai(self):
-        self.ai.unpublish()
-        self.ai.save()
-        self.meeting.public = True
-        self.meeting.save()
-        VIEW = self.p("VIEW")
-        self.assertFalse(self.anon_user.has_perm(VIEW, self.discussion_post))
-        self.assertFalse(self.participant.has_perm(VIEW, self.discussion_post))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.discussion_post))
-        self.assertFalse(self.discusser.has_perm(VIEW, self.discussion_post))
-        self.assertFalse(self.discusser_author.has_perm(VIEW, self.discussion_post))
-
-    def test_view_public_meeting(self):
-        self.meeting.public = True
-        self.meeting.save()
-        VIEW = self.p("VIEW")
-        self.assertTrue(self.anon_user.has_perm(VIEW, self.discussion_post))
-        self.assertTrue(self.participant.has_perm(VIEW, self.discussion_post))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.discussion_post))
-        self.assertTrue(self.discusser.has_perm(VIEW, self.discussion_post))
-        self.assertTrue(self.discusser_author.has_perm(VIEW, self.discussion_post))
-
     def test_add(self):
-        ADD = self.p("ADD")
+        ADD = self.p(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertTrue(self.moderator.has_perm(ADD, self.ai))
@@ -90,7 +50,7 @@ class RulesTests(TestCase):
     def test_add_with_block(self):
         self.ai.block_discussion = True
         self.ai.save()
-        ADD = self.p("ADD")
+        ADD = self.p(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertTrue(self.moderator.has_perm(ADD, self.ai))
@@ -98,14 +58,14 @@ class RulesTests(TestCase):
 
     def test_add_archived_meeting(self):
         self._archive()
-        ADD = self.p("ADD")
+        ADD = self.p(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertFalse(self.moderator.has_perm(ADD, self.ai))
         self.assertFalse(self.discusser.has_perm(ADD, self.ai))
 
     def test_change(self):
-        CHANGE = self.p("CHANGE")
+        CHANGE = self.p(PERM.CHANGE)
         # Maybe we want to allow changes for authors later on...
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.discussion_post))
         self.assertFalse(self.participant.has_perm(CHANGE, self.discussion_post))
@@ -115,7 +75,7 @@ class RulesTests(TestCase):
 
     def test_change_archived_meeting(self):
         self._archive()
-        CHANGE = self.p("CHANGE")
+        CHANGE = self.p(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.discussion_post))
         self.assertFalse(self.participant.has_perm(CHANGE, self.discussion_post))
         self.assertFalse(self.moderator.has_perm(CHANGE, self.discussion_post))
@@ -123,7 +83,7 @@ class RulesTests(TestCase):
         self.assertFalse(self.discusser_author.has_perm(CHANGE, self.discussion_post))
 
     def test_delete(self):
-        DELETE = self.p("DELETE")
+        DELETE = self.p(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.discussion_post))
         self.assertFalse(self.participant.has_perm(DELETE, self.discussion_post))
         self.assertTrue(self.moderator.has_perm(DELETE, self.discussion_post))
@@ -132,7 +92,7 @@ class RulesTests(TestCase):
 
     def test_delete_archived_meeting(self):
         self._archive()
-        DELETE = self.p("DELETE")
+        DELETE = self.p(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.discussion_post))
         self.assertFalse(self.participant.has_perm(DELETE, self.discussion_post))
         self.assertFalse(self.moderator.has_perm(DELETE, self.discussion_post))

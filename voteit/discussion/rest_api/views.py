@@ -6,59 +6,62 @@ from django.db import models
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 
-from voteit.agenda.models import AgendaItem
 
-from voteit.core import PERM
-from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
-from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.discussion.models import DiscussionPost
 from voteit.discussion.rest_api import serializers
 from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
+from voteit.meeting.roles import ROLE_MODERATOR
 
 
-__all__ = ["DiscussionPostViewSet", "ExportDiscussionPostsViewSet"]
+__all__ = [
+    "DiscussionPostViewSet",
+    "ExportDiscussionPostsViewSet",
+]
 
 
 @router.register("discussion-posts", basename="discussion-posts")
-class DiscussionPostViewSet(DefaultModelViewSet):
+class DiscussionPostViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     model = DiscussionPost
     queryset = DiscussionPost.objects.all()
     serializer_class = serializers.DiscussionPostDetailSerializer
-    serializer_classes = {
-        "create": serializers.DiscussionPostCreateSerializer,
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "create": None,  # Checked in serializer
+        "retrieve": None,  # Filtered by queryset
     }
-    filterset_fields = (
-        "agenda_item",
-        "agenda_item__meeting",
-    )
-    context_queryset = AgendaItem.objects.all()
-    context_lookup_kwarg = "agenda_item"
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.DiscussionPostCreateSerializer
+        return super().get_serializer_class()
 
     def get_queryset(self):
         if self.action == "list":
-            try:
-                ai = self.get_context(self.request)
-            except ValidationError:
-                ai = None
-            # FIXME
-            if ai and self.request.user.has_perm(AgendaItem.get_perm(PERM.VIEW), ai):
-                return self.queryset.filter(agenda_item=ai)
-            return self.queryset.none()
-        return self.queryset
+            return DiscussionPost.objects.none()
+        return DiscussionPost.objects.filter(
+            models.Q(agenda_item__meeting__roles__user=self.request.user)
+            & models.Q(agenda_item__meeting__roles__assigned__contains=ROLE_MODERATOR)
+            | ~models.Q(agenda_item__state="private")
+        ).distinct()
 
 
 @router.register("export-discussion-posts", basename="export-discussion-posts")
 class ExportDiscussionPostsViewSet(viewsets.GenericViewSet):
     model = DiscussionPost
-    queryset = Meeting.objects.all()
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = serializers.DiscussionPostExportSerializer
+
+    def get_queryset(self):
+        return Meeting.objects.filter(
+            models.Q(roles__user=self.request.user)
+            & models.Q(roles__assigned__contains=ROLE_MODERATOR)
+        )
 
     def list(self, request):
         return Response(data=[])
@@ -74,7 +77,6 @@ class ExportDiscussionPostsViewSet(viewsets.GenericViewSet):
         methods=["get"],
         detail=True,
     )
-    @has_perm_drf(MeetingPermissions.MODERATE)
     def csv(self, request, *args, **kwargs):
         meeting = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(meeting), many=True)
@@ -95,7 +97,6 @@ class ExportDiscussionPostsViewSet(viewsets.GenericViewSet):
         detail=True,
         renderer_classes=[JSONRenderer],
     )
-    @has_perm_drf(MeetingPermissions.MODERATE)
     def json(self, request, *args, **kwargs):
         meeting = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(meeting), many=True)

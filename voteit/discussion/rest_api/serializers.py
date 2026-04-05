@@ -7,6 +7,7 @@ from rest_framework import serializers
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import ExportBaseSerializerMixin
 from voteit.core.rest_api.serializers import RichTextSerializerMixin
+from voteit.core.rest_api.utils import validate_model_add
 from voteit.core.rest_api.validators import ValidateGroupAIContext
 from voteit.discussion import models
 
@@ -15,6 +16,8 @@ __all__ = (
     "DiscussionPostDetailSerializer",
     "DiscussionPostCreateSerializer",
 )
+
+from voteit.discussion.models import DiscussionPost
 
 
 class DiscussionPostDetailSerializer(RichTextSerializerMixin, BaseModelSerializer):
@@ -51,6 +54,11 @@ class DiscussionPostCreateSerializer(RichTextSerializerMixin, BaseModelSerialize
             "as_group",
         ]
         validators = (ValidateGroupAIContext(),)
+
+    def validate_agenda_item(self, value):
+        validate_model_add(self, DiscussionPost, value)
+
+        return value
 
 
 _export_fields = ["created", "body", "userid", "agenda_item"]

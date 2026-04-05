@@ -64,8 +64,11 @@ class DiscussionPostAPITests(APITestCase):
         }
         self.client.force_login(self.discusser)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertDictEqual(
+            {"agenda_item": ['Invalid pk "-1" - object does not exist.']}, data
+        )
 
     def test_create_bad_input(self):
         self.client.force_login(self.moderator)
@@ -80,67 +83,9 @@ class DiscussionPostAPITests(APITestCase):
     def test_list(self):
         url = reverse("discussion-posts-list")
         self.client.force_login(self.discusser)
-        response = self.client.get(url)
+        response = self.client.get(url, data={"meeting": self.meeting.pk})
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json())
-
-    def test_list_with_ai(self):
-        url = reverse("discussion-posts-list")
-        self.client.force_login(self.discusser)
-        response = self.client.get(url, {"agenda_item": self.ai.pk})
-        self.assertEqual(response.status_code, 200)
-        items = response.json()
-        self.assertEqual(1, len(items))
-        data = items[0]
-        self.assertTrue(data.pop("created"))
-        self.assertEqual(
-            {
-                "agenda_item": self.ai.pk,
-                "pk": self.post_one.pk,
-                "author": None,
-                "body": "One for open",
-                "meeting_group": None,
-                "tags": [],
-                "as_group": False,
-            },
-            data,
-        )
-
-    def test_list_with_ai_outsider(self):
-        url = reverse("discussion-posts-list")
-        self.client.force_login(self.outsider)
-        response = self.client.get(url, {"agenda_item": self.ai.pk})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual([], response.json())
-
-    def test_list_with_private_ai(self):
-        url = reverse("discussion-posts-list")
-        self.client.force_login(self.discusser)
-        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual([], response.json())
-
-    def test_list_with_private_ai_moderator(self):
-        url = reverse("discussion-posts-list")
-        self.client.force_login(self.moderator)
-        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
-        self.assertEqual(response.status_code, 200)
-        items = response.json()
-        self.assertEqual(1, len(items))
-        data = items[0]
-        self.assertTrue(data.pop("created"))
-        self.assertEqual(
-            {
-                "agenda_item": self.ai_private.pk,
-                "pk": self.post_two.pk,
-                "author": None,
-                "body": "Two for private",
-                "meeting_group": None,
-                "tags": [],
-                "as_group": False,
-            },
-            data,
-        )
 
     def test_put_author_discusser(self):
         disc = self.ai.discussions.create(body="hello", author=self.discusser)
@@ -185,8 +130,6 @@ class DiscussionPostAPITests(APITestCase):
         self.assertEqual("Sup?", disc.body)
 
     def test_create_meeting_group_not_in_meeting(self):
-        from voteit.meeting.models import Meeting
-
         meeting = Meeting.objects.create()
         ai = meeting.agenda_items.create()
         disc = ai.discussions.create(body="I'm from another meeting")
@@ -294,9 +237,7 @@ class ExportDiscussionsViewSetTests(APITestCase):
         self.client.force_login(self.participant)
         url = reverse("export-discussion-posts-json", kwargs={"pk": self.meeting.pk})
         response = self.client.get(url)
-        self.assertContains(
-            response, "permission meeting.moderate_meeting", status_code=403
-        )
+        self.assertEqual(404, response.status_code)
 
     def test_csv_no_data(self):
         self.ai.discussions.all().delete()

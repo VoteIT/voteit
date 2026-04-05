@@ -5,6 +5,7 @@ from django.test import TestCase
 
 from voteit.core.testing import mk_hashtag
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_DISCUSSER
 
 
 class DiscussionPostDetailSerializerTests(TestCase):
@@ -58,14 +59,17 @@ class DiscussionPostDetailSerializerTests(TestCase):
 
 
 class DiscussionPostCreateSerializer(TestCase):
-    def setUp(self):
-        self.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
-        self.group = self.meeting.groups.create()
-        self.user = self.meeting.participants.create(username="jane")
-        self.group.members.add(self.user)
-        self.ai = self.meeting.agenda_items.create(state="ongoing", title="Ongoing")
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.group = cls.meeting.groups.create()
+        cls.user = cls.meeting.participants.create(username="jane")
+        cls.meeting.add_roles(cls.user, ROLE_DISCUSSER)
+        # Add discusser
+        cls.group.members.add(cls.user)
+        cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
 
     @property
     def _cut(self):
