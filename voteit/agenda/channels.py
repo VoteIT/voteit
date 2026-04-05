@@ -5,7 +5,7 @@ from logging import getLogger
 from envelope.channels.models import ContextChannel
 
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.permissions import AgendaPermissions
+from voteit.core import PERM
 from voteit.messaging.decorators import channel
 
 logger = getLogger(__name__)
@@ -25,4 +25,4 @@ class AgendaItemChannel(ContextChannel):
     name = "agenda_item"
     logger = logger
     model = AgendaItem
-    permission = AgendaPermissions.VIEW
+    permission = AgendaItem.get_perm(PERM.VIEW)

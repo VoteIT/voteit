@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
 from auditlog.registry import auditlog
 from django.conf import settings
@@ -8,11 +9,13 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField, transition
+from django_fsm import FSMField
+from django_fsm import transition
 
-from voteit.agenda.permissions import AgendaPermissions
 from voteit.agenda.workflows import AgendaItemWf
-from voteit.core.abcs import AgendaItemContext, MeetingContext
+from voteit.core import PERM
+from voteit.core.abcs import AgendaItemContext
+from voteit.core.abcs import MeetingContext
 from voteit.core.fields import RichTextField
 from voteit.core.models import BaseContent
 from voteit.core.permissions import NOT_ALLOWED
@@ -80,12 +83,11 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
 
     def save(self, **kw):
         """Set order as last agenda item for meeting when creating."""
-        if not self.pk:
-            max_order = self.meeting.agenda_items.aggregate(
+        if self.pk is None and self.order in (0, None):
+            max_order = AgendaItem.objects.filter(meeting_id=self.meeting_id).aggregate(
                 max_order=models.Max("order")
             )["max_order"]
-            if max_order is not None:
-                self.order = max_order + 1
+            self.order = (max_order or 0) + 1
         super().save(**kw)
 
     def get_proposals(self):
@@ -153,7 +155,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         target=AgendaItemWf.UPCOMING,
         source=[AgendaItemWf.PRIVATE, AgendaItemWf.CLOSED, AgendaItemWf.ONGOING],
-        permission=AgendaPermissions.CHANGE,
+        permission=f"agenda.{PERM.CHANGE}_agendaitem",
         custom={"title": _("Make upcoming")},
         conditions=[guard_no_ongoing_polls],
     )
@@ -167,7 +169,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         source=[AgendaItemWf.UPCOMING, AgendaItemWf.CLOSED, AgendaItemWf.ONGOING],
         target=AgendaItemWf.PRIVATE,
-        permission=AgendaPermissions.CHANGE,
+        permission=f"agenda.{PERM.CHANGE}_agendaitem",
         custom={"title": _("Unpublish")},
         conditions=[guard_no_ongoing_polls],
     )
@@ -181,7 +183,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         source=[AgendaItemWf.PRIVATE, AgendaItemWf.UPCOMING, AgendaItemWf.CLOSED],
         target=AgendaItemWf.ONGOING,
-        permission=AgendaPermissions.CHANGE,
+        permission=f"agenda.{PERM.CHANGE}_agendaitem",
         conditions=[guard_meeting_ongoing],
         custom={"title": _("Make ongoing")},
     )
@@ -193,7 +195,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         target=AgendaItemWf.CLOSED,
         source=[AgendaItemWf.PRIVATE, AgendaItemWf.UPCOMING, AgendaItemWf.ONGOING],
-        permission=AgendaPermissions.CHANGE,
+        permission=f"agenda.{PERM.CHANGE}_agendaitem",
         conditions=[guard_no_ongoing_polls],
         custom={"title": _("Close")},
     )

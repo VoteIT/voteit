@@ -23,7 +23,8 @@ class VerbosePermissionBackendTests(TestCase):
         # OK test
         self.assertFalse(self.user.has_perm(MeetingPermissions.VIEW, self.meeting))
         # No target passed
-        self.assertFalse(self.user.has_perm(MeetingPermissions.VIEW))
+        with self.assertRaises(TypeError):
+            self.user.has_perm(MeetingPermissions.VIEW)
         # obj not ok
         self.assertRaises(
             AssertionError, self.user.has_perm, MeetingPermissions.VIEW, object()

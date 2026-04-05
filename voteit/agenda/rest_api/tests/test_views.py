@@ -2,35 +2,28 @@ from django.contrib.auth import get_user_model
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
+from voteit.core.testing import PermissionTesterMixin
 from voteit.meeting.models import Meeting
-from voteit.meeting.roles import ROLE_MODERATOR
-from voteit.meeting.roles import ROLE_PARTICIPANT
 
 User = get_user_model()
 
 
-class AgendaItemViewTestCase(APITestCase):
+class AgendaItemViewTestCase(PermissionTesterMixin, APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.other_meeting: Meeting = Meeting.objects.create(
             title="Other meeting", state="ongoing"
         )
         cls.ai = cls.meeting.agenda_items.create(
-            state="ongoing", title="Ongoing", tags=["hello", "world"]
+            state="ongoing", title="Ongoing AI", tags=["hello", "world"]
         )
-        cls.ai_private = cls.meeting.agenda_items.create(title="Private")
-        cls.participant: User = User.objects.create_user("participant")
-        cls.moderator: User = User.objects.create_user("moderator")
+        cls.ai_private = cls.meeting.agenda_items.create(title="Private AI")
+        cls.participant: User = cls.meeting.participants.get(username="participant")
+        cls.moderator: User = cls.meeting.participants.get(username="moderator")
         cls.outsider: User = User.objects.create_user("outsider")
-        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
-        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
-
-    def setUp(self):
-        self.meeting.refresh_from_db()
-        self.ai.refresh_from_db()
 
     def test_create(self):
         url = reverse("agendaitem-list")
@@ -38,19 +31,16 @@ class AgendaItemViewTestCase(APITestCase):
             "title": "Item no 1",
             "meeting": self.meeting.pk,
         }
-        for user, status in (
-            (None, 401),
-            (self.moderator, 201),
-            (self.participant, 403),
-        ):
-            if user:
-                self.client.force_login(user)
-            response = self.client.post(url, data)
-            self.assertEqual(
-                response.status_code,
-                status,
-                f"{user} action returned wrong response code",
-            )
+        self.run_permission_tests(
+            url=url,
+            data=data,
+            method="post",
+            expected=[
+                [None, 401],
+                [self.moderator, 201],
+                [self.participant, 403],
+            ],
+        )
 
     def test_create_meeting_ne(self):
         url = reverse("agendaitem-list")
@@ -60,8 +50,11 @@ class AgendaItemViewTestCase(APITestCase):
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertEqual(
+            {"meeting": ['Invalid pk "-1" - object does not exist.']}, data
+        )
 
     def test_list(self):
         url = reverse("agendaitem-list")
@@ -83,17 +76,20 @@ class AgendaItemViewTestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(1, len(response.json()))
 
-    def test_list_anon(self):
+    def test_list_other(self):
         url = reverse("agendaitem-list")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 401)
-
-    def test_list_outsider(self):
-        url = reverse("agendaitem-list")
-        self.client.force_login(self.outsider)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual([], response.json())
+        data = {
+            "meeting": self.meeting.pk,
+        }
+        self.run_permission_tests(
+            url=url,
+            data=data,
+            method="post",
+            expected=[
+                [None, 401],
+                [self.outsider, 403, []],
+            ],
+        )
 
     def test_patch_change_meeting(self):
         url = reverse("agendaitem-detail", kwargs={"pk": self.ai.pk})
@@ -129,7 +125,7 @@ class AgendaItemViewTestCase(APITestCase):
         self.assertEqual([], data["tags"])
 
 
-class ExportParticipantsViewSetTests(APITestCase):
+class ExportParticipantsViewSetTests(PermissionTesterMixin, APITestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
 
     @classmethod
@@ -138,12 +134,12 @@ class ExportParticipantsViewSetTests(APITestCase):
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
 
-    def test_not_allowed(self):
+    def test_permissions(self):
         url = reverse("export-agenda-items-json", kwargs={"pk": self.meeting.pk})
-        self.client.force_login(self.participant)
-        response = self.client.get(url)
-        self.assertContains(
-            response, "permission meeting.moderate_meeting", status_code=403
+        self.run_permission_tests(
+            url=url,
+            method="get",
+            expected=[[None, 401], [self.participant, 404], [self.moderator, 200]],
         )
 
     def test_json(self):

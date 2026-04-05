@@ -4,6 +4,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.agenda.models import LastRead
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import RichTextSerializerMixin
+from voteit.core.rest_api.utils import validate_model_add
 
 
 class AgendaItemSerializer(RichTextSerializerMixin, BaseModelSerializer):
@@ -70,6 +71,10 @@ class CreateAgendaItemSerializer(AgendaItemSerializer):
             "state",
             "last_modified_by",
         )
+
+    def validate_meeting(self, meeting):
+        validate_model_add(self, AgendaItem, meeting)
+        return meeting
 
 
 class ExportAgendaItemSerializer(serializers.ModelSerializer):

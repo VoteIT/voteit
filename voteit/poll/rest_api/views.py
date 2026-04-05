@@ -17,7 +17,8 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.viewsets import ViewSet
 
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.permissions import AgendaPermissions
+
+from voteit.core import PERM
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.base import ReadonlyModelViewSet
@@ -65,7 +66,8 @@ class PollViewSet(DefaultModelViewSet):
             ai = self.get_context(self.request)
         except ValidationError:
             ai = None
-        if ai and self.request.user.has_perm(AgendaPermissions.VIEW, ai):
+        # FIXME
+        if ai and self.request.user.has_perm(AgendaItem.get_perm(PERM.VIEW), ai):
             return self.queryset.filter(agenda_item=ai)
         return self.queryset.none()
 

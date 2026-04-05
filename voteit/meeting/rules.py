@@ -9,6 +9,7 @@ from rules import is_authenticated
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_not_archived
+from voteit.meeting.models import MeetingRoles
 from voteit.meeting.permissions import GroupMembershipPermissions
 from voteit.meeting.permissions import MeetingGroupPermissions
 from voteit.meeting.permissions import MeetingPermissions
@@ -28,11 +29,10 @@ if TYPE_CHECKING:
 @predicate(role=ROLE_PARTICIPANT)
 def is_participant(user: AbstractUser, context: MeetingContext) -> bool:
     """Is this a meeting participant?"""
-    return (
-        isinstance(context, MeetingContext)
-        and context.meeting is not None
-        and context.meeting.has_roles(user, ROLE_PARTICIPANT)
-    )
+    if not isinstance(context, MeetingContext):
+        raise TypeError(f"Expected MeetingContext, got {type(context)}")
+    meeting_id = getattr(context, "meeting_id", context.meeting.pk)
+    return MeetingRoles.objects.filter(context_id=meeting_id, user=user).exists()
 
 
 @predicate(role=ROLE_POTENTIAL_VOTER)
@@ -132,9 +132,7 @@ def can_view_meeting(user: AbstractUser, context: MeetingContext) -> bool:
     Import and use this for any underlying things that implement MeetingContext
     """
     return is_authenticated(user) and (
-        is_public_meeting(user, context)
-        or is_participant(user, context)
-        or is_moderator(user, context)
+        is_public_meeting(user, context) or is_participant(user, context)
     )
 
 

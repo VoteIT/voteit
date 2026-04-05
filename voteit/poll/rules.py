@@ -5,7 +5,8 @@ from django.contrib.auth.models import AbstractUser
 from rules import is_authenticated
 
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.permissions import AgendaPermissions
+
+from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_not_archived
@@ -55,7 +56,8 @@ def can_view_polls_context(user: AbstractUser, poll: Poll):
     """This is a special case where polls without agenda items are checked against meeting instead"""
     if isinstance(poll, Poll):
         if poll.agenda_item is not None:
-            return user.has_perm(AgendaPermissions.VIEW, poll.agenda_item)
+            # FIXME
+            return user.has_perm(AgendaItem.get_perm(PERM.VIEW), poll.agenda_item)
         return user.has_perm(MeetingPermissions.VIEW, poll.meeting)
     return False
 

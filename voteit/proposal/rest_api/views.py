@@ -10,7 +10,8 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.permissions import AgendaPermissions
+
+from voteit.core import PERM
 from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import DefaultModelViewSet
@@ -61,7 +62,8 @@ class ProposalViewSet(DefaultModelViewSet):
                 ai = self.get_context(self.request)
             except ValidationError:
                 ai = None
-            if ai and self.request.user.has_perm(AgendaPermissions.VIEW, ai):
+            # FIXME
+            if ai and self.request.user.has_perm(AgendaItem.get_perm(PERM.VIEW), ai):
                 return self.queryset.filter(agenda_item=ai)
             return self.queryset.none()
         return self.queryset
@@ -87,7 +89,8 @@ class TextDocumentViewSet(DefaultModelViewSet):
                 ai = self.get_context(self.request)
             except ValidationError:
                 ai = None
-            if ai and self.request.user.has_perm(AgendaPermissions.VIEW, ai):
+            # FIXME
+            if ai and self.request.user.has_perm(AgendaItem.get_perm(PERM.VIEW), ai):
                 return self.queryset.filter(agenda_item=ai)
             return self.queryset.none()
         return self.queryset

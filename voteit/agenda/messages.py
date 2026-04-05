@@ -17,7 +17,7 @@ from pydantic import validator
 from rest_framework.exceptions import ValidationError
 
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.permissions import AgendaPermissions
+from voteit.core import PERM
 from voteit.core.rest_api.utils import drf_do_transition
 from voteit.core.rest_api.utils import get_valid_transitions
 from voteit.meeting.models import Meeting
@@ -98,7 +98,7 @@ class AgendaItemBulkChange(ContextAction):
                                 user=self.user,
                             )
                             must_save.add(ai)
-                        except ValidationError as exc:
+                        except ValidationError:
                             logger.debug("Transition failed", exc_info=True)
                         break
         if self.data.block_proposals is not None:
@@ -149,7 +149,9 @@ class UpdateLastRead(ContextAction):
     model = AgendaItem
     context: AgendaItem
     context_schema_attr = "agenda_item"
-    permission = AgendaPermissions.VIEW  # FIXME: Anon users and public meetings?
+    permission = AgendaItem.get_perm(
+        PERM.VIEW
+    )  # FIXME: Anon users and public meetings?
     schema = UpdateLastReadSchema
     data: UpdateLastReadSchema
     ttl = 15

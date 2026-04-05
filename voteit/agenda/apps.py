@@ -7,8 +7,8 @@ class AgendaConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        from voteit.agenda import rules
-        from .rest_api import views
-        from voteit.agenda import channels
-        from voteit.agenda import messages
-        from voteit.agenda import signals
+        from voteit.agenda import rules  # noqa
+        from voteit.agenda import channels  # noqa
+        from voteit.agenda import messages  # noqa
+        from voteit.agenda import signals  # noqa
+        from voteit.agenda.rest_api import views  # noqa
