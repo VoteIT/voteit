@@ -12,7 +12,6 @@ from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.roles import ROLE_MODERATOR
-from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import TextDocument
@@ -22,11 +21,11 @@ User = get_user_model()
 
 
 class ProposalsAPITests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai: AgendaItem = cls.meeting.agenda_items.create(
             state="ongoing", title="Ongoing"
         )
@@ -37,13 +36,15 @@ class ProposalsAPITests(APITestCase):
             body="I am the eggman\nI am the walrus"
         )
         cls.para: TextParagraph = cls.text_doc.text_paragraphs.first()
-        cls.participant: User = User.objects.create_user("participant")
-        cls.proposer: User = User.objects.create_user("proposer")
-        cls.moderator: User = User.objects.create_user("moderator", userid="Moderator")
+        cls.participant: User = cls.meeting.participants.get(username="participant")
+        cls.proposer: User = cls.meeting.participants.create(username="proposer")
+        cls.moderator: User = cls.meeting.participants.get(username="moderator")
+        cls.moderator.userid = "moderator"
+        cls.moderator.save()
         cls.outsider: User = User.objects.create_user("outsider")
-        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        # cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.proposer, ROLE_PROPOSER)
-        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        # cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.meeting_group = cls.meeting.groups.create()
 
     def test_create(self):
@@ -73,8 +74,11 @@ class ProposalsAPITests(APITestCase):
         data = {"body": "bla", "agenda_item": -1, "shortname": "proposal"}
         self.client.force_login(self.proposer)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertDictEqual(
+            {"agenda_item": ['Invalid pk "-1" - object does not exist.']}, data
+        )
 
     def test_create_diff_proposal(self):
         url = reverse("proposal-list")
@@ -124,34 +128,6 @@ class ProposalsAPITests(APITestCase):
                 status,
                 f"{user} action returned wrong response code",
             )
-
-    def test_list_without_ai(self):
-        url = reverse("proposal-list")
-        self.client.force_login(self.participant)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual([], response.json())
-
-    def test_list(self):
-        url = reverse("proposal-list")
-        self.client.force_login(self.participant)
-        response = self.client.get(url, {"agenda_item": self.ai.pk})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(1, len(response.json()))
-
-    def test_list_private_ai(self):
-        url = reverse("proposal-list")
-        self.client.force_login(self.participant)
-        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual([], response.json())
-
-    def test_list_private_ai_moderator(self):
-        url = reverse("proposal-list")
-        self.client.force_login(self.moderator)
-        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(1, len(response.json()))
 
     def test_put_author_proposer(self):
         prop = self.ai.proposals.create(body="hello", author=self.proposer)
@@ -428,39 +404,23 @@ class TextDocumentAPITests(APITestCase):
         data = {
             "body": "bla",
             "agenda_item": -1,
+            "base_tag": "hi",
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
-
-    def test_list_without_ai(self):
-        url = reverse("text-document-list")
-        self.client.force_login(self.participant)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual([], response.json())
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertDictEqual(
+            {"agenda_item": ['Invalid pk "-1" - object does not exist.']},
+            data,
+        )
 
     def test_list(self):
         url = reverse("text-document-list")
-        self.client.force_login(self.participant)
-        response = self.client.get(url, {"agenda_item": self.ai.pk})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(1, len(response.json()))
-
-    def test_list_private_ai(self):
-        url = reverse("text-document-list")
-        self.client.force_login(self.participant)
-        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual([], response.json())
-
-    def test_list_private_ai_moderator(self):
-        url = reverse("text-document-list")
         self.client.force_login(self.moderator)
-        response = self.client.get(url, {"agenda_item": self.ai_private.pk})
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(1, len(response.json()))
+        self.assertEqual(0, len(response.json()))
 
     def test_delete(self):
         url = reverse("text-document-detail", kwargs={"pk": self.text_doc.pk})

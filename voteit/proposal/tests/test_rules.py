@@ -1,6 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.core import PERM
+from voteit.proposal import PERM_RETRACT
+from voteit.proposal.models import Proposal
+from voteit.proposal.models import TextDocument
+
 
 class RulesTests(TestCase):
     @classmethod
@@ -38,66 +43,13 @@ class RulesTests(TestCase):
         self.ai.refresh_from_db()
         self.meeting.refresh_from_db()
 
-    def p(self, perm):
-        from voteit.proposal.permissions import ProposalPermissions
-
-        return getattr(ProposalPermissions, perm)
-
     def _archive(self):
         self.meeting.archive()
         self.meeting.save()
         self.ai.refresh_from_db()
 
-    def test_view_private(self):
-        self.ai.unpublish()
-        self.ai.save()
-        VIEW = self.p("VIEW")
-        self.assertFalse(self.anon_user.has_perm(VIEW, self.proposal))
-        self.assertFalse(self.participant.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.proposal))
-        self.assertFalse(self.proposer.has_perm(VIEW, self.proposal))
-        self.assertFalse(self.proposer_author.has_perm(VIEW, self.proposal))
-        self.assertFalse(self.group_proposer.has_perm(VIEW, self.proposal))
-        self.assertFalse(self.group_participant.has_perm(VIEW, self.proposal))
-
-    def test_view_upcoming(self):
-        VIEW = self.p("VIEW")
-        self.assertFalse(self.anon_user.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.participant.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.proposer.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.proposer_author.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.group_proposer.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.group_participant.has_perm(VIEW, self.proposal))
-
-    def test_view_public_meeting_private_ai(self):
-        self.ai.unpublish()
-        self.ai.save()
-        self.meeting.public = True
-        self.meeting.save()
-        VIEW = self.p("VIEW")
-        self.assertFalse(self.anon_user.has_perm(VIEW, self.proposal))
-        self.assertFalse(self.participant.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.proposal))
-        self.assertFalse(self.proposer.has_perm(VIEW, self.proposal))
-        self.assertFalse(self.proposer_author.has_perm(VIEW, self.proposal))
-        self.assertFalse(self.group_proposer.has_perm(VIEW, self.proposal))
-        self.assertFalse(self.group_participant.has_perm(VIEW, self.proposal))
-
-    def test_view_public_meeting(self):
-        self.meeting.public = True
-        self.meeting.save()
-        VIEW = self.p("VIEW")
-        self.assertTrue(self.anon_user.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.participant.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.proposer.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.proposer_author.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.group_proposer.has_perm(VIEW, self.proposal))
-        self.assertTrue(self.group_participant.has_perm(VIEW, self.proposal))
-
     def test_add(self):
-        ADD = self.p("ADD")
+        ADD = Proposal.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertTrue(self.moderator.has_perm(ADD, self.ai))
@@ -108,7 +60,7 @@ class RulesTests(TestCase):
     def test_add_with_block(self):
         self.ai.block_proposals = True
         self.ai.save()
-        ADD = self.p("ADD")
+        ADD = Proposal.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertTrue(self.moderator.has_perm(ADD, self.ai))
@@ -118,7 +70,7 @@ class RulesTests(TestCase):
 
     def test_add_closed_ai_ongoing_meeting(self):
         self.ai.close()
-        ADD = self.p("ADD")
+        ADD = Proposal.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertFalse(self.moderator.has_perm(ADD, self.ai))
@@ -131,7 +83,7 @@ class RulesTests(TestCase):
         self.meeting.ongoing()
         self.meeting.close()
         self.ai.close()
-        ADD = self.p("ADD")
+        ADD = Proposal.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertFalse(self.moderator.has_perm(ADD, self.ai))
@@ -141,7 +93,7 @@ class RulesTests(TestCase):
 
     def test_add_archived_meeting(self):
         self._archive()
-        ADD = self.p("ADD")
+        ADD = Proposal.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertFalse(self.moderator.has_perm(ADD, self.ai))
@@ -150,7 +102,7 @@ class RulesTests(TestCase):
         self.assertFalse(self.group_participant.has_perm(ADD, self.ai))
 
     def test_change(self):
-        CHANGE = self.p("CHANGE")
+        CHANGE = Proposal.get_perm(PERM.CHANGE)
         # Maybe we want to allow changes for authors later on...
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.participant.has_perm(CHANGE, self.proposal))
@@ -165,7 +117,7 @@ class RulesTests(TestCase):
         self.meeting.save()
         self.ai.close()
         self.ai.save()
-        CHANGE = self.p("CHANGE")
+        CHANGE = Proposal.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.participant.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.moderator.has_perm(CHANGE, self.proposal))
@@ -180,7 +132,7 @@ class RulesTests(TestCase):
         self.meeting.save()
         self.ai.close()
         self.ai.save()
-        CHANGE = self.p("CHANGE")
+        CHANGE = Proposal.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.participant.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.moderator.has_perm(CHANGE, self.proposal))
@@ -191,7 +143,7 @@ class RulesTests(TestCase):
 
     def test_change_archived_meeting(self):
         self._archive()
-        CHANGE = self.p("CHANGE")
+        CHANGE = Proposal.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.participant.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.moderator.has_perm(CHANGE, self.proposal))
@@ -201,7 +153,7 @@ class RulesTests(TestCase):
         self.assertFalse(self.group_participant.has_perm(CHANGE, self.proposal))
 
     def test_delete(self):
-        DELETE = self.p("DELETE")
+        DELETE = Proposal.get_perm(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.proposal))
         self.assertFalse(self.participant.has_perm(DELETE, self.proposal))
         self.assertTrue(self.moderator.has_perm(DELETE, self.proposal))
@@ -215,7 +167,7 @@ class RulesTests(TestCase):
         self.meeting.save()
         self.ai.close()
         self.ai.save()
-        DELETE = self.p("DELETE")
+        DELETE = Proposal.get_perm(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.proposal))
         self.assertFalse(self.participant.has_perm(DELETE, self.proposal))
         self.assertFalse(self.moderator.has_perm(DELETE, self.proposal))
@@ -230,7 +182,7 @@ class RulesTests(TestCase):
         self.meeting.save()
         self.ai.close()
         self.ai.save()
-        DELETE = self.p("DELETE")
+        DELETE = Proposal.get_perm(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.proposal))
         self.assertFalse(self.participant.has_perm(DELETE, self.proposal))
         self.assertFalse(self.moderator.has_perm(DELETE, self.proposal))
@@ -241,7 +193,7 @@ class RulesTests(TestCase):
 
     def test_delete_archived_meeting(self):
         self._archive()
-        DELETE = self.p("DELETE")
+        DELETE = Proposal.get_perm(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.proposal))
         self.assertFalse(self.participant.has_perm(DELETE, self.proposal))
         self.assertFalse(self.moderator.has_perm(DELETE, self.proposal))
@@ -251,7 +203,7 @@ class RulesTests(TestCase):
         self.assertFalse(self.group_participant.has_perm(DELETE, self.proposal))
 
     def test_retract(self):
-        RETRACT = self.p("RETRACT")
+        RETRACT = Proposal.get_perm(PERM_RETRACT)
         self.assertFalse(self.anon_user.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.participant.has_perm(RETRACT, self.proposal))
         self.assertTrue(self.moderator.has_perm(RETRACT, self.proposal))
@@ -262,7 +214,7 @@ class RulesTests(TestCase):
 
     def test_retract_archived_meeting(self):
         self._archive()
-        RETRACT = self.p("RETRACT")
+        RETRACT = Proposal.get_perm(PERM_RETRACT)
         self.assertFalse(self.anon_user.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.participant.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.moderator.has_perm(RETRACT, self.proposal))
@@ -274,7 +226,7 @@ class RulesTests(TestCase):
     def test_retract_private_ai(self):
         self.ai.unpublish()
         self.ai.save()
-        RETRACT = self.p("RETRACT")
+        RETRACT = Proposal.get_perm(PERM_RETRACT)
         self.assertFalse(self.anon_user.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.participant.has_perm(RETRACT, self.proposal))
         self.assertTrue(self.moderator.has_perm(RETRACT, self.proposal))
@@ -286,7 +238,7 @@ class RulesTests(TestCase):
     def test_retract_closed_ai_ongoing_meeting(self):
         self.ai.close()
         self.ai.save()
-        RETRACT = self.p("RETRACT")
+        RETRACT = Proposal.get_perm(PERM_RETRACT)
         self.assertFalse(self.anon_user.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.participant.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.moderator.has_perm(RETRACT, self.proposal))
@@ -299,7 +251,7 @@ class RulesTests(TestCase):
         self.ai.close()
         self.meeting.ongoing()
         self.meeting.close()
-        RETRACT = self.p("RETRACT")
+        RETRACT = Proposal.get_perm(PERM_RETRACT)
         self.assertFalse(self.anon_user.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.participant.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.moderator.has_perm(RETRACT, self.proposal))
@@ -343,76 +295,58 @@ class TextDocumentPermissionsTests(TestCase):
     def setUp(self):
         self.ai.refresh_from_db()
 
-    def p(self, perm):
-        from voteit.proposal.permissions import TextDocumentPermissions
-
-        return getattr(TextDocumentPermissions, perm)
-
     def _mk_prop(self):
         self.para.proposals.create()
 
     def test_add_ongoing_ai(self):
-        ADD = self.p("ADD")
+        ADD = TextDocument.get_perm(PERM.ADD)
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertTrue(self.moderator.has_perm(ADD, self.ai))
         self.assertFalse(self.outsider.has_perm(ADD, self.ai))
 
     def test_add_closed_ai(self):
         self.ai.close()
-        ADD = self.p("ADD")
+        ADD = TextDocument.get_perm(PERM.ADD)
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertFalse(self.moderator.has_perm(ADD, self.ai))
         self.assertFalse(self.outsider.has_perm(ADD, self.ai))
 
     def test_change_ongoing_ai(self):
-        CHANGE = self.p("CHANGE")
+        CHANGE = TextDocument.get_perm(PERM.CHANGE)
         self.assertFalse(self.participant.has_perm(CHANGE, self.text_doc))
         self.assertTrue(self.moderator.has_perm(CHANGE, self.text_doc))
         self.assertFalse(self.outsider.has_perm(CHANGE, self.text_doc))
 
     def test_change_closed_ai(self):
         self.ai.close()
-        CHANGE = self.p("CHANGE")
+        CHANGE = TextDocument.get_perm(PERM.CHANGE)
         self.assertFalse(self.participant.has_perm(CHANGE, self.text_doc))
         self.assertFalse(self.moderator.has_perm(CHANGE, self.text_doc))
         self.assertFalse(self.outsider.has_perm(CHANGE, self.text_doc))
 
     def test_change_ongoing_ai_with_proposals(self):
         self._mk_prop()
-        CHANGE = self.p("CHANGE")
+        CHANGE = TextDocument.get_perm(PERM.CHANGE)
         self.assertFalse(self.participant.has_perm(CHANGE, self.text_doc))
         self.assertFalse(self.moderator.has_perm(CHANGE, self.text_doc))
         self.assertFalse(self.outsider.has_perm(CHANGE, self.text_doc))
 
-    def test_view_ongoing_ai(self):
-        VIEW = self.p("VIEW")
-        self.assertTrue(self.participant.has_perm(VIEW, self.text_doc))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.text_doc))
-        self.assertFalse(self.outsider.has_perm(VIEW, self.text_doc))
-
-    def test_view_private_ai(self):
-        self.ai.unpublish()
-        VIEW = self.p("VIEW")
-        self.assertFalse(self.participant.has_perm(VIEW, self.text_doc))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.text_doc))
-        self.assertFalse(self.outsider.has_perm(VIEW, self.text_doc))
-
     def test_delete_ongoing_ai(self):
-        DELETE = self.p("DELETE")
+        DELETE = TextDocument.get_perm(PERM.DELETE)
         self.assertFalse(self.participant.has_perm(DELETE, self.text_doc))
         self.assertTrue(self.moderator.has_perm(DELETE, self.text_doc))
         self.assertFalse(self.outsider.has_perm(DELETE, self.text_doc))
 
     def test_delete_closed_ai(self):
         self.ai.close()
-        DELETE = self.p("DELETE")
+        DELETE = TextDocument.get_perm(PERM.DELETE)
         self.assertFalse(self.participant.has_perm(DELETE, self.text_doc))
         self.assertFalse(self.moderator.has_perm(DELETE, self.text_doc))
         self.assertFalse(self.outsider.has_perm(DELETE, self.text_doc))
 
     def test_delete_ongoing_ai_proposals(self):
         self._mk_prop()
-        DELETE = self.p("DELETE")
+        DELETE = TextDocument.get_perm(PERM.DELETE)
         self.assertFalse(self.participant.has_perm(DELETE, self.text_doc))
         self.assertFalse(self.moderator.has_perm(DELETE, self.text_doc))
         self.assertFalse(self.outsider.has_perm(DELETE, self.text_doc))

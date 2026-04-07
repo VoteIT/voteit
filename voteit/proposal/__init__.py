@@ -1,1 +1,2 @@
 DEFAULT_PROPOSAL_ID_POLICY = "userid"
+PERM_RETRACT = "retract"

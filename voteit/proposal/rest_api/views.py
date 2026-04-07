@@ -1,24 +1,24 @@
 import csv
 
+from django.db import models
 from django.http import Http404
 from django.http import HttpResponse
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 
-from voteit.agenda.models import AgendaItem
-
-from voteit.core import PERM
 from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
-from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
-from voteit.proposal.models import TextDocument
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.proposal.models import Proposal
+from voteit.proposal.models import TextDocument
 from voteit.proposal.rest_api import serializers
 from voteit.proposal.rest_api.serializers import GenericExportProposalSerializer
 
@@ -30,23 +30,39 @@ __all__ = [
 
 
 @router.register("proposals", basename="proposal")
-class ProposalViewSet(DefaultModelViewSet):
-    model = Proposal  # And ALL subtypes!
-    queryset = Proposal.objects.all().select_subclasses()
+class ProposalViewSet(
+    VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelViewSet
+):
     serializer_class = serializers.GenericProposalSerializer  # Morphic
-    serializer_classes = {
-        "create": serializers.GenericCreateProposalSerializer,
-        "preview": serializers.GenericCreateProposalSerializer,
-        "list": serializers.ProposalDetailSerializer,
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "create": None,
+        "preview": None,
+        "retract": "retract",
     }
-    filterset_fields = (
-        "agenda_item",
-        "agenda_item__meeting",
-    )
-    context_queryset = AgendaItem.objects.all()
-    context_lookup_kwarg = "agenda_item"
-    permission_type_map = DefaultModelViewSet.permission_type_map.copy()
-    permission_type_map["preview"] = None
+
+    def get_serializer_class(self):
+        if self.action in ("preview", "create"):
+            return serializers.GenericCreateProposalSerializer
+        elif self.action == "list":
+            return serializers.ProposalDetailSerializer
+        return super().get_serializer_class()
+
+    def get_queryset(self):
+        # Proposal and subtypes!
+        if self.action == "list":
+            return Proposal.objects.none()
+        return (
+            Proposal.objects.filter(
+                models.Q(agenda_item__meeting__roles__user=self.request.user)
+                & models.Q(
+                    agenda_item__meeting__roles__assigned__contains=ROLE_MODERATOR
+                )
+                | ~models.Q(agenda_item__state="private")
+            )
+            .select_subclasses()
+            .distinct()
+        )
 
     @action(methods=["post"], detail=False)
     def preview(self, request, *args, **kwargs):
@@ -55,45 +71,29 @@ class ProposalViewSet(DefaultModelViewSet):
         data = serializer.to_representation(serializer.validated_data)
         return Response(data=data)
 
-    def get_queryset(self):
-        if self.action == "list":
-            # This isn't really necessary for QS since we use websockets
-            try:
-                ai = self.get_context(self.request)
-            except ValidationError:
-                ai = None
-            # FIXME
-            if ai and self.request.user.has_perm(AgendaItem.get_perm(PERM.VIEW), ai):
-                return self.queryset.filter(agenda_item=ai)
-            return self.queryset.none()
-        return self.queryset
-
 
 @router.register("text-documents", basename="text-document")
-class TextDocumentViewSet(DefaultModelViewSet):
-    model = TextDocument
-    queryset = TextDocument.objects.all()
+class TextDocumentViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     serializer_class = serializers.TextDocumentSerializer
-    serializer_classes = {"create": serializers.CreateTextDocumentSerializer}
-    filterset_fields = (
-        "agenda_item",
-        "agenda_item__meeting",
-    )
-    context_queryset = AgendaItem.objects.all()
-    context_lookup_kwarg = "agenda_item"
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "create": None,  # Handled by qs
+        "retrieve": None,
+    }
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.CreateTextDocumentSerializer
+        return super().get_serializer_class()
 
     def get_queryset(self):
         if self.action == "list":
-            # This isn't really necessary for QS since we use websockets
-            try:
-                ai = self.get_context(self.request)
-            except ValidationError:
-                ai = None
-            # FIXME
-            if ai and self.request.user.has_perm(AgendaItem.get_perm(PERM.VIEW), ai):
-                return self.queryset.filter(agenda_item=ai)
-            return self.queryset.none()
-        return self.queryset
+            return TextDocument.objects.none()
+        return TextDocument.objects.filter(
+            models.Q(agenda_item__meeting__roles__user=self.request.user)
+            & models.Q(agenda_item__meeting__roles__assigned__contains=ROLE_MODERATOR)
+            | ~models.Q(agenda_item__state="private")
+        ).distinct()
 
 
 @router.register("export-proposals", basename="export-proposals")

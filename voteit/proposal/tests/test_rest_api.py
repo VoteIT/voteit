@@ -51,5 +51,8 @@ class ProposalTestCase(APITestCase):
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertDictEqual(
+            {"agenda_item": ['Invalid pk "-1" - object does not exist.']}, data
+        )

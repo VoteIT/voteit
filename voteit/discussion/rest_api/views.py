@@ -28,7 +28,6 @@ __all__ = [
 @router.register("discussion-posts", basename="discussion-posts")
 class DiscussionPostViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     model = DiscussionPost
-    queryset = DiscussionPost.objects.all()
     serializer_class = serializers.DiscussionPostDetailSerializer
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,

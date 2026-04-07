@@ -7,8 +7,8 @@ class ProposalConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        from voteit.proposal import rules
-        from .rest_api import views
-        from voteit.proposal import messages
-        from voteit.proposal import signals
-        from voteit.proposal.app import proposal_id
+        from voteit.proposal import rules  # noqa
+        from voteit.proposal.rest_api import views  # noqa
+        from voteit.proposal import messages  # noqa
+        from voteit.proposal import signals  # noqa
+        from voteit.proposal.app import proposal_id  # noqa

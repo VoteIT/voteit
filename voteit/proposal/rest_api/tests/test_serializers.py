@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from voteit.agenda.models import AgendaItem
 from voteit.core.testing import mk_hashtag
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
 from voteit.proposal.models import TextParagraph
@@ -118,6 +119,8 @@ class ProposalCreateSerializer(TestCase):
         cls.group = cls.meeting.groups.create()
         cls.group.members.add(cls.user)
         cls.non_group_user = cls.meeting.participants.create(username="non_group_user")
+        cls.meeting.add_roles(cls.user, ROLE_PROPOSER)
+        cls.meeting.add_roles(cls.non_group_user, ROLE_PROPOSER)
         cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
 
     @property
@@ -228,6 +231,7 @@ class DiffProposalCreateSerializerTests(TestCase):
             title="Test meeting", state="ongoing"
         )
         cls.user = cls.meeting.participants.create(username="participant")
+        cls.meeting.add_roles(cls.user, ROLE_PROPOSER)
         cls.ai: AgendaItem = cls.meeting.agenda_items.create(
             state="ongoing", title="Ongoing"
         )
@@ -321,12 +325,12 @@ class TextDocumentSerializerTests(TestCase):
 
 
 class CreateTextDocumentSerializerTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
-        cls.user = cls.meeting.participants.create(username="participant")
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.user = cls.meeting.participants.get(username="moderator")
         cls.ai: AgendaItem = cls.meeting.agenda_items.create(
             state="ongoing", title="Ongoing"
         )

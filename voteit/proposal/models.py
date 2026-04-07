@@ -13,10 +13,12 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField, transition
 from model_utils.managers import InheritanceManager
+from rules.contrib.models import RulesModelMixin
 
+from voteit.core import PERM
 from voteit.core.abcs import AgendaItemContext, MeetingContext
 from voteit.core.models import BaseContent
-from voteit.proposal.permissions import ProposalPermissions
+from voteit.proposal import PERM_RETRACT
 from voteit.proposal.workflows import ProposalWf
 from voteit.reactions.mixins import Reactable
 from voteit.stats.registry import history_log
@@ -105,7 +107,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         field=state,
         source=ProposalWf.PUBLISHED,
         target=ProposalWf.RETRACTED,
-        permission=ProposalPermissions.RETRACT,
+        permission=f"proposal.{PERM_RETRACT}_proposal",
         custom={"title": _("Retract")},
     )
     def retract(self):
@@ -116,7 +118,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         field=state,
         source=[ProposalWf.PUBLISHED, ProposalWf.RETRACTED],
         target=ProposalWf.VOTING,
-        permission=ProposalPermissions.CHANGE,
+        permission=f"proposal.{PERM.CHANGE}_proposal",
         custom={"title": _("Lock for vote")},
     )
     def lock_for_vote(self):
@@ -130,7 +132,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         field=state,
         source=[ProposalWf.PUBLISHED, ProposalWf.VOTING, ProposalWf.DENIED],
         target=ProposalWf.APPROVED,
-        permission=ProposalPermissions.CHANGE,
+        permission=f"proposal.{PERM.CHANGE}_proposal",
         custom={"title": _("Approve")},
     )
     def approved(self):
@@ -141,7 +143,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         field=state,
         source=[ProposalWf.PUBLISHED, ProposalWf.VOTING, ProposalWf.APPROVED],
         target=ProposalWf.DENIED,
-        permission=ProposalPermissions.CHANGE,
+        permission=f"proposal.{PERM.CHANGE}_proposal",
         custom={"title": _("Deny")},
     )
     def denied(self):
@@ -152,7 +154,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         field=state,
         source=ProposalWf.PUBLISHED,
         target=ProposalWf.UNHANDLED,
-        permission=ProposalPermissions.CHANGE,
+        permission=f"proposal.{PERM.CHANGE}_proposal",
         custom={"title": _("Mark as unhandled")},
     )
     def unhandled(self):
@@ -163,7 +165,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         field=state,
         source="+",
         target=ProposalWf.PUBLISHED,
-        permission=ProposalPermissions.CHANGE,
+        permission=f"proposal.{PERM.CHANGE}_proposal",
         custom={"title": _("Publish")},
     )
     def publish(self):
@@ -204,7 +206,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
         "agenda_item",
     ],
 )
-class TextDocument(AgendaItemContext, MeetingContext):
+class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
     """
     The full text that's the basis for diff proposals.
     """

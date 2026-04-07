@@ -12,6 +12,7 @@ from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import ExportBaseSerializerMixin
 from voteit.core.rest_api.serializers import RichTextSerializerMixin
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
+from voteit.core.rest_api.utils import validate_model_add
 from voteit.core.rest_api.validators import ValidateGroupAIContext
 from voteit.core.utils import get_model_shortname
 from voteit.proposal.diff import Changes
@@ -158,6 +159,10 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "agenda_item": {"required": True},
         }
 
+    def validate_agenda_item(self, value):
+        validate_model_add(self, Proposal, value)
+        return value
+
 
 class DiffProposalCreateSerializer(ProposalCreateSerializer):
     body_diff = serializers.SerializerMethodField()
@@ -197,6 +202,10 @@ class DiffProposalCreateSerializer(ProposalCreateSerializer):
         else:
             raise TypeError("Got something other than TextParagraph as 'paragraph'")
         return attrs
+
+    def validate_agenda_item(self, value):
+        validate_model_add(self, DiffProposal, value)
+        return value
 
 
 class DiffProposalDetailSerializer(ProposalDetailSerializer):
@@ -269,6 +278,10 @@ class CreateTextDocumentSerializer(BaseModelSerializer):
         if TextDocument.objects.filter(agenda_item=ai, base_tag=base_tag).exists():
             raise ValidationError({"base_tag": _("Must be unique for agenda item")})
         return attrs
+
+    def validate_agenda_item(self, value):
+        validate_model_add(self, TextDocument, value)
+        return value
 
 
 class TextDocumentSerializer(serializers.ModelSerializer):
