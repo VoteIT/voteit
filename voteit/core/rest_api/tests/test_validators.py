@@ -4,6 +4,7 @@ from rest_framework.exceptions import ValidationError
 
 from voteit.core.testing import mk_hashtag
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_MODERATOR
 
 
@@ -21,6 +22,7 @@ class ValidateGroupAIContextTests(TestCase):
         cls.user = cls.meeting.participants.create(username="jane")
         cls.moderator = cls.meeting.participants.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.meeting.add_roles(cls.user, ROLE_DISCUSSER)
         cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
         # Outside of test meeting
         cls.other_meeting: Meeting = Meeting.objects.create(title="Other meeting")

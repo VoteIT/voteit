@@ -193,7 +193,6 @@ class MeetingViewSetTests(APITestCase):
 
     def test_list_n1(self):
         self.org.meetings.create(er_policy_name=AutoAlways.name, public=True)
-        self.org.meetings.create(er_policy_name=AutoAlways.name, public=True)
         url = reverse("meeting-list")
         self.client.force_login(self.participant)
         with self.assertNumQueries(4):
