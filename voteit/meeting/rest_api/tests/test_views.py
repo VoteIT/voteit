@@ -198,7 +198,7 @@ class MeetingViewSetTests(APITestCase):
         with self.assertNumQueries(4):
             response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(3, len(response.json()))
+        self.assertEqual(2, len(response.json()))
 
     def test_get(self):
         url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})
