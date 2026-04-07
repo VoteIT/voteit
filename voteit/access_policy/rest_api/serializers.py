@@ -4,6 +4,7 @@ from rest_framework import serializers
 from voteit.access_policy.app.policies import AutomaticAccess
 from voteit.access_policy.utils import get_policies
 from voteit.core.rest_api.fields import RolesField
+from voteit.core.rest_api.utils import validate_model_add
 from voteit.meeting.models import Meeting
 
 
@@ -19,6 +20,10 @@ class CreateAutomaticAccessSerializer(serializers.ModelSerializer):
             "name",
             "roles_given",
         )
+
+    def validate_meeting(self, value):
+        validate_model_add(self, AutomaticAccess, value)
+        return value
 
 
 class AutomaticAccessSerializer(CreateAutomaticAccessSerializer):

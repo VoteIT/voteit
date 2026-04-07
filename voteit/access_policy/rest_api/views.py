@@ -8,13 +8,14 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 
 from voteit.access_policy.app.policies import AutomaticAccess
 from voteit.access_policy.rest_api import serializers
 from voteit.core.rest_api import router
-from voteit.core.rest_api.base import DefaultModelViewSet
+from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
+from voteit.meeting.roles import ROLE_MODERATOR
 
 logger = getLogger(__name__)
 
@@ -30,32 +31,29 @@ class AccessPoliciesViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 @router.register("access-policy-automatic", basename="access-policy-automatic")
-class AutomaticAccessViewSet(DefaultModelViewSet):
-    model = AutomaticAccess
+class AutomaticAccessViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     serializer_class = serializers.AutomaticAccessSerializer
-    serializer_classes = {"create": serializers.CreateAutomaticAccessSerializer}
-    context_queryset = Meeting.objects.all()
-    context_lookup_kwarg = "meeting"
-    permission_classes = (IsAuthenticated,)
-    queryset = AutomaticAccess.objects.all()
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "join": None,
+        "retrieve": None,
+        "create": None,  # Checked in serializer
+    }
 
-    @property
-    def permission_type_map(self) -> dict:
-        return {"join": None, **super().permission_type_map}
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.CreateAutomaticAccessSerializer
+        return super().get_serializer_class()
 
     def get_queryset(self) -> QuerySet:
-        if self.action == "list":
-            try:
-                meeting: Meeting = self.get_context(self.request)
-            except ValidationError:
-                meeting = None
-            if meeting and self.request.user.has_perm(
-                MeetingPermissions.MODERATE, meeting
-            ):
-                return self.queryset.filter(meeting=meeting)
-            else:
-                return self.queryset.none()
-        return self.queryset
+        if self.action in ("list", "join"):
+            return AutomaticAccess.objects.filter(
+                meeting__organisation_id=self.request.user.organisation_id
+            )
+        return AutomaticAccess.objects.filter(
+            meeting__roles__user=self.request.user,
+            meeting__roles__assigned__contains=ROLE_MODERATOR,
+        )
 
     @action(detail=True, methods=["post"])
     def join(self, request: Request, **kw):

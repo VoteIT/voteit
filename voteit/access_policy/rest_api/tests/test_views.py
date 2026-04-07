@@ -3,25 +3,26 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
+from voteit.access_policy.app.policies import AutomaticAccess
+from voteit.core.testing import PermissionTesterMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.organisation.models import Organisation
 
 User = get_user_model()
 
 _BASENAME = "access-policy-automatic"
 
 
-class AutomaticAccessAPITests(APITestCase):
+class AutomaticAccessAPITests(PermissionTesterMixin, APITestCase):
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
     def setUpTestData(cls):
-        from voteit.meeting.models import Meeting
-        from voteit.access_policy.app.policies import AutomaticAccess
-
+        cls.org = Organisation.objects.get(pk=1)
         cls.participant: User = User.objects.get(username="participant")
         cls.moderator: User = User.objects.get(username="moderator")
-        cls.outsider: User = User.objects.create_user("outsider")
+        cls.outsider: User = cls.org.users.create(username="outsider")
         cls.meeting = Meeting.objects.get(pk=1)
         cls.automatic_access = AutomaticAccess.objects.create(meeting=cls.meeting)
 
@@ -32,40 +33,30 @@ class AutomaticAccessAPITests(APITestCase):
         self.automatic_access.delete()
         url = reverse(f"{_BASENAME}-list")
         data = {"meeting": self.meeting.pk, "roles_given": []}
-        for user, status in (
-            (None, 401),
-            (self.moderator, 201),
-            (self.participant, 403),
-        ):
-            if user:
-                self.client.force_login(user)
-            response = self.client.post(url, data)
-            self.assertEqual(
-                response.status_code,
-                status,
-                f"{user} action returned wrong response code",
-            )
+        self.run_permission_tests(
+            url=url,
+            data=data,
+            method="post",
+            expected=[[None, 401], [self.moderator, 201], [self.participant, 403]],
+        )
 
     def test_create_meeting_ne(self):
         url = reverse(f"{_BASENAME}-list")
         data = {
             "meeting": -1,
+            "roles_given": [],
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
-
-    def test_list(self):
-        url = reverse(f"{_BASENAME}-list")
-        self.client.force_login(self.participant)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.json())
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertDictEqual(
+            {"meeting": ['Invalid pk "-1" - object does not exist.']}, data
+        )
 
     def test_list_with_meeting(self):
         url = reverse(f"{_BASENAME}-list")
-        self.client.force_login(self.moderator)
+        self.client.force_login(self.participant)
         response = self.client.get(url, data={"meeting": self.meeting.pk})
         self.assertEqual(response.status_code, 200)
         data = response.json()

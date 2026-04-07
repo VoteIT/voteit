@@ -5,6 +5,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from django.db import models
+from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import MeetingContext
 
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-class AccessPolicy(MeetingContext):
+class AccessPolicy(RulesModelMixin, MeetingContext):
     """
     Subclass this to create an access policy.
 
