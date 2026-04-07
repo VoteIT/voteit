@@ -1,7 +1,6 @@
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db import transaction
-
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -17,6 +16,8 @@ from voteit.room.rest_api.serializers import RoomDetailSerializer
 from voteit.room.rest_api.serializers import RoomHandleSerializer
 from voteit.room.rest_api.serializers import RoomSerializer
 from voteit.room.rest_api.serializers import SpeakerManagerRoomDetailSerializer
+from voteit.speaker.models import Speaker
+from voteit.speaker.models import SpeakerList
 
 
 @router.register("rooms", basename="rooms")
@@ -28,9 +29,10 @@ class RoomsViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "create": None,  # In serializer
-        "set_handler": PERM.CHANGE,
         "handle": PERM.HANDLE,
         "handle_speaker": ROOM_PERM_HANDLE_SPEAKER,
+        "set_handler": PERM.CHANGE,
+        "status": None,
         #  "partial_update": None,  # checked in method - only partial needs to be handled manually
     }
 
@@ -83,6 +85,17 @@ class RoomsViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     )
     def handle_speaker(self, request, *args, **kwargs):
         return self.partial_update(request, *args, **kwargs)
+
+    @action(methods=["get"], detail=True)
+    def status(self, request, *args, **kwargs):
+        """Preflight check endpoint, to see if it's safe to delete this room."""
+        room = self.get_object()
+        return Response(
+            {
+                "speakers": Speaker.objects.filter(speaker_list__room=room).count(),
+                "speaker_lists": SpeakerList.objects.filter(room=room).count(),
+            }
+        )
 
     def perform_destroy(self, instance):
         with transaction.atomic(durable=True):
