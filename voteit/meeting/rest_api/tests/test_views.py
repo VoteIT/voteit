@@ -189,7 +189,16 @@ class MeetingViewSetTests(APITestCase):
         self.client.force_login(self.participant)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(0, len(response.json()))
+        self.assertEqual(1, len(response.json()))
+
+    def test_list_n1(self):
+        self.org.meetings.create(er_policy_name=AutoAlways.name, public=True)
+        url = reverse("meeting-list")
+        self.client.force_login(self.participant)
+        with self.assertNumQueries(4):
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(2, len(response.json()))
 
     def test_get(self):
         url = reverse("meeting-detail", kwargs={"pk": self.meeting.pk})

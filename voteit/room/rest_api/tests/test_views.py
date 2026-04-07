@@ -4,10 +4,10 @@ from rest_framework.test import APITestCase
 
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.poll.app.polls.simple import Simple as SimplePoll
 from voteit.speaker.app.list_methods.simple import Simple
 from voteit.speaker.models import Speaker
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
-from voteit.poll.app.polls.simple import Simple as SimplePoll
 
 User = get_user_model()
 
@@ -225,6 +225,19 @@ class RoomsViewTestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.room.refresh_from_db()
         self.assertEqual(self.moderator, self.room.handler)
+
+    def test_room_status(self):
+        """Delete preflight check"""
+        slist = self.sls.speaker_lists.create()
+        slist.speaker_items.create(user=self.moderator)
+        slist.speaker_items.create(user=self.participant)
+        self.client.force_login(self.moderator)
+        url = reverse("rooms-status", kwargs={"pk": self.room.pk})
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(data["speaker_lists"], 1)
+        self.assertEqual(data["speakers"], 2)
 
     def test_delete_with_sls_and_speaker(self):
         slist = self.sls.speaker_lists.create()
