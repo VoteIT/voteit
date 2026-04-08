@@ -45,7 +45,7 @@ class RoomsViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     def get_serializer_class(self):
         if self.action == "create":
             return CreateRoomSerializer
-        elif self.action in ("put", "retrieve"):
+        elif self.action in ("partial_update", "retrieve", "update"):
             return RoomDetailSerializer
         return super().get_serializer_class()
 

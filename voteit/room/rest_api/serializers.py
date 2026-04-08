@@ -40,6 +40,7 @@ class RoomHandleSerializer(ModelSerializer):
             "highlighted",
             "poll",
             "agenda_item",
+            "send_proposals",
             "show_ballot",
         ]
 
