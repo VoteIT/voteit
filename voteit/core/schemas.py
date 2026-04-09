@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from typing import Any
+
+from django.utils.functional import Promise
 from pydantic import BaseModel
 from pydantic import validator
 
@@ -13,6 +16,12 @@ class RoleOutput(BaseModel):
 
     class Config:
         orm_mode = True
+
+    @validator("title", "description", pre=True)
+    def convert_lazy(cls, v: Any):
+        if isinstance(v, Promise):
+            return str(v)
+        return v
 
 
 class PredicateOutput(BaseModel):
