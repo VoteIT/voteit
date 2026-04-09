@@ -40,15 +40,11 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelVi
         return super().get_serializer_class()
 
     def get_queryset(self):
-        return (
-            AgendaItem.objects.filter()
-            .filter(
-                models.Q(meeting__roles__user=self.request.user)
-                & models.Q(meeting__roles__assigned__contains=ROLE_MODERATOR)
-                | ~models.Q(state="private")
-            )
-            .distinct()
-        )
+        return AgendaItem.objects.filter(
+            models.Q(meeting__roles__user=self.request.user)
+            & models.Q(meeting__roles__assigned__contains=ROLE_MODERATOR)
+            | ~models.Q(state="private")
+        ).distinct()
 
 
 @router.register("export-agenda-items", basename="export-agenda-items")
