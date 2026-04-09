@@ -33,13 +33,6 @@ class MeetingComponentViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual(2, len(data))
 
-    def test_moderator_list_empty_filter(self):
-        self.client.force_login(self.moderator)
-        url = reverse("meeting-components-list")
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        self.assertFalse(response.json())
-
     def test_with_filter_participant(self):
         self.client.force_login(self.participant)
         url = reverse("meeting-components-list")
@@ -52,7 +45,8 @@ class MeetingComponentViewSetTests(APITestCase):
         self.client.force_login(self.outsider)
         url = reverse("meeting-components-list")
         response = self.client.get(url, data={"meeting": 1})
-        self.assertEqual(404, response.status_code)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([], response.json())
 
     def test_create_moderator(self):
         self.print_component.delete()

@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
+from django.test import RequestFactory
 from django.test import TestCase
-
 from voteit.components.app.components.message import FlashMessage
 from voteit.components.app.components.proposal_print import ProposalPrint
 from voteit.meeting.models import Meeting
@@ -99,6 +99,7 @@ class CreateMeetingComponentSerializerTests(TestCase):
         cls.flash_component = cls.meeting.components.create(
             component_name=FlashMessage.name, settings={"msg": "Hello"}
         )
+        cls.moderator = cls.meeting.participants.get(username="moderator")
 
     @property
     def _cut(self):
@@ -109,8 +110,11 @@ class CreateMeetingComponentSerializerTests(TestCase):
         return CreateMeetingComponentSerializer
 
     def test_duplicate_not_allowed(self):
+        request = RequestFactory().post("/")
+        request.user = self.moderator
         serializer = self._cut(
-            data={"component_name": ProposalPrint.name, "meeting": self.meeting.pk}
+            data={"component_name": ProposalPrint.name, "meeting": self.meeting.pk},
+            context={"request": request},
         )
         serializer.is_valid()
         self.assertIn("component_name", serializer.errors)

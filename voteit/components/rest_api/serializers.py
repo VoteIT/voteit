@@ -9,6 +9,8 @@ from voteit.components.models import OrganisationComponent
 from voteit.components.utils import get_meeting_component_adapters
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
+from voteit.core.rest_api.utils import validate_model_add
+from voteit.meeting.models import Meeting
 
 
 class ComponentSerializer(serializers.ModelSerializer):
@@ -50,6 +52,10 @@ class CreateMeetingComponentSerializer(ComponentSerializer):
             raise ValidationError(
                 "Only one of these components are allowed per meeting."
             )
+        return value
+
+    def validate_meeting(self, value: Meeting):
+        validate_model_add(self, MeetingComponent, value)
         return value
 
 

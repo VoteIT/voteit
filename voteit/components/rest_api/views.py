@@ -1,38 +1,33 @@
-from django.db.models import QuerySet
-from rest_framework.exceptions import ValidationError
+from rest_framework.viewsets import ModelViewSet
 
 from voteit.components.rest_api import serializers
 from voteit.core.rest_api import router
-from voteit.core.rest_api.base import DefaultModelViewSet
-from voteit.meeting.models import Meeting
+from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.components.models import MeetingComponent
-from voteit.meeting.permissions import MeetingPermissions
 
 __all__ = ("MeetingComponentViewSet",)
 
 
 @router.register("meeting-components", basename="meeting-components")
-class MeetingComponentViewSet(DefaultModelViewSet):
+class MeetingComponentViewSet(
+    VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelViewSet
+):
     model = MeetingComponent
     serializer_class = serializers.MeetingComponentSerializer
-    serializer_classes = {
-        "create": serializers.CreateMeetingComponentSerializer,
-        "retrieve": serializers.VerboseMeetingComponentSerializer,
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "create": None,
+        "retrieve": None,  # Checked in serializer
     }
-    context_lookup_kwarg: str = "meeting"
-
-    @property
-    def context_queryset(self) -> QuerySet:
-        return Meeting.objects.for_user(self.request.user)
+    filterset_fields = ("meeting",)
 
     def get_queryset(self):
-        if self.detail:
-            # Permission checked against object
-            return MeetingComponent.objects.all()
-        try:
-            meeting = self.get_context(self.request)
-        except ValidationError:
-            meeting = None
-        if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
-            return MeetingComponent.objects.filter(meeting=meeting)
-        return MeetingComponent.objects.none()
+        return MeetingComponent.objects.filter(meeting__participants=self.request.user)
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.CreateMeetingComponentSerializer
+        elif self.action == "retrieve":
+            return serializers.VerboseMeetingComponentSerializer
+        return super().get_serializer_class()

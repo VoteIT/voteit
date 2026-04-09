@@ -10,9 +10,9 @@ from django_fsm import FSMField
 from django_fsm import transition
 
 from voteit.components.abcs import Component
-from voteit.components.permissions import MeetingComponentPermissions
 from voteit.components.utils import get_meeting_component_adapters
 from voteit.components.utils import get_organisation_component_adapters
+from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.core.abcs import OrganisationContext
 from voteit.core.workflows import EnabledWf
@@ -57,7 +57,7 @@ class MeetingComponent(Component, MeetingContext):
         field=state,
         source=EnabledWf.OFF,
         target=EnabledWf.ON,
-        permission=MeetingComponentPermissions.CHANGE,
+        permission=f"components.{PERM.CHANGE}_meetingcomponent",
         custom={"title": _("Enable")},
         conditions=[Component.valid_component_name, Component.valid_settings],
     )
@@ -68,7 +68,7 @@ class MeetingComponent(Component, MeetingContext):
         field=state,
         source=EnabledWf.ON,
         target=EnabledWf.OFF,
-        permission=MeetingComponentPermissions.CHANGE,
+        permission=f"components.{PERM.CHANGE}_meetingcomponent",
         custom={"title": _("Disable")},
     )
     def disable(self):
@@ -103,7 +103,7 @@ class OrganisationComponent(Component, OrganisationContext):
         field=state,
         source=EnabledWf.OFF,
         target=EnabledWf.ON,
-        # permission=MeetingComponentPermissions.CHANGE,
+        # permission=XXX,
         custom={"title": _("Enable")},
         conditions=[Component.valid_component_name, Component.valid_settings],
     )
@@ -114,7 +114,7 @@ class OrganisationComponent(Component, OrganisationContext):
         field=state,
         source=EnabledWf.ON,
         target=EnabledWf.OFF,
-        # permission=MeetingComponentPermissions.CHANGE,
+        # permission=XXX,
         custom={"title": _("Disable")},
     )
     def disable(self):

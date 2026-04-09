@@ -9,6 +9,7 @@ from django.db import models
 from django.utils.functional import cached_property
 from pydantic import BaseModel
 from pydantic import ValidationError
+from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import ABCModel
 from voteit.core.component import Registry
@@ -17,7 +18,7 @@ from voteit.core.component import Registry
 # if TYPE_CHECKING:
 
 
-class Component(ABCModel):
+class Component(RulesModelMixin, ABCModel):
     component_name: str = models.CharField(max_length=30)
     settings_data: dict | None = models.JSONField(
         verbose_name="JSON-serialized settings",
