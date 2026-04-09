@@ -1,8 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.core import PERM
 from voteit.invites.models import MeetingInvite
-from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -27,11 +27,6 @@ class MeetingInvitePermissionsTests(TestCase):
         self.meeting.refresh_from_db()
         self.invite.refresh_from_db()
 
-    def p(self, perm):
-        from voteit.invites.permissions import MeetingInvitePermissions
-
-        return getattr(MeetingInvitePermissions, perm)
-
     def _archive(self):
         self.meeting.ongoing()
         self.meeting.close()
@@ -39,47 +34,41 @@ class MeetingInvitePermissionsTests(TestCase):
         self.meeting.save()
         self.invite.refresh_from_db()  # will be expired
 
-    def test_view(self):
-        PERM = self.p("VIEW")
-        self.assertFalse(self.anon_user.has_perm(PERM, self.invite))
-        self.assertFalse(self.participant.has_perm(PERM, self.invite))
-        self.assertTrue(self.moderator.has_perm(PERM, self.invite))
-
     def test_add(self):
-        PERM = self.p("ADD")
-        self.assertFalse(self.anon_user.has_perm(PERM, self.meeting))
-        self.assertFalse(self.participant.has_perm(PERM, self.meeting))
-        self.assertTrue(self.moderator.has_perm(PERM, self.meeting))
+        ADD = MeetingInvite.get_perm(PERM.ADD)
+        self.assertFalse(self.anon_user.has_perm(ADD, self.meeting))
+        self.assertFalse(self.participant.has_perm(ADD, self.meeting))
+        self.assertTrue(self.moderator.has_perm(ADD, self.meeting))
 
     def test_add_archived_meeting(self):
         self._archive()
-        PERM = self.p("ADD")
-        self.assertFalse(self.anon_user.has_perm(PERM, self.meeting))
-        self.assertFalse(self.participant.has_perm(PERM, self.meeting))
-        self.assertFalse(self.moderator.has_perm(PERM, self.meeting))
+        ADD = MeetingInvite.get_perm(PERM.ADD)
+        self.assertFalse(self.anon_user.has_perm(ADD, self.meeting))
+        self.assertFalse(self.participant.has_perm(ADD, self.meeting))
+        self.assertFalse(self.moderator.has_perm(ADD, self.meeting))
 
     def test_change(self):
-        PERM = self.p("CHANGE")
-        self.assertFalse(self.anon_user.has_perm(PERM, self.invite))
-        self.assertFalse(self.participant.has_perm(PERM, self.invite))
-        self.assertTrue(self.moderator.has_perm(PERM, self.invite))
+        CHANGE = MeetingInvite.get_perm(PERM.CHANGE)
+        self.assertFalse(self.anon_user.has_perm(CHANGE, self.invite))
+        self.assertFalse(self.participant.has_perm(CHANGE, self.invite))
+        self.assertTrue(self.moderator.has_perm(CHANGE, self.invite))
 
     def test_change_archived_meeting(self):
         self._archive()
-        PERM = self.p("CHANGE")
-        self.assertFalse(self.anon_user.has_perm(PERM, self.invite))
-        self.assertFalse(self.participant.has_perm(PERM, self.invite))
-        self.assertFalse(self.moderator.has_perm(PERM, self.invite))
+        CHANGE = MeetingInvite.get_perm(PERM.CHANGE)
+        self.assertFalse(self.anon_user.has_perm(CHANGE, self.invite))
+        self.assertFalse(self.participant.has_perm(CHANGE, self.invite))
+        self.assertFalse(self.moderator.has_perm(CHANGE, self.invite))
 
     def test_delete(self):
-        PERM = self.p("DELETE")
-        self.assertFalse(self.anon_user.has_perm(PERM, self.invite))
-        self.assertFalse(self.participant.has_perm(PERM, self.invite))
-        self.assertTrue(self.moderator.has_perm(PERM, self.invite))
+        DELETE = MeetingInvite.get_perm(PERM.DELETE)
+        self.assertFalse(self.anon_user.has_perm(DELETE, self.invite))
+        self.assertFalse(self.participant.has_perm(DELETE, self.invite))
+        self.assertTrue(self.moderator.has_perm(DELETE, self.invite))
 
     def test_delete_archived_meeting(self):
         self._archive()
-        PERM = self.p("DELETE")
-        self.assertFalse(self.anon_user.has_perm(PERM, self.invite))
-        self.assertFalse(self.participant.has_perm(PERM, self.invite))
-        self.assertFalse(self.moderator.has_perm(PERM, self.invite))
+        DELETE = MeetingInvite.get_perm(PERM.DELETE)
+        self.assertFalse(self.anon_user.has_perm(DELETE, self.invite))
+        self.assertFalse(self.participant.has_perm(DELETE, self.invite))
+        self.assertFalse(self.moderator.has_perm(DELETE, self.invite))

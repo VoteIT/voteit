@@ -19,13 +19,14 @@ from django.db import models
 from django.utils.timezone import now
 from django_fsm import FSMField
 from django_fsm import transition
+from rules.contrib.models import RulesModelMixin
 
+from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import ensure_atomic
 from voteit.core.decorators import has_exact_filter
 from voteit.core.fields import RolesField
 from voteit.core.permissions import NOT_ALLOWED
-from voteit.invites.permissions import MeetingInvitePermissions
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.dialects import dialect_registry
@@ -266,7 +267,7 @@ class MeetingInviteManager(models.Manager):
     mask_fields=["user_data"],
     mask_callable="voteit.invites.utils.user_data_mask",
 )
-class MeetingInvite(MeetingContext):
+class MeetingInvite(RulesModelMixin, MeetingContext):
     name = "meeting_invite"
     state: str = FSMField(
         default=InviteWf.initial, choices=InviteWf.choices(), editable=False
@@ -337,7 +338,7 @@ class MeetingInvite(MeetingContext):
         field=state,
         source=InviteWf.OPEN,
         target=InviteWf.REVOKED,
-        permission=MeetingInvitePermissions.CHANGE,
+        permission=f"invites.{PERM.CHANGE}_meetinginvite",
     )
     def revoke(self):
         pass

@@ -15,13 +15,14 @@ from rest_framework.viewsets import ViewSet
 
 from voteit.core.rest_api import router
 from voteit.core.rest_api.base import TransitionsMixin
-from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
+from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api import serializers
 from voteit.invites.schemas import InviteDataTypesSchema
 from voteit.invites.utils import get_invite_adapter_registry
-from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.utils import get_idproxy_user_data
 
 if TYPE_CHECKING:
@@ -32,16 +33,18 @@ logger = getLogger(__name__)
 
 @router.register("meeting-invites", basename="meeting-invites")
 class MeetingInviteViewSet(
-    AutoPermissionViewSetMixin,
+    VerboseAutoPermissionViewSetMixin,
     TransitionsMixin,
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    context_queryset = Meeting.objects.all()
-    context_lookup_kwarg = "meeting"
-    model = MeetingInvite
+    # context_queryset = Meeting.objects.all()
+    # ontext_lookup_kwarg = "meeting"
+    # model = MeetingInvite
+    filterset_fields = ("meeting",)
     permission_type_map = {
-        **AutoPermissionViewSetMixin.permission_type_map,
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "retrieve": None,
         "bulk_delete": None,
         "bulk_revoke": None,
     }
@@ -50,10 +53,10 @@ class MeetingInviteViewSet(
         """
         Generic searches without meeting as part of the query aren't allowed for this view.
         """
-        if self.detail:
-            # Permission checked against obj
-            return MeetingInvite.objects.all()
-        return MeetingInvite.objects.none()
+        return MeetingInvite.objects.filter(
+            meeting__roles__user=self.request.user,
+            meeting__roles__assigned__contains=ROLE_MODERATOR,
+        ).exclude(state__in=MeetingWf.archived_states)
 
     def retrieve(self, request, *args, **kwargs):
         """
@@ -73,7 +76,6 @@ class MeetingInviteViewSet(
     def list(self, *args, **kwargs):
         return Response([])
 
-    @transaction.atomic(durable=True)
     @action(
         methods=["post"],
         detail=False,
@@ -84,7 +86,8 @@ class MeetingInviteViewSet(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         invites: list[int] = serializer.validated_data["invites"]
-        count = MeetingInvite.objects.filter(id__in=invites).delete()[0]
+        with transaction.atomic(durable=True):
+            count = MeetingInvite.objects.filter(id__in=invites).delete()[0]
         return Response({"deleted": count})
 
     @transaction.atomic(durable=True)

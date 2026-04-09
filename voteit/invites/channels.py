@@ -3,8 +3,9 @@ from __future__ import annotations
 from logging import getLogger
 
 from envelope.channels.models import ContextChannel
+
+from voteit.core import PERM
 from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
 from voteit.messaging.decorators import channel
 
 logger = getLogger(__name__)
@@ -19,4 +20,4 @@ class MeetingInvitesChannel(ContextChannel):
     name = "invites"
     logger = logger
     model = Meeting
-    permission = MeetingPermissions.MODERATE
+    permission = Meeting.get_perm(PERM.MODERATE)

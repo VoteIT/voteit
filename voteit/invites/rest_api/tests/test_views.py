@@ -11,8 +11,6 @@ from social_django.models import UserSocialAuth
 
 from voteit.invites.models import MeetingInvite
 from voteit.meeting.models import Meeting
-from voteit.meeting.roles import ROLE_MODERATOR
-from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
 
@@ -23,17 +21,15 @@ User: UserType = get_user_model()
 
 
 class MeetingInviteViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.organisation: Organisation = Organisation.objects.create()
-        cls.meeting: Meeting = cls.organisation.meetings.create(
-            title="Test meeting", state="ongoing"
-        )
-        cls.participant: User = User.objects.create_user("participant")
-        cls.moderator: User = User.objects.create_user("moderator")
+        cls.organisation: Organisation = Organisation.objects.get(pk=1)
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.participant: User = cls.meeting.participants.get(username="participant")
+        cls.moderator: User = cls.meeting.participants.get(username="moderator")
         cls.outsider: User = User.objects.create_user("outsider")
-        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
-        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.invite: MeetingInvite = cls.meeting.invites.create(
             user_data={"email": "hello@betahaus.net"},
         )
@@ -66,7 +62,7 @@ class MeetingInviteViewSetTests(APITestCase):
         )
         self.client.force_login(self.participant)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_delete(self):
         url = reverse("meeting-invites-detail", kwargs={"pk": self.invite.pk})
@@ -78,7 +74,7 @@ class MeetingInviteViewSetTests(APITestCase):
         url = reverse("meeting-invites-detail", kwargs={"pk": self.invite.pk})
         self.client.force_login(self.participant)
         response = self.client.delete(url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
     def test_delete_used_invite(self):
         self.invite.accept(self.participant)

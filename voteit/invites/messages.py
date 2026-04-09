@@ -14,7 +14,8 @@ from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
 
-from voteit.invites.permissions import MeetingInvitePermissions
+from voteit.core import PERM
+from voteit.invites.models import MeetingInvite
 from voteit.invites.schemas import AddMixedUserDataInvitesSchema
 from voteit.invites.schemas import AddInviteAnnotationsSchema
 from voteit.invites.schemas import AnnotationResultSchema
@@ -40,7 +41,7 @@ logger = getLogger(__name__)
 @incoming
 class AddInvites(ContextAction):
     name = "invites.add"
-    permission = MeetingInvitePermissions.ADD
+    permission = MeetingInvite.get_perm(PERM.ADD)
     schema = AddMixedUserDataInvitesSchema
     data: AddMixedUserDataInvitesSchema
     model = Meeting
@@ -123,7 +124,7 @@ class AddInvites(ContextAction):
 @incoming
 class AddInviteAnnotations(ContextAction):
     name = "invites.add_annotations"
-    permission = MeetingInvitePermissions.ADD
+    permission = MeetingInvite.get_perm(PERM.ADD)
     schema = AddInviteAnnotationsSchema
     data: AddInviteAnnotationsSchema
     model = Meeting
@@ -246,7 +247,7 @@ class AddInviteAnnotations(ContextAction):
 @incoming
 class ClearInviteAnnotations(ContextAction):
     name = "invites.clear_annotations"
-    permission = MeetingInvitePermissions.ADD
+    permission = MeetingInvite.get_perm(PERM.ADD)
     schema = ClearInviteAnnotationsSchema
     data: ClearInviteAnnotationsSchema
     model = Meeting

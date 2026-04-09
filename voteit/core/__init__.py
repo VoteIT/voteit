@@ -13,6 +13,7 @@ class PERM:
     ADD = "add"
     CHANGE = "change"
     DELETE = "delete"
+    MODERATE = "moderate"
     HANDLE = "handle"
     CHANGE_ROLES = "change_roles"
     VIEW_ROLES = "view_roles"

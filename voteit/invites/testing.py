@@ -1,7 +1,7 @@
 import os
 
 import voteit.invites.tests
-from voteit.invites.schemas import RowColInvitesBaseSchema
+
 
 FIXTURES_DIR = os.path.join(
     os.path.dirname(os.path.abspath(voteit.invites.tests.__file__)), "fixtures"
