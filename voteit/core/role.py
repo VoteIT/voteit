@@ -6,13 +6,22 @@ from voteit.core.schemas import PredicateOutput
 from voteit.core.schemas import RoleOutput
 
 if TYPE_CHECKING:
-    from voteit.core.models import Roles
     from voteit.core.predicate import Predicate
 
 
 class Role:
     """
     Create a role instance with a name. The name is used like an ID within a voteit.core.models.Roles object.
+    >>> GAMER = Role("gamer", title="Gamerz")
+    >>> GAMER
+    Gamerz (gamer)
+
+    And with translation strings
+    >>> from django.utils.translation import gettext_lazy
+    >>> out = Role('hello', title=gettext_lazy('World')).output()
+    >>> isinstance(out.title, str)
+    True
+
     >>> GAMER = Role("gamer", title="Gamerz")
     >>> GAMER
     Gamerz (gamer)
