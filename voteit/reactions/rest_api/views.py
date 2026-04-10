@@ -1,32 +1,27 @@
-from rest_framework.exceptions import ValidationError
+from rest_framework.viewsets import ModelViewSet
 
 from voteit.core.rest_api import router
-from voteit.core.rest_api.base import DefaultModelViewSet
-from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
+from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
+from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.reactions.models import ReactionButton
 from voteit.reactions.rest_api import serializers
 
 
 @router.register("reaction-buttons", basename="reaction-buttons")
-class ReactionButtonViewSet(DefaultModelViewSet):
+class ReactionButtonViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     serializer_class = serializers.ButtonDetailSerializer
-    serializer_classes = {
-        "create": serializers.ButtonCreateSerializer,
+    filterset_class = ForceMeetingWithRoleFilter
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "create": None,  # In serializer
+        "retrieve": None,
     }
-    context_queryset = Meeting.objects.all()
-    context_lookup_kwarg = "meeting"
-    model = ReactionButton
-    queryset = ReactionButton.objects.all()
-    filterset_fields = ("meeting",)
+    expected_default_http_status = 400
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.ButtonCreateSerializer
+        return super().get_serializer_class()
 
     def get_queryset(self):
-        if self.detail:
-            return self.queryset
-        try:
-            meeting = self.get_context(self.request)
-        except ValidationError:
-            meeting = None
-        if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
-            return self.queryset.filter(meeting=meeting)
-        return self.queryset.none()
+        return ReactionButton.objects.filter(meeting__participants=self.request.user)

@@ -1,39 +1,46 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from rest_framework.validators import UniqueTogetherValidator
 
 from voteit.core.rest_api.fields import RolesField
+from voteit.core.rest_api.utils import validate_model_add
 from voteit.core.utils import get_model_shortname
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
 
 
-class ButtonDetailSerializer(serializers.ModelSerializer):
+class ButtonCreateSerializer(serializers.ModelSerializer):
     change_roles = RolesField(required=False)
     list_roles = RolesField(required=False)
 
     class Meta:
         model = ReactionButton
-        read_only_fields = ("meeting", "flag_mode")
-        fields = list(read_only_fields) + [
+        read_only_fields = [
             "pk",
-            "meeting",
+        ]
+        fields = read_only_fields + [
+            "active",
             "title",
             "description",
             "icon",
             "color",
+            "meeting",
             "order",
             "change_roles",
             "list_roles",
-            "active",
             "allowed_models",
             "target",
+            "flag_mode",
             "vote_template",
             "on_presentation",
             "on_vote",
         ]
 
+    def validate_meeting(self, value):
+        validate_model_add(self, ReactionButton, value)
+        return value
+
     def validate(self, attrs):
+        attrs = super().validate(attrs)
         query = {}
         for fname in ("color", "icon", "title"):
             query[f"{fname}__iexact"] = attrs.get(
@@ -50,25 +57,9 @@ class ButtonDetailSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class ButtonCreateSerializer(ButtonDetailSerializer):
-    class Meta(ButtonDetailSerializer.Meta):
-        read_only_fields = ()
-        fields = (
-            "title",
-            "description",
-            "icon",
-            "color",
-            "meeting",
-            "order",
-            "change_roles",
-            "list_roles",
-            "allowed_models",
-            "target",
-            "flag_mode",
-            "vote_template",
-            "on_presentation",
-            "on_vote",
-        )
+class ButtonDetailSerializer(ButtonCreateSerializer):
+    class Meta(ButtonCreateSerializer.Meta):
+        read_only_fields = ("meeting", "flag_mode")
 
 
 class ContentTypeSerializer(serializers.CharField):

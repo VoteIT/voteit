@@ -7,6 +7,6 @@ class ReactionsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        from voteit.reactions import rules
-        from voteit.reactions import signals
-        from .rest_api import views
+        from voteit.reactions import rules  # noqa
+        from voteit.reactions import signals  # noqa
+        from voteit.reactions.rest_api import views  # noqa

@@ -3,15 +3,14 @@ from __future__ import annotations
 import rules
 from django.contrib.auth.models import AbstractUser
 
+from voteit.core import PERM
 from voteit.core.decorators import predicate
 from voteit.meeting.roles import ROLE_MODERATOR
-from voteit.meeting.rules import can_view_meeting
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import meeting_upcoming_ongoing
+from voteit.reactions import PERM_LIST_REACTIONS
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
-from voteit.reactions.permissions import ReactionButtonPermissions
-from voteit.reactions.permissions import ReactionPermissions
 
 
 @predicate
@@ -33,7 +32,7 @@ def is_button_flag(user: AbstractUser, obj: Reaction | ReactionButton) -> bool:
         button = obj.button
     else:  # pragma: no coverage
         # We don't want to return a bool here since this must be negatable
-        raise TypeError(f"obj is not an instance of Reaction or ReactionButton")
+        raise TypeError("obj is not an instance of Reaction or ReactionButton")
     return button.flag_mode
 
 
@@ -42,7 +41,7 @@ def has_list_users_reactions_role_or_moderator(
     user: AbstractUser, obj: ReactionButton
 ) -> bool:
     if not isinstance(obj, ReactionButton):  # pragma: no coverage
-        raise TypeError(f"obj is not an instance of ReactionButton")
+        raise TypeError("obj is not an instance of ReactionButton")
     roles = obj.list_roles
     if ROLE_MODERATOR not in roles:
         roles.append(ROLE_MODERATOR)
@@ -75,21 +74,23 @@ def is_reaction_owner(user: AbstractUser, obj: Reaction):
 
 
 # Button
-rules.add_perm(ReactionButtonPermissions.ADD, meeting_upcoming_ongoing & is_moderator)
 rules.add_perm(
-    ReactionButtonPermissions.CHANGE, meeting_upcoming_ongoing & is_moderator
+    ReactionButton.get_perm(PERM.ADD), meeting_upcoming_ongoing & is_moderator
 )
 rules.add_perm(
-    ReactionButtonPermissions.DELETE, meeting_upcoming_ongoing & is_moderator
+    ReactionButton.get_perm(PERM.CHANGE), meeting_upcoming_ongoing & is_moderator
 )
-rules.add_perm(ReactionButtonPermissions.VIEW, can_view_meeting)
 rules.add_perm(
-    ReactionButtonPermissions.LIST_REACTIONS, has_list_users_reactions_role_or_moderator
+    ReactionButton.get_perm(PERM.DELETE), meeting_upcoming_ongoing & is_moderator
+)
+rules.add_perm(
+    ReactionButton.get_perm(PERM_LIST_REACTIONS),
+    has_list_users_reactions_role_or_moderator,
 )
 
 # Reaction
 rules.add_perm(
-    ReactionPermissions.ADD,
+    Reaction.get_perm(PERM.ADD),
     is_button_active
     & meeting_upcoming_ongoing
     & (
@@ -98,7 +99,7 @@ rules.add_perm(
     ),
 )
 rules.add_perm(
-    ReactionPermissions.DELETE,
+    Reaction.get_perm(PERM.DELETE),
     is_button_active
     & meeting_upcoming_ongoing
     & (

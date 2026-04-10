@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
+from voteit.core.testing import run_permission_tests
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -49,13 +49,35 @@ class ReactionButtonViewSetTests(APITestCase):
             "change_roles": [],
             "list_roles": [],
         }
-        self.client.force_login(self.moderator)
-        response = self.client.post(url, data)
-        self.assertEqual(
-            response.status_code,
-            201,
-        )
-        self.assertTrue(self.meeting.reaction_buttons.exists())
+        for func, args in run_permission_tests(
+            self,
+            url=url,
+            data=data,
+            method="POST",
+            expected=[
+                [
+                    self.moderator,
+                    201,
+                    {
+                        "description": "",
+                        "color": "primary",
+                        "order": 0,
+                        "change_roles": [],
+                        "list_roles": [],
+                        "allowed_models": ["proposal", "discussion_post"],
+                        "target": None,
+                        "flag_mode": False,
+                        "vote_template": False,
+                        "on_presentation": False,
+                        "on_vote": False,
+                        "active": True,
+                    },
+                ],
+                [self.participant, 403],
+                [self.outsider, 403],
+            ],
+        ):
+            func(*args)
 
     def test_create_duplicate(self):
         one = self._mk_one()
@@ -107,46 +129,68 @@ class ReactionButtonViewSetTests(APITestCase):
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json().get("detail"), "No item found where pk==-1")
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertDictEqual(
+            {"meeting": ['Invalid pk "-1" - object does not exist.']}, data
+        )
 
     def test_list(self):
+        btn = self._mk_one()
         url = reverse("reaction-buttons-list")
         self.client.force_login(self.moderator)
         response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        self.assertEqual([], response.json())
+        self.assertEqual(400, response.status_code)
+        response = self.client.get(url, data={"meeting": self.meeting.pk})
+        data = response.json()
+        self.assertEqual(
+            200,
+            response.status_code,
+            data,
+        )
+        self.assertEqual(len(data), 1)
+        self.assertSetEqual({btn.pk}, {x["pk"] for x in data})
 
     def test_get(self):
         button = self._mk_one()
         url = reverse("reaction-buttons-detail", kwargs={"pk": button.pk})
-        self.client.force_login(self.moderator)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(button.pk, data["pk"])
-        self.assertEqual(self.meeting.pk, data["meeting"])
+        for func, args in run_permission_tests(
+            self,
+            url=url,
+            expected=[
+                [
+                    self.moderator,
+                    200,
+                    {
+                        "meeting": self.meeting.pk,
+                        "title": "Thumbs up",
+                        "color": "primary",
+                        "icon": "mdi-thumb-up",
+                    },
+                ],
+                [self.participant, 200],
+                [self.outsider, 404],
+            ],
+        ):
+            func(*args)
 
     def test_delete(self):
         button = self._mk_one()
         url = reverse("reaction-buttons-detail", kwargs={"pk": button.pk})
-        self.client.force_login(self.moderator)
-        response = self.client.delete(url)
-        self.assertEqual(
-            response.status_code,
-            204,
-        )
-        self.assertRaises(ObjectDoesNotExist, button.refresh_from_db)
-
-    def test_delete_participant(self):
-        button = self._mk_one()
-        url = reverse("reaction-buttons-detail", kwargs={"pk": button.pk})
-        self.client.force_login(self.participant)
-        response = self.client.delete(url)
-        self.assertEqual(
-            response.status_code,
-            403,
-        )
+        for func, args in run_permission_tests(
+            self,
+            url=url,
+            method="delete",
+            expected=[
+                [
+                    self.moderator,
+                    204,
+                ],
+                [self.participant, 403],
+                [self.outsider, 404],
+            ],
+        ):
+            func(*args)
 
     def test_edit_causes_duplicate(self):
         self._mk_one()

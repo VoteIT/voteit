@@ -1,3 +1,4 @@
+from django.test import RequestFactory
 from django.test import TestCase
 
 from voteit.meeting.models import Meeting
@@ -67,10 +68,12 @@ class ButtonDetailSerializerTests(TestCase):
 
 
 class ButtonCreateSerializerTests(TestCase):
-    def setUp(self):
-        self.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting", state="ongoing"
-        )
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.moderator = cls.meeting.participants.get(username="moderator")
 
     @property
     def _cut(self):
@@ -79,13 +82,16 @@ class ButtonCreateSerializerTests(TestCase):
         return ButtonCreateSerializer
 
     def test_create(self):
+        request = RequestFactory().request()
+        request.user = self.moderator
         serializer = self._cut(
             data={
                 "meeting": self.meeting.pk,
                 "title": "Hello",
                 "color": "primary",
                 "icon": "mdi-thumb-up",
-            }
+            },
+            context={"request": request},
         )
         serializer.is_valid()
         self.assertFalse(serializer.errors)

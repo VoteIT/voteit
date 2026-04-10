@@ -12,6 +12,8 @@ from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import websocket_send
+
+from voteit.core import PERM
 from voteit.core.utils import get_model_by_shortname
 from voteit.core.validators import validate_model_shortname
 from voteit.messaging.base import BaseAddObject
@@ -22,10 +24,9 @@ from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
+from voteit.reactions import PERM_LIST_REACTIONS
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
-from voteit.reactions.permissions import ReactionButtonPermissions
-from voteit.reactions.permissions import ReactionPermissions
 
 
 @outgoing
@@ -93,7 +94,7 @@ class UserReactionDeleted(BaseObjectDeleted):
 @incoming
 class AddReaction(BaseAddObject):
     name = "reaction.add"
-    permission = ReactionPermissions.ADD
+    permission = Reaction.get_perm(PERM.ADD)
     model = ReactionButton  # This is the context for the action!
     add_model = Reaction
     relation_queryset_attribute = "reactions"
@@ -155,7 +156,7 @@ class DeleteReaction(BaseDeleteObject):
     """
 
     name = "reaction.delete"
-    permission = ReactionPermissions.DELETE
+    permission = Reaction.get_perm(PERM.DELETE)
     model = Reaction
     atomic = False
     result_ttl: int | None = None
@@ -176,7 +177,7 @@ class DeleteFlagReaction(BaseDeleteObject):
     """
 
     name = "reaction.delete_flag"
-    permission = ReactionPermissions.DELETE
+    permission = Reaction.get_perm(PERM.DELETE)
     model = ReactionButton
     add_model = Reaction
     # relation_queryset_attribute = "reactions"
@@ -218,7 +219,7 @@ class DeleteFlagReaction(BaseDeleteObject):
 @incoming
 class ListReactionUsers(BaseObjectAction):
     name = "reaction.list"
-    permission = ReactionButtonPermissions.LIST_REACTIONS
+    permission = ReactionButton.get_perm(PERM_LIST_REACTIONS)
     model = ReactionButton  # This is the context for the action!
     schema = ReactionSchema
     data: ReactionSchema

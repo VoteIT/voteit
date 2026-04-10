@@ -10,6 +10,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import IntegrityError
 from django.db import models
 from django.db.models.functions import Lower
+from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
@@ -46,7 +47,7 @@ def _default_allowed_models():
         "flag_mode",
     ],
 )
-class ReactionButton(MeetingContext):
+class ReactionButton(RulesModelMixin, MeetingContext):
     name = "reaction_button"
     title: str = models.CharField(verbose_name="Display name", max_length=80)
     description: str = models.CharField(
@@ -144,7 +145,7 @@ class ReactionButton(MeetingContext):
         return f"ReactionButton: {self.title}"
 
 
-class Reaction(AgendaItemContext, MeetingContext):
+class Reaction(RulesModelMixin, AgendaItemContext, MeetingContext):
     """
     Works as a boolean true for a specific context, user and button.
     Essentially users never have reactions if they haven't marked something.
