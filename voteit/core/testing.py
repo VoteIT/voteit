@@ -15,7 +15,6 @@ from django.db.transaction import get_connection
 from voteit.core.utils import exectime  # noqa
 
 if TYPE_CHECKING:
-    from voteit.core.models import User
     from rest_framework.test import APITestCase
 
 
@@ -121,7 +120,7 @@ def run_permission_tests(
     url: str,
     data: dict = None,
     method: str = "get",
-    expected: list[list[User | None | int | dict] | tuple[User | None | int | dict],],
+    expected: list | tuple,
 ) -> Generator[tuple, None, None]:
     """
 
@@ -191,9 +190,14 @@ def run_permission_tests(
                     f"{url}: {user} got {response.status_code} instead of {expected_status}.\n{json_response}",
                 ],
             )
-            if partial_response:
+            if partial_response is not None:
                 if json_response is None:
                     yield tester.assertEqual, [json_response, None]  # To produce error
+                elif isinstance(json_response, list):  # Maybe fix mapping later on
+                    yield (
+                        tester.assertEqual,
+                        [partial_response, json_response],
+                    )
                 else:
                     yield (
                         tester.assertDictEqual,
