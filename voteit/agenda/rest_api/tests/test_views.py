@@ -2,13 +2,13 @@ from django.contrib.auth import get_user_model
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
-from voteit.core.testing import PermissionTesterMixin
+from voteit.core.testing import run_permission_tests
 from voteit.meeting.models import Meeting
 
 User = get_user_model()
 
 
-class AgendaItemViewTestCase(PermissionTesterMixin, APITestCase):
+class AgendaItemViewTestCase(APITestCase):
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
@@ -31,7 +31,8 @@ class AgendaItemViewTestCase(PermissionTesterMixin, APITestCase):
             "title": "Item no 1",
             "meeting": self.meeting.pk,
         }
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=url,
             data=data,
             method="post",
@@ -40,7 +41,8 @@ class AgendaItemViewTestCase(PermissionTesterMixin, APITestCase):
                 [self.moderator, 201],
                 [self.participant, 403],
             ],
-        )
+        ):
+            func(*args)
 
     def test_create_meeting_ne(self):
         url = reverse("agendaitem-list")
@@ -81,15 +83,17 @@ class AgendaItemViewTestCase(PermissionTesterMixin, APITestCase):
         data = {
             "meeting": self.meeting.pk,
         }
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=url,
             data=data,
             method="post",
             expected=[
                 [None, 401],
-                [self.outsider, 403, []],
+                [self.outsider, 403],
             ],
-        )
+        ):
+            func(*args)
 
     def test_patch_change_meeting(self):
         url = reverse("agendaitem-detail", kwargs={"pk": self.ai.pk})
@@ -125,7 +129,7 @@ class AgendaItemViewTestCase(PermissionTesterMixin, APITestCase):
         self.assertEqual([], data["tags"])
 
 
-class ExportParticipantsViewSetTests(PermissionTesterMixin, APITestCase):
+class ExportParticipantsViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
 
     @classmethod
@@ -136,11 +140,13 @@ class ExportParticipantsViewSetTests(PermissionTesterMixin, APITestCase):
 
     def test_permissions(self):
         url = reverse("export-agenda-items-json", kwargs={"pk": self.meeting.pk})
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=url,
             method="get",
             expected=[[None, 401], [self.participant, 404], [self.moderator, 200]],
-        )
+        ):
+            func(*args)
 
     def test_json(self):
         url = reverse("export-agenda-items-json", kwargs={"pk": self.meeting.pk})

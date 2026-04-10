@@ -4,7 +4,7 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 
 from voteit.access_policy.app.policies import AutomaticAccess
-from voteit.core.testing import PermissionTesterMixin
+from voteit.core.testing import run_permission_tests
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation.models import Organisation
@@ -14,7 +14,7 @@ User = get_user_model()
 _BASENAME = "access-policy-automatic"
 
 
-class AutomaticAccessAPITests(PermissionTesterMixin, APITestCase):
+class AutomaticAccessAPITests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
@@ -33,12 +33,14 @@ class AutomaticAccessAPITests(PermissionTesterMixin, APITestCase):
         self.automatic_access.delete()
         url = reverse(f"{_BASENAME}-list")
         data = {"meeting": self.meeting.pk, "roles_given": []}
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=url,
             data=data,
             method="post",
             expected=[[None, 401], [self.moderator, 201], [self.participant, 403]],
-        )
+        ):
+            func(*args)
 
     def test_create_meeting_ne(self):
         url = reverse(f"{_BASENAME}-list")

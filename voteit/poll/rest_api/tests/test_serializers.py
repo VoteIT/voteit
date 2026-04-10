@@ -18,7 +18,6 @@ class PollDetailSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
-
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
         cls.meeting.add_roles(cls.moderator, ROLE_POTENTIAL_VOTER)
@@ -53,12 +52,6 @@ class PollDetailSerializerTests(TestCase):
         self.assertEqual(
             f"http://testserver/api/polls/{self.poll.pk}/", serializer.data["url"]
         )
-
-    def test_serializer_readonly_fields(self):
-        serializer = self._cut(self.poll, data={"title": "No no"})
-        serializer.is_valid()  # Why the f...
-        inst = serializer.save()
-        self.assertEqual("world", inst.title)
 
     def test_serializer_simple(self):
         serializer = self._cut(self.poll)
@@ -225,7 +218,7 @@ class PollCreateSerializerTests(TestCase):
     def test_serializer_no_props(self):
         data = self._fixture()
         data.pop("proposals")
-        serializer = self._cut(data=data)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertFalse(serializer.is_valid())
         self.assertIn("proposals", serializer.errors)
 
@@ -243,26 +236,26 @@ class PollCreateSerializerTests(TestCase):
         other_ai = self.meeting.agenda_items.create()
         other_prop = other_ai.proposals.create()
         data = self._fixture(proposals=[other_prop.pk])
-        serializer = self._cut(data=data)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertFalse(serializer.is_valid())
         self.assertIn("proposals", serializer.errors)
 
     def test_serializer_wrong_method(self):
         data = self._fixture(method_name="404")
-        serializer = self._cut(data=data)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertFalse(serializer.is_valid())
         self.assertIn("method_name", serializer.errors)
 
     def test_serializer_historic_method(self):
         data = self._fixture(method_name="schulze_pr")
-        serializer = self._cut(data=data)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertFalse(serializer.is_valid())
         self.assertIn("method_name", serializer.errors)
         self.assertIn("historic", str(serializer.errors["method_name"][0]))
 
     def test_settings_with_no_settings_method(self):
         data = self._fixture(settings={"weee": "okay"})
-        serializer = self._cut(data=data)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertFalse(serializer.is_valid())
         self.assertIn("settings", serializer.errors)
 
@@ -270,7 +263,7 @@ class PollCreateSerializerTests(TestCase):
         data = self._fixture(
             settings={"winners": "yes please"}, method_name="repeated_schulze"
         )
-        serializer = self._cut(data=data)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertFalse(serializer.is_valid())
         self.assertIn("settings", serializer.errors)
 
@@ -281,7 +274,7 @@ class PollCreateSerializerTests(TestCase):
             method_name="repeated_schulze",
             proposals=[self.prop.pk, prop2.pk, prop3.pk],
         )
-        serializer = self._cut(data=data)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
         instance.electoral_register = self.er
@@ -296,7 +289,7 @@ class PollCreateSerializerTests(TestCase):
             settings={"deny_proposal": True},
             proposals=[self.prop.pk, prop2.pk],
         )
-        serializer = self._cut(data=data)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
         instance.electoral_register = self.er
@@ -312,7 +305,7 @@ class PollCreateSerializerTests(TestCase):
             proposals=[self.prop.pk, prop2.pk, prop3.pk],
             settings={"winners": 2},
         )
-        serializer = self._cut(data=data)
+        serializer = self._cut(data=data, context={"request": self._mk_request()})
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
         instance.electoral_register = self.er
@@ -346,10 +339,8 @@ class PollCreateSerializerTests(TestCase):
         serializer = self._cut(
             data=data, context={"request": self._mk_request(user=self.voter)}
         )
-        self.assertTrue(serializer.is_valid())
-        # FIXME: Raise validation error
         with self.assertRaises(PermissionDenied):
-            instance = serializer.save()
+            self.assertTrue(serializer.is_valid())
 
 
 class ElectoralRegisterSerializerTests(TestCase):
@@ -447,7 +438,9 @@ class VoterExportSerializerTests(TestCase):
         return VoterExportSerializer
 
     def test_serializer(self):
-        serializer = self._cut(self.er.voterweight_set.all(), many=True)
+        serializer = self._cut(
+            self.er.voterweight_set.all().order_by("weight"), many=True
+        )
         data = serializer.data
         self.assertEqual(3, len(data))
         self.assertEqual(

@@ -17,3 +17,4 @@ class PERM:
     HANDLE = "handle"
     CHANGE_ROLES = "change_roles"
     VIEW_ROLES = "view_roles"
+    CHANGE_STATE = "change_state"

@@ -9,22 +9,17 @@ from django.views.decorators.cache import cache_page
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
-from rest_framework.exceptions import ValidationError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.viewsets import ViewSet
 
-from voteit.agenda.models import AgendaItem
-
-from voteit.core import PERM
 from voteit.core.rest_api import router
-from voteit.core.rest_api.base import DefaultModelViewSet
-from voteit.core.rest_api.base import ReadonlyModelViewSet
-from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
-from voteit.core.rest_api.mixins import SerializerClassesMixin
-from voteit.meeting.permissions import MeetingPermissions
+from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
+from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import VoteTransfer
@@ -32,51 +27,47 @@ from voteit.poll.rest_api import serializers
 from voteit.poll.schemas import ElectoralRegistryPolicySchema
 from voteit.poll.utils import get_electoral_policy_registry
 
-__all__ = (
-    "PollViewSet",
-    "ElectoralRegisterViewSet",
-    "ElectoralRegisterPoliciesViewSet",
-    "ExportERViewSet",
-)
+__all__ = ()
 
 User = get_user_model()
 
 
-@router.register("polls")
-class PollViewSet(DefaultModelViewSet):
+@router.register("polls", basename="poll")
+class PollViewSet(VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelViewSet):
     serializer_class = serializers.PollDetailSerializer
-    serializer_classes = {
-        "create": serializers.PollCreateSerializer,
-        "list": serializers.PollListSerializer,
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "retrieve": None,
+        "create": None,  # In serializer
     }
-    context_queryset = AgendaItem.objects.all()
-    context_lookup_kwarg = "agenda_item"
-    model = Poll
-    queryset = Poll.objects.all()
     filterset_fields = (
         "agenda_item",
         "meeting",
     )
 
     def get_queryset(self):
-        if self.detail:
-            return self.queryset
-        # This isn't really necessary for QS since we use websockets
-        try:
-            ai = self.get_context(self.request)
-        except ValidationError:
-            ai = None
-        # FIXME
-        if ai and self.request.user.has_perm(AgendaItem.get_perm(PERM.VIEW), ai):
-            return self.queryset.filter(agenda_item=ai)
-        return self.queryset.none()
+        return Poll.objects.filter(
+            models.Q(meeting__roles__user=self.request.user)
+            & (
+                models.Q(meeting__roles__assigned__contains=ROLE_MODERATOR)
+                | (~models.Q(state="private") & ~models.Q(agenda_item__state="private"))
+            )
+        ).distinct()
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.PollCreateSerializer
+        elif self.action == "list":
+            return serializers.PollListSerializer
+        return super().get_serializer_class()
 
 
 @router.register("electoral-registers", basename="electoral-registers")
-class ElectoralRegisterViewSet(ReadonlyModelViewSet):
-    model = ElectoralRegister
+class ElectoralRegisterViewSet(ReadOnlyModelViewSet):
     serializer_class = serializers.ElectoralRegisterSerializer
-    filterset_fields = ("meeting",)
+    filterset_class = ForceMeetingWithRoleFilter
+    # filterset_fields = ("meeting",)
+    expected_default_http_status = 400
 
     def get_queryset(self):
         return ElectoralRegister.objects.for_user(self.request.user)
@@ -88,25 +79,33 @@ class ElectoralRegisterViewSet(ReadonlyModelViewSet):
 
 @router.register("vote-transfer", basename="vote-transfer")
 class VoteTransferViewSet(
-    AutoPermissionViewSetMixin,
-    SerializerClassesMixin,
+    VerboseAutoPermissionViewSetMixin,
     ModelViewSet,
 ):
     serializer_class = serializers.VoteTransferSerializer
-    serializer_classes = {
-        "update": serializers.VoteTransferReassignSerializer,
-        "partial_update": serializers.VoteTransferReassignSerializer,
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "retrieve": None,
+        "create": None,  # Checked in serializer
     }
-    model = VoteTransfer
-    queryset = VoteTransfer.objects.all()
 
     def get_queryset(self):
-        if self.action == "list":
-            return VoteTransfer.objects.filter(
-                models.Q(source=self.request.user) | models.Q(target=self.request.user)
+        qs = VoteTransfer.objects.filter(
+            models.Q(source=self.request.user)
+            | models.Q(target=self.request.user)
+            | models.Q(
+                meeting__roles__user=self.request.user,
+                meeting__roles__assigned__contains=ROLE_MODERATOR,
             )
-        # Perms handle the rest
-        return VoteTransfer.objects.select_related("source", "target", "meeting").all()
+        )
+        if self.action == "retrieve":
+            qs = qs.select_related("source", "target", "meeting")
+        return qs.distinct()
+
+    def get_serializer_class(self):
+        if self.action in ("update", "partial_update"):
+            return serializers.VoteTransferReassignSerializer
+        return super().get_serializer_class()
 
 
 @router.register("electoral-register-policies", basename="electoral-register-policies")
@@ -126,8 +125,12 @@ class ElectoralRegisterPoliciesViewSet(ViewSet):
 class ExportERViewSet(viewsets.GenericViewSet):
     model = ElectoralRegister
     permission_classes = [permissions.IsAuthenticated]
-    queryset = ElectoralRegister.objects.all().prefetch_related("meeting")
     serializer_class = serializers.VoterExportSerializer
+
+    def get_queryset(self):
+        return ElectoralRegister.objects.for_user(self.request.user).prefetch_related(
+            "meeting"
+        )
 
     def list(self, request):
         return Response(data=[])
@@ -139,20 +142,12 @@ class ExportERViewSet(viewsets.GenericViewSet):
             .order_by("user__first_name")
         )
 
-    def get_er(self, request):
-        er: ElectoralRegister = self.get_object()
-        if not request.user.has_perm(MeetingPermissions.MODERATE, er.meeting):
-            raise PermissionDenied(
-                f"Missing required permission {MeetingPermissions.MODERATE}"
-            )
-        return er
-
     @action(
         methods=["get"],
         detail=True,
     )
     def csv(self, request, *args, **kwargs):
-        er = self.get_er(request)
+        er = self.get_object()
         if not er.voterweight_set.exists():
             raise Http404("No data yet")
         serializer = self.get_serializer(self.get_export_qs(er), many=True)
@@ -173,7 +168,7 @@ class ExportERViewSet(viewsets.GenericViewSet):
         renderer_classes=[JSONRenderer],
     )
     def json(self, request, *args, **kwargs):
-        er = self.get_er(request)
+        er = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(er), many=True)
         return Response(
             serializer.data,

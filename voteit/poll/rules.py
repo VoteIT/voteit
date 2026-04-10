@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import rules
 from django.contrib.auth.models import AbstractUser
-from rules import is_authenticated
 
 from voteit.agenda.models import AgendaItem
 
@@ -11,19 +10,15 @@ from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_not_archived
 from voteit.core.rules import is_not_finished
-from voteit.core.rules import is_not_private
 from voteit.meeting.models import Meeting
 from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import is_potential_voter
 from voteit.meeting.rules import meeting_upcoming_ongoing
+from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
 from voteit.poll.models import VoteTransfer
-from voteit.poll.permissions import ElectoralRegisterPermissions
-from voteit.poll.permissions import PollPermissions
-from voteit.poll.permissions import VotePermissions
-from voteit.poll.permissions import VoteTransferPermissions
 from voteit.poll.workflows import PollWf
 
 
@@ -88,16 +83,18 @@ def polls_context_not_closed(user: AbstractUser, instance: Poll | AgendaItem | M
 
 # Poll
 rules.add_perm(
-    PollPermissions.ADD,
+    Poll.get_perm(PERM.ADD),
     is_moderator & polls_context_not_closed & polls_context_not_archived,
 )  # Checked against meeting or agenda item.
-rules.add_perm(PollPermissions.CHANGE, is_poll_in_permissive_state & is_moderator)
-rules.add_perm(PollPermissions.DELETE, is_moderator & polls_context_not_archived)
+rules.add_perm(Poll.get_perm(PERM.CHANGE), is_poll_in_permissive_state & is_moderator)
+rules.add_perm(Poll.get_perm(PERM.DELETE), is_moderator & polls_context_not_archived)
+# rules.add_perm(
+#     Poll.get_perm(PERM.VIEW),
+#     is_moderator | (is_not_private & can_view_polls_context),
+# )
 rules.add_perm(
-    PollPermissions.VIEW,
-    is_moderator | (is_not_private & can_view_polls_context),
+    Poll.get_perm(PERM.CHANGE_STATE), is_moderator & polls_context_not_archived
 )
-rules.add_perm(PollPermissions.CHANGE_STATE, is_moderator & polls_context_not_archived)
 
 
 @predicate
@@ -126,35 +123,36 @@ def is_transfer_target_user(user: AbstractUser, vt: VoteTransfer):
 
 
 # Vote
-rules.add_perm(VotePermissions.ADD, is_poll_ongoing & is_voter)  # Checked against poll.
-rules.add_perm(VotePermissions.DELETE, is_vote_owner & vote_is_poll_ongoing)
-rules.add_perm(VotePermissions.VIEW, is_vote_owner)
+rules.add_perm(
+    Vote.get_perm(PERM.ADD), is_poll_ongoing & is_voter
+)  # Checked against poll.
+rules.add_perm(Vote.get_perm(PERM.DELETE), is_vote_owner & vote_is_poll_ongoing)
+rules.add_perm(Vote.get_perm(PERM.VIEW), is_vote_owner)
 
 
 # Electoral register
-rules.add_perm(ElectoralRegisterPermissions.VIEW, is_authenticated)
-rules.add_perm(ElectoralRegisterPermissions.ADD, is_moderator & is_not_archived)
+rules.add_perm(ElectoralRegister.get_perm(PERM.ADD), is_moderator & is_not_archived)
 
 # Vote transfer
 rules.add_perm(
-    VoteTransferPermissions.ADD,
+    VoteTransfer.get_perm(PERM.ADD),
     is_vote_transfer_enabled
     & meeting_upcoming_ongoing
     & (is_potential_voter | is_moderator),
 )  # Checked against meeting.
 rules.add_perm(
-    VoteTransferPermissions.DELETE,
+    VoteTransfer.get_perm(PERM.DELETE),
     is_vote_transfer_enabled
     & meeting_upcoming_ongoing
     & (is_transfer_source_user | is_transfer_target_user | is_moderator),
 )
 rules.add_perm(
-    VoteTransferPermissions.CHANGE,
+    VoteTransfer.get_perm(PERM.CHANGE),
     is_vote_transfer_enabled
     & meeting_upcoming_ongoing
     & (is_transfer_source_user | is_transfer_target_user | is_moderator),
 )
 rules.add_perm(
-    VoteTransferPermissions.VIEW,
+    VoteTransfer.get_perm(PERM.VIEW),
     is_transfer_source_user | is_transfer_target_user | is_moderator,
 )

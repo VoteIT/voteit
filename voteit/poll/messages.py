@@ -11,6 +11,8 @@ from envelope.messages.common import Status
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.messages.errors import BadRequestError
 from envelope.utils import websocket_send
+
+from voteit.core import PERM
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.messaging.base import BaseObjectAdded
@@ -19,9 +21,9 @@ from voteit.messaging.base import BaseObjectDeleted
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 from voteit.poll.app.er_policies.manual import Manual
+from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
-from voteit.poll.permissions import ElectoralRegisterPermissions
-from voteit.poll.permissions import VotePermissions
+from voteit.poll.models import Vote
 from voteit.poll.schemas import AddedVoteSchema
 from voteit.poll.schemas import VotersWeightsSchema
 
@@ -88,7 +90,7 @@ class AddVote(VoteBase, ABC):
     There's no change vote, so this updates an existing vote if it exists.
     """
 
-    permission = VotePermissions.ADD
+    permission = Vote.get_perm(PERM.ADD)
     model = Poll
     context: Poll
     context_schema_attr = "poll"
@@ -114,7 +116,7 @@ class AbstainSchema(BaseModel):
 class AbstainVote(VoteBase):
     """Abstain from voting in this poll"""
 
-    permission = VotePermissions.ADD
+    permission = Vote.get_perm(PERM.ADD)
     model = Poll
     name = "vote.abstain"
     schema = AbstainSchema
@@ -161,7 +163,7 @@ class ManualCreateER(ContextAction):
     data: ManualCreateERSchema
     model = Meeting
     context_schema_attr = "meeting"
-    permission = ElectoralRegisterPermissions.ADD
+    permission = ElectoralRegister.get_perm(PERM.ADD)
 
     def run_job(self) -> Status:
         self.assert_perm()
@@ -214,7 +216,7 @@ class TriggerCreateER(ContextAction):
     data: TriggerCreateERSchema
     model = Meeting
     context_schema_attr = "meeting"
-    permission = ElectoralRegisterPermissions.ADD
+    permission = ElectoralRegister.get_perm(PERM.ADD)
 
     def run_job(self) -> TriggerERResponse:
         meeting: Meeting = self.context

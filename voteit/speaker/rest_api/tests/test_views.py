@@ -10,7 +10,7 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
 from voteit.agenda.models import AgendaItem
-from voteit.core.testing import PermissionTesterMixin
+from voteit.core.testing import run_permission_tests
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -26,7 +26,7 @@ from voteit.speaker.workflows import SpeakerSystemWf
 User = get_user_model()
 
 
-class SpeakerListsViewTests(PermissionTesterMixin, APITestCase):
+class SpeakerListsViewTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
@@ -60,7 +60,8 @@ class SpeakerListsViewTests(PermissionTesterMixin, APITestCase):
             "speaker_system": self.system.pk,
             "agenda_item": self.ai.pk,
         }
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=reverse("speaker-lists-list"),
             data=data,
             method="post",
@@ -70,7 +71,8 @@ class SpeakerListsViewTests(PermissionTesterMixin, APITestCase):
                 [self.participant, 403],
                 [self.list_moderator, 201],
             ],
-        )
+        ):
+            func(*args)
 
     def test_create_sls_ne(self):
         url = reverse("speaker-lists-list")
@@ -129,7 +131,8 @@ class SpeakerListsViewTests(PermissionTesterMixin, APITestCase):
     def test_transition_close(self):
         data = {"transition": "close"}
         slist = self.system.speaker_lists.create()
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=reverse("speaker-lists-transitions", kwargs={"pk": slist.pk}),
             data=data,
             method="post",
@@ -139,7 +142,8 @@ class SpeakerListsViewTests(PermissionTesterMixin, APITestCase):
                 [self.moderator, 201],
                 [self.participant, 403],
             ],
-        )
+        ):
+            func(*args)
 
     def test_bad_transition_moderator(self):
         self.client.force_login(self.list_moderator)
@@ -152,7 +156,8 @@ class SpeakerListsViewTests(PermissionTesterMixin, APITestCase):
     def test_patch(self):
         data = {"title": "Sup?"}
         slist = self.system.speaker_lists.create()
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=reverse("speaker-lists-detail", kwargs={"pk": slist.pk}),
             data=data,
             method="patch",
@@ -162,10 +167,12 @@ class SpeakerListsViewTests(PermissionTesterMixin, APITestCase):
                 [self.participant, 403],
                 [self.list_moderator, 200],
             ],
-        )
+        ):
+            func(*args)
 
     def test_delete(self):
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=reverse("speaker-lists-detail", kwargs={"pk": self.slist.pk}),
             method="delete",
             expected=[
@@ -174,7 +181,8 @@ class SpeakerListsViewTests(PermissionTesterMixin, APITestCase):
                 [self.participant, 403],
                 [self.list_moderator, 204],
             ],
-        )
+        ):
+            func(*args)
 
     def test_delete_with_started_speaker(self):
         self.part_speaker.started = now()
@@ -190,7 +198,8 @@ class SpeakerListsViewTests(PermissionTesterMixin, APITestCase):
 
     def test_get(self):
         url = reverse("speaker-lists-detail", kwargs={"pk": self.slist.pk})
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=url,
             method="get",
             expected=[
@@ -213,11 +222,13 @@ class SpeakerListsViewTests(PermissionTesterMixin, APITestCase):
                 ],
                 [self.speaker_user, 200],
             ],
-        )
+        ):
+            func(*args)
 
     def test_enter_permissions(self):
         url = reverse("speaker-lists-enter", args=[self.slist.pk])
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=url,
             method="post",
             expected=[
@@ -232,7 +243,8 @@ class SpeakerListsViewTests(PermissionTesterMixin, APITestCase):
                 [self.list_moderator, 201],
                 [self.speaker_user, 201],
             ],
-        )
+        ):
+            func(*args)
 
     def test_enter_moderator(self):
         url = reverse("speaker-lists-enter", args=[self.slist.pk])
@@ -710,7 +722,7 @@ class HistoricSpeakerViewTests(APITestCase):
         )
 
 
-class SpeakerViewSetTests(PermissionTesterMixin, APITestCase):
+class SpeakerViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
@@ -870,7 +882,8 @@ class SpeakerViewSetTests(PermissionTesterMixin, APITestCase):
             [self.moderator.pk, self.participant.pk], self.slist.order_list
         )
         url = reverse("speakers-detail", kwargs={"pk": self.fifth_in_queue.pk})
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=url,
             method="delete",
             expected=[
@@ -879,11 +892,13 @@ class SpeakerViewSetTests(PermissionTesterMixin, APITestCase):
                 [self.speaker_user, 404],
                 [self.participant, 404],
             ],
-        )
+        ):
+            func(*args)
 
     def test_get_not_finished(self):
         url = reverse("speakers-detail", kwargs={"pk": self.fourth_ongoing.pk})
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=url,
             method="get",
             expected=[
@@ -892,10 +907,12 @@ class SpeakerViewSetTests(PermissionTesterMixin, APITestCase):
                 [self.speaker_user, 404],
                 [self.participant, 404],
             ],
-        )
+        ):
+            func(*args)
 
     def test_add_speaker(self):
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=reverse("speakers-list"),
             method="POST",
             data={"user": self.speaker_user.id, "speaker_list": self.slist.pk},
@@ -905,11 +922,13 @@ class SpeakerViewSetTests(PermissionTesterMixin, APITestCase):
                 [self.speaker_user, 403],
                 [self.participant, 403],
             ],
-        )
+        ):
+            func(*args)
 
     def test_view_speaker(self):
         url = reverse("speakers-detail", kwargs={"pk": self.third.pk})
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=url,
             method="get",
             expected=[
@@ -918,14 +937,16 @@ class SpeakerViewSetTests(PermissionTesterMixin, APITestCase):
                 [self.speaker_user, 404],
                 [self.participant, 404],
             ],
-        )
+        ):
+            func(*args)
 
     def test_change_speaker(self):
         url = reverse("speakers-detail", kwargs={"pk": self.third.pk})
         data = {
             "seconds": "10",
         }
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=url,
             method="patch",
             data=data,
@@ -935,10 +956,11 @@ class SpeakerViewSetTests(PermissionTesterMixin, APITestCase):
                 [self.speaker_user, 404],
                 [self.participant, 404],
             ],
-        )
+        ):
+            func(*args)
 
 
-class ExportSpeakersViewSetTests(PermissionTesterMixin, APITestCase):
+class ExportSpeakersViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
@@ -967,7 +989,8 @@ class ExportSpeakersViewSetTests(PermissionTesterMixin, APITestCase):
 
     def test_export_permissions(self):
         url = reverse("export-speakers-json", kwargs={"pk": self.sls.pk})
-        self.run_permission_tests(
+        for func, args in run_permission_tests(
+            self,
             url=url,
             method="get",
             expected=[
@@ -975,7 +998,8 @@ class ExportSpeakersViewSetTests(PermissionTesterMixin, APITestCase):
                 [self.outsider, 404],
                 [self.participant, 404],
             ],
-        )
+        ):
+            func(*args)
 
     def test_csv_no_data(self):
         self.sls.speaker_lists.all().delete()

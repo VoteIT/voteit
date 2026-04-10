@@ -7,6 +7,7 @@ from envelope.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
+from voteit.core.testing import run_permission_tests
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -14,6 +15,8 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.polls.combined_simple import CombinedSimple
+from voteit.poll.app.polls.schulze import RepeatedSchulze
+from voteit.poll.messages import ManualCreateER
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.registries import er_policy
 from voteit.poll.registries import vote_transfer_policies
@@ -26,37 +29,19 @@ User = get_user_model()
 
 
 class PollViewSetTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create(
-            title="Test meeting",
-        )
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.ai = cls.meeting.agenda_items.create(state="ongoing", title="Ongoing")
         cls.ai_private = cls.meeting.agenda_items.create(title="Private")
         cls.prop = cls.ai.proposals.create()
         cls.prop2 = cls.ai.proposals.create()
         cls.prop3 = cls.ai.proposals.create()
-        cls.participant: User = User.objects.create_user("participant")
-        cls.moderator: User = User.objects.create_user("moderator")
+        cls.participant: User = User.objects.get(username="participant")
+        cls.moderator: User = User.objects.get(username="moderator")
         cls.outsider: User = User.objects.create_user("outsider")
-        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
-        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
-
-    def test_create(self):
-        url = reverse("poll-list")
-        data = {
-            "title": "Let's vote",
-            "meeting": self.meeting.pk,
-            "method_name": "simple",
-            "agenda_item": self.ai.pk,
-            "proposals": [self.prop.pk],
-            "p_ord": "a",
-        }
-        self.client.force_login(self.moderator)
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 201)
-        data = response.json()
-        self.assertEqual("a", data["p_ord"])
 
     def test_create_very_long_title(self):
         url = reverse("poll-list")
@@ -71,8 +56,7 @@ class PollViewSetTests(APITestCase):
         response = self.client.post(url, data)
         self.assertContains(response, "title", status_code=400)
 
-    def test_create_wrong_user(self):
-        url = reverse("poll-list")
+    def test_create(self):
         data = {
             "title": "Let's vote",
             "meeting": self.meeting.pk,
@@ -80,19 +64,19 @@ class PollViewSetTests(APITestCase):
             "agenda_item": self.ai.pk,
             "proposals": [self.prop.pk],
         }
-        for user, status in (
-            (None, 401),
-            (self.participant, 403),
-            (self.outsider, 403),
+        for func, args in run_permission_tests(
+            self,
+            url=reverse("poll-list"),
+            data=data,
+            method="POST",
+            expected=[
+                [None, 401],
+                [self.participant, 403],
+                [self.outsider, 403],
+                [self.moderator, 201, data],
+            ],
         ):
-            if user:
-                self.client.force_login(user)
-            response = self.client.post(url, data)
-            self.assertEqual(
-                response.status_code,
-                status,
-                f"{user} action returned wrong response code",
-            )
+            func(*args)
 
     def test_create_no_method_name(self):
         url = reverse("poll-list")
@@ -108,8 +92,6 @@ class PollViewSetTests(APITestCase):
         self.assertIn("method_name", response.json())
 
     def test_create_repeated_schulze_sort(self):
-        from voteit.poll.app.polls.schulze import RepeatedSchulze
-
         url = reverse("poll-list")
         data = {
             "title": "Let's vote",
@@ -147,88 +129,147 @@ class PollViewSetTests(APITestCase):
 
     def test_get(self):
         poll = self.meeting.polls.create(
-            agenda_item=self.ai, method_name="simple", state="upcoming"
+            agenda_item=self.ai,
+            method_name="simple",
+            state="upcoming",
+            title="A visible poll",
         )
-        url = f"/api/polls/{poll.pk}/"
-        self.client.force_login(self.moderator)
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        data = response.json()
-        self.assertEqual(poll.pk, data["pk"])
-        # Participant
-        self.client.force_login(self.participant)
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        # Authenticated but not within meeting
-        self.client.force_login(self.outsider)
-        response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
+        poll.proposals.add(self.prop)
+        for func, args in run_permission_tests(
+            self,
+            url=reverse("poll-detail", kwargs={"pk": poll.id}),
+            method="get",
+            expected=[
+                [None, 401],
+                [self.participant, 200],
+                [self.outsider, 404],
+                [
+                    self.moderator,
+                    200,
+                    {
+                        "title": "A visible poll",
+                        "meeting": self.meeting.pk,
+                        "method_name": "simple",
+                        "state": "upcoming",
+                        "agenda_item": self.ai.pk,
+                        "proposals": [self.prop.pk],
+                        "pk": poll.pk,
+                    },
+                ],
+            ],
+        ):
+            func(*args)
 
     def test_get_private_ai(self):
         poll = self.meeting.polls.create(
-            agenda_item=self.ai_private, method_name="simple", state="upcoming"
+            agenda_item=self.ai_private,
+            method_name="simple",
+            state="upcoming",
+            title="With private AI",
         )
-        url = reverse("poll-detail", kwargs={"pk": poll.pk})
-        self.client.force_login(self.moderator)
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        data = response.json()
-        self.assertEqual(poll.pk, data["pk"])
-        # Participant
-        self.client.force_login(self.participant)
-        response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
-        # Authenticated but not within meeting
-        self.client.force_login(self.outsider)
-        response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
+        poll.proposals.add(self.prop)
+        for func, args in run_permission_tests(
+            self,
+            url=reverse("poll-detail", kwargs={"pk": poll.id}),
+            method="get",
+            expected=[
+                [None, 401],
+                [self.participant, 404],
+                [self.outsider, 404],
+                [
+                    self.moderator,
+                    200,
+                    {
+                        "title": "With private AI",
+                        "meeting": self.meeting.pk,
+                        "method_name": "simple",
+                        "agenda_item": self.ai_private.pk,
+                        "proposals": [self.prop.pk],
+                        "pk": poll.pk,
+                    },
+                ],
+            ],
+        ):
+            func(*args)
 
     def test_get_private_poll(self):
-        poll = self.meeting.polls.create(agenda_item=self.ai, method_name="simple")
-        url = reverse("poll-detail", kwargs={"pk": poll.pk})
-        self.client.force_login(self.moderator)
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        # Participant
-        self.client.force_login(self.participant)
-        response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
-        # Authenticated but not within meeting
-        self.client.force_login(self.outsider)
-        response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
+        poll = self.meeting.polls.create(
+            agenda_item=self.ai,
+            method_name="simple",
+            title="Private poll",
+        )
+        poll.proposals.add(self.prop)
+        for func, args in run_permission_tests(
+            self,
+            url=reverse("poll-detail", kwargs={"pk": poll.id}),
+            method="get",
+            expected=[
+                [None, 401],
+                [self.participant, 404],
+                [self.outsider, 404],
+                [
+                    self.moderator,
+                    200,
+                    {
+                        "title": "Private poll",
+                        "meeting": self.meeting.pk,
+                        "method_name": "simple",
+                        "agenda_item": self.ai.pk,
+                        "proposals": [self.prop.pk],
+                        "pk": poll.pk,
+                    },
+                ],
+            ],
+        ):
+            func(*args)
 
     def test_get_other_meeting(self):
         meeting = Meeting.objects.create()
-        poll = meeting.polls.create(method_name="simple", state="upcoming")
-        url = reverse("poll-detail", kwargs={"pk": poll.pk})
-        self.client.force_login(self.moderator)
-        response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
-        # Participant
-        self.client.force_login(self.participant)
-        response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
-        # Authenticated but not within meeting
-        self.client.force_login(self.outsider)
-        response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
+        poll = meeting.polls.create(
+            method_name="simple", state="upcoming", title="Other meetings poll"
+        )
+        for func, args in run_permission_tests(
+            self,
+            url=reverse("poll-detail", kwargs={"pk": poll.id}),
+            method="get",
+            expected=[
+                [None, 401],
+                [self.participant, 404],
+                [self.outsider, 404],
+                [self.moderator, 404],
+            ],
+        ):
+            func(*args)
 
     def test_change(self):
         poll = self.meeting.polls.create(method_name="simple", title="First")
-        url = reverse("poll-detail", kwargs={"pk": poll.pk})
-        self.client.force_login(self.moderator)
-        data = {"title": "And then"}  # Readonly
-        response = self.client.patch(url, data)
-        self.assertEqual(200, response.status_code)
-        poll.refresh_from_db(fields=("title",))
-        self.assertEqual("First", poll.title)
+        for func, args in run_permission_tests(
+            self,
+            url=reverse("poll-detail", kwargs={"pk": poll.id}),
+            method="patch",
+            data={"title": "And then"},
+            expected=[
+                [self.participant, 404],
+                [self.outsider, 404],
+                [
+                    self.moderator,
+                    200,
+                    {
+                        "title": "And then",
+                        "pk": poll.pk,
+                    },
+                ],
+            ],
+        ):
+            func(*args)
 
     def test_transition_without_register(self):
+        self.meeting.er_policy_name = ManualCreateER.name
+        self.meeting.save()
         poll = self.meeting.polls.create(
             method_name="simple", title="First", state="upcoming"
         )
-        self.meeting.electoral_registers.create()
+        poll.proposals.add(self.prop)
         url = reverse("poll-transitions", kwargs={"pk": poll.pk})
         self.client.force_login(self.moderator)
         response = self.client.post(url, data={"transition": "ongoing"})
@@ -296,7 +337,7 @@ class ElectoralRegisterViewSetTests(APITestCase):
     def test_list(self):
         url = reverse("electoral-registers-list")
         self.client.force_login(self.moderator)
-        response = self.client.get(url)
+        response = self.client.get(url, data={"meeting": self.meeting.pk})
         self.assertEqual(200, response.status_code)
         data = response.json()
         self.assertEqual(4, len(data))
@@ -343,9 +384,7 @@ class ExportElectoralRegisterViewSetTests(APITestCase):
         self.client.force_login(self.outsider)
         url = reverse("export-electoral-register-json", kwargs={"pk": self.er.pk})
         response = self.client.get(url)
-        self.assertContains(
-            response, "permission meeting.moderate_meeting", status_code=403
-        )
+        self.assertEqual(404, response.status_code)
 
     def test_csv_no_data(self):
         self.er.voterweight_set.all().delete()
@@ -427,7 +466,6 @@ class ElectoralRegisterPolicyViewSetTests(APITestCase):
     {UnrestrictedVoteTransferER.name: UnrestrictedVoteTransferER},
 )
 class VoteTransferViewSetTests(APITestCase):
-
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
@@ -472,9 +510,9 @@ class VoteTransferViewSetTests(APITestCase):
             "target": self.other_participant.pk,
         }
         response = self.client.post(url, data=data)
-        self.assertEqual(
+        self.assertDictEqual(
             {
-                "detail": "You lack the required permission to add (assign) vote transfer in this meeting."
+                "detail": "You're missing the permission 'poll.add_votetransfer' on Testfixture meeting."
             },
             response.json(),
         )
@@ -572,7 +610,7 @@ class VoteTransferViewSetTests(APITestCase):
         )
         url = reverse("vote-transfer-detail", kwargs={"pk": transfer.pk})
         response = self.client.delete(url)
-        self.assertEqual(403, response.status_code)
+        self.assertEqual(404, response.status_code)
 
     def test_delete_others_moderator(self):
         self.client.force_login(self.moderator)

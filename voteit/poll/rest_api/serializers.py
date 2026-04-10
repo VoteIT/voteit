@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING
 
 from django.db import transaction
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 
 from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.core.rest_api.utils import drf_do_transition
 from voteit.core.rest_api.utils import get_valid_transitions_dict
+from voteit.core.rest_api.utils import validate_model_add
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api.fields import UserInMeetingContextField
 from voteit.meeting.rest_api.fields import UserInSameMeetingsField
@@ -22,7 +22,6 @@ from voteit.poll.models import Poll
 from voteit.poll.models import Vote
 from voteit.poll.models import VoteTransfer
 from voteit.poll.models import VoterWeight
-from voteit.poll.permissions import VoteTransferPermissions
 from voteit.poll.utils import get_poll_method_registry
 
 if TYPE_CHECKING:
@@ -45,10 +44,9 @@ class PollDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Poll
-        read_only_fields = (
+        read_only_fields = [
             "abstain_count",
             "agenda_item",
-            "body",
             "closed",
             "electoral_register",
             "initial_electoral_register",
@@ -62,10 +60,9 @@ class PollDetailSerializer(serializers.ModelSerializer):
             "settings",
             "started",
             "state",
-            "title",
             "url",
-        )
-        fields = read_only_fields
+        ]
+        fields = ["title", "body"] + read_only_fields
 
     def get_abstain_count(self, instance: Poll) -> int | None:
         if instance.is_finished:
@@ -141,6 +138,10 @@ class PollCreateSerializer(serializers.ModelSerializer):
             except ValueError:
                 raise serializers.ValidationError({"settings": "Invalid settings"})
         return super().validate(attrs)
+
+    def validate_agenda_item(self, agenda_item):
+        validate_model_add(self, Poll, agenda_item)
+        return agenda_item
 
     def create(self, validated_data):
         start = validated_data.pop("start")
@@ -250,12 +251,7 @@ class VoteTransferSerializer(serializers.ModelSerializer):
         ]
 
     def validate_meeting(self, value: Meeting):
-        if not self.context["request"].user.has_perm(
-            VoteTransferPermissions.ADD, value
-        ):
-            raise PermissionDenied(
-                "You lack the required permission to add (assign) vote transfer in this meeting."
-            )
+        validate_model_add(self, VoteTransfer, value)
         return value
 
     def validate(self, attrs):
@@ -302,7 +298,6 @@ class VoteTransferReassignSerializer(serializers.ModelSerializer):
         target = attrs["target"]
         if self.instance.source == target:
             raise ValidationError("Can't transfer to self")
-
         self.instance.meeting.vote_transfer_policy.check(
             source=self.instance.source, target=target, modifying=self.instance
         )

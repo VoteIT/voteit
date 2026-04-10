@@ -29,6 +29,7 @@ from pydantic import ValidationError
 from pydantic.main import BaseModel
 from rules.contrib.models import RulesModelMixin
 
+from voteit.core import PERM
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
@@ -39,7 +40,6 @@ from voteit.poll.exceptions import InvalidPollMethod
 from voteit.poll.exceptions import NotAllowedToVote
 from voteit.poll.exceptions import PollError
 from voteit.poll.exceptions import PollNotFinished
-from voteit.poll.permissions import PollPermissions
 from voteit.poll.schemas import PollResult
 from voteit.poll.utils import get_poll_method_registry
 from voteit.poll.workflows import PollWf
@@ -92,7 +92,7 @@ class VoterWeight(MeetingContext):
     ],
 )
 @history_log("meeting__organisation")
-class ElectoralRegister(MeetingContext):
+class ElectoralRegister(RulesModelMixin, MeetingContext):
     name = "electoral_register"
     created: datetime = models.DateTimeField(editable=False, default=now)
     source: str | None = models.CharField(max_length=20, null=True, blank=True)
@@ -186,6 +186,7 @@ class ElectoralRegister(MeetingContext):
 )
 class Poll(BaseContent, MeetingContext, AgendaItemContext):
     P_ORD_CHOICES = (("c", "Chronological"), ("a", "Alphabetical"), ("r", "Random"))
+    PERM_CHANGE_STATE = f"poll.{PERM.CHANGE_STATE}_poll"
 
     name = "poll"
     state: str = FSMField(
@@ -412,7 +413,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         source=PollWf.PRIVATE,
         target=PollWf.UPCOMING,
         conditions=[validate_settings_guard],
-        permission=PollPermissions.CHANGE_STATE,
+        permission=PERM_CHANGE_STATE,
         custom={"title": _("Make upcoming")},
     )
     def upcoming(self):
@@ -428,7 +429,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             manual_er_needed_guard,
             method_guard,
         ],
-        permission=PollPermissions.CHANGE_STATE,
+        permission=PERM_CHANGE_STATE,
         custom={"title": _("Start")},
     )
     def ongoing(self):
@@ -441,7 +442,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         source=[PollWf.ONGOING, PollWf.FAILED, PollWf.CANCELED],
         target=PollWf.CLOSED,
-        permission=PollPermissions.CHANGE_STATE,
+        permission=PERM_CHANGE_STATE,
         custom={"title": _("Close")},
     )
     def close(self):
@@ -484,7 +485,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         source=PollWf.WITHHELD,
         target=PollWf.FINISHED,
         on_error=PollWf.FAILED,
-        permission=PollPermissions.CHANGE_STATE,
+        permission=PERM_CHANGE_STATE,
         custom={"title": _("Publish result")},
     )
     def publish_result(self):
@@ -496,7 +497,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         source=PollWf.FINISHED,
         target=PollWf.WITHHELD,
         on_error=PollWf.FAILED,
-        permission=PollPermissions.CHANGE_STATE,
+        permission=PERM_CHANGE_STATE,
         custom={"title": _("Withold detailed result")},
     )
     def withhold_result(self):
@@ -506,7 +507,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         source=PollWf.ONGOING,
         target=PollWf.CANCELED,
-        permission=PollPermissions.CHANGE_STATE,
+        permission=PERM_CHANGE_STATE,
         custom={"title": _("Cancel")},
     )
     def cancel(self):
@@ -517,7 +518,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         source=PollWf.UPCOMING,
         target=PollWf.PRIVATE,
-        permission=PollPermissions.CHANGE_STATE,
+        permission=PERM_CHANGE_STATE,
         custom={"title": _("Revert to private")},
     )
     def unpublish(self):
@@ -660,7 +661,7 @@ def _remove_all_mask(value: str) -> str:
     mask_fields=["vote_data", "abstain"],
     mask_callable="voteit.poll.models._remove_all_mask",
 )
-class Vote(models.Model):
+class Vote(RulesModelMixin, models.Model):
     """Contains data on the users vote in a specific poll."""
 
     name = "vote"

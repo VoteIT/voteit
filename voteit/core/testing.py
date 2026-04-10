@@ -4,6 +4,7 @@ from __future__ import annotations
 import doctest
 import random
 from pkgutil import walk_packages
+from typing import Generator
 from typing import TYPE_CHECKING
 
 from django.db import transaction
@@ -15,6 +16,7 @@ from voteit.core.utils import exectime  # noqa
 
 if TYPE_CHECKING:
     from voteit.core.models import User
+    from rest_framework.test import APITestCase
 
 
 user_tag = """
@@ -113,48 +115,95 @@ class SetSeed:
         random.seed()
 
 
-class PermissionTesterMixin:
-    def run_permission_tests(
-        self,
-        *,
-        url: str,
-        data: dict = None,
-        method: str = "get",
-        expected: list[
-            list[User | int | dict | None]
-        ],  # FIXME: Typing is either [User, int] or [User, int, dict]
-    ):
-        if data is None:
-            data = {}
-        for row in expected:
-            if len(row) == 2:
-                row.append(None)
-        for user, expected_status, check_response in expected:
-            if user:
-                self.client.force_login(user)
-            else:
-                self.client.logout()
+def run_permission_tests(
+    tester: APITestCase,
+    *,
+    url: str,
+    data: dict = None,
+    method: str = "get",
+    expected: list[list[User | None | int | dict] | tuple[User | None | int | dict],],
+) -> Generator[tuple, None, None]:
+    """
 
-            sid = transaction.savepoint()
-            with self.subTest(
-                user=user,
-                expected_status=expected_status,
-                url=url,
-                data=data,
-                check_response=check_response,
-            ):
-                response = getattr(self.client, method.lower())(
-                    url, data, format="json"
+    Returns a generator with test function and args.
+    Run test like:
+
+        for func, args in run_permission_tests(
+            self,
+            url=http://someurl,
+            data={'whatever': 1},
+            method="POST",
+            expected=[
+                [None, 401],
+                [self.participant, 403],
+                [self.outsider, 403],
+                [self.moderator, 201, {'partial': 'Hello'],
+            ],
+        ):
+            func(*args)
+
+    """
+    if data is None:
+        data = {}
+    for row in expected:
+        if len(row) not in (2, 3):
+            yield tester.fail, [f"expected must have 2 or 3 items per row. Got: {row}"]
+        user = row[0]
+        if user:
+            tester.client.force_login(user)
+        else:
+            tester.client.logout()
+        expected_status = row[1]
+        if not isinstance(expected_status, int):
+            yield (
+                tester.fail,
+                [f"item 2 of each row must be in int, got {expected_status}"],
+            )
+        try:
+            partial_response = row[2]
+            if not isinstance(partial_response, dict):
+                yield (
+                    tester.fail,
+                    [
+                        f"item 3 of each row must be dict or not exist, got {partial_response}"
+                    ],
                 )
-                try:
-                    json_response = response.json()
-                except TypeError:
-                    json_response = None
-                self.assertEqual(
+        except IndexError:
+            partial_response = None
+        sid = transaction.savepoint()
+        with tester.subTest(
+            user=user,
+            expected_status=expected_status,
+            url=url,
+            data=data,
+            partial_response=partial_response,
+        ):
+            response = getattr(tester.client, method.lower())(url, data, format="json")
+            try:
+                json_response = response.json()
+            except TypeError:
+                json_response = None
+            yield (
+                tester.assertEqual,
+                [
                     response.status_code,
                     expected_status,
                     f"{url}: {user} got {response.status_code} instead of {expected_status}.\n{json_response}",
-                )
-                if check_response:
-                    self.assertDictEqual(check_response, response.json())
-            transaction.savepoint_rollback(sid)
+                ],
+            )
+            if partial_response:
+                if json_response is None:
+                    yield tester.assertEqual, [json_response, None]  # To produce error
+                else:
+                    yield (
+                        tester.assertDictEqual,
+                        [
+                            partial_response,
+                            {
+                                k: v
+                                for k, v in json_response.items()
+                                if k in partial_response
+                            },
+                        ],
+                    )
+        transaction.savepoint_rollback(sid)
