@@ -34,7 +34,6 @@ if TYPE_CHECKING:
 @router.register("organisation", basename="organisation")
 class OrganisationViewSet(
     VerboseAutoPermissionViewSetMixin,
-    mixins.UpdateModelMixin,
     GenericViewSet,
 ):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
@@ -65,11 +64,10 @@ class OrganisationViewSet(
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
-    @action(detail=False, methods=["patch", "put"])
+    @action(detail=False, methods=["patch"])
     def change(self, request, *args, **kwargs):
         instance = self.get_object()
-        partial = request.method.lower() == "patch"
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         if getattr(instance, "_prefetched_objects_cache", None):
