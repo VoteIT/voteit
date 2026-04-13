@@ -2,7 +2,6 @@ import yaml
 from django.db import transaction
 from django.http import HttpResponse
 from pydantic import ValidationError as PydanticValidationError
-from rest_framework import permissions
 from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -11,30 +10,30 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from voteit.core.rest_api import router
-from voteit.core.rest_api.mixins import AutoPermissionViewSetMixin
+from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.utils import pydantic_to_drf_validation_error
 from voteit.export_import.utils import sign_payload
-from voteit.meeting.models import Meeting
 from voteit.export_import.exporter import Exporter
 from voteit.export_import.importer import Importer
 from voteit.export_import.rest_api.serializers import ImportFileSerializer
 from voteit.export_import.rest_api.serializers import ExportFileSerializer
+from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 
 
 @router.register("meeting-data", basename="meeting-data")
-class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
-    permission_classes = [permissions.IsAuthenticated]
-    queryset = Meeting.objects.all()
+class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericViewSet):
     serializer_class = ImportFileSerializer
     parser_classes = (MultiPartParser, FileUploadParser)
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "preview": None,
+        "yaml": None,
+    }
 
-    @property
-    def permission_type_map(self):
-        return dict(
-            yaml="moderate",
-            json="moderate",
-            preview="moderate",
-            **super().permission_type_map,
+    def get_queryset(self):
+        return Meeting.objects.filter(
+            roles__user=self.request.user, roles__assigned__contains=ROLE_MODERATOR
         )
 
     def list(self, request, *args, **kwargs):
@@ -106,6 +105,6 @@ class MeetingDataViewSet(AutoPermissionViewSetMixin, viewsets.GenericViewSet):
             signed_payload,
             content_type="application/yaml",
             headers={
-                f"Content-Disposition": f'attachment; filename="meeting_{instance.pk}_export.yaml"'
+                "Content-Disposition": f'attachment; filename="meeting_{instance.pk}_export.yaml"'
             },
         )

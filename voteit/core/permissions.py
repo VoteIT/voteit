@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from abc import ABC
 from abc import ABCMeta
 from collections import UserString
@@ -13,6 +14,7 @@ logger = getLogger(__name__)
 # FIXME: context can be None later on, change when that happens
 
 
+@warnings.deprecated("Use rules instead with contants like voteit.core.PERM")
 class Permission(UserString):
     """
     Permissions work as strings, and are equal do the same kind of string
@@ -103,18 +105,7 @@ class ModelPermissions(ABC, metaclass=MPMeta):
     model = None  # The shortname of the model. For instance "meeting"
 
 
-class AlwaysTrueSet(set):
-    def add(self, item):
-        pass
-
-    def __contains__(self, item):
-        return True
-
-
-ANY_SET = AlwaysTrueSet()
-NOT_ALLOWED = Permission(
-    "__not_allowed", model=ANY_SET, context=ANY_SET
-)  # Not manually anyway!
+NOT_ALLOWED = "__not_allowed"  # Not manually anyway!
 
 
 class UserPermissions(ModelPermissions):

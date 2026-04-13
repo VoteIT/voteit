@@ -9,10 +9,11 @@ from django.db import models
 from django.utils.timezone import now
 from django_fsm import FSMField
 from django_fsm import transition
+from rules.contrib.models import RulesModelMixin
 
+from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
-from voteit.presence.permissions import PresenceCheckPermissions
 from voteit.presence.workflows import PresenceCheckWf
 
 
@@ -55,7 +56,7 @@ class Presence(MeetingContext):
     objects: models.Manager
 
 
-class PresenceCheck(MeetingContext):
+class PresenceCheck(RulesModelMixin, MeetingContext):
     """
     This models handles lists of users who are present.
     Only one presence check should be open at a time.
@@ -89,7 +90,7 @@ class PresenceCheck(MeetingContext):
         field=state,
         source=PresenceCheckWf.OPEN,
         target=PresenceCheckWf.CLOSED,
-        permission=PresenceCheckPermissions.CHANGE,
+        permission=f"presence.{PERM.CHANGE}_presencecheck",
     )
     def close(self) -> None:
         self.closed = now()
