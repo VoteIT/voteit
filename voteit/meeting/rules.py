@@ -6,13 +6,16 @@ import rules
 from django.contrib.auth.models import AbstractUser
 from rules import is_authenticated
 
+from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import predicate
 from voteit.core.rules import is_not_archived
+from voteit.meeting import PERM_CHANGE_DIALECT
+from voteit.meeting import PERM_PREVIEW
+from voteit.meeting.models import GroupMembership
+from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
-from voteit.meeting.permissions import GroupMembershipPermissions
-from voteit.meeting.permissions import MeetingGroupPermissions
-from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -28,7 +31,9 @@ if TYPE_CHECKING:
 
 @predicate(role=ROLE_PARTICIPANT)
 def is_participant(user: AbstractUser, context: MeetingContext) -> bool:
-    """Is this a meeting participant?"""
+    """
+    Is this a meeting participant? (Any kind of role)
+    """
     if not isinstance(context, MeetingContext):
         raise TypeError(f"Expected MeetingContext, got {type(context)}")
     meeting_id = getattr(context, "meeting_id", context.meeting.pk)
@@ -149,31 +154,35 @@ def visible_in_lists(user: AbstractUser, context: MeetingContext) -> bool:
     )
 
 
-rules.add_perm(MeetingPermissions.ADD, is_manager | is_meeting_creator)
+rules.add_perm(Meeting.get_perm(PERM.ADD), is_manager | is_meeting_creator)
+# FIXME: This queryset has changed. It used to include public meetings
+rules.add_perm(Meeting.get_perm(PERM.VIEW), is_participant)
+rules.add_perm(Meeting.get_perm(PERM.MODERATE), is_moderator)
 rules.add_perm(
-    MeetingPermissions.VIEW, can_view_meeting
-)  # FIXME: Should not be tested this way
-rules.add_perm(MeetingPermissions.MODERATE, is_moderator)
-rules.add_perm(MeetingPermissions.ARCHIVE, meeting_not_fully_archived & is_moderator)
+    Meeting.get_perm(PERM.ARCHIVE), meeting_not_fully_archived & is_moderator
+)
 # We might want to add editor role later on
-rules.add_perm(MeetingPermissions.CHANGE, meeting_not_archived & is_moderator)
-rules.add_perm(MeetingPermissions.CHANGE_DIALECT, meeting_upcoming & is_moderator)
-rules.add_perm(MeetingPermissions.DELETE, is_moderator)
+rules.add_perm(Meeting.get_perm(PERM.CHANGE), meeting_not_archived & is_moderator)
+rules.add_perm(Meeting.get_perm(PERM_CHANGE_DIALECT), meeting_upcoming & is_moderator)
+rules.add_perm(Meeting.get_perm(PERM.DELETE), is_moderator)
 rules.add_perm(
-    MeetingPermissions.CHANGE_ROLES, meeting_not_archived & (is_moderator | is_manager)
+    Meeting.get_perm(PERM.CHANGE_ROLES),
+    meeting_not_archived & is_moderator,
+)
+rules.add_perm(Meeting.get_perm(PERM_PREVIEW), visible_in_lists)
+# FIXME: View should be removed here, use queryset instead. Fix when messages update.
+rules.add_perm(Meeting.get_perm(PERM.VIEW_ROLES), is_moderator)
+
+
+rules.add_perm(MeetingGroup.get_perm(PERM.ADD), meeting_not_archived & is_moderator)
+rules.add_perm(MeetingGroup.get_perm(PERM.CHANGE), meeting_not_archived & is_moderator)
+rules.add_perm(MeetingGroup.get_perm(PERM.DELETE), meeting_not_archived & is_moderator)
+# Used by messages
+rules.add_perm(MeetingGroup.get_perm(PERM.VIEW), is_participant)
+rules.add_perm(GroupMembership.get_perm(PERM.ADD), meeting_not_archived & is_moderator)
+rules.add_perm(
+    GroupMembership.get_perm(PERM.CHANGE), meeting_not_archived & is_moderator
 )
 rules.add_perm(
-    MeetingPermissions.PREVIEW, visible_in_lists
-)  # View removed here since it won't be part of the queryset otherwise
-rules.add_perm(MeetingPermissions.VIEW_ROLES, can_view_meeting | is_manager)
-
-
-rules.add_perm(MeetingGroupPermissions.ADD, meeting_not_archived & is_moderator)
-rules.add_perm(MeetingGroupPermissions.VIEW, can_view_meeting)
-rules.add_perm(MeetingGroupPermissions.CHANGE, meeting_not_archived & is_moderator)
-rules.add_perm(MeetingGroupPermissions.DELETE, meeting_not_archived & is_moderator)
-
-rules.add_perm(GroupMembershipPermissions.ADD, meeting_not_archived & is_moderator)
-rules.add_perm(GroupMembershipPermissions.VIEW, can_view_meeting)
-rules.add_perm(GroupMembershipPermissions.CHANGE, meeting_not_archived & is_moderator)
-rules.add_perm(GroupMembershipPermissions.DELETE, meeting_not_archived & is_moderator)
+    GroupMembership.get_perm(PERM.DELETE), meeting_not_archived & is_moderator
+)

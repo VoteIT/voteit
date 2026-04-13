@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.core import PERM
+from voteit.meeting import PERM_CHANGE_DIALECT
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -12,7 +14,6 @@ from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.models import Organisation
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
-from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 User = get_user_model()
 
@@ -66,59 +67,51 @@ class RulesTests(TestCase):
 
 
 class MeetingPermissionTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.organisation: Organisation = Organisation.objects.create()
-        cls.meeting = cls.organisation.meetings.create()
-        cls.org_manager = cls.organisation.users.create(username="org_manager")
+        cls.organisation: Organisation = Organisation.objects.get(pk=1)
+        cls.meeting = cls.organisation.meetings.get(pk=1)
+        cls.org_manager = cls.organisation.users.get(username="org_manager")
         cls.meeting_creator = cls.organisation.users.create(username="meeting_creator")
-        cls.organisation.add_roles(cls.org_manager, ROLE_ORG_MANAGER)
         cls.organisation.add_roles(cls.meeting_creator, ROLE_MEETING_CREATOR)
         cls.anon_user = User.objects.create(username="anon")
-        cls.moderator = User.objects.create(username="moderator")
-        cls.participant = User.objects.create(username="participant")
-        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
-        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
 
     def setUp(self):
         self.meeting.refresh_from_db()
 
-    def p(self, name):
-        from voteit.meeting.permissions import MeetingPermissions
-
-        return getattr(MeetingPermissions, name)
-
     def test_can_add_meeting(self):
-        ADD = self.p("ADD")
+        ADD = Meeting.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.organisation))
         self.assertTrue(self.meeting_creator.has_perm(ADD, self.organisation))
         self.assertTrue(self.org_manager.has_perm(ADD, self.organisation))
 
     def test_can_view_meeting(self):
-        VIEW = self.p("VIEW")
+        VIEW = Meeting.get_perm(PERM.VIEW)
+        self.assertFalse(self.anon_user.has_perm(VIEW, self.meeting))
+        self.assertTrue(self.moderator.has_perm(VIEW, self.meeting))
+        self.assertTrue(self.participant.has_perm(VIEW, self.meeting))
+        self.assertFalse(self.org_manager.has_perm(VIEW, self.meeting))
+        self.meeting.public = True
+        self.meeting.save()
+        # Same nowdays
         self.assertFalse(self.anon_user.has_perm(VIEW, self.meeting))
         self.assertTrue(self.moderator.has_perm(VIEW, self.meeting))
         self.assertTrue(self.participant.has_perm(VIEW, self.meeting))
         self.assertFalse(self.org_manager.has_perm(VIEW, self.meeting))
 
-    def test_can_view_meeting_public(self):
-        VIEW = self.p("VIEW")
-        self.meeting.public = True
-        self.meeting.save()
-        self.assertTrue(self.anon_user.has_perm(VIEW, self.meeting))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.meeting))
-        self.assertTrue(self.participant.has_perm(VIEW, self.meeting))
-        self.assertTrue(self.org_manager.has_perm(VIEW, self.meeting))
-
     def test_can_moderate(self):
-        MODERATE = self.p("MODERATE")
+        MODERATE = Meeting.get_perm(PERM.MODERATE)
         self.assertFalse(self.anon_user.has_perm(MODERATE, self.meeting))
         self.assertTrue(self.moderator.has_perm(MODERATE, self.meeting))
         self.assertFalse(self.participant.has_perm(MODERATE, self.meeting))
         self.assertFalse(self.org_manager.has_perm(MODERATE, self.meeting))
 
     def test_can_change_meeting(self):
-        CHANGE = self.p("CHANGE")
+        CHANGE = Meeting.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting))
         self.assertTrue(self.moderator.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.participant.has_perm(CHANGE, self.meeting))
@@ -127,7 +120,7 @@ class MeetingPermissionTests(TestCase):
     def test_can_change_meeting_archived(self):
         self.meeting.archive()
         self.meeting.save()
-        CHANGE = self.p("CHANGE")
+        CHANGE = Meeting.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.moderator.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.participant.has_perm(CHANGE, self.meeting))
@@ -136,14 +129,14 @@ class MeetingPermissionTests(TestCase):
     def test_can_change_meeting_archive_requested(self):
         self.meeting.state = MeetingWf.ARCHIVING
         self.meeting.save()
-        CHANGE = self.p("CHANGE")
+        CHANGE = Meeting.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.moderator.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.participant.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.org_manager.has_perm(CHANGE, self.meeting))
 
     def test_can_change_dialect(self):
-        CHANGE_DIALECT = self.p("CHANGE_DIALECT")
+        CHANGE_DIALECT = Meeting.get_perm(PERM_CHANGE_DIALECT)
         self.assertFalse(self.anon_user.has_perm(CHANGE_DIALECT, self.meeting))
         self.assertTrue(self.moderator.has_perm(CHANGE_DIALECT, self.meeting))
         self.assertFalse(self.participant.has_perm(CHANGE_DIALECT, self.meeting))
@@ -152,28 +145,29 @@ class MeetingPermissionTests(TestCase):
     def test_can_change_dialect_ongoing(self):
         self.meeting.state = MeetingWf.ONGOING
         self.meeting.save()
-        CHANGE_DIALECT = self.p("CHANGE_DIALECT")
+        CHANGE_DIALECT = Meeting.get_perm(PERM_CHANGE_DIALECT)
         self.assertFalse(self.anon_user.has_perm(CHANGE_DIALECT, self.meeting))
         self.assertFalse(self.moderator.has_perm(CHANGE_DIALECT, self.meeting))
         self.assertFalse(self.participant.has_perm(CHANGE_DIALECT, self.meeting))
         self.assertFalse(self.org_manager.has_perm(CHANGE_DIALECT, self.meeting))
 
     def test_can_delete_meeting(self):
-        DELETE = self.p("DELETE")
+        DELETE = Meeting.get_perm(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.meeting))
         self.assertTrue(self.moderator.has_perm(DELETE, self.meeting))
         self.assertFalse(self.participant.has_perm(DELETE, self.meeting))
         self.assertFalse(self.org_manager.has_perm(DELETE, self.meeting))
 
     def test_can_change_roles(self):
-        CHANGE_ROLES = self.p("CHANGE_ROLES")
+        CHANGE_ROLES = Meeting.get_perm(PERM.CHANGE_ROLES)
         self.assertFalse(self.anon_user.has_perm(CHANGE_ROLES, self.meeting))
         self.assertTrue(self.moderator.has_perm(CHANGE_ROLES, self.meeting))
         self.assertFalse(self.participant.has_perm(CHANGE_ROLES, self.meeting))
-        self.assertTrue(self.org_manager.has_perm(CHANGE_ROLES, self.meeting))
+        # They need to join/set their own role as moderator first
+        self.assertFalse(self.org_manager.has_perm(CHANGE_ROLES, self.meeting))
 
     def test_can_change_roles_archived(self):
-        CHANGE_ROLES = self.p("CHANGE_ROLES")
+        CHANGE_ROLES = Meeting.get_perm(PERM.CHANGE_ROLES)
         self.meeting.archive()
         self.meeting.save()
         self.assertFalse(self.anon_user.has_perm(CHANGE_ROLES, self.meeting))
@@ -182,23 +176,21 @@ class MeetingPermissionTests(TestCase):
         self.assertFalse(self.org_manager.has_perm(CHANGE_ROLES, self.meeting))
 
     def test_can_view_roles(self):
-        VIEW_ROLES = self.p("VIEW_ROLES")
+        VIEW_ROLES = Meeting.get_perm(PERM.VIEW_ROLES)
         self.assertFalse(self.anon_user.has_perm(VIEW_ROLES, self.meeting))
         self.assertTrue(self.moderator.has_perm(VIEW_ROLES, self.meeting))
-        self.assertTrue(self.participant.has_perm(VIEW_ROLES, self.meeting))
-        self.assertTrue(self.org_manager.has_perm(VIEW_ROLES, self.meeting))
-
-    def test_can_view_roles_anon(self):
-        VIEW_ROLES = self.p("VIEW_ROLES")
+        self.assertFalse(self.participant.has_perm(VIEW_ROLES, self.meeting))
+        # Join meeting first
+        self.assertFalse(self.org_manager.has_perm(VIEW_ROLES, self.meeting))
         self.meeting.public = True
         self.meeting.save()
-        self.assertTrue(self.anon_user.has_perm(VIEW_ROLES, self.meeting))
+        self.assertFalse(self.anon_user.has_perm(VIEW_ROLES, self.meeting))
         self.assertTrue(self.moderator.has_perm(VIEW_ROLES, self.meeting))
-        self.assertTrue(self.participant.has_perm(VIEW_ROLES, self.meeting))
-        self.assertTrue(self.org_manager.has_perm(VIEW_ROLES, self.meeting))
+        self.assertFalse(self.participant.has_perm(VIEW_ROLES, self.meeting))
+        self.assertFalse(self.org_manager.has_perm(VIEW_ROLES, self.meeting))
 
     def test_can_archive_meeting(self):
-        ARCHIVE = self.p("ARCHIVE")
+        ARCHIVE = Meeting.get_perm(PERM.ARCHIVE)
         self.assertFalse(self.anon_user.has_perm(ARCHIVE, self.meeting))
         self.assertTrue(self.moderator.has_perm(ARCHIVE, self.meeting))
         self.assertFalse(self.participant.has_perm(ARCHIVE, self.meeting))
@@ -208,7 +200,7 @@ class MeetingPermissionTests(TestCase):
         # Essentially the archive permission is used to request abort too
         self.meeting.state = MeetingWf.ARCHIVING
         self.meeting.save()
-        ARCHIVE = self.p("ARCHIVE")
+        ARCHIVE = Meeting.get_perm(PERM.ARCHIVE)
         self.assertFalse(self.anon_user.has_perm(ARCHIVE, self.meeting))
         self.assertTrue(self.moderator.has_perm(ARCHIVE, self.meeting))
         self.assertFalse(self.participant.has_perm(ARCHIVE, self.meeting))
@@ -231,19 +223,14 @@ class MeetingGroupPermissionTests(TestCase):
     def setUp(self):
         self.meeting.refresh_from_db()
 
-    def p(self, name):
-        from voteit.meeting.permissions import MeetingGroupPermissions
-
-        return getattr(MeetingGroupPermissions, name)
-
     def test_can_add(self):
-        ADD = self.p("ADD")
+        ADD = MeetingGroup.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.meeting))
         self.assertTrue(self.moderator.has_perm(ADD, self.meeting))
         self.assertFalse(self.participant.has_perm(ADD, self.meeting))
 
     def test_can_add_archived(self):
-        ADD = self.p("ADD")
+        ADD = MeetingGroup.get_perm(PERM.ADD)
         self.meeting.archive()
         self.meeting.save()
         self.assertFalse(self.anon_user.has_perm(ADD, self.meeting))
@@ -251,27 +238,28 @@ class MeetingGroupPermissionTests(TestCase):
         self.assertFalse(self.participant.has_perm(ADD, self.meeting))
 
     def test_can_view(self):
-        VIEW = self.p("VIEW")
+        VIEW = MeetingGroup.get_perm(PERM.VIEW)
         self.assertFalse(self.anon_user.has_perm(VIEW, self.meeting_group))
         self.assertTrue(self.moderator.has_perm(VIEW, self.meeting_group))
         self.assertTrue(self.participant.has_perm(VIEW, self.meeting_group))
 
     def test_can_view_meeting_public(self):
-        VIEW = self.p("VIEW")
+        VIEW = MeetingGroup.get_perm(PERM.VIEW)
         self.meeting.public = True
         self.meeting.save()
-        self.assertTrue(self.anon_user.has_perm(VIEW, self.meeting_group))
+        # We've changed the queryset here
+        self.assertFalse(self.anon_user.has_perm(VIEW, self.meeting_group))
         self.assertTrue(self.moderator.has_perm(VIEW, self.meeting_group))
         self.assertTrue(self.participant.has_perm(VIEW, self.meeting_group))
 
     def test_can_change(self):
-        CHANGE = self.p("CHANGE")
+        CHANGE = MeetingGroup.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting_group))
         self.assertTrue(self.moderator.has_perm(CHANGE, self.meeting_group))
         self.assertFalse(self.participant.has_perm(CHANGE, self.meeting_group))
 
     def test_can_change_archived_meeting(self):
-        CHANGE = self.p("CHANGE")
+        CHANGE = MeetingGroup.get_perm(PERM.CHANGE)
         self.meeting.archive()
         self.meeting.save()
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting_group))
@@ -279,13 +267,13 @@ class MeetingGroupPermissionTests(TestCase):
         self.assertFalse(self.participant.has_perm(CHANGE, self.meeting_group))
 
     def test_can_delete(self):
-        DELETE = self.p("DELETE")
+        DELETE = MeetingGroup.get_perm(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.meeting_group))
         self.assertTrue(self.moderator.has_perm(DELETE, self.meeting_group))
         self.assertFalse(self.participant.has_perm(DELETE, self.meeting_group))
 
     def test_can_delete_archived_meeting(self):
-        DELETE = self.p("DELETE")
+        DELETE = MeetingGroup.get_perm(PERM.DELETE)
         self.meeting.archive()
         self.meeting.save()
         self.assertFalse(self.anon_user.has_perm(DELETE, self.meeting_group))
@@ -312,47 +300,28 @@ class GroupMembershipPermissionTests(TestCase):
     def setUp(self):
         self.meeting.refresh_from_db()
 
-    def p(self, name):
-        from voteit.meeting.permissions import GroupMembershipPermissions
-
-        return getattr(GroupMembershipPermissions, name)
-
     def test_can_add(self):
-        ADD = self.p("ADD")
+        ADD = GroupMembership.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.meeting_group))
         self.assertTrue(self.moderator.has_perm(ADD, self.meeting_group))
         self.assertFalse(self.participant.has_perm(ADD, self.meeting_group))
 
     def test_can_add_archived(self):
-        ADD = self.p("ADD")
+        ADD = GroupMembership.get_perm(PERM.ADD)
         self.meeting.archive()
         self.meeting.save()
         self.assertFalse(self.anon_user.has_perm(ADD, self.meeting_group))
         self.assertFalse(self.moderator.has_perm(ADD, self.meeting_group))
         self.assertFalse(self.participant.has_perm(ADD, self.meeting_group))
 
-    def test_can_view(self):
-        VIEW = self.p("VIEW")
-        self.assertFalse(self.anon_user.has_perm(VIEW, self.group_membership))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.group_membership))
-        self.assertTrue(self.participant.has_perm(VIEW, self.group_membership))
-
-    def test_can_view_meeting_public(self):
-        VIEW = self.p("VIEW")
-        self.meeting.public = True
-        self.meeting.save()
-        self.assertTrue(self.anon_user.has_perm(VIEW, self.group_membership))
-        self.assertTrue(self.moderator.has_perm(VIEW, self.group_membership))
-        self.assertTrue(self.participant.has_perm(VIEW, self.group_membership))
-
     def test_can_change(self):
-        CHANGE = self.p("CHANGE")
+        CHANGE = GroupMembership.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.group_membership))
         self.assertTrue(self.moderator.has_perm(CHANGE, self.group_membership))
         self.assertFalse(self.participant.has_perm(CHANGE, self.group_membership))
 
     def test_can_change_archived_meeting(self):
-        CHANGE = self.p("CHANGE")
+        CHANGE = GroupMembership.get_perm(PERM.CHANGE)
         self.meeting.archive()
         self.meeting.save()
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.group_membership))
@@ -360,13 +329,13 @@ class GroupMembershipPermissionTests(TestCase):
         self.assertFalse(self.participant.has_perm(CHANGE, self.group_membership))
 
     def test_can_delete(self):
-        DELETE = self.p("DELETE")
+        DELETE = GroupMembership.get_perm(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.group_membership))
         self.assertTrue(self.moderator.has_perm(DELETE, self.group_membership))
         self.assertFalse(self.participant.has_perm(DELETE, self.group_membership))
 
     def test_can_delete_archived_meeting(self):
-        DELETE = self.p("DELETE")
+        DELETE = GroupMembership.get_perm(PERM.DELETE)
         self.meeting.archive()
         self.meeting.save()
         self.assertFalse(self.anon_user.has_perm(DELETE, self.group_membership))

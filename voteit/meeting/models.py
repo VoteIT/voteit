@@ -17,6 +17,7 @@ from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField, transition
 from rules.contrib.models import RulesModelMixin
 
+from voteit.core import PERM
 from voteit.core.abcs import MeetingContext, OrganisationContext
 from voteit.core.decorators import ensure_atomic
 from voteit.core.fields import RichTextField, RolesField
@@ -25,7 +26,6 @@ from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.utils import relaxed_clean_html
 from voteit.core.workflows import EnabledWf
 from voteit.meeting import roles
-from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.permissions import OrgPermissions
 from voteit.poll.utils import (
@@ -147,6 +147,7 @@ class Meeting(
 ):
     name = "meeting"
     _er_policy_name = None
+
     title: str = models.CharField(max_length=100)
     body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
     state: str = FSMField(
@@ -302,7 +303,7 @@ class Meeting(
         field=state,
         source=MeetingWf.ONGOING,
         target=MeetingWf.UPCOMING,
-        permission=MeetingPermissions.MODERATE,
+        permission=f"meeting.{PERM.MODERATE}_meeting",
         custom={"title": _("Back to upcoming")},
     )
     def upcoming(self):
@@ -312,7 +313,7 @@ class Meeting(
         field=state,
         source=[MeetingWf.UPCOMING, MeetingWf.CLOSED],
         target=MeetingWf.ONGOING,
-        permission=MeetingPermissions.MODERATE,
+        permission=f"meeting.{PERM.MODERATE}_meeting",
         conditions=[valid_er_policy_guard],
         custom={"title": _("Make ongoing")},
     )
@@ -323,7 +324,7 @@ class Meeting(
         field=state,
         source=MeetingWf.ONGOING,
         target=MeetingWf.CLOSED,
-        permission=MeetingPermissions.MODERATE,
+        permission=f"meeting.{PERM.MODERATE}_meeting",
         conditions=[no_ongoing_polls_guard],
         custom={"title": _("Close")},
     )
@@ -334,7 +335,7 @@ class Meeting(
         field=state,
         source=MeetingWf.CLOSED,
         target=MeetingWf.ARCHIVING,
-        permission=MeetingPermissions.ARCHIVE,
+        permission=f"meeting.{PERM.ARCHIVE}_meeting",
         custom={"title": _("Request archiving")},
     )
     def request_archiving(self):
@@ -345,7 +346,7 @@ class Meeting(
         field=state,
         source=MeetingWf.ARCHIVING,
         target=MeetingWf.CLOSED,
-        permission=MeetingPermissions.ARCHIVE,
+        permission=f"meeting.{PERM.ARCHIVE}_meeting",
         custom={"title": _("Abort archiving")},
     )
     def abort_archiving(self):
@@ -373,7 +374,7 @@ class Meeting(
             MeetingWf.ARCHIVING,
         ],
         target=MeetingWf.DELETING,
-        permission=MeetingPermissions.DELETE,
+        permission=f"meeting.{PERM.DELETE}_meeting",
         custom={"title": _("Request delete...")},
     )
     def request_delete(self):
@@ -384,7 +385,7 @@ class Meeting(
         field=state,
         source=MeetingWf.DELETING,
         target=None,
-        permission=MeetingPermissions.DELETE,
+        permission=f"meeting.{PERM.DELETE}_meeting",
         custom={"title": _("Abort delete")},
     )
     def abort_delete(self):
@@ -627,7 +628,7 @@ class GroupRole(MeetingContext):
         "votes",
     ],
 )
-class GroupMembership(MeetingContext):
+class GroupMembership(RulesModelMixin, MeetingContext):
     """
     Join table for users and group roles.
     """

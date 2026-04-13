@@ -5,12 +5,8 @@ from abc import ABCMeta
 from collections import UserString
 from logging import getLogger
 
-from django.conf import settings
-from django.utils.functional import cached_property
-from rules.permissions import ObjectPermissionBackend
 
 from voteit.core.schemas import PermissionOutput
-from voteit.core.utils import get_model_shortname
 from voteit.core.utils import get_permission_registry
 
 logger = getLogger(__name__)
@@ -89,9 +85,9 @@ class MPMeta(ABCMeta):
             if isinstance(v, Permission):
                 perm: Permission = getattr(cls, k)
                 if perm.model is None:
-                    assert isinstance(
-                        cls.model, str
-                    ), f"{cls} doesn't have a valid 'model' attribute set"
+                    assert isinstance(cls.model, str), (
+                        f"{cls} doesn't have a valid 'model' attribute set"
+                    )
                     perm.model = cls.model
                 if not perm.context:
                     # context should not be empty here
@@ -105,44 +101,6 @@ class MPMeta(ABCMeta):
 
 class ModelPermissions(ABC, metaclass=MPMeta):
     model = None  # The shortname of the model. For instance "meeting"
-
-
-class VerbosePermissionBackend(ObjectPermissionBackend):
-    """
-    A very verbose ObjectPermissionBackend meant to catch permission checks against the wrong target.
-    Set CHECK_PERMISSION_CONTEXT=True to enable.
-
-    It has no other changes compaired to Rules ObjectPermissionBackend, so same docs apply.
-
-    """
-
-    def has_perm(self, user, perm, *args, **kwargs) -> bool:
-        if self.check_permission_context:
-            assert isinstance(perm, Permission), f"{perm} is not a Permission-instance."
-            if args:
-                target = args[0]
-                if target is None:
-                    # Only complain if None isn't a specified context. This will happen though
-                    if None not in perm.context:
-                        logger.debug(
-                            "Permission '%s' was checked with target None", perm
-                        )
-                else:
-                    try:
-                        model_shortname = get_model_shortname(target)
-                    except ValueError:
-                        # Non-model, should never work though
-                        model_shortname = target
-                    assert model_shortname in perm.context, (
-                        f"{perm} was checked against {model_shortname} but only "
-                        f"lists these as allowed contexts: {perm.context}"
-                    )
-            # Simply skip for has_perm with only one arg
-        return super().has_perm(user, perm, *args, **kwargs)
-
-    @cached_property
-    def check_permission_context(self):
-        return getattr(settings, "CHECK_PERMISSION_CONTEXT", False)
 
 
 class AlwaysTrueSet(set):

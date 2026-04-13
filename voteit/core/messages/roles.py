@@ -21,13 +21,11 @@ from envelope.messages.common import Status
 from envelope.messages.errors import ValidationErrorMsg
 from envelope.utils import websocket_send
 
+from voteit.core import PERM
 from voteit.core.loggers import log_roles_change
-from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.role import Role
 from voteit.core.schemas import RoleOutput
 from voteit.core.utils import get_model_by_shortname
-from voteit.core.utils import get_model_shortname
-from voteit.core.utils import get_permission_registry
 from voteit.core.validators import root_validate_roles_and_model
 from voteit.core.validators import validate_roles_context_model
 from voteit.messaging.decorators import incoming
@@ -80,10 +78,7 @@ class BaseRoles(ContextAction, ABC):
 
     @cached_property
     def permission(self) -> str:
-        model_name = get_model_shortname(self.context)
-        reg = get_permission_registry()
-        model_perms = reg.get_model_permissions(model_name)
-        return getattr(model_perms, "CHANGE_ROLES", NOT_ALLOWED)
+        return self.context.get_perm(PERM.CHANGE_ROLES)
 
     def validate_and_fetch(self) -> models.QuerySet:
         # Permission
@@ -177,10 +172,7 @@ class GetRoles(ContextAction):
 
     @cached_property
     def permission(self) -> str:
-        model_name = get_model_shortname(self.context)
-        reg = get_permission_registry()
-        model_perms = reg.get_model_permissions(model_name)
-        return getattr(model_perms, "VIEW_ROLES", NOT_ALLOWED)
+        return self.context.get_perm(PERM.CHANGE_ROLES)
 
     @property
     def model(self) -> type[RoleContextMixin]:

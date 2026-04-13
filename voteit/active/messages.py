@@ -1,8 +1,5 @@
-from datetime import timedelta
-
 from auditlog.context import set_actor
 from django.contrib.auth import get_user_model
-from django.utils.timezone import now
 from pydantic import BaseModel
 from pydantic import conint
 from pydantic import validator
@@ -12,13 +9,12 @@ from envelope.core.message import Message
 from envelope.messages.common import Status
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
-from envelope.models import Connection
 from envelope.utils import websocket_send
 
 from voteit.active.permissions import ActiveUserPermissions
 from voteit.active.utils import get_inactive_qs
+from voteit.core import PERM
 from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
 from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
 
@@ -51,7 +47,7 @@ class SetActive(ContextAction):
         meeting: Meeting = self.context
         if self.data.user:
             if self.data.user != self.user.pk and not self.user.has_perm(
-                MeetingPermissions.MODERATE, self.context
+                Meeting.get_perm(PERM.MODERATE), self.context
             ):
                 # if set and user isn't moderator
                 raise UnauthorizedError.from_message(
@@ -111,7 +107,7 @@ class PurgeInactiveUsers(ContextAction):
     name = "active_user.purge"
     schema = PurgeInactiveUsersSchema
     data: PurgeInactiveUsersSchema
-    permission = MeetingPermissions.CHANGE
+    permission = Meeting.get_perm(PERM.CHANGE)
     model = Meeting
     context_schema_attr = "meeting"
 

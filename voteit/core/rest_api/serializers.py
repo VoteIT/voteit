@@ -16,13 +16,13 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 
+from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
 from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
 from voteit.core.validators import get_invalid_tags
 from voteit.core.validators import valid_userid
-from voteit.meeting.permissions import MeetingPermissions
 from voteit.organisation.utils import get_idproxy_user_data
 
 if TYPE_CHECKING:
@@ -78,7 +78,7 @@ class BaseModelSerializer(serializers.ModelSerializer):
                 if (
                     user is None
                     or user != author
-                    and not user.has_perm(MeetingPermissions.MODERATE, meeting)
+                    and not user.has_perm(meeting.get_perm(PERM.MODERATE), meeting)
                 ):
                     raise PermissionDenied(
                         detail={
@@ -127,7 +127,7 @@ class BaseModelSerializer(serializers.ModelSerializer):
         if not meeting.groups.filter(pk=value.pk).exists():
             raise ValidationError(_("Meeting group doesn't exist"))
         if (
-            user.has_perm(MeetingPermissions.MODERATE, meeting)
+            user.has_perm(Meeting.get_perm(PERM.MODERATE), meeting)
             or value.members.filter(pk=user.pk).exists()
         ):
             return value

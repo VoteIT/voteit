@@ -9,15 +9,12 @@ from django.apps import apps
 from django.db import IntegrityError
 from django.db.transaction import get_connection
 from django.db.transaction import on_commit
-from rest_framework.exceptions import PermissionDenied
 from redis.exceptions import ConnectionError
 
 from voteit.core import RQ_LONG_QUEUE
-from voteit.core.permissions import Permission
 
 if TYPE_CHECKING:
     from django.db.models import Manager
-    from rest_framework.viewsets import GenericAPIView
     from voteit.core.role import Role
     from voteit.core.predicate import Predicate
 
@@ -149,26 +146,6 @@ def disable_on_raw_save(signal_handler):
         if kwargs.get("raw"):
             return
         signal_handler(*args, **kwargs)
-
-    return wrapper
-
-
-def has_perm_drf(permission):
-    """
-    has_perm check on currently logged in user for a DRF method.
-    View must implement get_object.
-    """
-    assert isinstance(permission, Permission)
-
-    def wrapper(f):
-        @wraps(f)
-        def wrapped(view: GenericAPIView, request, *args, **kwargs):
-            obj = view.get_object()
-            if not request.user.has_perm(permission, obj):
-                raise PermissionDenied(f"Missing required permission {permission}")
-            return f(view, request, *args, **kwargs)
-
-        return wrapped
 
     return wrapper
 

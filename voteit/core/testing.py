@@ -160,11 +160,11 @@ def run_permission_tests(
             )
         try:
             partial_response = row[2]
-            if not isinstance(partial_response, dict):
+            if not isinstance(partial_response, (dict, list)):
                 yield (
                     tester.fail,
                     [
-                        f"item 3 of each row must be dict or not exist, got {partial_response}"
+                        f"item 3 of each row must be dict, list or not exist, got {partial_response}"
                     ],
                 )
         except IndexError:

@@ -3,19 +3,16 @@ import csv
 from django.db import models
 from django.http import Http404
 from django.http import HttpResponse
-from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
@@ -98,10 +95,12 @@ class TextDocumentViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
 
 @router.register("export-proposals", basename="export-proposals")
 class ExportProposalsViewSet(viewsets.GenericViewSet):
-    model = Proposal  # And subtypes
-    permission_classes = [permissions.IsAuthenticated]
-    queryset = Meeting.objects.all()
     serializer_class = serializers.GenericExportProposalSerializer  # Morphic
+
+    def get_queryset(self):
+        return Meeting.objects.filter(
+            roles__user=self.request.user, roles__assigned__contains=ROLE_MODERATOR
+        )
 
     def list(self, request):
         return Response(data=[])
@@ -119,7 +118,6 @@ class ExportProposalsViewSet(viewsets.GenericViewSet):
         methods=["get"],
         detail=True,
     )
-    @has_perm_drf(MeetingPermissions.MODERATE)
     def csv(self, request, *args, **kwargs):
         meeting = self.get_object()
         export_qs = self.get_export_qs(meeting)
@@ -143,7 +141,6 @@ class ExportProposalsViewSet(viewsets.GenericViewSet):
         detail=True,
         renderer_classes=[JSONRenderer],
     )
-    @has_perm_drf(MeetingPermissions.MODERATE)
     def json(self, request, *args, **kwargs):
         meeting = self.get_object()
         export_qs = self.get_export_qs(meeting)

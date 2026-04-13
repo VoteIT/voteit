@@ -5,8 +5,9 @@ from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 
 from voteit.agenda.models import AgendaItem
+from voteit.core import PERM
 from voteit.core.rest_api.serializers import BaseModelSerializer
-from voteit.meeting.permissions import MeetingPermissions
+from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
     from voteit.meeting.models import MeetingGroup
@@ -50,7 +51,7 @@ class ValidateGroupAIContext:
                         }
                     )
                 # Moderator? Abort the rest of the check in that case
-                if user.has_perm(MeetingPermissions.MODERATE, agenda_item.meeting):
+                if user.has_perm(Meeting.get_perm(PERM.MODERATE), agenda_item.meeting):
                     return
                 # This op doesn't require a DB lookup so do it before group check
                 if value.get("as_group") and not group.post_as:

@@ -11,6 +11,7 @@ from voteit.active.components import ActiveUsersComponent
 from voteit.agenda.models import AgendaItem
 from voteit.components.app.components.dialects import DialectsFilter
 from voteit.components.app.components.proposal_print import ProposalPrint
+from voteit.core.testing import run_permission_tests
 from voteit.core.workflows import EnabledWf
 from voteit.meeting.dialects import DialectHandler
 from voteit.meeting.dialects import get_named_paths
@@ -375,20 +376,18 @@ class MeetingGroupViewSetTests(APITestCase):
     def test_create(self):
         url = reverse("meeting-groups-list")
         data = {"title": "Hello world", "meeting": self.meeting.pk}
-
-        for user, status in (
-            (None, 401),
-            (self.moderator, 201),
-            (self.participant, 403),
+        for func, args in run_permission_tests(
+            self,
+            url=url,
+            data=data,
+            expected=[
+                (self.moderator, 201, data),
+                (self.anon, 403),
+                (self.participant, 403, {}),
+            ],
+            method="post",
         ):
-            if user:
-                self.client.force_login(user)
-            response = self.client.post(url, data)
-            self.assertEqual(
-                response.status_code,
-                status,
-                f"{user} action returned wrong response code",
-            )
+            func(*args)
 
     def test_create_archived_meeting(self):
         self.meeting.archive()
@@ -407,44 +406,48 @@ class MeetingGroupViewSetTests(APITestCase):
         self.assertEqual(400, response.status_code)
 
     def test_get(self):
-        self.client.force_login(self.moderator)
         url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        data = response.json()
-        self.assertEqual(self.meeting_group.pk, data.get("pk", None))
-
-    def test_get_wrong_user(self):
-        self.client.force_login(self.anon)
-        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
-        response = self.client.get(url)
-        self.assertEqual(403, response.status_code)
-
-    def test_list_no_meeting(self):
-        url = reverse("meeting-groups-list")
-        self.client.force_login(self.moderator)
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        self.assertEqual([], response.json())
+        for func, args in run_permission_tests(
+            self,
+            url=url,
+            expected=[
+                (self.moderator, 200, {"pk": self.meeting_group.pk}),
+                (self.anon, 404),
+                (self.participant, 200),
+            ],
+        ):
+            func(*args)
 
     def test_list(self):
         url = reverse("meeting-groups-list")
-        self.client.force_login(self.moderator)
-        response = self.client.get(url, data={"meeting": self.meeting.pk})
-        self.assertEqual(200, response.status_code)
-        data = response.json()
-        self.assertEqual(2, len(data))
-        self.assertEqual(
-            {self.meeting_group.pk, self.meeting_group_two.pk}, {x["pk"] for x in data}
-        )
+        data = {"meeting": self.meeting.pk}
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            data=data,
+            expected=[
+                (self.moderator, 200, []),
+                (self.anon, 200, []),
+                (self.participant, 200, []),
+            ],
+        ):
+            func(*params)
 
     def test_change(self):
-        self.client.force_login(self.moderator)
         url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
-        response = self.client.patch(url, data={"title": "Hello"})
-        self.assertEqual(200, response.status_code)
-        data = response.json()
-        self.assertEqual("Hello", data["title"])
+        data = {"title": "Hello"}
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            method="patch",
+            data=data,
+            expected=[
+                (self.moderator, 200, {"title": "Hello"}),
+                (self.anon, 404),
+                (self.participant, 403),
+            ],
+        ):
+            func(*params)
 
     def test_change_archived_meeting(self):
         self.meeting.archive()
@@ -455,10 +458,18 @@ class MeetingGroupViewSetTests(APITestCase):
         self.assertEqual(403, response.status_code)
 
     def test_delete(self):
-        self.client.force_login(self.moderator)
         url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
-        response = self.client.delete(url)
-        self.assertEqual(204, response.status_code)
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            method="delete",
+            expected=[
+                (self.moderator, 204),
+                (self.anon, 404),
+                (self.participant, 403),
+            ],
+        ):
+            func(*params)
 
     def test_delete_with_related_proposal(self):
         prop = self.meeting_group.proposals.create()
@@ -555,75 +566,85 @@ class GroupMembershipViewSetTests(APITestCase):
     def test_create(self):
         url = reverse("group-memberships-list")
         data = {"user": self.participant.pk, "meeting_group": self.meeting_group.pk}
-
-        for user, status in (
-            (None, 401),
-            (self.moderator, 201),
-            (self.participant, 403),
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            data=data,
+            method="POST",
+            expected=[(None, 401), (self.moderator, 201), (self.participant, 403)],
         ):
-            if user:
-                self.client.force_login(user)
-            response = self.client.post(url, data)
-            self.assertEqual(
-                response.status_code,
-                status,
-                f"{user} action returned wrong response code",
-            )
+            func(*params)
 
     def test_get(self):
-        self.client.force_login(self.moderator)
         url = reverse("group-memberships-detail", kwargs={"pk": self.membership.pk})
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        data = response.json()
-        self.assertEqual(
-            {
-                "user": self.moderator.pk,
-                "role": self.role.pk,
-                "meeting_group": self.meeting_group.pk,
-                "pk": self.membership.pk,
-                "votes": None,
-            },
-            data,
-        )
-
-    def test_list_no_grp(self):
-        url = reverse("group-memberships-list")
-        self.client.force_login(self.moderator)
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
-        self.assertEqual([], response.json())
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            expected=[
+                (None, 401),
+                (self.moderator, 200),
+                (self.participant, 200),
+                (self.anon, 404),
+            ],
+        ):
+            func(*params)
 
     def test_list(self):
         url = reverse("group-memberships-list")
         self.client.force_login(self.moderator)
-        response = self.client.get(url, data={"meeting_group": self.meeting_group.pk})
+        response = self.client.get(url)
         self.assertEqual(200, response.status_code)
-        data = response.json()
-        self.assertEqual(1, len(data))
-        self.assertEqual(self.membership.pk, data[0]["pk"])
+        # Always empty
+        self.assertEqual([], response.json())
 
     def test_change(self):
-        self.client.force_login(self.moderator)
         url = reverse("group-memberships-detail", kwargs={"pk": self.membership.pk})
-        response = self.client.patch(url, data={"role": ""})
-        self.assertEqual(200, response.status_code)
-        data = response.json()
-        self.assertEqual(None, data["role"])
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            method="PATCH",
+            data={"role": None},
+            expected=[
+                (None, 401),
+                (self.moderator, 200, {"role": None}),
+                (self.participant, 403),
+                (self.anon, 404),
+            ],
+        ):
+            func(*params)
 
     def test_change_archived_meeting(self):
         self.meeting.archive()
         self.meeting.save()
-        self.client.force_login(self.moderator)
         url = reverse("group-memberships-detail", kwargs={"pk": self.membership.pk})
-        response = self.client.patch(url, data={"role": ""})
-        self.assertEqual(403, response.status_code)
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            method="PATCH",
+            data={"role": None},
+            expected=[
+                (None, 401),
+                (self.moderator, 403, {}),
+                (self.participant, 403),
+                (self.anon, 404),
+            ],
+        ):
+            func(*params)
 
     def test_delete(self):
-        self.client.force_login(self.moderator)
         url = reverse("group-memberships-detail", kwargs={"pk": self.membership.pk})
-        response = self.client.delete(url)
-        self.assertEqual(204, response.status_code)
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            method="DELETE",
+            expected=[
+                (None, 401),
+                (self.moderator, 204, {}),
+                (self.participant, 403),
+                (self.anon, 404),
+            ],
+        ):
+            func(*params)
 
     def test_delete_archived_meeting(self):
         self.meeting.archive()
@@ -771,7 +792,9 @@ class MeetingRolesViewSetTests(APITestCase):
         self.client.force_login(self.org_manager)
         url = reverse("meeting-roles-list")
         response = self.client.get(url, {"meeting": self.meeting.pk})
-        self.assertEqual(403, response.status_code)
+        data = response.json()
+        self.assertEqual(200, response.status_code, data)
+        self.assertEqual([], data)
 
     def test_with_filter_participant(self):
         self.client.force_login(self.participant)
@@ -802,11 +825,13 @@ class MeetingRolesViewSetTests(APITestCase):
             {x["user"]["pk"] for x in data},
         )
 
-    def test_same_org_but_another_meeting_so_not_allowed(self):
+    def test_same_org_but_another_meeting(self):
         self.client.force_login(self.user_jeff)
         url = reverse("meeting-roles-list")
         response = self.client.get(url, {"meeting": self.other_meeting.pk})
-        self.assertEqual(403, response.status_code)
+        data = response.json()
+        self.assertEqual(200, response.status_code, data)
+        self.assertEqual([], data)
 
     @property
     def roles_url(self):
@@ -868,9 +893,7 @@ class ExportMeetingGroupsViewSetTests(APITestCase):
         url = reverse("export-meeting-groups-json", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.participant)
         response = self.client.get(url)
-        self.assertContains(
-            response, "permission meeting.moderate_meeting", status_code=403
-        )
+        self.assertEqual(404, response.status_code)
 
     def test_json(self):
         url = reverse("export-meeting-groups-json", kwargs={"pk": self.meeting.pk})
@@ -928,9 +951,7 @@ class ExportParticipantsViewSetTests(APITestCase):
         url = reverse("export-participants-json", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.participant)
         response = self.client.get(url)
-        self.assertContains(
-            response, "permission meeting.moderate_meeting", status_code=403
-        )
+        self.assertEqual(404, response.status_code)
 
     def test_json(self):
         url = reverse("export-participants-json", kwargs={"pk": self.meeting.pk})

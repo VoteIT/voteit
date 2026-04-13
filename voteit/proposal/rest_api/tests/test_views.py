@@ -483,9 +483,7 @@ class ExportProposalsViewSetTests(APITestCase):
         self.client.force_login(self.participant)
         url = reverse("export-proposals-json", kwargs={"pk": self.meeting.pk})
         response = self.client.get(url)
-        self.assertContains(
-            response, "permission meeting.moderate_meeting", status_code=403
-        )
+        self.assertEqual(404, response.status_code)
 
     def test_csv_no_data(self):
         self.ai.proposals.all().delete()

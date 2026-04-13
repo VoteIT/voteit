@@ -10,11 +10,12 @@ from pydantic import validator
 
 from envelope.deferred_jobs.message import ContextAction
 from envelope.messages.common import Status
-from envelope.messages.errors import UnauthorizedError
 from envelope.utils import websocket_send
+
+from voteit.core import PERM
 from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
-#from voteit.meeting.utils import clone_meeting
+
+# from voteit.meeting.utils import clone_meeting
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
@@ -217,7 +218,7 @@ class CreateMeetingGroupsSchema(BaseModel):
 @incoming
 class CreateMeetingGroups(ContextAction):
     name = "meeting_group.bulk_create"
-    permission = MeetingPermissions.CHANGE
+    permission = Meeting.get_perm(PERM.CHANGE)
     schema = CreateMeetingGroupsSchema
     data: CreateMeetingGroupsSchema
     model = Meeting

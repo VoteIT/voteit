@@ -11,7 +11,6 @@ from voteit.core.decorators import predicate
 from voteit.core.rules import is_not_archived
 from voteit.core.rules import is_not_finished
 from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import is_potential_voter
 from voteit.meeting.rules import meeting_upcoming_ongoing
@@ -47,17 +46,6 @@ def is_vote_owner(user: AbstractUser, vote: Vote):
 
 
 @predicate
-def can_view_polls_context(user: AbstractUser, poll: Poll):
-    """This is a special case where polls without agenda items are checked against meeting instead"""
-    if isinstance(poll, Poll):
-        if poll.agenda_item is not None:
-            # FIXME
-            return user.has_perm(AgendaItem.get_perm(PERM.VIEW), poll.agenda_item)
-        return user.has_perm(MeetingPermissions.VIEW, poll.meeting)
-    return False
-
-
-@predicate
 def polls_context_not_archived(
     user: AbstractUser, instance: Poll | AgendaItem | Meeting
 ):
@@ -88,10 +76,6 @@ rules.add_perm(
 )  # Checked against meeting or agenda item.
 rules.add_perm(Poll.get_perm(PERM.CHANGE), is_poll_in_permissive_state & is_moderator)
 rules.add_perm(Poll.get_perm(PERM.DELETE), is_moderator & polls_context_not_archived)
-# rules.add_perm(
-#     Poll.get_perm(PERM.VIEW),
-#     is_moderator | (is_not_private & can_view_polls_context),
-# )
 rules.add_perm(
     Poll.get_perm(PERM.CHANGE_STATE), is_moderator & polls_context_not_archived
 )

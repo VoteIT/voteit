@@ -11,9 +11,9 @@ class MeetingConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        from voteit.meeting import roles
-        from voteit.meeting import rules
-        from voteit.meeting.rest_api import views
-        from voteit.meeting import channels
-        from voteit.meeting import messages
-        from voteit.meeting import signals
+        from voteit.meeting import roles  # noqa
+        from voteit.meeting import rules  # noqa
+        from voteit.meeting import channels  # noqa
+        from voteit.meeting import messages  # noqa
+        from voteit.meeting import signals  # noqa
+        from voteit.meeting.rest_api import views  # noqa

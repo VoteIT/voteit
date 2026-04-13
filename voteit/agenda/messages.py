@@ -21,7 +21,6 @@ from voteit.core import PERM
 from voteit.core.rest_api.utils import drf_do_transition
 from voteit.core.rest_api.utils import get_valid_transitions
 from voteit.meeting.models import Meeting
-from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.workflows import MeetingWf
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
@@ -72,7 +71,7 @@ class AgendaItemBulkChange(ContextAction):
     data: AgendaItemBulkChangeSchema
     context: Meeting
     context_schema_attr = "meeting"
-    permission = MeetingPermissions.CHANGE
+    permission = Meeting.get_perm(PERM.CHANGE)
     ttl: 20
 
     def run_job(self):
@@ -125,7 +124,7 @@ class AgendaItemBulkDelete(ContextAction):
     data: AgendaItemBulkSchema
     context: Meeting
     context_schema_attr = "meeting"
-    permission = MeetingPermissions.CHANGE
+    permission = Meeting.get_perm(PERM.CHANGE)
     ttl: 20
 
     def run_job(self):

@@ -18,10 +18,9 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 
-from voteit.core.decorators import has_perm_drf
 from voteit.core.rest_api import router
-from voteit.core.rest_api.base import DefaultModelViewSet
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.dialects import dialect_registry
@@ -29,12 +28,8 @@ from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
-from voteit.meeting.permissions import MeetingGroupPermissions
-from voteit.meeting.permissions import MeetingPermissions
 from voteit.meeting.rest_api import serializers
 from voteit.meeting.rest_api.filters import MeetingRolesFilter
-from voteit.meeting.roles import ROLE_MODERATOR
-from voteit.meeting.roles import ROLE_PARTICIPANT
 
 __all__ = (
     "MeetingViewSet",
@@ -43,6 +38,8 @@ __all__ = (
     "GroupMembershipViewSet",
     "ExportParticipantsViewSet",
 )
+
+from voteit.meeting.roles import ROLE_MODERATOR
 
 
 @router.register("meetings", basename="meeting")
@@ -108,8 +105,6 @@ class MeetingViewSet(
 
 @router.register("meeting-roles", basename="meeting-roles")
 class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    model = MeetingRoles
-    queryset = MeetingRoles.objects.all()
     serializer_class = serializers.MeetingRolesSerializer
     filter_backends = (DjangoFilterBackend, SearchFilter)
     filterset_class = MeetingRolesFilter
@@ -122,45 +117,34 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             "meeting", self.request.query_params.get("context", None)
         )
         if meeting_pk is None:
-            return self.queryset.none()
+            return MeetingRoles.objects.none()
         try:
             meeting_pk = int(meeting_pk)
         except (ValueError, TypeError):
             raise ValidationError({"meeting": ["Must be a number"]})
-        meeting = Meeting.objects.filter(pk=meeting_pk).first()
-        if meeting is None:
-            raise ValidationError({"meeting": ["No such meeting"]})
-        # FIXME: Public meeting is used in an odd way in frontend. This needs to be cleaned up.
-        # Related to #206
-        if not meeting.has_any_roles(
-            self.request.user, ROLE_PARTICIPANT, ROLE_MODERATOR
-        ):
-            raise PermissionDenied()
-        return self.queryset.filter(context=meeting).prefetch_related("user")
+        return MeetingRoles.objects.filter(
+            context__participants=self.request.user, context_id=meeting_pk
+        ).prefetch_related("user")
 
 
 @router.register("meeting-groups", basename="meeting-groups")
-class MeetingGroupViewSet(DefaultModelViewSet):
-    model = MeetingGroup
+class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     serializer_class = serializers.MeetingGroupSerializer
-    serializer_classes = {"create": serializers.CreateMeetingGroupSerializer}
-    context_lookup_kwarg: str = "meeting"
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "create": None,  # In serializer
+        "retrieve": None,
+    }
 
-    @property
-    def context_queryset(self) -> QuerySet:
-        return Meeting.objects.for_user(self.request.user)
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.CreateMeetingGroupSerializer
+        return super().get_serializer_class()
 
     def get_queryset(self):
-        if self.detail:
-            # Permission checked against object
-            return MeetingGroup.objects.all()
-        try:
-            meeting = self.get_context(self.request)
-        except ValidationError:
-            meeting = None
-        if meeting and self.request.user.has_perm(MeetingPermissions.VIEW, meeting):
-            return MeetingGroup.objects.filter(meeting=meeting)
-        return MeetingGroup.objects.none()
+        if self.action == "list":
+            return MeetingGroup.objects.none()
+        return MeetingGroup.objects.filter(meeting__participants=self.request.user)
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -182,31 +166,25 @@ class MeetingGroupViewSet(DefaultModelViewSet):
 
 
 @router.register("group-memberships", basename="group-memberships")
-class GroupMembershipViewSet(DefaultModelViewSet):
-    model = GroupMembership
+class GroupMembershipViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     serializer_class = serializers.GroupMembershipSerializer
-    serializer_classes = {"create": serializers.CreateGroupMembershipSerializer}
-    context_lookup_kwarg: str = "meeting_group"
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "create": None,  # In serializer
+        "retrieve": None,
+    }
 
-    @property
-    def context_queryset(self) -> QuerySet:
-        return MeetingGroup.objects.filter(
-            meeting__in=Meeting.objects.for_user(self.request.user)
-        )
+    def get_serializer_class(self):
+        if self.action == "create":
+            return serializers.CreateGroupMembershipSerializer
+        return super().get_serializer_class()
 
     def get_queryset(self):
-        if self.detail:
-            # Permission checked against object
-            return GroupMembership.objects.all()
-        try:
-            meeting_group = self.get_context(self.request)
-        except ValidationError:
-            meeting_group = None
-        if meeting_group and self.request.user.has_perm(
-            MeetingGroupPermissions.VIEW, meeting_group
-        ):
-            return GroupMembership.objects.filter(meeting_group=meeting_group)
-        return GroupMembership.objects.none()
+        if self.action == "list":
+            return GroupMembership.objects.none()
+        return GroupMembership.objects.filter(
+            meeting_group__meeting__participants=self.request.user
+        )
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -243,11 +221,10 @@ class GroupMembershipViewSet(DefaultModelViewSet):
 
 @router.register("export-participants", basename="export-participants")
 class ExportParticipantsViewSet(viewsets.GenericViewSet):
-    model = Meeting
-    permission_classes = [permissions.IsAuthenticated]
-
     def get_queryset(self) -> QuerySet:
-        return Meeting.objects.for_user(self.request.user)
+        return Meeting.objects.filter(
+            roles__user=self.request.user, roles__assigned__contains=ROLE_MODERATOR
+        )
 
     def list(self, request):
         return Response(data=[])
@@ -265,7 +242,6 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
         detail=True,
         serializer_class=serializers.ParticipantExportSerializer,
     )
-    @has_perm_drf(MeetingPermissions.MODERATE)
     def csv(self, request, *args, **kwargs):
         meeting = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(meeting), many=True)
@@ -287,7 +263,6 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
         serializer_class=serializers.ParticipantExportSerializer,
         renderer_classes=[JSONRenderer],
     )
-    @has_perm_drf(MeetingPermissions.MODERATE)
     def json(self, request, *args, **kwargs):
         meeting = self.get_object()
         serializer = self.get_serializer(self.get_export_qs(meeting), many=True)
@@ -301,11 +276,12 @@ class ExportParticipantsViewSet(viewsets.GenericViewSet):
 
 @router.register("export-meeting-groups", basename="export-meeting-groups")
 class ExportMeetingGroupsViewSet(viewsets.GenericViewSet):
-    model = Meeting
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self) -> QuerySet:
-        return Meeting.objects.for_user(self.request.user)
+        return Meeting.objects.filter(
+            roles__user=self.request.user, roles__assigned__contains=ROLE_MODERATOR
+        )
 
     def list(self, request):  # To avoid errors
         return Response(data=[])
@@ -315,7 +291,6 @@ class ExportMeetingGroupsViewSet(viewsets.GenericViewSet):
         detail=True,
         serializer_class=serializers.MeetingGroupExportSerializer,
     )
-    @has_perm_drf(MeetingPermissions.MODERATE)
     def csv(self, request, *args, **kwargs):
         meeting = self.get_object()
         serializer = self.get_serializer(meeting.groups.all(), many=True)
@@ -337,7 +312,6 @@ class ExportMeetingGroupsViewSet(viewsets.GenericViewSet):
         serializer_class=serializers.MeetingGroupExportSerializer,
         renderer_classes=[JSONRenderer],
     )
-    @has_perm_drf(MeetingPermissions.MODERATE)
     def json(self, request, *args, **kwargs):
         meeting = self.get_object()
         serializer = self.get_serializer(meeting.groups.all(), many=True)

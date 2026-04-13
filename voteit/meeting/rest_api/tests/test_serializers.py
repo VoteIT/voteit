@@ -299,6 +299,7 @@ class MeetingGroupRelatedSerializersTests(TestCase):
                 {"title": "One", "votes": "1", "meeting": self.meeting.pk},
                 {"title": "Two", "meeting": self.meeting.pk},
             ],
+            context={"request": self._mk_request(self.moderator)},
             many=True,
         )
         serializer.is_valid(raise_exception=True)
@@ -312,7 +313,8 @@ class MeetingGroupRelatedSerializersTests(TestCase):
                 "groupid": "new_id",
                 "votes": "1",
                 "meeting": self.meeting.pk,
-            }
+            },
+            context={"request": self._mk_request(self.moderator)},
         )
         serializer.is_valid()
         self.assertFalse(serializer.errors)
@@ -340,7 +342,8 @@ class MeetingGroupRelatedSerializersTests(TestCase):
                 "groupid": self.plebei_hangout.groupid,
                 "votes": "1",
                 "meeting": self.meeting.pk,
-            }
+            },
+            context={"request": self._mk_request(self.moderator)},
         )
         serializer.is_valid()
         self.assertIn("groupid", serializer.errors)
@@ -352,7 +355,8 @@ class MeetingGroupRelatedSerializersTests(TestCase):
                 "groupid": "Äöl",
                 "votes": "1",
                 "meeting": self.meeting.pk,
-            }
+            },
+            context={"request": self._mk_request(self.moderator)},
         )
         serializer.is_valid()
         self.assertIn("groupid", serializer.errors)
@@ -362,7 +366,8 @@ class MeetingGroupRelatedSerializersTests(TestCase):
                 "groupid": " A ",
                 "votes": "1",
                 "meeting": self.meeting.pk,
-            }
+            },
+            context={"request": self._mk_request(self.moderator)},
         )
         serializer.is_valid()
         self.assertIn("groupid", serializer.errors)
@@ -476,12 +481,14 @@ class MeetingGroupRelatedSerializersTests(TestCase):
     def test_group_membership_create_user_not_same_meeting(self):
         new_meeting = Meeting.objects.create()
         new_group = new_meeting.groups.create(title="New group", groupid="thenew")
+        new_moderator = new_meeting.participants.create(username="new_moderator")
+        new_meeting.add_roles(new_moderator, ROLE_MODERATOR)
         serializer = CreateGroupMembershipSerializer(
             data={
                 "meeting_group": new_group.pk,
                 "user": self.moderator.pk,
             },
-            context={"request": self._mk_request(self.moderator)},
+            context={"request": self._mk_request(new_moderator)},
         )
         serializer.is_valid()
         self.assertIn("user", serializer.errors)

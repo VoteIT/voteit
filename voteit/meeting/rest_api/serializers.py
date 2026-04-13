@@ -15,6 +15,7 @@ from voteit.core.rest_api.fields import RolesField
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
+from voteit.core.rest_api.utils import validate_model_add
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
@@ -314,6 +315,10 @@ class CreateMeetingGroupSerializer(BaseModelSerializer):
             "post_as",
         ]
 
+    def validate_meeting(self, value):
+        validate_model_add(self, MeetingGroup, value)
+        return value
+
     def validate_groupid(self, value: str | None):
         if value:
             slug = slugify(value)
@@ -411,6 +416,10 @@ class CreateGroupMembershipSerializer(serializers.ModelSerializer):
             if role.meeting != meeting:
                 raise ValidationError({"role": "Role doesn't exist in this meeting"})
         return attrs
+
+    def validate_meeting_group(self, value):
+        validate_model_add(self, GroupMembership, value)
+        return value
 
 
 class GroupMembershipSerializer(serializers.ModelSerializer):
