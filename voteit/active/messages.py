@@ -11,7 +11,7 @@ from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
 from envelope.utils import websocket_send
 
-from voteit.active.permissions import ActiveUserPermissions
+from voteit.active.models import ActiveUser
 from voteit.active.utils import get_inactive_qs
 from voteit.core import PERM
 from voteit.meeting.models import Meeting
@@ -38,7 +38,7 @@ class SetActive(ContextAction):
     name = "active_user.set"
     schema = SetActiveSchema
     data: SetActiveSchema
-    permission = ActiveUserPermissions.CHANGE
+    permission = ActiveUser.get_perm(PERM.CHANGE)
     model = Meeting
     context_schema_attr = "meeting"
 

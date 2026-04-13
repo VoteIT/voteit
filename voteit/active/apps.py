@@ -7,7 +7,7 @@ class ActiveConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        from voteit.active import components
-        from voteit.active import rules
-        from voteit.active import messages
-        from voteit.active import signals
+        from voteit.active import components  # noqa
+        from voteit.active import rules  # noqa
+        from voteit.active import messages  # noqa
+        from voteit.active import signals  # noqa

@@ -2,36 +2,30 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from voteit.active.components import ActiveUsersComponent
+from voteit.active.models import ActiveUser
+from voteit.core import PERM
 from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import Meeting
-from voteit.meeting.roles import ROLE_MODERATOR
-from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.workflows import MeetingWf
 
 User = get_user_model()
 
 
 class ActiveUserPermissionsTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create()
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.component = cls.meeting.components.create(
             component_name=ActiveUsersComponent.name, state=EnabledWf.ON
         )
-        cls.moderator = User.objects.create(username="moderator")
-        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
-        cls.participant = User.objects.create(username="participant")
-        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
         cls.anon_user = User.objects.create(username="anon")
 
-    @property
-    def P(self):
-        from voteit.active.permissions import ActiveUserPermissions
-
-        return ActiveUserPermissions
-
     def test_change(self):
-        CHANGE = self.P.CHANGE
+        CHANGE = ActiveUser.get_perm(PERM.CHANGE)
         self.assertTrue(self.moderator.has_perm(CHANGE, self.meeting))
         self.assertTrue(self.participant.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting))
@@ -39,7 +33,7 @@ class ActiveUserPermissionsTests(TestCase):
     def test_change_closed_meeting(self):
         self.meeting.state = MeetingWf.CLOSED
         self.meeting.save()
-        CHANGE = self.P.CHANGE
+        CHANGE = ActiveUser.get_perm(PERM.CHANGE)
         self.assertFalse(self.moderator.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.participant.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting))
@@ -47,13 +41,13 @@ class ActiveUserPermissionsTests(TestCase):
     def test_change_component_not_enabled(self):
         self.component.disable()
         self.component.save()
-        CHANGE = self.P.CHANGE
+        CHANGE = ActiveUser.get_perm(PERM.CHANGE)
         self.assertFalse(self.moderator.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.participant.has_perm(CHANGE, self.meeting))
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting))
 
     def test_view(self):
-        VIEW = self.P.VIEW
+        VIEW = ActiveUser.get_perm(PERM.VIEW)
         self.assertTrue(self.moderator.has_perm(VIEW, self.meeting))
         self.assertTrue(self.participant.has_perm(VIEW, self.meeting))
         self.assertFalse(self.anon_user.has_perm(VIEW, self.meeting))

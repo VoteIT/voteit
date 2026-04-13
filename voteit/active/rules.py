@@ -1,10 +1,10 @@
 import rules
 
-from voteit.active.permissions import ActiveUserPermissions
+from voteit.active.models import ActiveUser
 from voteit.active.utils import active_enabled_for_meeting
+from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import predicate
-from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import is_participant
 from voteit.meeting.rules import meeting_upcoming_ongoing
 
@@ -17,9 +17,7 @@ def users_active_component_enabled(user, context: MeetingContext):
 
 
 rules.add_perm(
-    ActiveUserPermissions.CHANGE,
-    meeting_upcoming_ongoing
-    & users_active_component_enabled
-    & (is_moderator | is_participant),
+    ActiveUser.get_perm(PERM.CHANGE),
+    meeting_upcoming_ongoing & users_active_component_enabled & is_participant,
 )
-rules.add_perm(ActiveUserPermissions.VIEW, is_moderator | is_participant)
+rules.add_perm(ActiveUser.get_perm(PERM.VIEW), is_participant)

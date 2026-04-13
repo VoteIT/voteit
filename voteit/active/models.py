@@ -7,6 +7,7 @@ from auditlog.registry import auditlog
 from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
+from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
         "user",
     ],
 )
-class ActiveUser(MeetingContext):
+class ActiveUser(RulesModelMixin, MeetingContext):
     name = "active_user"
     meeting: Meeting = models.ForeignKey(
         Meeting,
