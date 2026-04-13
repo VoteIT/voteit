@@ -38,8 +38,8 @@ settings and meetings. The rule is_manager checks that.
 
 Most permissions checks are done directly from the user model though.
 
-    >>> from voteit.organisation.permissions import OrgPermissions
-    >>> jane.has_perm(OrgPermissions.MANAGE, org)
+    >>> from voteit.core import PERM
+    >>> jane.has_perm(Organisation.get_perm(PERM.MANAGE), org)
     True
 
 ## Meetings

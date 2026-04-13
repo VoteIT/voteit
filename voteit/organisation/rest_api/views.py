@@ -54,7 +54,6 @@ class OrganisationViewSet(
                 )
             return self.request.user.organisation
         return get_object_or_404(Organisation.objects, host=hostname)
-        # return Organisation.objects.get(hostname=hostname)
 
     def list(self, request, *args, **kwargs):
         """

@@ -32,8 +32,9 @@ class RouterTests(APITestCase):
         for basename, viewset, url in self.get_urls():
             response = self.client.get(url)
             status = getattr(viewset, "expected_default_http_status", 200)
+            data = response.json()
             self.assertEqual(
                 status,
                 response.status_code,
-                f"API view {basename} must return HTTP 200. Class: {viewset.__module__}.{viewset.__name__}",
+                f"API view {basename} must return HTTP 200. Class: {viewset.__module__}.{viewset.__name__}.\n{data}",
             )

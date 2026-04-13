@@ -191,13 +191,11 @@ class OrganisationSendsComponentsViewSetTests(APITestCase):
 
     def test_user_list(self):
         self.client.force_login(self.user)
-        url = reverse("organisations-list")
+        url = reverse("organisation-list")
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
         data = response.json()
-        self.assertEqual(1, len(data))
-        org_data = data[0]
-        self.assertIn("components", org_data)
+        self.assertIn("components", data)
         self.assertEqual(
             [
                 {
@@ -209,17 +207,15 @@ class OrganisationSendsComponentsViewSetTests(APITestCase):
                     "organisation": 1,
                 }
             ],
-            org_data["components"],
+            data["components"],
         )
 
     def test_unauthenticated_list(self):
-        url = reverse("organisations-list")
+        url = reverse("organisation-list")
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
         data = response.json()
-        self.assertEqual(1, len(data))
-        org_data = data[0]
-        self.assertIn("components", org_data)
+        self.assertIn("components", data)
         self.assertEqual(
             [
                 {
@@ -231,30 +227,26 @@ class OrganisationSendsComponentsViewSetTests(APITestCase):
                     "organisation": 1,
                 }
             ],
-            org_data["components"],
+            data["components"],
         )
 
     def test_disabled_component(self):
         self.client.force_login(self.user)
         self.message_component.disable()
         self.message_component.save()
-        url = reverse("organisations-list")
+        url = reverse("organisation-list")
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
         data = response.json()
-        self.assertEqual(1, len(data))
-        org_data = data[0]
-        self.assertEqual([], org_data.get("components"))
+        self.assertEqual([], data.get("components"))
 
     def test_broken_component(self):
         self.client.force_login(self.user)
         self.message_component.settings_data = ""
         self.message_component.save()
         self.assertFalse(self.message_component.is_valid)
-        url = reverse("organisations-list")
+        url = reverse("organisation-list")
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
         data = response.json()
-        self.assertEqual(1, len(data))
-        org_data = data[0]
-        self.assertEqual([], org_data.get("components"))
+        self.assertEqual([], data.get("components"))
