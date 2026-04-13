@@ -8,6 +8,7 @@ from django.utils.http import urlencode
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
+from voteit.core.testing import run_permission_tests
 from voteit.organisation.models import Organisation
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
@@ -29,121 +30,113 @@ class OrganisationViewSetTests(APITestCase):
             title="Other org", host="other.voteit.se"
         )
         cls.other_org_user = cls.other_org.users.create(username="other_org_user")
+        cls.other_org_manager = cls.other_org.users.create(username="other_org_manager")
+        cls.other_org.add_roles(cls.other_org_manager, ROLE_ORG_MANAGER)
+        cls.other_org_response = {
+            "active": True,
+            "body": "",
+            "components": [],
+            "help_info": "",
+            "id_host": "https://id.betahaus.net",
+            "login_url": None,
+            "page_title": "Other org",
+            "scope": [],
+            "title": "Other org",
+            "pk": cls.other_org.pk,
+        }
 
     def test_create(self):
-        url = reverse("organisations-list")
+        url = reverse("organisation-list")
         data = {
             "title": "Item no 1",
         }
-        for user, status in (
-            (None, 401),
-            (self.user, 405),
-            (self.manager, 405),
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            data=data,
+            method="POST",
+            expected=(
+                (self.manager, 405),
+                (None, 401),
+            ),
         ):
-            if user:
-                self.client.force_login(user)
-            response = self.client.post(url, data)
-            self.assertEqual(
-                response.status_code,
-                status,
-                f"{user} action returned wrong response code",
-            )
-
-    def test_get(self):
-        url = reverse("organisations-detail", kwargs={"pk": self.org.pk})
-        self.client.force_login(self.manager)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(self.org.pk, data["pk"])
-
-    def test_get_other(self):
-        url = reverse("organisations-detail", kwargs={"pk": self.other_org})
-        self.client.force_login(self.manager)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 404)
-
-    def test_get_anon_matching_domain(self):
-        url = reverse("organisations-detail", kwargs={"pk": self.org.pk})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_anon_other(self):
-        url = reverse("organisations-detail", kwargs={"pk": self.other_org.pk})
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 404)
-
-    def test_patch_manager(self):
-        url = reverse("organisations-detail", kwargs={"pk": self.org.pk})
-        self.client.force_login(self.manager)
-        response = self.client.patch(url, {"title": "Hello"})
-        self.assertEqual(response.status_code, 200)
-
-    def test_patch_manager_other(self):
-        url = reverse("organisations-detail", kwargs={"pk": self.other_org.pk})
-        self.client.force_login(self.manager)
-        response = self.client.patch(url, {"title": "Hello"})
-        self.assertEqual(response.status_code, 404)
-
-    def test_patch_user(self):
-        url = reverse("organisations-detail", kwargs={"pk": self.org.pk})
-        self.client.force_login(self.user)
-        response = self.client.patch(url, {"title": "Hello"})
-        self.assertEqual(response.status_code, 403)
-
-    def test_patch_user_other(self):
-        url = reverse("organisations-detail", kwargs={"pk": self.other_org.pk})
-        self.client.force_login(self.user)
-        response = self.client.patch(url, {"title": "Hello"})
-        self.assertEqual(response.status_code, 404)
-
-    def test_list_anon(self):
-        url = reverse("organisations-list")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(1, len(data))
+            func(*params)
 
     def test_list(self):
-        self.client.force_login(self.user)
-        url = reverse("organisations-list")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(1, len(data))
+        url = reverse("organisation-list")
+        expected_data = {
+            "active": True,
+            "body": "",
+            "components": [],
+            "help_info": "",
+            "id_host": "https://id.betahaus.net",
+            "login_url": None,
+            "page_title": "Test org",
+            "pk": 7,
+            "scope": [],
+            "title": "Test org",
+        }
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            expected=(
+                (self.manager, 200, expected_data),
+                (self.user, 200, expected_data),
+                (None, 200, expected_data),
+                (
+                    self.other_org_user,
+                    401,
+                    {"detail": "You're logged in to another organisation"},
+                ),
+                (
+                    self.other_org_manager,
+                    401,
+                    {"detail": "You're logged in to another organisation"},
+                ),
+            ),
+        ):
+            func(*params)
 
-    def test_list_wrong_domain(self):
-        self.client.force_login(self.other_org_user)
-        url = reverse("organisations-list")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 401)
-        data = response.json()
-        self.assertEqual("You're logged in to another organisation", data["detail"])
+    def test_patch(self):
+        url = reverse("organisation-change")
+        data = {"body": "Hello"}
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            data=data,
+            method="PATCH",
+            expected=(
+                (self.manager, 200, data),
+                (self.user, 403),
+                (None, 401),
+            ),
+        ):
+            func(*params)
 
     def test_list_host_match(self):
         self.client.force_login(self.other_org_user)
-        url = reverse("organisations-list")
+        url = reverse("organisation-list")
         response = self.client.get(url, SERVER_NAME="other.voteit.se")
-        self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(1, len(data))
+        self.assertEqual(response.status_code, 200, data)
+        self.assertDictEqual(self.other_org_response, data)
 
     @override_settings(USE_X_FORWARDED_HOST=True)
     def test_list_host_proxy(self):
         self.client.force_login(self.other_org_user)
-        url = reverse("organisations-list")
+        url = reverse("organisation-list")
         response = self.client.get(url, HTTP_X_FORWARDED_HOST="other.voteit.se")
-        self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(1, len(data))
+        self.assertEqual(response.status_code, 200, data)
+        self.assertDictEqual(self.other_org_response, data)
 
     def test_list_host_regular_host(self):
         self.client.force_login(self.other_org_user)
-        url = reverse("organisations-list")
+        url = reverse("organisation-list")
         response = self.client.get(url, HTTP_HOST="other.voteit.se")
-        self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(1, len(data))
+        self.assertEqual(response.status_code, 200, data)
+        self.assertDictEqual(self.other_org_response, data)
 
 
 # @override_settings(ID_PROXY_API_KEY="secret")

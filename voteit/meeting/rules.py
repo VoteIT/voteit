@@ -22,7 +22,6 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.workflows import MeetingWf
-from voteit.organisation.rules import is_manager
 from voteit.organisation.rules import is_meeting_creator
 
 if TYPE_CHECKING:
@@ -154,7 +153,7 @@ def visible_in_lists(user: AbstractUser, context: MeetingContext) -> bool:
     )
 
 
-rules.add_perm(Meeting.get_perm(PERM.ADD), is_manager | is_meeting_creator)
+rules.add_perm(Meeting.get_perm(PERM.ADD), is_meeting_creator)
 # FIXME: This queryset has changed. It used to include public meetings
 rules.add_perm(Meeting.get_perm(PERM.VIEW), is_participant)
 rules.add_perm(Meeting.get_perm(PERM.MODERATE), is_moderator)

@@ -27,7 +27,6 @@ from voteit.core.utils import relaxed_clean_html
 from voteit.core.workflows import EnabledWf
 from voteit.meeting import roles
 from voteit.meeting.workflows import MeetingWf
-from voteit.organisation.permissions import OrgPermissions
 from voteit.poll.utils import (
     get_electoral_policy_registry,
     get_vote_transfer_policy_registry,
@@ -419,7 +418,9 @@ class Meeting(
                 return user.organisation.meetings.all()
             if user.organisation is None:
                 return self.none()
-            if user.has_perm(OrgPermissions.MANAGE, user.organisation):
+            if user.has_perm(
+                user.organisation.get_perm(PERM.MANAGE), user.organisation
+            ):
                 return user.organisation.meetings.all()
             else:
                 return user.organisation.meetings.filter(

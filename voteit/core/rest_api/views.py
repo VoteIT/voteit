@@ -15,6 +15,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from voteit.core import PERM
 from voteit.core.loggers import log_auth
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import ModelContextMixin
@@ -26,7 +27,6 @@ from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
-from voteit.organisation.permissions import OrgPermissions
 from voteit.organisation.utils import get_idproxy_user_data
 
 UserModel = get_user_model()
@@ -59,7 +59,9 @@ class UserSearchViewSet(
         - moderators: all meeting participants
         """
         user = self.request.user
-        if user.is_superuser or user.has_perm(OrgPermissions.MANAGE, user.organisation):
+        if user.is_superuser or user.has_perm(
+            user.organisation.get_perm(PERM.MANAGE), user.organisation
+        ):
             return user.organisation.users.all()
         # Method will raise 404 if meeting doesn't exist
         try:

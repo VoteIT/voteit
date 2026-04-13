@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
+from typing import TYPE_CHECKING
+from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.utils.translation import gettext as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework import permissions
@@ -11,16 +11,17 @@ from rest_framework import viewsets
 from rest_framework import exceptions
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from voteit.core import PERM
 from voteit.core.loggers import notification_logger
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
-from voteit.organisation.permissions import OrgPermissions
 from voteit.organisation.rest_api import serializers
 from voteit.organisation.rest_api.filters import OrphanUserEmailFilter
 from voteit.organisation.rest_api.filters import UserIdentitiesFilter
@@ -30,40 +31,51 @@ if TYPE_CHECKING:
     from voteit.core.models import User as UserType
 
 
-@router.register("organisations", basename="organisations")
+@router.register("organisation", basename="organisation")
 class OrganisationViewSet(
     VerboseAutoPermissionViewSetMixin,
-    mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
-    mixins.ListModelMixin,
     GenericViewSet,
 ):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    model = Organisation
-    queryset = Organisation.objects.all()
+    queryset = Organisation.objects.none()
     serializer_class = serializers.OrganisationSerializer
-    expected_default_http_status = 401
-    allow_unauthenticated = True
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "change": "change",
+    }
 
-    def get_queryset(self):
-        # Host is forced for authenticated too
+    def get_object(self):
         host = self.request.get_host()
         hostname = host.split(":")[0]
-        if self.request.user.is_authenticated and self.request.user.organisation:
+        if self.request.user.is_authenticated:
             if hostname != self.request.user.organisation.host:
                 raise exceptions.AuthenticationFailed(
                     detail=_("You're logged in to another organisation")
                 )
-            return self.queryset.filter(
-                pk=self.request.user.organisation.pk, host=hostname
-            )
-        return self.queryset.filter(host=hostname)
+            return self.request.user.organisation
+        return get_object_or_404(Organisation.objects, host=hostname)
+        # return Organisation.objects.get(hostname=hostname)
 
     def list(self, request, *args, **kwargs):
         """
         A list that may contain one item, but no more.
         """
-        serializer = self.get_serializer(self.get_queryset(), many=True)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["patch", "put"])
+    def change(self, request, *args, **kwargs):
+        instance = self.get_object()
+        partial = request.method.lower() == "patch"
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        if getattr(instance, "_prefetched_objects_cache", None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
         return Response(serializer.data)
 
 
@@ -142,7 +154,7 @@ class OrganisationRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.has_perm(OrgPermissions.VIEW_ROLES, user.organisation):
+        if user.has_perm(Organisation.get_perm(PERM.VIEW_ROLES), user.organisation):
             return self.queryset.filter(context=user.organisation).prefetch_related(
                 "user",
             )

@@ -3,15 +3,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import rules
+
+from voteit.core import PERM
 from voteit.core.decorators import predicate
-from voteit.organisation.permissions import OrgPermissions
+from voteit.organisation.models import Organisation
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 if TYPE_CHECKING:
-    from django.contrib.auth import get_user_model
-
-    User = get_user_model()
+    from voteit.core.models import User
 
 
 @predicate(role=ROLE_ORG_MANAGER)
@@ -24,16 +24,15 @@ def is_manager(user: User, *args):
 
 @predicate(role=ROLE_MEETING_CREATOR)
 def is_meeting_creator(user: User, *args):
-    """User has meeting creator role"""
+    """User has any role able to create a meeting"""
     if user.organisation_id:
-        return user.organisation.has_roles(user, ROLE_MEETING_CREATOR)
+        return user.organisation.has_any_roles(
+            user, ROLE_MEETING_CREATOR, ROLE_ORG_MANAGER
+        )
     return False
 
 
-# FIXME: This is a stub
-rules.add_perm(OrgPermissions.CHANGE, is_manager)
-rules.add_perm(OrgPermissions.DELETE, is_manager)
-rules.add_perm(OrgPermissions.VIEW, rules.always_allow)
-rules.add_perm(OrgPermissions.MANAGE, is_manager)
-rules.add_perm(OrgPermissions.CHANGE_ROLES, is_manager)
-rules.add_perm(OrgPermissions.VIEW_ROLES, is_manager)  # We might want to change this?
+rules.add_perm(Organisation.get_perm(PERM.CHANGE), is_manager)
+rules.add_perm(Organisation.get_perm(PERM.MANAGE), is_manager)
+rules.add_perm(Organisation.get_perm(PERM.CHANGE_ROLES), is_manager)
+rules.add_perm(Organisation.get_perm(PERM.VIEW_ROLES), is_manager)

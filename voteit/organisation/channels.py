@@ -5,7 +5,6 @@ from logging import getLogger
 from envelope.channels.models import ContextChannel
 
 from .models import Organisation
-from .permissions import OrgPermissions
 from voteit.messaging.decorators import channel
 
 logger = getLogger(__name__)
@@ -20,4 +19,4 @@ class OrganisationChannel(ContextChannel):
     name = "organisation"
     logger = logger
     model = Organisation
-    permission = OrgPermissions.VIEW
+    permission = None

@@ -19,3 +19,4 @@ class PERM:
     VIEW_ROLES = "view_roles"
     CHANGE_STATE = "change_state"
     ARCHIVE = "archive"
+    MANAGE = "manage"

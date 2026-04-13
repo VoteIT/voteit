@@ -121,6 +121,7 @@ def run_permission_tests(
     data: dict = None,
     method: str = "get",
     expected: list | tuple,
+    **kwargs,
 ) -> Generator[tuple, None, None]:
     """
 
@@ -177,7 +178,9 @@ def run_permission_tests(
             data=data,
             partial_response=partial_response,
         ):
-            response = getattr(tester.client, method.lower())(url, data, format="json")
+            response = getattr(tester.client, method.lower())(
+                url, data, format="json", **kwargs
+            )
             try:
                 json_response = response.json()
             except TypeError:
