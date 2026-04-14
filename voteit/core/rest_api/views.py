@@ -3,7 +3,6 @@ from django.contrib.auth import login
 from django.contrib.auth import logout
 from django.contrib.messages import get_messages
 from django.db import transaction
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework import mixins
 from rest_framework import permissions
@@ -18,9 +17,8 @@ from rest_framework.viewsets import GenericViewSet
 from voteit.core import PERM
 from voteit.core.loggers import log_auth
 from voteit.core.rest_api import router
+from voteit.core.rest_api.filters import ActionAnnotatedDjangoFilterBackend
 from voteit.core.rest_api.mixins import ModelContextMixin
-from voteit.core.rest_api.mixins import SerializerClassesMixin
-from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.serializers import MessageSerializer
 from voteit.core.rest_api.serializers import UserAndRolesSerializer
 from voteit.core.rest_api.serializers import UserSerializer
@@ -29,27 +27,27 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation.utils import get_idproxy_user_data
 
-UserModel = get_user_model()
+__all__ = ()
+
+User = get_user_model()
 
 
 @router.register("users", "users")
-class UserSearchViewSet(
-    SerializerClassesMixin, ModelContextMixin, viewsets.ReadOnlyModelViewSet
-):
-    model = UserModel
-    permission_classes = (
-        permissions.IsAuthenticated,
-    )  # Permissions checked in queryset!
+class UserSearchViewSet(ModelContextMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = UserSerializer
-    serializer_classes = {"list": UserListSerializer}
     filter_backends = (
-        DjangoFilterBackend,
+        ActionAnnotatedDjangoFilterBackend,
         filters.SearchFilter,
     )
     filterset_fields = ("meeting",)
     search_fields = "username", "email", "first_name", "last_name"
     context_queryset = Meeting.objects.all()
     context_lookup_kwarg = "meeting"
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return UserListSerializer
+        return super().get_serializer_class()
 
     def get_queryset(self):
         """
@@ -63,7 +61,6 @@ class UserSearchViewSet(
             user.organisation.get_perm(PERM.MANAGE), user.organisation
         ):
             return user.organisation.users.all()
-        # Method will raise 404 if meeting doesn't exist
         try:
             meeting = self.get_context(self.request)
         except ValidationError:
@@ -71,12 +68,11 @@ class UserSearchViewSet(
         # FIXME: Public meeting is used in an odd way in frontend. This needs to be cleaned up.
         if meeting and meeting.has_roles(user, ROLE_PARTICIPANT):
             return meeting.participants.all()
-        return UserModel.objects.none()
+        return User.objects.none()
 
 
 @router.register("user", basename="user")
 class UserView(
-    TransitionsMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
@@ -85,31 +81,18 @@ class UserView(
     A single view to get data for currently logged in user.
     """
 
-    permission_classes = (permissions.IsAuthenticated,)
     serializer_class = UserAndRolesSerializer
-    serializer_classes = {
-        "logout": serializers.Serializer,
-    }
-
-    @property
-    def User(self):
-        return UserSerializer.Meta.model
 
     def get_queryset(self):
-        if self.request.user.pk:
-            if self.request.user.identity_id:
-                return self.User.objects.filter(
-                    identity_id=self.request.user.identity_id, is_active=True
-                )
-            # Only for manually created users, i.e. in dev environment
-            return self.User.objects.filter(pk=self.request.user.pk)
-        return self.User.objects.none()
+        if identity_id := getattr(self.request.user, "identity_id", None):
+            return User.objects.filter(identity_id=identity_id, is_active=True)
+        return User.objects.none()
 
     def list(self, request):
         serializer = self.serializer_class(request.user)
         return Response(serializer.data)
 
-    @action(methods=["POST"], detail=False)
+    @action(methods=["POST"], detail=False, serializer_class=serializers.Serializer)
     def logout(self, request):
         log_auth("Logout", request=request)
         logout(request)
@@ -129,7 +112,7 @@ class UserView(
         if request.user.identity_id:
             qs = self.get_queryset().exclude(pk=request.user.pk)
         else:
-            qs = self.User.objects.none()
+            qs = User.objects.none()
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
 

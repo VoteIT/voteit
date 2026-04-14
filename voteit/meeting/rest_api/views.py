@@ -67,7 +67,6 @@ class MeetingViewSet(
         return {
             **super().permission_type_map,
             "set_agenda_order": "change",
-            # "retrieve": "preview",
             "retrieve": None,  # Handled by queryset
             "transitions": None,  # Checked in transitions
         }
