@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from voteit.core.models import User as UserType
 
 
+@override_settings(ID_HOST="https://testserver")
 class OrganisationViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -37,7 +38,7 @@ class OrganisationViewSetTests(APITestCase):
             "body": "",
             "components": [],
             "help_info": "",
-            "id_host": "https://id.betahaus.net",
+            "id_host": "https://testserver",
             "login_url": None,
             "page_title": "Other org",
             "scope": [],
@@ -69,7 +70,7 @@ class OrganisationViewSetTests(APITestCase):
             "body": "",
             "components": [],
             "help_info": "",
-            "id_host": "https://id.betahaus.net",
+            "id_host": "https://testserver",
             "login_url": None,
             "page_title": "Test org",
             "pk": 7,
