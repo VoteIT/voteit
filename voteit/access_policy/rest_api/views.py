@@ -2,13 +2,13 @@ from logging import getLogger
 
 from django.db import transaction
 from django.db.models import QuerySet
-from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from voteit.access_policy.app.policies import AutomaticAccess
 from voteit.access_policy.rest_api import serializers
@@ -21,7 +21,7 @@ logger = getLogger(__name__)
 
 
 @router.register("access-policies", basename="access-policies")
-class AccessPoliciesViewSet(viewsets.ReadOnlyModelViewSet):
+class AccessPoliciesViewSet(ReadOnlyModelViewSet):
     model = Meeting
     serializer_class = serializers.MeetingAccessPoliciesSerializer
     permission_classes = (IsAuthenticated,)

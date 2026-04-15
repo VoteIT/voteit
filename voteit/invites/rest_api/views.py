@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from voteit.core.rest_api import router
-from voteit.core.rest_api.base import TransitionsMixin
+from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.invites.models import MeetingInvite
