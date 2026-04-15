@@ -8,18 +8,13 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         from voteit.core.registries import content_types
-        from voteit.core.registries import permissions
         from voteit.core import models_to_register
         from voteit.core.utils import prepare_available_transitions
-        from .rest_api import views
 
         while models_to_register:
             model = models_to_register.pop()
             if not model._meta.proxy:
                 register_model(model, content_types)
-
-        # Make sure linked permissions make sense
-        permissions.validate_registry()
 
         # Cache all workflow transitions
         prepare_available_transitions()

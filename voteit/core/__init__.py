@@ -20,3 +20,4 @@ class PERM:
     CHANGE_STATE = "change_state"
     ARCHIVE = "archive"
     MANAGE = "manage"
+    NOT_ALLOWED = "__not_allowed"

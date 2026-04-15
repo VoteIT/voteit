@@ -30,7 +30,6 @@ from voteit.core.decorators import ensure_atomic
 from voteit.core.fields import RolesField
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
-from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.role import Role
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
@@ -256,7 +255,7 @@ class SpeakerListSystem(
         field=state,
         source=["+"],
         target=SpeakerSystemWf.ARCHIVED,
-        permission=NOT_ALLOWED,
+        permission=PERM.NOT_ALLOWED,
         custom={"title": _("Archive")},
     )
     @ensure_atomic

@@ -16,7 +16,6 @@ from rest_framework.exceptions import ValidationError
 from rules.contrib.models import RulesModelMixin
 
 from voteit.core import PERM
-from voteit.core.permissions import NOT_ALLOWED
 
 if TYPE_CHECKING:
     from pydantic import ValidationError as PydanticValidationError
@@ -67,7 +66,7 @@ def get_valid_transitions(
         ):
             valid_transition: Transition
             # Is this a hidden transition?
-            if valid_transition.permission != NOT_ALLOWED:
+            if valid_transition.permission != PERM.NOT_ALLOWED:
                 yield valid_transition
 
 

@@ -15,7 +15,6 @@ from django.utils.text import slugify
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
-    from voteit.core.registries import PermissionRegistry
     from voteit.core.registries import ContentRegistry
 
 
@@ -300,12 +299,6 @@ def get_content_registry() -> ContentRegistry:
     from .registries import content_types
 
     return content_types
-
-
-def get_permission_registry() -> PermissionRegistry:
-    from .registries import permissions
-
-    return permissions
 
 
 def get_model_by_shortname(name, default=None) -> type[Model] | None:

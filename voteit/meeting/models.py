@@ -22,7 +22,6 @@ from voteit.core.abcs import MeetingContext, OrganisationContext
 from voteit.core.decorators import ensure_atomic
 from voteit.core.fields import RichTextField, RolesField
 from voteit.core.models import BaseContent, RoleContextMixin, Roles, User
-from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.utils import relaxed_clean_html
 from voteit.core.workflows import EnabledWf
 from voteit.meeting import roles
@@ -355,7 +354,7 @@ class Meeting(
         field=state,
         source="+",
         target=MeetingWf.ARCHIVED,
-        permission=NOT_ALLOWED,
+        permission=PERM.NOT_ALLOWED,
     )
     @ensure_atomic
     def archive(self):

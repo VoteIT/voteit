@@ -18,7 +18,6 @@ from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.fields import RichTextField
 from voteit.core.models import BaseContent
-from voteit.core.permissions import NOT_ALLOWED
 from voteit.core.utils import relaxed_clean_html
 from voteit.meeting.models import Meeting
 from voteit.meeting.workflows import MeetingWf
@@ -209,7 +208,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         target=AgendaItemWf.ARCHIVED,
         source="*",
-        permission=NOT_ALLOWED,  # Handled by scripts
+        permission=PERM.NOT_ALLOWED,  # Handled by scripts
     )
     def archive(self):
         # Mark agenda item as archived. Handled by scripts.

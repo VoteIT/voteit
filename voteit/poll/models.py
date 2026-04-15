@@ -33,7 +33,6 @@ from voteit.core import PERM
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
-from voteit.core.permissions import NOT_ALLOWED
 from voteit.poll.exceptions import BallotChecksumError
 from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidPollMethod
@@ -457,7 +456,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         source=PollWf.CLOSED,
         target=PollWf.FINISHED,
         on_error=PollWf.FAILED,
-        permission=NOT_ALLOWED,
+        permission=PERM.NOT_ALLOWED,
         custom={"title": _("Finish")},
     )
     def finish(self):
@@ -472,7 +471,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         source=PollWf.CLOSED,
         target=PollWf.WITHHELD,
         on_error=PollWf.FAILED,
-        permission=NOT_ALLOWED,
+        permission=PERM.NOT_ALLOWED,
     )
     def finish_withhold(self):
         """
@@ -528,7 +527,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         source="+",
         target=PollWf.FAILED,
-        permission=NOT_ALLOWED,
+        permission=PERM.NOT_ALLOWED,
         custom={"title": _("Failed")},
     )
     def failed(self):
@@ -541,7 +540,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         field=state,
         source=PollWf.CLOSED,
         target=PollWf.NO_RESULT,
-        permission=NOT_ALLOWED,
+        permission=PERM.NOT_ALLOWED,
         custom={"title": _("No result")},
     )
     def no_result(self):

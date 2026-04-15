@@ -26,7 +26,6 @@ from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import ensure_atomic
 from voteit.core.decorators import has_exact_filter
 from voteit.core.fields import RolesField
-from voteit.core.permissions import NOT_ALLOWED
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.workflows import InviteWf
 from voteit.meeting.dialects import dialect_registry
@@ -310,7 +309,7 @@ class MeetingInvite(RulesModelMixin, MeetingContext):
         field=state,
         source=InviteWf.OPEN,
         target=InviteWf.ACCEPTED,
-        permission=NOT_ALLOWED,  # Special view, not a normal transition
+        permission=PERM.NOT_ALLOWED,  # Special view, not a normal transition
     )
     def accept(self, user: UserType):
         """
@@ -326,7 +325,7 @@ class MeetingInvite(RulesModelMixin, MeetingContext):
         field=state,
         source=InviteWf.OPEN,
         target=InviteWf.REJECTED,
-        permission=NOT_ALLOWED,  # Special view, not a normal transition
+        permission=PERM.NOT_ALLOWED,  # Special view, not a normal transition
     )
     def reject(self, user: UserType | None = None):
         if not user:
