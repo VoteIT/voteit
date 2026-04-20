@@ -64,12 +64,12 @@ class RulesTests(TestCase):
         HANDLE = Room.get_perm(PERM.HANDLE)
         self.assertFalse(self.anon_user.has_perm(HANDLE, self.room))
         self.assertFalse(self.participant.has_perm(HANDLE, self.room))
-        self.assertFalse(self.moderator.has_perm(HANDLE, self.room))
-        self.assertFalse(self.moderator2.has_perm(HANDLE, self.room))
+        self.assertTrue(self.moderator.has_perm(HANDLE, self.room))
+        self.assertTrue(self.moderator2.has_perm(HANDLE, self.room))
 
     def test_handle(self):
         self.room.handler = self.moderator
         self.room.save()
         HANDLE = Room.get_perm(PERM.HANDLE)
         self.assertTrue(self.moderator.has_perm(HANDLE, self.room))
-        self.assertFalse(self.moderator2.has_perm(HANDLE, self.room))
+        self.assertTrue(self.moderator2.has_perm(HANDLE, self.room))

@@ -33,14 +33,19 @@ class RoomsViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
         "handle_speaker": ROOM_PERM_HANDLE_SPEAKER,
         "set_handler": PERM.CHANGE,
         "status": None,
+        "retrieve": None,
         #  "partial_update": None,  # checked in method - only partial needs to be handled manually
     }
 
     def get_queryset(self):
-        return Room.objects.filter(
-            models.Q(meeting__roles__user=self.request.user)
-            | models.Q(sls__speakersystemroles__user=self.request.user)
-        ).distinct()
+        return (
+            Room.objects.filter(
+                models.Q(meeting__roles__user=self.request.user)
+                | models.Q(sls__speakersystemroles__user=self.request.user)
+            )
+            .select_related("handler")
+            .distinct()
+        )
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -56,18 +61,6 @@ class RoomsViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     @transaction.atomic(durable=True)
     def update(self, request, *args, **kwargs):
         return super().update(request, *args, **kwargs)
-
-    @action(
-        methods=["post"],
-        detail=True,
-        url_path="set-handler",
-    )
-    def set_handler(self, request, *args, **kwargs):
-        room = self.get_object()
-        if room.handler != request.user:
-            room.handler = request.user
-            room.save()
-        return Response(data={}, status=200)
 
     @action(
         methods=["patch"],

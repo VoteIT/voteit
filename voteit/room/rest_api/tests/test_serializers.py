@@ -1,13 +1,17 @@
 from django.test import TestCase
+from django.test import RequestFactory
 
 from voteit.meeting.models import Meeting
 from voteit.room.models import Room
 
 
 class RoomDetailSerializerTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.meeting = Meeting.objects.create()
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderaotr = cls.meeting.participants.get(username="moderator")
         cls.room: Room = cls.meeting.rooms.create(title="Hello")
         cls.sls = cls.meeting.speaker_systems.create(
             method_name="simple", room=cls.room
@@ -48,9 +52,12 @@ class RoomDetailSerializerTests(TestCase):
 
 
 class RoomHandleSerializerTests(TestCase):
+    fixtures = ["meeting_test_fixture"]
+
     @classmethod
     def setUpTestData(cls):
-        cls.meeting = Meeting.objects.create()
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderator = cls.meeting.participants.get(username="moderator")
         cls.room = cls.meeting.rooms.create()
         cls.sls = cls.meeting.speaker_systems.create(
             method_name="simple", room=cls.room
@@ -60,7 +67,6 @@ class RoomHandleSerializerTests(TestCase):
         cls.prop2 = cls.ai.proposals.create()
         cls.prop2 = cls.ai.proposals.create()
         cls.prop3 = cls.ai.proposals.create()
-        cls.room = cls.meeting.rooms.create()
 
     @property
     def _cut(self):
@@ -68,9 +74,19 @@ class RoomHandleSerializerTests(TestCase):
 
         return RoomHandleSerializer
 
+    def _mk_context(self, user):
+        req = RequestFactory().request()
+        req.user = user
+        return {"request": req}
+
     def test_no_highlighted(self):
         self.room.highlighted_proposals.create(proposal=self.prop2)
-        serializer = self._cut(self.room, data={"highlighted": []}, partial=True)
+        serializer = self._cut(
+            self.room,
+            data={"highlighted": []},
+            partial=True,
+            context=self._mk_context(self.moderator),
+        )
         serializer.is_valid()
         self.assertFalse(serializer.errors)
         serializer.save()
@@ -81,6 +97,7 @@ class RoomHandleSerializerTests(TestCase):
             self.room,
             data={"highlighted": [self.prop2.pk, self.prop1.pk]},
             partial=True,
+            context=self._mk_context(self.moderator),
         )
         serializer.is_valid()
         self.assertFalse(serializer.errors)
@@ -94,6 +111,7 @@ class RoomHandleSerializerTests(TestCase):
             self.room,
             data={"highlighted": [-1, self.prop1.pk]},
             partial=True,
+            context=self._mk_context(self.moderator),
         )
         serializer.is_valid()
         self.assertEqual({"highlighted"}, set(serializer.errors))
@@ -110,6 +128,7 @@ class RoomHandleSerializerTests(TestCase):
             self.room,
             data={"highlighted": [new_prop.pk, self.prop1.pk]},
             partial=True,
+            context=self._mk_context(self.moderator),
         )
         serializer.is_valid()
         self.assertEqual({"highlighted"}, set(serializer.errors))

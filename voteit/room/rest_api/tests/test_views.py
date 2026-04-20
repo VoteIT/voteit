@@ -156,11 +156,9 @@ class RoomsViewTestCase(APITestCase):
         self.client.force_login(self.moderator)
         data = {"highlighted": [self.prop3.pk, self.prop2.pk]}
         response = self.client.patch(url, data)
-        self.assertContains(
-            response,
-            "You're missing the permission 'room.handle_room'",
-            status_code=403,
-        )
+        self.assertEqual(response.status_code, 200)
+        self.room.refresh_from_db()
+        self.assertEqual(self.moderator, self.room.handler)
 
     def test_patch_change_highlighted_other_handler(self):
         self.room.handler = self.participant
@@ -169,11 +167,9 @@ class RoomsViewTestCase(APITestCase):
         self.client.force_login(self.moderator)
         data = {"highlighted": [self.prop3.pk, self.prop2.pk]}
         response = self.client.patch(url, data)
-        self.assertContains(
-            response,
-            "You're missing the permission 'room.handle_room'",
-            status_code=403,
-        )
+        self.assertEqual(response.status_code, 200)
+        self.room.refresh_from_db()
+        self.assertEqual(self.moderator, self.room.handler)
 
     def test_patch_change_highlighted_order(self):
         url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
@@ -215,16 +211,6 @@ class RoomsViewTestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.room.refresh_from_db()
         self.assertFalse(self.room.show_ballot)
-
-    def test_patch_moderator_replaces_handler(self):
-        self.room.handler = self.participant
-        self.room.save()
-        url = reverse("rooms-set-handler", kwargs={"pk": self.room.pk})
-        self.client.force_login(self.moderator)
-        response = self.client.post(url)
-        self.assertEqual(response.status_code, 200)
-        self.room.refresh_from_db()
-        self.assertEqual(self.moderator, self.room.handler)
 
     def test_room_status(self):
         """Delete preflight check"""

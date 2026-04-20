@@ -62,7 +62,11 @@ class RoomHandleSerializer(ModelSerializer):
                 )
         return attrs
 
-    def update(self, instance, validated_data):
+    def update(self, instance: Room, validated_data):
+        if not instance.open:
+            validated_data["open"] = True
+        if instance.handler != self.context["request"].user:
+            validated_data["handler"] = self.context["request"].user
         highlighted = validated_data.get("highlighted", None)
         if highlighted is not None:
             if highlighted:
