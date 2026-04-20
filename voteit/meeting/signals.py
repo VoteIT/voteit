@@ -124,6 +124,14 @@ def meeting_roles_created(instance: MeetingRoles, created: bool = None, **kw):
             )
 
 
+@receiver(pre_delete, sender=MeetingRoles)
+@disable_on_raw_save
+def remove_group_memberships(instance: MeetingRoles, **kw):
+    GroupMembership.objects.filter(
+        meeting_group__meeting_id=instance.context_id, user_id=instance.user_id
+    ).delete()
+
+
 @receiver(post_save, sender=Meeting)
 @disable_on_raw_save
 def meeting_change(instance, created=None, **kw):

@@ -10,6 +10,7 @@ from envelope.messages.common import Batch
 from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
+from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.channels import MeetingChannel
@@ -166,7 +167,8 @@ class MeetingGroupChangedTests(TestCase):
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create()
         cls.group = cls.meeting.groups.create()
-        cls.user = User.objects.create(username="maybe_member")
+        cls.user = cls.meeting.participants.create(username="maybe_member")
+        cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added(self, mock_publish):
@@ -252,6 +254,20 @@ class MeetingGroupChangedTests(TestCase):
         self.assertEqual(1, len(messages))
         msg = messages[0]
         self.assertIsInstance(msg, GroupMembershipDeleted)
+
+    def test_membership_removed_when_user_kicked_from_meeting(self):
+        self.user.meeting_groups.add(self.group)
+        self.assertTrue(
+            GroupMembership.objects.filter(
+                user=self.user, meeting_group=self.group
+            ).exists()
+        )
+        self.meeting.remove_roles(self.user, ROLE_PARTICIPANT)
+        self.assertFalse(
+            GroupMembership.objects.filter(
+                user=self.user, meeting_group=self.group
+            ).exists()
+        )
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
