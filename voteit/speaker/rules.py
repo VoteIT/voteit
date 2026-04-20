@@ -5,8 +5,8 @@ import rules
 
 from voteit.core import PERM
 from voteit.core.decorators import predicate
-from voteit.meeting.rules import can_view_meeting
 from voteit.meeting.rules import is_moderator
+from voteit.meeting.rules import is_participant
 from voteit.meeting.rules import meeting_upcoming_ongoing
 from voteit.speaker import PERM_ENTER
 from voteit.speaker import PERM_SHUFFLE
@@ -174,7 +174,7 @@ rules.add_perm(
 # This is related to roles.get message
 rules.add_perm(
     SpeakerListSystem.get_perm(PERM.VIEW_ROLES),
-    can_view_meeting,
+    is_participant,
 )
 
 

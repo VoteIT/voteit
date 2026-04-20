@@ -179,14 +179,14 @@ class MeetingPermissionTests(TestCase):
         VIEW_ROLES = Meeting.get_perm(PERM.VIEW_ROLES)
         self.assertFalse(self.anon_user.has_perm(VIEW_ROLES, self.meeting))
         self.assertTrue(self.moderator.has_perm(VIEW_ROLES, self.meeting))
-        self.assertFalse(self.participant.has_perm(VIEW_ROLES, self.meeting))
+        self.assertTrue(self.participant.has_perm(VIEW_ROLES, self.meeting))
         # Join meeting first
         self.assertFalse(self.org_manager.has_perm(VIEW_ROLES, self.meeting))
         self.meeting.public = True
         self.meeting.save()
         self.assertFalse(self.anon_user.has_perm(VIEW_ROLES, self.meeting))
         self.assertTrue(self.moderator.has_perm(VIEW_ROLES, self.meeting))
-        self.assertFalse(self.participant.has_perm(VIEW_ROLES, self.meeting))
+        self.assertTrue(self.participant.has_perm(VIEW_ROLES, self.meeting))
         self.assertFalse(self.org_manager.has_perm(VIEW_ROLES, self.meeting))
 
     def test_can_archive_meeting(self):

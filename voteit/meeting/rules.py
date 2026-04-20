@@ -170,8 +170,7 @@ rules.add_perm(
 )
 rules.add_perm(Meeting.get_perm(PERM_PREVIEW), visible_in_lists)
 # FIXME: View should be removed here, use queryset instead. Fix when messages update.
-rules.add_perm(Meeting.get_perm(PERM.VIEW_ROLES), is_moderator)
-
+rules.add_perm(Meeting.get_perm(PERM.VIEW_ROLES), is_participant)
 
 rules.add_perm(MeetingGroup.get_perm(PERM.ADD), meeting_not_archived & is_moderator)
 rules.add_perm(MeetingGroup.get_perm(PERM.CHANGE), meeting_not_archived & is_moderator)
