@@ -172,7 +172,7 @@ class GetRoles(ContextAction):
 
     @cached_property
     def permission(self) -> str:
-        return self.context.get_perm(PERM.CHANGE_ROLES)
+        return self.context.get_perm(PERM.VIEW_ROLES)
 
     @property
     def model(self) -> type[RoleContextMixin]:
