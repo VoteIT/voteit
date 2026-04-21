@@ -241,3 +241,34 @@
     button: 1
     user: 1
     agenda_item: 1
+
+# Personal notes
+- model: notes.note
+  pk: 1
+  fields:
+    meeting: 1
+    proposal: 1
+    user: 1
+    body: I really like this proposal
+    intent: a
+    created: 2022-03-29 09:31:51.432414+00:00
+
+- model: notes.note
+  pk: 2
+  fields:
+    meeting: 1
+    proposal: 1
+    user: 2
+    body: I'm not sure what they're trying to say
+    intent: ''
+    created: 2022-03-29 09:31:51.432414+00:00
+
+- model: notes.note
+  pk: 3
+  fields:
+    meeting: 1
+    proposal: 2
+    user: 2
+    body: ''
+    intent: d
+    created: 2022-03-29 09:31:51.432414+00:00

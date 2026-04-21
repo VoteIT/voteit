@@ -110,6 +110,7 @@ class Importer:
             user_identifiers.update(
                 x.username for x in btn_data.reactions if x.username
             )
+        user_identifiers.update(x.user for x in self.data.notes if x.user)
         user_qs = (
             self.organisation.users.exclude(is_active=False)
             .filter(**{f"{self.user_map_attr}__in": user_identifiers})
@@ -256,6 +257,16 @@ class Importer:
                         "Can't find object id %s with natural key %s"
                         % (reactd.object_id, reactd.content_type)
                     )
+        for note_d in self.data.notes:
+            # Notes are skipped if proposal wasn't imported or if it already existed
+            if prop := self.prop_map.get(note_d.proposal_id):
+                note, _ = self.meeting.notes.get_or_create(
+                    user=self.user_map[note_d.user],
+                    proposal=prop,
+                    defaults=note_d.dict(
+                        exclude={"user", "proposal_id"}, exclude_none=True
+                    ),
+                )
 
     def resolve_reaction_generic(self, fk: str, natural_key: tuple[str, str]):
         match natural_key:
@@ -278,6 +289,8 @@ class Importer:
             buttons=len(self.data.reaction_buttons),
             buttons_reused=self.buttons_reused,
             groups_reused=self.groups_reused,
+            reactions=sum(len(x.reactions) for x in self.data.reaction_buttons),
+            notes=len(self.data.notes),
         )
         for ai in self.data.agenda_items:
             stats.diff_proposals += len(
@@ -288,6 +301,4 @@ class Importer:
             )
             stats.discussion_posts += len(ai.discussions)
             stats.text_documents += len(ai.text_documents)
-        for btn in self.data.reaction_buttons:
-            stats.reactions += len(btn.reactions)
         return stats

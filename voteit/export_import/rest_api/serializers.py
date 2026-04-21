@@ -19,7 +19,7 @@ class ImportFileValidator:
         importer = Importer(meeting)
         try:
             importer.from_stream(value)
-        except ReaderError as exc:
+        except ReaderError:
             raise ValidationError("Not a valid yaml file")
         except ImportFileError as exc:
             raise ValidationError(exc)
@@ -41,10 +41,10 @@ class ImportFileSerializer(serializers.Serializer):
     Compare context arg with serializer args
     >>> from voteit.export_import.schemas import BaseContext
     >>> schema_fields = set(BaseContext.schema()['properties'])
-    >>> _ = schema_fields.remove('model_to_schema')
+    >>> _ = [schema_fields.remove(x) for x in {'model_to_schema', 'include_notes'}]
     >>> serializer = ImportFileSerializer()
     >>> ser_fields = set(serializer.fields)
-    >>> _ = ser_fields.remove('file'), ser_fields.remove('add_participants')  # Not in schema
+    >>> _ = [ser_fields.remove(x) for x in {'file', 'add_participants'}] # Not in schema
 
     >>> schema_fields - ser_fields
     set()
@@ -76,3 +76,4 @@ class ExportFileSerializer(serializers.Serializer):
     include_discussions = fields.BooleanField(default=True)
     include_buttons = fields.BooleanField(default=True)
     include_reactions = fields.BooleanField(default=False)
+    # Don't allow notes here!

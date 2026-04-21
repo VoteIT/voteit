@@ -21,6 +21,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.discussion.models import DiscussionPost
 from voteit.meeting.models import MeetingGroup
+from voteit.notes.models import Note
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
@@ -52,6 +53,7 @@ class BaseContext(BaseModel, extra=Extra.forbid):
     include_discussions: bool = True
     include_buttons: bool = True
     include_reactions: bool = False
+    include_notes: bool = False  # This should be restrictive, not via rest API!
 
     @validator("include_groups", allow_reuse=True)
     def validate_include_groups(cls, v: bool, values: dict):
@@ -374,6 +376,34 @@ class ReactionButtonData(BaseModel):
         return []
 
 
+class NoteData(BaseModel):
+    user: str
+    proposal_id: str
+    body: str = ""
+    intent: str = ""
+    created: datetime | None
+
+    class Config:
+        orm_mode = True
+
+    @validator("proposal_id", pre=True)
+    def convert_ids(cls, v):
+        """
+        Change to an unusable form to avoid mistakes later on.
+        """
+        if isinstance(v, int):
+            v = str(v)
+        if isinstance(v, str) and not v.startswith("_"):
+            v = "_" + v
+        return v
+
+    @validator("user", pre=True)
+    def to_username(cls, v):
+        if isinstance(v, User):
+            return v.username
+        return v
+
+
 class MeetingGroupData(BaseContentData):
     title: constr(max_length=100, strip_whitespace=True) = ""
     groupid: constr(max_length=100, strip_whitespace=True)
@@ -538,6 +568,7 @@ class MeetingStructure(BaseModel):
     groups: list[MeetingGroupData] = []
     agenda_items: list[AgendaItemData] = []
     reaction_buttons: list[ReactionButtonData] = []
+    notes: list[NoteData] = []
 
     class Config:
         orm_mode = True
@@ -564,6 +595,13 @@ class MeetingStructure(BaseModel):
     def fetch_reaction_buttons(cls, v):
         ctx = get_context()
         if not ctx.include_buttons:
+            return []
+        return resolve_potential_manager(v)
+
+    @validator("notes", pre=True)
+    def fetch_notes(cls, v):
+        ctx = get_context()
+        if not ctx.include_notes:
             return []
         return resolve_potential_manager(v)
 
@@ -637,6 +675,7 @@ model_to_schema = {
     DiscussionPost: DiscussionPostData,
     ReactionButton: ReactionButtonData,
     Reaction: ReactionData,
+    Note: NoteData,
 }
 
 
@@ -651,6 +690,7 @@ class ImportStats(BaseModel):
     reactions: int = 0
     groups_reused: int = 0
     buttons_reused: int = 0
+    notes: int = 0
 
 
 class ImportMeetingMeta(BaseModel):

@@ -10,7 +10,7 @@ from voteit.discussion.models import DiscussionPost
 from voteit.export_import.exceptions import SignatureVerificationFailed
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
-from voteit.proposal.models import DiffProposal
+from voteit.notes import NoteIntent
 from voteit.proposal.models import Proposal
 from voteit.proposal.workflows import ProposalWf
 from voteit.export_import.schemas import MeetingStructure
@@ -29,6 +29,19 @@ class ImporterTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.participant = cls.meeting.participants.get(username="participant")
         cls.moderator = cls.meeting.participants.get(username="moderator")
+        cls.default_result = {
+            "agenda_items": 3,
+            "diff_proposals": 1,
+            "discussion_posts": 2,
+            "groups": 1,
+            "proposals": 4,
+            "text_documents": 1,
+            "buttons": 2,
+            "reactions": 0,
+            "groups_reused": 0,
+            "buttons_reused": 0,
+            "notes": 0,
+        }
 
     @property
     def _cut(self):
@@ -44,14 +57,18 @@ class ImporterTests(TestCase):
         importer.collect_users()
         self.assertEqual({"participant": self.participant}, importer.user_map)
 
-    def test_import(self):
-        importer = self._cut(self.meeting, include_reactions=True)
+    def test_import_with_reactions_and_notes(self):
+        importer = self._cut(self.meeting, include_reactions=True, include_notes=True)
         fn = os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml")
         importer.from_file(fn)
         importer.run()
-        self.assertEqual(
+        self.assertDictEqual(
             {"participant": self.participant, "moderator": self.moderator},
             importer.user_map,
+        )
+        self.assertDictEqual(
+            {**self.default_result, "notes": 3, "reactions": 4},
+            importer.stats().dict(),
         )
         self.assertEqual(
             {"Hot dogs", "Crisps", "Pickles"},
@@ -127,11 +144,48 @@ class ImporterTests(TestCase):
             },
             reactions_data[0],
         )
+        # Notes
+        notes_values = [
+            dict(x)
+            for x in self.meeting.notes.order_by("pk").values(
+                "user",
+                "body",
+                "proposal_id",
+                "body",
+                "intent",
+            )
+        ]
+        self.assertEqual(3, len(notes_values))
+        self.assertDictEqual(
+            {
+                "user": self.moderator.id,
+                "body": "I really like this proposal",
+                "proposal_id": proposals["loeksas-1"].id,
+                "intent": str(NoteIntent.APPROVE),
+            },
+            notes_values[0],
+        )
+        self.assertDictEqual(
+            {
+                "user": self.participant.id,
+                "body": "I'm not sure what they're trying to say",
+                "proposal_id": proposals["loeksas-1"].id,
+                "intent": "",
+            },
+            notes_values[1],
+        )
+        self.assertDictEqual(
+            {
+                "user": self.participant.id,
+                "body": "",
+                "proposal_id": proposals["loeksas-2"].id,
+                "intent": str(NoteIntent.DENY),
+            },
+            notes_values[2],
+        )
 
     def test_import_already_existing_groups(self):
-        meeting_group = self.meeting.groups.create(
-            groupid="the-hellos", title="I'm a group"
-        )
+        self.meeting.groups.create(groupid="the-hellos", title="I'm a group")
         importer = self._cut(self.meeting, use_existing_groups=False)
         fn = os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml")
         importer.from_file(fn)
@@ -249,35 +303,21 @@ class ImporterTests(TestCase):
         # Reaction shouldn't work since object doesn't exist
         self.assertEqual(
             {
-                "agenda_items": 3,
+                **self.default_result,
                 "diff_proposals": 0,
-                "discussion_posts": 2,
-                "groups": 1,
-                "proposals": 0,
-                "text_documents": 1,
-                "buttons": 2,
                 "reactions": 1,
-                "groups_reused": 0,
-                "buttons_reused": 0,
+                "proposals": 0,
             },
             importer.stats().dict(),
         )
 
     def test_stats(self):
-        importer = self._cut(self.meeting, include_reactions=1)
+        importer = self._cut(self.meeting)
+        importer.from_file(os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml"))
+        self.assertEqual(self.default_result, importer.stats().dict())
+        importer = self._cut(self.meeting, include_notes=True, include_reactions=True)
         importer.from_file(os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml"))
         self.assertEqual(
-            {
-                "agenda_items": 3,
-                "diff_proposals": 1,
-                "discussion_posts": 2,
-                "groups": 1,
-                "proposals": 4,
-                "text_documents": 1,
-                "buttons": 2,
-                "reactions": 4,
-                "groups_reused": 0,
-                "buttons_reused": 0,
-            },
+            {**self.default_result, "notes": 3, "reactions": 4},
             importer.stats().dict(),
         )

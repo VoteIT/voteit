@@ -47,6 +47,7 @@ class ExportMeetingForm(forms.ModelForm):
 
 
 class ImportMeetingForm(ExportMeetingForm):
+    include_notes = forms.BooleanField(required=False)
     use_existing_groups = forms.BooleanField(required=False, initial=True)
     add_participants = forms.BooleanField(required=False)
     commit = forms.BooleanField(required=False)

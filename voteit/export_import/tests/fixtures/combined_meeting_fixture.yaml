@@ -1,4 +1,4 @@
-sign: 08c018f3dd320a27843884ba8fa5a51e1125e1155f56980e0a632ed4073bc5b1
+sign: bee06302c9feb6a97fa1a81d2f1a59c86dc612b86ad86600955c86463ac706d1
 meta:
   title: Hello world!
   description: Not much
@@ -190,3 +190,19 @@ reaction_buttons:
     username: moderator
   title: "Valberedningens f\xF6rslag"
   vote_template: false
+notes:
+  - proposal_id: _1
+    user: moderator
+    body: I really like this proposal
+    intent: a
+    created: 2022-03-29 09:31:51.432414+00:00
+  - proposal_id: _1
+    user: participant
+    body: I'm not sure what they're trying to say
+    intent: ''
+    created: 2022-03-29 09:31:51.432414+00:00
+  - proposal_id: _2
+    user: participant
+    body: ''
+    intent: d
+    created: 2022-03-29 09:31:51.432414+00:00

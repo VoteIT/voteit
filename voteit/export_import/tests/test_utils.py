@@ -14,6 +14,19 @@ class UtilsTests(TestCase):
         cls.org = cls.meeting.organisation
         cls.new_meeting = cls.org.meetings.create()
         cls.btn = cls.meeting.reaction_buttons.get(pk=1)
+        cls.default_stats = {
+            "agenda_items": 3,
+            "buttons": 2,
+            "diff_proposals": 1,
+            "discussion_posts": 2,
+            "groups": 1,
+            "proposals": 4,
+            "reactions": 0,
+            "text_documents": 1,
+            "groups_reused": 0,
+            "buttons_reused": 0,
+            "notes": 0,
+        }
 
     def test_direct_clone(self):
         importer = direct_clone(
@@ -23,19 +36,7 @@ class UtilsTests(TestCase):
             include_reactions=True,
         )
         self.assertEqual(
-            {
-                "agenda_items": 3,
-                "buttons": 2,
-                "diff_proposals": 1,
-                "discussion_posts": 2,
-                "groups": 1,
-                "proposals": 4,
-                "reactions": 4,
-                "text_documents": 1,
-                "groups_reused": 0,
-                "buttons_reused": 0,
-            },
-            importer.stats().dict(),
+            {**self.default_stats, "reactions": 4}, importer.stats().dict()
         )
         self.assertSetEqual(
             self.meeting.agenda_items.values_list("title", flat=True),
@@ -50,18 +51,7 @@ class UtilsTests(TestCase):
             include_reactions=True,
         )
         self.assertEqual(
-            {
-                "agenda_items": 3,
-                "buttons": 2,
-                "diff_proposals": 1,
-                "discussion_posts": 2,
-                "groups": 1,
-                "proposals": 4,
-                "reactions": 4,
-                "text_documents": 1,
-                "groups_reused": 0,
-                "buttons_reused": 0,
-            },
+            {**self.default_stats, "reactions": 4},
             importer.stats().dict(),
         )
         self.assertSetEqual(
@@ -78,17 +68,21 @@ class UtilsTests(TestCase):
             include_discussions=False,
         )
         self.assertEqual(
+            {**self.default_stats, "discussion_posts": 0, "reactions": 3},
+            importer.stats().dict(),
+        )
+
+    def test_direct_clone_notes(self):
+        importer = direct_clone(
+            source=self.meeting,
+            target=self.new_meeting,
+            commit=False,
+            include_notes=True,
+        )
+        self.assertEqual(
             {
-                "agenda_items": 3,
-                "buttons": 2,
-                "diff_proposals": 1,
-                "discussion_posts": 0,
-                "groups": 1,
-                "proposals": 4,
-                "reactions": 3,
-                "text_documents": 1,
-                "groups_reused": 0,
-                "buttons_reused": 0,
+                **self.default_stats,
+                "notes": 3,
             },
             importer.stats().dict(),
         )
@@ -122,18 +116,7 @@ class UtilsTests(TestCase):
             include_reactions=True,
         )
         self.assertEqual(
-            {
-                "agenda_items": 3,
-                "buttons": 2,
-                "diff_proposals": 1,
-                "discussion_posts": 2,
-                "groups": 1,
-                "proposals": 4,
-                "reactions": 4,
-                "text_documents": 1,
-                "groups_reused": 0,
-                "buttons_reused": 0,
-            },
+            {**self.default_stats, "reactions": 4},
             importer.stats().dict(),
         )
         # And once again
@@ -145,14 +128,8 @@ class UtilsTests(TestCase):
         )
         self.assertEqual(
             {
-                "agenda_items": 3,
-                "buttons": 2,
-                "diff_proposals": 1,
-                "discussion_posts": 2,
-                "groups": 1,
-                "proposals": 4,
+                **self.default_stats,
                 "reactions": 4,
-                "text_documents": 1,
                 "groups_reused": 1,
                 "buttons_reused": 2,
             },
