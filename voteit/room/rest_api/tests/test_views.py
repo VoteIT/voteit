@@ -1,10 +1,14 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
+from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.poll.app.polls.simple import Simple as SimplePoll
+from voteit.room.messages import RoomChanged
 from voteit.speaker.app.list_methods.simple import Simple
 from voteit.speaker.models import Speaker
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
@@ -211,6 +215,24 @@ class RoomsViewTestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.room.refresh_from_db()
         self.assertFalse(self.room.show_ballot)
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_patch_with_token_includes_token_in_message(self, mock_publish):
+        url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        data = {"highlight": [self.prop1.pk, self.prop2.pk], "token": "abc"}
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(mock_publish.called)
+        messages = [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if isinstance(x.args[0], RoomChanged)
+        ]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertEqual(self.room.pk, msg.data.pk)
+        self.assertEqual("abc", msg.data.token)
 
     def test_room_status(self):
         """Delete preflight check"""
