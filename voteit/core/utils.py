@@ -95,6 +95,7 @@ RELAXED_ALLOWED_ATTRIBUTES["iframe"] = {
     "width",
 }
 RELAXED_ALLOWED_TAGS = deepcopy(nh3.ALLOWED_TAGS)
+RELAXED_ALLOWED_TAGS.update(RELAXED_ALLOWED_ATTRIBUTES)  # In case something was missing
 
 
 def get_tags(text: str, lower=True) -> set[str]:
@@ -285,6 +286,11 @@ def strict_clean_html(text: str):
 def relaxed_clean_html(text: str):
     """
     Clean HTML for moderators and trusted users. Note that trusted users may have viruses too...
+
+    >>> relaxed_clean_html('<iframe src="https://video.voteit.se" width="426" height="240" frameborder="0" '
+    ...     'allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share" '
+    ...     'referrerpolicy="strict-origin-when-cross-origin" title="Well hello"></iframe>')
+    '<iframe src="https://video.voteit.se" width="426" height="240" frameborder="0" title="Well hello"></iframe>'
     """
     text = nh3.clean(
         text,
