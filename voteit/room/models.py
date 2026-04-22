@@ -126,6 +126,14 @@ class Room(RulesModelMixin, SpeakerSystemContext, MeetingContext):
             self.show_ballot = False
         super().save(**kwargs)
 
+    @property
+    def token(self):
+        return getattr(self, "_token", None)
+
+    @token.setter
+    def token(self, value: str):
+        self._token = value
+
     def __str__(self):
         return f"Room {self.title} for meeting {self.meeting.pk}"
 

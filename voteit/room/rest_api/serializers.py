@@ -32,6 +32,7 @@ class RoomHandleSerializer(ModelSerializer):
     highlighted = serializers.ListSerializer(
         child=serializers.IntegerField(), required=False
     )
+    token = serializers.CharField()
 
     class Meta:
         model = Room
@@ -42,6 +43,7 @@ class RoomHandleSerializer(ModelSerializer):
             "agenda_item",
             "send_proposals",
             "show_ballot",
+            "token",
         ]
 
     def validate(self, attrs):
@@ -63,6 +65,7 @@ class RoomHandleSerializer(ModelSerializer):
         return attrs
 
     def update(self, instance: Room, validated_data):
+        instance.token = validated_data.pop("token", None)
         if not instance.open:
             validated_data["open"] = True
         if instance.handler != self.context["request"].user:

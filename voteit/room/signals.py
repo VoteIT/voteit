@@ -52,7 +52,7 @@ def send_room_updates(*, instance: Room, created: bool, **kwargs):
     if created:
         msg = RoomAdded(**data)
     else:
-        msg = RoomChanged(**data)
+        msg = RoomChanged(**data, token=instance.token)
     meeting_ch.sync_publish(msg)
 
 
@@ -66,5 +66,8 @@ def send_room_deleted(*, instance: Room, **kwargs):
 @receiver(highlighted_proposals_changed, sender=Room)
 def send_highlighted_proposals(*, instance, **kwargs):
     room_ch = RoomChannel(instance.pk)
-    msg = RoomHighlighted(pk=instance.pk, highlighted=instance.highlighted_proposal_pks)
+    msg = RoomHighlighted(
+        pk=instance.pk,
+        highlighted=instance.highlighted_proposal_pks,
+    )
     room_ch.sync_publish(msg)
