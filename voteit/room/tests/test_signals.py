@@ -86,6 +86,7 @@ class SubscriptionTests(TestCase):
                 {
                     "highlighted": [self.prop1.pk],
                     "pk": self.room.pk,
+                    "token": None,
                 }
             ],
             [x.p for x in msg.data.app_state if x.t == RoomHighlighted.name],

@@ -69,5 +69,6 @@ def send_highlighted_proposals(*, instance, **kwargs):
     msg = RoomHighlighted(
         pk=instance.pk,
         highlighted=instance.highlighted_proposal_pks,
+        token=instance.token,
     )
     room_ch.sync_publish(msg)

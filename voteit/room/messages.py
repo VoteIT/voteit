@@ -27,6 +27,7 @@ class RoomChanged(BaseObjectChanged):
 class RoomHighlightedSchema(BaseModel):
     pk: int
     highlighted: list[int]
+    token: str | None = None
 
 
 @outgoing

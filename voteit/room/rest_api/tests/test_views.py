@@ -8,7 +8,9 @@ from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.poll.app.polls.simple import Simple as SimplePoll
+from voteit.room.channels import RoomChannel
 from voteit.room.messages import RoomChanged
+from voteit.room.messages import RoomHighlighted
 from voteit.speaker.app.list_methods.simple import Simple
 from voteit.speaker.models import Speaker
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
@@ -233,6 +235,25 @@ class RoomsViewTestCase(APITestCase):
         msg = messages[0]
         self.assertEqual(self.room.pk, msg.data.pk)
         self.assertEqual("abc", msg.data.token)
+
+    @patch.object(RoomChannel, "sync_publish")
+    def test_highlight_with_token(self, mock_publish):
+        url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        data = {"highlighted": [self.prop1.pk, self.prop2.pk], "token": "abc"}
+        response = self.client.patch(url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(mock_publish.called)
+        messages = [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if isinstance(x.args[0], RoomHighlighted)
+        ]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertEqual(self.room.pk, msg.data.pk)
+        self.assertEqual("abc", msg.data.token)
+        self.assertEqual([self.prop1.pk, self.prop2.pk], msg.data.highlighted)
 
     def test_room_status(self):
         """Delete preflight check"""
