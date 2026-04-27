@@ -7,6 +7,7 @@ from rest_framework.serializers import ModelSerializer
 from voteit.core.decorators import ensure_atomic
 from voteit.core.rest_api.utils import validate_model_add
 from voteit.proposal.models import Proposal
+from voteit.room.models import HighlightProposal
 from voteit.room.models import Room
 
 
@@ -75,13 +76,19 @@ class RoomHandleSerializer(ModelSerializer):
         highlighted = validated_data.get("highlighted", None)
         if highlighted is not None:
             if highlighted:
+                new_rows = [
+                    HighlightProposal(room=instance, proposal_id=prop_id, order=i)
+                    for i, prop_id in enumerate(highlighted, start=1)
+                ]
+                HighlightProposal.objects.bulk_create(
+                    new_rows,
+                    update_conflicts=True,
+                    update_fields=["order"],
+                    unique_fields=["room", "proposal"],
+                )
                 instance.highlighted_proposals.exclude(
                     proposal__in=highlighted
                 ).delete()
-                for i, prop_id in enumerate(highlighted, start=1):
-                    instance.highlighted_proposals.update_or_create(
-                        proposal_id=prop_id, defaults={"order": i}
-                    )
             else:
                 instance.highlighted_proposals.all().delete()
             instance.signal_highlighted()
