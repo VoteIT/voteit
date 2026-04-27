@@ -38,14 +38,14 @@ class RoomsViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     }
 
     def get_queryset(self):
-        qs = Room.objects.filter(
-            models.Q(meeting__roles__user=self.request.user)
-            | models.Q(sls__speakersystemroles__user=self.request.user)
+        return (
+            Room.objects.filter(
+                models.Q(meeting__roles__user=self.request.user)
+                | models.Q(sls__speakersystemroles__user=self.request.user)
+            )
+            .select_related("handler")
+            .distinct()
         )
-        if self.action == "handle":
-            # This is a combination of "distinct" without using distinct and also locking the table
-            return Room.objects.filter(pk__in=qs.values("pk")).select_for_update()
-        return qs.select_related("handler").distinct()
 
     def get_serializer_class(self):
         if self.action == "create":

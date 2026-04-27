@@ -68,6 +68,9 @@ class RoomHandleSerializer(ModelSerializer):
         return attrs
 
     def update(self, instance: Room, validated_data):
+        # This is due to how select_for_update works, and we need it to lock the table to avoid adjusting
+        # highlighted proposals for the same room
+        instance = Room.objects.select_for_update().get(pk=instance.pk)
         instance.token = validated_data.pop("token", None)
         if not instance.open:
             validated_data["open"] = True
