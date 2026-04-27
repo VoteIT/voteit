@@ -48,6 +48,8 @@ class RoomHandleSerializer(ModelSerializer):
 
     def validate(self, attrs):
         if highlighted := attrs.get("highlighted"):
+            if len(highlighted) != len(set(highlighted)):
+                raise ValidationError({"highlighted": ["Values aren't unique"]})
             prop_pks = set(
                 Proposal.objects.filter(
                     agenda_item__meeting_id=self.instance.meeting_id

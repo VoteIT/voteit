@@ -155,6 +155,15 @@ class RoomsViewTestCase(APITestCase):
             [self.prop3.pk, self.prop2.pk], list(self.room.highlighted_proposal_pks)
         )
 
+    def test_patch_change_highlighted_duplicate_value(self):
+        url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        data = {"highlighted": [self.prop3.pk, self.prop2.pk, self.prop3.pk]}  # Same
+        response = self.client.patch(url, data)
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertDictEqual({"highlighted": ["Values aren't unique"]}, data)
+
     def test_patch_change_highlighted_no_handler(self):
         self.room.handler = None
         self.room.save()
