@@ -38,9 +38,6 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --chown=voteit:voteit --chmod=+x manage.py docker-entrypoint.sh wait-for-it.sh ./
 COPY --chown=voteit:voteit project ./project
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health/ || exit 1
-
 USER voteit
 
 EXPOSE 8000
