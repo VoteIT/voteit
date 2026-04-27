@@ -1,31 +1,48 @@
 FROM python:3.13-slim AS builder
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 VIRTUAL_ENV=/opt/venv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+COPY --from=ghcr.io/astral-sh/uv /uv /uvx /bin/
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/venv \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PATH="/opt/venv/bin:$PATH"
+
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt --no-cache-dir
-COPY dist dist
-RUN pip install dist/*.whl --no-cache-dir --no-deps
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=requirements.txt,target=requirements.txt \
+    --mount=type=bind,source=dist,target=dist \
+    uv venv $VIRTUAL_ENV && \
+    uv pip install -r requirements.txt && \
+    uv pip install dist/*.whl --no-deps
 
 # Clean stage
 FROM python:3.13-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 VIRTUAL_ENV=/opt/venv
-RUN set -e; \
-    addgroup --gid 555 voteit; \
-    adduser --system --no-create-home --disabled-login --disabled-password --gid 555 --uid 555 voteit; \
-    extra_deps='curl'; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends $extra_deps; \
-    rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH" \
+    DJANGO_SETTINGS_MODULE=project.settings_production
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 555 voteit \
+    && useradd -u 555 -g voteit --system --no-create-home voteit
+
 WORKDIR /app
+
 COPY --from=builder /opt/venv /opt/venv
-ENV DJANGO_SETTINGS_MODULE=project.settings_production PATH="$VIRTUAL_ENV/bin:$PATH"
-COPY manage.py .
-COPY docker-entrypoint.sh .
-COPY wait-for-it.sh .
-COPY project project
-EXPOSE 8000
+COPY --chown=voteit:voteit --chmod=+x manage.py docker-entrypoint.sh wait-for-it.sh ./
+COPY --chown=voteit:voteit project ./project
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health/ || exit 1
+
 USER voteit
+
+EXPOSE 8000
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["run"]

@@ -35,7 +35,7 @@ build:
 	uv build --wheel src/member_dialects -o ./dist
 dev: build
 	set -e
-	docker pull python:3.12-slim
+	docker pull python:3.13-slim
 	docker build . -t voteit/voteit4dev:dev
 envtest:
 	export DJANGO_DEBUG=1 \
