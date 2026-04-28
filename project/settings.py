@@ -241,13 +241,11 @@ if SLACK_WEBHOOK_URL := os.getenv("SLACK_LOGGER_WEBHOOK"):
 if SENTRY_DSN := os.getenv("SENTRY_DSN"):  # pragma: no cover
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
-    from sentry_sdk.scrubber import EventScrubber, DEFAULT_PII_DENYLIST
 
     SENTRY_TRACES_SAMPLERATE = float(os.getenv("SENTRY_TRACES_SAMPLERATE", 1.0))
     SENTRY_PROFILES_SAMPLERATE = float(os.getenv("SENTRY_PROFILES_SAMPLERATE", 1.0))
     # Remember trailing slash!
     SENTRY_IGNORE_PATHS = os.getenv("SENTRY_IGNORE_PATHS", "/api/health/").split(",")
-    SENTRY_PII = os.getenv("SENTRY_PII", "false").lower() == "true"
     SENTRY_ENVIRONMENT = os.getenv("SENTRY_ENVIRONMENT", "local_dev")
     SENTRY_RELEASE = os.getenv("BACKEND_VERSION", "local_dev")
 
@@ -259,6 +257,11 @@ if SENTRY_DSN := os.getenv("SENTRY_DSN"):  # pragma: no cover
             return 0
         return SENTRY_TRACES_SAMPLERATE
 
+    def before_send(event, hint):
+        if user := event.get("user"):
+            event["user"] = {"id": user.get("id")}
+        return event
+
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[DjangoIntegration()],
@@ -267,13 +270,10 @@ if SENTRY_DSN := os.getenv("SENTRY_DSN"):  # pragma: no cover
         # We recommend adjusting this value in production.
         traces_sample_rate=SENTRY_TRACES_SAMPLERATE,
         profiles_sample_rate=SENTRY_PROFILES_SAMPLERATE,
-        # If you wish to associate users to errors (assuming you are using
-        # django.contrib.auth) you may enable sending PII data.
-        send_default_pii=SENTRY_PII,
-        # Should report only user primary key, no other user info
-        event_scrubber=EventScrubber(
-            pii_denylist=[*DEFAULT_PII_DENYLIST, "email", "username"]
-        ),
+        # This must be on to fetch users
+        send_default_pii=True,
+        # Scrub this way instead
+        before_send=before_send,
         # Filter out specific endpoints to avoid spamming
         traces_sampler=traces_sampler,
         # Env tag
