@@ -195,7 +195,6 @@ class UserViewSetTests(APITestCase):
         self.assertEqual(
             {
                 "pk": 1,
-                "state": "incomplete",
                 "userid": "moderator",
                 "first_name": "Moderator",
                 "last_name": "",
@@ -226,7 +225,6 @@ class UserViewSetTests(APITestCase):
                 "organisation": 1,
                 "organisation_roles": [],
                 "pk": 1,
-                "state": "incomplete",
                 "userid": "moderator",
                 "email": "moderator@voteit.se",
             },

@@ -7,7 +7,6 @@ from django.urls import NoReverseMatch
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.timezone import now
-from fsm_admin.mixins import FSMTransitionMixin
 
 from auditlog.admin import LogEntryAdmin
 from auditlog.models import LogEntry
@@ -134,8 +133,7 @@ class LinkedFilter(admin.SimpleListFilter):
 
 
 @admin.register(User)
-class UserAdmin(FSMTransitionMixin, DefaultUserAdmin):
-    fsm_field = ("state",)
+class UserAdmin(DefaultUserAdmin):
     fieldsets = _user_fieldsets
     list_display = (
         "__str__",
@@ -155,7 +153,6 @@ class UserAdmin(FSMTransitionMixin, DefaultUserAdmin):
     )
     list_filter = (
         "organisation",
-        "state",
         OnlineFilter,
         LinkedFilter,
         "is_active",
@@ -184,7 +181,7 @@ class VoteITLogEntryAdmin(LogEntryAdmin):
         if meeting_pk := obj.additional_data and obj.additional_data.get("m", None):
             try:
                 meeting = Meeting.objects.get(pk=meeting_pk)
-            except Meeting.DoesNotExist as exc:
+            except Meeting.DoesNotExist:
                 return f"Deleted: {meeting_pk}"
             viewname = "admin:meeting_meeting_change"
             try:

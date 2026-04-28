@@ -160,7 +160,6 @@ class UserSerializer(serializers.ModelSerializer):
         model = get_user_model()
         read_only_fields = (
             "pk",
-            "state",
             "img_url",
             "organisation",
         )

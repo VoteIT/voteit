@@ -14,3 +14,5 @@ var
 static
 dist
 voteit_tools
+.claudignore
+CLAUDE.md

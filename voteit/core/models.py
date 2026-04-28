@@ -16,9 +16,6 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db import models
 from django.utils.timezone import now
-from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField
-from django_fsm import transition
 from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import ABCModel
@@ -29,7 +26,6 @@ from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import strict_clean_html
 from voteit.core.validators import UserIDValidator
-from voteit.core.workflows import UserWf
 from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
@@ -48,7 +44,6 @@ logger = getLogger(__name__)
 @history_log("organisation")
 @auditlog.register(
     include_fields=[
-        "state",
         "organisation",
         "userid",
         "username",
@@ -68,9 +63,6 @@ class User(AbstractUser):
     name = "user"
     userid_validator = UserIDValidator()
 
-    state: str = FSMField(
-        default=UserWf.initial, choices=UserWf.choices(), editable=False
-    )
     # Note that this is only null to make testing easier, it should never be null!
     organisation: Organisation | None = models.ForeignKey(
         "organisation.Organisation",
@@ -115,27 +107,6 @@ class User(AbstractUser):
             except ValidationError:
                 pass
         return False
-
-    @transition(
-        field=state,
-        source="+",
-        target=UserWf.ACTIVE,
-        conditions=[valid_userid_guard],
-        custom={"title": _("Make user active")},
-        # permission=Organisation manager or not manual?,
-    )
-    def activate(self):
-        pass
-
-    @transition(
-        field=state,
-        source="+",
-        target=UserWf.INCOMPLETE,
-        custom={"title": _("Mark user as incomplete")},
-        # permission=Organisation manager or not manual?,
-    )
-    def incomplete(self):
-        pass
 
     objects = UserManager()
 
