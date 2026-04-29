@@ -96,3 +96,13 @@ def bump_permissions(backend, user, social, *args, **kwargs):
     # No not Djangos!
     if social.extra_data.get("is_superuser", False):
         backend.organisation.add_roles(user, ROLE_ORG_MANAGER)
+
+
+def remove_nonmatching_email(backend, user, social, *args, **kwargs):
+    if emails := social.extra_data.get("user_data", {}).get("email", []):
+        if user.email not in emails:
+            user.email = emails[0]
+            user.save()
+    elif user.email:
+        user.email = ""
+        user.save()

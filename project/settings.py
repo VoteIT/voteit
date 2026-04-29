@@ -85,6 +85,7 @@ SOCIAL_AUTH_PIPELINE = [
     "social_core.pipeline.user.user_details",
     "voteit.organisation.pipeline.inherit_users",
     "voteit.organisation.pipeline.bump_permissions",
+    "voteit.organisation.pipeline.remove_nonmatching_email",
 ]
 
 

@@ -427,6 +427,60 @@ class SocialIntegrationTests(APITestCase):
         self.assertEqual("123", forgotten_user.identity_id)
 
     @responses.activate
+    def test_email_updated_when_not_in_extra_data(self):
+        user = User.objects.create(username="adminer", email="wrong@betahaus.net")
+        user.social_auth.create(uid="123", provider="idproxy")
+        response = self.client.get("/login/idproxy/")
+        location = response.get("Location")
+        parsed = parse_qs(location)
+        state = parsed["state"][0]
+        self.assertTrue(state)
+        # Mocked response
+        token_response = responses.Response(
+            method="POST",
+            url="https://idproxy/o/token/",
+            json={"access_token": "knock knock"},
+        )
+        responses.add(token_response)
+        identity_response = responses.Response(
+            method="GET",
+            url="https://idproxy/api/identity/",
+            json=_IDENTITY_RESPONSE_JSON,
+        )
+        responses.add(identity_response)
+        response = self.client.get("/complete/idproxy/", data={"state": state})
+        self.assertEqual(302, response.status_code)
+        user.refresh_from_db()
+        self.assertEqual("admin@betahaus.net", user.email)
+
+    @responses.activate
+    def test_email_cleared_when_no_emails_in_extra_data(self):
+        user = User.objects.create(username="adminer", email="admin@betahaus.net")
+        user.social_auth.create(uid="123", provider="idproxy")
+        response = self.client.get("/login/idproxy/")
+        location = response.get("Location")
+        parsed = parse_qs(location)
+        state = parsed["state"][0]
+        self.assertTrue(state)
+        # Mocked response
+        token_response = responses.Response(
+            method="POST",
+            url="https://idproxy/o/token/",
+            json={"access_token": "knock knock"},
+        )
+        responses.add(token_response)
+        identity_response = responses.Response(
+            method="GET",
+            url="https://idproxy/api/identity/",
+            json={**_IDENTITY_RESPONSE_JSON, "user_data": []},
+        )
+        responses.add(identity_response)
+        response = self.client.get("/complete/idproxy/", data={"state": state})
+        self.assertEqual(302, response.status_code)
+        user.refresh_from_db()
+        self.assertEqual("", user.email)
+
+    @responses.activate
     def test_several_users_and_authenticated_as_other(self):
         social_user = self.organisation.users.create(
             username="social_user",
