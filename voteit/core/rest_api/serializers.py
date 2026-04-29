@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from contextlib import suppress
 from logging import getLogger
-from typing import OrderedDict
 from typing import TYPE_CHECKING
+from typing import OrderedDict
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
@@ -28,9 +28,10 @@ from voteit.organisation.utils import get_idproxy_user_data
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from django_fsm import Transition
+
+    from voteit.agenda.models import AgendaItem
     from voteit.core.models import BaseContent
     from voteit.meeting.models import Meeting
-    from voteit.agenda.models import AgendaItem
     from voteit.meeting.models import MeetingGroup
 
 logger = getLogger(__name__)
@@ -146,12 +147,13 @@ class UserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = get_user_model()
         fields = read_only_fields = (
-            "pk",
             "email",
+            "image",
             "img_url",
-            "userid",
             "first_name",
             "last_name",
+            "pk",
+            "userid",
         )
 
 
@@ -159,15 +161,16 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = get_user_model()
         read_only_fields = (
-            "pk",
             "img_url",
             "organisation",
+            "pk",
         )
         fields = read_only_fields + (
-            "userid",
-            "first_name",
-            "last_name",
             "email",
+            "first_name",
+            "image",
+            "last_name",
+            "userid",
         )
 
     def validate_userid(self, value: str):

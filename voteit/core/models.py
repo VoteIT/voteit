@@ -24,12 +24,15 @@ from voteit.core.fields import RichTextField
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
+from voteit.core.utils import ContentTypeValidator
+from voteit.core.utils import FileSizeValidator
 from voteit.core.utils import strict_clean_html
 from voteit.core.validators import UserIDValidator
 from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
     from social_django.models import UserSocialAuth
+
     from voteit.notes.models import Note
     from voteit.organisation.models import Organisation
     from voteit.participant_tags.models import ParticipantTags
@@ -81,6 +84,17 @@ class User(AbstractUser):
     img_url: str | None = models.URLField(
         "Profile image url", blank=True, null=True
     )  # FIXME Validator and scheme
+    # FileField means no need for Pillow
+    image = models.FileField(
+        upload_to="profile_pics",
+        blank=True,
+        null=True,
+        verbose_name="Profile image",
+        validators=[
+            ContentTypeValidator(("image/webp", "image/jpeg", "image/png")),
+            FileSizeValidator(300_000),
+        ],
+    )
 
     importers = {"user": {}, "organisation": {}}
 

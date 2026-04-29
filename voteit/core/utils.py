@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from contextlib import contextmanager
 from copy import deepcopy
+from dataclasses import dataclass
 from inspect import isclass
 from random import randint
 from time import perf_counter
@@ -10,11 +11,15 @@ from typing import TYPE_CHECKING
 
 import nh3
 from bs4 import BeautifulSoup
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import UploadedFile
 from django.db.models import Model
+from django.utils.deconstruct import deconstructible
 from django.utils.text import slugify
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
+
     from voteit.core.registries import ContentRegistry
 
 
@@ -425,3 +430,27 @@ def generate_valid_userid(user: AbstractUser) -> str | None:
 def exectime() -> float:
     start = perf_counter()
     yield lambda: perf_counter() - start
+
+
+@deconstructible
+@dataclass
+class ContentTypeValidator:
+    content_types: tuple[str, ...]
+
+    def __call__(self, value: UploadedFile):
+        if value.content_type not in self.content_types:
+            raise ValidationError(
+                f"Invalid content type '{value.content_type}' (must be {', '.join(self.content_types)})"
+            )
+
+
+@deconstructible
+@dataclass
+class FileSizeValidator:
+    max_size: int
+
+    def __call__(self, value: UploadedFile):
+        if value.size and value.size > self.max_size:
+            raise ValidationError(
+                f"File too big ({value.size // 1_000}k, max size is {self.max_size // 1000}k)"
+            )
