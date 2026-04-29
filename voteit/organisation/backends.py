@@ -56,17 +56,8 @@ class IDProxyOAuth2(BaseOAuth2):
             | {x for x in self.organisation.provider.scope.split() if x}
         )
 
-    def authorization_url(self):
-        return self.setting("AUTHORIZATION_URL") or self.AUTHORIZATION_URL
-
-    def access_token_url(self):
-        return self.setting("ACCESS_TOKEN_URL") or self.ACCESS_TOKEN_URL
-
     def identity_url(self):
         return self.setting("IDENTITY_URL") or self.IDENTITY_URL
-
-    # def revoke_token_url(self, **kwargs):
-    #     return self.setting("REVOKE_TOKEN_URL")
 
     def user_data(self, access_token, *args, **kwargs):
         return self.get_json(
