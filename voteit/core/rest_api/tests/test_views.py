@@ -1,7 +1,12 @@
+import io
+import tempfile
+
 from django.contrib.auth import get_user_model
 from django.contrib.messages import success
 from django.contrib.messages.storage import default_storage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
@@ -148,6 +153,47 @@ class UserViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual(2, data["pk"])
         self.assertEqual("anewone", data["userid"])
+
+    def _mk_fake_file(self, *, content_type: str = "image/webp", size: int = 1_00):
+        # Memory saving method of creating file of requested size
+        file_io = io.BytesIO()
+        file_io.seek(size - 1)
+        file_io.write(b"\0")
+        file_io.seek(0)
+        return SimpleUploadedFile("blob", file_io.read(), content_type=content_type)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_upload(self):
+        self.client.force_login(self.participant)
+        url = reverse("user-detail", kwargs={"pk": self.participant.pk})
+        response = self.client.patch(
+            url, data={"image": self._mk_fake_file()}, format="multipart"
+        )
+        self.assertContains(
+            response, "http://testserver/media/profile_pics/blob", status_code=200
+        )
+        response = self.client.patch(
+            url,
+            data={"image": self._mk_fake_file(content_type="text/plain")},
+            format="multipart",
+        )
+        self.assertContains(response, "Invalid content type", status_code=400)
+        response = self.client.patch(
+            url, data={"image": self._mk_fake_file(size=301_000)}, format="multipart"
+        )
+        self.assertContains(response, "File too big", status_code=400)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_clear_image(self):
+        self.client.force_login(self.participant)
+        url = reverse("user-detail", kwargs={"pk": self.participant.pk})
+        self.participant.image = "/fake.file"
+        self.participant.save()
+        self.assertContains(
+            self.client.get(url), "http://testserver/media/fake.file", status_code=200
+        )
+        response = self.client.patch(url, data={"image": ""}, format="multipart")
+        self.assertContains(response, '"image":null', status_code=200)
 
     def test_update_other_user(self):
         self.client.force_login(self.participant)
