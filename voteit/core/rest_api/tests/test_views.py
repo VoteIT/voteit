@@ -198,6 +198,7 @@ class UserViewSetTests(APITestCase):
                 "userid": "moderator",
                 "first_name": "Moderator",
                 "last_name": "",
+                "image": None,
                 "img_url": None,
                 "organisation": 1,
                 "organisation_roles": [],
@@ -220,6 +221,7 @@ class UserViewSetTests(APITestCase):
         self.assertEqual(
             {
                 "first_name": "Moderator",
+                "image": None,
                 "img_url": None,
                 "last_name": "",
                 "organisation": 1,

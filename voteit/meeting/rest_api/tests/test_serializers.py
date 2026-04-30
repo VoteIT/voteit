@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
-from django.test import override_settings
 from django.test import TestCase
+from django.test import override_settings
 
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
@@ -230,6 +230,7 @@ class MeetingRolesSerializerTests(TestCase):
                 "email": "moderator@voteit.se",
                 "first_name": "Moderator",
                 "last_name": "",
+                "image": None,
                 "img_url": None,
             },
             dict(data["user"]),
