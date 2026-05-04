@@ -118,6 +118,7 @@ class UserSearchViewSetTests(APITestCase):
         self.assertEqual(405, response.status_code)
 
 
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(), MEDIA_URL="/media/")
 class UserViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 
@@ -162,7 +163,6 @@ class UserViewSetTests(APITestCase):
         file_io.seek(0)
         return SimpleUploadedFile("blob", file_io.read(), content_type=content_type)
 
-    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
     def test_upload(self):
         self.client.force_login(self.participant)
         url = reverse("user-detail", kwargs={"pk": self.participant.pk})
@@ -183,7 +183,6 @@ class UserViewSetTests(APITestCase):
         )
         self.assertContains(response, "File too big", status_code=400)
 
-    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
     def test_clear_image(self):
         self.client.force_login(self.participant)
         url = reverse("user-detail", kwargs={"pk": self.participant.pk})
