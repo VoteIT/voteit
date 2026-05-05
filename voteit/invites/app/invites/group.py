@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import TYPE_CHECKING
 from typing import Generator
-from typing import ItemsView
 
-from django.db.models import Count
+from django.db.models import Exists
+from django.db.models import OuterRef
 from django.utils.translation import gettext_lazy as _
 from pydantic import constr
 from pydantic.main import BaseModel
@@ -106,12 +107,17 @@ class InviteGroup(AnnotationDataAdapter):
         invites_qs: QuerySet[MeetingInvite],
         columns: list[str],
         registry: InviteAdapterRegistry,
-        annotations_formatted: list[ItemsView[str, str], dict],
+        annotations_formatted,
         meeting: Meeting,
         **kwargs,
     ):
         """
-        Note that this takes care of group roles too
+        Note that this takes care of group roles too.
+
+        Lifecycle:
+        - Already-accepted invites: GroupMembership created/updated immediately (per-invite, signals fire).
+        - Pending invites: MeetingGroupAnnotation stored and bulk-created (no signals on that model).
+          When the invite is later accepted, InviteGroup.accepted() processes those records.
         """
         from voteit.invites.app.invites.grouprole import InviteGroupRole
 
@@ -119,64 +125,94 @@ class InviteGroup(AnnotationDataAdapter):
         if InviteGroupRole.name in columns:
             role_mapping.update(meeting.group_roles.all().values_list("role_id", "pk"))
         group_mapping = dict(meeting.groups.all().values_list("groupid", "pk"))
-        local_data = annotations_formatted.copy()
         result = AnnotationResultSchema(name=cls.name)
-        # FIXME: This can be rewritten as a joined OR query with exact matches for each item.
-        # That way we can eliminate exact matches and make thinks a lot faster.
+
+        # Index rows by their identity portion for O(1) invite matching
+        rows_by_ud: dict[frozenset, list[dict]] = defaultdict(list)
+        for row in annotations_formatted:
+            rows_by_ud[frozenset(row.user_data.items())].append(row.row_data)
+
+        pending_invites = []
         for invite in invites_qs:
-            user_data_items = invite.user_data.items()
-            popthis = []
-            for i, row in enumerate(local_data):
-                ud_items, data = row
-                if ud_items <= user_data_items:
-                    popthis.append(i)
-                    if meeting_group := data.get(cls.name):
+            invite_ud = frozenset(invite.user_data.items())
+            matched_rows = [
+                row_data
+                for key, row_list in rows_by_ud.items()
+                if key <= invite_ud
+                for row_data in row_list
+            ]
+            if not matched_rows:
+                continue
+
+            if invite.used_by_id:
+                # Already accepted — apply GroupMembership directly (keep per-invite for signals)
+                for row_data in matched_rows:
+                    if meeting_group := row_data.get(cls.name):
                         mg_id = group_mapping[meeting_group]
-                        if role_id := data.get(InviteGroupRole.name):
-                            role_pk = role_mapping[role_id]
+                        role_pk = role_mapping.get(row_data.get(InviteGroupRole.name))
+                        if GroupMembership.objects.filter(
+                            meeting_group_id=mg_id,
+                            user_id=invite.used_by_id,
+                            role_id=role_pk,
+                        ).exists():
+                            result.existed += 1
                         else:
-                            role_pk = None
-                        # Invite might be accepted!
-                        if invite.used_by_id:
-                            # Exact match - nothing modified
-                            if GroupMembership.objects.filter(
+                            _, created = GroupMembership.objects.update_or_create(
                                 meeting_group_id=mg_id,
-                                user_id=invite.used_by_id,
-                                role_id=role_pk,
-                            ).exists():
+                                user=invite.used_by,
+                                defaults={"role_id": role_pk},
+                            )
+                            if created:
+                                result.added += 1
+                            else:
+                                result.changed += 1
+            else:
+                pending_invites.append((invite, matched_rows))
+
+        # Bulk-handle pending invites — MeetingGroupAnnotation has no signals
+        if pending_invites:
+            pending_invite_pks = {invite.pk for invite, _ in pending_invites}
+            existing = {
+                (inv_pk, mg_id): role_pk
+                for inv_pk, mg_id, role_pk in MeetingGroupAnnotation.objects.filter(
+                    meeting_invite_id__in=pending_invite_pks
+                ).values_list("meeting_invite_id", "meeting_group_id", "group_role_id")
+            }
+            to_upsert = []
+            newly_annotated: set[int] = set()
+            for invite, matched_rows in pending_invites:
+                for row_data in matched_rows:
+                    if meeting_group := row_data.get(cls.name):
+                        mg_id = group_mapping[meeting_group]
+                        role_pk = role_mapping.get(row_data.get(InviteGroupRole.name))
+                        lookup_key = (invite.pk, mg_id)
+                        if lookup_key in existing:
+                            if existing[lookup_key] == role_pk:
                                 result.existed += 1
                             else:
-                                _, created = GroupMembership.objects.update_or_create(
+                                result.changed += 1
+                                to_upsert.append(MeetingGroupAnnotation(
+                                    meeting_invite_id=invite.pk,
                                     meeting_group_id=mg_id,
-                                    user=invite.used_by,
-                                    defaults={"role_id": role_pk},
-                                )
-                                if created:
-                                    result.added += 1
-                                else:
-                                    result.changed += 1
+                                    group_role_id=role_pk,
+                                ))
                         else:
-                            # Invite isn't used - does an annotation exist?
-                            if invite.group_annotations.filter(
+                            result.added += 1
+                            newly_annotated.add(invite.pk)
+                            to_upsert.append(MeetingGroupAnnotation(
+                                meeting_invite_id=invite.pk,
                                 meeting_group_id=mg_id,
                                 group_role_id=role_pk,
-                            ).exists():
-                                result.existed += 1
-                            else:
-                                # Create or update annotation
-                                _, created = invite.group_annotations.update_or_create(
-                                    meeting_group_id=mg_id,
-                                    defaults={"group_role_id": role_pk},
-                                )
-                                if created:
-                                    result.added += 1
-                                    # Only case were we need to add invite pk, since an annotation was created!
-                                    if invite.pk not in result.newly_annotated_invites:
-                                        result.newly_annotated_invites.append(invite.pk)
-                                else:
-                                    result.changed += 1
-            for i in reversed(popthis):
-                local_data.pop(i)
+                            ))
+            if to_upsert:
+                MeetingGroupAnnotation.objects.bulk_create(
+                    to_upsert,
+                    update_conflicts=True,
+                    update_fields=["group_role_id"],
+                    unique_fields=["meeting_invite_id", "meeting_group_id"],
+                )
+            result.newly_annotated_invites = list(newly_annotated)
+
         return result
 
     @classmethod
@@ -188,9 +224,10 @@ class InviteGroup(AnnotationDataAdapter):
         Information should be passed along to method 'has_annotations' and doesn't need to result
         in anything else than a bool value.
         """
-        # FIXME: This should probably be Exist instead
         return invites_qs.annotate(
-            **{cls.invite_qs_annotation_name: Count("group_annotations")}
+            **{cls.invite_qs_annotation_name: Exists(
+                MeetingGroupAnnotation.objects.filter(meeting_invite=OuterRef("pk"))
+            )}
         )
 
     def get_annotations(self) -> Generator[dict]:

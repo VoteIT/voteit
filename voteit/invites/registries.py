@@ -10,6 +10,7 @@ from typing import Generator
 from voteit.core.component import Registry
 from voteit.core.decorators import ensure_atomic
 from voteit.invites.abcs import AnnotationDataAdapter
+from voteit.invites.abcs import FormattedAnnotationRow
 from voteit.invites.abcs import InviteDataAdapter
 from voteit.invites.abcs import InviteUserDataAdapter
 
@@ -196,27 +197,39 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
             l = len(row)
             yield {columns[i]: row[i] for i in idx if i < l and row[i]}
 
-    def format_for_annotations(
+    def format_effect_rows(
         self, columns: list[str], rows: list[list[str | None | int]]
-    ):
+    ) -> Generator[FormattedAnnotationRow]:
         """
+        Split each CSV row into identity data (for invite matching) and full row data (for effect application).
+
         >>> from voteit.invites.app.invites.email import InviteEmail
         >>> from voteit.invites.app.invites.group import InviteGroup
         >>> from voteit.invites.abcs import InviteDataAdapter
         >>> testing_reg = InviteAdapterRegistry(InviteDataAdapter)
         >>> _ = testing_reg(InviteEmail)
         >>> _ = testing_reg(InviteGroup)
-        >>> out = testing_reg.format_for_annotations(['email', 'group'], [['jeff@betahaus.net', '123'], ['jane@betahaus.net', '123']])
+        >>> out = testing_reg.format_effect_rows(['email', 'group'], [['jeff@betahaus.net', '123'], ['jane@betahaus.net', '123']])
         >>> list(out)
-        [(dict_items([('email', 'jeff@betahaus.net')]), {'email': 'jeff@betahaus.net', 'group': '123'}), (dict_items([('email', 'jane@betahaus.net')]), {'email': 'jane@betahaus.net', 'group': '123'})]
+        [FormattedAnnotationRow(user_data={'email': 'jeff@betahaus.net'}, row_data={'email': 'jeff@betahaus.net', 'group': '123'}), FormattedAnnotationRow(user_data={'email': 'jane@betahaus.net'}, row_data={'email': 'jane@betahaus.net', 'group': '123'})]
         """
         for row in rows:
             row = row[: len(columns)]
-            yield {
-                columns[i]: x
-                for i, x in enumerate(row)
-                if columns[i] in self.user_data_keys
-            }.items(), {columns[i]: x for i, x in enumerate(row)}
+            yield FormattedAnnotationRow(
+                user_data={
+                    columns[i]: x
+                    for i, x in enumerate(row)
+                    if columns[i] in self.user_data_keys
+                },
+                row_data={columns[i]: x for i, x in enumerate(row)},
+            )
+
+    def format_for_annotations(
+        self, columns: list[str], rows: list[list[str | None | int]]
+    ):
+        """Deprecated: use format_effect_rows() instead."""
+        for r in self.format_effect_rows(columns, rows):
+            yield r.user_data.items(), r.row_data
 
     def get_annotations(self, columns: list[str]) -> list[type[AnnotationDataAdapter]]:
         result = []
@@ -241,7 +254,7 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
         invites_qs: models.QuerySet[MeetingInvite],
         meeting: Meeting,
     ) -> Generator[AnnotationResultSchema, None]:
-        annotations_formatted = list(self.format_for_annotations(columns, rows))
+        annotations_formatted = list(self.format_effect_rows(columns, rows))
         for adapter in self.get_annotations(columns):
             yield adapter.annotate(
                 columns=columns,
