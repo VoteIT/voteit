@@ -50,9 +50,13 @@ Repository = "https://github.com/voteit/voteit.git"
 Issues = "https://github.com/voteit/voteit/issues"
 Changelog = "https://github.com/voteit/voteit/blob/main/CHANGELOG.md"
 
+[tool.uv.workspace]
+members = ["src/voteit_org", "src/member_dialects"]
+
 [tool.uv.sources]
-member_dialects = { path = "src/member_dialects", editable = true }
-voteit_org = { path = "src/voteit_org", editable = true }
+member_dialects = { workspace = true }
+voteit_org = { workspace = true }
+voteit = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
