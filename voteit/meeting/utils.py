@@ -6,18 +6,15 @@ from typing import TYPE_CHECKING
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models.functions import Collate
-from django_fsm import FSMField
 # from dolly.core import LiveCloner
 # from dolly.utils import get_inf_collector
 # from dolly.utils import get_model_formatted_dict
 
-from voteit.core.decorators import ensure_atomic
 from voteit.core.utils import get_model_by_shortname
 
 if TYPE_CHECKING:
     from django.db.models import Model
     from voteit.meeting.models import Meeting
-    from voteit.core.models import User
     from voteit.agenda.models import AgendaItem
 
 logger = getLogger(__name__)
@@ -42,10 +39,8 @@ def get_default_ignored_on_clone() -> set[str]:
     Fetch shortnames that should (probably) be ignored when you clone a meeting.
     """
     return {
-        "bug_report",
         "electoral_register",
         "last_read",
-        # "invite_dispatch",
         "meeting_invite",
         "meeting_roles",
         "organisation",

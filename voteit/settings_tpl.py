@@ -63,7 +63,6 @@ INSTALLED_APPS = [
     "voteit.active",
     "voteit.access_policy",
     "voteit.agenda",
-    "voteit.bug_reports",
     "voteit.components",
     "voteit.notes",
     "voteit.presence",
