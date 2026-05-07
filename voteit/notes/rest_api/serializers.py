@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from rest_framework import serializers
-from rest_framework.validators import UniqueTogetherValidator
 
 from voteit.meeting.models import Meeting
 from voteit.notes.models import Note
@@ -53,15 +52,17 @@ class CreateNoteSerializer(NoteSerializer):
             "body",
             "intent",
         ]
-        validators = [
-            UniqueTogetherValidator(
-                queryset=Note.objects.all(), fields=["user", "proposal"]
-            )
-        ]
+        validators = []
 
     def create(self, validated_data):
-        validated_data["user"] = self.context["request"].user
-        return super().create(validated_data)
+        user = self.context["request"].user
+        proposal = validated_data.pop("proposal")
+        instance, self._created = Note.objects.update_or_create(
+            user=user,
+            proposal=proposal,
+            defaults=validated_data,
+        )
+        return instance
 
 
 class ViewableMeetingField(serializers.PrimaryKeyRelatedField):
