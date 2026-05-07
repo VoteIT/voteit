@@ -1,0 +1,826 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-05-07 15:28+0200\n"
+"PO-Revision-Date: 2026-05-07 15:29+0200\n"
+"Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
+"Language-Team: \n"
+"Language: sv\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Poedit 3.8\n"
+
+#: access_policy/app/policies/automatic.py:36
+msgid "Give users access automatically"
+msgstr "Ge användare access automatiskt"
+
+#: agenda/messages.py:134
+msgid "Can't bulk delete in ongoing meeting"
+msgstr "Kan inte radera många på en gång i ett pågående möte"
+
+#: agenda/models.py:158 poll/models.py:416
+msgid "Make upcoming"
+msgstr "Gör kommande"
+
+#: agenda/models.py:172
+msgid "Unpublish"
+msgstr "Avpublicera"
+
+#: agenda/models.py:187 meeting/models.py:316
+msgid "Make ongoing"
+msgstr "Gör pågående"
+
+#: agenda/models.py:199 meeting/models.py:327 poll/models.py:445
+#: speaker/models.py:540
+msgid "Close"
+msgstr "Avsluta"
+
+#: agenda/workflows.py:11 poll/workflows.py:15
+msgid "Private"
+msgstr "Privat"
+
+#: agenda/workflows.py:12 meeting/workflows.py:12 poll/workflows.py:16
+msgid "Upcoming"
+msgstr "Kommande"
+
+#: agenda/workflows.py:13 meeting/workflows.py:13 poll/workflows.py:17
+msgid "Ongoing"
+msgstr "Pågående"
+
+#: agenda/workflows.py:14 meeting/workflows.py:14 poll/workflows.py:18
+#: presence/workflows.py:7 speaker/workflows.py:9
+msgid "Closed"
+msgstr "Avslutat"
+
+#: agenda/workflows.py:15 meeting/workflows.py:16 speaker/workflows.py:25
+msgid "Archived"
+msgstr "Arkiverad"
+
+#: components/models.py:61 components/models.py:107
+msgid "Enable"
+msgstr ""
+
+#: components/models.py:72 components/models.py:118
+msgid "Disable"
+msgstr ""
+
+#: core/messages/roles.py:92
+msgid "Some users don't exist, aborting"
+msgstr "Några av användarna existerar inte, avbryter"
+
+#: core/rest_api/serializers.py:128
+msgid "Meeting group doesn't exist"
+msgstr "Gruppen existerar inte"
+
+#: core/rest_api/serializers.py:135
+msgid "You're not a member of this group"
+msgstr "Du är inte medlem av den här gruppen"
+
+#: core/rest_api/serializers.py:195
+msgid "Email you specified isn't validated. It must exist on your profile."
+msgstr ""
+"Eposten du specificerade är inte validerad. Den måste finnas i din profil."
+
+#: core/rest_api/serializers.py:419
+msgid "You can only pick existing users within this meeting"
+msgstr "Du kan bara välja existerande användare som är med i mötet"
+
+#: core/rest_api/utils.py:31
+#, python-format
+msgid "You're missing the permission '%(perm)s' on %(obj)s."
+msgstr "Du saknar behörigheten ’%(perm)s’ på %(obj)s."
+
+#: core/rest_api/utils.py:92
+msgid "Transition not specified"
+msgstr "Handling måste anges"
+
+#: core/rest_api/utils.py:97
+#, python-format
+msgid "Invalid transition: %(name)s"
+msgstr "Ogiltig handling: %(name)s"
+
+#: core/rest_api/utils.py:108
+#, python-format
+msgid "Can't switch from state '%(state)s' using method '%(method)s'"
+msgstr "Kan inte byta från tillståndet ’%(state)s’ med metoden ’%(method)s’"
+
+#: core/rest_api/utils.py:121
+#, python-format
+msgid "Guard %(guard)s blocks transition %(name)s"
+msgstr "Regeln %(guard)s blockerar handlingen %(name)s"
+
+#: core/rest_api/utils.py:207
+msgid "Can't find meeting"
+msgstr "Kan inte hitta mötet"
+
+#: core/rest_api/validators.py:61
+msgid ""
+"This meeting group doesn't allow you to create posts in its name. "
+"(post_as=False)"
+msgstr "Denna mötesgrupp tillåter inte att du postar som den (post_as=False)"
+
+#: core/templates/voteit/base_email.html:38
+msgid "This email was sent from:"
+msgstr ""
+
+#: core/workflows.py:11 proposal/workflows.py:17
+msgid "Unhandled"
+msgstr "Ohanterad"
+
+#: core/workflows.py:12 invites/workflows.py:15
+msgid "Accepted"
+msgstr "Accepterad"
+
+#: core/workflows.py:13 invites/workflows.py:16
+msgid "Rejected"
+msgstr "Nekad"
+
+#: core/workflows.py:28
+msgid "Incomplete"
+msgstr "Ofullständig"
+
+#: core/workflows.py:29 speaker/workflows.py:24
+msgid "Active"
+msgstr "Aktiv"
+
+#: core/workflows.py:46
+msgid "Created"
+msgstr "Skapad"
+
+#: core/workflows.py:47
+msgid "Scheduled"
+msgstr "Schemalagd"
+
+#: core/workflows.py:48
+msgid "Sending"
+msgstr "Skickas"
+
+#: core/workflows.py:49
+msgid "Sent"
+msgstr "Skickad"
+
+#: core/workflows.py:50 poll/models.py:531 poll/workflows.py:22
+msgid "Failed"
+msgstr "Misslyckades"
+
+#: core/workflows.py:63
+msgid "On"
+msgstr "På"
+
+#: core/workflows.py:64
+msgid "Off"
+msgstr "Av"
+
+#: invites/app/invites/email.py:41
+msgid "Email"
+msgstr "Epost"
+
+#: invites/app/invites/group.py:41
+msgid "GroupID"
+msgstr "GruppID"
+
+#: invites/app/invites/grouprole.py:32
+msgid "Group role"
+msgstr "Grupproll"
+
+#: invites/app/invites/swedish_ssn.py:60
+msgid "Swedish social security number"
+msgstr "Svenskt personnummer"
+
+#: invites/messages.py:66 invites/messages.py:149
+msgid ""
+"Found existing invites matching only parts of a row. Look for rows "
+"containing the following items:"
+msgstr ""
+"Hittade existerande inbjudningar som bara matchade en del av raden. Leta "
+"efter rader med följande innehåll:"
+
+#: invites/messages.py:71 invites/messages.py:154
+#, python-format
+msgid "Column %(k)s:"
+msgstr "Kolumn %(k)s:"
+
+#: invites/messages.py:91
+#, python-format
+msgid ""
+"Your action would downgrade permissions for some moderators. Handle "
+"moderators via participants tab instead. Related to userID(s): %(userids)s. "
+"Data: %(data)s"
+msgstr ""
+
+#: invites/messages.py:169
+msgid ""
+"The following don't match any existing invites. Perhaps the invite doesn't "
+"exist or were only partially matched? Look for the following data:"
+msgstr ""
+"Följande matchar inte existerande inbjudningar. Kanske finns inte inbjudan "
+"eller så matchades datan bara delvis? Undersök följande data:"
+
+#: invites/workflows.py:12 presence/workflows.py:7 speaker/models.py:530
+#: speaker/workflows.py:8
+msgid "Open"
+msgstr "Öppen"
+
+#: invites/workflows.py:13
+msgid "Expired"
+msgstr "Utgången"
+
+#: invites/workflows.py:14
+msgid "Revoked"
+msgstr "Tillbakadragen"
+
+#: meeting/models.py:293
+msgid "Must have valid electoral register policy name"
+msgstr "Mötet måste ha en giltig röstlängdspolicy"
+
+#: meeting/models.py:298
+msgid "Meeting has ongoing polls - close them first"
+msgstr "Mötet har pågående omröstningar - stäng dem först"
+
+#: meeting/models.py:305
+msgid "Back to upcoming"
+msgstr "Tillbaka till kommande"
+
+#: meeting/models.py:337
+msgid "Request archiving"
+msgstr "Begär arkivering"
+
+#: meeting/models.py:348
+msgid "Abort archiving"
+msgstr "Avbryt arkivering"
+
+#: meeting/models.py:376
+msgid "Request delete..."
+msgstr "Begär borttagning…"
+
+#: meeting/models.py:387
+msgid "Abort delete"
+msgstr "Avbryt borttagning"
+
+#: meeting/roles.py:14
+msgid "Participant"
+msgstr "Deltagare"
+
+#: meeting/roles.py:15
+msgid "Moderator"
+msgstr "Moderator"
+
+#: meeting/roles.py:16
+msgid "Potential voter"
+msgstr "Potentiell rösträtt"
+
+#: meeting/roles.py:17
+msgid "Discusser"
+msgstr "Debattör"
+
+#: meeting/roles.py:18
+msgid "Proposer"
+msgstr "Förslagsläggare"
+
+#: meeting/workflows.py:15
+msgid "Archiving"
+msgstr "Arkiverar"
+
+#: meeting/workflows.py:17
+msgid "Deleting"
+msgstr "Raderar"
+
+#: organisation/pipeline.py:13
+msgid "This organisation is no longer active."
+msgstr "Organisationen är inte längre aktiv"
+
+#: organisation/rest_api/views.py:53
+msgid "You're logged in to another organisation"
+msgstr "Du är inloggad i en annan organisation"
+
+#: participant_number/apps.py:7
+msgid "Participant number"
+msgstr ""
+
+#: poll/app/er_policies/auto_always.py:32
+msgid "Automatic always"
+msgstr "Alltid automatisk"
+
+#: poll/app/er_policies/auto_always.py:34
+msgid ""
+"This method will always create a new electoral register when potential "
+"voters change. It will even change electoral register for ongoing polls, so "
+"use this with caution!"
+msgstr ""
+"Denna metod skapar alltid nya röstlängder när potentiellt röstande ändras. "
+"Den kommer även byta ut röstlängder för pågående omröstningar så använd med "
+"försiktighet!"
+
+#: poll/app/er_policies/auto_before_poll.py:26
+msgid "Automatic before poll"
+msgstr "Automatiskt före omröstning"
+
+#: poll/app/er_policies/auto_before_poll.py:28
+msgid ""
+"Any users with potential voter status will be added to the electoral "
+"register when a poll starts."
+msgstr ""
+"Användare med potentiell rösträtt kommer läggas till röstlängden när en "
+"omröstning startar."
+
+#: poll/app/er_policies/group_auto_rnd_before_poll.py:28
+msgid "Equal weighted group votes"
+msgstr "Jämt fördelade viktade gruppröster"
+
+#: poll/app/er_policies/group_auto_rnd_before_poll.py:30
+msgid ""
+"Any group members share votes within the group equally. If they can't be "
+"distributed evenly, the rest will be randomized. Only potential voters may "
+"receive a vote."
+msgstr ""
+"Gruppmedlemmar delar på gruppens röstvikt. Om de inte kan distribueras jämt, "
+"så kommer resten slumpas. Bara potentiellt röstande kan få röster."
+
+#: poll/app/er_policies/group_votes_before_poll.py:36
+msgid "Weighted votes from group settings"
+msgstr "Viktade röster från gruppers inställningar"
+
+#: poll/app/er_policies/group_votes_before_poll.py:38
+msgid ""
+"Groups have a total vote count which can be distributed among members that "
+"have the potential voter role. New electoral registers will be created "
+"whenever a poll starts if needed."
+msgstr ""
+"Grupperna har en röstmängd som kan fördelas mellan medlemmar som har "
+"potentiell rösträtt. Nya röstlängder skapas när en omröstning startar om det "
+"behövs."
+
+#: poll/app/er_policies/manual.py:20
+msgid "Fully manual"
+msgstr "Helt manuell"
+
+#: poll/app/er_policies/manual.py:22
+msgid ""
+"No electoral registers will be created at all, you have to do it yourself! "
+"You need to hand-pick voters from any participants with the role potential "
+"voter."
+msgstr ""
+"Inga röstlängder skapas alls, du måste göra det själv! Du behöver handplocka "
+"röstande från deltagare med rollen potentiell röstare."
+
+#: poll/app/er_policies/manual_trigger.py:22
+msgid "Manual trigger"
+msgstr "Manuellt skapad"
+
+#: poll/app/er_policies/manual_trigger.py:24
+msgid ""
+"Create electoral registers from potential voters. Simply click the button on "
+"electoral registers page."
+msgstr ""
+"Skapa röstlängder från potentiella röstare. Klicka på knappen på sidan med "
+"röstlängder."
+
+#: poll/app/er_policies/presence_check.py:29
+msgid "Presence check"
+msgstr "Närvarokontroll"
+
+#: poll/app/er_policies/presence_check.py:31
+msgid ""
+"Any user who's both present and has the potential voter role will be added "
+"to the electoral register when it closes. If group votes is activated, the "
+"votes will be distributed equally between present members."
+msgstr ""
+"Användare som är närvarande och har rollen potentiell rösträtt kommer läggas "
+"till i röstlängden när närvarokontrollen stängs. Om gruppröster är aktivt så "
+"kommer rösterna fördelas jämt mellan närvarande."
+
+#: poll/app/polls/combined_simple.py:23 poll/app/polls/simple.py:22
+msgid "Yes"
+msgstr "Ja"
+
+#: poll/app/polls/combined_simple.py:23 poll/app/polls/simple.py:22
+msgid "No"
+msgstr "Nej"
+
+#: poll/app/polls/combined_simple.py:23
+msgid "Abstain"
+msgstr "Avstå"
+
+#: poll/app/polls/combined_simple.py:64
+msgid "Combined Simple"
+msgstr "Kombinerad enkel"
+
+#: poll/app/polls/dutt.py:150 poll/app/polls/dutt.py:162
+#: poll/app/polls/dutt.py:180 poll/app/polls/irv.py:203
+#: poll/app/polls/irv.py:218 poll/app/polls/majority.py:130
+#: poll/app/polls/schulze.py:172 poll/app/polls/scottish_stv.py:155
+msgid "Invalid vote"
+msgstr "Ogiltig röst"
+
+#: poll/app/polls/dutt.py:154
+msgid "Too few proposals picked"
+msgstr "För få förslag valda"
+
+#: poll/app/polls/dutt.py:166
+msgid "Too many proposals picked"
+msgstr "För många förslag valda"
+
+#: poll/app/polls/dutt.py:185 poll/app/polls/schulze.py:177
+#: poll/app/polls/scottish_stv.py:160
+#, python-format
+msgid "Invalid choice, the following proposals don't exist: %s"
+msgstr "Ogiltigt val, följande förslag existerar inte: %s"
+
+#: poll/app/polls/irv.py:41
+msgid "Instant-Runoff Voting"
+msgstr "Instant-Runoff Voting"
+
+#: poll/app/polls/irv.py:58 poll/app/polls/irv.py:188
+#, python-format
+msgid "The method %(method)s require at least 3 proposals"
+msgstr "Metoden %(method)s kräver minst 3 förslag"
+
+#: poll/app/polls/irv.py:170
+msgid "Repeated Instant-Runoff Voting"
+msgstr "Repeterad Instant-Runoff Voting"
+
+#: poll/app/polls/irv.py:207
+msgid "Too few selected"
+msgstr "För få valda"
+
+#: poll/app/polls/irv.py:222
+msgid "Too many selected"
+msgstr "För många valda"
+
+#: poll/app/polls/majority.py:67
+msgid "Majority"
+msgstr "Majoritet"
+
+#: poll/app/polls/majority.py:124
+msgid "Must have at least 2 proposals"
+msgstr "Metoden %(method)s kräver minst 2 förslag"
+
+#: poll/app/polls/schulze.py:73
+msgid "Schulze"
+msgstr "Schulze"
+
+#: poll/app/polls/schulze.py:227
+msgid "Repeated Schulze"
+msgstr "Repeterad Schulze"
+
+#: poll/app/polls/scottish_stv.py:86
+msgid "Scottish STV"
+msgstr "Skotsk STV"
+
+#: poll/app/polls/scottish_stv.py:172
+#, python-format
+msgid "The method %(method)s can't have as many winners as proposals"
+msgstr "Metoden %(method)s kan inte ha lika många vinnare som förslag"
+
+#: poll/app/polls/scottish_stv.py:177
+#, python-format
+msgid "The method %(method)s require at least %(min_winners)d winners"
+msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
+
+#: poll/app/polls/simple.py:58
+msgid "Simple"
+msgstr "Enkel"
+
+#: poll/models.py:332
+msgid "Invalid settings"
+msgstr "Ogiltiga inställningar"
+
+#: poll/models.py:340
+msgid ""
+"There's no electoral register method on this meeting - check configuration"
+msgstr ""
+"Det finns ingen metod för att skapa en röstlängd i mötet - kolla "
+"inställningar"
+
+#: poll/models.py:353
+msgid "Poll method settings invalid"
+msgstr "Omröstningens inställningar är fel"
+
+#: poll/models.py:366
+msgid ""
+"This electoral register method requires you to create electoral registers "
+"manually before starting a poll."
+msgstr ""
+"Röstlängdsmetoden kräver att du skapar en röstlängd manuellt. Gör det innan "
+"du startar omröstningen."
+
+#: poll/models.py:432
+msgid "Start"
+msgstr "Starta"
+
+#: poll/models.py:460
+msgid "Finish"
+msgstr "Avsluta"
+
+#: poll/models.py:488
+msgid "Publish result"
+msgstr "Publicera resultat"
+
+#: poll/models.py:500
+msgid "Withold detailed result"
+msgstr "Dölj detaljerat resultat"
+
+#: poll/models.py:510
+msgid "Cancel"
+msgstr "Avbryt"
+
+#: poll/models.py:521
+msgid "Revert to private"
+msgstr "Återgå till privat"
+
+#: poll/models.py:544 poll/workflows.py:23
+msgid "No result"
+msgstr "Inget resultat"
+
+#: poll/workflows.py:19
+msgid "Finished"
+msgstr "Avslutad"
+
+#: poll/workflows.py:20
+msgid "Withheld"
+msgstr "Dolt resultat"
+
+#: poll/workflows.py:21
+msgid "Canceled"
+msgstr "Avbruten"
+
+#: proposal/models.py:111
+msgid "Retract"
+msgstr "Dra tillbaka"
+
+#: proposal/models.py:122
+msgid "Lock for vote"
+msgstr "Lås för omröstning"
+
+#: proposal/models.py:136
+msgid "Approve"
+msgstr "Bifall"
+
+#: proposal/models.py:147
+msgid "Deny"
+msgstr "Avslå"
+
+#: proposal/models.py:158
+msgid "Mark as unhandled"
+msgstr "Markera som ohanterad"
+
+#: proposal/models.py:169
+msgid "Publish"
+msgstr "Publicerad"
+
+#: proposal/rest_api/serializers.py:201 proposal/rest_api/serializers.py:228
+msgid "Identical with original text"
+msgstr "Identisk med ursprungstexten"
+
+#: proposal/rest_api/serializers.py:279 proposal/rest_api/serializers.py:321
+msgid "Must be unique for agenda item"
+msgstr "Måste vara unik för dagordninspunkten"
+
+#: proposal/workflows.py:12
+msgid "Published"
+msgstr "Publicerad"
+
+#: proposal/workflows.py:13
+msgid "Retracted"
+msgstr "Tillbakadraget"
+
+#: proposal/workflows.py:14
+msgid "Voting"
+msgstr "I omröstning"
+
+#: proposal/workflows.py:15
+msgid "Approved"
+msgstr "Bifallen"
+
+#: proposal/workflows.py:16
+msgid "Denied"
+msgstr "Avslagen"
+
+#: reactions/messages.py:116 reactions/messages.py:199
+msgid "This type of reaction can't be added to this content type"
+msgstr ""
+"Denna typ av reaktion kan inte läggas till för den här sortens innehåll"
+
+#: speaker/models.py:230
+msgid "Make active"
+msgstr "Gör aktiv"
+
+#: speaker/models.py:243
+msgid "Inactivate"
+msgstr "Inaktivera"
+
+#: speaker/models.py:259
+msgid "Archive"
+msgstr "Arkivera"
+
+#: speaker/rest_api/serializers.py:118
+msgid "User already in list."
+msgstr "Redan i listan."
+
+#: speaker/rest_api/serializers.py:121
+msgid "User isn't a participant in this meeting."
+msgstr "Användaren är inte en del av mötet."
+
+#: speaker/rest_api/views.py:93
+msgid "Shuffle isn't allowed with an active speaker."
+msgstr "Slumpa är inte tillåtet med aktiv talare."
+
+#: speaker/roles.py:6
+msgid "List moderator"
+msgstr "Listmoderator"
+
+#: speaker/roles.py:7
+msgid "Speaker"
+msgstr "Talare"
+
+#: speaker/workflows.py:23
+msgid "Inactive"
+msgstr "Inaktiv"
+
+#, fuzzy
+#~| msgid "Make user active"
+#~ msgid "Main/Substitute + active"
+#~ msgstr "Gör användaren aktiv"
+
+#, fuzzy
+#~| msgid ""
+#~| "Groups have a total vote count which can be distributed among members "
+#~| "that have the potential voter role. New electoral registers will be "
+#~| "created whenever a poll starts if needed."
+#~ msgid ""
+#~ "Group members with main have votes and can delegate them to users with "
+#~ "substitute role. Electoral registries will be created and assigned when a "
+#~ "poll starts."
+#~ msgstr ""
+#~ "Grupperna har en röstmängd som kan fördelas mellan medlemmar som har "
+#~ "potentiell rösträtt. Nya röstlängder skapas när en omröstning startar om "
+#~ "det behövs."
+
+#~ msgid "Users apply for access, moderators approve manually"
+#~ msgstr "Användare begär tillträde, moderatorer godkänner manuellt"
+
+#~ msgid "Mark user as incomplete"
+#~ msgstr "Markera användaren som ofullständig"
+
+#~ msgid "Identity service not available right now"
+#~ msgstr "Identitetstjänsten är inte tillgänglig just nu"
+
+#~ msgid "You need to login again to use invites"
+#~ msgstr "Du behöver logga in igen för att använda inbjudningar"
+
+#~ msgid ""
+#~ "This meeting group doesn't allow you to display it together with your "
+#~ "posts. (post_with=False)"
+#~ msgstr ""
+#~ "Denna mötesgrupp tillåter inte att du postar med den. (post_with=False)"
+
+#~ msgid "Discussion"
+#~ msgstr "Diskussion"
+
+#~ msgid "User doesn't exist"
+#~ msgstr "Användaren finns inte"
+
+#~ msgid "User can't be present here - maybe they're not a participant?"
+#~ msgstr ""
+#~ "Användaren kan inte sättas som närvarande här - de kanske inte är "
+#~ "deltagare?"
+
+#~ msgid "Thumb up"
+#~ msgstr "Tumme upp"
+
+#~ msgid "Thumb down"
+#~ msgstr "Tumme ner"
+
+#~ msgid "Checkmark"
+#~ msgstr "Bock"
+
+#~ msgid "Block"
+#~ msgstr "Block"
+
+#~ msgid "Star"
+#~ msgstr "Stjärna"
+
+#~ msgid "Accessible"
+#~ msgstr "Tillgänglighet"
+
+#~ msgid "Heart"
+#~ msgstr "Hjärta"
+
+#~ msgid "Forum"
+#~ msgstr "Forum"
+
+#~ msgid "Alert"
+#~ msgstr "Varning"
+
+#~ msgid "Attachment"
+#~ msgstr "Bilaga"
+
+#~ msgid "Pencil"
+#~ msgstr "Penna"
+
+#~ msgid "Currency"
+#~ msgstr "Valuta"
+
+#~ msgid "Accent"
+#~ msgstr "Accentuering"
+
+#~ msgid "Primary"
+#~ msgstr "Primär"
+
+#~ msgid "Secondary"
+#~ msgstr "Sekundär"
+
+#~ msgid "Error"
+#~ msgstr "Fel"
+
+#~ msgid "Info"
+#~ msgstr "Info"
+
+#~ msgid "Success"
+#~ msgstr "Lyckades"
+
+#~ msgid "Warning"
+#~ msgstr "Varning"
+
+#~ msgid "Not in list"
+#~ msgstr "Inte i listan"
+
+#~ msgid "No such user in queue."
+#~ msgstr "Inte sådan användare i kön."
+
+#~ msgid "No current speaker"
+#~ msgstr "Ingen pågående talare"
+
+#~ msgid "That user isn't speaking."
+#~ msgstr "Den användaren talar inte just nu."
+
+#~ msgid "Currently speaking"
+#~ msgstr "Den användaren talar redan"
+
+#~ msgid "No active speaker"
+#~ msgstr "Ingen aktiv talare"
+
+#, python-format
+#~ msgid "%(lookup_kw)s not specified"
+#~ msgstr "%(lookup_kw)s har inte angetts"
+
+#, python-format
+#~ msgid "No item found where %(lookup_field)s==%(lookup_val)s"
+#~ msgstr "Inget objekt hittades där %(lookup_field)s==%(lookup_val)s"
+
+#~ msgid "Permission '${perm}s' not allowed on ${context}s"
+#~ msgstr "Behörighet '${perm}s' tillåts inte på ${context}s"
+
+#~ msgid "Send email"
+#~ msgstr "Skicka epost"
+
+#, python-format
+#~ msgid "Meeting invitation to %(title)s"
+#~ msgstr "Mötesinbjudan till %(title)s"
+
+#~ msgid "Invites caused an error"
+#~ msgstr "Inbjudningarna orsakade ett fel"
+
+#~ msgid "Undo archiving request"
+#~ msgstr "Ångra arkivering"
+
+#~ msgid "Agenda items"
+#~ msgstr "Dagordningspunkter"
+
+#~ msgid "Manual only"
+#~ msgstr "Bara manuellt"
+
+#~ msgid "Electoral register is empty - no voters"
+#~ msgstr "Röstlängden är tom - inga röstande"
+
+#~ msgid "No proposals, can't start poll"
+#~ msgstr "Inga förslag, kan inte starta omröstningen"
+
+#~ msgid "Closing a presence check will set a new electoral register."
+#~ msgstr "En ny röstlängd skapas när en närvarokontroll avslutas."
+
+#~ msgid "Active check"
+#~ msgstr "Aktiv-koll"
+
+#~ msgid ""
+#~ "All users who're registered as active and have the potential voter role "
+#~ "will be added when a poll starts. If group voting is used, the votes will "
+#~ "be equally distributed among the active members of that group."
+#~ msgstr ""
+#~ "Alla användare som registreras som aktiva och har rollen potentiell "
+#~ "rösträtt läggs till en röstlängd när en omröstning startar. Om "
+#~ "gruppröster används så kommer rösterna fördelas jämt mellan aktiva "
+#~ "medlemmar i gruppen."
+
+#, fuzzy
+#~| msgid "Demo meeting: Always update electoral register"
+#~ msgid "Always update and replace electoral register"
+#~ msgstr "Demomöte: Uppdatera alltid röstlängden"
