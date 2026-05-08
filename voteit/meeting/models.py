@@ -648,7 +648,7 @@ class GroupMembership(RulesModelMixin, MeetingContext):
     # We won't support keeping membership and deleting a role for now,
     # it will have a lot of side effects we don't want to handle now.
     role: GroupRole | None = models.ForeignKey(
-        GroupRole, on_delete=models.CASCADE, related_name="+", null=True, blank=True
+        GroupRole, on_delete=models.SET_NULL, related_name="+", null=True, blank=True
     )
     # Note that this field isn't the actual votes,
     # but the votes we expect the user to have next time the electoral register is updated!
