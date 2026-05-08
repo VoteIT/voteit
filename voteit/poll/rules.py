@@ -25,7 +25,7 @@ from voteit.poll.workflows import PollWf
 def is_voter(user: AbstractUser, poll: Poll):
     return (
         poll.electoral_register is not None
-        and poll.electoral_register.voters.filter(pk=user.pk).exists()
+        and poll.electoral_register.has_voter(user)
     )
 
 

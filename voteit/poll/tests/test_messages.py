@@ -29,7 +29,8 @@ class AddVoteTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
-        cls.voter = cls.er.voters.create(username="voter")
+        cls.voter = User.objects.create(username="voter")
+        cls.er.add_voter(cls.voter)
         cls.poll: Poll = Poll.objects.create(
             electoral_register=cls.er, method_name="simple"
         )
@@ -91,7 +92,8 @@ class AbstainTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
-        cls.voter = cls.er.voters.create(username="voter")
+        cls.voter = User.objects.create(username="voter")
+        cls.er.add_voter(cls.voter)
         cls.poll: Poll = Poll.objects.create(
             electoral_register=cls.er, method_name="simple"
         )
@@ -139,7 +141,8 @@ class ChangeVoteTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
-        cls.voter = cls.er.voters.create(username="voter")
+        cls.voter = User.objects.create(username="voter")
+        cls.er.add_voter(cls.voter)
         cls.poll: Poll = Poll.objects.create(
             electoral_register=cls.er, method_name="simple"
         )
@@ -205,9 +208,9 @@ class ManualCreateERTests(TestCase):
         msg = self._mk_one(self.moderator)
         response = msg.run_job()
         self.assertEqual(1, self.meeting.electoral_registers.count())
-        self.assertEqual(
-            ["participant"],
-            list(self.meeting.latest_er.voters.values_list("username", flat=True)),
+        self.assertIn(
+            self.participant.pk,
+            {int(k) for k in self.meeting.latest_er.voter_data.keys()},
         )
         self.assertEqual("1", response.mm.id)
 
@@ -277,9 +280,9 @@ class TriggerCreateERTests(TestCase):
         msg = self._mk_one(self.moderator)
         response = msg.run_job()
         self.assertEqual(1, self.meeting.electoral_registers.count())
-        self.assertEqual(
-            ["participant"],
-            list(self.meeting.latest_er.voters.values_list("username", flat=True)),
+        self.assertIn(
+            self.participant.pk,
+            {int(k) for k in self.meeting.latest_er.voter_data.keys()},
         )
         self.assertEqual("1", response.mm.id)
 

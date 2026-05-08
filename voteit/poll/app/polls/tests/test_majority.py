@@ -26,9 +26,10 @@ class MajorityTests(TestCase):
 
         cls.Majority = Majority
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
-        cls.voter_a = cls.er.voters.create(username="a")
-        cls.voter_b = cls.er.voters.create(username="b")
-        cls.voter_c = cls.er.voters.create(username="c")
+        cls.voter_a = User.objects.create(username="a")
+        cls.voter_b = User.objects.create(username="b")
+        cls.voter_c = User.objects.create(username="c")
+        cls.er.set_voters_from_dict({cls.voter_a.pk: 1, cls.voter_b.pk: 1, cls.voter_c.pk: 1})
         cls.poll: Poll = Poll.objects.create(
             electoral_register=cls.er, method_name="majority"
         )
@@ -134,7 +135,8 @@ class AddMajorityVoteTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
-        cls.voter = cls.er.voters.create(username="a")
+        cls.voter = User.objects.create(username="a")
+        cls.er.add_voter(cls.voter)
         cls.poll: Poll = Poll.objects.create(
             electoral_register=cls.er, method_name="majority", state=PollWf.ONGOING
         )

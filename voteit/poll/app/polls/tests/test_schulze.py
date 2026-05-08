@@ -1,5 +1,6 @@
 from collections import Counter
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
@@ -10,6 +11,8 @@ from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.workflows import PollWf
+
+User = get_user_model()
 
 _channel_layers_setting = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
@@ -352,7 +355,8 @@ class AddSchulzeVoteTests(TestCase):
         cls.prop1 = cls.poll.proposals.create()
         cls.prop2 = cls.poll.proposals.create()
         cls.prop3 = cls.poll.proposals.create()
-        cls.voter = cls.er.voters.create(username="voter")
+        cls.voter = User.objects.create(username="voter")
+        cls.er.add_voter(cls.voter)
         cls.poll.upcoming()
         cls.poll.save()
 

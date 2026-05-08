@@ -29,7 +29,8 @@ class AutoAlwaysTests(TestCase):
         self.poll.upcoming()
         self.assertIsInstance(self.poll.electoral_register, ElectoralRegister)
         self.assertEqual(
-            {self.user1, self.user2}, set(self.poll.electoral_register.voters.all())
+            {self.user1.pk, self.user2.pk},
+            {int(k) for k in self.poll.electoral_register.voter_data.keys()},
         )
 
     def test_new_er_for_started_poll_when_roles_removed(self):

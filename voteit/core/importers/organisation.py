@@ -84,7 +84,6 @@ class OrganisationImporter(BaseImporter):
             "speaker_list",
             "meeting_group",
             "electoral_register",
-            "voter_weight",
             "proposal",  # Before diff!
             "pnsystem",
             "poll",
@@ -109,18 +108,18 @@ class OrganisationImporter(BaseImporter):
             ).exclude(pk__in=existing_qs)
             matched_existing_username = existing_qs_username.count()
             for user in existing_qs_username:
-                self.objects_to_handle["user"][
-                    username_to_import_pk[user.username]
-                ] = user
+                self.objects_to_handle["user"][username_to_import_pk[user.username]] = (
+                    user
+                )
             matched_existing_userid = 0
             if reuse_userid:
                 existing_qs_userid = User.objects.filter(
                     userid__in=userid_to_import_pk.keys(), organisation=organisation
                 ).exclude(pk__in=existing_qs_username)
                 for user in existing_qs_userid:
-                    self.objects_to_handle["user"][
-                        userid_to_import_pk[user.userid]
-                    ] = user
+                    self.objects_to_handle["user"][userid_to_import_pk[user.userid]] = (
+                        user
+                    )
                 matched_existing_userid = existing_qs_userid.count()
             print(
                 f"Found {matched_existing_emails} users via email and {matched_existing_username} via username. "
@@ -158,7 +157,7 @@ class OrganisationImporter(BaseImporter):
                         self.update_special_fields(deserialized)
                         try:
                             self.save_obj(deserialized)
-                        except Exception as exc:
+                        except Exception:
                             breakpoint()
                             pass
                     else:

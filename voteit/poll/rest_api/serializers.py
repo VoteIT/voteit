@@ -21,7 +21,6 @@ from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
 from voteit.poll.models import VoteTransfer
-from voteit.poll.models import VoterWeight
 from voteit.poll.utils import get_poll_method_registry
 
 if TYPE_CHECKING:
@@ -81,7 +80,7 @@ class PollListSerializer(PollDetailSerializer):
 
     def get_total(self, instance):
         if instance.electoral_register:
-            return instance.method.poll.electoral_register.voters.count()
+            return len(instance.method.poll.electoral_register.voter_data)
         return 0
 
     def get_voted(self, instance):
@@ -209,15 +208,12 @@ class ElectoralRegisterSerializer(serializers.ModelSerializer):
         return results
 
 
-class VoterExportSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(source="user.first_name")
-    last_name = serializers.CharField(source="user.last_name")
-    email = serializers.CharField(source="user.email")
-    userid = serializers.CharField(source="user.userid")
-
-    class Meta:
-        model = VoterWeight
-        exclude = ("id", "register", "user")
+class VoterExportSerializer(serializers.Serializer):
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    email = serializers.CharField()
+    userid = serializers.CharField()
+    weight = serializers.IntegerField()
 
 
 class VoteSerializer(serializers.ModelSerializer):

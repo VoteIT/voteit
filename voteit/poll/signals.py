@@ -66,15 +66,17 @@ def send_ongoing_meeting_poll_stats(context: Meeting, app_state: AppState, **kw)
     Populate app_state with current poll status
     """
     batch = Batch(t=PollStatus.name, payloads=[])
-    for poll in context.polls.filter(state=PollWf.ONGOING).annotate(
-        voted=SubqueryCount("votes"),
-        total=SubqueryCount("electoral_register__voters"),
+    for poll in (
+        context.polls.filter(state=PollWf.ONGOING)
+        .annotate(voted=SubqueryCount("votes"))
+        .select_related("electoral_register")
     ):
+        total = len(poll.electoral_register.voter_data) if poll.electoral_register else 0
         batch.append(
             PollStatus(
                 pk=poll.pk,
                 voted=poll.voted,
-                total=poll.total,
+                total=total,
             )
         )
     app_state.append(batch)
@@ -292,7 +294,7 @@ def vote_added(instance: Vote, *, created: bool, **kw):
             msg = PollStatus(
                 pk=poll.pk,
                 voted=poll.votes.count(),
-                total=poll.electoral_register.voters.count(),
+                total=len(poll.electoral_register.voter_data),
             )
             ch = MeetingChannel(poll.meeting_id)
             ch.sync_publish(msg)

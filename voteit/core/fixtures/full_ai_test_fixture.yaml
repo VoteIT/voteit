@@ -1,20 +1,9 @@
 - fields:
     created: '2020-05-20T07:56:01.739622Z'
     meeting: 1
+    voter_data: {'1': 1, '2': 1}
   model: poll.electoralregister
   pk: 1
-- fields:
-    register: 1
-    user: 1
-    weight: 1
-  model: poll.voterweight
-  pk: 1
-- fields:
-    register: 1
-    user: 2
-    weight: 1
-  model: poll.voterweight
-  pk: 2
 
 # Discussion post
 - fields:

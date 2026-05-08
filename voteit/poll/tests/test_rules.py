@@ -31,7 +31,8 @@ class PollRulesTests(TestCase):
         cls.anon = AnonymousUser()
         cls.outsider = User.objects.create(username="anon")
         cls.participant_user = cls.meeting.participants.create(username="participant")
-        cls.voter_user = cls.er.voters.create(username="voter")
+        cls.voter_user = User.objects.create(username="voter")
+        cls.er.add_voter(cls.voter_user)
         # Voters should always be participants too
         cls.meeting.add_roles(cls.voter_user, ROLE_PARTICIPANT)
         cls.moderator = cls.meeting.participants.create(username="moderator")
@@ -184,8 +185,9 @@ class VoteRulesTests(TestCase):
         cls.poll.save()
         cls.anon_user = User.objects.create(username="anon")
         cls.participant_user = cls.meeting.participants.create(username="participant")
-        cls.voter_user = cls.er.voters.create(username="voter")
-        cls.voted_user = cls.er.voters.create(username="voted")
+        cls.voter_user = User.objects.create(username="voter")
+        cls.voted_user = User.objects.create(username="voted")
+        cls.er.set_voters_from_dict({cls.voter_user.pk: 1, cls.voted_user.pk: 1})
         cls.anon = AnonymousUser()
         # Voters should always be participants too
         cls.meeting.add_roles(cls.voter_user, ROLE_PARTICIPANT)

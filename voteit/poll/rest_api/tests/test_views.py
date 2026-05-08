@@ -345,7 +345,6 @@ class ElectoralRegisterViewSetTests(APITestCase):
     def test_get(self):
         url = reverse("electoral-registers-detail", kwargs={"pk": self.er.pk})
         self.client.force_login(self.moderator)
-        # FIXME: assert queries! N+1!
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
         data = response.json()
@@ -387,7 +386,7 @@ class ExportElectoralRegisterViewSetTests(APITestCase):
         self.assertEqual(404, response.status_code)
 
     def test_csv_no_data(self):
-        self.er.voterweight_set.all().delete()
+        self.er.set_voters_from_dict({})
         self.client.force_login(self.moderator)
         url = reverse("export-electoral-register-csv", kwargs={"pk": self.er.pk})
         response = self.client.get(url)

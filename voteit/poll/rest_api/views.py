@@ -136,11 +136,19 @@ class ExportERViewSet(viewsets.GenericViewSet):
         return Response(data=[])
 
     def get_export_qs(self, er: ElectoralRegister):
-        return (
-            er.voterweight_set.all()
-            .prefetch_related("user")
-            .order_by("user__first_name")
-        )
+        User = get_user_model()
+        voter_data = er.voter_data
+        users = User.objects.filter(pk__in=voter_data.keys()).order_by("first_name")
+        return [
+            {
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "email": u.email,
+                "userid": u.userid,
+                "weight": voter_data[str(u.pk)],
+            }
+            for u in users
+        ]
 
     @action(
         methods=["get"],
@@ -148,7 +156,7 @@ class ExportERViewSet(viewsets.GenericViewSet):
     )
     def csv(self, request, *args, **kwargs):
         er = self.get_object()
-        if not er.voterweight_set.exists():
+        if not er.voter_data:
             raise Http404("No data yet")
         serializer = self.get_serializer(self.get_export_qs(er), many=True)
         response = HttpResponse(content_type="text/csv")

@@ -39,7 +39,8 @@ class SimpleTests(TestCase):
         self.poll.upcoming()
         proposal = self.poll.proposals.create()
         proposal2 = self.poll.proposals.create()
-        voter = self.er.voters.create(username="a")
+        voter = User.objects.create(username="a")
+        self.er.add_voter(voter)
         self.poll.ongoing()
         vote = self.poll.votes.create(
             user=voter, vote=f'{{"yes": [{proposal2.pk},{proposal.pk}]}}'
@@ -57,7 +58,7 @@ class SimpleTests(TestCase):
         ua = User.objects.create(username="a")
         ub = User.objects.create(username="b")
         uc = User.objects.create(username="c")
-        self.er.voters.set([ua, ub, uc])
+        self.er.set_voters_from_dict({u.pk: 1 for u in [ua, ub, uc]})
         self.poll.ongoing()
         self.poll.votes.create(
             user=ua, vote=f'{{"yes": [{prop.pk}], "no": [{prop2.pk}]}}'
