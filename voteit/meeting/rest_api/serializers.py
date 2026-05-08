@@ -265,6 +265,14 @@ class AgendaOrderSerializer(serializers.Serializer):
     order = serializers.ListSerializer(child=serializers.IntegerField())
 
 
+class InstallDialectSerializer(serializers.Serializer):
+    dialect = serializers.CharField(validators=[DialectInstallableValidator()])
+
+
+class RemoveDialectSerializer(serializers.Serializer):
+    groups = serializers.BooleanField(default=False, required=False)
+
+
 class MeetingRolesSerializer(serializers.ModelSerializer):
     meeting = serializers.IntegerField(source="context_id", read_only=True)
     user = UserListSerializer(read_only=True)

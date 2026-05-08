@@ -23,6 +23,7 @@ from rest_framework.viewsets import ModelViewSet
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
+from voteit.meeting import PERM_CHANGE_DIALECT
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
@@ -30,6 +31,7 @@ from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api import serializers
 from voteit.meeting.rest_api.filters import MeetingRolesFilter
+from voteit.meeting.roles import ROLE_MODERATOR
 
 __all__ = (
     "MeetingViewSet",
@@ -38,8 +40,6 @@ __all__ = (
     "GroupMembershipViewSet",
     "ExportParticipantsViewSet",
 )
-
-from voteit.meeting.roles import ROLE_MODERATOR
 
 
 @router.register("meetings", basename="meeting")
@@ -54,6 +54,8 @@ class MeetingViewSet(
         "create": serializers.CreateMeetingSerializer,
         "list": serializers.MeetingSerializer,
         "set_agenda_order": serializers.AgendaOrderSerializer,
+        "install_dialect": serializers.InstallDialectSerializer,
+        "remove_dialect": serializers.RemoveDialectSerializer,
     }
     filter_backends = (
         DjangoFilterBackend,
@@ -67,6 +69,8 @@ class MeetingViewSet(
         return {
             **super().permission_type_map,
             "set_agenda_order": "change",
+            "install_dialect": PERM_CHANGE_DIALECT,
+            "remove_dialect": PERM_CHANGE_DIALECT,
             "retrieve": None,  # Handled by queryset
             "transitions": None,  # Checked in transitions
         }
@@ -86,6 +90,36 @@ class MeetingViewSet(
                     ai.order = order.index(ai.pk) + 1
                     ai.save()
         return Response(status=201)
+
+    @action(methods=["post"], detail=True)
+    def install_dialect(self, request, pk):
+        meeting: Meeting = self.get_object()
+        if meeting.installed_dialect:
+            raise ValidationError(
+                {"dialect": ["A dialect is already installed. Remove it first."]}
+            )
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic(durable=True):
+            handler = dialect_registry.get_merged_handler(
+                serializer.validated_data["dialect"]
+            )
+            handler.install(meeting)
+        return Response(status=200)
+
+    @action(methods=["post"], detail=True)
+    def remove_dialect(self, request, pk):
+        meeting: Meeting = self.get_object()
+        if not meeting.installed_dialect:
+            raise ValidationError(
+                {"dialect": ["No dialect is installed on this meeting."]}
+            )
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic(durable=True):
+            handler = dialect_registry.get_merged_handler(meeting.installed_dialect)
+            handler.remove(meeting, groups=serializer.validated_data["groups"])
+        return Response(status=200)
 
     def get_queryset(self) -> QuerySet:
         qs = Meeting.objects.for_user(self.request.user)

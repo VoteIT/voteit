@@ -353,6 +353,80 @@ class MeetingViewSetTests(APITestCase):
         self.assertEqual(3, two.order)
         self.assertEqual(1, three.order)
 
+    def test_install_dialect(self):
+        url = reverse("meeting-install-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, {"dialect": "main_subst"})
+        self.assertEqual(200, response.status_code)
+        self.meeting.refresh_from_db()
+        self.assertEqual("main_subst", self.meeting.installed_dialect)
+
+    def test_install_dialect_already_installed(self):
+        Meeting.objects.filter(pk=self.meeting.pk).update(installed_dialect="main_subst")
+        url = reverse("meeting-install-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, {"dialect": "main_subst"})
+        self.assertEqual(400, response.status_code)
+
+    def test_install_dialect_invalid_name(self):
+        url = reverse("meeting-install-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, {"dialect": "does_not_exist"})
+        self.assertEqual(400, response.status_code)
+
+    def test_install_dialect_forbidden_for_participant(self):
+        url = reverse("meeting-install-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.participant)
+        response = self.client.post(url, {"dialect": "main_subst"})
+        self.assertEqual(403, response.status_code)
+
+    def test_install_dialect_forbidden_when_not_upcoming(self):
+        Meeting.objects.filter(pk=self.meeting.pk).update(state="ongoing")
+        url = reverse("meeting-install-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, {"dialect": "main_subst"})
+        self.assertEqual(403, response.status_code)
+
+    def test_remove_dialect(self):
+        Meeting.objects.filter(pk=self.meeting.pk).update(installed_dialect="main_subst")
+        url = reverse("meeting-remove-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, {})
+        self.assertEqual(200, response.status_code)
+        self.meeting.refresh_from_db()
+        self.assertIsNone(self.meeting.installed_dialect)
+
+    def test_remove_dialect_none_installed(self):
+        url = reverse("meeting-remove-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, {})
+        self.assertEqual(400, response.status_code)
+
+    def test_remove_dialect_forbidden_for_participant(self):
+        Meeting.objects.filter(pk=self.meeting.pk).update(installed_dialect="main_subst")
+        url = reverse("meeting-remove-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.participant)
+        response = self.client.post(url, {})
+        self.assertEqual(403, response.status_code)
+
+    def test_remove_dialect_forbidden_when_not_upcoming(self):
+        Meeting.objects.filter(pk=self.meeting.pk).update(
+            state="ongoing", installed_dialect="main_subst"
+        )
+        url = reverse("meeting-remove-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, {})
+        self.assertEqual(403, response.status_code)
+
+    def test_remove_dialect_with_groups_flag(self):
+        Meeting.objects.filter(pk=self.meeting.pk).update(installed_dialect="main_subst")
+        url = reverse("meeting-remove-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, {"groups": True})
+        self.assertEqual(200, response.status_code)
+        self.meeting.refresh_from_db()
+        self.assertIsNone(self.meeting.installed_dialect)
+
 
 class MeetingGroupViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
