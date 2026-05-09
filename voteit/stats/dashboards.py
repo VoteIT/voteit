@@ -52,7 +52,7 @@ class DailyChart(widgets.LineChart):
             yield today - timedelta(days=n)
 
     def labels(self):
-        return list(self.iter_dates())
+        return [d.strftime("%d %b") for d in self.iter_dates()]
 
 
 class ActiveOrgs[T](DailyChart):
