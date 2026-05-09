@@ -511,7 +511,7 @@ class ExportProposalsViewSetTests(APITestCase):
         )
         rows = response.content.splitlines()
         header = rows[0].decode().split(",")
-        self.assertIn("body_diff_brief", header)
+        self.assertNotIn("body_diff_brief", header)
         self.assertEqual(
             [
                 "created",
@@ -532,7 +532,6 @@ class ExportProposalsViewSetTests(APITestCase):
                 "group_id",
                 "tags",
                 "paragraph",
-                "body_diff_brief",
             ],
             header,
         )

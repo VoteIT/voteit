@@ -213,6 +213,7 @@ class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
 
     name = "text_document"
     _should_refresh: bool = False
+    _original_body: str
     title: str = models.CharField(max_length=100, default="")
     body: str = models.TextField(default="")
     base_tag: str = models.CharField(max_length=40)
@@ -250,14 +251,25 @@ class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
         if self.agenda_item:
             return self.agenda_item.meeting
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._original_body = instance.body
+        return instance
+
     def create_text_paragraphs(self):
         paragraphs = get_paragraphs(self.body)
-        i = 1
-        for para in paragraphs:
-            self.text_paragraphs.create(
-                body=para, agenda_item=self.agenda_item, paragraph_id=i
-            )
-            i += 1
+        TextParagraph.objects.bulk_create(
+            [
+                TextParagraph(
+                    body=para,
+                    text_document=self,
+                    agenda_item=self.agenda_item,
+                    paragraph_id=i,
+                )
+                for i, para in enumerate(paragraphs, start=1)
+            ]
+        )
         self._should_refresh = False
 
     @property
@@ -267,14 +279,13 @@ class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
     def save(self, **kw):
         if self.pk is None:
             self._should_refresh = True
-        else:
-            old = TextDocument.objects.get(pk=self.pk)
-            if old.body != self.body:
-                self._should_refresh = True
+        elif getattr(self, "_original_body", None) != self.body:
+            self._should_refresh = True
         # We want all the subsequent creates that comes from the save signal to be within
         # the same transaction. Empty TextDocuments won't make anyone happy.
         with transaction.atomic():
             super().save(**kw)
+        self._original_body = self.body
 
     # Annotations
     objects: models.Manager

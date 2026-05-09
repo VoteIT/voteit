@@ -109,7 +109,7 @@ class ExportProposalsViewSet(viewsets.GenericViewSet):
         return (
             Proposal.objects.all()
             .select_subclasses()
-            .prefetch_related("author", "meeting_group", "agenda_item")
+            .select_related("author", "meeting_group", "agenda_item__meeting")
             .filter(agenda_item__in=meeting.agenda_items.all())
             .order_by("agenda_item__order", "created")
         )

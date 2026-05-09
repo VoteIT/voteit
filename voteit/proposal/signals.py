@@ -39,44 +39,59 @@ if TYPE_CHECKING:
 
 
 def attach_proposals(meeting: Meeting, app_state: AppState, include_private=False):
-    # Proposals
-    qs = Proposal.objects.filter(
-        agenda_item__meeting=meeting, diffproposal__isnull=True
-    ).prefetch_related(
-        "mentions",
-    )
+    # Proposals — exclude "mentions" from .values() because M2M in values() produces one row
+    # per relationship (fan-out), causing duplicate proposals. Inject mentions separately.
+    proposal_fields = {
+        x for x in ProposalDetailSerializer.Meta.fields if x not in {"shortname", "mentions"}
+    }
+    qs = Proposal.objects.filter(agenda_item__meeting=meeting, diffproposal__isnull=True)
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
     batch = Batch(t=ProposalAdded.name, payloads=[])
     shortname = get_model_shortname(Proposal)
-    for item in qs.values(
-        *{x for x in ProposalDetailSerializer.Meta.fields if x not in {"shortname"}}
-    ):
-        # Inject meeting attr
+    items = list(qs.values(*proposal_fields))
+    # Bulk-fetch mentions in one extra query instead of N per proposal
+    if items:
+        pks = [item["pk"] for item in items]
+        mentions_map: dict[int, list] = {}
+        for p in Proposal.objects.filter(pk__in=pks).prefetch_related("mentions"):
+            mentions_map[p.pk] = list(p.mentions.values_list("pk", flat=True))
+    else:
+        mentions_map = {}
+    for item in items:
         item["m"] = meeting.pk
         item["shortname"] = shortname
+        item["mentions"] = mentions_map.get(item["pk"], [])
         batch.append(ProposalAdded(data=item))
-    qs = (
-        DiffProposal.objects.filter(agenda_item__meeting=meeting)
-        .prefetch_related("mentions")
-        .annotate(para_body=models.F("paragraph__body"))
-    )
-    if not include_private:
-        qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
+
     diff_fields = {
         x
         for x in DiffProposalDetailSerializer.Meta.fields
-        if x not in {"body_diff_brief", "body_diff", "shortname"}
+        if x not in {"body_diff_brief", "body_diff", "shortname", "mentions"}
     }
     diff_fields.add("para_body")
+    diff_qs = DiffProposal.objects.filter(agenda_item__meeting=meeting).annotate(
+        para_body=models.F("paragraph__body")
+    )
+    if not include_private:
+        diff_qs = diff_qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
     shortname = get_model_shortname(DiffProposal)
-    for item in qs.values(*diff_fields):
+    diff_items = list(diff_qs.values(*diff_fields))
+    if diff_items:
+        diff_pks = [item["pk"] for item in diff_items]
+        diff_mentions_map: dict[int, list] = {}
+        for p in Proposal.objects.filter(pk__in=diff_pks).prefetch_related("mentions"):
+            diff_mentions_map[p.pk] = list(p.mentions.values_list("pk", flat=True))
+    else:
+        diff_mentions_map = {}
+    for item in diff_items:
         para_body = item.pop("para_body")
         item["body_diff_brief"] = Changes(para_body, item["body"]).get_html(brief=True)
         item["shortname"] = shortname
-        # Inject meeting attr
         item["m"] = meeting.pk
+        item["mentions"] = diff_mentions_map.get(item["pk"], [])
         batch.append(ProposalAdded(data=item))
+
     app_state.append(batch)
 
 
@@ -142,9 +157,15 @@ def private_ai_published(instance: AgendaItem, source: str, **kw):
     if source == AgendaItemWf.PRIVATE and instance.meeting_id is not None:
         meeting_pk = instance.meeting_id
         participants_ch = ParticipantsChannel(meeting_pk)
-        for proposal in instance.proposals.all():
+        # select_subclasses() is required so DiffProposals are returned as DiffProposal
+        # instances and serialized with the correct serializer (includes body_diff_brief).
+        proposals = (
+            Proposal.objects.filter(agenda_item=instance)
+            .select_subclasses()
+            .prefetch_related("mentions")
+        )
+        for proposal in proposals:
             data = GenericProposalSerializer(proposal).data
-            # Inject meeting pk
             data["m"] = meeting_pk
             msg = ProposalAdded(data=data)
             participants_ch.sync_publish(msg)
