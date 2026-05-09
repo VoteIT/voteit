@@ -1319,6 +1319,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/1d/c7/28220d37e041fe1df03e857fe48f768dcd30cd151480bf6f00da8713214a/py-ubjson-0.16.1.tar.gz", hash = "sha256:b9bfb8695a1c7e3632e800fb83c943bf67ed45ddd87cd0344851610c69a5a482", size = 50316, upload-time = "2020-04-18T15:05:57.698Z" }
 
 [[package]]
+name = "py-vote-core"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-graph", extra = ["dot"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/83/cc/64d00107eec5097d809b5117ddac038ec823f96241594ab3428ee9b9ec0d/py_vote_core-2.0.0.tar.gz", hash = "sha256:a7981614d78ef09c4448806088fdfe9dc10b6f1aec4592ed5cde3d7bfded668b", size = 95270, upload-time = "2026-04-30T08:13:07.372Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e6/87/82b249cdfd052553828d43ee303bc4f79a4a5b82427da8d112d6c82f19b0/py_vote_core-2.0.0-py3-none-any.whl", hash = "sha256:2e8c1a51eee85f952cbf8c5278bad283f475928033ef01c94d96649b1ab79937", size = 17013, upload-time = "2026-04-30T08:13:03.507Z" },
+]
+
+[[package]]
 name = "pyasn1"
 version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1381,6 +1393,18 @@ email = [
 ]
 
 [[package]]
+name = "pydot"
+version = "4.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyparsing" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/50/35/b17cb89ff865484c6a20ef46bf9d95a5f07328292578de0b295f4a6beec2/pydot-4.0.1.tar.gz", hash = "sha256:c2148f681c4a33e08bf0e26a9e5f8e4099a82e0e2a068098f32ce86577364ad5", size = 162594, upload-time = "2025-06-17T20:09:56.454Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/32/a7125fb28c4261a627f999d5fb4afff25b523800faed2c30979949d6facd/pydot-4.0.1-py3-none-any.whl", hash = "sha256:869c0efadd2708c0be1f916eb669f3d664ca684bc57ffb7ecc08e70d5e93fee6", size = 37087, upload-time = "2025-06-17T20:09:55.25Z" },
+]
+
+[[package]]
 name = "pygments"
 version = "2.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1414,6 +1438,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/1a/51/27a5ad5f939d08f690a326ef9582cda7140555180db71695f6fb747d6a36/pyopenssl-26.2.0.tar.gz", hash = "sha256:8c6fcecd1183a7fc897548dfe388b0cdb7f37e018200d8409cf33959dbe35387", size = 182195, upload-time = "2026-05-04T23:06:09.72Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/73/b8/a0e2790ae249d6f38c9f66de7a211621a7ab2650217bcd04e1262f578a56/pyopenssl-26.2.0-py3-none-any.whl", hash = "sha256:4f9d971bc5298b8bc1fab282803da04bf000c755d4ad9d99b52de2569ca19a70", size = 55823, upload-time = "2026-05-04T23:06:08.395Z" },
+]
+
+[[package]]
+name = "pyparsing"
+version = "3.3.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/91/9c6ee907786a473bf81c5f53cf703ba0957b23ab84c264080fb5a450416f/pyparsing-3.3.2.tar.gz", hash = "sha256:c777f4d763f140633dcb6d8a3eda953bf7a214dc4eff598413c070bcdc117cbc", size = 6851574, upload-time = "2026-01-21T03:57:59.36Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d", size = 122781, upload-time = "2026-01-21T03:57:55.912Z" },
 ]
 
 [[package]]
@@ -1451,6 +1484,20 @@ wheels = [
 ]
 
 [[package]]
+name = "python-graph"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/73/bb/e495b5daca0427ba06858d84c7cb8a325fb48911f6dc0cae083b19e65711/python_graph-2.0.0.tar.gz", hash = "sha256:81672ca535f3cfc0136e1a9828b860d510f7ebdb3906158a2f05f076401e22d9", size = 26623, upload-time = "2025-06-13T10:26:26.281Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/5e/64a619b99726fe5908dcbd246c3958fea231251d7e03fb1ad317489f378a/python_graph-2.0.0-py3-none-any.whl", hash = "sha256:3072cac574d8a673b78246feef0d4ea22c35b3bf977ff7ffca83b5a17ecc675c", size = 57567, upload-time = "2025-06-13T10:26:24.608Z" },
+]
+
+[package.optional-dependencies]
+dot = [
+    { name = "pydot" },
+]
+
+[[package]]
 name = "python-graph-core"
 version = "1.8.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1475,18 +1522,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5f/4a/29feb8da6c44f77007dcd29518fea73a3d5653ee02a587ae1f17f1f5ddb5/python3-openid-3.2.0.tar.gz", hash = "sha256:33fbf6928f401e0b790151ed2b5290b02545e8775f982485205a066f874aaeaf", size = 305600, upload-time = "2020-06-29T12:15:49.026Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e0/a5/c6ba13860bdf5525f1ab01e01cc667578d6f1efc8a1dba355700fb04c29b/python3_openid-3.2.0-py3-none-any.whl", hash = "sha256:6626f771e0417486701e0b4daff762e7212e820ca5b29fcc0d05f6f8736dfa6b", size = 133681, upload-time = "2020-06-29T12:15:47.502Z" },
-]
-
-[[package]]
-name = "python3-vote-core"
-version = "20170329.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "python-graph-core" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/91/d5/8b85db9e827e21da4cb627c57ff1dfce59ffb2bb4cb9352e97b15b95d181/python3-vote-core-20170329.0.tar.gz", hash = "sha256:a2566482ba5afba5bdafe7069578ccf146ed5ec12c2ef6a88eafeef35740b694", size = 35267, upload-time = "2017-03-30T03:08:56.468Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2b/0f/98480dd67f63f33d3a423eb0b96d1a44f1d21028d09a9a37e1498773b47c/python3_vote_core-20170329.0-py3-none-any.whl", hash = "sha256:bb2b626f6a990a39528b94940601f37c4fcd59892cc0c0e9bb709a47d1e54c65", size = 46271, upload-time = "2017-03-30T03:08:48.411Z" },
 ]
 
 [[package]]
@@ -1978,10 +2013,10 @@ dependencies = [
     { name = "lxml" },
     { name = "nh3" },
     { name = "psycopg", extra = ["binary", "pool"] },
+    { name = "py-vote-core" },
     { name = "pydantic", extra = ["email"] },
     { name = "python-graph-core" },
     { name = "python-json-logger" },
-    { name = "python3-vote-core" },
     { name = "pyyaml" },
     { name = "rq" },
     { name = "rq-scheduler" },
@@ -2032,10 +2067,10 @@ requires-dist = [
     { name = "lxml", specifier = ">=6.0.2,<7.0.0" },
     { name = "nh3", specifier = ">=0.3.1,<0.4.0" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2.12,<4.0.0" },
+    { name = "py-vote-core", specifier = ">=2.0.0" },
     { name = "pydantic", extras = ["email"], specifier = "<2" },
     { name = "python-graph-core", specifier = ">=1.8.2,<2.0.0" },
     { name = "python-json-logger", specifier = ">=4.0.0,<5.0.0" },
-    { name = "python3-vote-core", specifier = ">=20170329.0,<20170330.0" },
     { name = "pyyaml", specifier = ">=6.0.3,<7.0.0" },
     { name = "rq", specifier = ">=2.6.0,<3.0.0" },
     { name = "rq-scheduler", specifier = ">=0.14.0,<0.15.0" },
