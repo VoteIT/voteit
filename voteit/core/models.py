@@ -322,13 +322,6 @@ class BaseContent(RulesModelMixin, ABCModel):
         related_name="author_%(app_label)s_%(class)s",
     )
     modified: datetime = models.DateTimeField(editable=False, auto_now=True)
-    last_modified_by: User | None = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        editable=False,
-        null=True,
-        related_name="last_modified_%(app_label)s_%(class)s",
-    )
     mentions = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name="mentions_%(app_label)s_%(class)s",
