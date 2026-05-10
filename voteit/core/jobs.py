@@ -4,8 +4,10 @@ from datetime import timedelta
 from logging import getLogger
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models import Q
 from django.utils.timezone import now
+from social_django.models import UserSocialAuth
 
 from voteit.core.decorators import schedule_job
 
@@ -21,15 +23,19 @@ def deactivate_unused_users() -> int:
     - More than 30 days since last_login (or never logged in)
     - No MeetingRoles and no OrganisationRoles
 
+    Also clears UserSocialAuth so the user can re-register via social login later.
+
     Returns count of deactivated users.
     """
     cutoff = now() - timedelta(days=30)
-    count = (
+    qs = (
         User.objects.filter(is_active=True)
         .filter(Q(last_login__lt=cutoff) | Q(last_login__isnull=True))
         .filter(meeting_roles__isnull=True)
         .filter(organisation_roles__isnull=True)
-        .update(is_active=False)
     )
+    with transaction.atomic(durable=True):
+        UserSocialAuth.objects.filter(user__in=qs).delete()
+        count = qs.update(is_active=False)
     logger.info("deactivate_unused_users: deactivated %d users", count)
     return count

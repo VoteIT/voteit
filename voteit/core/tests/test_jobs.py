@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils.timezone import now
+from social_django.models import UserSocialAuth
 
 from voteit.meeting.models import Meeting
 from voteit.organisation.models import Organisation
@@ -93,3 +94,17 @@ class DeactivateUnusedUsersTests(TestCase):
         user.save(update_fields=["last_login", "is_active"])
         count = self._run()
         self.assertEqual(0, count)
+
+    def test_social_auth_cleared_on_deactivation(self):
+        user = self._old_user("social_auth_user")
+        UserSocialAuth.objects.create(user=user, provider="testprovider", uid="test-uid")
+        self._run()
+        self.assertFalse(UserSocialAuth.objects.filter(user=user).exists())
+
+    def test_social_auth_kept_for_active_user(self):
+        user = _mk_user(self.org, "active_social")
+        user.last_login = now() - timedelta(days=5)
+        user.save(update_fields=["last_login"])
+        UserSocialAuth.objects.create(user=user, provider="testprovider", uid="test-uid-2")
+        self._run()
+        self.assertTrue(UserSocialAuth.objects.filter(user=user).exists())
