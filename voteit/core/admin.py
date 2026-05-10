@@ -1,9 +1,14 @@
 from datetime import timedelta
 
+from django import forms
 from django.contrib import admin
+from django.contrib import messages
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin
 from django.db import models
+from django.http import HttpResponseRedirect
+from django.shortcuts import render
 from django.urls import NoReverseMatch
+from django.urls import path
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.timezone import now
@@ -11,7 +16,10 @@ from django.utils.timezone import now
 from auditlog.admin import LogEntryAdmin
 from auditlog.models import LogEntry
 from voteit.core.models import User
+from voteit.core.user_merger import UserMerger
+from voteit.discussion.models import DiscussionPost
 from voteit.meeting.models import Meeting
+from voteit.proposal.models import Proposal
 
 _user_fieldsets = list(DefaultUserAdmin.fieldsets)
 _user_fieldsets[0][1]["fields"] = list(_user_fieldsets[0][1]["fields"])
@@ -75,7 +83,7 @@ class OnlineFilter(admin.SimpleListFilter):
 
 
 class LinkedFilter(admin.SimpleListFilter):
-    title = "ID-linked"
+    title = "ID-links"
 
     # Parameter for the filter that will be used in the URL query.
     parameter_name = "linked"
@@ -132,6 +140,33 @@ class LinkedFilter(admin.SimpleListFilter):
                 )
 
 
+def _pick_source_target(user_a, user_b):
+    """Return (source, target) — least active user becomes source."""
+    from voteit.meeting.models import MeetingRoles
+    from voteit.poll.models import Vote
+
+    def score(user):
+        return (
+            MeetingRoles.objects.filter(user=user).count()
+            + Vote.objects.filter(user=user).count()
+            + Proposal.objects.filter(author=user).count()
+            + DiscussionPost.objects.filter(author=user).count()
+        )
+
+    score_a, score_b = score(user_a), score(user_b)
+    if score_a <= score_b:
+        return user_a, user_b, score_a, score_b
+    return user_b, user_a, score_b, score_a
+
+
+class MergeUsersForm(forms.Form):
+    source_pk = forms.IntegerField(widget=forms.HiddenInput)
+    target_pk = forms.IntegerField(widget=forms.HiddenInput)
+    score_src = forms.CharField(widget=forms.HiddenInput, required=False)
+    score_tgt = forms.CharField(widget=forms.HiddenInput, required=False)
+    confirm = forms.BooleanField(label="Yes, I confirm the merge", required=True)
+
+
 @admin.register(User)
 class UserAdmin(DefaultUserAdmin):
     fieldsets = _user_fieldsets
@@ -161,10 +196,115 @@ class UserAdmin(DefaultUserAdmin):
         "date_joined",
         "last_login",
     )
+    actions = ["merge_users_action"]
 
     @admin.display(description="ID-linked", boolean=True)
     def is_linked(self, user):
         return user.identity_id is not None
+
+    @admin.action(description="Merge two users (select exactly two)")
+    def merge_users_action(self, request, queryset):
+        if queryset.count() != 2:
+            self.message_user(
+                request, "Select exactly 2 users to merge.", messages.ERROR
+            )
+            return
+        users = list(queryset.order_by("pk"))
+        if users[0].organisation_id != users[1].organisation_id:
+            self.message_user(
+                request,
+                "Both users must belong to the same organisation.",
+                messages.ERROR,
+            )
+            return
+        source, target, score_src, score_tgt = _pick_source_target(*users)
+        url = reverse("admin:core_user_merge_confirm")
+        return HttpResponseRedirect(
+            f"{url}?source={source.pk}&target={target.pk}"
+            f"&score_src={score_src}&score_tgt={score_tgt}"
+        )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "merge-confirm/",
+                self.admin_site.admin_view(self.merge_confirm_view),
+                name="core_user_merge_confirm",
+            ),
+        ]
+        return custom_urls + urls
+
+    def merge_confirm_view(self, request):
+        source_pk = request.GET.get("source") or request.POST.get("source_pk")
+        target_pk = request.GET.get("target") or request.POST.get("target_pk")
+        score_src = request.GET.get("score_src") or request.POST.get("score_src")
+        score_tgt = request.GET.get("score_tgt") or request.POST.get("score_tgt")
+        try:
+            source = User.objects.select_related("organisation").get(pk=int(source_pk))
+            target = User.objects.select_related("organisation").get(pk=int(target_pk))
+        except (User.DoesNotExist, TypeError, ValueError):
+            self.message_user(request, "Invalid user selection.", messages.ERROR)
+            return HttpResponseRedirect(reverse("admin:core_user_changelist"))
+
+        merger = UserMerger(source=source, target=target, dry_run=True)
+        try:
+            preview_log = merger.run()
+        except ValueError as e:
+            self.message_user(request, str(e), messages.ERROR)
+            return HttpResponseRedirect(reverse("admin:core_user_changelist"))
+
+        swap_url = (
+            reverse("admin:core_user_merge_confirm")
+            + f"?source={target.pk}&target={source.pk}"
+            + (
+                f"&score_src={score_tgt}&score_tgt={score_src}"
+                if score_src is not None
+                else ""
+            )
+        )
+
+        if request.method == "POST":
+            form = MergeUsersForm(request.POST)
+            if form.is_valid():
+                real_merger = UserMerger(source=source, target=target, dry_run=False)
+                try:
+                    log = real_merger.run()
+                except ValueError as e:
+                    self.message_user(request, str(e), messages.ERROR)
+                    return HttpResponseRedirect(reverse("admin:core_user_changelist"))
+                self.message_user(
+                    request,
+                    f"Merge complete: {len(log.moved)} moved, "
+                    f"{len(log.merged_roles)} role merges, "
+                    f"{len(log.skipped)} skipped.",
+                    messages.SUCCESS,
+                )
+                return HttpResponseRedirect(
+                    reverse("admin:core_user_change", args=[target.pk])
+                )
+        else:
+            form = MergeUsersForm(
+                initial={
+                    "source_pk": source.pk,
+                    "target_pk": target.pk,
+                    "score_src": score_src,
+                    "score_tgt": score_tgt,
+                }
+            )
+
+        context = dict(
+            self.admin_site.each_context(request),
+            title="Confirm user merge",
+            source=source,
+            target=target,
+            score_src=score_src,
+            score_tgt=score_tgt,
+            swap_url=swap_url,
+            preview_log=preview_log,
+            form=form,
+        )
+        return render(request, "admin/core/user_merge_confirm.html", context)
 
 
 # Replace existing
@@ -188,5 +328,5 @@ class VoteITLogEntryAdmin(LogEntryAdmin):
                 link = reverse(viewname, args=[meeting.pk])
             except NoReverseMatch:
                 return "%s" % meeting
-            return format_html('<a href="{}">{}</a>', link, meeting)
+            return format_html('<a href="{}">{}</a>', link=link, meeting=meeting)
         return "-"

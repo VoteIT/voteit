@@ -1,0 +1,74 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+
+<table>
+  <tr>
+    <th>Source (will be deactivated)</th>
+    <th>Target (will receive all data)</th>
+  </tr>
+  <tr>
+    <td>{{ source }} <small>(pk={{ source.pk }})</small></td>
+    <td>{{ target }} <small>(pk={{ target.pk }})</small></td>
+  </tr>
+  <tr>
+    <td>{{ source.email }}</td>
+    <td>{{ target.email }}</td>
+  </tr>
+  <tr>
+    <td>{{ source.organisation }}</td>
+    <td>{{ target.organisation }}</td>
+  </tr>
+  {% if score_src is not None %}
+  <tr>
+    <td>Activity score: {{ score_src }}</td>
+    <td>Activity score: {{ score_tgt }}</td>
+  </tr>
+  {% endif %}
+</table>
+
+{% if swap_url %}
+<p><a href="{{ swap_url }}" class="button">&#8646; Swap source and target</a></p>
+{% endif %}
+
+{% if preview_log.moved %}
+<h2>Will be moved ({{ preview_log.moved|length }})</h2>
+<ul>
+  {% for msg in preview_log.moved %}<li>{{ msg }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+{% if preview_log.merged_roles %}
+<h2>Roles will be merged ({{ preview_log.merged_roles|length }})</h2>
+<ul>
+  {% for msg in preview_log.merged_roles %}<li>{{ msg }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+{% if preview_log.deleted %}
+<h2>Will be deleted (transient) ({{ preview_log.deleted|length }})</h2>
+<ul>
+  {% for msg in preview_log.deleted %}<li>{{ msg }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+{% if preview_log.skipped %}
+<h2>Will be skipped — conflicts ({{ preview_log.skipped|length }})</h2>
+<p>These records cannot be moved because the target user already has a conflicting record. They will remain on the (deactivated) source user.</p>
+<ul>
+  {% for msg in preview_log.skipped %}<li>{{ msg }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<hr>
+<p><strong>Warning:</strong> Source user <em>{{ source }}</em> will be deactivated after the merge. This cannot be undone automatically.</p>
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <input type="submit" value="Confirm merge" class="default button">
+  &nbsp;
+  <a href="{% url 'admin:core_user_changelist' %}" class="button cancel-link">Cancel</a>
+</form>
+{% endblock %}
