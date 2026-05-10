@@ -1,0 +1,25 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Online organisations</h1>
+{% if organisations %}
+<table>
+    <thead>
+        <tr>
+            <th>Organisation</th>
+            <th>Online users</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for org in organisations %}
+        <tr>
+            <td><a href="{{ org.pk }}/change/">{{ org.title }}</a></td>
+            <td>{{ org.online_users__count }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No organisations have online users right now.</p>
+{% endif %}
+<p><a href="../">← Back to organisations</a></p>
+{% endblock %}
