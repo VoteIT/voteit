@@ -83,7 +83,7 @@ class AgendaItemBulkChange(ContextAction):
         # Remember! We can't reload or change queryset when we touch several attributes.
         if self.data.state:
             for ai in agenda_items:
-                if ai == self.data.state:
+                if ai.state == self.data.state:
                     continue
                 for transition in get_valid_transitions(ai):
                     if transition.target == self.data.state:

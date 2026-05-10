@@ -18,6 +18,7 @@ from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
+from voteit.agenda.workflows import AgendaItemWf
 from voteit.meeting.roles import ROLE_MODERATOR
 
 
@@ -40,10 +41,16 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelVi
         return super().get_serializer_class()
 
     def get_queryset(self):
+        user = self.request.user
         return AgendaItem.objects.filter(
-            models.Q(meeting__roles__user=self.request.user)
-            & models.Q(meeting__roles__assigned__contains=ROLE_MODERATOR)
-            | ~models.Q(state="private")
+            # Moderators see all items in their meetings
+            models.Q(
+                meeting__roles__user=user,
+                meeting__roles__assigned__contains=ROLE_MODERATOR,
+            )
+            # Participants see non-private items in their meetings
+            | models.Q(meeting__roles__user=user)
+            & ~models.Q(state=AgendaItemWf.PRIVATE)
         ).distinct()
 
 
