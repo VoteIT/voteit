@@ -70,6 +70,7 @@ class OrganisationAdmin(admin.ModelAdmin):
         "title",
         "meeting_count",
         "online_users",
+        "users",
         "manager_count",
         "meeting_creator_count",
     )
@@ -97,9 +98,13 @@ class OrganisationAdmin(admin.ModelAdmin):
     def manager_count(self, obj: Organisation):
         return obj.managers__count
 
-    @admin.display(description="Online users")
+    @admin.display(description="Online", ordering="online_users")
     def online_users(self, obj: Organisation):
-        return f"{self.online_mapping.get(obj.pk, 0)} / {obj.users.count()}"
+        return self.online_mapping.get(obj.pk, 0)
+
+    @admin.display(description="Users", ordering="users")
+    def users(self, obj: Organisation):
+        return obj.users.count()
 
     @admin.display(description="Meeting Creators")
     def meeting_creator_count(self, obj: Organisation):
