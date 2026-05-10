@@ -4,7 +4,9 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.test import override_settings
 from django.utils.timezone import now
+from envelope.testing import testing_channel_layers_setting
 from social_django.models import UserSocialAuth
 
 from voteit.meeting.models import Meeting
@@ -25,6 +27,10 @@ def _mk_meeting(org):
     return Meeting.objects.create(organisation=org)
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+    ENVELOPE_CONNECTIONS_QUEUE=None,
+)
 class DeactivateUnusedUsersTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -97,7 +103,9 @@ class DeactivateUnusedUsersTests(TestCase):
 
     def test_social_auth_cleared_on_deactivation(self):
         user = self._old_user("social_auth_user")
-        UserSocialAuth.objects.create(user=user, provider="testprovider", uid="test-uid")
+        UserSocialAuth.objects.create(
+            user=user, provider="testprovider", uid="test-uid"
+        )
         self._run()
         self.assertFalse(UserSocialAuth.objects.filter(user=user).exists())
 
@@ -105,6 +113,8 @@ class DeactivateUnusedUsersTests(TestCase):
         user = _mk_user(self.org, "active_social")
         user.last_login = now() - timedelta(days=5)
         user.save(update_fields=["last_login"])
-        UserSocialAuth.objects.create(user=user, provider="testprovider", uid="test-uid-2")
+        UserSocialAuth.objects.create(
+            user=user, provider="testprovider", uid="test-uid-2"
+        )
         self._run()
         self.assertTrue(UserSocialAuth.objects.filter(user=user).exists())

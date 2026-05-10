@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from django.test import TransactionTestCase
+from django.test import override_settings
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.core.user_merger import UserMerger
 from voteit.meeting.models import Meeting
@@ -33,6 +35,9 @@ def _mk_meeting(org):
     return Meeting.objects.create(organisation=org)
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+)
 class ValidationTests(TransactionTestCase):
     def setUp(self):
         self.org = _mk_org()
@@ -59,6 +64,9 @@ class ValidationTests(TransactionTestCase):
             UserMerger(self.source, no_id).run()
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+)
 class MeetingRolesTests(TransactionTestCase):
     def setUp(self):
         from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -103,6 +111,9 @@ class MeetingRolesTests(TransactionTestCase):
         )
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+)
 class OrganisationRolesTests(TransactionTestCase):
     def setUp(self):
         from voteit.organisation.roles import ROLE_ORG_MANAGER
@@ -117,7 +128,9 @@ class OrganisationRolesTests(TransactionTestCase):
         self.org.add_roles(self.source, self.ROLE_ORG_MANAGER)
         UserMerger(self.source, self.target).run()
         self.assertTrue(
-            OrganisationRoles.objects.filter(user=self.target, context=self.org).exists()
+            OrganisationRoles.objects.filter(
+                user=self.target, context=self.org
+            ).exists()
         )
 
     def test_org_roles_merged(self):
@@ -129,6 +142,9 @@ class OrganisationRolesTests(TransactionTestCase):
         self.assertIn(self.ROLE_MEETING_CREATOR.name, target_or.assigned)
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+)
 class VoteTests(TransactionTestCase):
     def setUp(self):
         from voteit.poll.models import ElectoralRegister
@@ -161,12 +177,13 @@ class VoteTests(TransactionTestCase):
         Vote.objects.create(user=self.source, poll=self.poll, abstain=True)
         Vote.objects.create(user=self.target, poll=self.poll, abstain=True)
         log = UserMerger(self.source, self.target).run()
-        self.assertTrue(
-            Vote.objects.filter(user=self.source, poll=self.poll).exists()
-        )
+        self.assertTrue(Vote.objects.filter(user=self.source, poll=self.poll).exists())
         self.assertTrue(any("skipped" in msg.lower() for msg in log.skipped))
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+)
 class ElectoralRegisterTests(TransactionTestCase):
     def setUp(self):
         from voteit.poll.models import ElectoralRegister
@@ -196,6 +213,9 @@ class ElectoralRegisterTests(TransactionTestCase):
         self.assertTrue(any("ElectoralRegister" in msg for msg in log.skipped))
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+)
 class ActiveUserTests(TransactionTestCase):
     def setUp(self):
         self.org = _mk_org()
@@ -211,6 +231,9 @@ class ActiveUserTests(TransactionTestCase):
         self.assertTrue(any("deleted" in msg.lower() for msg in log.deleted))
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+)
 class ProposalAuthorTests(TransactionTestCase):
     def setUp(self):
         from voteit.agenda.models import AgendaItem
@@ -227,6 +250,9 @@ class ProposalAuthorTests(TransactionTestCase):
         self.assertEqual(self.proposal.author, self.target)
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+)
 class SpeakerListOrderTests(TransactionTestCase):
     def setUp(self):
         self.org = _mk_org()
@@ -240,9 +266,7 @@ class SpeakerListOrderTests(TransactionTestCase):
 
         room = self.meeting.rooms.create()
         sls = SpeakerListSystem.objects.create(method_name="simple", room=room)
-        sl = SpeakerList.objects.create(
-            speaker_system=sls, order=str(self.source.pk)
-        )
+        sl = SpeakerList.objects.create(speaker_system=sls, order=str(self.source.pk))
         Speaker.objects.create(user=self.source, speaker_list=sl)
         UserMerger(self.source, self.target).run()
         sl.refresh_from_db()
@@ -250,6 +274,9 @@ class SpeakerListOrderTests(TransactionTestCase):
         self.assertIn(str(self.target.pk), sl.order)
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+)
 class MentionsMoveTests(TransactionTestCase):
     def setUp(self):
         from voteit.agenda.models import AgendaItem
@@ -270,6 +297,9 @@ class MentionsMoveTests(TransactionTestCase):
         self.assertNotIn(self.source, proposal.mentions.all())
 
 
+@override_settings(
+    CHANNEL_LAYERS=testing_channel_layers_setting,
+)
 class SourceDeactivatedTests(TransactionTestCase):
     def setUp(self):
         self.org = _mk_org()
