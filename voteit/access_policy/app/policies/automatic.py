@@ -37,8 +37,6 @@ class AutomaticAccess(AccessPolicy):
     roles_given: list[Role] = RolesField(
         max_length=60, role_choices=MeetingRoles.valid_roles.values()
     )
-    exporters = {"meeting": {}}
-    importers = {"meeting": {}, "organisation": {}}
 
     def assign(self, user: AbstractUser):
         if self.roles_given:

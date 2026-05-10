@@ -74,12 +74,6 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
             "order",
         )
 
-    exporters = {"meeting": {}}
-    importers = {
-        "meeting": {},
-        "organisation": {"remap_relations": {"user": {"author"}}},
-    }
-
     def save(self, **kw):
         """Set order as last agenda item for meeting when creating."""
         if self.pk is None and self.order in (0, None):

@@ -78,8 +78,6 @@ class ElectoralRegister(RulesModelMixin, MeetingContext):
     )
     voter_data: dict = models.JSONField(default=dict)
 
-    importers = {"organisation": {"remap_relations": {"user": {"author"}}}}
-
     @staticmethod
     def _voter_key(user: AbstractUser | int | str) -> str:
         if isinstance(user, str):
@@ -230,19 +228,6 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         verbose_name="Withheld result",
         default=False,
     )
-
-    importers = {
-        "organisation": {
-            "remap_relations": {
-                "electoral_register": {
-                    "initial_electoral_register",
-                    "electoral_register",
-                },
-                "proposal": {"proposals"},
-                "user": {"author"},
-            }
-        }
-    }
 
     def get_method_class(self) -> type[PollMethod]:
         """Fetch the poll method class, a django proxy model."""
@@ -659,8 +644,6 @@ class Vote(RulesModelMixin, models.Model):
     vote_data: str | None = models.TextField(
         null=True, blank=True
     )  # This field should contain the value from PollMethod
-
-    importers = {"organisation": {}}
 
     @property
     def vote(self) -> BaseModel:

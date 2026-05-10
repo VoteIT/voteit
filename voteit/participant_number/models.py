@@ -30,8 +30,6 @@ class ParticipantNumber(models.Model):
     )
     created: datetime = models.DateTimeField(editable=False, default=now)
 
-    importers = {"organisation": {"remap_relations": {"pnsystem": {"pns"}}}}
-
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -73,8 +71,6 @@ class PNSystem(MeetingContext):
     meeting: Meeting | None = models.OneToOneField(
         Meeting, on_delete=models.CASCADE, null=True, related_name="pn_system"
     )
-
-    importers = {"organisation": {}}
 
     def get_user(self, pn: int, default=None) -> AbstractUser | None:
         for pn_obj in self.numbers.filter(number=pn).all().prefetch_related("user"):

@@ -113,16 +113,6 @@ class MeetingRoles(Roles, MeetingContext):
         """
         return {"m": self.context.pk, "o": self.context.organisation_id}
 
-    exporters = {"meeting": {"meeting_kw": "context"}}
-    importers = {
-        "meeting": {"remap_relations": {"meeting": "context"}},
-        "organisation": {
-            "remap_relations": {
-                "meeting": "context",
-            }
-        },
-    }
-
 
 @history_log("organisation")
 @auditlog.register(
@@ -206,21 +196,6 @@ class Meeting(
     participants = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through=MeetingRoles
     )
-
-    exporters = {
-        "meeting": {
-            "meeting_kw": "pk",
-            "ignore_fields": (
-                "archive_after",
-                "start_time",
-                "end_time",
-            ),
-        }
-    }
-    importers = {
-        "meeting": {},
-        "organisation": {"remap_relations": {"user": {"author"}}},
-    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -535,12 +510,6 @@ class MeetingGroup(BaseContent, MeetingContext):
             #     ),
             # ),
         )
-
-    exporters = {"meeting": {}}
-    importers = {
-        "meeting": {},
-        "organisation": {"remap_relations": {"user": {"author"}}},
-    }
 
     # Type annotations - relations
     proposals: models.QuerySet[Proposal]

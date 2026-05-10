@@ -82,8 +82,6 @@ class User(AbstractUser):
         "Profile image url", blank=True, null=True
     )  # FIXME Validator and scheme
 
-    importers = {"user": {}, "organisation": {}}
-
     class Meta:
         constraints = [
             models.UniqueConstraint(

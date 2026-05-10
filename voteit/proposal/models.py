@@ -95,12 +95,6 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
             )
         ]
 
-    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {
-        "meeting": {"remap_relations": {"user": {"author"}}},
-        "organisation": {"remap_relations": {"user": {"author", "mentions"}}},
-    }
-
     @transition(
         field=state,
         source=ProposalWf.PUBLISHED,
@@ -231,12 +225,6 @@ class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
         null=True,  # Normally no, forced in serializer
     )
 
-    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {
-        "meeting": {"remap_relations": {"user": {"author"}}},
-        "organisation": {"remap_relations": {"user": {"author"}}},
-    }
-
     @property
     def meeting(self) -> Meeting | None:
         if self.agenda_item:
@@ -332,12 +320,6 @@ class TextParagraph(AgendaItemContext, MeetingContext):
         null=True,  # Normally no, forced in serializer
     )
 
-    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {
-        "meeting": {},
-        "organisation": {"remap_relations": {"user"}},
-    }
-
     @property
     def tag(self):
         return f"{self.text_document.base_tag}-{self.paragraph_id}"
@@ -384,22 +366,6 @@ class DiffProposal(Proposal):
     paragraph: TextParagraph = models.ForeignKey(
         TextParagraph, on_delete=models.RESTRICT, related_name="proposals"
     )
-
-    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {
-        "meeting": {
-            "remap_relations": {
-                "text_paragraph": {"paragraph"},
-                "proposal": {"proposal_ptr"},
-            }
-        },
-        "organisation": {
-            "remap_relations": {
-                "text_paragraph": {"paragraph"},
-                "proposal": {"proposal_ptr"},
-            }
-        },
-    }
 
     def save(self, **kw):
         """
