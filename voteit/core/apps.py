@@ -11,6 +11,7 @@ class CoreConfig(AppConfig):
         from voteit.core import models_to_register
         from voteit.core.utils import prepare_available_transitions
         from voteit.core.rest_api import views  # noqa
+        from voteit.core import jobs  # noqa
 
         while models_to_register:
             model = models_to_register.pop()
