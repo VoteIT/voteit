@@ -4,16 +4,13 @@ from typing import Union
 
 from django.db.models import Model
 from django.db.models import QuerySet
-from typing import List
 
 from typing import Set
 
-from typing import Generator
 
 from django.utils.functional import cached_property
 from typing import Iterator
 from voteit.core.utils import get_content_registry
-from voteit.core.utils import get_model_by_shortname
 from voteit.core.utils import get_model_shortname
 
 
@@ -61,7 +58,6 @@ class MeetingExport:
 
 DEFAULT_IGNORE_FIELDS = (
     "created",
-    "last_modified_by",
     "modified",
     "related_modified",
     "start_time",

@@ -77,7 +77,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     exporters = {"meeting": {}}
     importers = {
         "meeting": {},
-        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}},
+        "organisation": {"remap_relations": {"user": {"author"}}},
     }
 
     def save(self, **kw):

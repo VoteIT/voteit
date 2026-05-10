@@ -98,9 +98,7 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
     importers = {
         "meeting": {"remap_relations": {"user": {"author"}}},
-        "organisation": {
-            "remap_relations": {"user": {"author", "mentions", "last_modified_by"}}
-        },
+        "organisation": {"remap_relations": {"user": {"author", "mentions"}}},
     }
 
     @transition(
@@ -226,13 +224,6 @@ class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
         null=True,
         related_name="text_documents",
     )
-    last_modified_by: User = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        editable=False,
-        null=True,
-        related_name="text_documents_last_modified",
-    )
     agenda_item: AgendaItem = models.ForeignKey(
         "agenda.AgendaItem",
         on_delete=models.CASCADE,
@@ -243,7 +234,7 @@ class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
     importers = {
         "meeting": {"remap_relations": {"user": {"author"}}},
-        "organisation": {"remap_relations": {"user": {"author", "last_modified_by"}}},
+        "organisation": {"remap_relations": {"user": {"author"}}},
     }
 
     @property
@@ -344,7 +335,7 @@ class TextParagraph(AgendaItemContext, MeetingContext):
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
     importers = {
         "meeting": {},
-        "organisation": {"remap_relations": {"user": "last_modified_by"}},
+        "organisation": {"remap_relations": {"user"}},
     }
 
     @property

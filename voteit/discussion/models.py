@@ -62,9 +62,7 @@ class DiscussionPost(
     exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
     importers = {
         "meeting": {"remap_relations": {"user": {"author"}}},
-        "organisation": {
-            "remap_relations": {"user": {"author", "mentions", "last_modified_by"}}
-        },
+        "organisation": {"remap_relations": {"user": {"author", "mentions"}}},
     }
 
     @property

@@ -24,7 +24,6 @@ class AgendaItemSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "id",
             "author",
             "mentions",
-            "last_modified_by",
         )
 
 
@@ -69,7 +68,6 @@ class CreateAgendaItemSerializer(AgendaItemSerializer):
             "related_modified",
             "mentions",
             "state",
-            "last_modified_by",
         )
 
     def validate_meeting(self, meeting):

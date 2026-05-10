@@ -78,9 +78,7 @@ class ElectoralRegister(RulesModelMixin, MeetingContext):
     )
     voter_data: dict = models.JSONField(default=dict)
 
-    importers = {
-        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}}
-    }
+    importers = {"organisation": {"remap_relations": {"user": {"author"}}}}
 
     @staticmethod
     def _voter_key(user: AbstractUser | int | str) -> str:
@@ -241,7 +239,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
                     "electoral_register",
                 },
                 "proposal": {"proposals"},
-                "user": {"last_modified_by", "author"},
+                "user": {"author"},
             }
         }
     }

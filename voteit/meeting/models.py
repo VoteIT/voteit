@@ -219,7 +219,7 @@ class Meeting(
     }
     importers = {
         "meeting": {},
-        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}},
+        "organisation": {"remap_relations": {"user": {"author"}}},
     }
 
     def __init__(self, *args, **kwargs):
@@ -539,7 +539,7 @@ class MeetingGroup(BaseContent, MeetingContext):
     exporters = {"meeting": {}}
     importers = {
         "meeting": {},
-        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}},
+        "organisation": {"remap_relations": {"user": {"author"}}},
     }
 
     # Type annotations - relations
