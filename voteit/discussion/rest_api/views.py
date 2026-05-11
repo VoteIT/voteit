@@ -51,7 +51,7 @@ class DiscussionPostViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
             )
             | models.Q(agenda_item__meeting__roles__user=user)
             & ~models.Q(agenda_item__state="private")
-        ).distinct()
+        ).select_related("agenda_item__meeting").distinct()
 
 
 @router.register("export-discussion-posts", basename="export-discussion-posts")

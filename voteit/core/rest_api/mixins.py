@@ -34,6 +34,14 @@ class VerboseAutoPermissionViewSetMixin(RulesAutoPermissionViewSetMixin):
         "transitions": None,
     }
 
+    def get_object(self):
+        # Cache the fetched object for the lifetime of the request so that
+        # AutoPermissionViewSetMixin.initial() and the action handler don't
+        # each issue a separate DB query for the same row.
+        if not hasattr(self, "_cached_object"):
+            self._cached_object = super().get_object()
+        return self._cached_object
+
     def initial(self, *args, **kwargs):
         try:
             return super().initial(*args, **kwargs)

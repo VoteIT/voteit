@@ -51,7 +51,7 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelVi
             # Participants see non-private items in their meetings
             | models.Q(meeting__roles__user=user)
             & ~models.Q(state=AgendaItemWf.PRIVATE)
-        ).distinct()
+        ).select_related("meeting").distinct()
 
 
 @router.register("export-agenda-items", basename="export-agenda-items")

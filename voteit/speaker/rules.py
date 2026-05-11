@@ -142,8 +142,8 @@ rules.add_perm(
 rules.add_perm(
     SpeakerList.get_perm(PERM_ENTER),
     is_list_open
-    & not_currently_speaking
     & meeting_upcoming_ongoing
+    & not_currently_speaking
     & (has_speaker_role | is_moderator),
 )
 rules.add_perm(

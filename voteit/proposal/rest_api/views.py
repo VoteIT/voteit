@@ -59,6 +59,7 @@ class ProposalViewSet(
                 | models.Q(agenda_item__meeting__roles__user=user)
                 & ~models.Q(agenda_item__state="private")
             )
+            .select_related("agenda_item__meeting")
             .select_subclasses()
             .distinct()
         )
