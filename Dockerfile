@@ -37,6 +37,7 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 COPY --chown=voteit:voteit --chmod=+x manage.py docker-entrypoint.sh wait-for-it.sh ./
 COPY --chown=voteit:voteit project ./project
+COPY --chown=voteit:voteit locales ./locales
 
 USER voteit
 

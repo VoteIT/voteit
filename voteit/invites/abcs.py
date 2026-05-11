@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from django.utils.translation import gettext_lazy as _
 from django.utils.functional import classproperty
@@ -11,11 +12,20 @@ from typing import Generator
 
 from voteit.invites.exceptions import DataColValidationError
 
+
 if TYPE_CHECKING:
     from voteit.invites.models import MeetingInvite
     from voteit.meeting.models import Meeting
     from voteit.invites.registries import InviteAdapterRegistry
     from voteit.invites.schemas import AnnotationResultSchema
+
+
+@dataclass(frozen=True)
+class FormattedAnnotationRow:
+    """A CSV row split into identity data (for invite matching) and full row data (for effect application)."""
+
+    user_data: dict  # identity columns only (email, ssn) — used to match against invite.user_data
+    row_data: dict  # all columns including effect columns (group, grouprole)
 
 
 class InviteDataAdapter(ABC):
@@ -78,7 +88,7 @@ class InviteDataAdapter(ABC):
                 if rval:
                     try:
                         data = cls.schema(**{cls.name: rval})
-                    except ValueError as exc:
+                    except ValueError:
                         bad_rows.append(num)
                         continue
                     row[i] = getattr(data, cls.name)
@@ -145,7 +155,7 @@ class AnnotationDataAdapter(InviteDataAdapter, ABC):
         columns: list[str],
         rows: list[list[str | None | int]],
         registry: InviteAdapterRegistry,
-        annotations_formatted,
+        annotations_formatted: list[FormattedAnnotationRow],
         meeting: Meeting,
         **kwargs,
     ) -> AnnotationResultSchema | None:
@@ -171,7 +181,7 @@ class AnnotationDataAdapter(InviteDataAdapter, ABC):
         """
         return invites_qs
 
-    def has_annotations(self, from_qs: bool = True) -> bool | None | int:
+    def has_annotations(self, from_qs: bool = True) -> bool | None:
         """
         Does this method have any annotations?
         """

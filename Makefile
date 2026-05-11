@@ -1,5 +1,6 @@
 .DEFAULT_GOAL := install
 .ONESHELL:
+.PHONY: build dev
 
 install:
 	cat INSTALL.md
@@ -27,16 +28,17 @@ run:
 test:
 	python manage.py test voteit --keepdb --failfast
 test-deps:
-	python manage.py test dialect_tests voteit_org --keepdb --failfast
+	python manage.py test dialects voteit_org --keepdb --failfast
 build:
-	set -e
-	uv build --wheel
-	uv build --wheel src/voteit_org -o ./dist
-	uv build --wheel src/member_dialects -o ./dist
+	uv build --all-packages -o ./dist
 dev: build
 	set -e
 	docker pull python:3.13-slim
 	docker build . -t voteit/voteit4dev:dev
+messages:
+	cd voteit && python ../manage.py makemessages  -l sv -i=.venv -i=src
+compilemessages:
+	cd voteit && python ../manage.py compilemessages -i=.venv -i=src
 envtest:
 	export DJANGO_DEBUG=1 \
 	POSTGRES_HOST=127.0.0.1 \

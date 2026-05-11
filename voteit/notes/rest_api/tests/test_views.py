@@ -68,14 +68,12 @@ class NoteViewSetTests(APITestCase):
         self.client.force_login(self.participant)
         response = self.client.post(
             url,
-            data={"proposal": self.prop.pk, "body": "I <b>dig</b> this!"},
+            data={"proposal": self.prop.pk, "body": "Updated body"},
         )
         data = response.json()
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, data)
-        self.assertEqual(
-            {"non_field_errors": ["The fields user, proposal must make a unique set."]},
-            data,
-        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, data)
+        self.assertEqual(data["proposal"], self.prop.pk)
+        self.assertEqual(data["body"], "Updated body")
 
     def test_create_with_messy_html(self):
         url = reverse("notes-list")

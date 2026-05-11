@@ -69,7 +69,7 @@ class GroupAnnotationTests(TestCase):
     def test_annotate(self):
         columns, rows = get_unvalidated_fixture_content("grouprole.csv")
         annotations_formatted = list(
-            self.registry.format_for_annotations(columns, rows)
+            self.registry.format_effect_rows(columns, rows)
         )
         invites_qs = self.meeting.invites.all()
         result = self._cut.annotate(
@@ -100,7 +100,7 @@ class GroupAnnotationTests(TestCase):
     def test_annotate_some_existed(self):
         columns, rows = get_unvalidated_fixture_content("grouprole.csv")
         annotations_formatted = list(
-            self.registry.format_for_annotations(columns, rows)
+            self.registry.format_effect_rows(columns, rows)
         )
         invites_qs = self.meeting.invites.all()
         self._cut.annotate(
@@ -143,7 +143,7 @@ class GroupAnnotationTests(TestCase):
     def test_annotate_some_existed_with_wrong_role(self):
         columns, rows = get_unvalidated_fixture_content("grouprole.csv")
         annotations_formatted = list(
-            self.registry.format_for_annotations(columns, rows)
+            self.registry.format_effect_rows(columns, rows)
         )
         invites_qs = self.meeting.invites.all()
         self._cut.annotate(
@@ -188,7 +188,7 @@ class GroupAnnotationTests(TestCase):
         self.inv_vader.save()
         columns, rows = get_unvalidated_fixture_content("mixed_and_group.csv")
         annotations_formatted = list(
-            self.registry.format_for_annotations(columns, rows)
+            self.registry.format_effect_rows(columns, rows)
         )
         invites_qs = self.meeting.invites.all()
         result = self._cut.annotate(
@@ -203,7 +203,7 @@ class GroupAnnotationTests(TestCase):
     def test_annotate_some_used_one_used_wrong_state(self):
         columns, rows = get_unvalidated_fixture_content("grouprole.csv")
         annotations_formatted = list(
-            self.registry.format_for_annotations(columns, rows)
+            self.registry.format_effect_rows(columns, rows)
         )
         self._cut.annotate(
             invites_qs=self.meeting.invites.all(),
@@ -243,7 +243,7 @@ class GroupAnnotationTests(TestCase):
     def test_prep_invites_qs_for_subscribe(self):
         columns, rows = get_unvalidated_fixture_content("grouprole.csv")
         annotations_formatted = list(
-            self.registry.format_for_annotations(columns, rows)
+            self.registry.format_effect_rows(columns, rows)
         )
         invites_qs = self.meeting.invites.all()
         self._cut.annotate(
@@ -255,7 +255,7 @@ class GroupAnnotationTests(TestCase):
         )
         annotated_invites_qs = self._cut.prep_invites_qs_for_subscribe(invites_qs)
         self.assertEqual(
-            [2, 2, 1, 0],
+            [True, True, True, False],
             [
                 self._cut(x).has_annotations()
                 for x in annotated_invites_qs.order_by("pk")
@@ -265,7 +265,7 @@ class GroupAnnotationTests(TestCase):
     def test_get_annotations(self):
         columns, rows = get_unvalidated_fixture_content("grouprole.csv")
         annotations_formatted = list(
-            self.registry.format_for_annotations(columns, rows)
+            self.registry.format_effect_rows(columns, rows)
         )
         invites_qs = self.meeting.invites.all()
         self._cut.annotate(

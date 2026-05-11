@@ -25,6 +25,18 @@ class NoteViewSet(ModelViewSet):
     def get_queryset(self):
         return Note.objects.filter(user=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        headers = self.get_success_headers(serializer.data)
+        created = getattr(serializer, "_created", True)
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+            headers=headers,
+        )
+
     @action(
         detail=False,
         methods=["post"],

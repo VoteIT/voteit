@@ -6,8 +6,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
-      max-parallel: 5
       matrix:
         python-version: ['3.13']
 
@@ -27,9 +25,14 @@ jobs:
         image: redis:8
         ports:
           - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
 
     - name: Checkout / voteit_org
       uses: actions/checkout@v6
@@ -67,3 +70,4 @@ jobs:
         OAUTHLIB_INSECURE_TRANSPORT: 1
         HOST: .voteit.se
         REDIS_CACHE_LOCATION: redis://127.0.0.1:6379/4
+        DJANGO_SECRET_KEY: very-secret
