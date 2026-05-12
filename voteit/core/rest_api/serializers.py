@@ -149,6 +149,7 @@ class UserListSerializer(serializers.ModelSerializer):
             "pk",
             "email",
             "img_url",
+            "image",
             "userid",
             "first_name",
             "last_name",
@@ -168,6 +169,7 @@ class UserSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "email",
+            "image",
         )
 
     def validate_userid(self, value: str):

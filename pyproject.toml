@@ -42,6 +42,7 @@ dependencies = [
     "setuptools (>=80.9.0,<81.0.0)",
     "django-controlcenter>=0.3.3",
     "py-vote-core>=2.0.0",
+    "python-magic>=0.4.27",
 ]
 
 [project.urls]

@@ -1,4 +1,8 @@
+import logging
+
 from django.apps import AppConfig
+
+logger = logging.getLogger(__name__)
 
 
 class CoreConfig(AppConfig):
@@ -29,6 +33,16 @@ class CoreConfig(AppConfig):
         from voteit.core.signals import post_init_registrations
 
         post_init_registrations()
+
+        try:
+            import magic
+
+            magic.from_buffer(b"\xff\xd8", mime=True)
+        except Exception:
+            logger.exception(
+                "libmagic C library is missing or broken — image upload validation will "
+                "return HTTP 400. Install it with: apt-get install libmagic1"
+            )
 
 
 def register_model(model, registry):

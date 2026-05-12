@@ -10,6 +10,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() in ("true", "1")
 VERBOSE_PERMISSIONS = DEBUG
 LOCALE_PATHS = [os.path.join(BASE_DIR, "locales")]
+MEDIA_URL = "media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 STATIC_ROOT = "/app/static/"
 ALLOWED_HOSTS = ["127.0.0.1"] + os.getenv("HOST", "").split()
