@@ -32,6 +32,12 @@ _user_fieldsets.insert(
         {"fields": ("organisation",)},
     ),
 )
+_user_fieldsets.append(
+    (
+        "Profile image",
+        {"fields": ("img_url", "image")},
+    )
+)
 
 
 class OnlineFilter(admin.SimpleListFilter):

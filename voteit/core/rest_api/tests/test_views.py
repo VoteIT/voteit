@@ -301,7 +301,9 @@ _PNG = (
     b"\x00\x00\x00\x00IEND\xaeB`\x82"
 )
 _WEBP = b"RIFF\x04\x00\x00\x00WEBP"
-_GIF = b"GIF89a\x01\x00\x01\x00\x00\xff\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x00;"
+_GIF = (
+    b"GIF89a\x01\x00\x01\x00\x00\xff\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x00;"
+)
 
 
 class UserImageAPITests(APITestCase):
@@ -331,7 +333,9 @@ class UserImageAPITests(APITestCase):
     def _patch(self, content, name="photo.jpg", content_type="image/jpeg"):
         return self.client.patch(
             self._url(),
-            data={"image": SimpleUploadedFile(name, content, content_type=content_type)},
+            data={
+                "image": SimpleUploadedFile(name, content, content_type=content_type)
+            },
             format="multipart",
         )
 
@@ -363,7 +367,9 @@ class UserImageAPITests(APITestCase):
         self.assertEqual(200, self._patch(_JPEG).status_code)
         self.participant.refresh_from_db()
         self.assertTrue(self.participant.image)
-        self.assertTrue(self.participant.image.storage.exists(self.participant.image.name))
+        self.assertTrue(
+            self.participant.image.storage.exists(self.participant.image.name)
+        )
 
     def test_replace_image_returns_new_url(self):
         self.client.force_login(self.participant)
@@ -392,9 +398,9 @@ class UserImageAPITests(APITestCase):
         self.assertEqual(400, response.status_code)
 
     def test_oversized_file_rejected(self):
-        # Default max_size is 30 000 bytes; pad JPEG bytes well beyond that
+        # Default max_size is 300kb, pad JPEG bytes well beyond that
         self.client.force_login(self.participant)
-        response = self._patch(_JPEG + b"\x00" * 30_001)
+        response = self._patch(_JPEG + b"\x00" * 350_000)
         self.assertEqual(400, response.status_code)
         self.assertIn("image", response.json())
 

@@ -10,11 +10,19 @@ from django.utils.translation import gettext_lazy as _
 from voteit.core.utils import get_model_by_shortname
 
 
+def _fmt_bytes(n: int) -> str:
+    if n >= 1024 * 1024:
+        return f"{n / (1024 * 1024):.1f} MB"
+    if n >= 1024:
+        return f"{n // 1024} KB"
+    return f"{n} B"
+
+
 @deconstructible
 class ImageValidator:
     def __init__(
         self,
-        max_size: int = 300_00,
+        max_size: int = 300 * 1024,
         allowed_mimes=("image/jpeg", "image/png", "image/webp"),
     ):
         self.max_size = max_size
@@ -27,7 +35,9 @@ class ImageValidator:
             raise ValidationError(_("Image upload is currently unavailable."))
 
         if file.size > self.max_size:
-            raise ValidationError(_("File too large. Max size: %d" % self.max_size))
+            raise ValidationError(
+                _("File too large. Max size: %s") % _fmt_bytes(self.max_size)
+            )
         file.seek(0)
         data = file.read(2048)
         file.seek(0)
