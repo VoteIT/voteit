@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-07 15:28+0200\n"
-"PO-Revision-Date: 2026-05-07 15:29+0200\n"
+"POT-Creation-Date: 2026-05-12 11:21+0200\n"
+"PO-Revision-Date: 2026-05-12 11:23+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 3.8\n"
+"X-Generator: Poedit 3.9\n"
 
 #: access_policy/app/policies/automatic.py:36
 msgid "Give users access automatically"
@@ -26,20 +26,20 @@ msgstr "Ge användare access automatiskt"
 msgid "Can't bulk delete in ongoing meeting"
 msgstr "Kan inte radera många på en gång i ett pågående möte"
 
-#: agenda/models.py:158 poll/models.py:416
+#: agenda/models.py:152 poll/models.py:383
 msgid "Make upcoming"
 msgstr "Gör kommande"
 
-#: agenda/models.py:172
+#: agenda/models.py:166
 msgid "Unpublish"
 msgstr "Avpublicera"
 
-#: agenda/models.py:187 meeting/models.py:316
+#: agenda/models.py:181 meeting/models.py:291
 msgid "Make ongoing"
 msgstr "Gör pågående"
 
-#: agenda/models.py:199 meeting/models.py:327 poll/models.py:445
-#: speaker/models.py:540
+#: agenda/models.py:193 meeting/models.py:302 poll/models.py:412
+#: speaker/models.py:523
 msgid "Close"
 msgstr "Avsluta"
 
@@ -66,11 +66,11 @@ msgstr "Arkiverad"
 
 #: components/models.py:61 components/models.py:107
 msgid "Enable"
-msgstr ""
+msgstr "Aktivera"
 
 #: components/models.py:72 components/models.py:118
 msgid "Disable"
-msgstr ""
+msgstr "Stäng av"
 
 #: core/messages/roles.py:92
 msgid "Some users don't exist, aborting"
@@ -84,12 +84,12 @@ msgstr "Gruppen existerar inte"
 msgid "You're not a member of this group"
 msgstr "Du är inte medlem av den här gruppen"
 
-#: core/rest_api/serializers.py:195
+#: core/rest_api/serializers.py:197
 msgid "Email you specified isn't validated. It must exist on your profile."
 msgstr ""
 "Eposten du specificerade är inte validerad. Den måste finnas i din profil."
 
-#: core/rest_api/serializers.py:419
+#: core/rest_api/serializers.py:421
 msgid "You can only pick existing users within this meeting"
 msgstr "Du kan bara välja existerande användare som är med i mötet"
 
@@ -129,7 +129,21 @@ msgstr "Denna mötesgrupp tillåter inte att du postar som den (post_as=False)"
 
 #: core/templates/voteit/base_email.html:38
 msgid "This email was sent from:"
-msgstr ""
+msgstr "Eposten skickades från:"
+
+#: core/validators.py:35 core/validators.py:47
+msgid "Image upload is currently unavailable."
+msgstr "Det går för närvarande inte att ladda upp bilder."
+
+#: core/validators.py:39
+#, python-format
+msgid "File too large. Max size: %s"
+msgstr "Filen är för stor. Maxstorlek: %s"
+
+#: core/validators.py:55
+#, python-format
+msgid "Unsupported file type, must be one of: %s."
+msgstr "Filtypen stöds inte. Det måste vara en av följande: %s."
 
 #: core/workflows.py:11 proposal/workflows.py:17
 msgid "Unhandled"
@@ -167,7 +181,7 @@ msgstr "Skickas"
 msgid "Sent"
 msgstr "Skickad"
 
-#: core/workflows.py:50 poll/models.py:531 poll/workflows.py:22
+#: core/workflows.py:50 poll/models.py:498 poll/workflows.py:22
 msgid "Failed"
 msgstr "Misslyckades"
 
@@ -215,6 +229,9 @@ msgid ""
 "moderators via participants tab instead. Related to userID(s): %(userids)s. "
 "Data: %(data)s"
 msgstr ""
+"Din åtgärd skulle leda till att behörigheterna för vissa moderatorer sänks. "
+"Hantera istället moderatorerna via fliken ”Deltagare”. Berörda användar-ID: "
+"%(userids)s. Data: %(data)s"
 
 #: invites/messages.py:169
 msgid ""
@@ -224,7 +241,7 @@ msgstr ""
 "Följande matchar inte existerande inbjudningar. Kanske finns inte inbjudan "
 "eller så matchades datan bara delvis? Undersök följande data:"
 
-#: invites/workflows.py:12 presence/workflows.py:7 speaker/models.py:530
+#: invites/workflows.py:12 presence/workflows.py:7 speaker/models.py:513
 #: speaker/workflows.py:8
 msgid "Open"
 msgstr "Öppen"
@@ -237,31 +254,31 @@ msgstr "Utgången"
 msgid "Revoked"
 msgstr "Tillbakadragen"
 
-#: meeting/models.py:293
+#: meeting/models.py:268
 msgid "Must have valid electoral register policy name"
 msgstr "Mötet måste ha en giltig röstlängdspolicy"
 
-#: meeting/models.py:298
+#: meeting/models.py:273
 msgid "Meeting has ongoing polls - close them first"
 msgstr "Mötet har pågående omröstningar - stäng dem först"
 
-#: meeting/models.py:305
+#: meeting/models.py:280
 msgid "Back to upcoming"
 msgstr "Tillbaka till kommande"
 
-#: meeting/models.py:337
+#: meeting/models.py:312
 msgid "Request archiving"
 msgstr "Begär arkivering"
 
-#: meeting/models.py:348
+#: meeting/models.py:323
 msgid "Abort archiving"
 msgstr "Avbryt arkivering"
 
-#: meeting/models.py:376
+#: meeting/models.py:351
 msgid "Request delete..."
 msgstr "Begär borttagning…"
 
-#: meeting/models.py:387
+#: meeting/models.py:362
 msgid "Abort delete"
 msgstr "Avbryt borttagning"
 
@@ -303,7 +320,7 @@ msgstr "Du är inloggad i en annan organisation"
 
 #: participant_number/apps.py:7
 msgid "Participant number"
-msgstr ""
+msgstr "Deltagarnummer"
 
 #: poll/app/er_policies/auto_always.py:32
 msgid "Automatic always"
@@ -489,22 +506,22 @@ msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
 msgid "Simple"
 msgstr "Enkel"
 
-#: poll/models.py:332
+#: poll/models.py:299
 msgid "Invalid settings"
 msgstr "Ogiltiga inställningar"
 
-#: poll/models.py:340
+#: poll/models.py:307
 msgid ""
 "There's no electoral register method on this meeting - check configuration"
 msgstr ""
 "Det finns ingen metod för att skapa en röstlängd i mötet - kolla "
 "inställningar"
 
-#: poll/models.py:353
+#: poll/models.py:320
 msgid "Poll method settings invalid"
 msgstr "Omröstningens inställningar är fel"
 
-#: poll/models.py:366
+#: poll/models.py:333
 msgid ""
 "This electoral register method requires you to create electoral registers "
 "manually before starting a poll."
@@ -512,31 +529,31 @@ msgstr ""
 "Röstlängdsmetoden kräver att du skapar en röstlängd manuellt. Gör det innan "
 "du startar omröstningen."
 
-#: poll/models.py:432
+#: poll/models.py:399
 msgid "Start"
 msgstr "Starta"
 
-#: poll/models.py:460
+#: poll/models.py:427
 msgid "Finish"
 msgstr "Avsluta"
 
-#: poll/models.py:488
+#: poll/models.py:455
 msgid "Publish result"
 msgstr "Publicera resultat"
 
-#: poll/models.py:500
+#: poll/models.py:467
 msgid "Withold detailed result"
 msgstr "Dölj detaljerat resultat"
 
-#: poll/models.py:510
+#: poll/models.py:477
 msgid "Cancel"
 msgstr "Avbryt"
 
-#: poll/models.py:521
+#: poll/models.py:488
 msgid "Revert to private"
 msgstr "Återgå till privat"
 
-#: poll/models.py:544 poll/workflows.py:23
+#: poll/models.py:511 poll/workflows.py:23
 msgid "No result"
 msgstr "Inget resultat"
 
@@ -552,27 +569,27 @@ msgstr "Dolt resultat"
 msgid "Canceled"
 msgstr "Avbruten"
 
-#: proposal/models.py:111
+#: proposal/models.py:103
 msgid "Retract"
 msgstr "Dra tillbaka"
 
-#: proposal/models.py:122
+#: proposal/models.py:114
 msgid "Lock for vote"
 msgstr "Lås för omröstning"
 
-#: proposal/models.py:136
+#: proposal/models.py:128
 msgid "Approve"
 msgstr "Bifall"
 
-#: proposal/models.py:147
+#: proposal/models.py:139
 msgid "Deny"
 msgstr "Avslå"
 
-#: proposal/models.py:158
+#: proposal/models.py:150
 msgid "Mark as unhandled"
 msgstr "Markera som ohanterad"
 
-#: proposal/models.py:169
+#: proposal/models.py:161
 msgid "Publish"
 msgstr "Publicerad"
 
@@ -609,15 +626,15 @@ msgid "This type of reaction can't be added to this content type"
 msgstr ""
 "Denna typ av reaktion kan inte läggas till för den här sortens innehåll"
 
-#: speaker/models.py:230
+#: speaker/models.py:222
 msgid "Make active"
 msgstr "Gör aktiv"
 
-#: speaker/models.py:243
+#: speaker/models.py:235
 msgid "Inactivate"
 msgstr "Inaktivera"
 
-#: speaker/models.py:259
+#: speaker/models.py:251
 msgid "Archive"
 msgstr "Arkivera"
 
