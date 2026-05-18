@@ -115,18 +115,26 @@ class ElectoralRegister(RulesModelMixin, MeetingContext):
         """
         Set voters exactly according to {user PK: weight}.
         Low-level — does not validate that users have meeting access.
+        This is the only sanctioned way to update voter_data after creation.
         """
+        if self.voter_data:
+            raise ValueError("voter_data already set")
+        self._allow_voter_data_write = True
         self.voter_data = {str(k): v for k, v in values.items()}
         self.save(update_fields=["voter_data"])
 
-    def add_voter(self, user: AbstractUser, weight: int = 1):
-        self.voter_data = {**self.voter_data, self._voter_key(user): weight}
-        self.save(update_fields=["voter_data"])
-
-    def remove_voter(self, user: AbstractUser):
-        key = self._voter_key(user)
-        self.voter_data = {k: v for k, v in self.voter_data.items() if k != key}
-        self.save(update_fields=["voter_data"])
+    def save(self, **kw):
+        # A bit silly but better than nothing
+        update_fields = kw.get("update_fields")
+        if (
+            self.pk is not None
+            and update_fields is not None
+            and "voter_data" in update_fields
+            and not getattr(self, "_allow_voter_data_write", False)
+        ):
+            raise ValueError("voter_data is immutable; use set_voters_from_dict()")
+        self._allow_voter_data_write = False
+        super().save(**kw)
 
     class QuerySet(models.QuerySet):
         def for_user(self, user: AbstractUser):

@@ -32,7 +32,7 @@ class PollRulesTests(TestCase):
         cls.outsider = User.objects.create(username="anon")
         cls.participant_user = cls.meeting.participants.create(username="participant")
         cls.voter_user = User.objects.create(username="voter")
-        cls.er.add_voter(cls.voter_user)
+        cls.er.set_voters_from_dict({cls.voter_user.pk: 1})
         # Voters should always be participants too
         cls.meeting.add_roles(cls.voter_user, ROLE_PARTICIPANT)
         cls.moderator = cls.meeting.participants.create(username="moderator")

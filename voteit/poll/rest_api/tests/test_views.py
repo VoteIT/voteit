@@ -386,7 +386,8 @@ class ExportElectoralRegisterViewSetTests(APITestCase):
         self.assertEqual(404, response.status_code)
 
     def test_csv_no_data(self):
-        self.er.set_voters_from_dict({})
+        self.er.voter_data = {}
+        self.er.save()
         self.client.force_login(self.moderator)
         url = reverse("export-electoral-register-csv", kwargs={"pk": self.er.pk})
         response = self.client.get(url)

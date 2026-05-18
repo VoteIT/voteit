@@ -356,7 +356,7 @@ class AddSchulzeVoteTests(TestCase):
         cls.prop2 = cls.poll.proposals.create()
         cls.prop3 = cls.poll.proposals.create()
         cls.voter = User.objects.create(username="voter")
-        cls.er.add_voter(cls.voter)
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.poll.upcoming()
         cls.poll.save()
 

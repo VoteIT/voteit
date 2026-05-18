@@ -30,7 +30,7 @@ class AddVoteTests(TestCase):
     def setUpTestData(cls):
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter = User.objects.create(username="voter")
-        cls.er.add_voter(cls.voter)
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.poll: Poll = Poll.objects.create(
             electoral_register=cls.er, method_name="simple"
         )
@@ -93,7 +93,7 @@ class AbstainTests(TestCase):
     def setUpTestData(cls):
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter = User.objects.create(username="voter")
-        cls.er.add_voter(cls.voter)
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.poll: Poll = Poll.objects.create(
             electoral_register=cls.er, method_name="simple"
         )
@@ -142,7 +142,7 @@ class ChangeVoteTests(TestCase):
     def setUpTestData(cls):
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter = User.objects.create(username="voter")
-        cls.er.add_voter(cls.voter)
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.poll: Poll = Poll.objects.create(
             electoral_register=cls.er, method_name="simple"
         )

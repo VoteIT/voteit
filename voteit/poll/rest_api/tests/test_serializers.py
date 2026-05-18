@@ -189,7 +189,7 @@ class PollCreateSerializerTests(TestCase):
         cls.prop = cls.ai.proposals.create()
         cls.er = cls.meeting.electoral_registers.create()
         cls.voter = User.objects.create(username="one")
-        cls.er.add_voter(cls.voter)
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.meeting.add_roles(cls.voter, ROLE_POTENTIAL_VOTER)
         cls.moderator = cls.meeting.participants.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
@@ -390,7 +390,7 @@ class VoteSerializerTests(TestCase):
         )
         cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
         cls.user = User.objects.create(username="voter")
-        cls.er.add_voter(cls.user)
+        cls.er.set_voters_from_dict({cls.user.pk: 1})
         cls.vote = cls.poll.votes.create(user=cls.user, vote="yes")
 
     @property

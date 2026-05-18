@@ -165,7 +165,7 @@ class PollTests(TestCase):
     def test_vote_moved_when_no_conflict(self):
         from voteit.poll.models import Vote
 
-        self.er.add_voter(self.source)
+        self.er.set_voters_from_dict({self.source.pk: 1})
         vote = Vote.objects.create(user=self.source, poll=self.poll, abstain=True)
         UserMerger(self.source, self.target).run()
         vote.refresh_from_db()
@@ -174,8 +174,7 @@ class PollTests(TestCase):
     def test_vote_skipped_when_both_voted(self):
         from voteit.poll.models import Vote
 
-        self.er.add_voter(self.source)
-        self.er.add_voter(self.target)
+        self.er.set_voters_from_dict({self.source.pk: 1, self.target.pk: 1})
         Vote.objects.create(user=self.source, poll=self.poll, abstain=True)
         Vote.objects.create(user=self.target, poll=self.poll, abstain=True)
         log = UserMerger(self.source, self.target).run()
@@ -185,7 +184,7 @@ class PollTests(TestCase):
     def test_er_key_moved(self):
         from voteit.poll.models import ElectoralRegister
 
-        self.er.add_voter(self.source)
+        self.er.set_voters_from_dict({self.source.pk: 1})
         UserMerger(self.source, self.target).run()
         er = ElectoralRegister.objects.get(pk=self.er.pk)
         self.assertIn(str(self.target.pk), er.voter_data)
@@ -194,8 +193,7 @@ class PollTests(TestCase):
     def test_er_skipped_when_both_present(self):
         from voteit.poll.models import ElectoralRegister
 
-        self.er.add_voter(self.source)
-        self.er.add_voter(self.target)
+        self.er.set_voters_from_dict({self.source.pk: 1, self.target.pk: 1})
         log = UserMerger(self.source, self.target).run()
         er = ElectoralRegister.objects.get(pk=self.er.pk)
         self.assertIn(str(self.source.pk), er.voter_data)

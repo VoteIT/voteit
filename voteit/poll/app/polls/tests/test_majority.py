@@ -136,7 +136,7 @@ class AddMajorityVoteTests(TestCase):
     def setUpTestData(cls):
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter = User.objects.create(username="a")
-        cls.er.add_voter(cls.voter)
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.poll: Poll = Poll.objects.create(
             electoral_register=cls.er, method_name="majority", state=PollWf.ONGOING
         )

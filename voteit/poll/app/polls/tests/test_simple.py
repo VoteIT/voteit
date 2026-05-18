@@ -40,7 +40,7 @@ class SimpleTests(TestCase):
         self.poll.upcoming()
         self.poll.proposals.create()
         voter = User.objects.create(username="a")
-        self.er.add_voter(voter)
+        self.er.set_voters_from_dict({voter.pk: 1})
         self.poll.ongoing()
         vote = self.poll.votes.create(user=voter, vote="yes")
         self.assertIsInstance(vote.vote, SimpleVoteSchema)

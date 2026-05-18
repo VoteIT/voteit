@@ -1,7 +1,6 @@
 from collections import Counter
 from random import randint
 from random import sample
-from random import seed
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -25,7 +24,7 @@ class IRVTests(TestCase):
         cls.er = ElectoralRegister.objects.create()
         cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="irv")
         cls.voter = User.objects.create(username="a_voter")
-        cls.er.add_voter(cls.voter)
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
 
     @property
     def IRV(self):
@@ -53,7 +52,10 @@ class IRVTests(TestCase):
         self.assertIsNone(self.poll.method.start_check())
         proposal_pks = list(self.poll.proposals.values_list("pk", flat=True))
         new_voters = [User.objects.create(username=f"voter-{n}") for n in range(20)]
-        self.er.set_voters_from_dict({**self.er.voter_data, **{u.pk: 1 for u in new_voters}})
+        self.er.voter_data = {}  # To allow reset
+        self.er.set_voters_from_dict(
+            {**self.er.voter_data, **{u.pk: 1 for u in new_voters}}
+        )
         self.poll.upcoming()
         self.poll.ongoing()
         for voter in User.objects.filter(pk__in=self.er.voter_data.keys()):
@@ -114,7 +116,7 @@ class AddVoteTests(TestCase):
     def setUpTestData(cls):
         cls.er = ElectoralRegister.objects.create()
         cls.voter = User.objects.create(username="voter")
-        cls.er.add_voter(cls.voter)
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.irv_poll = Poll.objects.create(electoral_register=cls.er, method_name="irv")
         cls.repeated_irv_poll = Poll.objects.create(
             electoral_register=cls.er,
@@ -229,7 +231,7 @@ class RepeatedIRVTests(TestCase):
             settings={"winners": 2},
         )
         cls.voter = User.objects.create(username="a_voter")
-        er.add_voter(cls.voter)
+        er.set_voters_from_dict({cls.voter.pk: 1})
         cls.prop_one = cls.poll.proposals.create()
         cls.prop_two = cls.poll.proposals.create()
         cls.prop_three = cls.poll.proposals.create()
@@ -270,7 +272,10 @@ class RepeatedIRVTests(TestCase):
         self.assertIsNone(self.poll.method.start_check())
         proposal_pks = list(self.poll.proposals.values_list("pk", flat=True))
         new_voters = [User.objects.create(username=f"voter-{n}") for n in range(20)]
-        self.er.set_voters_from_dict({**self.er.voter_data, **{u.pk: 1 for u in new_voters}})
+        self.er.voter_data = {}  # To allow reset
+        self.er.set_voters_from_dict(
+            {**self.er.voter_data, **{u.pk: 1 for u in new_voters}}
+        )
         self.poll.upcoming()
         self.poll.ongoing()
         with SetSeed():
