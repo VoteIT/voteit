@@ -95,7 +95,7 @@ class ExportAgendaItemSerializer(serializers.ModelSerializer):
 class LastReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = LastRead
-        fields = (
+        fields = read_only_fields = (
             "agenda_item",
             "timestamp",
         )
