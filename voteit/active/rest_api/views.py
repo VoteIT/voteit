@@ -34,6 +34,10 @@ class ActiveUserViewSet(VerboseAutoPermissionViewSetMixin, GenericViewSet):
     def list(self, request, *args, **kwargs):
         return Response([])
 
+    def retrieve(self, request, *args, **kwargs):
+        meeting = self.get_object()
+        return Response(data={"title": meeting.title, "id": meeting.id})
+
     @action(
         detail=True,
         methods=["post"],
