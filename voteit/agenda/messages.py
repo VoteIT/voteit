@@ -16,7 +16,6 @@ from pydantic import root_validator
 from pydantic import validator
 from rest_framework.exceptions import ValidationError
 
-from voteit.agenda.models import AgendaItem
 from voteit.core import PERM
 from voteit.core.rest_api.utils import drf_do_transition
 from voteit.core.rest_api.utils import get_valid_transitions
@@ -136,36 +135,6 @@ class AgendaItemBulkDelete(ContextAction):
         self.context.agenda_items.filter(pk__in=self.data.agenda_items).delete()
         response = Status.from_message(self, state=Status.SUCCESS)
         websocket_send(response)
-
-
-class UpdateLastReadSchema(BaseModel):
-    agenda_item: int
-
-
-@incoming
-class UpdateLastRead(ContextAction):
-    name = "last_read.change"
-    model = AgendaItem
-    context: AgendaItem
-    context_schema_attr = "agenda_item"
-    permission = AgendaItem.get_perm(
-        PERM.VIEW
-    )  # FIXME: Anon users and public meetings?
-    schema = UpdateLastReadSchema
-    data: UpdateLastReadSchema
-    ttl = 15
-
-    def run_job(self):
-        """
-        Create or mark agenda as read. This will create a separate database entry,
-        but we'll serialize the agenda item instead.
-        """
-        self.assert_perm()
-        timestamp = self.context.mark_read(self.user)
-        response = LastReadChanged.from_message(
-            self, timestamp=timestamp, agenda_item=self.context.pk
-        )
-        websocket_send(response, state=response.SUCCESS)
 
 
 @outgoing
