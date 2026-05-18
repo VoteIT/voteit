@@ -11,3 +11,4 @@ class ActiveConfig(AppConfig):
         from voteit.active import rules  # noqa
         from voteit.active import messages  # noqa
         from voteit.active import signals  # noqa
+        from voteit.active.rest_api import views  # noqa
