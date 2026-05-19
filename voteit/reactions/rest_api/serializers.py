@@ -1,8 +1,10 @@
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from voteit.core.rest_api.fields import RolesField
 from voteit.core.rest_api.utils import validate_model_add
+from voteit.core.utils import get_model_by_shortname
 from voteit.core.utils import get_model_shortname
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
@@ -85,6 +87,17 @@ class ContentTypeShortnameSerializer(serializers.CharField):
     def to_representation(self, value):
         klass = value.model_class()
         return get_model_shortname(klass)
+
+
+class ReactionTargetSerializer(serializers.Serializer):
+    content_type = serializers.CharField()
+    object_id = serializers.IntegerField()
+
+    def validate_content_type(self, value):
+        model = get_model_by_shortname(value)
+        if model is None:
+            raise serializers.ValidationError(f"Unknown model: {value}")
+        return ContentType.objects.get_for_model(model)
 
 
 class ReactionSerializer(serializers.ModelSerializer):
