@@ -28,48 +28,57 @@ from voteit.proposal.messages import TextDocumentDeleted
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
+from voteit.proposal.rest_api.serializers import DiffProposalDetailSerializer
 from voteit.proposal.rest_api.serializers import GenericProposalSerializer
 from voteit.proposal.rest_api.serializers import ProposalDetailSerializer
-from voteit.proposal.rest_api.serializers import DiffProposalDetailSerializer
 from voteit.proposal.rest_api.serializers import TextDocumentSerializer
 
 if TYPE_CHECKING:
-    from voteit.meeting.models import Meeting
     from envelope.channels.models import AppState
+
+    from voteit.meeting.models import Meeting
+
+
+def _fetch_mentions_map(pks: list[int]) -> dict[int, list[int]]:
+    """Return {proposal_pk: [user_pk, ...]} for the given proposal PKs.
+
+    Queries the M2M through table directly in one query rather than using
+    prefetch_related, which would bypass the prefetch cache when .values_list()
+    is called and cause an N+1 query per proposal.
+    """
+    if not pks:
+        return {}
+    result: dict[int, list] = {}
+    for row in Proposal.mentions.through.objects.filter(proposal_id__in=pks).values(
+        "proposal_id", "user_id"
+    ):
+        result.setdefault(row["proposal_id"], []).append(row["user_id"])
+    return result
 
 
 def attach_proposals(meeting: Meeting, app_state: AppState, include_private=False):
     # Proposals — exclude "mentions" from .values() because M2M in values() produces one row
     # per relationship (fan-out), causing duplicate proposals. Inject mentions separately.
-    proposal_fields = {
-        x for x in ProposalDetailSerializer.Meta.fields if x not in {"shortname", "mentions"}
-    }
-    qs = Proposal.objects.filter(agenda_item__meeting=meeting, diffproposal__isnull=True)
+    exclude_fields = {"body_diff_brief", "body_diff", "shortname", "mentions"}
+    proposal_fields = set(ProposalDetailSerializer.Meta.fields) - exclude_fields
+    qs = Proposal.objects.filter(
+        agenda_item__meeting=meeting, diffproposal__isnull=True
+    )
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
     batch = Batch(t=ProposalAdded.name, payloads=[])
     shortname = get_model_shortname(Proposal)
     items = list(qs.values(*proposal_fields))
-    # Bulk-fetch mentions in one extra query instead of N per proposal
-    if items:
-        pks = [item["pk"] for item in items]
-        mentions_map: dict[int, list] = {}
-        for p in Proposal.objects.filter(pk__in=pks).prefetch_related("mentions"):
-            mentions_map[p.pk] = list(p.mentions.values_list("pk", flat=True))
-    else:
-        mentions_map = {}
+    mentions_map = _fetch_mentions_map([item["pk"] for item in items])
     for item in items:
         item["m"] = meeting.pk
         item["shortname"] = shortname
         item["mentions"] = mentions_map.get(item["pk"], [])
         batch.append(ProposalAdded(data=item))
 
-    diff_fields = {
-        x
-        for x in DiffProposalDetailSerializer.Meta.fields
-        if x not in {"body_diff_brief", "body_diff", "shortname", "mentions"}
+    diff_fields = (set(DiffProposalDetailSerializer.Meta.fields) - exclude_fields) | {
+        "para_body"
     }
-    diff_fields.add("para_body")
     diff_qs = DiffProposal.objects.filter(agenda_item__meeting=meeting).annotate(
         para_body=models.F("paragraph__body")
     )
@@ -77,13 +86,7 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
         diff_qs = diff_qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
     shortname = get_model_shortname(DiffProposal)
     diff_items = list(diff_qs.values(*diff_fields))
-    if diff_items:
-        diff_pks = [item["pk"] for item in diff_items]
-        diff_mentions_map: dict[int, list] = {}
-        for p in Proposal.objects.filter(pk__in=diff_pks).prefetch_related("mentions"):
-            diff_mentions_map[p.pk] = list(p.mentions.values_list("pk", flat=True))
-    else:
-        diff_mentions_map = {}
+    diff_mentions_map = _fetch_mentions_map([item["pk"] for item in diff_items])
     for item in diff_items:
         para_body = item.pop("para_body")
         item["body_diff_brief"] = Changes(para_body, item["body"]).get_html(brief=True)
