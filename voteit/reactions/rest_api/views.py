@@ -1,5 +1,6 @@
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django.http import Http404
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -43,9 +44,16 @@ class ReactionButtonViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
         model = content_type.model_class()
         if get_model_shortname(model) not in button.allowed_models:
             raise ValidationError(
-                {"content_type": "This reaction button does not support this content type."}
+                {
+                    "content_type": "This reaction button does not support this content type."
+                }
             )
-        return model.objects.get(pk=object_id, agenda_item__meeting_id=button.meeting_id)
+        try:
+            return model.objects.get(
+                pk=object_id, agenda_item__meeting_id=button.meeting_id
+            )
+        except model.DoesNotExist:
+            raise Http404
 
     @action(
         methods=["POST"],
@@ -59,9 +67,12 @@ class ReactionButtonViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
         serializer.is_valid(raise_exception=True)
         reactable = self._get_reactable(button=button, **serializer.validated_data)
         ai_pk = getattr(reactable, "agenda_item_id", None)
-        reaction, created = button.reactions.get_or_create(
-            **serializer.validated_data, agenda_item_id=ai_pk, user=request.user
-        )
+        set_data = {**serializer.validated_data, "agenda_item_id": ai_pk}
+        if button.flag_mode:
+            set_data["defaults"] = {"user": request.user}
+        else:
+            set_data["user"] = request.user
+        reaction, created = button.reactions.get_or_create(**set_data)
         return Response(
             serializers.ReactionSerializer(reaction).data,
             status=201 if created else 200,

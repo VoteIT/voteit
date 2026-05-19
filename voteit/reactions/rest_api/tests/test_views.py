@@ -419,3 +419,47 @@ class ReactionButtonActionsTests(APITestCase):
         self.assertCountEqual(
             response.json()["users"], [self.participant.pk, self.moderator.pk]
         )
+
+    # --- set: 404 for invalid object_id (bug 1 regression) ---
+
+    def test_set_nonexistent_object_id_returns_404(self):
+        url = reverse("reaction-buttons-set", kwargs={"pk": self.button.pk})
+        self.client.force_login(self.participant)
+        response = self.client.post(
+            url, {"content_type": "proposal", "object_id": 999999}, format="json"
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_set_object_from_other_meeting_returns_404(self):
+        other_meeting = Meeting.objects.create(title="Other", state="ongoing")
+        other_ai = AgendaItem.objects.create(meeting=other_meeting)
+        other_proposal = Proposal.objects.create(agenda_item=other_ai)
+        url = reverse("reaction-buttons-set", kwargs={"pk": self.button.pk})
+        self.client.force_login(self.participant)
+        response = self.client.post(
+            url, {"content_type": "proposal", "object_id": other_proposal.pk}, format="json"
+        )
+        self.assertEqual(response.status_code, 404)
+
+    # --- flag singleton enforcement (bug 2 regression) ---
+
+    def test_set_flag_second_moderator_does_not_create_duplicate(self):
+        from voteit.reactions.models import Reaction
+
+        url = reverse("reaction-buttons-set", kwargs={"pk": self.flag_button.pk})
+        self.client.force_login(self.moderator)
+        response1 = self.client.post(url, self.target_data, format="json")
+        self.assertEqual(response1.status_code, 201)
+
+        self.client.force_login(self.moderator2)
+        response2 = self.client.post(url, self.target_data, format="json")
+        self.assertEqual(response2.status_code, 200)
+
+        self.assertEqual(
+            Reaction.objects.filter(
+                button=self.flag_button,
+                content_type=self.target_ct,
+                object_id=self.proposal.pk,
+            ).count(),
+            1,
+        )
