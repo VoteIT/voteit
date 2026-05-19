@@ -2,6 +2,7 @@ import csv
 
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
@@ -81,7 +82,9 @@ class ElectoralRegisterViewSet(ReadOnlyModelViewSet):
         detail=False,
         methods=["post"],
         serializer_class=serializers.TriggerCreateERSerializer,
+        url_path="trigger-create",
     )
+    @transaction.atomic
     def trigger_create(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -99,7 +102,9 @@ class ElectoralRegisterViewSet(ReadOnlyModelViewSet):
         detail=False,
         methods=["post"],
         serializer_class=serializers.ManualCreateERSerializer,
+        url_path="manual-create",
     )
+    @transaction.atomic
     def manual_create(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
