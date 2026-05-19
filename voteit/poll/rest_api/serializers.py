@@ -1,30 +1,30 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
+from auditlog.context import set_actor
 from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
 from voteit.core.rest_api.utils import drf_do_transition
 from voteit.core.rest_api.utils import get_valid_transitions_dict
 from voteit.core.rest_api.utils import validate_model_add
+from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api.fields import UserInMeetingContextField
 from voteit.meeting.rest_api.fields import UserInSameMeetingsField
 from voteit.meeting.rest_api.fields import UserMeetingField
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.meeting.workflows import MeetingWf
 from voteit.poll.abcs import PollMethod
+from voteit.poll.app.er_policies.manual import Manual
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
 from voteit.poll.models import VoteTransfer
 from voteit.poll.utils import get_poll_method_registry
-
-if TYPE_CHECKING:
-    from voteit.meeting.models import Meeting
 
 __all__ = (
     "ElectoralRegisterSerializer",
@@ -206,6 +206,81 @@ class ElectoralRegisterSerializer(serializers.ModelSerializer):
         for user_pk, weight in er.weight_dict.items():
             results.append({"user": user_pk, "weight": weight})
         return results
+
+
+class ActiveModeratorMeetingField(serializers.PrimaryKeyRelatedField):
+    def get_queryset(self):
+        return Meeting.objects.filter(
+            state__in=[MeetingWf.UPCOMING, MeetingWf.ONGOING],
+            roles__user=self.context["request"].user,
+            roles__assigned__contains=ROLE_MODERATOR,
+        )
+
+
+class TriggerCreateERSerializer(serializers.Serializer):
+    meeting = ActiveModeratorMeetingField()
+
+    def validate_meeting(self, value):
+        validate_model_add(self, ElectoralRegister, value)
+        if not value.valid_er_policy_guard():
+            raise ValidationError("No valid electoral register policy")
+        if not value.er_policy.allow_trigger:
+            raise ValidationError("Electoral register can't be triggered this way")
+        return value
+
+    def create(self, validated_data):
+        meeting = validated_data["meeting"]
+        latest_er = meeting.latest_er
+        with set_actor(self.context["request"].user):
+            new_er = meeting.er_policy.create_er()
+        created = bool(new_er and latest_er != new_er)
+        self._er = new_er if created else None
+        self._created = created
+        return validated_data
+
+
+class VoterWeightItemSerializer(serializers.Serializer):
+    user = serializers.IntegerField()
+    weight = serializers.IntegerField(min_value=1)
+
+
+class ManualCreateERSerializer(serializers.Serializer):
+    meeting = ActiveModeratorMeetingField()
+    weights = VoterWeightItemSerializer(many=True)
+
+    def validate_meeting(self, value):
+        validate_model_add(self, ElectoralRegister, value)
+        if not value.valid_er_policy_guard() or not value.er_policy.allow_manual:
+            raise ValidationError(
+                "Electoral register can't be manually created for this meeting"
+            )
+        return value
+
+    def validate(self, data):
+        meeting = data["meeting"]
+        weights = data["weights"]
+        potential_voters = set(meeting.get_userids_with_roles(ROLE_POTENTIAL_VOTER))
+        invalid = {w["user"] for w in weights if w["user"] not in potential_voters}
+        if invalid:
+            raise ValidationError(
+                {
+                    "weights": f"Got the following invalid potential voters (User PKs): {', '.join(str(x) for x in sorted(invalid))}"
+                }
+            )
+        return data
+
+    def create(self, validated_data):
+        meeting = validated_data["meeting"]
+        weights = validated_data["weights"]
+        weight_dict = {w["user"]: w["weight"] for w in weights}
+        manual_er = Manual(meeting)
+        latest_er = meeting.latest_er
+        with set_actor(self.context["request"].user):
+            er = manual_er.create_er(weight_dict=weight_dict)
+        created = bool(er and er != latest_er)
+        self._er = er if created else None
+        self._created = created
+        return validated_data
 
 
 class VoterExportSerializer(serializers.Serializer):
