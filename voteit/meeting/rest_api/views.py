@@ -97,9 +97,14 @@ class MeetingViewSet(
                     ai.save()
         return Response(status=201)
 
-    @action(methods=["post"], detail=True)
+    @action(methods=["post"], detail=True, url_path="install-dialect")
     def install_dialect(self, request, pk):
         meeting: Meeting = self.get_object()
+        if not meeting.is_upcoming:
+            # This is an extra check - superusers may bypass permission checks
+            raise ValidationError(
+                {"dialect": ["Meeting must be upcoming to install dialect."]}
+            )
         if meeting.installed_dialect:
             raise ValidationError(
                 {"dialect": ["A dialect is already installed. Remove it first."]}
@@ -113,9 +118,14 @@ class MeetingViewSet(
             handler.install(meeting)
         return Response(status=200)
 
-    @action(methods=["post"], detail=True)
+    @action(methods=["post"], detail=True, url_path="remove-dialect")
     def remove_dialect(self, request, pk):
         meeting: Meeting = self.get_object()
+        if not meeting.is_upcoming:
+            # This is an extra check - superusers may bypass permission checks
+            raise ValidationError(
+                {"dialect": ["Meeting must be upcoming to install dialect."]}
+            )
         if not meeting.installed_dialect:
             raise ValidationError(
                 {"dialect": ["No dialect is installed on this meeting."]}

@@ -366,6 +366,10 @@ class Meeting(
         self.delete_requested = None
 
     @property
+    def is_upcoming(self):
+        return self.state == MeetingWf.UPCOMING
+
+    @property
     def is_archived(self):
         return self.state in MeetingWf.archived_states
 
