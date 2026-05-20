@@ -2,11 +2,13 @@ import csv
 
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from rest_framework import permissions
+from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.renderers import JSONRenderer
@@ -75,6 +77,46 @@ class ElectoralRegisterViewSet(ReadOnlyModelViewSet):
     @method_decorator(cache_page(60 * 60 * 24 * 7))
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.TriggerCreateERSerializer,
+        url_path="trigger-create",
+    )
+    @transaction.atomic
+    def trigger_create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        if serializer._created:
+            return Response(
+                serializers.ElectoralRegisterSerializer(
+                    serializer._er, context={"request": request}
+                ).data,
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.ManualCreateERSerializer,
+        url_path="manual-create",
+    )
+    @transaction.atomic
+    def manual_create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        if serializer._created:
+            return Response(
+                serializers.ElectoralRegisterSerializer(
+                    serializer._er, context={"request": request}
+                ).data,
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @router.register("vote-transfer", basename="vote-transfer")

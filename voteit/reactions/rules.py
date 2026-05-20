@@ -73,6 +73,11 @@ def is_reaction_owner(user: AbstractUser, obj: Reaction):
     return isinstance(obj, Reaction) and user == obj.user
 
 
+_reaction_change_predicate = is_button_active & meeting_upcoming_ongoing & (
+    (~is_button_flag & has_change_own_reaction_role_or_moderator)
+    | (is_button_flag & is_moderator)
+)
+
 # Button
 rules.add_perm(
     ReactionButton.get_perm(PERM.ADD), meeting_upcoming_ongoing & is_moderator
@@ -87,6 +92,8 @@ rules.add_perm(
     ReactionButton.get_perm(PERM_LIST_REACTIONS),
     has_list_users_reactions_role_or_moderator,
 )
+rules.add_perm(ReactionButton.get_perm("set"), _reaction_change_predicate)
+rules.add_perm(ReactionButton.get_perm("remove"), _reaction_change_predicate)
 
 # Reaction
 rules.add_perm(
