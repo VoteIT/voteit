@@ -1,9 +1,11 @@
 from http import HTTPStatus
+from json import loads
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.dispatch import receiver
 from django.test import override_settings
+from pythonjsonlogger.jsonlogger import JsonFormatter
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
@@ -37,6 +39,12 @@ from voteit.speaker.app.list_methods.simple import Simple
 from voteit.speaker.models import SpeakerListSystem
 
 User = get_user_model()
+
+_json_formatter = JsonFormatter()
+
+
+def _record_to_dict(record):
+    return loads(_json_formatter.format(record))
 
 
 @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
@@ -362,7 +370,9 @@ class MeetingViewSetTests(APITestCase):
         self.assertEqual("main_subst", self.meeting.installed_dialect)
 
     def test_install_dialect_already_installed(self):
-        Meeting.objects.filter(pk=self.meeting.pk).update(installed_dialect="main_subst")
+        Meeting.objects.filter(pk=self.meeting.pk).update(
+            installed_dialect="main_subst"
+        )
         url = reverse("meeting-install-dialect", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.moderator)
         response = self.client.post(url, {"dialect": "main_subst"})
@@ -388,7 +398,9 @@ class MeetingViewSetTests(APITestCase):
         self.assertEqual(403, response.status_code)
 
     def test_remove_dialect(self):
-        Meeting.objects.filter(pk=self.meeting.pk).update(installed_dialect="main_subst")
+        Meeting.objects.filter(pk=self.meeting.pk).update(
+            installed_dialect="main_subst"
+        )
         url = reverse("meeting-remove-dialect", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.moderator)
         response = self.client.post(url, {})
@@ -403,7 +415,9 @@ class MeetingViewSetTests(APITestCase):
         self.assertEqual(400, response.status_code)
 
     def test_remove_dialect_forbidden_for_participant(self):
-        Meeting.objects.filter(pk=self.meeting.pk).update(installed_dialect="main_subst")
+        Meeting.objects.filter(pk=self.meeting.pk).update(
+            installed_dialect="main_subst"
+        )
         url = reverse("meeting-remove-dialect", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.participant)
         response = self.client.post(url, {})
@@ -419,7 +433,9 @@ class MeetingViewSetTests(APITestCase):
         self.assertEqual(403, response.status_code)
 
     def test_remove_dialect_with_groups_flag(self):
-        Meeting.objects.filter(pk=self.meeting.pk).update(installed_dialect="main_subst")
+        Meeting.objects.filter(pk=self.meeting.pk).update(
+            installed_dialect="main_subst"
+        )
         url = reverse("meeting-remove-dialect", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.moderator)
         response = self.client.post(url, {"groups": True})
@@ -443,9 +459,6 @@ class MeetingGroupViewSetTests(APITestCase):
         cls.meeting_group_two: MeetingGroup = MeetingGroup.objects.create(
             meeting=cls.meeting, title="two"
         )
-
-    def setUp(self):
-        self.meeting.refresh_from_db()
 
     def test_create(self):
         url = reverse("meeting-groups-list")
@@ -949,6 +962,220 @@ class MeetingRolesViewSetTests(APITestCase):
         )
         self.assertContains(response, "Jeff")
         self.assertEqual(len(response.json()), 5, "Should match all users")
+
+
+class MeetingRolesChangeTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    add_url = reverse("meeting-roles-add-roles")
+    remove_url = reverse("meeting-roles-remove-roles")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.org_manager = User.objects.get(username="org_manager")
+
+    def _add_payload(self, user=None, roles=None):
+        return {
+            "meeting": self.meeting.pk,
+            "user": (user or self.participant).pk,
+            "roles": [str(x) for x in (roles or [ROLE_DISCUSSER])],
+        }
+
+    def test_add_unauthorized(self):
+        response = self.client.post(self.add_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+
+    def test_add_participant_forbidden(self):
+        self.client.force_login(self.participant)
+        response = self.client.post(self.add_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
+
+    def test_add_moderator(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(self.add_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertIn(str(ROLE_DISCUSSER), response.json()["assigned"])
+
+    def test_add_org_manager(self):
+        self.client.force_login(self.org_manager)
+        response = self.client.post(self.add_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertIn(str(ROLE_DISCUSSER), response.json()["assigned"])
+
+    def test_add_nonexistent_user(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.add_url,
+            {**self._add_payload(), "user": -1},
+            format="json",
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+    def test_add_logs_change(self):
+        self.client.force_login(self.moderator)
+        with self.assertLogs("voteit.event.roles") as logs:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.client.post(self.add_url, self._add_payload(), format="json")
+                self.assertEqual(0, len(logs.records))
+            self.assertEqual(1, len(logs.records))
+        data = _record_to_dict(logs.records[0])
+        data.pop("taskName", None)
+        self.assertEqual(
+            {
+                "message": "Added",
+                "context_name": "meeting",
+                "context": self.meeting.pk,
+                "org": self.meeting.organisation_id,
+                "meeting": self.meeting.pk,
+                "actor": self.moderator.pk,
+                "for_user": self.participant.pk,
+                "roles": [str(ROLE_DISCUSSER)],
+            },
+            data,
+        )
+
+    def test_add_bad_role(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.add_url, self._add_payload(roles=["jeff"]), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+    def test_add_user_from_other_org(self):
+        other_org = Organisation.objects.create(title="Other org")
+        other_user = other_org.users.create(username="alien")
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.add_url, self._add_payload(user=other_user), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+    def test_remove_unauthorized(self):
+        response = self.client.post(self.remove_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+
+    def test_remove_participant_forbidden(self):
+        self.client.force_login(self.participant)
+        response = self.client.post(self.remove_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
+
+    def test_remove_moderator(self):
+        self.meeting.add_roles(self.participant, ROLE_DISCUSSER)
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.remove_url, self._add_payload(roles=[ROLE_DISCUSSER]), format="json"
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertNotIn(str(ROLE_DISCUSSER), response.json()["assigned"])
+
+    def test_remove_last_role_returns_no_content(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.remove_url, self._add_payload(roles=[ROLE_PARTICIPANT]), format="json"
+        )
+        self.assertEqual(HTTPStatus.NO_CONTENT, response.status_code)
+
+    def test_remove_nonexistent_user(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.remove_url,
+            {**self._add_payload(), "user": -1},
+            format="json",
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+    def test_remove_logs_change(self):
+        self.client.force_login(self.moderator)
+        with self.assertLogs("voteit.event.roles") as logs:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.client.post(
+                    self.remove_url,
+                    self._add_payload(roles=[ROLE_PARTICIPANT]),
+                    format="json",
+                )
+                self.assertEqual(0, len(logs.records))
+            self.assertEqual(1, len(logs.records))
+        data = _record_to_dict(logs.records[0])
+        data.pop("taskName", None)
+        self.assertEqual(
+            {
+                "message": "Removed",
+                "context_name": "meeting",
+                "context": self.meeting.pk,
+                "org": self.meeting.organisation_id,
+                "meeting": self.meeting.pk,
+                "actor": self.moderator.pk,
+                "for_user": self.participant.pk,
+                "roles": [str(ROLE_PARTICIPANT)],
+            },
+            data,
+        )
+
+    def test_remove_bad_role(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.remove_url, self._add_payload(roles=["jeff"]), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+    def test_remove_user_from_other_org(self):
+        other_org = Organisation.objects.create(title="Other org")
+        other_user = other_org.users.create(username="alien2")
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.remove_url, self._add_payload(user=other_user), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+
+class MeetingRolesAvailableRolesTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    url = reverse("meeting-roles-available")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.participant = User.objects.get(username="participant")
+
+    def test_anonymous_allowed(self):
+        response = self.client.get(self.url)
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+
+    def test_returns_all_roles(self):
+        self.client.force_login(self.participant)
+        response = self.client.get(self.url)
+        names = {item["name"] for item in response.json()}
+        self.assertEqual(
+            {
+                str(r)
+                for r in (
+                    ROLE_PARTICIPANT,
+                    ROLE_MODERATOR,
+                    ROLE_DISCUSSER,
+                    ROLE_POTENTIAL_VOTER,
+                    ROLE_PROPOSER,
+                )
+            },
+            names,
+        )
+
+    def test_no_predicate_info_in_response(self):
+        self.client.force_login(self.participant)
+        response = self.client.get(self.url)
+        for item in response.json():
+            self.assertNotIn("predicate_info", item)
+
+    def test_each_role_has_required_fields(self):
+        self.client.force_login(self.participant)
+        response = self.client.get(self.url)
+        for item in response.json():
+            self.assertIn("name", item)
+            self.assertIn("title", item)
+            self.assertIn("description", item)
+            self.assertIn("require_names", item)
 
 
 class ExportMeetingGroupsViewSetTests(APITestCase):

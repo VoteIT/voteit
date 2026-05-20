@@ -12,6 +12,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator
 
 from voteit.core.rest_api.fields import RolesField
+from voteit.core.rest_api.fields import SameOrgUserField
 from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
@@ -22,6 +23,7 @@ from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
+from voteit.meeting.rest_api.fields import ViewableMeetingField
 from voteit.meeting.rest_api.validators import RoleValidator
 from voteit.meeting.rest_api.validators import DialectInstallableValidator
 from voteit.meeting.roles import ROLE_DISCUSSER
@@ -43,7 +45,6 @@ __all__ = (
     "MeetingDetailSerializer",
     "AgendaOrderSerializer",
     "MeetingRolesSerializer",
-    "MeetingAddParticipantSerializer",
     "RoleSerializer",
     "MeetingGroupSerializer",
     "GroupRoleSerializer",
@@ -288,18 +289,19 @@ class MeetingRolesSerializer(serializers.ModelSerializer):
         )
 
 
-class MeetingAddParticipantSerializer(serializers.ModelSerializer):
-    user_id = serializers.IntegerField()
-    meeting_id = serializers.IntegerField(source="context_id")
-
-    class Meta:
-        model = MeetingRoles
-        fields = "user_id", "meeting_id"
-
-
 class RoleSerializer(serializers.Serializer):
     role = serializers.CharField(
         max_length=20, validators=[RoleValidator(roles_cls=MeetingRoles)]
+    )
+
+
+class MeetingChangeRolesSerializer(serializers.Serializer):
+    meeting = ViewableMeetingField()
+    user = SameOrgUserField()
+    roles = serializers.ListField(
+        child=serializers.CharField(
+            max_length=20, validators=[RoleValidator(roles_cls=MeetingRoles)]
+        )
     )
 
 

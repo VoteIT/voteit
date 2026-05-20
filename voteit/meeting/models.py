@@ -388,11 +388,9 @@ class Meeting(
 
     class QuerySet(models.QuerySet):
         def for_user(self, user: User):
-            if user.is_superuser:
-                return user.organisation.meetings.all()
-            if user.organisation is None:
+            if user.organisation_id is None:
                 return self.none()
-            if user.has_perm(
+            elif user.is_superuser or user.has_perm(
                 user.organisation.get_perm(PERM.MANAGE), user.organisation
             ):
                 return user.organisation.meetings.all()

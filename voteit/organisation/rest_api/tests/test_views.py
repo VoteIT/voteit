@@ -10,6 +10,7 @@ from rest_framework.test import APITestCase
 
 from voteit.core.testing import run_permission_tests
 from voteit.organisation.models import Organisation
+from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 if TYPE_CHECKING:
@@ -73,7 +74,7 @@ class OrganisationViewSetTests(APITestCase):
             "id_host": "https://testserver",
             "login_url": None,
             "page_title": "Test org",
-            "pk": 7,
+            "pk": self.org.pk,
             "scope": [],
             "title": "Test org",
         }
@@ -255,6 +256,174 @@ class OrganisationRolesTests(APITestCase):
             response.json()[0]["user"]["pk"],
             self.manager.pk,
         )
+
+    def test_user_id_in_filter(self):
+        second_manager = self.organisation.users.create(username="second_manager")
+        self.organisation.add_roles(second_manager, ROLE_MEETING_CREATOR)
+        self.client.force_login(self.manager)
+        response = self.client.get(
+            self.list_url,
+            {"user_id_in": f"{self.manager.pk},{second_manager.pk}"},
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertEqual(
+            {self.manager.pk, second_manager.pk},
+            {item["user"]["pk"] for item in response.json()},
+        )
+
+    def test_user_id_in_filter_single(self):
+        self.client.force_login(self.manager)
+        response = self.client.get(
+            self.list_url,
+            {"user_id_in": str(self.manager.pk)},
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertEqual(1, len(response.json()))
+        self.assertEqual(self.manager.pk, response.json()[0]["user"]["pk"])
+
+
+class OrganisationRolesChangeTests(APITestCase):
+    add_url = reverse("organisationroles-add-roles")
+    remove_url = reverse("organisationroles-remove-roles")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.organisation = org = Organisation.objects.create(title="Test org")
+        cls.manager = org.users.create(username="chg_manager")
+        org.add_roles(cls.manager, ROLE_ORG_MANAGER)
+        cls.member = org.users.create(username="chg_member")
+
+    def _add_payload(self, user=None, roles=None):
+        return {
+            "user": (user or self.member).pk,
+            "roles": roles or [str(ROLE_ORG_MANAGER)],
+        }
+
+    def test_add_unauthorized(self):
+        response = self.client.post(self.add_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+
+    def test_add_member_forbidden(self):
+        self.client.force_login(self.member)
+        response = self.client.post(self.add_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
+
+    def test_add_manager(self):
+        self.client.force_login(self.manager)
+        response = self.client.post(self.add_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertIn(str(ROLE_ORG_MANAGER), response.json()["assigned"])
+
+    def test_add_logs_change(self):
+        self.client.force_login(self.manager)
+        with self.assertLogs("voteit.event.roles") as logs:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.client.post(self.add_url, self._add_payload(), format="json")
+                self.assertEqual(0, len(logs.records))
+            self.assertEqual(1, len(logs.records))
+        self.assertIn("Added", logs.records[0].getMessage())
+
+    def test_add_bad_role(self):
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            self.add_url, self._add_payload(roles=["jeff"]), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+    def test_add_user_from_other_org(self):
+        other_org = Organisation.objects.create(title="Other org")
+        other_user = other_org.users.create(username="org_alien")
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            self.add_url, self._add_payload(user=other_user), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+    def test_remove_unauthorized(self):
+        response = self.client.post(self.remove_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+
+    def test_remove_member_forbidden(self):
+        self.client.force_login(self.member)
+        response = self.client.post(self.remove_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
+
+    def test_remove_manager(self):
+        self.organisation.add_roles(self.member, ROLE_ORG_MANAGER, ROLE_MEETING_CREATOR)
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            self.remove_url,
+            self._add_payload(roles=[str(ROLE_MEETING_CREATOR)]),
+            format="json",
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertNotIn(str(ROLE_MEETING_CREATOR), response.json()["assigned"])
+
+    def test_remove_last_role_returns_no_content(self):
+        self.organisation.add_roles(self.member, ROLE_ORG_MANAGER)
+        self.client.force_login(self.manager)
+        response = self.client.post(self.remove_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.NO_CONTENT, response.status_code)
+
+    def test_remove_logs_change(self):
+        self.organisation.add_roles(self.member, ROLE_ORG_MANAGER)
+        self.client.force_login(self.manager)
+        with self.assertLogs("voteit.event.roles") as logs:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.client.post(self.remove_url, self._add_payload(), format="json")
+                self.assertEqual(0, len(logs.records))
+            self.assertEqual(1, len(logs.records))
+        self.assertIn("Removed", logs.records[0].getMessage())
+
+    def test_remove_bad_role(self):
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            self.remove_url, self._add_payload(roles=["jeff"]), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+    def test_remove_user_from_other_org(self):
+        other_org = Organisation.objects.create(title="Other org")
+        other_user = other_org.users.create(username="org_alien2")
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            self.remove_url, self._add_payload(user=other_user), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+
+class OrganisationRolesAvailableRolesTests(APITestCase):
+    url = reverse("organisationroles-available")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create(title="Avail org")
+        cls.member = cls.org.users.create(username="avail_member")
+
+    def test_anonymous_allowed(self):
+        response = self.client.get(self.url)
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+
+    def test_returns_all_roles(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        names = {item["name"] for item in response.json()}
+        self.assertEqual({str(ROLE_ORG_MANAGER), str(ROLE_MEETING_CREATOR)}, names)
+
+    def test_no_predicate_info_in_response(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        for item in response.json():
+            self.assertNotIn("predicate_info", item)
+
+    def test_each_role_has_required_fields(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        for item in response.json():
+            self.assertIn("name", item)
+            self.assertIn("title", item)
+            self.assertIn("description", item)
+            self.assertIn("require_names", item)
 
 
 @override_settings(ID_PROXY_API_KEY="xxx")

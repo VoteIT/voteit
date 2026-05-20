@@ -7,9 +7,22 @@ from voteit.meeting.models import Meeting
 User = get_user_model()
 
 
-class UserMeetingField(serializers.PrimaryKeyRelatedField):
+class ViewableMeetingField(serializers.PrimaryKeyRelatedField):
+    """
+    The current user can see that the meeting exist. Takes care of
+    """
+
     def get_queryset(self):
-        return Meeting.objects.filter(roles__user=self.context["request"].user)
+        return Meeting.objects.for_user(self.context["request"].user)
+
+
+class ParticipantMeetingField(serializers.PrimaryKeyRelatedField):
+    """
+    The current user is a participant in the specified meeting.
+    """
+
+    def get_queryset(self):
+        return Meeting.objects.filter(participants=self.context["request"].user)
 
 
 class UserInSameMeetingsField(serializers.PrimaryKeyRelatedField):

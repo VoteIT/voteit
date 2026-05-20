@@ -10,12 +10,16 @@ from rest_framework import exceptions
 from rest_framework.exceptions import ValidationError
 
 from voteit.core.rest_api.fields import RolesField
+from voteit.core.rest_api.fields import SameOrgUserField
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
+from voteit.core.rest_api.serializers import UserListSerializer
 from voteit.core.rest_api.utils import validate_model_add
+from voteit.core.rest_api.validators import RoleValidator
 from voteit.meeting.models import MeetingRoles
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.models import SpeakerSystemRoles
 from voteit.speaker.utils import get_list_method_registry
 
 if TYPE_CHECKING:
@@ -23,6 +27,33 @@ if TYPE_CHECKING:
     from voteit.room.models import Room
 
 User = get_user_model()
+
+
+class SpeakerSystemField(serializers.PrimaryKeyRelatedField):
+    def get_queryset(self):
+        return SpeakerListSystem.objects.filter(
+            meeting__participants=self.context["request"].user
+        )
+
+
+class SpeakerSystemRolesSerializer(serializers.ModelSerializer):
+    speaker_system = serializers.IntegerField(source="context_id", read_only=True)
+    user = UserListSerializer(read_only=True)
+    assigned = serializers.ListSerializer(child=serializers.CharField(), read_only=True)
+
+    class Meta:
+        model = SpeakerSystemRoles
+        fields = read_only_fields = ("pk", "user", "speaker_system", "assigned")
+
+
+class SpeakerChangeRolesSerializer(serializers.Serializer):
+    speaker_system = SpeakerSystemField()
+    user = SameOrgUserField()
+    roles = serializers.ListField(
+        child=serializers.CharField(
+            max_length=30, validators=[RoleValidator(roles_cls=SpeakerSystemRoles)]
+        )
+    )
 
 
 class CreateSpeakerListSerializer(serializers.ModelSerializer):

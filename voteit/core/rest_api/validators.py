@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from django.utils.translation import gettext as _
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import ValidationError
 
 from voteit.agenda.models import AgendaItem
 from voteit.core import PERM
@@ -64,3 +65,14 @@ class ValidateGroupAIContext:
                         }
                     )
                 # Group membership check should be done via BaseModelSerializer
+
+
+class RoleValidator:
+    """Validates that a role name is valid for the given roles class."""
+
+    def __init__(self, roles_cls):
+        self.roles_cls = roles_cls
+
+    def __call__(self, value):
+        if value not in self.roles_cls.valid_roles:
+            raise ValidationError(f'The role "{value}" is not valid for this context.')

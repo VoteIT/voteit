@@ -3,6 +3,7 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from voteit.meeting.models import Meeting
+from voteit.meeting.rest_api.fields import ParticipantMeetingField
 from voteit.notes.models import Note
 
 
@@ -65,13 +66,8 @@ class CreateNoteSerializer(NoteSerializer):
         return instance
 
 
-class ViewableMeetingField(serializers.PrimaryKeyRelatedField):
-    def get_queryset(self):
-        return Meeting.objects.for_user(self.context["request"].user)
-
-
 class RelatedMeetingSerializer(serializers.ModelSerializer):
-    meeting = ViewableMeetingField()
+    meeting = ParticipantMeetingField()
 
     class Meta:
         model = Meeting

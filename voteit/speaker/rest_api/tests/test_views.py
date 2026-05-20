@@ -1,6 +1,7 @@
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
+from http import HTTPStatus
 import random
 
 from django.contrib.auth import get_user_model
@@ -1035,3 +1036,234 @@ class ExportSpeakersViewSetTests(APITestCase):
         oz_row = rows[1]
         self.assertIn(b"hello@world.se", oz_row)
         self.assertIn(b"\xe5\xa5\xbd", oz_row)
+
+
+class SpeakerSystemRolesListTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    list_url = reverse("speaker-system-roles-list")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.room = cls.meeting.rooms.create()
+        cls.system = cls.meeting.speaker_systems.create(
+            method_name="simple", room=cls.room
+        )
+        cls.system.add_roles(cls.participant, ROLE_LIST_MODERATOR)
+
+    def test_unauthorized(self):
+        response = self.client.get(self.list_url, {"speaker_system": self.system.pk})
+        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+
+    def test_participant_can_list(self):
+        self.client.force_login(self.participant)
+        response = self.client.get(self.list_url, {"speaker_system": self.system.pk})
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertEqual(1, len(response.json()))
+        self.assertEqual(self.participant.pk, response.json()[0]["user"]["pk"])
+
+    def test_no_system_returns_empty(self):
+        self.client.force_login(self.participant)
+        response = self.client.get(self.list_url)
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertEqual([], response.json())
+
+    def test_user_id_in_filter(self):
+        second = self.meeting.participants.get(username="moderator")
+        self.system.add_roles(second, ROLE_LIST_MODERATOR)
+        self.client.force_login(self.participant)
+        response = self.client.get(
+            self.list_url,
+            {
+                "speaker_system": self.system.pk,
+                "user_id_in": f"{self.participant.pk},{second.pk}",
+            },
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertEqual(
+            {self.participant.pk, second.pk},
+            {item["user"]["pk"] for item in response.json()},
+        )
+
+    def test_user_id_in_filters_to_subset(self):
+        self.client.force_login(self.participant)
+        response = self.client.get(
+            self.list_url,
+            {
+                "speaker_system": self.system.pk,
+                "user_id_in": str(self.participant.pk),
+            },
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertEqual(1, len(response.json()))
+        self.assertEqual(self.participant.pk, response.json()[0]["user"]["pk"])
+
+    def test_other_meeting_participant_cannot_see(self):
+        other_meeting = Meeting.objects.create()
+        other_user = other_meeting.participants.create(username="outsider_slr")
+        other_meeting.add_roles(other_user, ROLE_PARTICIPANT)
+        self.client.force_login(other_user)
+        response = self.client.get(self.list_url, {"speaker_system": self.system.pk})
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertEqual([], response.json())
+
+
+class SpeakerSystemRolesChangeTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    add_url = reverse("speaker-system-roles-add-roles")
+    remove_url = reverse("speaker-system-roles-remove-roles")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.get(pk=1)
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.room = cls.meeting.rooms.create()
+        cls.system = cls.meeting.speaker_systems.create(
+            method_name="simple", room=cls.room
+        )
+
+    def _add_payload(self, user=None, roles=None):
+        return {
+            "speaker_system": self.system.pk,
+            "user": (user or self.participant).pk,
+            "roles": [str(x) for x in (roles or [ROLE_LIST_MODERATOR])],
+        }
+
+    def test_add_unauthorized(self):
+        response = self.client.post(self.add_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+
+    def test_add_participant_forbidden(self):
+        self.client.force_login(self.participant)
+        response = self.client.post(self.add_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
+
+    def test_add_moderator(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(self.add_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertIn(str(ROLE_LIST_MODERATOR), response.json()["assigned"])
+
+    def test_add_logs_change(self):
+        self.client.force_login(self.moderator)
+        with self.assertLogs("voteit.event.roles") as logs:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.client.post(self.add_url, self._add_payload(), format="json")
+                self.assertEqual(0, len(logs.records))
+            self.assertEqual(1, len(logs.records))
+        self.assertIn("Added", logs.records[0].getMessage())
+
+    def test_add_bad_role(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.add_url, self._add_payload(roles=["jeff"]), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+    def test_add_user_from_other_org(self):
+        other_org = Organisation.objects.create(title="Other org")
+        other_user = other_org.users.create(username="spk_alien")
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.add_url, self._add_payload(user=other_user), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+    def test_remove_unauthorized(self):
+        response = self.client.post(self.remove_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
+
+    def test_remove_participant_forbidden(self):
+        self.client.force_login(self.participant)
+        response = self.client.post(self.remove_url, self._add_payload(), format="json")
+        self.assertEqual(HTTPStatus.FORBIDDEN, response.status_code)
+
+    def test_remove_moderator(self):
+        self.system.add_roles(self.participant, ROLE_LIST_MODERATOR, ROLE_SPEAKER)
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.remove_url, self._add_payload(roles=[ROLE_SPEAKER]), format="json"
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+        self.assertNotIn(str(ROLE_SPEAKER), response.json()["assigned"])
+
+    def test_remove_last_role_returns_no_content(self):
+        self.system.add_roles(self.participant, ROLE_LIST_MODERATOR)
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.remove_url,
+            self._add_payload(roles=[ROLE_LIST_MODERATOR]),
+            format="json",
+        )
+        self.assertEqual(HTTPStatus.NO_CONTENT, response.status_code)
+
+    def test_remove_logs_change(self):
+        self.system.add_roles(self.participant, ROLE_LIST_MODERATOR, ROLE_SPEAKER)
+        self.client.force_login(self.moderator)
+        with self.assertLogs("voteit.event.roles") as logs:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.client.post(
+                    self.remove_url,
+                    self._add_payload(roles=[ROLE_SPEAKER]),
+                    format="json",
+                )
+                self.assertEqual(0, len(logs.records))
+            self.assertEqual(1, len(logs.records))
+        self.assertIn("Removed", logs.records[0].getMessage())
+
+    def test_remove_bad_role(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.remove_url, self._add_payload(roles=["jeff"]), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+    def test_remove_user_from_other_org(self):
+        other_org = Organisation.objects.create(title="Other org")
+        other_user = other_org.users.create(username="spk_alien2")
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.remove_url, self._add_payload(user=other_user), format="json"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+
+class SpeakerSystemRolesAvailableRolesTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    url = reverse("speaker-system-roles-available")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.participant = User.objects.get(username="participant")
+
+    def test_anonymous_allowed(self):
+        response = self.client.get(self.url)
+        self.assertEqual(HTTPStatus.OK, response.status_code)
+
+    def test_returns_all_roles(self):
+        self.client.force_login(self.participant)
+        response = self.client.get(self.url)
+        names = {item["name"] for item in response.json()}
+        self.assertEqual({str(ROLE_LIST_MODERATOR), str(ROLE_SPEAKER)}, names)
+
+    def test_no_predicate_info_in_response(self):
+        self.client.force_login(self.participant)
+        response = self.client.get(self.url)
+        for item in response.json():
+            self.assertNotIn("predicate_info", item)
+
+    def test_each_role_has_required_fields(self):
+        self.client.force_login(self.participant)
+        response = self.client.get(self.url)
+        for item in response.json():
+            self.assertIn("name", item)
+            self.assertIn("title", item)
+            self.assertIn("description", item)
+            self.assertIn("require_names", item)

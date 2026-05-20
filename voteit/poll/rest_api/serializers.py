@@ -14,7 +14,7 @@ from voteit.core.rest_api.utils import validate_model_add
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api.fields import UserInMeetingContextField
 from voteit.meeting.rest_api.fields import UserInSameMeetingsField
-from voteit.meeting.rest_api.fields import UserMeetingField
+from voteit.meeting.rest_api.fields import ParticipantMeetingField
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.poll.abcs import PollMethod
 from voteit.poll.models import ElectoralRegister
@@ -233,7 +233,7 @@ class VoteSerializer(serializers.ModelSerializer):
 
 
 class VoteTransferSerializer(serializers.ModelSerializer):
-    meeting = UserMeetingField()
+    meeting = ParticipantMeetingField()
     source = UserInSameMeetingsField()
     target = UserInSameMeetingsField()
 

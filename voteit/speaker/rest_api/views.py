@@ -6,6 +6,7 @@ from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
 from django.utils.translation import gettext as _
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -18,6 +19,8 @@ from rest_framework.response import Response
 from rest_framework.serializers import Serializer
 from rest_framework.viewsets import GenericViewSet
 
+from voteit.core import PERM
+from voteit.core.loggers import log_roles_change
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
@@ -25,8 +28,10 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
+from voteit.speaker.models import SpeakerSystemRoles
 from voteit.speaker.rest_api import serializers
 from voteit.speaker.rest_api.filters import SpeakerFilterSet
+from voteit.speaker.rest_api.filters import SpeakerSystemRolesFilterSet
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 
 logger = getLogger(__name__)
@@ -140,6 +145,87 @@ class SpeakerListSystemViewSet(
                 meeting__participants=self.request.user,
             )
         return SpeakerListSystem.objects.none()
+
+
+@router.register("speaker-system-roles", basename="speaker-system-roles")
+class SpeakerSystemRolesViewSet(ListModelMixin, GenericViewSet):
+    serializer_class = serializers.SpeakerSystemRolesSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = SpeakerSystemRolesFilterSet
+
+    def get_queryset(self):
+        if not self.request.query_params.get("speaker_system"):
+            return SpeakerSystemRoles.objects.none()
+        return SpeakerSystemRoles.objects.filter(
+            context__meeting__participants=self.request.user
+        ).prefetch_related("user")
+
+    @action(detail=False, methods=["get"], permission_classes=[])
+    def available(self, request):
+        return Response(
+            [
+                role.output().dict(exclude={"predicate_info"})
+                for role in SpeakerSystemRoles.valid_roles.values()
+            ]
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.SpeakerChangeRolesSerializer,
+    )
+    @transaction.atomic
+    def add_roles(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        system = serializer.validated_data["speaker_system"]
+        user = serializer.validated_data["user"]
+        if not request.user.has_perm(
+            SpeakerListSystem.get_perm(PERM.CHANGE_ROLES), system
+        ):
+            raise PermissionDenied
+        changed = system.add_roles(user, *serializer.validated_data["roles"])
+        if changed:
+            log_roles_change(
+                "Added",
+                actor=request.user,
+                for_user=user,
+                context=system,
+                roles=changed,
+            )
+        roles_obj = SpeakerSystemRoles.objects.get(context=system, user=user)
+        return Response(serializers.SpeakerSystemRolesSerializer(roles_obj).data)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.SpeakerChangeRolesSerializer,
+    )
+    @transaction.atomic
+    def remove_roles(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        system = serializer.validated_data["speaker_system"]
+        user = serializer.validated_data["user"]
+        if not request.user.has_perm(
+            SpeakerListSystem.get_perm(PERM.CHANGE_ROLES), system
+        ):
+            raise PermissionDenied
+        changed = system.remove_roles(user, *serializer.validated_data["roles"])
+        if changed:
+            log_roles_change(
+                "Removed",
+                actor=request.user,
+                for_user=user,
+                context=system,
+                roles=changed,
+            )
+        try:
+            roles_obj = SpeakerSystemRoles.objects.get(context=system, user=user)
+        except SpeakerSystemRoles.DoesNotExist:
+            return Response(status=204)
+        return Response(serializers.SpeakerSystemRolesSerializer(roles_obj).data)
 
 
 @router.register("speakers", basename="speakers")

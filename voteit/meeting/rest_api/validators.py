@@ -3,28 +3,13 @@ from typing import TYPE_CHECKING
 
 from rest_framework.exceptions import ValidationError
 
+from voteit.core.rest_api.validators import RoleValidator  # noqa: F401 re-export
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.dialects import get_named_paths
 
 
 if TYPE_CHECKING:
-    from voteit.core.models import Roles
     from rest_framework.serializers import Serializer
-
-
-class RoleValidator:
-    """
-    Ensures that role name is valid for roles class provided on class instantiation.
-    """
-
-    roles_cls: type[Roles]
-
-    def __init__(self, roles_cls: type[Roles]):
-        self.roles_cls = roles_cls
-
-    def __call__(self, value):
-        if value not in self.roles_cls.valid_roles:
-            raise ValidationError(f'The role "{value}" is not valid for this context.')
 
 
 class DialectInstallableValidator:

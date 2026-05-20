@@ -1,5 +1,7 @@
+from django.contrib.auth import get_user_model
 from rest_framework import fields
 from rest_framework.exceptions import ValidationError
+from rest_framework.relations import PrimaryKeyRelatedField
 
 from voteit.core.role import Role
 from voteit.core.fields import RolesField as ModelRolesField
@@ -25,9 +27,9 @@ class RoleField(fields.CharField):
         if self.valid_roles:
             return self.valid_roles
         # Different usecases for field, for instance single role?
-        assert (
-            self.parent is not None
-        ), "RoleField must be bound to a parent if roles aren't specified as 'valid_roles'"
+        assert self.parent is not None, (
+            "RoleField must be bound to a parent if roles aren't specified as 'valid_roles'"
+        )
         try:
             model = self.root.Meta.model
         except AttributeError as exc:
@@ -46,3 +48,14 @@ class RolesField(fields.ListField):
         self.valid_roles = valid_roles
         super().__init__(**kwargs)
         self.child.valid_roles = self.valid_roles
+
+
+class SameOrgUserField(PrimaryKeyRelatedField):
+    """
+    Users from the same organisation.
+    """
+
+    def get_queryset(self):
+        return get_user_model().objects.filter(
+            organisation_id=self.context["request"].user.organisation_id
+        )

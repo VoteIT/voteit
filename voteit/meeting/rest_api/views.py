@@ -9,6 +9,7 @@ from django.db.models import RestrictedError
 from django.http import Http404
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
+from envelope.app.user_channel.channel import UserChannel
 from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
@@ -20,6 +21,11 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from envelope import INTERNAL
+from envelope.channels.messages import RecheckChannelSubscriptions
+
+from voteit.core import PERM
+from voteit.core.loggers import log_roles_change
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
@@ -158,6 +164,70 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         return MeetingRoles.objects.filter(
             context__participants=self.request.user, context_id=meeting_pk
         ).prefetch_related("user")
+
+    @action(detail=False, methods=["get"], permission_classes=[])
+    def available(self, request):
+        return Response(
+            [
+                role.output().dict(exclude={"predicate_info"})
+                for role in MeetingRoles.valid_roles.values()
+            ]
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.MeetingChangeRolesSerializer,
+    )
+    @transaction.atomic(durable=True)
+    def add_roles(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        meeting = serializer.validated_data["meeting"]
+        user = serializer.validated_data["user"]
+        if not request.user.has_perm(Meeting.get_perm(PERM.CHANGE_ROLES), meeting):
+            raise PermissionDenied
+        changed = meeting.add_roles(user, *serializer.validated_data["roles"])
+        if changed:
+            log_roles_change(
+                "Added",
+                actor=request.user,
+                for_user=user,
+                context=meeting,
+                roles=changed,
+            )
+        roles_obj = MeetingRoles.objects.get(context=meeting, user=user)
+        return Response(serializers.MeetingRolesSerializer(roles_obj).data)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.MeetingChangeRolesSerializer,
+    )
+    @transaction.atomic(durable=True)
+    def remove_roles(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        meeting = serializer.validated_data["meeting"]
+        user = serializer.validated_data["user"]
+        if not request.user.has_perm(Meeting.get_perm(PERM.CHANGE_ROLES), meeting):
+            raise PermissionDenied
+        changed = meeting.remove_roles(user, *serializer.validated_data["roles"])
+        if changed:
+            log_roles_change(
+                "Removed",
+                actor=request.user,
+                for_user=user,
+                context=meeting,
+                roles=changed,
+            )
+            msg = RecheckChannelSubscriptions(consumer_name="", subscriptions=[])
+            UserChannel.from_instance(user, envelope_name=INTERNAL).sync_publish(msg)
+        try:
+            roles_obj = MeetingRoles.objects.get(context=meeting, user=user)
+        except MeetingRoles.DoesNotExist:
+            return Response(status=204)
+        return Response(serializers.MeetingRolesSerializer(roles_obj).data)
 
 
 @router.register("meeting-groups", basename="meeting-groups")
