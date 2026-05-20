@@ -1055,12 +1055,12 @@ class SpeakerSystemRolesListTests(APITestCase):
         cls.system.add_roles(cls.participant, ROLE_LIST_MODERATOR)
 
     def test_unauthorized(self):
-        response = self.client.get(self.list_url, {"speaker_system": self.system.pk})
+        response = self.client.get(self.list_url, {"context": self.system.pk})
         self.assertEqual(HTTPStatus.UNAUTHORIZED, response.status_code)
 
     def test_participant_can_list(self):
         self.client.force_login(self.participant)
-        response = self.client.get(self.list_url, {"speaker_system": self.system.pk})
+        response = self.client.get(self.list_url, {"context": self.system.pk})
         self.assertEqual(HTTPStatus.OK, response.status_code)
         self.assertEqual(1, len(response.json()))
         self.assertEqual(self.participant.pk, response.json()[0]["user"]["pk"])
@@ -1078,7 +1078,7 @@ class SpeakerSystemRolesListTests(APITestCase):
         response = self.client.get(
             self.list_url,
             {
-                "speaker_system": self.system.pk,
+                "context": self.system.pk,
                 "user_id_in": f"{self.participant.pk},{second.pk}",
             },
         )
@@ -1093,7 +1093,7 @@ class SpeakerSystemRolesListTests(APITestCase):
         response = self.client.get(
             self.list_url,
             {
-                "speaker_system": self.system.pk,
+                "context": self.system.pk,
                 "user_id_in": str(self.participant.pk),
             },
         )
@@ -1106,9 +1106,17 @@ class SpeakerSystemRolesListTests(APITestCase):
         other_user = other_meeting.participants.create(username="outsider_slr")
         other_meeting.add_roles(other_user, ROLE_PARTICIPANT)
         self.client.force_login(other_user)
-        response = self.client.get(self.list_url, {"speaker_system": self.system.pk})
-        self.assertEqual(HTTPStatus.OK, response.status_code)
-        self.assertEqual([], response.json())
+        response = self.client.get(self.list_url, {"context": self.system.pk})
+        data = response.json()
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code, data)
+        self.assertEqual(
+            {
+                "context": [
+                    "Select a valid choice. That choice is not one of the available choices."
+                ]
+            },
+            data,
+        )
 
 
 class SpeakerSystemRolesChangeTests(APITestCase):

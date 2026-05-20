@@ -1,5 +1,6 @@
 from django_filters import rest_framework as filters
 
+from voteit.core.rest_api.filters import RequiredModelChoiceFilter
 from voteit.meeting.models import Meeting
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerListSystem
@@ -15,12 +16,14 @@ def users_speaker_systems_qs(request):
 
 
 class SpeakerSystemRolesFilterSet(filters.FilterSet):
-    speaker_system = filters.NumberFilter(field_name="context_id")
+    context = RequiredModelChoiceFilter(
+        queryset=users_speaker_systems_qs, label="Speaker system"
+    )
     user_id_in = NumberInFilter(field_name="user_id", lookup_expr="in")
 
     class Meta:
         model = SpeakerSystemRoles
-        fields = ("speaker_system", "user_id_in")
+        fields = ("context", "user_id_in")
 
 
 def users_meetings(request):

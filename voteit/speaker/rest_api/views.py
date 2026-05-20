@@ -155,8 +155,6 @@ class SpeakerSystemRolesViewSet(ListModelMixin, GenericViewSet):
     filterset_class = SpeakerSystemRolesFilterSet
 
     def get_queryset(self):
-        if not self.request.query_params.get("speaker_system"):
-            return SpeakerSystemRoles.objects.none()
         return SpeakerSystemRoles.objects.filter(
             context__meeting__participants=self.request.user
         ).prefetch_related("user")
@@ -174,6 +172,7 @@ class SpeakerSystemRolesViewSet(ListModelMixin, GenericViewSet):
         detail=False,
         methods=["post"],
         serializer_class=serializers.SpeakerChangeRolesSerializer,
+        url_path="add",
     )
     @transaction.atomic
     def add_roles(self, request):
@@ -201,6 +200,7 @@ class SpeakerSystemRolesViewSet(ListModelMixin, GenericViewSet):
         detail=False,
         methods=["post"],
         serializer_class=serializers.SpeakerChangeRolesSerializer,
+        url_path="remove",
     )
     @transaction.atomic
     def remove_roles(self, request):

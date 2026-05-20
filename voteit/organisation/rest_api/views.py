@@ -162,13 +162,17 @@ class OrganisationRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     @action(detail=False, methods=["get"], permission_classes=[])
     def available(self, request):
         return Response(
-            [role.output().dict(exclude={"predicate_info"}) for role in OrganisationRoles.valid_roles.values()]
+            [
+                role.output().dict(exclude={"predicate_info"})
+                for role in OrganisationRoles.valid_roles.values()
+            ]
         )
 
     @action(
         detail=False,
         methods=["post"],
         serializer_class=serializers.OrgChangeRolesSerializer,
+        url_path="add",
     )
     @transaction.atomic
     def add_roles(self, request):
@@ -190,6 +194,7 @@ class OrganisationRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         detail=False,
         methods=["post"],
         serializer_class=serializers.OrgChangeRolesSerializer,
+        url_path="remove",
     )
     @transaction.atomic
     def remove_roles(self, request):

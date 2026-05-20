@@ -161,18 +161,8 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
-        # This is a temp fix to extract meeting PK. Context is still used by the frontend.
-        meeting_pk = self.request.query_params.get(
-            "meeting", self.request.query_params.get("context", None)
-        )
-        if meeting_pk is None:
-            return MeetingRoles.objects.none()
-        try:
-            meeting_pk = int(meeting_pk)
-        except (ValueError, TypeError):
-            raise ValidationError({"meeting": ["Must be a number"]})
         return MeetingRoles.objects.filter(
-            context__participants=self.request.user, context_id=meeting_pk
+            context__participants=self.request.user
         ).prefetch_related("user")
 
     @action(detail=False, methods=["get"], permission_classes=[])
@@ -188,6 +178,7 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         detail=False,
         methods=["post"],
         serializer_class=serializers.MeetingChangeRolesSerializer,
+        url_path="add",
     )
     @transaction.atomic(durable=True)
     def add_roles(self, request):
@@ -213,6 +204,7 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         detail=False,
         methods=["post"],
         serializer_class=serializers.MeetingChangeRolesSerializer,
+        url_path="remove",
     )
     @transaction.atomic(durable=True)
     def remove_roles(self, request):
