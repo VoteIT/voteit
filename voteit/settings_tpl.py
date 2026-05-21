@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rules",
     "rest_framework",
+    "rest_framework_api_key",
     "django_filters",
     "django_fsm",
     "fsm_admin",
@@ -76,6 +77,7 @@ INSTALLED_APPS = [
     "voteit.reactions",
     "voteit.room",
     "voteit.participant_tags",
+    "voteit.token_api",
     "controlcenter",
 ]
 

@@ -370,6 +370,10 @@ class Meeting(
         return self.state == MeetingWf.UPCOMING
 
     @property
+    def is_ongoing(self):
+        return self.state == MeetingWf.ONGOING
+
+    @property
     def is_archived(self):
         return self.state in MeetingWf.archived_states
 
@@ -413,6 +417,7 @@ class Meeting(
             return self.get_queryset().for_user(user)
 
     objects = Manager()
+    organisation_id: int
     groups: models.QuerySet
     invites: models.QuerySet
     electoral_registers: models.QuerySet
