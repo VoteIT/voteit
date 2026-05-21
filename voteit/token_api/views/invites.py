@@ -23,6 +23,29 @@ class InvitesView(
     mixins.ListModelMixin,
     MeetingApiBaseViewSet,
 ):
+    """
+    Manage invites for the meeting associated with the API key.
+
+    Authenticate with `Api-Key <key>` in the `Authorization` header.
+    The `meeting` field is never accepted in the request body — it is always
+    taken from the API key itself.
+
+    **Scopes**
+
+    | Action   | Required scope                    |
+    |----------|-----------------------------------|
+    | list     | `invites.list` or `invites.*`     |
+    | retrieve | `invites.retrieve` or `invites.*` |
+    | create   | `invites.create` or `invites.*`   |
+    | destroy  | `invites.destroy` or `invites.*`  |
+
+    **POST body (create)**
+
+    - `roles` — list of role identifiers, e.g. `["pa"]`. At least one required.
+    - `data` — list of user-data objects, e.g. `[{"email": "user@example.com"}]`.
+    - `dryrun` — boolean (default `false`). If `true`, the operation is validated
+      and the result returned but nothing is persisted.
+    """
     token_api_scope = "invites"
     serializer_class = MeetingInviteSerializer
 

@@ -14,6 +14,7 @@ from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.token_api.models import MeetingAPIKey
 from voteit.token_api.models import create_api_key_user
+from voteit.token_api.validators import _valid_scopes_map
 
 
 class MeetingAPIKeySerializer(serializers.ModelSerializer):
@@ -60,7 +61,24 @@ class MeetingApiTokenViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    """API-view for the tokens themselves"""
+    """
+    Manage API keys for a meeting. Only moderators of the meeting can access these endpoints.
+
+    An API key is scoped to a single meeting and carries a list of permission scopes
+    (`resource.action` or `resource.*`). Use `GET /scopes/` to see all valid scopes.
+
+    | Action   | Description                                          |
+    |----------|------------------------------------------------------|
+    | list     | List all keys for a meeting (`?meeting=<id>`)        |
+    | retrieve | Retrieve a single key by prefix                      |
+    | create   | Create a new key — returns the plaintext key once    |
+    | destroy  | Revoke a key (sets `revoked=true`, does not delete)  |
+    | cycle    | Replace a key with a new one, returns new plaintext  |
+    | scopes   | List all valid scope strings (no auth required)      |
+
+    Keys expire 120 days after creation. Creating or cycling keys is blocked once
+    the meeting is closed.
+    """
 
     lookup_field = "prefix"
     lookup_value_regex = r"[A-Za-z0-9]+"
@@ -69,6 +87,7 @@ class MeetingApiTokenViewSet(
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "create": None,  # Checked inside MeetingAPIKeyCreateSerializer.validate_meeting
+        "scopes": None,
         "cycle": "change",
     }
     expected_default_http_status = 400
@@ -98,6 +117,15 @@ class MeetingApiTokenViewSet(
     def perform_destroy(self, instance):
         instance.revoked = True
         instance.save(update_fields=["revoked"])
+
+    @action(methods=["GET"], detail=False, permission_classes=[])
+    def scopes(self, request):
+        scopes_map = _valid_scopes_map()
+        result = []
+        for resource, actions in sorted(scopes_map.items()):
+            result.append(f"{resource}.*")
+            result.extend(f"{resource}.{a}" for a in sorted(actions))
+        return Response(result)
 
     @action(methods=["POST"], detail=True)
     def cycle(self, request, prefix=None):

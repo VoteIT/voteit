@@ -8,6 +8,16 @@ from voteit.token_api.base import MeetingApiBaseViewSet
 
 @register_meeting_api("meeting")
 class MeetingView(MeetingApiBaseViewSet):
+    """
+    Read-only view of the meeting associated with the API key.
+
+    Authenticate with `Api-Key <key>` in the `Authorization` header.
+    Required scope: `meeting.list` or `meeting.*`.
+
+    **GET** `/token-api/meeting/` — returns the single meeting the key belongs to.
+    Session-authenticated users receive an empty response (no data exposed).
+    """
+
     token_api_scope = "meeting"
     queryset = Meeting.objects.none()
     serializer_class = MeetingDetailSerializer

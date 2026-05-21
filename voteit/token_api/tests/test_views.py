@@ -207,6 +207,29 @@ class MeetingApiTokenViewSetTest(APITestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    # --- scopes ---
+
+    def test_scopes_returns_list_without_authentication(self):
+        response = self.client.get(reverse("meeting-api-token-scopes"))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, list)
+        self.assertIn("meeting.*", data)
+        self.assertIn("meeting.list", data)
+        self.assertIn("invites.*", data)
+
+    def test_scopes_includes_wildcard_before_actions(self):
+        response = self.client.get(reverse("meeting-api-token-scopes"))
+        data = response.json()
+        for resource in ("meeting", "invites"):
+            wildcard_idx = data.index(f"{resource}.*")
+            action_indices = [
+                i for i, s in enumerate(data) if s.startswith(f"{resource}.") and s != f"{resource}.*"
+            ]
+            self.assertTrue(all(wildcard_idx < i for i in action_indices))
+
+    # --- finished meeting ---
+
     def test_destroy_allowed_when_meeting_finished(self):
         obj, _ = self._create_key()
         self._close_meeting()
