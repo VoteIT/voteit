@@ -21,7 +21,7 @@ class MeetingAPIKeyAuthentication(BaseAuthentication, BaseHasAPIKey):
             try:
                 meeting_api_key = self.model.objects.get_from_key(key)
             except MeetingAPIKey.DoesNotExist:
-                raise AuthenticationFailed("No meeting api key")
+                raise AuthenticationFailed("Not a valid meeting API key")
             setattr(request, "meeting_api_key", meeting_api_key)
             now = timezone.now()
             if (
