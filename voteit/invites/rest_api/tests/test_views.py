@@ -309,6 +309,132 @@ class UserMatchedInviteViewSetTests(APITestCase):
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
 
 
+class MeetingInviteViewSetCreateTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.organisation: Organisation = Organisation.objects.get(pk=1)
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.participant: User = cls.meeting.participants.get(username="participant")
+        cls.moderator: User = cls.meeting.participants.get(username="moderator")
+
+    def _url(self):
+        return reverse("meeting-invites-list")
+
+    def _post(self, data, user=None):
+        if user is None:
+            user = self.moderator
+        self.client.force_login(user)
+        return self.client.post(self._url(), data, content_type="application/json")
+
+    def test_create_single(self):
+        response = self._post(
+            {"meeting": self.meeting.pk, "roles": ["pa"], "data": [{"email": "new@example.com"}]}
+        )
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual(data["added"], 1)
+        self.assertEqual(data["changed"], 0)
+        self.assertEqual(data["existed"], 0)
+        self.assertTrue(self.meeting.invites.filter(user_data={"email": "new@example.com"}).exists())
+
+    def test_create_multiple(self):
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [{"email": "a@example.com"}, {"email": "b@example.com"}],
+            }
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["added"], 2)
+
+    def test_create_existing_unchanged(self):
+        self.meeting.invites.create(user_data={"email": "existing@example.com"}, roles=["pa"])
+        response = self._post(
+            {"meeting": self.meeting.pk, "roles": ["pa"], "data": [{"email": "existing@example.com"}]}
+        )
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual(data["added"], 0)
+        self.assertEqual(data["existed"], 1)
+
+    def test_create_role_change(self):
+        self.meeting.invites.create(user_data={"email": "change@example.com"}, roles=["pa"])
+        response = self._post(
+            {"meeting": self.meeting.pk, "roles": ["pa", "mo"], "data": [{"email": "change@example.com"}]}
+        )
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual(data["changed"], 1)
+
+    def test_create_unauthenticated(self):
+        response = self.client.post(
+            self._url(),
+            {"meeting": self.meeting.pk, "roles": ["pa"], "data": [{"email": "x@example.com"}]},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_create_non_moderator(self):
+        response = self._post(
+            {"meeting": self.meeting.pk, "roles": ["pa"], "data": [{"email": "x@example.com"}]},
+            user=self.participant,
+        )
+        self.assertIn(response.status_code, (400, 403, 404))
+
+    def test_create_unknown_user_data_key(self):
+        response = self._post(
+            {"meeting": self.meeting.pk, "roles": ["pa"], "data": [{"unknown_key": "value"}]}
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_create_invalid_email(self):
+        response = self._post(
+            {"meeting": self.meeting.pk, "roles": ["pa"], "data": [{"email": "not-an-email"}]}
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_create_intersecting_data(self):
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [
+                    {"email": "shared@example.com"},
+                    {"email": "shared@example.com", "swedish_ssn": "191212121212"},
+                ],
+            }
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_create_dryrun(self):
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [{"email": "dryrun@example.com"}],
+                "dryrun": True,
+            }
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertFalse(self.meeting.invites.filter(user_data={"email": "dryrun@example.com"}).exists())
+
+    def test_create_invalid_role(self):
+        response = self._post(
+            {"meeting": self.meeting.pk, "roles": ["invalid_role"], "data": [{"email": "x@example.com"}]}
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_create_email_normalised(self):
+        response = self._post(
+            {"meeting": self.meeting.pk, "roles": ["pa"], "data": [{"email": "UPPER@Example.COM"}]}
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(self.meeting.invites.filter(user_data={"email": "upper@example.com"}).exists())
+
+
 class InviteDataTypesViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
