@@ -1,10 +1,14 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
+from voteit.organisation.models import Organisation
+from voteit.token_api.auth import MeetingAPIKeyScope
 from voteit.token_api.models import MeetingAPIKey
 from voteit.token_api.models import create_api_key_user
-from voteit.organisation.models import Organisation
 
 User = get_user_model()
 
@@ -90,3 +94,21 @@ class MeetingViewTest(APITestCase):
         self.assertEqual(data["pk"], self.meeting.pk)
         self.assertEqual(data["title"], self.meeting.title)
         self.assertEqual(data["state"], self.meeting.state)
+
+
+class AnonRateLimitTest(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    def setUp(self):
+        # Ensure the throttle counter starts from zero for each test.
+        cache.clear()
+
+    def test_anon_throttled_after_limit(self):
+        # MeetingAPIKeyScope denies anonymous requests at check_permissions, before
+        # DRF ever reaches check_throttles. Patch has_permission to bypass that so
+        # this test can exercise the throttle in isolation.
+        with patch.object(MeetingAPIKeyScope, "has_permission", return_value=True):
+            response1 = self.client.get(reverse(URL))
+            self.assertNotEqual(response1.status_code, 429)
+            response2 = self.client.get(reverse(URL))
+        self.assertEqual(response2.status_code, 429)

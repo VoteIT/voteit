@@ -168,6 +168,10 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": [
         "voteit.core.rest_api.filters.ActionAnnotatedDjangoFilterBackend"
     ],
+    "DEFAULT_THROTTLE_RATES": {
+        "token_api_user": "60/min",
+        "token_api_anon": "1/sec",
+    },
 }
 # Auditlog
 AUDITLOG_DISABLE_ON_RAW_SAVE = True

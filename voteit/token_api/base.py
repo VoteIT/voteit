@@ -5,9 +5,19 @@ from rest_framework import viewsets
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.renderers import BrowsableAPIRenderer
 from rest_framework.renderers import JSONRenderer
+from rest_framework.throttling import AnonRateThrottle
+from rest_framework.throttling import UserRateThrottle
 
 from voteit.token_api.auth import MeetingAPIKeyAuthentication
 from voteit.token_api.auth import MeetingAPIKeyScope
+
+
+class TokenAPIUserThrottle(UserRateThrottle):
+    scope = "token_api_user"
+
+
+class TokenAPIAnonThrottle(AnonRateThrottle):
+    scope = "token_api_anon"
 
 
 class MeetingApiBaseViewSet(viewsets.GenericViewSet, ABC):
@@ -17,6 +27,7 @@ class MeetingApiBaseViewSet(viewsets.GenericViewSet, ABC):
     token_api_scope: str | None = None
     authentication_classes = [MeetingAPIKeyAuthentication, SessionAuthentication]
     permission_classes = [MeetingAPIKeyScope]
+    throttle_classes = [TokenAPIUserThrottle, TokenAPIAnonThrottle]
     renderer_classes = [JSONRenderer, BrowsableAPIRenderer]
     filter_backends = []
 
