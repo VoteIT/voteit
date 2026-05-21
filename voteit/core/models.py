@@ -284,11 +284,11 @@ class Roles(ABCModel):
     def validate_roles(self, *roles: Role | str) -> set[Role]:
         found = set()
         for x in roles:
-            if isinstance(x, str):
-                x = self.valid_roles[x]
+            if isinstance(x, Role):
+                assert x in self.valid_roles, f"{x} is not a valid role for this context"
             else:
-                assert isinstance(x, Role), f"{x} is not an instance of Role"
-            assert x in self.valid_roles, f"{x} is not a valid role for this context"
+                assert isinstance(x, str), f"{x} is not an instance of Role"
+                x = self.valid_roles[x]
             found.add(x)
         return found
 
