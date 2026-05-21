@@ -65,6 +65,21 @@ class MeetingApiTokenViewSetTest(APITestCase):
 
     # --- create ---
 
+    def test_create_strips_redundant_scopes_when_wildcard_present(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            reverse("meeting-api-token-list"),
+            {
+                "name": "My key",
+                "scopes": ["meeting.list", "meeting.*", "meeting.retrieve"],
+                "meeting": self.meeting.pk,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        obj = MeetingAPIKey.objects.get(prefix=response.json()["prefix"])
+        self.assertEqual(obj.scopes, ["meeting.*"])
+
     def test_create_returns_key_and_object(self):
         self.client.force_login(self.moderator)
         response = self.client.post(

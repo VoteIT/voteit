@@ -21,10 +21,16 @@ def _valid_scopes_map() -> dict[str, set[str]]:
     return result
 
 
+def normalize_scopes(scopes: list) -> list:
+    """Remove redundant specific scopes when a wildcard for the same resource is present."""
+    wildcarded = {s[:-2] for s in scopes if s.endswith(".*")}
+    return [s for s in scopes if s.endswith(".*") or s.split(".")[0] not in wildcarded]
+
+
 def validate_api_key_scopes(scopes: list) -> None:
     valid = _valid_scopes_map()
 
-    for scope in scopes:
+    for scope in normalize_scopes(scopes):
         parts = scope.split(".", 1)
         if len(parts) != 2:
             raise ValidationError(

@@ -8,6 +8,7 @@ from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
+from voteit.token_api.validators import normalize_scopes
 from voteit.token_api.validators import validate_api_key_scopes
 
 
@@ -31,3 +32,9 @@ class MeetingAPIKey(RulesModelMixin, MeetingContext, AbstractAPIKey):
         default=list, blank=True, validators=[validate_api_key_scopes]
     )
     last_used = models.DateTimeField(null=True, blank=True, editable=False)
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        if update_fields is None or "scopes" in update_fields:
+            self.scopes = normalize_scopes(self.scopes)
+        super().save(*args, **kwargs)
