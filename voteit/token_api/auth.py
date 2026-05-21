@@ -22,6 +22,8 @@ class MeetingAPIKeyAuthentication(BaseAuthentication, BaseHasAPIKey):
                 meeting_api_key = self.model.objects.get_from_key(key)
             except MeetingAPIKey.DoesNotExist:
                 raise AuthenticationFailed("Not a valid meeting API key")
+            if meeting_api_key.has_expired:
+                raise AuthenticationFailed("API key has expired")
             setattr(request, "meeting_api_key", meeting_api_key)
             now = timezone.now()
             if (
@@ -67,7 +69,9 @@ class MeetingAPIKeyScope(BasePermission):
         return True
 
     def has_object_permission(self, request: HttpRequest, view, obj) -> bool:
+        key = getattr(request, "meeting_api_key", None)
+        if key is None:
+            return False
         if hasattr(obj, "meeting_id"):
-            return request.meeting_api_key.meeting_id == obj.meeting_id
-        else:
-            return request.meeting_api_key.meeting == obj.meeting
+            return key.meeting_id == obj.meeting_id
+        return key.meeting == obj.meeting
