@@ -71,6 +71,7 @@ class MeetingApiTokenViewSet(
         "create": None,  # Checked inside MeetingAPIKeyCreateSerializer.validate_meeting
         "cycle": "change",
     }
+    expected_default_http_status = 400
 
     def get_serializer_class(self):
         if self.action == "create":

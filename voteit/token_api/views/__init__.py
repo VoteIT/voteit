@@ -1,2 +1,2 @@
 def register():
-    from . import meeting
+    from . import meeting, invites

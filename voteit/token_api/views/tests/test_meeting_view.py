@@ -8,7 +8,7 @@ from voteit.organisation.models import Organisation
 
 User = get_user_model()
 
-URL = "meeting-list"
+URL = "token-api:meeting-list"
 
 
 class MeetingViewTest(APITestCase):
@@ -56,6 +56,8 @@ class MeetingViewTest(APITestCase):
         self._api_key_client(key)
         response = self.client.get(reverse(URL))
         self.assertEqual(response.status_code, 403)
+        self.assertIn("meeting.list", response.json()["detail"])
+        self.assertIn("meeting.*", response.json()["detail"])
 
     def test_wildcard_action_scope_allowed(self):
         _, key = self._create_key(scopes=["meeting.*"])

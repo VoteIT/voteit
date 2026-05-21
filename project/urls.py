@@ -12,7 +12,7 @@ urlpatterns = [
     path("admin/dashboard/", controlcenter.urls),
     path("admin/", admin.site.urls),
     path("api/", include(router.urls)),
-    path("token-api/", include(token_router.urls)),
+    path("token-api/", include((token_router.urls, "token-api"))),
     path("django-rq/", include("django_rq.urls")),
     path("", include("social_django.urls")),
 ]

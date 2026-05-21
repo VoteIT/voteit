@@ -4,6 +4,7 @@ from django.http import HttpRequest
 from django.utils import timezone
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission
 from rest_framework_api_key.permissions import BaseHasAPIKey
 
@@ -59,7 +60,11 @@ class MeetingAPIKeyScope(BasePermission):
         action = getattr(view, "action", None)
         if resource is None or action is None:
             return False
-        return any(_scope_matches(s, resource, action) for s in key.scopes)
+        if not any(_scope_matches(s, resource, action) for s in key.scopes):
+            raise PermissionDenied(
+                f"Scope '{resource}.{action}' or '{resource}.*' is required."
+            )
+        return True
 
     def has_object_permission(self, request: HttpRequest, view, obj) -> bool:
         if hasattr(obj, "meeting_id"):
