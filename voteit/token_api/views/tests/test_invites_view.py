@@ -1,4 +1,6 @@
+from auditlog.models import LogEntry
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
@@ -156,6 +158,8 @@ class InvitesViewTest(APITestCase):
         self.assertIn("invites.create", response.json()["detail"])
         self.assertIn("invites.*", response.json()["detail"])
 
+    # --- Effects on users ---
+
     def test_create_causes_used_invites_to_update_user(self):
         _, key = self._create_key(scopes=["invites.*"])
         self._api_key_client(key)
@@ -201,3 +205,33 @@ class InvitesViewTest(APITestCase):
         self.assertEqual(response.status_code, 204)
         # No effect
         self.assertEqual({ROLE_PARTICIPANT}, self.meeting.get_roles(self.participant))
+
+    # --- auditlog ---
+
+    def test_create_fetched_by_auditlog(self):
+        obj, key = self._create_key(scopes=["invites.*"])
+        self._api_key_client(key)
+        response = self.client.post(
+            reverse(LIST_URL),
+            {
+                "roles": [ROLE_PARTICIPANT, ROLE_PROPOSER],
+                "data": [{"email": "x@example.com"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+
+        invite = MeetingInvite.objects.get(user_data__email="x@example.com")
+
+        logentry = LogEntry.objects.filter(
+            content_type=ContentType.objects.get_for_model(MeetingInvite),
+            object_id=invite.pk,
+            actor=obj.user,
+        ).first()
+
+        self.assertIsNotNone(
+            logentry,
+            "No LogEntry found for the created invite with the API key user as actor",
+        )
+        self.assertEqual(logentry.actor, obj.user)
+        self.assertEqual(logentry.object_id, invite.pk)

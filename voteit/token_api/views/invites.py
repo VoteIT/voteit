@@ -46,6 +46,7 @@ class InvitesView(
     - `dryrun` — boolean (default `false`). If `true`, the operation is validated
       and the result returned but nothing is persisted.
     """
+
     token_api_scope = "invites"
     serializer_class = MeetingInviteSerializer
 
