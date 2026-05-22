@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from django.utils.timezone import now
+from envelope.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
 from voteit.active.components import ActiveUsersComponent
+from voteit.active.messages import ActiveUserChanged
 from voteit.core.workflows import EnabledWf
+from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -161,3 +166,34 @@ class PurgeActionTests(ActiveUserViewSetBase):
         url = reverse("active-users-purge", kwargs={"pk": self.meeting.pk})
         response = self.client.post(url, {"hours": 1})
         self.assertEqual(401, response.status_code)
+
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+class ActiveActionMessageTests(ActiveUserViewSetBase):
+    """Verify that ActiveUserChanged is published when the REST endpoint changes active state."""
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_set_active_publishes_active_user_changed(self, mock_publish):
+        url = reverse("active-users-active", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.participant)
+        self.client.post(url, {"active": True})
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.call_args.args[0]
+        self.assertIsInstance(msg, ActiveUserChanged)
+        self.assertEqual(msg.data.user, self.participant.pk)
+        self.assertEqual(msg.data.meeting, self.meeting.pk)
+        self.assertTrue(msg.data.active)
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_set_inactive_publishes_active_user_changed(self, mock_publish):
+        self.meeting.active_users.create(user=self.participant)
+        url = reverse("active-users-active", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.participant)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(url, {"active": False})
+        self.assertTrue(mock_publish.called)
+        msg = mock_publish.call_args.args[0]
+        self.assertIsInstance(msg, ActiveUserChanged)
+        self.assertEqual(msg.data.user, self.participant.pk)
+        self.assertEqual(msg.data.meeting, self.meeting.pk)
+        self.assertFalse(msg.data.active)
