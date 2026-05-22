@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.44
+
+Focused on optional meeting token-based API-access and moving messages that don't need to be websocket operations
+to regular rest interfaces in preparation of refactoring to ChanX.
+
+### New features
+
+- **Token API**: New `voteit.token_api` app for programmatic access to meeting resources.
+API keys are scoped to a single meeting and carry per-resource permission scopes
+(`resource.action` or `resource.*`). Keys are issued via the admin or a moderator-only
+REST endpoint, expire after 120 days, and can be revoked.
+Includes views for invites and meeting info, rate limiting, and full auditlog attribution.
+See `voteit/token_api/README.md`. #374
+
+### Changes
+
+- **`Role` now subclasses `str`**: `Role` objects serialize directly as JSON, compare equal to plain strings, and hash the same way.
+- **Internal API changes**: The following resources use REST instead of messages, in preparations for websocket refactoring:
+  - **Role**: Meetings, speaker systems, and organisations now expose `available`, `add_roles`, and `remove_roles` REST actions, replacing the previous WebSocket message-based role assignment.
+  - **Reactions**: Reactions can now be set, removed, and listed via `POST/DELETE /api/reactions/`.
+  - **Active users**: `ActiveUserViewSet` with list, retrieve, and purge actions.
+  - **Electoral register creation**: `trigger_create` and `manual_create`.
+  - **Agenda `last_read`**: The `update_last_read` action.
+  - **Speaker system**: New `SpeakerSystemRolesViewSet`.
+
 ## v0.43
 
 ### New features
