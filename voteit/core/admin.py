@@ -334,5 +334,5 @@ class VoteITLogEntryAdmin(LogEntryAdmin):
                 link = reverse(viewname, args=[meeting.pk])
             except NoReverseMatch:
                 return "%s" % meeting
-            return format_html('<a href="{}">{}</a>', link=link, meeting=meeting)
+            return format_html('<a href="{link}">{meeting}</a>', link=link, meeting=meeting)
         return "-"
