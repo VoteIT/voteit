@@ -50,7 +50,9 @@ def user_image_upload_to(instance, filename):
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext not in _IMAGE_SAFE_EXTENSIONS:
         ext = "bin"
-    org_dir = f"org_{instance.organisation_id}" if instance.organisation_id else "no_org"
+    org_dir = (
+        f"org_{instance.organisation_id}" if instance.organisation_id else "no_org"
+    )
     return f"{org_dir}/images/{uuid.uuid4().hex}.{ext}"
 
 
@@ -285,7 +287,9 @@ class Roles(ABCModel):
         found = set()
         for x in roles:
             if isinstance(x, Role):
-                assert x in self.valid_roles, f"{x} is not a valid role for this context"
+                assert x in self.valid_roles, (
+                    f"{x} is not a valid role for this context"
+                )
             else:
                 assert isinstance(x, str), f"{x} is not an instance of Role"
                 x = self.valid_roles[x]

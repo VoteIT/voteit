@@ -18,6 +18,14 @@ def _fmt_bytes(n: int) -> str:
     return f"{n} B"
 
 
+_MIME_TO_EXT = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
+
+
 @deconstructible
 class ImageValidator:
     def __init__(
@@ -55,6 +63,12 @@ class ImageValidator:
                 _("Unsupported file type, must be one of: %s.")
                 % ", ".join(self.allowed_mimes)
             )
+        # Browsers (e.g. mobile) often send the file as "blob" with no extension.
+        # Correct the name using the detected type so upload_to can use the right ext.
+        ext = _MIME_TO_EXT.get(mime)
+        if ext:
+            base = file.name.rsplit(".", 1)[0] if "." in file.name else file.name
+            file.name = f"{base}.{ext}"
 
 
 def validate_model_shortname(v: str):

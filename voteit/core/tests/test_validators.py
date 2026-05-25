@@ -146,6 +146,28 @@ class ImageValidatorTests(SimpleTestCase):
         with self.assertRaises(ValidationError):
             v(_upload(_JPEG, "photo.jpg"))
 
+    # — Filename correction from detected MIME type —
+
+    def test_blob_filename_corrected_to_jpeg_extension(self):
+        f = _upload(_JPEG, "blob")
+        self.v(f)
+        self.assertTrue(f.name.endswith(".jpg"), f.name)
+
+    def test_blob_filename_corrected_to_png_extension(self):
+        f = _upload(_PNG, "blob")
+        self.v(f)
+        self.assertTrue(f.name.endswith(".png"), f.name)
+
+    def test_blob_filename_corrected_to_webp_extension(self):
+        f = _upload(_WEBP, "blob")
+        self.v(f)
+        self.assertTrue(f.name.endswith(".webp"), f.name)
+
+    def test_wrong_extension_corrected_to_detected_type(self):
+        f = _upload(_JPEG, "photo.png")
+        self.v(f)
+        self.assertTrue(f.name.endswith(".jpg"), f.name)
+
 
 class UserImageUploadToTests(SimpleTestCase):
     def _instance(self, organisation_id):
