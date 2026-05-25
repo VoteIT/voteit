@@ -57,6 +57,15 @@ class MeetingAPIKeyAuthenticationTest(TestCase):
         result = MeetingAPIKeyAuthentication().authenticate(request)
         self.assertIsNone(result)
 
+    def test_authenticate_prefetches_related_objects(self):
+        request = self._make_request(self.raw_key)
+        MeetingAPIKeyAuthentication().authenticate(request)
+        api_key = request.meeting_api_key
+        with self.assertNumQueries(0):
+            _ = api_key.user
+            _ = api_key.meeting
+            _ = api_key.meeting.organisation
+
     def test_expired_key_raises_authentication_failed(self):
         self.obj.expiry_date = timezone.now() - timedelta(hours=1)
         self.obj.save(update_fields=["expiry_date"])

@@ -4,12 +4,22 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
 from rest_framework_api_key.models import AbstractAPIKey
+from rest_framework_api_key.models import BaseAPIKeyManager
 from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
 from voteit.token_api.validators import normalize_scopes
 from voteit.token_api.validators import validate_api_key_scopes
+
+
+class MeetingAPIKeyManager(BaseAPIKeyManager):
+    def get_usable_keys(self):
+        return super().get_usable_keys().select_related(
+            "user",
+            "meeting",
+            "meeting__organisation",
+        )
 
 
 def create_api_key_user(meeting: Meeting):
@@ -26,6 +36,7 @@ def create_api_key_user(meeting: Meeting):
 
 
 class MeetingAPIKey(RulesModelMixin, MeetingContext, AbstractAPIKey):
+    objects = MeetingAPIKeyManager()
     meeting: Meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     scopes = models.JSONField(
