@@ -1,10 +1,14 @@
 from django import forms
 from django.contrib import admin
 from rest_framework_api_key.admin import APIKeyModelAdmin
+from rest_framework_api_key.models import APIKey
 
 from voteit.token_api.models import MeetingAPIKey
 from voteit.token_api.models import create_api_key_user
 from voteit.token_api.validators import _valid_scopes_map
+from django.contrib.admin.sites import site as default_site
+
+default_site.unregister(APIKey)
 
 
 def _scope_choices():
