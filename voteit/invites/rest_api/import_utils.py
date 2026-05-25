@@ -7,11 +7,14 @@ import zipfile
 
 from voteit.meeting.roles import ROLE_PARTICIPANT
 
-PARTICIPANT = str(ROLE_PARTICIPANT)
+# Mostly for doctests...
+_PARTICIPANT = str(ROLE_PARTICIPANT)
 
 # Security limits
-MAX_UPLOAD_BYTES = 2 * 1024 * 1024  # 2 MB — rejects unexpectedly large files before parsing
-MAX_ROWS = 1000                      # Stop parsing after this many data rows
+MAX_UPLOAD_BYTES = (
+    2 * 1024 * 1024
+)  # 2 MB — rejects unexpectedly large files before parsing
+MAX_ROWS = 1000  # Stop parsing after this many data rows
 _MAX_XML_ENTRY_BYTES = 5 * 1024 * 1024  # 5 MB per XML entry — guards against zip bombs
 
 # Magic bytes for ZIP-based formats (xlsx and ods are both ZIP archives)
@@ -98,13 +101,17 @@ def _parse_zip_spreadsheet(raw: bytes) -> tuple[list[str], list[list[str]]]:
                     f"Unsupported ODF format '{mime}'. Only spreadsheets (.ods) are supported."
                 )
             # XLSX: has xl/ directory and [Content_Types].xml
-            if "[Content_Types].xml" in names and any(n.startswith("xl/") for n in names):
+            if "[Content_Types].xml" in names and any(
+                n.startswith("xl/") for n in names
+            ):
                 return _parse_xlsx_zip(zf)
             raise ValueError(
                 "Unrecognised ZIP-based format. Upload an Excel (.xlsx) or ODS (.ods) file."
             )
     except zipfile.BadZipFile:
-        raise ValueError("The file appears to be corrupt or is not a valid spreadsheet.")
+        raise ValueError(
+            "The file appears to be corrupt or is not a valid spreadsheet."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -216,9 +223,7 @@ def _dict_rows_to_columns_rows(
     header_dict = raw_rows[sorted_row_indices[0]]
     n_cols = max(header_dict) + 1 if header_dict else 0
 
-    columns = [
-        (header_dict.get(i) or "").strip().lower() for i in range(n_cols)
-    ]
+    columns = [(header_dict.get(i) or "").strip().lower() for i in range(n_cols)]
     # Drop trailing empty column headers (e.g. from ODS files with extra columns)
     while columns and not columns[-1]:
         columns.pop()
@@ -285,10 +290,7 @@ def parse_invite_file(content: str) -> tuple[list[str], list[list[str]]]:
         return columns, rows
 
     columns = [c.lower() for c in first_cells]
-    rows = [
-        [cell.strip() for cell in line.split(sep)]
-        for line in lines[1:]
-    ]
+    rows = [[cell.strip() for cell in line.split(sep)] for line in lines[1:]]
     return columns, rows
 
 
@@ -313,7 +315,7 @@ def extract_roles_per_row(
     (['email'], [['a@x.com']], [['pa']])
     """
     if "roles" not in columns:
-        return columns, rows, [[PARTICIPANT]] * len(rows)
+        return columns, rows, [[_PARTICIPANT]] * len(rows)
 
     role_idx = columns.index("roles")
     new_columns = [c for c in columns if c != "roles"]
@@ -322,6 +324,6 @@ def extract_roles_per_row(
     for row in rows:
         raw = row[role_idx] if role_idx < len(row) else ""
         extra = {r.strip() for r in raw.split(",") if r.strip()}
-        roles_per_row.append(sorted({PARTICIPANT} | extra))
+        roles_per_row.append(sorted({_PARTICIPANT} | extra))
         new_rows.append([v for i, v in enumerate(row) if i != role_idx])
     return new_columns, new_rows, roles_per_row
