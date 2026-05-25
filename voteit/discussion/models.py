@@ -59,14 +59,6 @@ class DiscussionPost(
         verbose_name="Posted as group rather than author", default=False
     )
 
-    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {
-        "meeting": {"remap_relations": {"user": {"author"}}},
-        "organisation": {
-            "remap_relations": {"user": {"author", "mentions", "last_modified_by"}}
-        },
-    }
-
     @property
     def meeting(self) -> Meeting | None:
         """While not directly related, it still good to be able to do lookups this way"""

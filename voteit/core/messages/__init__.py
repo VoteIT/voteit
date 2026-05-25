@@ -1,2 +1,2 @@
 def register():
-    from . import frontend_version, role_updates, roles, transitions
+    from . import frontend_version, role_updates, transitions

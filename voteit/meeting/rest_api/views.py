@@ -9,6 +9,7 @@ from django.db.models import RestrictedError
 from django.http import Http404
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
+from envelope.app.user_channel.channel import UserChannel
 from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
@@ -20,9 +21,15 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from envelope import INTERNAL
+from envelope.channels.messages import RecheckChannelSubscriptions
+
+from voteit.core import PERM
+from voteit.core.loggers import log_roles_change
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
+from voteit.meeting import PERM_CHANGE_DIALECT
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
@@ -30,6 +37,7 @@ from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api import serializers
 from voteit.meeting.rest_api.filters import MeetingRolesFilter
+from voteit.meeting.roles import ROLE_MODERATOR
 
 __all__ = (
     "MeetingViewSet",
@@ -38,8 +46,6 @@ __all__ = (
     "GroupMembershipViewSet",
     "ExportParticipantsViewSet",
 )
-
-from voteit.meeting.roles import ROLE_MODERATOR
 
 
 @router.register("meetings", basename="meeting")
@@ -54,6 +60,8 @@ class MeetingViewSet(
         "create": serializers.CreateMeetingSerializer,
         "list": serializers.MeetingSerializer,
         "set_agenda_order": serializers.AgendaOrderSerializer,
+        "install_dialect": serializers.InstallDialectSerializer,
+        "remove_dialect": serializers.RemoveDialectSerializer,
     }
     filter_backends = (
         DjangoFilterBackend,
@@ -67,6 +75,8 @@ class MeetingViewSet(
         return {
             **super().permission_type_map,
             "set_agenda_order": "change",
+            "install_dialect": PERM_CHANGE_DIALECT,
+            "remove_dialect": PERM_CHANGE_DIALECT,
             "retrieve": None,  # Handled by queryset
             "transitions": None,  # Checked in transitions
         }
@@ -86,6 +96,46 @@ class MeetingViewSet(
                     ai.order = order.index(ai.pk) + 1
                     ai.save()
         return Response(status=201)
+
+    @action(methods=["post"], detail=True, url_path="install-dialect")
+    def install_dialect(self, request, pk):
+        meeting: Meeting = self.get_object()
+        if not meeting.is_upcoming:
+            # This is an extra check - superusers may bypass permission checks
+            raise ValidationError(
+                {"dialect": ["Meeting must be upcoming to install dialect."]}
+            )
+        if meeting.installed_dialect:
+            raise ValidationError(
+                {"dialect": ["A dialect is already installed. Remove it first."]}
+            )
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic(durable=True):
+            handler = dialect_registry.get_merged_handler(
+                serializer.validated_data["dialect"]
+            )
+            handler.install(meeting)
+        return Response(status=200)
+
+    @action(methods=["post"], detail=True, url_path="remove-dialect")
+    def remove_dialect(self, request, pk):
+        meeting: Meeting = self.get_object()
+        if not meeting.is_upcoming:
+            # This is an extra check - superusers may bypass permission checks
+            raise ValidationError(
+                {"dialect": ["Meeting must be upcoming to install dialect."]}
+            )
+        if not meeting.installed_dialect:
+            raise ValidationError(
+                {"dialect": ["No dialect is installed on this meeting."]}
+            )
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic(durable=True):
+            handler = dialect_registry.get_merged_handler(meeting.installed_dialect)
+            handler.remove(meeting, groups=serializer.validated_data["groups"])
+        return Response(status=200)
 
     def get_queryset(self) -> QuerySet:
         qs = Meeting.objects.for_user(self.request.user)
@@ -111,19 +161,75 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self):
-        # This is a temp fix to extract meeting PK. Context is still used by the frontend.
-        meeting_pk = self.request.query_params.get(
-            "meeting", self.request.query_params.get("context", None)
-        )
-        if meeting_pk is None:
-            return MeetingRoles.objects.none()
-        try:
-            meeting_pk = int(meeting_pk)
-        except (ValueError, TypeError):
-            raise ValidationError({"meeting": ["Must be a number"]})
         return MeetingRoles.objects.filter(
-            context__participants=self.request.user, context_id=meeting_pk
+            context__participants=self.request.user
         ).prefetch_related("user")
+
+    @action(detail=False, methods=["get"], permission_classes=[])
+    def available(self, request):
+        return Response(
+            [
+                role.output().dict(exclude={"predicate_info"})
+                for role in MeetingRoles.valid_roles.values()
+            ]
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.MeetingChangeRolesSerializer,
+        url_path="add",
+    )
+    @transaction.atomic(durable=True)
+    def add_roles(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        meeting = serializer.validated_data["meeting"]
+        user = serializer.validated_data["user"]
+        if not request.user.has_perm(Meeting.get_perm(PERM.CHANGE_ROLES), meeting):
+            raise PermissionDenied
+        changed = meeting.add_roles(user, *serializer.validated_data["roles"])
+        if changed:
+            log_roles_change(
+                "Added",
+                actor=request.user,
+                for_user=user,
+                context=meeting,
+                roles=changed,
+            )
+        roles_obj = MeetingRoles.objects.get(context=meeting, user=user)
+        return Response(serializers.MeetingRolesSerializer(roles_obj).data)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.MeetingChangeRolesSerializer,
+        url_path="remove",
+    )
+    @transaction.atomic(durable=True)
+    def remove_roles(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        meeting = serializer.validated_data["meeting"]
+        user = serializer.validated_data["user"]
+        if not request.user.has_perm(Meeting.get_perm(PERM.CHANGE_ROLES), meeting):
+            raise PermissionDenied
+        changed = meeting.remove_roles(user, *serializer.validated_data["roles"])
+        if changed:
+            log_roles_change(
+                "Removed",
+                actor=request.user,
+                for_user=user,
+                context=meeting,
+                roles=changed,
+            )
+            msg = RecheckChannelSubscriptions(consumer_name="", subscriptions=[])
+            UserChannel.from_instance(user, envelope_name=INTERNAL).sync_publish(msg)
+        try:
+            roles_obj = MeetingRoles.objects.get(context=meeting, user=user)
+        except MeetingRoles.DoesNotExist:
+            return Response(status=204)
+        return Response(serializers.MeetingRolesSerializer(roles_obj).data)
 
 
 @router.register("meeting-groups", basename="meeting-groups")

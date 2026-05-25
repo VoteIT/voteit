@@ -41,6 +41,6 @@ class ManualTriggerTests(TestCase):
         self.meeting.active_users.create(user=self.user1)
         self.meeting.er_policy.create_er()
         self.assertEqual(
-            {self.user1},
-            set(self.meeting.latest_er.voters.all()),
+            {self.user1.pk},
+            {int(k) for k in self.meeting.latest_er.voter_data.keys()},
         )

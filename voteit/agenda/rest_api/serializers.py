@@ -24,7 +24,6 @@ class AgendaItemSerializer(RichTextSerializerMixin, BaseModelSerializer):
             "id",
             "author",
             "mentions",
-            "last_modified_by",
         )
 
 
@@ -69,7 +68,6 @@ class CreateAgendaItemSerializer(AgendaItemSerializer):
             "related_modified",
             "mentions",
             "state",
-            "last_modified_by",
         )
 
     def validate_meeting(self, meeting):
@@ -97,7 +95,7 @@ class ExportAgendaItemSerializer(serializers.ModelSerializer):
 class LastReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = LastRead
-        fields = (
+        fields = read_only_fields = (
             "agenda_item",
             "timestamp",
         )

@@ -1,14 +1,17 @@
 from logging import getLogger
 
+from django.db import transaction
 from django.utils.functional import cached_property
 from pydantic import ValidationError as PydanticValidationError
 from rest_framework import serializers
 
+from voteit.core.rest_api.serializers import BaseModelSerializer
+from voteit.core.validators import root_validate_roles_and_model
 from voteit.invites.models import MeetingInvite
 from voteit.invites.utils import get_invite_adapter_registry
-from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.meeting import roles
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.workflows import MeetingWf
 from voteit.invites.rest_api.import_utils import detect_and_parse_file
 from voteit.invites.rest_api.import_utils import extract_roles_per_row
@@ -158,6 +161,93 @@ class InviteImportSerializer(serializers.Serializer):
         data["rows"] = validated.rows
         data["roles_per_row"] = roles_per_row
         return data
+
+
+class InviteCreateSerializer(serializers.Serializer):
+    meeting = ModeratorMeetingField()
+    roles = serializers.ListField(child=serializers.CharField(), min_length=1)
+    data = serializers.ListField(
+        child=serializers.DictField(child=serializers.CharField()),
+        min_length=1,
+        max_length=1000,
+    )
+    dryrun = serializers.BooleanField(default=False)
+
+    def validate_roles(self, v):
+        try:
+            root_validate_roles_and_model(None, {"model": "meeting", "roles": v})
+        except (ValueError, AssertionError) as e:
+            raise serializers.ValidationError(str(e)) from e
+        return v
+
+    def validate_data(self, v):
+        reg = get_invite_adapter_registry()
+        normalised = []
+        for i, item in enumerate(v):
+            if not item:
+                raise serializers.ValidationError(f"Item {i + 1} is empty.")
+            normalised_item = {}
+            for key, val in item.items():
+                if key not in reg.user_data_keys:
+                    raise serializers.ValidationError(
+                        f"Item {i + 1}: '{key}' is not a valid user data type."
+                    )
+                try:
+                    schema_data = reg[key].schema(**{key: val})
+                    normalised_item[key] = getattr(schema_data, key)
+                except (ValueError, TypeError) as e:
+                    raise serializers.ValidationError(
+                        f"Item {i + 1}: invalid value for '{key}': {e}"
+                    ) from e
+            normalised.append(normalised_item)
+        # Cross-item intersection check: a single key=value must not appear
+        # across items with different total user_data (subset conflict).
+        all_items_views = [x.items() for x in normalised]
+        checked = []
+        for i, item in enumerate(normalised, 1):
+            item_view = item.items()
+            if item_view in checked:
+                continue
+            for k, val in item_view:
+                partial = {k: val}.items()
+                if any(
+                    partial <= other for other in all_items_views if other != item_view
+                ):
+                    raise serializers.ValidationError(
+                        f"The value {k}={val} appears in overlapping subsets of user data. "
+                        f"Offending item: {i}"
+                    )
+            checked.append(item_view)
+        return normalised
+
+    def validate(self, attrs):
+        meeting = attrs["meeting"]
+        item_roles = attrs["roles"]
+        data = attrs["data"]
+        if ROLE_MODERATOR not in item_roles:
+            curr_moderator_pks = meeting.roles.filter(
+                assigned__contains=ROLE_MODERATOR
+            ).values_list("user", flat=True)
+            if (
+                meeting.invites.find_mixed_user_data(*data)[0]
+                .filter(used_by__in=curr_moderator_pks)
+                .exists()
+            ):
+                raise serializers.ValidationError(
+                    "This would downgrade roles for an existing moderator."
+                )
+        return attrs
+
+    def save(self, **kwargs):
+        vd = self.validated_data
+        meeting = vd["meeting"]
+        with transaction.atomic(durable=True):
+            result = meeting.invites.create_or_update_mixed(
+                data=vd["data"], roles=vd["roles"], meeting=meeting
+            )
+            if vd["dryrun"]:
+                transaction.set_rollback(True)
+        return result
 
 
 class InviteBulkSerializer(serializers.Serializer):

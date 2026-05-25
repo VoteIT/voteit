@@ -2,11 +2,13 @@ import csv
 
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db import transaction
 from django.http import Http404
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from rest_framework import permissions
+from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.renderers import JSONRenderer
@@ -76,6 +78,46 @@ class ElectoralRegisterViewSet(ReadOnlyModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
 
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.TriggerCreateERSerializer,
+        url_path="trigger-create",
+    )
+    @transaction.atomic
+    def trigger_create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        if serializer._created:
+            return Response(
+                serializers.ElectoralRegisterSerializer(
+                    serializer._er, context={"request": request}
+                ).data,
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.ManualCreateERSerializer,
+        url_path="manual-create",
+    )
+    @transaction.atomic
+    def manual_create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        if serializer._created:
+            return Response(
+                serializers.ElectoralRegisterSerializer(
+                    serializer._er, context={"request": request}
+                ).data,
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 @router.register("vote-transfer", basename="vote-transfer")
 class VoteTransferViewSet(
@@ -136,11 +178,19 @@ class ExportERViewSet(viewsets.GenericViewSet):
         return Response(data=[])
 
     def get_export_qs(self, er: ElectoralRegister):
-        return (
-            er.voterweight_set.all()
-            .prefetch_related("user")
-            .order_by("user__first_name")
-        )
+        User = get_user_model()
+        voter_data = er.voter_data
+        users = User.objects.filter(pk__in=voter_data.keys()).order_by("first_name")
+        return [
+            {
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "email": u.email,
+                "userid": u.userid,
+                "weight": voter_data[str(u.pk)],
+            }
+            for u in users
+        ]
 
     @action(
         methods=["get"],
@@ -148,7 +198,7 @@ class ExportERViewSet(viewsets.GenericViewSet):
     )
     def csv(self, request, *args, **kwargs):
         er = self.get_object()
-        if not er.voterweight_set.exists():
+        if not er.voter_data:
             raise Http404("No data yet")
         serializer = self.get_serializer(self.get_export_qs(er), many=True)
         response = HttpResponse(content_type="text/csv")

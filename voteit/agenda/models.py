@@ -74,12 +74,6 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
             "order",
         )
 
-    exporters = {"meeting": {}}
-    importers = {
-        "meeting": {},
-        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}},
-    }
-
     def save(self, **kw):
         """Set order as last agenda item for meeting when creating."""
         if self.pk is None and self.order in (0, None):
@@ -219,13 +213,11 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     def is_private(self) -> bool:
         return self.state == AgendaItemWf.PRIVATE
 
-    def mark_read(self, user: AbstractUser) -> datetime:
-        last_read, created = self.last_read_set.get_or_create(user=user)
-        last_read: LastRead
-        if not created:
-            last_read.timestamp = now()
-            last_read.save()
-        return last_read.timestamp
+    def mark_read(self, user: AbstractUser) -> LastRead:
+        last_read, _ = self.last_read_set.update_or_create(
+            user=user, defaults={"timestamp": now()}
+        )
+        return last_read
 
     # Annotations
     objects: models.Manager

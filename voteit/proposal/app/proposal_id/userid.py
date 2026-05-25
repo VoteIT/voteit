@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import itertools
+import re
 
 from django.utils.text import slugify
 
@@ -38,7 +38,6 @@ class UseridPID(ProposalIDPolicy):
             return base_suggestion[: self.EST_MAX_LEN]
 
     def __call__(self, proposal: Proposal) -> str | None:
-        # if proposal.meeting is None or proposal.author is None:
         if proposal.meeting is None:
             return None
         if base_suggestion := self.suggestion(
@@ -46,19 +45,19 @@ class UseridPID(ProposalIDPolicy):
             meeting_group=proposal.meeting_group,
             as_group=proposal.as_group,
         ):
-            meeting_proposals = Proposal.objects.filter(
-                agenda_item__meeting=proposal.meeting
+            # Use an exact-prefix regex to avoid "anna" matching "annabel-1".
+            # Fetches all matching IDs in one query, finds max in Python, returns
+            # base-{max+1}. The UniqueConstraint is the backstop for race conditions.
+            pattern = rf"^{re.escape(base_suggestion)}-(\d+)$"
+            matching = list(
+                Proposal.objects.filter(
+                    agenda_item__meeting=proposal.meeting,
+                    prop_id__regex=pattern,
+                ).values_list("prop_id", flat=True)
             )
-            matching_prop_ids = meeting_proposals.filter(
-                prop_id__startswith=base_suggestion
-            ).values_list("prop_id", flat=True)
-            if matching_prop_ids:
-                num_part = max(
-                    int(prop_id.rsplit("-", 1)[-1]) for prop_id in matching_prop_ids
-                )
-            else:
-                num_part = 0
-            for i in itertools.count(num_part + 1):
-                suggestion = f"{base_suggestion}-{i}"
-                if not meeting_proposals.filter(prop_id=suggestion).exists():
-                    return suggestion
+            num_part = (
+                max(int(re.search(pattern, pid).group(1)) for pid in matching)
+                if matching
+                else 0
+            )
+            return f"{base_suggestion}-{num_part + 1}"

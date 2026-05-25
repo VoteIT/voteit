@@ -9,6 +9,9 @@ from voteit.settings_tpl import *
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() in ("true", "1")
 VERBOSE_PERMISSIONS = DEBUG
+LOCALE_PATHS = [os.path.join(BASE_DIR, "locales")]
+MEDIA_URL = "media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 STATIC_ROOT = "/app/static/"
 ALLOWED_HOSTS = ["127.0.0.1"] + os.getenv("HOST", "").split()
@@ -19,9 +22,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
-    from hashlib import md5
-
-    SECRET_KEY = md5().hexdigest()
+    raise ValueError("DJANGO_SECRET_KEY not set")
 
 _marker = object()
 for env_setting in (

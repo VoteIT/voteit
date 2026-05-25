@@ -15,7 +15,6 @@ from django.contrib.auth.models import AbstractUser
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
-from django.db.models import Sum
 from django.db.models import UniqueConstraint
 from django.dispatch import receiver
 from django.utils.functional import cached_property
@@ -55,33 +54,9 @@ __all__ = (
     "Poll",
     "Vote",
     "VoteTransfer",
-    "VoterWeight",
 )
 
 logger = getLogger(__name__)
-
-
-class VoterWeight(MeetingContext):
-    name = "voter_weight"
-    register: ElectoralRegister = models.ForeignKey(
-        "ElectoralRegister", on_delete=models.CASCADE
-    )
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    weight: int = models.PositiveIntegerField(default=1)
-
-    importers = {
-        "organisation": {"remap_relations": {"electoral_register": "register"}}
-    }
-
-    @property
-    def meeting(self) -> Meeting | None:
-        return self.register.meeting
-
-    # Annotations
-    objects: models.Manager
-
-    def __str__(self):
-        return f"{self.__class__.__name__}:{self.pk} for {self.user.userid}"
 
 
 @auditlog.register(
@@ -95,37 +70,39 @@ class ElectoralRegister(RulesModelMixin, MeetingContext):
     name = "electoral_register"
     created: datetime = models.DateTimeField(editable=False, default=now)
     source: str | None = models.CharField(max_length=20, null=True, blank=True)
-    voters = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        through=VoterWeight,
-        related_name="electoral_registers",
-    )
     meeting: Meeting | None = models.ForeignKey(
         "meeting.Meeting",
         on_delete=models.CASCADE,
         related_name="electoral_registers",
         null=True,
     )
+    voter_data: dict = models.JSONField(default=dict)
 
-    importers = {
-        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}}
-    }
+    @staticmethod
+    def _voter_key(user: AbstractUser | int | str) -> str:
+        if isinstance(user, str):
+            return user
+        if isinstance(user, int):
+            return str(user)
+        return str(user.pk)
+
+    def has_voter(self, user: AbstractUser | int | str) -> bool:
+        return self._voter_key(user) in self.voter_data
 
     def get_voter_weight(self, user: AbstractUser) -> int:
-        """
-        Allow votes to have a weight in some contexts.
-        Will raise VoterWeight.DoesNotExist if user not in registry.
-        """
-        return self.voterweight_set.get(user=user).weight
+        key = self._voter_key(user)
+        if key not in self.voter_data:
+            raise KeyError(f"User {user.pk} not in electoral register")
+        return self.voter_data[key]
 
     def get_total_vote_weight(self) -> int:
-        return self.voterweight_set.aggregate(Sum("weight"))["weight__sum"]
+        return sum(self.voter_data.values())
 
     def get_weight_dict(self) -> dict[int, int]:
         """
         Uncached version
         """
-        return dict(self.voterweight_set.values_list("user_id", "weight"))
+        return {int(k): v for k, v in self.voter_data.items()}
 
     @cached_property
     def weight_dict(self) -> dict[int, int]:
@@ -136,16 +113,28 @@ class ElectoralRegister(RulesModelMixin, MeetingContext):
 
     def set_voters_from_dict(self, values: dict[int, int]):
         """
-        Adjust and set voters exactly according to {user PK: weight}
-        Note that this is a low-lever function that does very little validation. It won't check that set users
-        even have permission to view the meeting!
+        Set voters exactly according to {user PK: weight}.
+        Low-level — does not validate that users have meeting access.
+        This is the only sanctioned way to update voter_data after creation.
         """
-        # FIXME: This touches models several times, fix this
-        self.voters.set(values.keys())
-        user_weights_to_adjust = {k for (k, v) in values.items() if v > 1}
-        for vw in self.voterweight_set.filter(user__in=user_weights_to_adjust):
-            vw.weight = values[vw.user_id]
-            vw.save()
+        if self.voter_data:
+            raise ValueError("voter_data already set")
+        self._allow_voter_data_write = True
+        self.voter_data = {str(k): v for k, v in values.items()}
+        self.save(update_fields=["voter_data"])
+
+    def save(self, **kw):
+        # A bit silly but better than nothing
+        update_fields = kw.get("update_fields")
+        if (
+            self.pk is not None
+            and update_fields is not None
+            and "voter_data" in update_fields
+            and not getattr(self, "_allow_voter_data_write", False)
+        ):
+            raise ValueError("voter_data is immutable; use set_voters_from_dict()")
+        self._allow_voter_data_write = False
+        super().save(**kw)
 
     class QuerySet(models.QuerySet):
         def for_user(self, user: AbstractUser):
@@ -160,14 +149,13 @@ class ElectoralRegister(RulesModelMixin, MeetingContext):
             return self.get_queryset().for_user(user)
 
     objects = Manager()
-    voterweight_set: models.QuerySet
     polls: models.QuerySet
     polls_initial: models.QuerySet
     meeting_id: int | None
 
     def __str__(self):
         return (
-            f"{self.__class__.__name__}:{self.pk} with {self.voters.count()} voter(s)"
+            f"{self.__class__.__name__}:{self.pk} with {len(self.voter_data)} voter(s)"
         )
 
 
@@ -248,19 +236,6 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         verbose_name="Withheld result",
         default=False,
     )
-
-    importers = {
-        "organisation": {
-            "remap_relations": {
-                "electoral_register": {
-                    "initial_electoral_register",
-                    "electoral_register",
-                },
-                "proposal": {"proposals"},
-                "user": {"last_modified_by", "author"},
-            }
-        }
-    }
 
     def get_method_class(self) -> type[PollMethod]:
         """Fetch the poll method class, a django proxy model."""
@@ -560,13 +535,16 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         """
         if self.ballot_data is not None:
             raise PollError("Poll already finalized")
+        er = self.electoral_register
+        weights = {int(k): v for k, v in er.voter_data.items()} if er else {}
         counter = Counter()
         abstains = 0
-        for v in self.votes.annotate_weight().order_by("pk"):
+        for v in self.votes.order_by("pk"):
+            w = weights.get(v.user_id, 1)
             if v.abstain:
-                abstains += v.weight
+                abstains += w
             else:
-                counter[v.vote_data] += v.weight
+                counter[v.vote_data] += w
         self.abstains = abstains
         self.ballot_data = dumps(counter)
         self.ballot_checksum = sha512(self.ballot_data.encode("utf-8")).hexdigest()
@@ -597,8 +575,8 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         """
         if self.electoral_register is None:
             raise PollError("No electoral register")
-        voters = self.electoral_register.voters.all()
-        return self.votes.exclude(user__in=voters)
+        voter_pks = [int(k) for k in self.electoral_register.voter_data.keys()]
+        return self.votes.exclude(user_id__in=voter_pks)
 
     def save(self, **kw):
         """Make sure meeting is set, from agenda_items meeting.
@@ -640,7 +618,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
     # Annotations
     objects: models.Manager
-    votes: Vote.QuerySet
+    votes: models.QuerySet
     meeting_id: int | None
 
 
@@ -675,8 +653,6 @@ class Vote(RulesModelMixin, models.Model):
         null=True, blank=True
     )  # This field should contain the value from PollMethod
 
-    importers = {"organisation": {}}
-
     @property
     def vote(self) -> BaseModel:
         return self.vote_data and self.poll.method.vote_to_obj(self.vote_data)
@@ -709,25 +685,13 @@ class Vote(RulesModelMixin, models.Model):
         er = self.poll.electoral_register
         if not er:
             raise ElectoralRegisterMissing()
-        if not er.voters.filter(id=self.user.id):
+        if not er.has_voter(self.user_id):
             raise NotAllowedToVote("Not allowed to vote")
         if self.abstain and self.vote_data is not None:
             self.vote_data = None
         super().save(**kw)
 
-    class QuerySet(models.QuerySet):
-        def annotate_weight(self):
-            """Add vote weight using subquery."""
-            return self.annotate(
-                weight=models.Subquery(
-                    VoterWeight.objects.filter(
-                        register=models.OuterRef("poll__electoral_register"),
-                        user=models.OuterRef("user"),
-                    )[:1].values_list("weight", flat=True)
-                )
-            )
-
-    objects = QuerySet.as_manager()
+    objects: models.Manager
 
 
 @auditlog.register(

@@ -49,14 +49,17 @@ class ProposalViewSet(
         # Proposal and subtypes!
         if self.action == "list":
             return Proposal.objects.none()
+        user = self.request.user
         return (
             Proposal.objects.filter(
-                models.Q(agenda_item__meeting__roles__user=self.request.user)
-                & models.Q(
-                    agenda_item__meeting__roles__assigned__contains=ROLE_MODERATOR
+                models.Q(
+                    agenda_item__meeting__roles__user=user,
+                    agenda_item__meeting__roles__assigned__contains=ROLE_MODERATOR,
                 )
-                | ~models.Q(agenda_item__state="private")
+                | models.Q(agenda_item__meeting__roles__user=user)
+                & ~models.Q(agenda_item__state="private")
             )
+            .select_related("agenda_item__meeting")
             .select_subclasses()
             .distinct()
         )
@@ -86,10 +89,14 @@ class TextDocumentViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     def get_queryset(self):
         if self.action == "list":
             return TextDocument.objects.none()
+        user = self.request.user
         return TextDocument.objects.filter(
-            models.Q(agenda_item__meeting__roles__user=self.request.user)
-            & models.Q(agenda_item__meeting__roles__assigned__contains=ROLE_MODERATOR)
-            | ~models.Q(agenda_item__state="private")
+            models.Q(
+                agenda_item__meeting__roles__user=user,
+                agenda_item__meeting__roles__assigned__contains=ROLE_MODERATOR,
+            )
+            | models.Q(agenda_item__meeting__roles__user=user)
+            & ~models.Q(agenda_item__state="private")
         ).distinct()
 
 
@@ -109,7 +116,7 @@ class ExportProposalsViewSet(viewsets.GenericViewSet):
         return (
             Proposal.objects.all()
             .select_subclasses()
-            .prefetch_related("author", "meeting_group", "agenda_item")
+            .select_related("author", "meeting_group", "agenda_item__meeting")
             .filter(agenda_item__in=meeting.agenda_items.all())
             .order_by("agenda_item__order", "created")
         )

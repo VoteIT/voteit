@@ -74,8 +74,8 @@ class GroupAutoRandomBeforePollTests(TestCase):
         self.meeting.active_users.create(user=self.user1)
         self.poll.upcoming()
         self.assertEqual(
-            {self.user1},
-            set(self.poll.electoral_register.voters.all()),
+            {self.user1.pk},
+            {int(k) for k in self.poll.electoral_register.voter_data.keys()},
         )
 
     def test_delegate_to(self):

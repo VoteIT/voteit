@@ -128,6 +128,31 @@ class AgendaItemViewTestCase(APITestCase):
         data = response.json()
         self.assertEqual([], data["tags"])
 
+    def test_update_last_read_permissions(self):
+        url = reverse("agendaitem-update-last-read", args=[self.ai.pk])
+        for func, args in run_permission_tests(
+            self,
+            url=url,
+            method="post",
+            expected=[
+                [None, 401],
+                [self.moderator, 200],
+                [self.participant, 200],
+                [self.outsider, 404],
+            ],
+        ):
+            func(*args)
+
+    def test_update_last_read_creates_record(self):
+        url = reverse("agendaitem-update-last-read", args=[self.ai.pk])
+        self.client.force_login(self.participant)
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(self.ai.pk, data["agenda_item"])
+        self.assertIn("timestamp", data)
+        self.assertTrue(self.ai.last_read_set.filter(user=self.participant).exists())
+
 
 class ExportParticipantsViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture"]

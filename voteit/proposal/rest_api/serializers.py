@@ -303,11 +303,11 @@ class TextDocumentSerializer(serializers.ModelSerializer):
         ]
 
     def get_paragraphs(self, instance: TextDocument):
-        data = TextParagraphSerializer(
-            instance.text_paragraphs.all().order_by("paragraph_id"), many=True
-        ).data
-        # FIXME: This is probably NOT the correct way to handle the serialized data
-        return [dict(x) for x in data]
+        return list(
+            TextParagraphSerializer(
+                instance.text_paragraphs.all().order_by("paragraph_id"), many=True
+            ).data
+        )
 
     def validate(self, attrs: dict) -> dict:
         attrs = super().validate(attrs)
@@ -385,7 +385,7 @@ class ExportDiffProposalSerializer(
             list(
                 x
                 for x in DiffProposalDetailSerializer.Meta.fields
-                if x not in ["body_diff", "mentions"]
+                if x not in ["body_diff", "body_diff_brief", "mentions"]
             )
             + ExportBaseSerializerMixin.Meta.fields
         )

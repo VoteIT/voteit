@@ -163,8 +163,7 @@ class MeetingPermissionTests(TestCase):
         self.assertFalse(self.anon_user.has_perm(CHANGE_ROLES, self.meeting))
         self.assertTrue(self.moderator.has_perm(CHANGE_ROLES, self.meeting))
         self.assertFalse(self.participant.has_perm(CHANGE_ROLES, self.meeting))
-        # They need to join/set their own role as moderator first
-        self.assertFalse(self.org_manager.has_perm(CHANGE_ROLES, self.meeting))
+        self.assertTrue(self.org_manager.has_perm(CHANGE_ROLES, self.meeting))
 
     def test_can_change_roles_archived(self):
         CHANGE_ROLES = Meeting.get_perm(PERM.CHANGE_ROLES)

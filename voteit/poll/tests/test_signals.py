@@ -56,7 +56,7 @@ class MeetingSubscribedTests(TestCase):
         )
         cls.user = User.objects.get(username="participant")
         cls.moderator = User.objects.get(username="moderator")
-        cls.er.voters.add(cls.user, cls.moderator)
+        cls.er.set_voters_from_dict({cls.user.pk: 1, cls.moderator.pk: 1})
         # Props
         cls.prop1 = cls.poll.proposals.create(agenda_item=cls.ai)
         cls.prop2 = cls.poll2.proposals.create(agenda_item=cls.ai)
@@ -160,7 +160,7 @@ class MeetingSubscribedTests(TestCase):
 
     def test_n1_problem(self):
         app_state = AppState()
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(3):
             self._fut(self.meeting, app_state, self.user)
 
     def test_withheld_result_participant(self):

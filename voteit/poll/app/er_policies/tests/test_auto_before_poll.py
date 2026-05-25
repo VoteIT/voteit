@@ -35,7 +35,8 @@ class AutoBeforePollTests(TestCase):
         self.assertIsInstance(self.poll.electoral_register, ElectoralRegister)
         # Why self.assertQuerysetEqual() create object strings of some kind?
         self.assertEqual(
-            {self.user1, self.user2}, set(self.poll.electoral_register.voters.all())
+            {self.user1.pk, self.user2.pk},
+            {int(k) for k in self.poll.electoral_register.voter_data.keys()},
         )
 
     def test_new_er_on_start_if_new_users(self):
@@ -45,8 +46,8 @@ class AutoBeforePollTests(TestCase):
         self.poll.upcoming()
         self.assertNotEqual(first_er, self.poll.electoral_register)
         self.assertEqual(
-            {self.user1, self.user2, user3},
-            set(self.poll.electoral_register.voters.all()),
+            {self.user1.pk, self.user2.pk, user3.pk},
+            {int(k) for k in self.poll.electoral_register.voter_data.keys()},
         )
 
     def test_same_er_on_start_if_no_new_users(self):
@@ -68,8 +69,8 @@ class AutoBeforePollTests(TestCase):
         self.poll.upcoming()
         self.assertNotEqual(first_er, self.poll.electoral_register)
         self.assertEqual(
-            {self.user1, self.user2, user3},
-            set(self.poll.electoral_register.voters.all()),
+            {self.user1.pk, self.user2.pk, user3.pk},
+            {int(k) for k in self.poll.electoral_register.voter_data.keys()},
         )
 
     def test_initial_er_set_when_upcoming(self):
@@ -106,6 +107,6 @@ class AutoBeforePollTests(TestCase):
         self.meeting.active_users.create(user=self.user1)
         self.poll.upcoming()
         self.assertEqual(
-            {self.user1},
-            set(self.poll.electoral_register.voters.all()),
+            {self.user1.pk},
+            {int(k) for k in self.poll.electoral_register.voter_data.keys()},
         )

@@ -50,7 +50,6 @@ class OrganisationRoles(OrganisationContext, Roles):
     context: Organisation = models.ForeignKey(
         "Organisation", on_delete=models.CASCADE, related_name="roles"
     )
-    importers = {"organisation": {"remap_relations": {"organisation": "context"}}}
 
     class Meta:
         verbose_name = verbose_name_plural = "Organisation roles"

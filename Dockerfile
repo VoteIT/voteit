@@ -27,16 +27,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DJANGO_SETTINGS_MODULE=project.settings_production
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl libmagic1 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 555 voteit \
-    && useradd -u 555 -g voteit --system --no-create-home voteit
+    && useradd -u 555 -g voteit --system --no-create-home voteit \
+    && mkdir -p /app/media \
+    && chown voteit:voteit /app/media
 
 WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
 COPY --chown=voteit:voteit --chmod=+x manage.py docker-entrypoint.sh wait-for-it.sh ./
 COPY --chown=voteit:voteit project ./project
+COPY --chown=voteit:voteit locales ./locales
 
 USER voteit
 

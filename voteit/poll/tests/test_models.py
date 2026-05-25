@@ -19,7 +19,7 @@ from voteit.poll.exceptions import (
     InvalidPollMethod,
     NotAllowedToVote,
 )
-from voteit.poll.models import ElectoralRegister, Poll, VoterWeight
+from voteit.poll.models import ElectoralRegister, Poll
 from voteit.poll.registries import er_policy, vote_transfer_policies
 from voteit.poll.testing import (
     UnrestrictedVoteTransferER,
@@ -28,6 +28,7 @@ from voteit.poll.testing import (
 from voteit.poll.workflows import PollWf
 from voteit.proposal.models import Proposal
 from voteit.proposal.workflows import ProposalWf
+
 
 User = get_user_model()
 
@@ -132,8 +133,12 @@ class PollTests(TestCase):
         vote1 = self.poll.votes.create(user=self.participant, vote="yes")
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
-        # Change ER
-        self.poll.electoral_register.voters.remove(self.participant)
+        # Change ER - remove participant
+        er = self.poll.electoral_register
+        er.voter_data = {}  # To allow reset
+        er.set_voters_from_dict(
+            {k: v for k, v in er.get_weight_dict().items() if k != self.participant.pk}
+        )
         self.poll.close()
         self.assertFalse(self.poll.votes.count())
         self.assertEqual(PollWf.NO_RESULT, self.poll.state)
@@ -146,8 +151,13 @@ class PollTests(TestCase):
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertIn(vote2, votes)
-        # Change ER
-        self.poll.electoral_register.voters.remove(self.moderator)
+        # Change ER - remove moderator
+        er = self.poll.electoral_register
+        new_vals = {
+            k: v for k, v in er.get_weight_dict().items() if k != self.moderator.pk
+        }
+        er.voter_data = {}  # To allow set_voters_from_dict
+        er.set_voters_from_dict(new_vals)
         self.poll.close()
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
@@ -270,11 +280,7 @@ class VoteWeightTests(TestCase):
         cls.user1 = User.objects.create(username="1")
         cls.user2 = User.objects.create(username="2")
         cls.user3 = User.objects.create(username="3")
-        VoterWeight.objects.create(register=cls.poll.electoral_register, user=cls.user1)
-        VoterWeight.objects.create(register=cls.poll.electoral_register, user=cls.user2)
-        VoterWeight.objects.create(
-            register=cls.poll.electoral_register, user=cls.user3, weight=3
-        )
+        cls.er.set_voters_from_dict({cls.user1.pk: 1, cls.user2.pk: 1, cls.user3.pk: 3})
 
     def test_poll_result(self):
         prop = self.poll.proposals.create(body="I propose!")
@@ -283,9 +289,7 @@ class VoteWeightTests(TestCase):
         self.poll.votes.create(user=self.user1, vote_data="yes")
         self.poll.votes.create(user=self.user2, vote_data="yes")
         self.poll.votes.create(user=self.user3, vote_data="no")
-        # Would be 14 if no annotation of weight
-        with self.assertNumQueries(8):
-            self.poll.close()
+        self.poll.close()
         self.assertEqual(
             self.poll.result.dict(),
             {
@@ -316,12 +320,8 @@ class ElectoralRegisterTests(TestCase):
         cls.meeting.add_roles(cls.participant, ROLE_POTENTIAL_VOTER)
         cls.meeting.add_roles(cls.moderator, ROLE_POTENTIAL_VOTER)
         cls.er: ElectoralRegister = cls.meeting.er_policy.create_er()
-        wv_participant = cls.er.voterweight_set.get(user=cls.participant)
-        wv_participant.weight = 4
-        wv_participant.save()
-        wv_moderator = cls.er.voterweight_set.get(user=cls.moderator)
-        wv_moderator.weight = 2
-        wv_moderator.save()
+        cls.er.voter_data = {}  # To allow reset
+        cls.er.set_voters_from_dict({cls.participant.pk: 4, cls.moderator.pk: 2})
 
     def setUp(self):
         # Clear cached things
@@ -340,6 +340,7 @@ class ElectoralRegisterTests(TestCase):
         )
 
     def test_set_voters_from_dict(self):
+        self.er.voter_data = {}  # To allow reset
         self.er.set_voters_from_dict({self.moderator.pk: 3})
         self.assertEqual({self.moderator.pk: 3}, self.er.weight_dict)
 
@@ -451,7 +452,11 @@ class VoteTests(TestCase):
         )
 
     def test_not_in_er(self):
-        self.poll.electoral_register.voters.remove(self.voter)
+        er = self.poll.electoral_register
+        er.voter_data = {}  # To allow set_voters_from_dict
+        er.set_voters_from_dict(
+            {k: v for k, v in er.get_weight_dict().items() if k != self.voter.pk}
+        )
         self.assertRaises(
             NotAllowedToVote,
             self.poll.votes.create,

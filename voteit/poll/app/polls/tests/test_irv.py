@@ -1,8 +1,8 @@
 from collections import Counter
 from random import randint
 from random import sample
-from random import seed
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from pydantic import ValidationError
 from envelope.messages.errors import ValidationErrorMsg
@@ -15,13 +15,16 @@ from voteit.poll.schemas import RankingSchema
 from voteit.poll.workflows import PollWf
 from voteit.proposal.workflows import ProposalWf
 
+User = get_user_model()
+
 
 class IRVTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.er = ElectoralRegister.objects.create()
         cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="irv")
-        cls.voter = cls.er.voters.create(username="a_voter")
+        cls.voter = User.objects.create(username="a_voter")
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
 
     @property
     def IRV(self):
@@ -48,11 +51,14 @@ class IRVTests(TestCase):
             self.poll.proposals.create()
         self.assertIsNone(self.poll.method.start_check())
         proposal_pks = list(self.poll.proposals.values_list("pk", flat=True))
-        for n in range(20):
-            self.er.voters.create(username=f"voter-{n}")
+        new_voters = [User.objects.create(username=f"voter-{n}") for n in range(20)]
+        self.er.voter_data = {}  # To allow reset
+        self.er.set_voters_from_dict(
+            {**self.er.voter_data, **{u.pk: 1 for u in new_voters}}
+        )
         self.poll.upcoming()
         self.poll.ongoing()
-        for voter in self.er.voters.all():
+        for voter in User.objects.filter(pk__in=self.er.voter_data.keys()):
             self.poll.votes.create(
                 user=voter,
                 vote_data=",".join(
@@ -109,7 +115,8 @@ class AddVoteTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.er = ElectoralRegister.objects.create()
-        cls.voter = cls.er.voters.create(username="voter")
+        cls.voter = User.objects.create(username="voter")
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.irv_poll = Poll.objects.create(electoral_register=cls.er, method_name="irv")
         cls.repeated_irv_poll = Poll.objects.create(
             electoral_register=cls.er,
@@ -223,7 +230,8 @@ class RepeatedIRVTests(TestCase):
             method_name="repeated_irv",
             settings={"winners": 2},
         )
-        cls.voter = er.voters.create(username="a_voter")
+        cls.voter = User.objects.create(username="a_voter")
+        er.set_voters_from_dict({cls.voter.pk: 1})
         cls.prop_one = cls.poll.proposals.create()
         cls.prop_two = cls.poll.proposals.create()
         cls.prop_three = cls.poll.proposals.create()
@@ -263,12 +271,15 @@ class RepeatedIRVTests(TestCase):
             self.poll.proposals.create()
         self.assertIsNone(self.poll.method.start_check())
         proposal_pks = list(self.poll.proposals.values_list("pk", flat=True))
-        for n in range(20):
-            self.er.voters.create(username=f"voter-{n}")
+        new_voters = [User.objects.create(username=f"voter-{n}") for n in range(20)]
+        self.er.voter_data = {}  # To allow reset
+        self.er.set_voters_from_dict(
+            {**self.er.voter_data, **{u.pk: 1 for u in new_voters}}
+        )
         self.poll.upcoming()
         self.poll.ongoing()
         with SetSeed():
-            for voter in self.er.voters.all():
+            for voter in User.objects.filter(pk__in=self.er.voter_data.keys()):
                 self.poll.votes.create(
                     user=voter,
                     vote_data=",".join(

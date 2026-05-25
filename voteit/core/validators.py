@@ -5,7 +5,70 @@ from typing import Dict
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.utils.deconstruct import deconstructible
+from django.utils.translation import gettext_lazy as _
+
 from voteit.core.utils import get_model_by_shortname
+
+
+def _fmt_bytes(n: int) -> str:
+    if n >= 1024 * 1024:
+        return f"{n / (1024 * 1024):.1f} MB"
+    if n >= 1024:
+        return f"{n // 1024} KB"
+    return f"{n} B"
+
+
+_MIME_TO_EXT = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
+
+
+@deconstructible
+class ImageValidator:
+    def __init__(
+        self,
+        max_size: int = 300 * 1024,
+        allowed_mimes=("image/jpeg", "image/png", "image/webp"),
+    ):
+        self.max_size = max_size
+        self.allowed_mimes = allowed_mimes
+
+    def __call__(self, file):
+        try:
+            import magic  # requires libmagic system library
+        except ImportError:
+            raise ValidationError(_("Image upload is currently unavailable."))
+
+        if file.size > self.max_size:
+            raise ValidationError(
+                _("File too large. Max size: %s") % _fmt_bytes(self.max_size)
+            )
+        file.seek(0)
+        data = file.read(2048)
+        file.seek(0)
+        try:
+            mime = magic.from_buffer(data, mime=True)
+        except Exception:
+            raise ValidationError(_("Image upload is currently unavailable."))
+        # Some libmagic builds cannot identify RIFF sub-types (WebP) from a buffer;
+        # fall back to manual signature check in that case.
+        if mime == "application/octet-stream" and len(data) >= 12:
+            if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+                mime = "image/webp"
+        if mime not in self.allowed_mimes:
+            raise ValidationError(
+                _("Unsupported file type, must be one of: %s.")
+                % ", ".join(self.allowed_mimes)
+            )
+        # Browsers (e.g. mobile) often send the file as "blob" with no extension.
+        # Correct the name using the detected type so upload_to can use the right ext.
+        ext = _MIME_TO_EXT.get(mime)
+        if ext:
+            base = file.name.rsplit(".", 1)[0] if "." in file.name else file.name
+            file.name = f"{base}.{ext}"
 
 
 def validate_model_shortname(v: str):

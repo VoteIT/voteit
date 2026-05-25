@@ -76,12 +76,6 @@ class SpeakerSystemRoles(Roles, MeetingContext):
     class Meta:
         verbose_name = verbose_name_plural = "Speaker system roles"
 
-    exporters = {"meeting": {"meeting_kw": "context__meeting"}}
-    importers = {
-        "meeting": {"remap_relations": {"speaker_system": "context"}},
-        "organisation": {"remap_relations": {"speaker_system": "context"}},
-    }
-
     def __str__(self):
         return f"{self.user} roles @ {self.context}"
 
@@ -157,8 +151,6 @@ class SpeakerListSystem(
     )
 
     roles_cls = SpeakerSystemRoles
-    exporters = {"meeting": {"ignore_fields": ("active_list",)}}
-    importers = {"meeting": {}, "organisation": {}}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -359,8 +351,6 @@ class Speaker(RulesModelMixin, MeetingContext, SpeakerSystemContext):
     started: datetime | None = models.DateTimeField(null=True)
     seconds: int | None = models.PositiveSmallIntegerField(null=True)
 
-    importers = {"organisation": {}}
-
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -480,13 +470,6 @@ class SpeakerList(
     order: str = models.TextField(
         verbose_name="Order of user PK, comma separated", default=""
     )
-    exporters = {
-        "meeting": {
-            "meeting_kw": "speaker_system__meeting",
-            "ignore_fields": ["current"],
-        }
-    }
-    importers = {"meeting": {}, "organisation": {}}
 
     @property
     def method(self) -> ListMethod:

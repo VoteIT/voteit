@@ -4,10 +4,15 @@ from django.contrib import admin
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.utils.functional import cached_property
+from django.db.models import OuterRef
+from django.db.models import Subquery
+from django.db.models.functions import Coalesce
+from django.template.response import TemplateResponse
+from django.urls import path
 from django.utils.timezone import now
 from envelope.models import Connection
 
+from voteit.meeting.models import Meeting
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
@@ -15,7 +20,6 @@ from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserConsent
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
-
 
 User = get_user_model()
 
@@ -65,64 +69,122 @@ class InactiveOrgFilter(admin.SimpleListFilter):
 
 @admin.register(Organisation)
 class OrganisationAdmin(admin.ModelAdmin):
+    change_list_template = "admin/organisation/change_list.html"
     search_fields = ("title",)
     list_display = (
         "title",
         "meeting_count",
-        "online_users",
+        "users",
         "manager_count",
         "meeting_creator_count",
     )
     autocomplete_fields = ("mentions",)
     list_filter = (InactiveOrgFilter,)
+    show_full_result_count = False
     actions = [
         "mark_as_active",
         "mark_as_inactive",
     ]
 
-    @cached_property
-    def online_mapping(self):
-        recent_connections_user_qs = Connection.objects.filter(
-            online=True, last_action__gt=now() - timedelta(minutes=10)
-        ).values_list("user_id", flat=True)
-        user_qs = User.objects.filter(id__in=recent_connections_user_qs).distinct()
-        return {
-            x["organisation"]: x["id__count"]
-            for x in user_qs.values("organisation")
-            .order_by()
-            .annotate(models.Count("id"))
-        }
-
     @admin.display(description="Managers")
     def manager_count(self, obj: Organisation):
         return obj.managers__count
 
-    @admin.display(description="Online users")
-    def online_users(self, obj: Organisation):
-        return f"{self.online_mapping.get(obj.pk, 0)} / {obj.users.count()}"
+    @admin.display(description="Users", ordering="users__count")
+    def users(self, obj: Organisation):
+        return obj.users__count
 
-    @admin.display(description="Meeting Creators")
+    @admin.display(description="Meeting Creators", ordering="meeting_creator__count")
     def meeting_creator_count(self, obj: Organisation):
         return obj.meeting_creator__count
 
-    @admin.display(description="Meetings")
+    @admin.display(description="Meetings", ordering="meeting__count")
     def meeting_count(self, obj: Organisation):
         return obj.meeting__count
 
+    def get_urls(self):
+        return [
+            path(
+                "online/",
+                self.admin_site.admin_view(self.online_view),
+                name="organisation_organisation_online",
+            ),
+        ] + super().get_urls()
+
+    def online_view(self, request):
+        recent_threshold = now() - timedelta(minutes=10)
+        online_subquery = Subquery(
+            Connection.objects.filter(
+                user__organisation=OuterRef("pk"),
+                online=True,
+                last_action__gt=recent_threshold,
+            )
+            .values("user__organisation")
+            .annotate(cnt=models.Count("user_id", distinct=True))
+            .values("cnt")[:1]
+        )
+        organisations = (
+            Organisation.objects.annotate(
+                online_users__count=Coalesce(online_subquery, 0)
+            )
+            .filter(online_users__count__gt=0)
+            .order_by("-online_users__count")
+        )
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Online organisations",
+            "organisations": organisations,
+        }
+        return TemplateResponse(request, "admin/organisation/online.html", context)
+
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.annotate(
-            meeting__count=models.Count("meetings", distinct=True),
-            meeting_creator__count=models.Count(
-                "roles",
-                distinct=True,
-                filter=models.Q(roles__assigned__contains=ROLE_MEETING_CREATOR),
-            ),
-            managers__count=models.Count(
-                "roles",
-                distinct=True,
-                filter=models.Q(roles__assigned__contains=ROLE_ORG_MANAGER),
-            ),
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(
+                meeting__count=Coalesce(
+                    Subquery(
+                        Meeting.objects.filter(organisation=OuterRef("pk"))
+                        .values("organisation")
+                        .annotate(cnt=models.Count("pk"))
+                        .values("cnt")[:1]
+                    ),
+                    0,
+                ),
+                meeting_creator__count=Coalesce(
+                    Subquery(
+                        OrganisationRoles.objects.filter(
+                            context=OuterRef("pk"),
+                            assigned__contains=ROLE_MEETING_CREATOR,
+                        )
+                        .values("context")
+                        .annotate(cnt=models.Count("pk"))
+                        .values("cnt")[:1]
+                    ),
+                    0,
+                ),
+                managers__count=Coalesce(
+                    Subquery(
+                        OrganisationRoles.objects.filter(
+                            context=OuterRef("pk"),
+                            assigned__contains=ROLE_ORG_MANAGER,
+                        )
+                        .values("context")
+                        .annotate(cnt=models.Count("pk"))
+                        .values("cnt")[:1]
+                    ),
+                    0,
+                ),
+                users__count=Coalesce(
+                    Subquery(
+                        User.objects.filter(organisation=OuterRef("pk"))
+                        .values("organisation")
+                        .annotate(cnt=models.Count("pk"))
+                        .values("cnt")[:1]
+                    ),
+                    0,
+                ),
+            )
         )
 
     @admin.display(description="Mark as active")
@@ -176,6 +238,9 @@ class UserConsentAdmin(admin.ModelAdmin):
 class OAuth2ProviderAdmin(admin.ModelAdmin):
     list_display = ["__str__", "organisation_active", "scope"]
     list_filter = ["scope", "organisation__active"]
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("organisation")
 
     @admin.display(description="Org active?", boolean=True)
     def organisation_active(self, instance):

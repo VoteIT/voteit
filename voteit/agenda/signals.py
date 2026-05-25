@@ -77,7 +77,7 @@ def meeting_channel_subscribed(
 ):
     # This will cause last read to be sent for private agenda items that the user has visited,
     # but that shouldn't be a problem.
-    serializer = LastReadSerializer(context.last_read_set.filter(user=user), many=True)
+    serializer = LastReadSerializer(context.last_read_set.filter(user=user).select_related("agenda_item"), many=True)
     if serializer.data:
         batch = Batch(t=LastReadChanged.name, payloads=[])
         for item in serializer.data:
@@ -162,7 +162,7 @@ def mark_ai_as_updated(instance: AgendaItemContext, created=None, **kwargs):
 def revert_to_last_updated(instance: AgendaItemContext, **kwargs):
     if instance.agenda_item is not None:
         try:
-            instance.agenda_item.refresh_from_db(fields=["pk"])
+            instance.agenda_item.refresh_from_db(fields=["state", "related_modified"])
         except AgendaItem.DoesNotExist:  # pragma: no cover
             return
         instance.agenda_item.revert_to_last_related_modified()

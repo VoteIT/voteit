@@ -41,9 +41,14 @@ class AgendaAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
     )
     readonly_fields = ("order",)
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(
+            _proposal_count=models.Count("proposals", distinct=True)
+        )
+
     @admin.display(description="Proposals")
     def proposal_count(self, obj: AgendaItem):
-        return obj.proposals.count()
+        return obj._proposal_count
 
 
 class AgendaItemAdminMixin:
@@ -72,5 +77,5 @@ class AgendaItemAdminMixin:
         """
         qs = qs.annotate(ai_title=models.F(title_attr))
         if pk_attr:
-            qs = qs.annotate(agenda_item_id=models.F(title_attr))
+            qs = qs.annotate(agenda_item_id=models.F(pk_attr))
         return qs

@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.test import override_settings
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
+from envelope.channels.models import AppState
 from envelope.testing import MessageCatcher
 
 from voteit.agenda.channels import AgendaItemChannel
@@ -138,6 +139,14 @@ class MeetingSubscribedTests(TestCase):
             if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
                 pks = {x.pk for x in msg.p["payloads"]}
         self.assertEqual(set(), pks)
+
+    def test_attach_proposals_query_count(self):
+        from voteit.proposal.signals import attach_proposals
+
+        self.prop1.mentions.add(self.user)
+        app_state = AppState()
+        with self.assertNumQueries(3):
+            attach_proposals(self.meeting, app_state, include_private=False)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)

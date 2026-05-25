@@ -188,7 +188,8 @@ class PollCreateSerializerTests(TestCase):
         cls.ai = cls.meeting.agenda_items.create(title="Hello")
         cls.prop = cls.ai.proposals.create()
         cls.er = cls.meeting.electoral_registers.create()
-        cls.voter = cls.er.voters.create(username="one")
+        cls.voter = User.objects.create(username="one")
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.meeting.add_roles(cls.voter, ROLE_POTENTIAL_VOTER)
         cls.moderator = cls.meeting.participants.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
@@ -349,8 +350,9 @@ class ElectoralRegisterSerializerTests(TestCase):
 
         self.meeting = Meeting.objects.create()
         self.er = self.meeting.electoral_registers.create()
-        self.one = self.er.voters.create(username="one")
-        self.two = self.er.voters.create(username="two")
+        self.one = User.objects.create(username="one")
+        self.two = User.objects.create(username="two")
+        self.er.set_voters_from_dict({self.one.pk: 1, self.two.pk: 1})
 
     @property
     def _cut(self):
@@ -387,7 +389,8 @@ class VoteSerializerTests(TestCase):
             electoral_register=cls.er,
         )
         cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
-        cls.user = cls.er.voters.create(username="voter")
+        cls.user = User.objects.create(username="voter")
+        cls.er.set_voters_from_dict({cls.user.pk: 1})
         cls.vote = cls.poll.votes.create(user=cls.user, vote="yes")
 
     @property
@@ -411,25 +414,21 @@ class VoterExportSerializerTests(TestCase):
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create()
         cls.er = cls.meeting.electoral_registers.create()
-        cls.voter_one = cls.er.voters.create(
+        cls.voter_one = User.objects.create(
             username="voter_one", userid="voter_one", first_name="One!"
         )
-        cls.voter_two = cls.er.voters.create(
+        cls.voter_two = User.objects.create(
             username="voter_two", userid="voter_two", last_name="Twoby"
         )
-        cls.voter_three = cls.er.voters.create(
+        cls.voter_three = User.objects.create(
             username="voter_three",
             userid="voter_three",
             first_name="Tres",
             last_name="Treo",
         )
-        cls.vw_one = cls.er.voterweight_set.filter(user=cls.voter_one).first()
-        cls.vw_two = cls.er.voterweight_set.filter(user=cls.voter_two).first()
-        cls.vw_three = cls.er.voterweight_set.filter(user=cls.voter_three).first()
-        cls.vw_two.weight = 2
-        cls.vw_two.save()
-        cls.vw_three.weight = 3
-        cls.vw_three.save()
+        cls.er.set_voters_from_dict(
+            {cls.voter_one.pk: 1, cls.voter_two.pk: 2, cls.voter_three.pk: 3}
+        )
 
     @property
     def _cut(self):
@@ -437,10 +436,25 @@ class VoterExportSerializerTests(TestCase):
 
         return VoterExportSerializer
 
+    def _export_data(self):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        voter_data = self.er.voter_data
+        users = User.objects.filter(pk__in=voter_data.keys()).order_by("first_name")
+        return [
+            {
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "email": u.email,
+                "userid": u.userid,
+                "weight": voter_data[str(u.pk)],
+            }
+            for u in users
+        ]
+
     def test_serializer(self):
-        serializer = self._cut(
-            self.er.voterweight_set.all().order_by("weight"), many=True
-        )
+        data_list = sorted(self._export_data(), key=lambda x: x["weight"])
+        serializer = self._cut(data_list, many=True)
         data = serializer.data
         self.assertEqual(3, len(data))
         self.assertEqual(
@@ -453,10 +467,3 @@ class VoterExportSerializerTests(TestCase):
             },
             dict(data[2]),
         )
-
-    def test_prefetch(self):
-        with self.assertNumQueries(2):
-            serializer = self._cut(
-                self.er.voterweight_set.all().prefetch_related("user"), many=True
-            )
-            list(serializer.data)  # It's lazy!

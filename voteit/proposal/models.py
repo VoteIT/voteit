@@ -95,14 +95,6 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable):
             )
         ]
 
-    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {
-        "meeting": {"remap_relations": {"user": {"author"}}},
-        "organisation": {
-            "remap_relations": {"user": {"author", "mentions", "last_modified_by"}}
-        },
-    }
-
     @transition(
         field=state,
         source=ProposalWf.PUBLISHED,
@@ -213,6 +205,7 @@ class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
 
     name = "text_document"
     _should_refresh: bool = False
+    _original_body: str
     title: str = models.CharField(max_length=100, default="")
     body: str = models.TextField(default="")
     base_tag: str = models.CharField(max_length=40)
@@ -225,13 +218,6 @@ class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
         null=True,
         related_name="text_documents",
     )
-    last_modified_by: User = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        editable=False,
-        null=True,
-        related_name="text_documents_last_modified",
-    )
     agenda_item: AgendaItem = models.ForeignKey(
         "agenda.AgendaItem",
         on_delete=models.CASCADE,
@@ -239,25 +225,30 @@ class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
         null=True,  # Normally no, forced in serializer
     )
 
-    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {
-        "meeting": {"remap_relations": {"user": {"author"}}},
-        "organisation": {"remap_relations": {"user": {"author", "last_modified_by"}}},
-    }
-
     @property
     def meeting(self) -> Meeting | None:
         if self.agenda_item:
             return self.agenda_item.meeting
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._original_body = instance.body
+        return instance
+
     def create_text_paragraphs(self):
         paragraphs = get_paragraphs(self.body)
-        i = 1
-        for para in paragraphs:
-            self.text_paragraphs.create(
-                body=para, agenda_item=self.agenda_item, paragraph_id=i
-            )
-            i += 1
+        TextParagraph.objects.bulk_create(
+            [
+                TextParagraph(
+                    body=para,
+                    text_document=self,
+                    agenda_item=self.agenda_item,
+                    paragraph_id=i,
+                )
+                for i, para in enumerate(paragraphs, start=1)
+            ]
+        )
         self._should_refresh = False
 
     @property
@@ -267,14 +258,13 @@ class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
     def save(self, **kw):
         if self.pk is None:
             self._should_refresh = True
-        else:
-            old = TextDocument.objects.get(pk=self.pk)
-            if old.body != self.body:
-                self._should_refresh = True
+        elif getattr(self, "_original_body", None) != self.body:
+            self._should_refresh = True
         # We want all the subsequent creates that comes from the save signal to be within
         # the same transaction. Empty TextDocuments won't make anyone happy.
         with transaction.atomic():
             super().save(**kw)
+        self._original_body = self.body
 
     # Annotations
     objects: models.Manager
@@ -330,12 +320,6 @@ class TextParagraph(AgendaItemContext, MeetingContext):
         null=True,  # Normally no, forced in serializer
     )
 
-    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {
-        "meeting": {},
-        "organisation": {"remap_relations": {"user": "last_modified_by"}},
-    }
-
     @property
     def tag(self):
         return f"{self.text_document.base_tag}-{self.paragraph_id}"
@@ -382,22 +366,6 @@ class DiffProposal(Proposal):
     paragraph: TextParagraph = models.ForeignKey(
         TextParagraph, on_delete=models.RESTRICT, related_name="proposals"
     )
-
-    exporters = {"meeting": {"meeting_kw": "agenda_item__meeting"}}
-    importers = {
-        "meeting": {
-            "remap_relations": {
-                "text_paragraph": {"paragraph"},
-                "proposal": {"proposal_ptr"},
-            }
-        },
-        "organisation": {
-            "remap_relations": {
-                "text_paragraph": {"paragraph"},
-                "proposal": {"proposal_ptr"},
-            }
-        },
-    }
 
     def save(self, **kw):
         """

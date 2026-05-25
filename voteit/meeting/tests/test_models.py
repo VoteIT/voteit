@@ -300,3 +300,9 @@ class GroupRoleTests(TestCase):
         self.debater.roles = [ROLE_POTENTIAL_VOTER]
         self.debater.save()
         self.assertRoles([ROLE_DISCUSSER], self.meeting.get_roles(self.participant))
+
+    def test_deleting_group_role_keeps_membership(self):
+        self.group_one.memberships.create(user=self.participant, role=self.debater)
+        self.assertRoles(self.debater.roles, self.meeting.get_roles(self.participant))
+        self.debater.delete()
+        self.assertTrue(self.group_one.memberships.filter(user=self.participant))

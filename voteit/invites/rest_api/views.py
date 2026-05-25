@@ -43,6 +43,7 @@ class MeetingInviteViewSet(
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "retrieve": None,
+        "create": None,
         "bulk_delete": None,
         "bulk_revoke": None,
         "import_invites": None,
@@ -74,6 +75,17 @@ class MeetingInviteViewSet(
 
     def list(self, *args, **kwargs):
         return Response([])
+
+    def create(self, request, *args, **kwargs):
+        serializer = serializers.InviteCreateSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
+        return Response(
+            {"added": result.added, "changed": result.changed, "existed": result.existed},
+            status=201,
+        )
 
     @action(
         methods=["post"],

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import uuid
 from abc import abstractmethod
 from datetime import datetime
 from logging import getLogger
@@ -25,6 +26,7 @@ from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import strict_clean_html
+from voteit.core.validators import ImageValidator
 from voteit.core.validators import UserIDValidator
 from voteit.stats.registry import history_log
 
@@ -39,6 +41,19 @@ __all__ = ("RoleContextMixin", "Roles", "BaseContent", "User")
 
 
 logger = getLogger(__name__)
+
+
+_IMAGE_SAFE_EXTENSIONS = frozenset({"jpg", "jpeg", "png", "webp"})
+
+
+def user_image_upload_to(instance, filename):
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in _IMAGE_SAFE_EXTENSIONS:
+        ext = "bin"
+    org_dir = (
+        f"org_{instance.organisation_id}" if instance.organisation_id else "no_org"
+    )
+    return f"{org_dir}/images/{uuid.uuid4().hex}.{ext}"
 
 
 @history_log("organisation")
@@ -81,8 +96,12 @@ class User(AbstractUser):
     img_url: str | None = models.URLField(
         "Profile image url", blank=True, null=True
     )  # FIXME Validator and scheme
-
-    importers = {"user": {}, "organisation": {}}
+    image: str | None = models.FileField(
+        upload_to=user_image_upload_to,
+        validators=[ImageValidator()],
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         constraints = [
@@ -267,11 +286,13 @@ class Roles(ABCModel):
     def validate_roles(self, *roles: Role | str) -> set[Role]:
         found = set()
         for x in roles:
-            if isinstance(x, str):
-                x = self.valid_roles[x]
+            if isinstance(x, Role):
+                assert x in self.valid_roles, (
+                    f"{x} is not a valid role for this context"
+                )
             else:
-                assert isinstance(x, Role), f"{x} is not an instance of Role"
-            assert x in self.valid_roles, f"{x} is not a valid role for this context"
+                assert isinstance(x, str), f"{x} is not an instance of Role"
+                x = self.valid_roles[x]
             found.add(x)
         return found
 
@@ -322,13 +343,6 @@ class BaseContent(RulesModelMixin, ABCModel):
         related_name="author_%(app_label)s_%(class)s",
     )
     modified: datetime = models.DateTimeField(editable=False, auto_now=True)
-    last_modified_by: User | None = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        editable=False,
-        null=True,
-        related_name="last_modified_%(app_label)s_%(class)s",
-    )
     mentions = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name="mentions_%(app_label)s_%(class)s",

@@ -113,16 +113,6 @@ class MeetingRoles(Roles, MeetingContext):
         """
         return {"m": self.context.pk, "o": self.context.organisation_id}
 
-    exporters = {"meeting": {"meeting_kw": "context"}}
-    importers = {
-        "meeting": {"remap_relations": {"meeting": "context"}},
-        "organisation": {
-            "remap_relations": {
-                "meeting": "context",
-            }
-        },
-    }
-
 
 @history_log("organisation")
 @auditlog.register(
@@ -206,21 +196,6 @@ class Meeting(
     participants = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through=MeetingRoles
     )
-
-    exporters = {
-        "meeting": {
-            "meeting_kw": "pk",
-            "ignore_fields": (
-                "archive_after",
-                "start_time",
-                "end_time",
-            ),
-        }
-    }
-    importers = {
-        "meeting": {},
-        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}},
-    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -391,6 +366,14 @@ class Meeting(
         self.delete_requested = None
 
     @property
+    def is_upcoming(self):
+        return self.state == MeetingWf.UPCOMING
+
+    @property
+    def is_ongoing(self):
+        return self.state == MeetingWf.ONGOING
+
+    @property
     def is_archived(self):
         return self.state in MeetingWf.archived_states
 
@@ -413,11 +396,9 @@ class Meeting(
 
     class QuerySet(models.QuerySet):
         def for_user(self, user: User):
-            if user.is_superuser:
-                return user.organisation.meetings.all()
-            if user.organisation is None:
+            if user.organisation_id is None:
                 return self.none()
-            if user.has_perm(
+            elif user.is_superuser or user.has_perm(
                 user.organisation.get_perm(PERM.MANAGE), user.organisation
             ):
                 return user.organisation.meetings.all()
@@ -436,6 +417,7 @@ class Meeting(
             return self.get_queryset().for_user(user)
 
     objects = Manager()
+    organisation_id: int
     groups: models.QuerySet
     invites: models.QuerySet
     electoral_registers: models.QuerySet
@@ -535,12 +517,6 @@ class MeetingGroup(BaseContent, MeetingContext):
             #     ),
             # ),
         )
-
-    exporters = {"meeting": {}}
-    importers = {
-        "meeting": {},
-        "organisation": {"remap_relations": {"user": {"last_modified_by", "author"}}},
-    }
 
     # Type annotations - relations
     proposals: models.QuerySet[Proposal]
@@ -648,7 +624,7 @@ class GroupMembership(RulesModelMixin, MeetingContext):
     # We won't support keeping membership and deleting a role for now,
     # it will have a lot of side effects we don't want to handle now.
     role: GroupRole | None = models.ForeignKey(
-        GroupRole, on_delete=models.CASCADE, related_name="+", null=True, blank=True
+        GroupRole, on_delete=models.SET_NULL, related_name="+", null=True, blank=True
     )
     # Note that this field isn't the actual votes,
     # but the votes we expect the user to have next time the electoral register is updated!

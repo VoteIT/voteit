@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rules",
     "rest_framework",
+    "rest_framework_api_key",
     "django_filters",
     "django_fsm",
     "fsm_admin",
@@ -76,6 +77,7 @@ INSTALLED_APPS = [
     "voteit.reactions",
     "voteit.room",
     "voteit.participant_tags",
+    "voteit.token_api",
     "controlcenter",
 ]
 
@@ -166,6 +168,10 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": [
         "voteit.core.rest_api.filters.ActionAnnotatedDjangoFilterBackend"
     ],
+    "DEFAULT_THROTTLE_RATES": {
+        "token_api_user": "60/min",
+        "token_api_anon": "1/sec",
+    },
 }
 # Auditlog
 AUDITLOG_DISABLE_ON_RAW_SAVE = True

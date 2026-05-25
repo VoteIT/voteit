@@ -10,7 +10,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 from voteit.components.rest_api.serializers import OrganisationComponentSerializer
+from voteit.core.rest_api.fields import SameOrgUserField
 from voteit.core.rest_api.serializers import UserSerializer
+from voteit.core.rest_api.validators import RoleValidator
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
 
@@ -174,6 +176,15 @@ class OrganisationRolesSerializer(serializers.ModelSerializer):
             "user",
             "assigned",
         )
+
+
+class OrgChangeRolesSerializer(serializers.Serializer):
+    user = SameOrgUserField()
+    roles = serializers.ListField(
+        child=serializers.CharField(
+            max_length=20, validators=[RoleValidator(roles_cls=OrganisationRoles)]
+        )
+    )
 
 
 class ExternalOrphanSerializer(serializers.ModelSerializer):

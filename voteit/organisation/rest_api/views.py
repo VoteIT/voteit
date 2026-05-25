@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework import permissions
@@ -16,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from voteit.core import PERM
+from voteit.core.loggers import log_roles_change
 from voteit.core.loggers import notification_logger
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
@@ -156,6 +158,62 @@ class OrganisationRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 "user",
             )
         return self.queryset.none()
+
+    @action(detail=False, methods=["get"], permission_classes=[])
+    def available(self, request):
+        return Response(
+            [
+                role.output().dict(exclude={"predicate_info"})
+                for role in OrganisationRoles.valid_roles.values()
+            ]
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.OrgChangeRolesSerializer,
+        url_path="add",
+    )
+    @transaction.atomic
+    def add_roles(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        org = request.user.organisation
+        user = serializer.validated_data["user"]
+        if not request.user.has_perm(Organisation.get_perm(PERM.CHANGE_ROLES), org):
+            raise exceptions.PermissionDenied
+        changed = org.add_roles(user, *serializer.validated_data["roles"])
+        if changed:
+            log_roles_change(
+                "Added", actor=request.user, for_user=user, context=org, roles=changed
+            )
+        roles_obj = OrganisationRoles.objects.get(context=org, user=user)
+        return Response(serializers.OrganisationRolesSerializer(roles_obj).data)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        serializer_class=serializers.OrgChangeRolesSerializer,
+        url_path="remove",
+    )
+    @transaction.atomic
+    def remove_roles(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        org = request.user.organisation
+        user = serializer.validated_data["user"]
+        if not request.user.has_perm(Organisation.get_perm(PERM.CHANGE_ROLES), org):
+            raise exceptions.PermissionDenied
+        changed = org.remove_roles(user, *serializer.validated_data["roles"])
+        if changed:
+            log_roles_change(
+                "Removed", actor=request.user, for_user=user, context=org, roles=changed
+            )
+        try:
+            roles_obj = OrganisationRoles.objects.get(context=org, user=user)
+        except OrganisationRoles.DoesNotExist:
+            return Response(status=204)
+        return Response(serializers.OrganisationRolesSerializer(roles_obj).data)
 
 
 @router.register("match-orphans", basename="match-orphans")

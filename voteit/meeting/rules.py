@@ -22,6 +22,7 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.workflows import MeetingWf
+from voteit.organisation.rules import is_manager
 from voteit.organisation.rules import is_meeting_creator
 
 if TYPE_CHECKING:
@@ -166,7 +167,7 @@ rules.add_perm(Meeting.get_perm(PERM_CHANGE_DIALECT), meeting_upcoming & is_mode
 rules.add_perm(Meeting.get_perm(PERM.DELETE), is_moderator)
 rules.add_perm(
     Meeting.get_perm(PERM.CHANGE_ROLES),
-    meeting_not_archived & is_moderator,
+    meeting_not_archived & (is_moderator | is_manager),
 )
 rules.add_perm(Meeting.get_perm(PERM_PREVIEW), visible_in_lists)
 # FIXME: View should be removed here, use queryset instead. Fix when messages update.

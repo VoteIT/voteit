@@ -1,5 +1,6 @@
 from collections import Counter
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django_fsm import TransitionNotAllowed
 
@@ -8,6 +9,8 @@ from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.workflows import PollWf
+
+User = get_user_model()
 
 
 class ScottishTests(TestCase):
@@ -19,7 +22,8 @@ class ScottishTests(TestCase):
             method_name="scottish_stv",
             settings={"winners": 2},
         )
-        cls.voter = cls.er.voters.create(username="a_voter")
+        cls.voter = User.objects.create(username="a_voter")
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
 
     @property
     def ScottishSTV(self):
@@ -58,11 +62,14 @@ class ScottishTests(TestCase):
             self.poll.proposals.create()
         self.assertIsNone(self.poll.method.start_check())
         proposal_pks = list(self.poll.proposals.values_list("pk", flat=True))
-        for n in range(20):
-            self.er.voters.create(username=f"voter-{n}")
+        new_voters = [User.objects.create(username=f"voter-{n}") for n in range(20)]
+        self.er.voter_data = {}  # To allow reset
+        self.er.set_voters_from_dict(
+            {**self.er.voter_data, **{u.pk: 1 for u in new_voters}}
+        )
         self.poll.upcoming()
         self.poll.ongoing()
-        for voter in self.er.voters.all():
+        for voter in User.objects.filter(pk__in=self.er.voter_data.keys()):
             self.poll.votes.create(
                 user=voter,
                 vote_data=",".join(
@@ -104,7 +111,8 @@ class AddVoteTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.er = ElectoralRegister.objects.create()
-        cls.voter = cls.er.voters.create(username="voter")
+        cls.voter = User.objects.create(username="voter")
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.poll = Poll.objects.create(
             electoral_register=cls.er,
             method_name="scottish_stv",

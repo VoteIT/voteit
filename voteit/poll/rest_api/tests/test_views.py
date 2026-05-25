@@ -1,8 +1,8 @@
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.test import override_settings
-from django.contrib.auth import get_user_model
 from envelope.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
@@ -14,9 +14,10 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.app.er_policies.auto_always import AutoAlways
+from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
+from voteit.poll.app.er_policies.manual import Manual
 from voteit.poll.app.polls.combined_simple import CombinedSimple
 from voteit.poll.app.polls.schulze import RepeatedSchulze
-from voteit.poll.messages import ManualCreateER
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.registries import er_policy
 from voteit.poll.registries import vote_transfer_policies
@@ -264,7 +265,7 @@ class PollViewSetTests(APITestCase):
             func(*args)
 
     def test_transition_without_register(self):
-        self.meeting.er_policy_name = ManualCreateER.name
+        self.meeting.er_policy_name = "er.manual_create"  # invalid policy name
         self.meeting.save()
         poll = self.meeting.polls.create(
             method_name="simple", title="First", state="upcoming"
@@ -345,7 +346,6 @@ class ElectoralRegisterViewSetTests(APITestCase):
     def test_get(self):
         url = reverse("electoral-registers-detail", kwargs={"pk": self.er.pk})
         self.client.force_login(self.moderator)
-        # FIXME: assert queries! N+1!
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
         data = response.json()
@@ -387,7 +387,8 @@ class ExportElectoralRegisterViewSetTests(APITestCase):
         self.assertEqual(404, response.status_code)
 
     def test_csv_no_data(self):
-        self.er.voterweight_set.all().delete()
+        self.er.voter_data = {}
+        self.er.save()
         self.client.force_login(self.moderator)
         url = reverse("export-electoral-register-csv", kwargs={"pk": self.er.pk})
         response = self.client.get(url)
@@ -703,4 +704,148 @@ class VoteTransferViewSetTests(APITestCase):
             },
             response.json(),
         )
-        self.assertEqual(400, response.status_code)
+
+
+class TriggerCreateERViewTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.create(
+            title="Trigger ER test meeting",
+            state=MeetingWf.UPCOMING,
+            er_policy_name=AutoBeforePoll.name,
+        )
+        cls.moderator: User = User.objects.create_user("trigger_er_moderator")
+        cls.participant: User = User.objects.create_user("trigger_er_participant")
+        cls.voter: User = User.objects.create_user("trigger_er_voter")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR, ROLE_POTENTIAL_VOTER)
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.voter, ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER)
+        cls.url = reverse("electoral-registers-trigger-create")
+
+    def test_creates_er(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.url, data={"meeting": self.meeting.pk}, format="json"
+        )
+        self.assertEqual(201, response.status_code)
+        data = response.json()
+        self.assertEqual(self.meeting.pk, data["meeting"])
+        self.assertIn("pk", data)
+        self.assertIn("weights", data)
+        self.assertEqual(1, self.meeting.electoral_registers.count())
+
+    def test_creates_if_changed(self):
+        self.client.force_login(self.moderator)
+        self.client.post(self.url, data={"meeting": self.meeting.pk}, format="json")
+        response = self.client.post(
+            self.url, data={"meeting": self.meeting.pk}, format="json"
+        )
+        self.assertEqual(204, response.status_code)
+
+    def test_participant_gets_400(self):
+        self.client.force_login(self.participant)
+        response = self.client.post(
+            self.url, data={"meeting": self.meeting.pk}, format="json"
+        )
+        self.assertContains(response, "object does not exist", status_code=400)
+
+    def test_trigger_not_allowed_for_manual_policy(self):
+        self.meeting.er_policy_name = Manual.name
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.url, data={"meeting": self.meeting.pk}, format="json"
+        )
+        self.assertContains(
+            response, "Electoral register can't be triggered", status_code=400
+        )
+
+    def test_no_valid_policy_gets_400(self):
+        self.meeting.er_policy_name = None
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.url, data={"meeting": self.meeting.pk}, format="json"
+        )
+        self.assertContains(
+            response, "No valid electoral register policy", status_code=400
+        )
+
+
+class ManualCreateERViewTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.create(
+            title="Manual ER test meeting",
+            state=MeetingWf.UPCOMING,
+            er_policy_name=Manual.name,
+        )
+        cls.moderator: User = User.objects.create_user("manual_er_moderator")
+        cls.participant: User = User.objects.create_user("manual_er_participant")
+        cls.voter: User = User.objects.create_user("manual_er_voter")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR, ROLE_POTENTIAL_VOTER)
+        cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
+        cls.meeting.add_roles(cls.voter, ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER)
+        cls.url = reverse("electoral-registers-manual-create")
+        cls.weights = [
+            {"user": cls.moderator.pk, "weight": 1},
+            {"user": cls.voter.pk, "weight": 2},
+        ]
+
+    def test_creates_er(self):
+        response = self.client.post(
+            self.url,
+            data={"meeting": self.meeting.pk, "weights": self.weights},
+            format="json",
+        )
+        self.assertEqual(401, response.status_code)
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.url,
+            data={"meeting": self.meeting.pk, "weights": self.weights},
+            format="json",
+        )
+        self.assertEqual(201, response.status_code)
+        data = response.json()
+        self.assertEqual(self.meeting.pk, data["meeting"])
+        self.assertIn("pk", data)
+        weight_dict = {w["user"]: w["weight"] for w in data["weights"]}
+        self.assertEqual({self.moderator.pk: 1, self.voter.pk: 2}, weight_dict)
+
+    def test_no_new_er_returns_204(self):
+        self.client.force_login(self.moderator)
+        payload = {"meeting": self.meeting.pk, "weights": self.weights}
+        self.client.post(self.url, data=payload, format="json")
+        response = self.client.post(self.url, data=payload, format="json")
+        self.assertEqual(204, response.status_code)
+
+    def test_participant_gets_400(self):
+        self.client.force_login(self.participant)
+        response = self.client.post(
+            self.url,
+            data={"meeting": self.meeting.pk, "weights": self.weights},
+            format="json",
+        )
+        self.assertContains(response, "object does not exist", status_code=400)
+
+    def test_bad_user_in_weights_gets_400(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.url,
+            data={"meeting": self.meeting.pk, "weights": [{"user": 0, "weight": 1}]},
+            format="json",
+        )
+        self.assertContains(response, "invalid potential voters", status_code=400)
+
+    def test_non_manual_policy_gets_400(self):
+        self.meeting.er_policy_name = AutoBeforePoll.name
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.url,
+            data={"meeting": self.meeting.pk, "weights": self.weights},
+            format="json",
+        )
+        self.assertContains(
+            response, "Electoral register can't be manually created", status_code=400
+        )

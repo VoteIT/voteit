@@ -13,6 +13,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api import serializers
+from voteit.agenda.workflows import AgendaItemWf
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
@@ -31,6 +32,7 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelVi
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "create": None,  # Checked in serializer
         "retrieve": None,  # Limited by queryset
+        "update_last_read": None,  # Limited by queryset
     }
     expected_default_http_status = 400
 
@@ -39,12 +41,34 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelVi
             return serializers.CreateAgendaItemSerializer
         return super().get_serializer_class()
 
+    @action(
+        methods=["POST"],
+        detail=True,
+        serializer_class=serializers.LastReadSerializer,
+        url_path="update-last-read",
+    )
+    def update_last_read(self, request, *args, **kwargs):
+        instance: AgendaItem = self.get_object()
+        last_read = instance.mark_read(request.user)
+        serializer = self.get_serializer(last_read)
+        return Response(serializer.data)
+
     def get_queryset(self):
-        return AgendaItem.objects.filter(
-            models.Q(meeting__roles__user=self.request.user)
-            & models.Q(meeting__roles__assigned__contains=ROLE_MODERATOR)
-            | ~models.Q(state="private")
-        ).distinct()
+        user = self.request.user
+        return (
+            AgendaItem.objects.filter(
+                # Moderators see all items in their meetings
+                models.Q(
+                    meeting__roles__user=user,
+                    meeting__roles__assigned__contains=ROLE_MODERATOR,
+                )
+                # Participants see non-private items in their meetings
+                | models.Q(meeting__roles__user=user)
+                & ~models.Q(state=AgendaItemWf.PRIVATE)
+            )
+            .select_related("meeting")
+            .distinct()
+        )
 
 
 @router.register("export-agenda-items", basename="export-agenda-items")
