@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.44
+## v0.44 (2026-05-25)
 
 Focused on optional meeting token-based API-access and moving messages that don't need to be websocket operations
 to regular rest interfaces in preparation of refactoring to ChanX.
@@ -25,7 +25,7 @@ See `voteit/token_api/README.md`. #374
   - **Agenda `last_read`**: The `update_last_read` action.
   - **Speaker system**: New `SpeakerSystemRolesViewSet`.
 
-## v0.43
+## v0.43 (2026-05-18)
 
 ### New features
 
