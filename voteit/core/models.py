@@ -13,7 +13,6 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import UserManager
 from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db import models
 from django.utils.timezone import now
@@ -114,18 +113,6 @@ class User(AbstractUser):
         if self.userid:
             return f"{self.get_full_name()} ({self.userid}) {self.organisation_id}"
         return f"[{self.username}] {self.organisation_id}"
-
-    def valid_userid_guard(self) -> bool:
-        """
-        Check if user has a valid userid
-        """
-        if self.userid:
-            try:
-                self.userid_validator(self.userid)
-                return True
-            except ValidationError:
-                pass
-        return False
 
     objects = UserManager()
 
