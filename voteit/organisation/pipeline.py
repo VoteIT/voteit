@@ -82,6 +82,16 @@ def create_user(strategy, details, backend, uid, user=None, *args, **kwargs):
     }
 
 
+def ensure_userid(backend, user, *args, **kwargs):
+    if user and not user.userid:
+        from voteit.core.utils import generate_valid_userid
+
+        userid = generate_valid_userid(user)
+        if userid:
+            user.userid = userid
+            user.save(update_fields=["userid"])
+
+
 def inherit_users(backend, user, response, uid, *args, **kwargs):
     if user.identity_id != uid:
         user.identity_id = uid
