@@ -81,6 +81,7 @@ SOCIAL_AUTH_PIPELINE = [
     "voteit.organisation.pipeline.social_user",
     "social_core.pipeline.user.get_username",
     "voteit.organisation.pipeline.create_user",
+    "voteit.organisation.pipeline.ensure_userid",
     "social_core.pipeline.social_auth.associate_user",
     "social_core.pipeline.social_auth.load_extra_data",
     "social_core.pipeline.user.user_details",

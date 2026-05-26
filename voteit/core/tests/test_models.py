@@ -1,9 +1,11 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.dispatch import receiver
 from django.test import TestCase
 from auditlog.models import LogEntry
 
+from voteit.core.models import User
 from voteit.core.testing import mk_hashtag
 from voteit.meeting.models import Meeting
 
@@ -11,18 +13,27 @@ from voteit.meeting.models import Meeting
 class UserTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.core.models import User
-
         cls.user = User.objects.create(username="blaha")
 
-    def test_valid_userid_guard(self):
-        self.assertFalse(self.user.valid_userid_guard())  # Empty
-        self.user.userid = "blaha"
-        self.assertTrue(self.user.valid_userid_guard())
-        self.user.userid = "äö"
-        self.assertFalse(self.user.valid_userid_guard())  # Bad!
-        self.user.userid = "ABC"
-        self.assertFalse(self.user.valid_userid_guard())  # Bad too!
+    def test_user_userid_field_accepts_valid_value(self):
+        user = User(username="test-valid", userid="abc-123_x")
+        user.full_clean(exclude=["organisation", "password"])
+
+    def test_user_userid_field_rejects_invalid_value(self):
+        user = User(username="test-invalid", userid="UPPERCASE")
+        with self.assertRaises(ValidationError):
+            user.full_clean(exclude=["organisation", "password"])
+        user.userid = "ööö"  # bad chars
+        with self.assertRaises(ValidationError):
+            user.full_clean(exclude=["organisation", "password"])
+
+        user.userid = " hej "  # spaces
+        with self.assertRaises(ValidationError):
+            user.full_clean(exclude=["organisation", "password"])
+
+    def test_user_userid_field_allows_null(self):
+        user = User(username="test-null", userid=None)
+        user.full_clean(exclude=["organisation", "password"])
 
 
 class RolesTests(TestCase):
