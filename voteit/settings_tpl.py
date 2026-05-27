@@ -110,7 +110,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Auth backends
 AUTHENTICATION_BACKENDS = [
     "rules.permissions.ObjectPermissionBackend",
-    "django.contrib.auth.backends.ModelBackend",
+    "voteit.core.backends.PrefetchedModelBackend",
 ]
 
 # Channels / Envelope / RQ
