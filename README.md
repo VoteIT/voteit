@@ -140,3 +140,11 @@ All commands assume the virtualenv is active. If using `uv run`, prefix with `uv
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## License
+
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+
+VoteIT is licensed under the [GNU Affero General Public License v3.0 or later](LICENSE).

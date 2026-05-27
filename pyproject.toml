@@ -5,8 +5,9 @@ description = "Decisions online or in general assemblies, realtime or async"
 authors = [{ name = "VoteIT dev team", email = "info@voteit.se" }]
 requires-python = ">=3.12"
 readme = "README.md"
-license = { text = "AGPL" }
+license = { text = "AGPL-3.0-or-later" }
 classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
