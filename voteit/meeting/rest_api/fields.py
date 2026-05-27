@@ -3,8 +3,18 @@ from rest_framework import serializers
 
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.workflows import MeetingWf
 
 User = get_user_model()
+
+
+class ModeratorMeetingField(serializers.PrimaryKeyRelatedField):
+    def get_queryset(self):
+        return Meeting.objects.filter(
+            roles__user=self.context["request"].user,
+            roles__assigned__contains=ROLE_MODERATOR,
+        ).exclude(state__in=MeetingWf.archived_states)
 
 
 class ViewableMeetingField(serializers.PrimaryKeyRelatedField):

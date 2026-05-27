@@ -11,10 +11,9 @@ from voteit.core.validators import root_validate_roles_and_model
 from voteit.invites.models import MeetingInvite
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.utils import send_updated_invites
-from voteit.meeting import roles
 from voteit.meeting.models import Meeting
+from voteit.meeting.rest_api.fields import ModeratorMeetingField
 from voteit.meeting.roles import ROLE_MODERATOR
-from voteit.meeting.workflows import MeetingWf
 from voteit.invites.rest_api.import_utils import detect_and_parse_file
 from voteit.invites.rest_api.import_utils import extract_roles_per_row
 from voteit.invites.schemas import RowColInvitesBaseSchema
@@ -105,14 +104,6 @@ class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
 
     def get_meeting_title(self, instance: MeetingInvite) -> str:
         return instance.meeting.title
-
-
-class ModeratorMeetingField(serializers.PrimaryKeyRelatedField):
-    def get_queryset(self):
-        return Meeting.objects.filter(
-            roles__user=self.context["request"].user,
-            roles__assigned__contains=roles.ROLE_MODERATOR,
-        ).exclude(state__in=MeetingWf.archived_states)
 
 
 def _pydantic_to_user_messages(exc: PydanticValidationError) -> list[str]:
@@ -207,7 +198,8 @@ def _items_to_columns(items: list[dict], reg) -> list[str]:
     """
     ud_keys = sorted({k for item in items for k in item if k in reg.user_data_keys})
     ann_keys = [
-        k for k in reg
+        k
+        for k in reg
         if k not in reg.user_data_keys and any(k in item for item in items)
     ]
     return ud_keys + ann_keys
@@ -285,7 +277,9 @@ class InviteCreateSerializer(serializers.Serializer):
         if ann_keys:
             col_rows = [[item.get(k, "") for k in all_keys] for item in data]
             try:
-                reg.run_validators(columns=all_keys, rows=col_rows, meeting=attrs["meeting"])
+                reg.run_validators(
+                    columns=all_keys, rows=col_rows, meeting=attrs["meeting"]
+                )
             except ValueError as exc:
                 raise serializers.ValidationError(str(exc))
         ud_items = [
@@ -354,8 +348,12 @@ class InviteClearAnnotationsSerializer(serializers.Serializer):
     def validate(self, attrs):
         invites = attrs["invites"]
         meeting = attrs["meeting"]
-        if MeetingInvite.objects.filter(id__in=invites, meeting=meeting).count() != len(invites):
-            raise serializers.ValidationError({"invites": "Invites don't match meeting."})
+        if MeetingInvite.objects.filter(id__in=invites, meeting=meeting).count() != len(
+            invites
+        ):
+            raise serializers.ValidationError(
+                {"invites": "Invites don't match meeting."}
+            )
         return attrs
 
 

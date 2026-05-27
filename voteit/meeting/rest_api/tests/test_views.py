@@ -629,6 +629,122 @@ class MeetingGroupViewSetTests(APITestCase):
         )
 
 
+class BulkCreateMeetingGroupsTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.moderator = User.objects.get(username="moderator")
+        cls.participant = User.objects.get(username="participant")
+        cls.anon = User.objects.create(username="anon")
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.existing_group: MeetingGroup = cls.meeting.groups.create(
+            title="A", groupid="a"
+        )
+
+    def _url(self):
+        return reverse("meeting-groups-bulk-create")
+
+    def test_bulk_create(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self._url(),
+            {
+                "meeting": self.meeting.pk,
+                "groups": [
+                    {"title": "B", "groupid": "B"},  # new, groupid lowercased
+                    {"title": "Aha", "groupid": "a", "votes": 1},  # updates existing
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"created": 1, "updated": 1}, response.json())
+        self.assertEqual(
+            [
+                {"groupid": "a", "title": "Aha", "votes": 1},
+                {"groupid": "b", "title": "B", "votes": None},
+            ],
+            list(
+                self.meeting.groups.all()
+                .order_by("pk")
+                .values("title", "groupid", "votes")
+            ),
+        )
+
+    def test_bulk_create_tsv(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self._url(),
+            {"meeting": self.meeting.pk, "groups": "B\tB\nAha\ta\t1"},
+            format="json",
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"created": 1, "updated": 1}, response.json())
+
+    def test_bulk_create_participant(self):
+        self.client.force_login(self.participant)
+        response = self.client.post(
+            self._url(),
+            {"meeting": self.meeting.pk, "groups": [{"title": "B", "groupid": "b"}]},
+            format="json",
+        )
+        self.assertEqual(
+            400, response.status_code
+        )  # meeting field rejects non-moderators
+
+    def test_bulk_create_anon(self):
+        response = self.client.post(
+            self._url(),
+            {"meeting": self.meeting.pk, "groups": [{"title": "B", "groupid": "b"}]},
+            format="json",
+        )
+        self.assertEqual(401, response.status_code)
+
+    def test_bulk_create_archived_meeting(self):
+        self.meeting.archive()
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self._url(),
+            {"meeting": self.meeting.pk, "groups": [{"title": "B", "groupid": "b"}]},
+            format="json",
+        )
+        self.assertEqual(400, response.status_code)
+
+    def test_bulk_create_duplicate_groupid(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self._url(),
+            {
+                "meeting": self.meeting.pk,
+                "groups": [
+                    {"title": "a", "groupid": "a"},
+                    {"title": "B", "groupid": "A"},  # lowercased becomes "a"
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("Duplicate groupids", str(response.json()))
+
+    def test_bulk_create_duplicate_title(self):
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self._url(),
+            {
+                "meeting": self.meeting.pk,
+                "groups": [
+                    {"title": "a", "groupid": "a"},
+                    {"title": "A", "groupid": "b"},  # same title, case-insensitive
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("Duplicate titles", str(response.json()))
+
+
 class GroupMembershipViewSetTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 

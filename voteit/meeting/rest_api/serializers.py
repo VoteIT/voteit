@@ -23,6 +23,7 @@ from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
+from voteit.meeting.rest_api.fields import ModeratorMeetingField
 from voteit.meeting.rest_api.fields import ViewableMeetingField
 from voteit.meeting.rest_api.validators import RoleValidator
 from voteit.meeting.rest_api.validators import DialectInstallableValidator
@@ -448,6 +449,74 @@ class GroupMembershipSerializer(serializers.ModelSerializer):
                 )
             if value.meeting != self.instance.meeting:
                 raise ValidationError("Role doesn't exist in this meeting")
+        return value
+
+
+class BulkMeetingGroupItemSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=100)
+    groupid = serializers.CharField(max_length=100)
+    votes = serializers.IntegerField(allow_null=True, required=False, default=None)
+    show_on_speaker = serializers.BooleanField(default=True)
+    post_as = serializers.BooleanField(default=False)
+
+    def validate_groupid(self, value):
+        return slugify(value.strip())
+
+
+class BulkCreateMeetingGroupsSerializer(serializers.Serializer):
+    meeting = ModeratorMeetingField()
+    groups = serializers.ListField(
+        child=BulkMeetingGroupItemSerializer(),
+        min_length=1,
+        max_length=250,
+    )
+
+    def to_internal_value(self, data):
+        groups_raw = data.get("groups")
+        if isinstance(groups_raw, str):
+            data = {**data, "groups": self._parse_tsv(groups_raw)}
+        return super().to_internal_value(data)
+
+    def _parse_tsv(self, tsv: str) -> list[dict]:
+        rows = []
+        for line in tsv.splitlines():
+            parts = line.split("\t")
+            row = {}
+            if len(parts) > 0 and parts[0]:
+                row["title"] = parts[0]
+            if len(parts) > 1 and parts[1]:
+                row["groupid"] = parts[1]
+            if len(parts) > 2 and parts[2]:
+                row["votes"] = parts[2]
+            if "title" in row:
+                rows.append(row)
+        return rows
+
+    def validate_groups(self, value: list[dict]) -> list[dict]:
+        found_titles: set[str] = set()
+        found_ids: set[str] = set()
+        dup_title_rows = []
+        dup_id_rows = []
+        for i, item in enumerate(value, 1):
+            title_lower = item["title"].lower()
+            groupid = item["groupid"]
+            if groupid in found_ids:
+                dup_id_rows.append(i)
+            found_ids.add(groupid)
+            if title_lower in found_titles:
+                dup_title_rows.append(i)
+            found_titles.add(title_lower)
+        errors = []
+        if dup_title_rows:
+            errors.append(
+                f"Duplicate titles at rows: {', '.join(map(str, dup_title_rows))}"
+            )
+        if dup_id_rows:
+            errors.append(
+                f"Duplicate groupids at rows: {', '.join(map(str, dup_id_rows))}"
+            )
+        if errors:
+            raise ValidationError(errors)
         return value
 
 

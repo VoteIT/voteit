@@ -239,17 +239,44 @@ class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "create": None,  # In serializer
         "retrieve": None,
+        "bulk_create": None,  # Meeting field restricts to moderators
     }
 
     def get_serializer_class(self):
         if self.action == "create":
             return serializers.CreateMeetingGroupSerializer
+        if self.action == "bulk_create":
+            return serializers.BulkCreateMeetingGroupsSerializer
         return super().get_serializer_class()
 
     def get_queryset(self):
         if self.action == "list":
             return MeetingGroup.objects.none()
         return MeetingGroup.objects.filter(meeting__participants=self.request.user)
+
+    @action(methods=["post"], detail=False, url_path="bulk-create")
+    @transaction.atomic(durable=True)
+    def bulk_create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        meeting = serializer.validated_data["meeting"]
+        created_count = 0
+        updated_count = 0
+        for gdata in serializer.validated_data["groups"]:
+            _, created = meeting.groups.update_or_create(
+                groupid=gdata["groupid"],
+                defaults={
+                    "title": gdata["title"],
+                    "votes": gdata["votes"],
+                    "show_on_speaker": gdata["show_on_speaker"],
+                    "post_as": gdata["post_as"],
+                },
+            )
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
+        return Response({"created": created_count, "updated": updated_count})
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
