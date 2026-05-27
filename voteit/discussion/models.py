@@ -14,6 +14,7 @@ from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
+
     from voteit.meeting.models import Meeting
     from voteit.meeting.models import MeetingGroup
 
@@ -34,6 +35,17 @@ class DiscussionPost(
     MeetingContext,
     Reactable,
 ):
+    """
+    A discussion contribution attached to an agenda item.
+
+    Posts can be submitted by individual participants or on behalf of a
+    ``MeetingGroup`` (``as_group=True``). The ``as_group`` flag is cleared
+    automatically if no ``meeting_group`` is provided.
+
+    New posts are blocked when ``AgendaItem.block_discussion`` is set or the
+    meeting is archived.
+    """
+
     name = "discussion_post"
     author: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL,

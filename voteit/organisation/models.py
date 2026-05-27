@@ -32,7 +32,10 @@ _marker = object()
 )
 class OrganisationRoles(OrganisationContext, Roles):
     """
-    Contains assigned meeting roles for a specific meeting and user
+    Holds the organisation-level roles assigned to a specific user.
+
+    One row per (user, organisation) pair. Valid roles are ``org_manager`` and
+    ``meeting_creator``. Changes fire ``roles_added`` / ``roles_removed`` signals.
     """
 
     name = "organisation_roles"
@@ -78,6 +81,18 @@ class OrganisationRoles(OrganisationContext, Roles):
     ],
 )
 class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
+    """
+    Top-level tenant that owns all meetings, users, and settings.
+
+    The ``host`` field maps a hostname (e.g. ``"meeting.myorg.se"``) to this tenant.
+    Every ``User`` in the system belongs to exactly one organisation via
+    ``User.organisation``. Superusers and users with ``org_manager`` role can
+    access all meetings belonging to the organisation.
+
+    ``active=False`` disables login for all users of this organisation.
+    ``OAuth2Provider`` (one-to-one) holds the OAuth2 credentials used for SSO.
+    """
+
     name = "organisation"
     roles_cls = OrganisationRoles
     title: str = models.CharField(
@@ -195,6 +210,14 @@ class OAuth2Provider(OrganisationContext):
 
 
 class TermsOfService(BaseContent, OrganisationContext):
+    """
+    A terms-of-service document that users must accept before using the platform.
+
+    ``required=True`` blocks login until the user has consented. Consents are tracked
+    via ``UserConsent``. Multiple TOS documents may exist per organisation; each is
+    accepted independently.
+    """
+
     name = "tos"
     title: str = models.CharField(max_length=100, default="")
     required: bool = models.BooleanField(default=False)
@@ -217,6 +240,14 @@ class TermsOfService(BaseContent, OrganisationContext):
 
 
 class UserConsent(OrganisationContext):
+    """
+    Records that a user has accepted a ``TermsOfService`` document.
+
+    ``revoked`` is set when the user withdraws consent. A non-null ``revoked``
+    timestamp means the consent is no longer active; check via ``is_revoked``.
+    One record per (user, tos) pair (unique constraint).
+    """
+
     name = "user_consent"
     user: AbstractUser = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="consents"

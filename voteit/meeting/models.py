@@ -133,6 +133,26 @@ class MeetingRoles(Roles, MeetingContext):
 class Meeting(
     BaseContent, RoleContextMixin, MeetingContext, OrganisationContext, RulesModelMixin
 ):
+    """
+    The primary container for all democratic activity within VoteIT.
+
+    Every agenda item, proposal, poll, and discussion belongs to a meeting.
+    Lifecycle (``MeetingWf``): ``upcoming → ongoing ↔ closed → archiving → archived``,
+    plus a ``deleting`` state reachable from any live state.
+
+    Key configuration fields:
+    - ``er_policy_name`` — names the electoral register policy used to determine
+      voter eligibility and weight. Required before the meeting can go ``ongoing``.
+    - ``group_votes_active`` — voting power comes from groups rather than individuals.
+    - ``group_roles_active`` — dynamic role assignment through group membership.
+    - ``installed_dialect`` — name of the active YAML dialect configuration.
+    - ``proposal_id_policy_name`` — pluggable proposal-ID generator (default: ``userid``).
+
+    Access: participants join via ``MeetingRoles`` (M2M through-model). Superusers
+    and org managers can always see all meetings; regular users only see meetings
+    where they are a participant, or that are public/visible-in-lists.
+    """
+
     name = "meeting"
     _er_policy_name = None
 
@@ -451,6 +471,21 @@ class Meeting(
     ],
 )
 class MeetingGroup(BaseContent, MeetingContext):
+    """
+    A named delegation or faction within a meeting (e.g. a political party or union branch).
+
+    Groups can hold collective voting power (``votes``) and delegate it to another
+    group (``delegate_to``). Self-delegation and circular chains are prevented by
+    a DB constraint and serializer validation respectively.
+
+    Members are linked through ``GroupMembership``. When ``group_votes_active`` is
+    on for the meeting, each member's ``GroupMembership.votes`` represents their
+    share of the group's total; adjustments to ``MeetingGroup.votes`` may zero out
+    individual allocations that exceed the new total.
+
+    ``groupid`` is a URL-safe slug auto-generated from the title on first save.
+    """
+
     name: str = "meeting_group"
     title: str = models.CharField(max_length=100, default="")
     groupid: str = models.CharField(max_length=100, null=True, blank=True)
@@ -606,7 +641,16 @@ class GroupRole(MeetingContext):
 )
 class GroupMembership(RulesModelMixin, MeetingContext):
     """
-    Join table for users and group roles.
+    Through-model linking a ``User`` to a ``MeetingGroup``, with an optional ``GroupRole``.
+
+    ``votes`` reflects the vote weight this member will receive in the next electoral
+    register update — it is *not* live voting power. It should never exceed the group's
+    total ``MeetingGroup.votes``.
+
+    Saving or deleting a membership fires ``group_role_added`` / ``group_role_removed``
+    signals which cascade into adding or removing the corresponding meeting-level roles on
+    ``MeetingRoles``. Note: using ``.members.add()`` / ``.members.remove()`` on the group
+    bypasses through-model signals — ``signals.py`` compensates via ``m2m_changed``.
     """
 
     name = "group_membership"
