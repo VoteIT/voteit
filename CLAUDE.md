@@ -1,0 +1,101 @@
+# CLAUDE.md
+
+## What This Project Is
+
+VoteIT is a Django-based backend for online democratic decision-making. It supports meetings, voting, proposals, discussions, and speaker queues for organisations running general assemblies or async decision processes. The frontend is a separate SPA that communicates via REST and WebSocket — this repo is pure backend.
+
+## Commands
+
+All commands assume the virtualenv is active. Use `uv sync` to install dependencies (creates `.venv`).
+
+```bash
+# Dev infrastructure (postgres + redis only)
+docker compose up -d
+
+# Full dev start
+make up          # docker compose + rqworker + runserver
+
+# Run dev server only
+make run         # python -W once manage.py runserver
+
+# Tests
+make test        # python manage.py test voteit --keepdb --failfast
+make test-deps   # tests for src/ packages (voteit_org, member_dialects)
+make coverage    # coverage run + report
+
+# Run a single test module
+python manage.py test voteit.poll.tests --keepdb --failfast
+
+# Linting
+ruff check voteit/ src/
+
+# Migrations
+make migrations  # makemigrations
+make migrate     # migrate
+
+# Background worker (dev)
+make rqworker
+
+# Build wheels (voteit + voteit_org + member_dialects)
+make build
+```
+
+Settings module for dev: `DJANGO_SETTINGS_MODULE=project.settings_development` (auto-loaded via `.env`). Copy `.env.tpl` to `.env` for local setup.
+
+## Architecture
+
+### Multi-tenancy
+
+Every resource belongs to an `Organisation`. The `Organisation.host` field maps a hostname to a tenant. The hierarchy is: **Organisation → Meeting → AgendaItem → Proposal / Poll / DiscussionPost**.
+
+Abstract base classes enforce consistent context properties across all models:
+- `OrganisationContext` → `.organisation`
+- `MeetingContext` → `.organisation`, `.meeting`
+- `AgendaItemContext` → `.organisation`, `.meeting`, `.agenda_item`
+
+### Role & Permission System
+
+- **Roles** (`voteit/core/role.py`): named singletons with optional requirements (e.g. Moderator requires Participant). Stored as a PostgreSQL `ArrayField` via `RolesField` on `Roles` abstract model.
+- **Meeting roles**: `pa` (Participant), `mo` (Moderator), `pv` (Potential voter), `di` (Discusser), `pr` (Proposer).
+- **Org roles**: `org_manager`, `meeting_creator`.
+- **Object-level permissions**: Use the `rules` library. Each app has a `rules.py`. Permission constants are defined in `voteit.core.PERM`.
+
+### State Machines
+
+`django-fsm` is used on most models. State classes follow the pattern `*Wf` (e.g. `MeetingWf`, `PollWf`, `ProposalWf`). Transitions have permission guards and condition guards.
+
+### REST API
+
+DRF with a central router at `voteit/core/rest_api/router.py`. Apps register ViewSets with `@router.register(...)`. All endpoints live under `/api/`. Auth: Token + Session.
+
+### WebSocket / Real-time
+
+Django Channels at `ws/`. The `channels-envelope` library provides the typed message-passing protocol. Each app's `channels.py` defines message handlers. RQ worker queues handle deferred WebSocket jobs (queues: `default`, `long`, `conn`, `ts`).
+
+### Registry Pattern
+
+A `Registry` (typed dict, `voteit/core/component.py`) is used for: poll methods, electoral register policies, proposal ID policies, vote transfer policies, meeting dialects, pluggable components, content types, predicates.
+
+### Dialects
+
+YAML-based meeting configuration profiles loaded from `src/dialect_configs/dialects/` (dev) or `BASE_DIR/dialects` (prod). Applied to a meeting to configure voting behaviour, roles, and group structures without code changes.
+
+### Components
+
+Pluggable per-meeting or per-org features (`MeetingComponent`, `OrganisationComponent`) with `on`/`off` state via `EnabledWf`. Registered in `meeting_components` / `organisation_components` registries.
+
+### Notable Conventions
+
+- **Narrative docs as doctests**: `docs/narrative.md` and `docs/workflows.md` are runnable as doctests, asserted in each app's `test_docs.py`. These serve as integration-level documentation and must stay passing.
+- **Auditlog context**: All models using `django-auditlog` implement `get_additional_data()` returning `{o, m, ai}` context keys.
+- **Pydantic v1** (pinned `<2`) is used for schemas/validation — not v2.
+- **Test runner**: Django's built-in `manage.py test`, not pytest. Coverage via the `coverage` package.
+- **Package manager**: `uv` with `uv.lock`. Do not use pip or poetry.
+- **Linting**: `ruff` only (includes isort with `force-single-line = true`).
+
+### Key Packages in `src/`
+
+Local editable sub-packages (separate git repos, mounted via uv workspace):
+- `src/voteit_org/` — org-level membership and REST features
+- `src/member_dialects/` — voting behaviour plugins
+- `src/dialect_configs/` — YAML dialect configuration files

@@ -1,0 +1,11 @@
+dist/
+build/
+*.lock
+__pycache__/
+volumes/
+locales/
+media/
+.git/
+*.db
+*.sqlite
+.env
