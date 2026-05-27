@@ -32,7 +32,7 @@ class UtilsTests(TestCase):
         importer = direct_clone(
             source=self.meeting,
             target=self.new_meeting,
-            commit=True,
+            dry_run=False,
             include_reactions=True,
         )
         self.assertEqual(
@@ -47,7 +47,7 @@ class UtilsTests(TestCase):
         importer = direct_clone(
             source=self.meeting,
             target=self.new_meeting,
-            commit=False,
+            dry_run=True,
             include_reactions=True,
         )
         self.assertEqual(
@@ -63,7 +63,7 @@ class UtilsTests(TestCase):
         importer = direct_clone(
             source=self.meeting,
             target=self.new_meeting,
-            commit=False,
+            dry_run=True,
             include_reactions=True,
             include_discussions=False,
         )
@@ -76,7 +76,7 @@ class UtilsTests(TestCase):
         importer = direct_clone(
             source=self.meeting,
             target=self.new_meeting,
-            commit=False,
+            dry_run=True,
             include_notes=True,
         )
         self.assertEqual(
@@ -112,7 +112,7 @@ class UtilsTests(TestCase):
         importer = direct_clone(
             source=self.meeting,
             target=self.new_meeting,
-            commit=True,
+            dry_run=False,
             include_reactions=True,
         )
         self.assertEqual(
@@ -123,7 +123,7 @@ class UtilsTests(TestCase):
         importer = direct_clone(
             source=self.meeting,
             target=self.new_meeting,
-            commit=True,
+            dry_run=False,
             include_reactions=True,
         )
         self.assertEqual(

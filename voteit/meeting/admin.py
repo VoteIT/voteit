@@ -79,7 +79,7 @@ class CloneMeetingForm(ImportMeetingForm):
         target = self.cleaned_data.pop("target_meeting")
         commit = self.cleaned_data.pop("commit")
         importer = direct_clone(
-            target=target, source=self.instance, commit=commit, **self.cleaned_data
+            target=target, source=self.instance, dry_run=not commit, **self.cleaned_data
         )
         self.stats = importer.stats().dict(skip_defaults=True)
         self.commit = commit

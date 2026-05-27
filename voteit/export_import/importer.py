@@ -9,6 +9,7 @@ from voteit.core.decorators import ensure_atomic
 from voteit.discussion.models import DiscussionPost
 from voteit.export_import.exceptions import ImportFileError
 from voteit.export_import.schemas import ImportMeetingStructure
+from voteit.export_import.utils import _NoAliasLoader
 from voteit.export_import.utils import verify_stream
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -79,7 +80,10 @@ class Importer:
         if self._verify:
             verify_stream(stream)
             stream.seek(0)
-        data = yaml.safe_load(stream)
+        try:
+            data = yaml.load(stream, Loader=_NoAliasLoader)
+        except yaml.scanner.ScannerError as exc:
+            raise ImportFileError(f"YAML parse error: {exc}")
         if not isinstance(data, dict):
             raise ImportFileError("Import file malformed, must be key-value data")
         try:
@@ -253,7 +257,7 @@ class Importer:
                         content_type=ct,
                     )
                 else:
-                    raise Exception(
+                    raise ImportFileError(
                         "Can't find object id %s with natural key %s"
                         % (reactd.object_id, reactd.content_type)
                     )
@@ -273,7 +277,9 @@ class Importer:
             case ("proposal", "proposal"):
                 return self.prop_map.get(fk)
             case ("proposal", "diffproposal"):
-                raise TypeError("Don't point to diff proposals!")
+                raise ImportFileError(
+                    "Reactions must not point to DiffProposals directly"
+                )
             case ("discussion", "discussionpost"):
                 return self.disc_map.get(fk)
 

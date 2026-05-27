@@ -1,36 +1,26 @@
 from rest_framework import fields
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from yaml.reader import ReaderError
-from pydantic import ValidationError as PydanticValidationError
 
-from voteit.core.rest_api.utils import pydantic_to_drf_validation_error
 from voteit.export_import.exceptions import SignatureVerificationFailed
-from voteit.meeting.models import Meeting
-from voteit.export_import.importer import ImportFileError
-from voteit.export_import.importer import Importer
+from voteit.export_import.utils import MAX_IMPORT_BYTES
+from voteit.export_import.utils import verify_stream
 
 
 class ImportFileValidator:
-    requires_context = True
+    requires_context = False
 
-    def __call__(self, value, serializer_field):
-        meeting: Meeting = serializer_field.context["meeting"]
-        importer = Importer(meeting)
+    def __call__(self, value):
+        if value.size > MAX_IMPORT_BYTES:
+            raise ValidationError(
+                f"File too large (max {MAX_IMPORT_BYTES // (1024 * 1024)} MB)"
+            )
         try:
-            importer.from_stream(value)
-        except ReaderError:
-            raise ValidationError("Not a valid yaml file")
-        except ImportFileError as exc:
-            raise ValidationError(exc)
-        except PydanticValidationError as exc:
-            raise pydantic_to_drf_validation_error(exc)
+            verify_stream(value)
         except SignatureVerificationFailed:
             raise ValidationError(
                 "Signature isn't valid for this file.", code="invalid_sign"
             )
-        if not (importer.data.groups or importer.data.agenda_items):
-            raise ValidationError("File doesn't contain any agenda items or groups")
         value.seek(0)  # Reset!
 
 

@@ -1,4 +1,4 @@
-sign: 85b93b98e25c18e6f4ec9b7088701a968f435b53e1353acd5932b1e6846e3f7a
+sign: 81026901d5d0caa5c9114d301522c05809b69734aa53c5ffa423e6e7ef0bf5ba
 meta:
   version: 1
 agenda_items:
@@ -19,7 +19,3 @@ agenda_items:
 groups:
   - title: The Hellos
     groupid: the-hellos
-
-
-
-

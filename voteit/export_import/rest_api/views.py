@@ -5,13 +5,17 @@ from pydantic import ValidationError as PydanticValidationError
 from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FileUploadParser
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
+from yaml.reader import ReaderError
 
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.utils import pydantic_to_drf_validation_error
+from voteit.export_import.exceptions import ImportFileError
+from voteit.export_import.exceptions import SignatureVerificationFailed
 from voteit.export_import.utils import sign_payload
 from voteit.export_import.exporter import Exporter
 from voteit.export_import.importer import Importer
@@ -57,6 +61,8 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             importer.from_stream(request.data["file"])
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
+        except (ImportFileError, SignatureVerificationFailed, ReaderError) as exc:
+            raise ValidationError(str(exc))
         return Response(
             data=importer.data.dict(exclude_unset=True, exclude={"meta", "sign"}),
             status=status.HTTP_200_OK,
@@ -69,7 +75,6 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             context={"meeting": instance, "request": request},
         )
         serializer.is_valid(raise_exception=True)
-        # Dispatch job?
         try:
             importer = Importer(
                 instance, **{k: v for k, v in serializer.data.items() if k != "file"}
@@ -77,6 +82,12 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             importer.from_stream(request.data["file"])
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
+        except (ImportFileError, SignatureVerificationFailed, ReaderError) as exc:
+            raise ValidationError(str(exc))
+        if not (importer.data.groups or importer.data.agenda_items):
+            raise ValidationError(
+                {"file": ["File doesn't contain any agenda items or groups"]}
+            )
         with transaction.atomic(durable=True):
             importer.run()
         return Response(

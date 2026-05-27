@@ -20,7 +20,7 @@ class Command(BaseCommand):
 
     >>> with override_settings(EXPORT_SECRET_KEY='abcdefghijk'):
     ...     call_command("import_signature_check", bad_sign_fn)
-    Signature invalid, should be 905e4c9227b6d166ef6365f0b5d8306733367f31ec255077bb22c8c5f675cdb0
+    Signature invalid, should be 06600ed7bb0293102251a5e8994edee168d637d37367009936dea736bf9b59d6
     """
 
     help = "Import file tools"
