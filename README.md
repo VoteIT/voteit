@@ -23,17 +23,17 @@ The frontend is a separate single-page application that communicates with this b
 
 ## Technology stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Django 5.2+, Django REST Framework |
-| Database | PostgreSQL (psycopg3) |
-| Real-time | Django Channels 4, Redis |
-| Background jobs | RQ + RQ Scheduler |
-| Auth | Token auth, Session auth, OAuth2 (IDProxy) |
-| Permissions | `django-rules` (object-level predicates) |
-| State machines | `django-fsm` |
-| Validation | Pydantic v1 |
-| Package manager | `uv` |
+| Layer           | Technology                                 |
+| --------------- | ------------------------------------------ |
+| Framework       | Django 5.2+, Django REST Framework         |
+| Database        | PostgreSQL (psycopg3)                      |
+| Real-time       | Django Channels 4, Redis                   |
+| Background jobs | RQ + RQ Scheduler                          |
+| Auth            | Token auth, Session auth, OAuth2 (IDProxy) |
+| Permissions     | `django-rules` (object-level predicates)   |
+| State machines  | `django-fsm`                               |
+| Validation      | Pydantic v1                                |
+| Package manager | `uv`                                       |
 
 ---
 
@@ -59,7 +59,7 @@ cp .env.tpl .env
 uv sync
 
 # 4. Start Postgres and Redis
-docker compose -f compose.dev.yml up -d
+docker compose up
 
 # 5. Apply migrations
 uv run python manage.py migrate
@@ -126,14 +126,14 @@ All commands assume the virtualenv is active. If using `uv run`, prefix with `uv
 
 ## Documentation
 
-| Document | Contents |
-|---|---|
-| [CLAUDE.md](CLAUDE.md) | Architecture guide, conventions, and key patterns |
+| Document                               | Contents                                                  |
+| -------------------------------------- | --------------------------------------------------------- |
+| [CLAUDE.md](CLAUDE.md)                 | Architecture guide, conventions, and key patterns         |
 | [docs/narrative.md](docs/narrative.md) | Model relationships and permission rules (also a doctest) |
-| [docs/workflows.md](docs/workflows.md) | Valid state machine combinations across models |
-| [INSTALL.md](INSTALL.md) | Minimal installation notes |
-| [CHANGELOG.md](CHANGELOG.md) | Release history |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [docs/workflows.md](docs/workflows.md) | Valid state machine combinations across models            |
+| [INSTALL.md](INSTALL.md)               | Minimal installation notes                                |
+| [CHANGELOG.md](CHANGELOG.md)           | Release history                                           |
+| [CONTRIBUTING.md](CONTRIBUTING.md)     | How to contribute                                         |
 
 ---
 
