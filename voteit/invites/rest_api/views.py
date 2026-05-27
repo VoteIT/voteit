@@ -5,7 +5,6 @@ from logging import getLogger
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils.functional import cached_property
-from django.utils.translation import gettext as _
 from rest_framework import mixins
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -151,30 +150,7 @@ class MeetingInviteViewSet(
                 if not items:
                     continue
 
-                # Moderator lockout protection
-                if ROLE_MODERATOR not in role_combo:
-                    existing_qs, _conflicting = meeting.invites.find_mixed_user_data(
-                        *items
-                    )
-                    curr_moderators = meeting.roles.filter(
-                        assigned__contains=ROLE_MODERATOR
-                    ).values_list("user", flat=True)
-                    at_risk = existing_qs.filter(used_by__in=curr_moderators)
-                    if at_risk.exists():
-                        userids = ", ".join(
-                            x
-                            for x in at_risk.values_list("used_by__userid", flat=True)
-                            if x
-                        )
-                        raise ValidationError(
-                            _(
-                                "Your action would downgrade permissions for some moderators. "
-                                "Handle moderators via participants tab instead. "
-                                "Related to userID(s): %(userids)s"
-                            )
-                            % {"userids": userids}
-                        )
-
+                serializers._raise_if_moderator_lockout(meeting, items, role_combo)
                 result = meeting.invites.create_or_update_mixed(
                     data=items, roles=role_combo, meeting=meeting
                 )

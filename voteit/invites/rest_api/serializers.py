@@ -2,6 +2,7 @@ from logging import getLogger
 
 from django.db import transaction
 from django.utils.functional import cached_property
+from django.utils.translation import gettext as _
 from pydantic import ValidationError as PydanticValidationError
 from rest_framework import serializers
 
@@ -134,6 +135,27 @@ def _pydantic_to_user_messages(exc: PydanticValidationError) -> list[str]:
     return messages
 
 
+def _raise_if_moderator_lockout(meeting, items: list[dict], roles: list[str]) -> None:
+    if ROLE_MODERATOR not in roles:
+        existing_qs, _conflicting = meeting.invites.find_mixed_user_data(*items)
+        curr_moderators = meeting.roles.filter(
+            assigned__contains=ROLE_MODERATOR
+        ).values_list("user", flat=True)
+        at_risk = existing_qs.filter(used_by__in=curr_moderators)
+        if at_risk.exists():
+            userids = ", ".join(
+                x for x in at_risk.values_list("used_by__userid", flat=True) if x
+            )
+            raise serializers.ValidationError(
+                _(
+                    "Your action would downgrade permissions for some moderators. "
+                    "Handle moderators via participants tab instead. "
+                    "Related to userID(s): %(userids)s"
+                )
+                % {"userids": userids}
+            )
+
+
 class InviteImportSerializer(serializers.Serializer):
     meeting = ModeratorMeetingField()
     file = serializers.FileField()
@@ -200,42 +222,16 @@ class InviteCreateSerializer(serializers.Serializer):
                         f"Item {i + 1}: invalid value for '{key}': {e}"
                     ) from e
             normalised.append(normalised_item)
-        # Cross-item intersection check: a single key=value must not appear
-        # across items with different total user_data (subset conflict).
-        all_items_views = [x.items() for x in normalised]
-        checked = []
-        for i, item in enumerate(normalised, 1):
-            item_view = item.items()
-            if item_view in checked:
-                continue
-            for k, val in item_view:
-                partial = {k: val}.items()
-                if any(
-                    partial <= other for other in all_items_views if other != item_view
-                ):
-                    raise serializers.ValidationError(
-                        f"The value {k}={val} appears in overlapping subsets of user data. "
-                        f"Offending item: {i}"
-                    )
-            checked.append(item_view)
+        all_keys = sorted({k for item in normalised for k in item})
+        col_rows = [[item.get(k, "") for k in all_keys] for item in normalised]
+        try:
+            reg.check_intersections(all_keys, col_rows)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc))
         return normalised
 
     def validate(self, attrs):
-        meeting = attrs["meeting"]
-        item_roles = attrs["roles"]
-        data = attrs["data"]
-        if ROLE_MODERATOR not in item_roles:
-            curr_moderator_pks = meeting.roles.filter(
-                assigned__contains=ROLE_MODERATOR
-            ).values_list("user", flat=True)
-            if (
-                meeting.invites.find_mixed_user_data(*data)[0]
-                .filter(used_by__in=curr_moderator_pks)
-                .exists()
-            ):
-                raise serializers.ValidationError(
-                    "This would downgrade roles for an existing moderator."
-                )
+        _raise_if_moderator_lockout(attrs["meeting"], attrs["data"], attrs["roles"])
         return attrs
 
     def save(self, **kwargs):
