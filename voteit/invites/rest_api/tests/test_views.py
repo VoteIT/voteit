@@ -2,13 +2,17 @@ from __future__ import annotations
 
 from http import HTTPStatus
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import override_settings
+from envelope.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 from social_django.models import UserSocialAuth
 
+from voteit.invites.channels import MeetingInvitesChannel
+from voteit.invites.messages import MeetingInviteChanged
 from voteit.invites.models import MeetingGroupAnnotation
 from voteit.invites.models import MeetingInvite
 from voteit.meeting.models import Meeting
@@ -634,6 +638,61 @@ class MeetingInviteViewSetCreateTests(APITestCase):
             }
         )
         self.assertEqual(response.status_code, 400)
+
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+class MeetingInviteViewSetAnnotationWsTests(APITestCase):
+    """Verify that MeetingInviteChanged is published when annotations are added via REST."""
+
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.moderator: User = cls.meeting.participants.get(username="moderator")
+        cls.group = MeetingGroup.objects.create(meeting=cls.meeting, groupid="board")
+        cls.invite = cls.meeting.invites.create(
+            user_data={"email": "a@example.com"}, roles=["pa"]
+        )
+
+    def _post(self, data):
+        self.client.force_login(self.moderator)
+        return self.client.post(
+            reverse("meeting-invites-list"),
+            data,
+            content_type="application/json",
+        )
+
+    @patch.object(MeetingInvitesChannel, "sync_publish")
+    def test_annotation_only_sends_invite_changed(self, mock_publish):
+        """
+        Adding an annotation to an existing invite (no new invite created, no invite saved)
+        must still publish MeetingInviteChanged so the frontend learns about has_annotations.
+        """
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self._post(
+                {
+                    "meeting": self.meeting.pk,
+                    "roles": ["pa"],
+                    "data": [{"email": "a@example.com", "group": "board"}],
+                }
+            )
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual(data["invites"]["existed"], 1)
+        self.assertEqual(data["annotations"][0]["added"], 1)
+
+        changed_msgs = [
+            call.args[0]
+            for call in mock_publish.mock_calls
+            if isinstance(call.args[0], MeetingInviteChanged)
+        ]
+        self.assertTrue(
+            changed_msgs,
+            "MeetingInviteChanged was not published after annotation was added",
+        )
+        self.assertEqual(self.invite.pk, changed_msgs[0].data.pk)
+        self.assertTrue(changed_msgs[0].data.has_annotations)
 
 
 class MeetingInviteViewSetClearAnnotationsTests(APITestCase):

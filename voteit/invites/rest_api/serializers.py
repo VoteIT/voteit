@@ -10,6 +10,7 @@ from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.core.validators import root_validate_roles_and_model
 from voteit.invites.models import MeetingInvite
 from voteit.invites.utils import get_invite_adapter_registry
+from voteit.invites.utils import send_updated_invites
 from voteit.meeting import roles
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -308,6 +309,7 @@ class InviteCreateSerializer(serializers.Serializer):
             )
             all_keys = _items_to_columns(data, reg)
             ann_keys = [k for k in all_keys if k not in ud_keys]
+            newly_annotated_pks: set[int] = set()
             if ann_keys:
                 col_rows = [[item.get(k, "") for k in all_keys] for item in data]
                 for ann_result in reg.run_annotations(
@@ -325,6 +327,13 @@ class InviteCreateSerializer(serializers.Serializer):
                                 "existed": ann_result.existed,
                             }
                         )
+                        newly_annotated_pks.update(ann_result.newly_annotated_invites)
+                if newly_annotated_pks:
+                    send_updated_invites(
+                        meeting,
+                        meeting.invites.filter(pk__in=newly_annotated_pks),
+                        annotate=True,
+                    )
             if vd["dryrun"]:
                 transaction.set_rollback(True)
         return {

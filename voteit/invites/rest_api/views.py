@@ -23,6 +23,7 @@ from voteit.invites.rest_api import serializers
 from voteit.invites.schemas import InviteDataTypesSchema
 from voteit.invites.schemas import InvitesResultSchema
 from voteit.invites.utils import get_invite_adapter_registry
+from voteit.invites.utils import send_updated_invites
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.utils import get_idproxy_user_data
@@ -287,6 +288,7 @@ class MeetingInviteViewSet(
                 invite_result.existed += result.existed
 
             # Run annotations if annotation columns are present
+            newly_annotated_pks: set[int] = set()
             if reg.get_annotations(columns):
                 try:
                     reg.run_validators(columns=columns, rows=rows, meeting=meeting)
@@ -308,6 +310,13 @@ class MeetingInviteViewSet(
                                 "existed": ann_result.existed,
                             }
                         )
+                        newly_annotated_pks.update(ann_result.newly_annotated_invites)
+                if newly_annotated_pks:
+                    send_updated_invites(
+                        meeting,
+                        meeting.invites.filter(pk__in=newly_annotated_pks),
+                        annotate=True,
+                    )
 
             if dryrun:
                 transaction.set_rollback(True)

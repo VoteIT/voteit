@@ -21,13 +21,12 @@ def get_invite_adapter_registry() -> InviteAdapterRegistry:
 
 
 def send_updated_invites(
-    meeting: Meeting, queryset: models.QuerySet[MeetingInvite], annotate=False
+    meeting: Meeting, queryset: models.QuerySet[MeetingInvite], annotate: bool = False
 ):
     """
-    Send message to meeting channel with updated invites.
-    This is more of a special case since invites have an attribute called 'has_annotations'
-    that has to do with other objects.
-    IE, we might not know about new annotations or that they've been removed.
+    Publish MeetingInviteChanged for each invite in queryset.
+    Pass annotate=True when calling after run_annotations so that has_annotations
+    is read from the queryset annotation rather than a live DB fetch.
     """
     from voteit.invites.channels import MeetingInvitesChannel
     from voteit.invites.messages import MeetingInviteChanged
