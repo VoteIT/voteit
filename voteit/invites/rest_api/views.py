@@ -38,6 +38,13 @@ class MeetingInviteViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
+    """
+    Moderator-facing endpoint for managing meeting invites.
+
+    Invite state is pushed over WebSocket (MeetingInvitesChannel); the list
+    action intentionally returns [] — do not poll this endpoint for invite lists.
+    """
+
     filterset_fields = ("meeting",)
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
@@ -59,7 +66,19 @@ class MeetingInviteViewSet(
 
     def retrieve(self, request, *args, **kwargs):
         """
-        Returns a list of any annotation data related to a specific invite.
+        GET /api/meeting-invites/{pk}/
+
+        Returns annotation data attached to a single invite.
+
+        Response:
+            {
+                "pk": 42,
+                "annotations": [
+                    {"name": "group", "meeting_group": 7, "role": null}
+                ]
+            }
+
+        Returns 404 if the invite does not belong to a meeting the user moderates.
         """
         instance = self.get_object()
         reg = get_invite_adapter_registry()
@@ -73,18 +92,54 @@ class MeetingInviteViewSet(
         return Response(data)
 
     def list(self, *args, **kwargs):
+        """
+        GET /api/meeting-invites/
+
+        Always returns []. Invite state is delivered over WebSocket on
+        MeetingInvitesChannel subscription, not via polling.
+        """
         return Response([])
 
     def create(self, request, *args, **kwargs):
+        """
+        POST /api/meeting-invites/
+
+        Create or update invites from a JSON list. Each item is a flat dict
+        mixing identity fields (e.g. email) and optional annotation fields
+        (e.g. group, grouprole). All items share the same roles.
+
+        Request:
+            {
+                "meeting": 1,
+                "roles": ["pa"],
+                "data": [
+                    {"email": "alice@example.com", "group": "board"},
+                    {"email": "bob@example.com"}
+                ],
+                "dryrun": false
+            }
+
+        - Identity fields are validated and normalised via their adapter schema.
+        - Annotation fields are normalised via preflight (strip, lowercase).
+        - grouprole requires group to be present in the same item, and the meeting dialect must use grouproles.
+        - An item must have at least one identity field.
+        - Existing invites with matching identity data have their roles updated.
+        - Raises 400 if the new roles would downgrade an existing moderator.
+
+        Response 201:
+            {
+                "invites": {"added": 1, "changed": 0, "existed": 1},
+                "annotations": [{"name": "group", "added": 1, "changed": 0, "existed": 0}],
+                "dryrun": false
+            }
+
+        With dryrun: true the transaction is rolled back and no data is written.
+        """
         serializer = serializers.InviteCreateSerializer(
             data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
-        result = serializer.save()
-        return Response(
-            {"added": result.added, "changed": result.changed, "existed": result.existed},
-            status=201,
-        )
+        return Response(serializer.save(), status=201)
 
     @action(
         methods=["post"],
@@ -93,6 +148,18 @@ class MeetingInviteViewSet(
         url_path="bulk-delete",
     )
     def bulk_delete(self, request, *args, **kwargs):
+        """
+        POST /api/meeting-invites/bulk-delete/
+
+        Permanently delete a list of invites. All PKs must belong to the
+        specified meeting, which the requesting user must moderate.
+
+        Request:
+            {"meeting": 1, "invites": [10, 11, 12]}
+
+        Response:
+            {"deleted": 3}
+        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         invites: list[int] = serializer.validated_data["invites"]
@@ -108,6 +175,21 @@ class MeetingInviteViewSet(
         url_path="bulk-revoke",
     )
     def bulk_revoke(self, request, *args, **kwargs):
+        """
+        POST /api/meeting-invites/bulk-revoke/
+
+        Transition a list of open invites to the 'revoked' state. All PKs must
+        belong to the specified meeting, which the requesting user must moderate.
+        Already-revoked or accepted invites are included in the count but the
+        FSM transition will raise if not applicable — filter to open invites
+        on the client if needed.
+
+        Request:
+            {"meeting": 1, "invites": [10, 11]}
+
+        Response:
+            {"revoked": 2}
+        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         invites: list[int] = serializer.validated_data["invites"]
@@ -126,6 +208,48 @@ class MeetingInviteViewSet(
         serializer_class=serializers.InviteImportSerializer,
     )
     def import_invites(self, request, *args, **kwargs):
+        """
+        POST /api/meeting-invites/import/   (multipart/form-data)
+
+        Create or update invites from an uploaded spreadsheet or text file.
+        File format is detected by content, not filename:
+          - XLSX (.xlsx) — Excel 2007+
+          - ODS (.ods) — LibreOffice / Google Sheets
+          - CSV / TSV — UTF-8 plain text, separator auto-detected
+          - Headerless email list — single column without a header row
+
+        The first row must be column headers. Recognised columns:
+          - Identity: email, swedish_ssn (org-dependent)
+          - Annotation: group, grouprole
+          - roles — per-row role override; omit to default all rows to PARTICIPANT
+
+        Example TSV:
+            email           group     roles
+            alice@x.com     board     pa,mo
+            bob@x.com       board
+
+        Form fields:
+            meeting  — meeting PK (integer)
+            file     — the spreadsheet file
+            dryrun   — "true" to validate without writing (optional, default false)
+
+        Rows with the same role combination are grouped and processed together.
+        Rows with annotation columns (group, grouprole) are annotated after
+        invites are created.
+
+        Response:
+            {
+                "invites": {"added": 2, "changed": 0, "existed": 1},
+                "annotations": [{"name": "group", "added": 2, "changed": 0, "existed": 1}],
+                "dryrun": false
+            }
+
+        Raises 400 if:
+          - File exceeds 2 MB or 1000 data rows
+          - Column names are unrecognised or violate cross-column constraints
+          - Any group IDs in the file don't exist in the meeting
+          - The new roles would downgrade an existing moderator
+        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         vd = serializer.validated_data
@@ -196,12 +320,11 @@ class MeetingInviteViewSet(
 @router.register("match-invites", basename="match-invites")
 class MatchInvitesViewSet(viewsets.GenericViewSet):
     """
-    This view is meant as a service endpoint for matching identity data.
+    Service endpoint for the external ID-proxy login system.
 
-    It uses basic http auth with username and password to match the user.
-    This should be a user without any access at all, and it must be listed within settings as:
-    INVITE_SERVICE_USERS = ["username", ...]
-    Settings must contain the service users
+    Auth: API key via HTTP_API_KEY header (setting: ID_PROXY_API_KEY).
+    This endpoint is called by the identity provider during login to look up
+    pending invites for a user before they have a local account.
     """
 
     serializer_class = serializers.ExternalMeetingInviteSerializer
@@ -212,6 +335,40 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
         detail=False,
     )
     def query(self, request):
+        """
+        POST /api/match-invites/query/
+
+        Find all open invites matching one or more identity scope+value pairs.
+        The request body is a list of validated identity assertions from the
+        ID-proxy provider.
+
+        Request:
+            [
+                {"scope": "email", "data": "alice@example.com", "validated": "2024-01-15T10:00:00Z"},
+                {"scope": "swedish_ssn", "data": "191212121212", "validated": "2024-01-15T10:00:00Z"}
+            ]
+
+        Response — list of matching open invites:
+            [
+                {
+                    "pk": 42,
+                    "user_data": {"email": "alice@example.com"},
+                    "roles": ["pa"],
+                    "state": "open",
+                    "meeting": 1,
+                    "meeting_title": "Annual general meeting",
+                    "organisation_host": "org.example.com",
+                    "created": "2024-01-10T08:00:00Z",
+                    "modified": "2024-01-10T08:00:00Z",
+                    "used_by": null,
+                    "used_at": null
+                }
+            ]
+
+        Returns [] if no open invites match. Scopes not present in the registry
+        are silently ignored (logged as warnings) to avoid breaking login flows
+        when scope lists diverge between systems.
+        """
         serializer = self.get_serializer(self.get_queryset(), many=True)
         return Response(serializer.data)
 
@@ -237,6 +394,18 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
         detail=True,
     )
     def reject(self, request, pk):
+        """
+        POST /api/match-invites/{pk}/reject/
+
+        Reject a specific invite on behalf of the user. The queryset is scoped
+        to invites matching the request's identity data, so this returns 404 if
+        the invite PK does not match the caller's identity — no explicit
+        permission check is needed.
+
+        Request body: same identity list as /query/ (used for queryset scoping).
+
+        Response 200: the updated invite object (state: "rejected").
+        """
         # Note: Permissions doesn't apply here since it's handled by the queryset
         instance: MeetingInvite = self.get_object()
         with transaction.atomic():
@@ -253,9 +422,12 @@ class HandleMatchedInvitesViewSet(
     mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet
 ):
     """
-    This is for authenticated local users.
-    They use this endpoint to accept or reject an invite.
-    Note that the data must match returned data from their identity_url
+    Authenticated local user endpoint for accepting or rejecting their own invites.
+
+    The user must belong to an
+    organisation and have identity data stored via their ID-proxy social auth.
+    The queryset is scoped to open invites that match the user's own identity —
+    no explicit object-level permission check is performed.
     """
 
     serializer_class = serializers.ExternalMeetingInviteSerializer
@@ -276,6 +448,15 @@ class HandleMatchedInvitesViewSet(
         detail=True,
     )
     def accept(self, request, pk):
+        """
+        POST /api/handle-matched-invites/{pk}/accept/
+
+        Accept an invite. Grants the invite's roles to the user and applies
+        any pending group annotations (MeetingGroupAnnotation rows). Returns
+        404 if the invite does not match the user's own identity data.
+
+        Response 200: the updated invite object (state: "accepted").
+        """
         # Note: Permissions doesn't apply here since it's handled by the queryset
         instance: MeetingInvite = self.get_object()
         with transaction.atomic():
@@ -288,6 +469,15 @@ class HandleMatchedInvitesViewSet(
         detail=True,
     )
     def reject(self, request, pk):
+        """
+        POST /api/handle-matched-invites/{pk}/reject/
+
+        Reject an invite. The invite moves to 'rejected' state and is recorded
+        as used by this user. Returns 404 if the invite does not match the
+        user's own identity data.
+
+        Response 200: the updated invite object (state: "rejected").
+        """
         # Note: Permissions doesn't apply here since it's handled by the queryset
         instance: MeetingInvite = self.get_object()
         with transaction.atomic():
@@ -298,9 +488,42 @@ class HandleMatchedInvitesViewSet(
 
 @router.register("invite-data-types", basename="invite-data-types")
 class InviteDataTypesViewSet(ViewSet):
+    """
+    Lists the registered invite adapter types available to the requesting user's
+    organisation. Used by the frontend to know which identity and annotation
+    fields to offer when building invite forms.
+    """
+
     permission_classes = [IsAuthenticated]
 
     def list(self, request):
+        """
+        GET /api/invite-data-types/
+
+        Returns all registered adapter types filtered by the organisation's
+        provider scope. If the user has no organisation or provider, only
+        the 'email' adapter is returned.
+
+        Response:
+            [
+                {
+                    "name": "email",
+                    "title": "Email",
+                    "is_user_data": true,
+                    "is_annotation": false,
+                    "is_clearable": false,
+                    "is_runnable": true
+                },
+                {
+                    "name": "group",
+                    "title": "GroupID",
+                    "is_user_data": false,
+                    "is_annotation": true,
+                    "is_clearable": true,
+                    "is_runnable": true
+                }
+            ]
+        """
         scopes = ["email"]
         with suppress(ObjectDoesNotExist, AttributeError):
             scope = request.user.organisation.provider.scope

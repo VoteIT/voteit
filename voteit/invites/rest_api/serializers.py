@@ -185,6 +185,20 @@ class InviteImportSerializer(serializers.Serializer):
         return data
 
 
+def _items_to_columns(items: list[dict], reg) -> list[str]:
+    """
+    Build an ordered column list from items.
+    User-data keys come first (sorted), annotation keys follow in registry registration order
+    so that cross-column constraints (e.g. grouprole must follow group) are satisfied.
+    """
+    ud_keys = sorted({k for item in items for k in item if k in reg.user_data_keys})
+    ann_keys = [
+        k for k in reg
+        if k not in reg.user_data_keys and any(k in item for item in items)
+    ]
+    return ud_keys + ann_keys
+
+
 class InviteCreateSerializer(serializers.Serializer):
     meeting = ModeratorMeetingField()
     roles = serializers.ListField(child=serializers.CharField(), min_length=1)
@@ -208,42 +222,106 @@ class InviteCreateSerializer(serializers.Serializer):
         for i, item in enumerate(v):
             if not item:
                 raise serializers.ValidationError(f"Item {i + 1} is empty.")
+            if not any(k in reg.user_data_keys for k in item):
+                raise serializers.ValidationError(
+                    f"Item {i + 1} has no identity field (e.g. email)."
+                )
             normalised_item = {}
             for key, val in item.items():
-                if key not in reg.user_data_keys:
+                if key not in reg:
                     raise serializers.ValidationError(
-                        f"Item {i + 1}: '{key}' is not a valid user data type."
+                        f"Item {i + 1}: '{key}' is not a valid field."
                     )
-                try:
-                    schema_data = reg[key].schema(**{key: val})
-                    normalised_item[key] = getattr(schema_data, key)
-                except (ValueError, TypeError) as e:
-                    raise serializers.ValidationError(
-                        f"Item {i + 1}: invalid value for '{key}': {e}"
-                    ) from e
+                if key in reg.user_data_keys:
+                    try:
+                        schema_data = reg[key].schema(**{key: val})
+                        normalised_item[key] = getattr(schema_data, key)
+                    except (ValueError, TypeError) as e:
+                        raise serializers.ValidationError(
+                            f"Item {i + 1}: invalid value for '{key}': {e}"
+                        ) from e
+                else:
+                    normalised_item[key] = val
             normalised.append(normalised_item)
-        all_keys = sorted({k for item in normalised for k in item})
-        col_rows = [[item.get(k, "") for k in all_keys] for item in normalised]
+        all_keys = _items_to_columns(normalised, reg)
         try:
-            reg.check_intersections(all_keys, col_rows)
+            reg.check_column_req(all_keys)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc))
+        ann_keys = [k for k in all_keys if k not in reg.user_data_keys]
+        if ann_keys:
+            col_rows = [[item.get(k, "") for k in all_keys] for item in normalised]
+            reg.preflight(all_keys, col_rows)
+            for item, row in zip(normalised, col_rows):
+                for k, cell in zip(all_keys, row):
+                    item[k] = cell
+        ud_keys = [k for k in all_keys if k in reg.user_data_keys]
+        ud_col_rows = [[item.get(k, "") for k in ud_keys] for item in normalised]
+        try:
+            reg.check_intersections(ud_keys, ud_col_rows)
         except ValueError as exc:
             raise serializers.ValidationError(str(exc))
         return normalised
 
     def validate(self, attrs):
-        _raise_if_moderator_lockout(attrs["meeting"], attrs["data"], attrs["roles"])
+        reg = get_invite_adapter_registry()
+        data = attrs["data"]
+        all_keys = _items_to_columns(data, reg)
+        ann_keys = [k for k in all_keys if k not in reg.user_data_keys]
+        if ann_keys:
+            col_rows = [[item.get(k, "") for k in all_keys] for item in data]
+            try:
+                reg.run_validators(columns=all_keys, rows=col_rows, meeting=attrs["meeting"])
+            except ValueError as exc:
+                raise serializers.ValidationError(str(exc))
+        ud_items = [
+            {k: v for k, v in item.items() if k in reg.user_data_keys} for item in data
+        ]
+        _raise_if_moderator_lockout(attrs["meeting"], ud_items, attrs["roles"])
         return attrs
 
     def save(self, **kwargs):
         vd = self.validated_data
         meeting = vd["meeting"]
+        data: list[dict] = vd["data"]
+        reg = get_invite_adapter_registry()
+        ud_keys = reg.user_data_keys
+        ud_items = [{k: v for k, v in item.items() if k in ud_keys} for item in data]
+        annotation_results = []
         with transaction.atomic(durable=True):
-            result = meeting.invites.create_or_update_mixed(
-                data=vd["data"], roles=vd["roles"], meeting=meeting
+            invite_result = meeting.invites.create_or_update_mixed(
+                data=ud_items, roles=vd["roles"], meeting=meeting
             )
+            all_keys = _items_to_columns(data, reg)
+            ann_keys = [k for k in all_keys if k not in ud_keys]
+            if ann_keys:
+                col_rows = [[item.get(k, "") for k in all_keys] for item in data]
+                for ann_result in reg.run_annotations(
+                    columns=all_keys,
+                    rows=col_rows,
+                    invites_qs=meeting.invites.all(),
+                    meeting=meeting,
+                ):
+                    if ann_result:
+                        annotation_results.append(
+                            {
+                                "name": ann_result.name,
+                                "added": ann_result.added,
+                                "changed": ann_result.changed,
+                                "existed": ann_result.existed,
+                            }
+                        )
             if vd["dryrun"]:
                 transaction.set_rollback(True)
-        return result
+        return {
+            "invites": {
+                "added": invite_result.added,
+                "changed": invite_result.changed,
+                "existed": invite_result.existed,
+            },
+            "annotations": annotation_results,
+            "dryrun": vd["dryrun"],
+        }
 
 
 class InviteBulkSerializer(serializers.Serializer):
