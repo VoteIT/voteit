@@ -9,6 +9,7 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 from social_django.models import UserSocialAuth
 
+from voteit.invites.models import MeetingGroupAnnotation
 from voteit.invites.models import MeetingInvite
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -557,6 +558,80 @@ class MeetingInviteViewSetCreateTests(APITestCase):
             }
         )
         self.assertEqual(response.status_code, 400)
+
+
+class MeetingInviteViewSetClearAnnotationsTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.moderator: User = cls.meeting.participants.get(username="moderator")
+        cls.group = MeetingGroup.objects.create(meeting=cls.meeting, groupid="board")
+        cls.invite = cls.meeting.invites.create(
+            user_data={"email": "a@example.com"}, roles=["pa"]
+        )
+        cls.invite_no_ann = cls.meeting.invites.create(
+            user_data={"email": "b@example.com"}, roles=["pa"]
+        )
+        MeetingGroupAnnotation.objects.create(
+            meeting_invite=cls.invite, meeting_group=cls.group
+        )
+
+    def _post(self, data):
+        self.client.force_login(self.moderator)
+        return self.client.post(
+            "/api/meeting-invites/clear-annotations/",
+            data,
+            content_type="application/json",
+        )
+
+    def test_clear_removes_annotation(self):
+        response = self._post({"meeting": self.meeting.pk, "invites": [self.invite.pk]})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["cleared"], 1)
+        self.assertEqual(self.invite.group_annotations.count(), 0)
+
+    def test_clear_only_affects_specified_invites(self):
+        other_invite = self.meeting.invites.create(
+            user_data={"email": "c@example.com"}, roles=["pa"]
+        )
+        from voteit.invites.models import MeetingGroupAnnotation
+
+        MeetingGroupAnnotation.objects.create(
+            meeting_invite=other_invite, meeting_group=self.group
+        )
+
+        response = self._post({"meeting": self.meeting.pk, "invites": [self.invite.pk]})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["cleared"], 1)
+        self.assertEqual(other_invite.group_annotations.count(), 1)
+
+    def test_clear_invite_without_annotation_returns_zero(self):
+        response = self._post(
+            {"meeting": self.meeting.pk, "invites": [self.invite_no_ann.pk]}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["cleared"], 0)
+
+    def test_clear_rejects_invites_from_other_meeting(self):
+        other_org = Organisation.objects.create()
+        other_meeting = other_org.meetings.create(title="Other", state="ongoing")
+        other_invite = other_meeting.invites.create(
+            user_data={"email": "x@example.com"}, roles=["pa"]
+        )
+        response = self._post(
+            {"meeting": self.meeting.pk, "invites": [other_invite.pk]}
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_clear_unauthenticated(self):
+        response = self.client.post(
+            "/api/meeting-invites/clear-annotations/",
+            {"meeting": self.meeting.pk, "invites": [self.invite.pk]},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 401)
 
 
 class InviteDataTypesViewSetTests(APITestCase):

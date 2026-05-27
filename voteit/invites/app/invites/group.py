@@ -251,3 +251,10 @@ class InviteGroup(AnnotationDataAdapter):
         )
         annotations_qs.delete()
         return invites_qs
+
+    @classmethod
+    def clear_for_invites(cls, invite_pks: list[int]) -> int:
+        count, _ = MeetingGroupAnnotation.objects.filter(
+            meeting_invite_id__in=invite_pks
+        ).delete()
+        return count

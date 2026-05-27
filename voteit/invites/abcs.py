@@ -207,6 +207,15 @@ class AnnotationDataAdapter(InviteDataAdapter, ABC):
         Clear annotations of this kind. Return invites that were affected by the clear operation.
         """
 
+    @classmethod
+    def clear_for_invites(cls, invite_pks: list[int]) -> int:
+        """
+        Clear annotations of this kind for a specific set of invites.
+        Returns the number of annotation records deleted.
+        Clearable adapters should override this; the default does nothing.
+        """
+        return 0
+
 
 class InviteUserDataAdapter(InviteDataAdapter, ABC):
     @classmethod

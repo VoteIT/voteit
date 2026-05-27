@@ -293,6 +293,14 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
             invites_qs |= self[k].clear(meeting)
         return invites_qs.distinct()
 
+    @ensure_atomic
+    def clear_for_invites(self, invite_pks: list[int]) -> int:
+        return sum(
+            adapter.clear_for_invites(invite_pks)
+            for adapter in self.values()
+            if adapter.is_clearable
+        )
+
     def get_masked_user_data(self, values: dict) -> dict:
         return {
             k: self[k].mask(v) for k, v in values.items() if k in self.user_data_keys

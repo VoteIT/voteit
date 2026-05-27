@@ -324,6 +324,18 @@ class InviteCreateSerializer(serializers.Serializer):
         }
 
 
+class InviteClearAnnotationsSerializer(serializers.Serializer):
+    meeting = ModeratorMeetingField()
+    invites = serializers.ListSerializer(child=serializers.IntegerField(), min_length=1)
+
+    def validate(self, attrs):
+        invites = attrs["invites"]
+        meeting = attrs["meeting"]
+        if MeetingInvite.objects.filter(id__in=invites, meeting=meeting).count() != len(invites):
+            raise serializers.ValidationError({"invites": "Invites don't match meeting."})
+        return attrs
+
+
 class InviteBulkSerializer(serializers.Serializer):
     invites = serializers.ListSerializer(child=serializers.IntegerField())
     meeting = ModeratorMeetingField()

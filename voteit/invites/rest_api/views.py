@@ -53,6 +53,7 @@ class MeetingInviteViewSet(
         "bulk_delete": None,
         "bulk_revoke": None,
         "import_invites": None,
+        "clear_annotations": None,
     }
 
     def get_queryset(self):
@@ -315,6 +316,42 @@ class MeetingInviteViewSet(
                 "dryrun": dryrun,
             }
         )
+
+    @action(
+        methods=["post"],
+        detail=False,
+        url_path="clear-annotations",
+        serializer_class=serializers.InviteClearAnnotationsSerializer,
+    )
+    def clear_annotations(self, request, *args, **kwargs):
+        """
+        POST /api/meeting-invites/clear-annotations/
+
+        Remove all annotations from a list of invites. Only the specified
+        invites are affected — other invites in the meeting are untouched.
+        All clearable annotation types (e.g. group) are cleared together,
+        since they can depend on each other.
+
+        All invite PKs must belong to the specified meeting, which the
+        requesting user must moderate.
+
+        Request:
+            {"meeting": 1, "invites": [10, 11, 12]}
+
+        Response:
+            {"cleared": 3}
+
+        "cleared" is the number of annotation records deleted (e.g. an invite
+        assigned to two groups counts as 2). Returns 0 if the invites had no
+        annotations.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        vd = serializer.validated_data
+        reg = get_invite_adapter_registry()
+        with transaction.atomic(durable=True):
+            cleared = reg.clear_for_invites(vd["invites"])
+        return Response({"cleared": cleared})
 
 
 @router.register("match-invites", basename="match-invites")
