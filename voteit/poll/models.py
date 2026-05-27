@@ -67,6 +67,17 @@ logger = getLogger(__name__)
 )
 @history_log("meeting__organisation")
 class ElectoralRegister(RulesModelMixin, MeetingContext):
+    """
+    A snapshot of who is allowed to vote in a meeting and with what weight.
+
+    Created by an electoral register policy (``Meeting.er_policy``) and
+    attached to one or more polls. Once saved, ``voter_data`` is immutable —
+    use ``set_voters_from_dict()`` on a fresh instance instead of writing
+    the field directly. This ensures checksums and audit trails stay consistent.
+
+    ``voter_data`` is a JSON dict of ``{str(user_pk): vote_weight}``.
+    """
+
     name = "electoral_register"
     created: datetime = models.DateTimeField(editable=False, default=now)
     source: str | None = models.CharField(max_length=20, null=True, blank=True)
@@ -172,6 +183,23 @@ class ElectoralRegister(RulesModelMixin, MeetingContext):
     ],
 )
 class Poll(BaseContent, MeetingContext, AgendaItemContext):
+    """
+    A vote taken on a set of proposals within an agenda item.
+
+    Lifecycle (``PollWf``): ``private → upcoming → ongoing → finished → published``.
+    The poll method (``method_name``) determines how votes are counted; methods
+    are registered in the poll method registry and may carry a Pydantic settings
+    schema (``settings_data``) and a result schema (``result_data``).
+
+    Two electoral registers are attached on start:
+    - ``initial_electoral_register`` — the register that existed when the poll opened.
+    - ``electoral_register`` — the register actually used for counting (may differ if
+      the register was regenerated before closing).
+
+    ``ballot_data`` and ``ballot_checksum`` (SHA-512) are written once when the poll
+    closes and are immutable afterwards; use ``verify_checksum()`` to validate integrity.
+    """
+
     P_ORD_CHOICES = (("c", "Chronological"), ("a", "Alphabetical"), ("r", "Random"))
     PERM_CHANGE_STATE = f"poll.{PERM.CHANGE_STATE}_poll"
 
@@ -699,8 +727,11 @@ class Vote(RulesModelMixin, models.Model):
 )
 class VoteTransfer(MeetingContext, RulesModelMixin):
     """
-    Transfer voting rights to another user.
+    Delegates voting rights from one meeting participant (``source``) to another (``target``).
 
+    Used when a participant cannot attend in person and wishes their vote weight
+    to be carried by a proxy. The actual weight redistribution is applied by the
+    electoral register policy when the register is (re)generated.
     """
 
     name = "vote_transfer"

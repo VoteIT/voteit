@@ -22,7 +22,7 @@ See [README.md](README.md#quick-start) for the full setup walkthrough. In short:
 ```bash
 uv sync
 cp .env.tpl .env
-docker compose -f compose.dev.yml up -d
+docker compose up
 uv run python manage.py migrate
 make up
 ```
@@ -114,11 +114,11 @@ Organisation → Meeting → AgendaItem → Proposal / Poll / DiscussionPost
 
 Abstract base classes enforce this:
 
-| Mixin | Properties provided |
-|---|---|
-| `OrganisationContext` | `.organisation` |
-| `MeetingContext` | `.organisation`, `.meeting` |
-| `AgendaItemContext` | `.organisation`, `.meeting`, `.agenda_item` |
+| Mixin                 | Properties provided                         |
+| --------------------- | ------------------------------------------- |
+| `OrganisationContext` | `.organisation`                             |
+| `MeetingContext`      | `.organisation`, `.meeting`                 |
+| `AgendaItemContext`   | `.organisation`, `.meeting`, `.agenda_item` |
 
 ### State machines (django-fsm)
 

@@ -41,6 +41,21 @@ from voteit.stats.registry import history_log
     ],
 )
 class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
+    """
+    A structured discussion/voting point within a meeting.
+
+    Agenda items are the containers that hold proposals, polls, and discussion posts.
+    Lifecycle (``AgendaItemWf``): ``private → upcoming → ongoing → closed → archived``.
+    State combinations with the parent meeting are documented in ``docs/workflows.md``.
+
+    ``order`` is auto-assigned as the next sequential value for the meeting.
+    ``related_modified`` is a debounced timestamp updated when nested content changes;
+    the frontend compares it against ``LastRead.timestamp`` to show "unread" indicators.
+
+    ``block_discussion`` and ``block_proposals`` are moderator flags that can disable
+    new content without changing the item's state.
+    """
+
     name: str = "agenda_item"
     body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
     title: str = models.CharField(max_length=100)
