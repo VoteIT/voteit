@@ -333,7 +333,7 @@ class PollCreateSerializerTests(TestCase):
         self.assertTrue(serializer.is_valid())
         # FIXME: Raise validation error
         with self.assertRaises(ValidationError):
-            instance = serializer.save()
+            serializer.save()
 
     def test_serializer_create_simple_start_transition_bad_perm(self):
         data = self._fixture(start=True)

@@ -13,7 +13,7 @@ class GetPoliciesTests(TestCase):
         )
 
         self.meeting = Meeting.objects.create()
-        auto_ap = AutomaticAccess.objects.create(meeting=self.meeting)
+        AutomaticAccess.objects.create(meeting=self.meeting)
         # mod_ap = ModeratorApprovedAccess.objects.create(
         #     meeting=self.meeting, active=True
         # )

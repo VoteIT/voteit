@@ -23,7 +23,7 @@ class CommandsTests(TestCase):
 
     @override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
     def test_meeting_dialect_files(self):
-        out = self.call_command("check_meeting_dialect_files")
+        self.call_command("check_meeting_dialect_files")
 
     @override_settings(MEETING_DIALECTS_DIR=BAD_VALUE_DIALECT_FIXTURE)
     def test_meeting_dialect_files_bad(self):

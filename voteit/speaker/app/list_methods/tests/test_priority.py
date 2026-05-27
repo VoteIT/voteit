@@ -99,9 +99,9 @@ class PriorityTests(TestCase):
         self.speaker_list.speaker_items.all().delete()  # Start fresh here
         self._mk_previous_spoken(self.user_one, 2)
         self._mk_previous_spoken(self.user_two, 1)
-        speaker_one = self.speaker_list.speaker_items.create(user=self.user_one)
-        speaker_two = self.speaker_list.speaker_items.create(user=self.user_two)
-        speaker_three = self.speaker_list.speaker_items.create(user=self.user_three)
+        self.speaker_list.speaker_items.create(user=self.user_one)
+        self.speaker_list.speaker_items.create(user=self.user_two)
+        self.speaker_list.speaker_items.create(user=self.user_three)
         self.assertEqual(
             [self.user_three.pk, self.user_one.pk, self.user_two.pk],
             self.speaker_list.reorder(),
@@ -118,13 +118,13 @@ class PriorityTests(TestCase):
             [self.user_one.pk, self.user_two.pk, self.user_three.pk],
             self.speaker_list.order_list,
         )
-        speaker_four = self.speaker_list.speaker_items.create(user=self.user_four)
+        self.speaker_list.speaker_items.create(user=self.user_four)
         self.speaker_list.reorder()
         self.assertEqual(
             [self.user_one.pk, self.user_four.pk, self.user_two.pk, self.user_three.pk],
             self.speaker_list.order_list,
         )
-        speaker_five = self.speaker_list.speaker_items.create(user=self.user_five)
+        self.speaker_list.speaker_items.create(user=self.user_five)
         self._mk_previous_spoken(self.user_five, 1)
         self.speaker_list.reorder()
         self.assertEqual(
@@ -149,13 +149,13 @@ class PriorityTests(TestCase):
             [self.user_one.pk, self.user_two.pk, self.user_three.pk],
             self.speaker_list.order_list,
         )
-        speaker_four = self.speaker_list.speaker_items.create(user=self.user_four)
+        self.speaker_list.speaker_items.create(user=self.user_four)
         self.speaker_list.reorder()
         self.assertEqual(
             [self.user_one.pk, self.user_four.pk, self.user_two.pk, self.user_three.pk],
             self.speaker_list.order_list,
         )
-        speaker_five = self.speaker_list.speaker_items.create(user=self.user_five)
+        self.speaker_list.speaker_items.create(user=self.user_five)
         self._mk_previous_spoken(self.user_five, 1)
         self.speaker_list.reorder()
         self.assertEqual(
@@ -168,7 +168,7 @@ class PriorityTests(TestCase):
             ],
             self.speaker_list.order_list,
         )
-        speaker_six = self.speaker_list.speaker_items.create(user=self.user_six)
+        self.speaker_list.speaker_items.create(user=self.user_six)
         self._mk_previous_spoken(self.user_six, 2)
         self.speaker_list.reorder()
         self.assertEqual(

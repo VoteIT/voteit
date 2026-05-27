@@ -391,7 +391,7 @@ class SocialIntegrationTests(APITestCase):
     @responses.activate
     def test_inherit_other_users_and_identity_id_update(self):
         user = User.objects.create(username="adminer", email="admin@betahaus.net")
-        forgotten_user_wrong_org = User.objects.create(
+        User.objects.create(
             username="wrong_user", email="forgotten@betahaus.net", identity_id="def"
         )
         forgotten_user = self.organisation.users.create(

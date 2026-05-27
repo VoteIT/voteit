@@ -182,7 +182,7 @@ class MeetingGroupTests(TestCase):
         voter_one = self.organisation.users.create(username="one")
         voter_two = self.organisation.users.create(username="two")
         member_one = group.memberships.create(user=voter_one, votes=1)
-        member_two = group.memberships.create(user=voter_two, votes=1)
+        group.memberships.create(user=voter_two, votes=1)
         group.votes = 2
         group.save()
         member_one.refresh_from_db()

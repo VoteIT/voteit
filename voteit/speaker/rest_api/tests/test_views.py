@@ -363,7 +363,6 @@ class SpeakerListSystemViewTests(APITestCase):
         data = response.json()
         self.assertEqual(response.status_code, 201, data)
         self.assertIn("room", data)
-        system = self.meeting.speaker_systems.get(pk=response.data.get("pk"))
         self.assertEqual(room.pk, data["room"])
 
     def test_create_bad_users(self):

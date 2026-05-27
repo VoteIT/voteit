@@ -1,2 +1,2 @@
 def register():
-    from . import views
+    from . import views  # noqa: F401

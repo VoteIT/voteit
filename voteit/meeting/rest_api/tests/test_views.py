@@ -559,7 +559,7 @@ class MeetingGroupViewSetTests(APITestCase):
             func(*params)
 
     def test_delete_with_related_proposal(self):
-        prop = self.meeting_group.proposals.create()
+        self.meeting_group.proposals.create()
         self.client.force_login(self.moderator)
         url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
         response = self.client.delete(url)
@@ -1341,7 +1341,7 @@ class ExportParticipantsViewSetTests(APITestCase):
         cls.meeting = Meeting.objects.get(pk=1)
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
-        int_user = cls.meeting.participants.create(
+        cls.meeting.participants.create(
             username="hao", first_name="Özgür", last_name="好"
         )
 

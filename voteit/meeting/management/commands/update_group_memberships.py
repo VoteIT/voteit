@@ -29,7 +29,7 @@ class Command(BaseCommand):
             else:
                 cwd = os.getcwd()
                 filepath = os.path.join(cwd, filename)
-            logger.debug("Loading data from file: %" % filepath)
+            logger.debug("Loading data from file: %s" % filepath)
             with open(filepath, "r") as f:
                 data = f.readlines()
         else:

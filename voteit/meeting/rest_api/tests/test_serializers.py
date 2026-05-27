@@ -242,7 +242,7 @@ class MeetingRolesSerializerTests(TestCase):
         qs = MeetingRoles.objects.prefetch_related("user")
         serializer = self._cut(instance=qs, many=True)
         with self.assertNumQueries(2):
-            data = serializer.data
+            _ = serializer.data
 
 
 class MeetingGroupRelatedSerializersTests(TestCase):

@@ -153,7 +153,7 @@ class AppStateTests(TestCase):
             pk=self.room.pk,
             channel_type=RoomChannel.name,
         )
-        with MessageCatcher(Subscribed) as messages:
+        with MessageCatcher(Subscribed):
             command.run_job()
 
     def test_system_and_roles_sent_to_meeting(self):
@@ -436,7 +436,7 @@ class SendStateChangesTestsTests(TestCase):
     def test_room_channel_ignores_list_added(self):
         with ChannelMessageCatcher(RoomChannel, SpeakerListAdded) as messages:
             with self.captureOnCommitCallbacks(execute=True):
-                new_list = self.ai.speaker_lists.create(speaker_system=self.system)
+                self.ai.speaker_lists.create(speaker_system=self.system)
         self.assertEqual(0, len(messages))
 
     def test_room_channel_receives_list_changed_if_active(self):

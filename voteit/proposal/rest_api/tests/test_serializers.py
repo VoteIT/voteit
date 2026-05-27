@@ -356,7 +356,7 @@ class CreateTextDocumentSerializerTests(TestCase):
         )
         serializer.is_valid()
         self.assertFalse(serializer.errors)
-        instance = serializer.create(serializer.validated_data)
+        serializer.create(serializer.validated_data)
 
     def test_create_duplicate(self):
         serializer = self._cut(

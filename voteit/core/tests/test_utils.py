@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.test import TestCase
 
 from voteit.organisation.models import Organisation
 
@@ -36,9 +37,6 @@ evil_full_example = (
  </html>"""
     % evil_text_snippet
 )
-
-from django.test import TestCase
-
 
 class CleaningUtilsTests(TestCase):
     pass

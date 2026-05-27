@@ -36,7 +36,6 @@ def send_tags_updated(instance: ParticipantTags, created=False, **kwargs):
 
 @receiver(pre_delete, sender=ParticipantTags)
 def send_tags_removed(instance: ParticipantTags, **kwargs):
-    pk = instance.pk  # None in a while
     ch = MeetingChannel(instance.meeting_id)
     msg = ParticipantTagsChanged(
         user=instance.user_id,

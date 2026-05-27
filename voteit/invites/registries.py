@@ -194,8 +194,8 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
         """
         idx = self.get_user_data_idx(columns)
         for row in rows:
-            l = len(row)
-            yield {columns[i]: row[i] for i in idx if i < l and row[i]}
+            length = len(row)
+            yield {columns[i]: row[i] for i in idx if i < length and row[i]}
 
     def format_effect_rows(
         self, columns: list[str], rows: list[list[str | None | int]]

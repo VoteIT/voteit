@@ -179,7 +179,7 @@ class GenderAndPriorityTests(TestCase):
             self._pks_to_usernames(*self.speaker_list.order_list),
         )
         # Seven gets a valid priority gender
-        tags_seven = self.meeting.participant_tags.create(
+        self.meeting.participant_tags.create(
             user=self.user_seven, tags={GenderTags.namespace: "f"}
         )
         self.speaker_list.reorder()

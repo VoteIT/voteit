@@ -26,7 +26,7 @@ class ParticipantTagTests(TestCase):
         self.assertFalse(self.component.is_valid)
 
     def test_duplicate_constraint(self):
-        one = self.meeting.participant_tags.create(user=self.participant)
-        other = self.meeting.participant_tags.create(user=self.moderator)
+        self.meeting.participant_tags.create(user=self.participant)
+        self.meeting.participant_tags.create(user=self.moderator)
         with self.assertRaises(IntegrityError):
-            two = self.meeting.participant_tags.create(user=self.participant)
+            self.meeting.participant_tags.create(user=self.participant)

@@ -218,7 +218,7 @@ class PopulateJobTests(TestCase):
         )
         for i, has_log in ((0, True), (1, False), (2, True)):
             if has_log:
-                entry = self._do_job(date=today - timedelta(days=i))
+                self._do_job(date=today - timedelta(days=i))
             else:
                 with self.assertRaises(HistoryLog.DoesNotExist):
                     self._do_job(date=today - timedelta(days=i))

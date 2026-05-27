@@ -246,7 +246,7 @@ class UserViewSetTests(APITestCase):
     def test_logout(self):
         self.client.force_login(self.participant)
         url = reverse("user-logout")
-        response = self.client.post(url)
+        self.client.post(url)
 
     def test_email_choices(self):
         self.client.force_login(self.participant)

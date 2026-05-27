@@ -26,7 +26,7 @@ class ProposalTests(TestCase):
 
     def test_already_existing(self):
         other = self.meeting.participants.create(username="hello")
-        prop = self.ai.proposals.create(author=other, prop_id="jane-doe-1")
+        self.ai.proposals.create(author=other, prop_id="jane-doe-1")
         prop2 = self.ai.proposals.create(author=self.user)
         self.assertEqual("jane-doe-2", prop2.prop_id)
 

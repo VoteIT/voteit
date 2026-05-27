@@ -1,5 +1,5 @@
 def register():
-    from . import (
+    from . import (  # noqa: F401
         combined_simple,
         dutt,
         irv,

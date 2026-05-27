@@ -94,7 +94,6 @@ class MeetingSubscribedTests(TestCase):
         self.assertEqual(1, len(messages))
         response = messages[0]
         self.assertIsInstance(response, Subscribed)
-        pks = set()
         for msg in response.data.app_state:
             if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
                 break

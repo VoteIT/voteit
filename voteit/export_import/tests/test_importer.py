@@ -218,7 +218,6 @@ class ImporterTests(TestCase):
 
     def test_import_with_missing_user_blank(self):
         self.participant.delete()
-        import_dict = read_fixture("combined_meeting_fixture.yaml")
         fn = os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml")
         importer = self._cut(self.meeting, missing_user="blank")
         importer.from_file(fn)

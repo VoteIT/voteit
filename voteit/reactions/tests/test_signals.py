@@ -166,7 +166,7 @@ class SignalReactionTests(TestCase):
         from voteit.reactions.messages import ReactionCount
 
         self.assertFalse(mock_publish.called)
-        reaction = self._mk_reaction()
+        self._mk_reaction()
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ReactionCount)
         self.assertEqual(1, msg.data.count)

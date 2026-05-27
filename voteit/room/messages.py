@@ -73,7 +73,7 @@ class RoomMarkTextSchema(BaseModel):
     @validator("end", always=True)
     def validate_start_end(cls, v: int | None, values: dict):
         start = values.get("start")
-        if type(v) != type(start):
+        if type(v) is not type(start):
             raise ValueError("Both start and end must be a number or None")
         if isinstance(start, int) and not start < v:
             raise ValueError("end must be higher than start")

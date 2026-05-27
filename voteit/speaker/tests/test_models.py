@@ -54,7 +54,7 @@ class SpeakerTests(TestCase):
         self.assertEqual(1, speaker.seconds)
 
     def test_constraint_only_one_ongoing_speaker(self):
-        speaker = self.list.speaker_items.create(user=self.user, started=now())
+        self.list.speaker_items.create(user=self.user, started=now())
         speaker2 = self.list.speaker_items.create(user=self.user2)
         with self.assertRaises(IntegrityError) as cm:
             speaker2.started = now()
@@ -202,8 +202,8 @@ class SpeakerListSystemsTests(TestCase):
         one_user = User.objects.create(username="one")
         one_two = User.objects.create(username="two")
         one_list = self.system.speaker_lists.create()
-        speaker_one = one_list.speaker_items.create(user=one_user)
-        speaker_two = one_list.speaker_items.create(user=one_two, started=now())
+        one_list.speaker_items.create(user=one_user)
+        one_list.speaker_items.create(user=one_two, started=now())
         self.system.active_list = one_list
         self.system.save()
         self.system.archive()
