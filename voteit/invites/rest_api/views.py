@@ -264,6 +264,9 @@ class MeetingInviteViewSet(
         invite_result = InvitesResultSchema()
         annotation_results = []
 
+        all_ud_items = list(reg.build_ud_query_seq(columns, rows))
+        serializers._raise_if_conflicting_partials(meeting, all_ud_items)
+
         with transaction.atomic(durable=True):
             # Group rows by unique role combination and create invites per group
             indexed = sorted(enumerate(rows), key=lambda t: roles_per_row[t[0]])

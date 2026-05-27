@@ -135,6 +135,19 @@ def _pydantic_to_user_messages(exc: PydanticValidationError) -> list[str]:
     return messages
 
 
+def _raise_if_conflicting_partials(meeting, items: list[dict]) -> None:
+    _existing, conflicting = meeting.invites.find_mixed_user_data(*items)
+    if conflicting:
+        cols = ", ".join(conflicting.keys())
+        raise serializers.ValidationError(
+            _(
+                "Found existing invites matching only parts of a row. "
+                "Check for conflicting data in column(s): %(cols)s"
+            )
+            % {"cols": cols}
+        )
+
+
 def _raise_if_moderator_lockout(meeting, items: list[dict], roles: list[str]) -> None:
     if ROLE_MODERATOR not in roles:
         existing_qs, _conflicting = meeting.invites.find_mixed_user_data(*items)
@@ -277,6 +290,7 @@ class InviteCreateSerializer(serializers.Serializer):
         ud_items = [
             {k: v for k, v in item.items() if k in reg.user_data_keys} for item in data
         ]
+        _raise_if_conflicting_partials(attrs["meeting"], ud_items)
         _raise_if_moderator_lockout(attrs["meeting"], ud_items, attrs["roles"])
         return attrs
 

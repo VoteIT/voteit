@@ -559,6 +559,82 @@ class MeetingInviteViewSetCreateTests(APITestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_create_partial_match_updates_roles(self):
+        """Existing invite with {email, ssn} can be updated by posting email only."""
+        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+
+        multi_invite = self.meeting.invites.create(
+            user_data={"email": "multi@example.com", "swedish_ssn": "191212121212"},
+            roles=["pv"],
+        )
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [{"email": "multi@example.com"}],
+            }
+        )
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual(data["invites"]["changed"], 1)
+        multi_invite.refresh_from_db()
+        self.assertEqual(["pa"], multi_invite.roles)
+
+    def test_create_problematic_partial_match(self):
+        """Two DB invites sharing identity values in different combinations → 400."""
+        self.meeting.invites.create(
+            user_data={"email": "one@example.com", "swedish_ssn": "191212121212"},
+            roles=["pa"],
+        )
+        self.meeting.invites.create(
+            user_data={"email": "two@example.com", "swedish_ssn": "200001011234"},
+            roles=["pa"],
+        )
+        # This row would partially match both invites (email→two, ssn→one's invite)
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [{"email": "two@example.com", "swedish_ssn": "191212121212"}],
+            }
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_create_moderator_lockout(self):
+        """Importing without moderator role when existing moderators have accepted invites → 400."""
+        from voteit.invites.workflows import InviteWf
+        from voteit.meeting.roles import ROLE_MODERATOR
+
+        moderator = self.meeting.participants.get(username="moderator")
+        moderator.userid = "moderator"
+        moderator.save()
+        self.meeting.invites.create(
+            user_data={"email": "moderator@example.com"},
+            roles=["mo", "pa"],
+            used_by=moderator,
+            state=InviteWf.ACCEPTED,
+        )
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [{"email": "moderator@example.com"}],
+            }
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("moderator", response.json()["non_field_errors"][0])
+
+    def test_create_annotation_group_not_in_meeting(self):
+        """Annotation with a group ID that doesn't exist in the meeting → 400."""
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [{"email": "x@example.com", "group": "nonexistent-group"}],
+            }
+        )
+        self.assertEqual(response.status_code, 400)
+
 
 class MeetingInviteViewSetClearAnnotationsTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
