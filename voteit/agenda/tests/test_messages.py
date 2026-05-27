@@ -5,15 +5,12 @@ from envelope.messages.common import BatchMessage
 from envelope.messages.errors import BadRequestError
 from envelope.messages.errors import UnauthorizedError
 from envelope.testing import ChannelMessageCatcher
-from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.agenda.messages import AgendaChanged
 from voteit.agenda.messages import AgendaDeleted
 from voteit.agenda.messages import LastReadChangedSchema
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.models import LastRead
-from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.rest_api.serializers import LastReadSerializer
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.meeting.channels import MeetingChannel

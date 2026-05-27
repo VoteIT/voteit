@@ -565,7 +565,6 @@ class MeetingInviteViewSetCreateTests(APITestCase):
 
     def test_create_partial_match_updates_roles(self):
         """Existing invite with {email, ssn} can be updated by posting email only."""
-        from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 
         multi_invite = self.meeting.invites.create(
             user_data={"email": "multi@example.com", "swedish_ssn": "191212121212"},
@@ -607,7 +606,6 @@ class MeetingInviteViewSetCreateTests(APITestCase):
     def test_create_moderator_lockout(self):
         """Importing without moderator role when existing moderators have accepted invites → 400."""
         from voteit.invites.workflows import InviteWf
-        from voteit.meeting.roles import ROLE_MODERATOR
 
         moderator = self.meeting.participants.get(username="moderator")
         moderator.userid = "moderator"

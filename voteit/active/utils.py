@@ -6,7 +6,6 @@ from django.utils.timezone import now
 
 from envelope.models import Connection
 from voteit.active.components import ActiveUsersComponent
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:

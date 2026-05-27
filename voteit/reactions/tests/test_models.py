@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
-from django.db import models
 from django.test import TestCase
 
 from voteit.meeting.roles import ROLE_PARTICIPANT

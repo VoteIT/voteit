@@ -1,6 +1,4 @@
-from pprint import pprint
 
-import yaml
 from django.core.management import BaseCommand
 
 

@@ -1,7 +1,6 @@
 from logging import getLogger
 
 from django.contrib import admin
-from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.access_policy.app.policies import AutomaticAccess
 

@@ -1,4 +1,3 @@
-from django.test import RequestFactory
 from django.test import TestCase
 
 from voteit.access_policy.app.policies import AutomaticAccess

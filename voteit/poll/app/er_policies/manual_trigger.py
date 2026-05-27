@@ -5,7 +5,6 @@ from django.utils.translation import gettext_lazy as _
 from voteit.active.utils import active_enabled_for_meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.abcs import ElectoralRegisterPolicy
-from voteit.poll.models import Poll
 from voteit.poll.registries import er_policy
 
 __all__ = ("ManualTrigger",)

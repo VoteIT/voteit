@@ -2,7 +2,6 @@ from logging import getLogger
 
 from django.conf import settings
 from rest_framework import HTTP_HEADER_ENCODING
-from rest_framework.authentication import get_authorization_header
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import BasePermission
 

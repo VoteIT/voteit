@@ -5,7 +5,6 @@ from django.test import TestCase
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import Meeting
 from voteit.room.models import Room
-from voteit.speaker.models import SpeakerListSystem
 
 User = get_user_model()
 

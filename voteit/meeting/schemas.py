@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from pydantic import Field
 from pydantic import conint
 from pydantic import conlist
 from pydantic import constr

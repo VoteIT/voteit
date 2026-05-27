@@ -1,9 +1,7 @@
 from envelope.core import Message
 from pydantic.main import BaseModel
 
-from voteit.meeting.models import Meeting
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.base import BaseObjectChanged
 
 
 class ParticipantTagsSchema(BaseModel):

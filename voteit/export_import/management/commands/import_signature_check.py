@@ -38,7 +38,7 @@ class Command(BaseCommand):
             try:
                 verify_file(filename)
                 self.stdout.write(self.style.SUCCESS("Signature is valid"))
-            except SignatureVerificationFailed as exc:
+            except SignatureVerificationFailed:
                 self.stdout.write(
                     self.style.ERROR(
                         f"Signature invalid, should be {file_signature(filename)}"

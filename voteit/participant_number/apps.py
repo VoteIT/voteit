@@ -8,5 +8,5 @@ class PNConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self):
-        from voteit.participant_number import signals
-        from voteit.participant_number import messages
+        from voteit.participant_number import signals  # noqa
+        from voteit.participant_number import messages  # noqa

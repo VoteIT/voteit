@@ -2,17 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.utils.translation import gettext_lazy as _
 from pydantic import conint
 from pydantic import validator
 from pydantic.main import BaseModel
 
-from voteit.invites.abcs import AnnotationDataAdapter
-from voteit.invites.registries import invite_adapter_registry
 
 if TYPE_CHECKING:
-    from django.db.models import QuerySet
-    from voteit.invites.models import MeetingInvite
+    pass
 
 
 class ParticipantNumberSchema(BaseModel):

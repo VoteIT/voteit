@@ -3,7 +3,6 @@ from contextlib import suppress
 from typing import TYPE_CHECKING
 from typing import TypeVar
 
-from pydantic.main import BaseModel
 from django.db import models
 from typing import Generator
 
@@ -34,6 +33,7 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
         self, key: str, factory: type[InviteUserDataAdapter | AnnotationDataAdapter]
     ):
         """
+        >>> from pydantic.main import BaseModel
         >>> testing_reg = InviteAdapterRegistry(InviteDataAdapter)
 
         >>> class HelloSchema(BaseModel):

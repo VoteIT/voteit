@@ -11,7 +11,7 @@ from voteit.invites.registries import invite_adapter_registry
 
 
 if TYPE_CHECKING:
-    from voteit.invites.models import MeetingInvite
+    pass
 
 
 class EmailSchema(BaseModel):

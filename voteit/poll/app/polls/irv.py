@@ -16,9 +16,7 @@ from voteit.poll.app.polls.ranked import AddRankedVote
 from voteit.poll.app.polls.scottish_stv import STVResultSchema
 from voteit.poll.app.polls.scottish_stv import ScottishSTV
 from voteit.poll.exceptions import InvalidProposalCount
-from voteit.poll.messages import AddVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import AddRankedVoteSchema
 
 __all__ = ("IRV",)
 

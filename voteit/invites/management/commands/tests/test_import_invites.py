@@ -61,7 +61,6 @@ class ImportInvitesCommandTests(TestCase):
         self.assertIn("DRY RUN", out)
 
     def test_roles_updated_for_accepted_invite(self):
-        from voteit.meeting.roles import ROLE_PROPOSER
 
         invite = self.meeting.invites.create(
             user_data={"email": "a@betahaus.net"}, roles=[ROLE_PARTICIPANT]
