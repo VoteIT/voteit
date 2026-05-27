@@ -69,8 +69,6 @@ This fixture (`voteit/core/fixtures/meeting_test_fixture.yaml`) creates one orga
 `voteit/core/testing.py` has several helpers worth knowing:
 
 - `run_permission_tests(view, cases)` — runs a list of `(user, expected_status)` pairs against a view, so permission matrix tests stay concise.
-- `FakeCommit` — context manager that fires `on_commit` callbacks immediately, useful for testing signals.
-- `SetSeed(n)` — makes random operations deterministic within a block.
 
 ### Narrative doctests
 
@@ -114,11 +112,11 @@ Organisation → Meeting → AgendaItem → Proposal / Poll / DiscussionPost
 
 Abstract base classes enforce this:
 
-| Mixin                 | Properties provided                         |
-| --------------------- | ------------------------------------------- |
-| `OrganisationContext` | `.organisation`                             |
-| `MeetingContext`      | `.organisation`, `.meeting`                 |
-| `AgendaItemContext`   | `.organisation`, `.meeting`, `.agenda_item` |
+| Mixin                 | Properties provided                   |
+| --------------------- | ------------------------------------- |
+| `OrganisationContext` | `.organisation`                       |
+| `MeetingContext`      | `.meeting`                |
+| `AgendaItemContext`   | `.agenda_item` |
 
 ### State machines (django-fsm)
 
