@@ -301,6 +301,20 @@ def relaxed_clean_html(text: str):
     return adjust_nl_and_spaces(text)
 
 
+def strip_html(text: str) -> str:
+    """
+    Strip all HTML tags, keeping only plain text. Use for fields that must never contain markup.
+
+    >>> strip_html('<script>alert(1)</script>Hello')
+    'Hello'
+    >>> strip_html('<b>bold</b> and <i>italic</i>')
+    'bold and italic'
+    >>> strip_html('plain text')
+    'plain text'
+    """
+    return nh3.clean(text, tags=set(), attributes={})
+
+
 def get_content_registry() -> ContentRegistry:
     from .registries import content_types
 

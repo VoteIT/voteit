@@ -17,7 +17,9 @@ from rules.contrib.models import RulesModelMixin
 
 from voteit.core import PERM
 from voteit.core.abcs import AgendaItemContext, MeetingContext
+from voteit.core.fields import RichTextField
 from voteit.core.models import BaseContent
+from voteit.core.utils import strip_html
 from voteit.proposal import PERM_RETRACT
 from voteit.proposal.workflows import ProposalWf
 from voteit.reactions.mixins import Reactable
@@ -221,7 +223,7 @@ class TextDocument(RulesModelMixin, AgendaItemContext, MeetingContext):
     _should_refresh: bool = False
     _original_body: str
     title: str = models.CharField(max_length=100, default="")
-    body: str = models.TextField(default="")
+    body: str = RichTextField(blank=True, default="", html_cleaner=strip_html)
     base_tag: str = models.CharField(max_length=40)
     created: datetime = models.DateTimeField(editable=False, default=now)
     modified: datetime = models.DateTimeField(editable=False, auto_now=True)
