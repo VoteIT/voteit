@@ -543,6 +543,29 @@ class MeetingInviteViewSetCreateTests(APITestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_create_skips_empty_rows(self):
+        # Empty dicts and whitespace-only rows (e.g. pasted from Excel) are skipped.
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [
+                    {},
+                    {"email": "real@example.com"},
+                    {"email": "   ", "group": "\t"},
+                    {},
+                ],
+            }
+        )
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertEqual(data["invites"]["added"], 1)
+        self.assertTrue(
+            self.meeting.invites.filter(
+                user_data={"email": "real@example.com"}
+            ).exists()
+        )
+
     def test_create_invalid_annotation_key(self):
         response = self._post(
             {

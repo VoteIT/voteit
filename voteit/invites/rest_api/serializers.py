@@ -209,7 +209,7 @@ class InviteCreateSerializer(serializers.Serializer):
     meeting = ModeratorMeetingField()
     roles = serializers.ListField(child=serializers.CharField(), min_length=1)
     data = serializers.ListField(
-        child=serializers.DictField(child=serializers.CharField()),
+        child=serializers.DictField(child=serializers.CharField(allow_blank=True)),
         min_length=1,
         max_length=1000,
     )
@@ -226,8 +226,8 @@ class InviteCreateSerializer(serializers.Serializer):
         reg = get_invite_adapter_registry()
         normalised = []
         for i, item in enumerate(v):
-            if not item:
-                raise serializers.ValidationError(f"Item {i + 1} is empty.")
+            if not item or all(not val.strip() for val in item.values()):
+                continue
             if not any(k in reg.user_data_keys for k in item):
                 raise serializers.ValidationError(
                     f"Item {i + 1} has no identity field (e.g. email)."
