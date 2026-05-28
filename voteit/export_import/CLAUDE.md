@@ -19,7 +19,7 @@ Note: `empty_sign.yaml` has a deliberately empty signature — it passes the val
 - `schemas.py` — Pydantic v1 schemas for all entities; context-aware validators control filtering; HTML sanitization on every text field
 - `utils.py` — HMAC-SHA256 signing/verification, `_NoAliasLoader`, `MAX_IMPORT_BYTES`, `MAX_UNSIGNED_IMPORT_BYTES`, `direct_clone()`
 - `exceptions.py` — `ImportFileError`, `SignatureVerificationFailed`
-- `rest_api/views.py` — `MeetingDataViewSet`: `GET /yaml/`, `POST /preview/`, `PUT /`
+- `rest_api/views.py` — `MeetingDataViewSet`: `GET /yaml/`, `POST /preview/`, `PUT /`, `POST /clone/`
 - `rest_api/serializers.py` — `ImportFileSerializer`, `ExportFileSerializer`, `ImportFileValidator` (size + signature check only)
 - `rest_api/lock.py` — `acquire_import_lock`, `release_import_lock`: per-session Redis lock preventing duplicate/concurrent imports
 - `management/commands/` — CLI: `export_meeting_structure`, `import_meeting_structure`, `import_signature_check`
@@ -68,12 +68,15 @@ Sanitization happens in Pydantic `@validator` methods (with `pre=True`) before t
 `PUT /meeting-data/{id}/` validates and runs `importer.run()` inside `transaction.atomic(durable=True)`, returning `200 OK` + the stats dict. Import is fully synchronous in the request thread.
 
 ### Per-session import lock
-`rest_api/lock.py` guards both `update()` and `preview()` against duplicate/concurrent submissions. Two Redis cache keys are used per session:
+`rest_api/lock.py` guards `update()`, `preview()`, and `clone()` against duplicate/concurrent submissions. Two Redis cache keys are used per session:
 
-- `import:processing:{session_key}` — held for up to 120 s while a request is running; acquired via `cache.add()` (atomic). Returns `409 Conflict` if already set.
-- `import:cooldown:{session_key}` — set for 5 s immediately after the processing key is released (in a `finally` block). Returns `429 Too Many Requests` if set.
+- `meeting_data:processing:{session_key}` — held for up to 120 s while a request is running; acquired via `cache.add()` (atomic). Returns `409 Conflict` if already set.
+- `meeting_data:cooldown:{session_key}` — set for 5 s immediately after the processing key is released (in a `finally` block). Returns `429 Too Many Requests` if set.
 
-The lock is acquired **after** `serializer.is_valid()` so ordinary validation errors (bad file, wrong format) bypass the lock entirely and never start a cooldown.
+The lock is acquired **after** `serializer.is_valid()` and source/target validation so ordinary validation errors bypass the lock entirely and never start a cooldown. All three endpoints share the same lock keys, so an in-flight import blocks a clone and vice versa.
+
+### Clone endpoint
+`POST /meeting-data/{pk}/clone/` clones meeting structure from a source meeting into the target meeting (the `pk` in the URL). Accepts JSON (uses `JSONParser` in addition to `MultiPartParser`). The target must be in `upcoming` state. The caller must be moderator of both the source and target meetings. Body: `{"source": <meeting_pk>, ...include/clear flags...}`. Returns the same stats dict as `PUT /`.
 
 ### model_to_schema registry
 `schemas.py` contains a `model_to_schema` dict mapping Django models → Pydantic schemas. This enables polymorphic serialization (e.g., `Proposal` vs `DiffProposal` use different schemas).

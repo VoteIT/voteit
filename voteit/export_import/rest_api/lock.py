@@ -13,11 +13,11 @@ class ImportCooldownActive(Exception):
 
 
 def _processing_key(session_key: str) -> str:
-    return f"import:processing:{session_key}"
+    return f"meeting_data:processing:{session_key}"
 
 
 def _cooldown_key(session_key: str) -> str:
-    return f"import:cooldown:{session_key}"
+    return f"meeting_data:cooldown:{session_key}"
 
 
 def acquire_import_lock(request):

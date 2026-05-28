@@ -7,6 +7,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FileUploadParser
+from rest_framework.parsers import JSONParser
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from yaml.reader import ReaderError
@@ -25,8 +26,10 @@ from voteit.export_import.rest_api.lock import ImportAlreadyRunning
 from voteit.export_import.rest_api.lock import ImportCooldownActive
 from voteit.export_import.rest_api.lock import acquire_import_lock
 from voteit.export_import.rest_api.lock import release_import_lock
+from voteit.export_import.rest_api.serializers import CloneSerializer
 from voteit.export_import.rest_api.serializers import ImportFileSerializer
 from voteit.export_import.rest_api.serializers import ExportFileSerializer
+from voteit.export_import.utils import direct_clone
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 
@@ -39,6 +42,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "preview": None,
         "yaml": None,
+        "clone": None,
     }
 
     def get_queryset(self):
@@ -138,6 +142,44 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
                 data=importer.stats().dict(),
                 status=status.HTTP_200_OK,
             )
+        finally:
+            release_import_lock(request)
+
+    @action(
+        methods=["POST"],
+        detail=True,
+        parser_classes=[JSONParser, MultiPartParser],
+    )
+    def clone(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not instance.is_upcoming:
+            raise ValidationError(
+                {"detail": "Target meeting must be in upcoming state."}
+            )
+        serializer = CloneSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        source = serializer.validated_data["source"]
+        clone_kwargs = {
+            k: v for k, v in serializer.validated_data.items() if k != "source"
+        }
+
+        try:
+            acquire_import_lock(request)
+        except ImportAlreadyRunning as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except ImportCooldownActive as exc:
+            return Response(
+                {"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        try:
+            importer = direct_clone(
+                source=source, target=instance, dry_run=False, **clone_kwargs
+            )
+            return Response(data=importer.stats().dict(), status=status.HTTP_200_OK)
+        except PydanticValidationError as exc:
+            raise pydantic_to_drf_validation_error(exc)
         finally:
             release_import_lock(request)
 

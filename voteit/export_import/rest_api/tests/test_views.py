@@ -345,6 +345,65 @@ class MeetingDataExportViewTests(APITestCase):
 
 
 @override_settings(EXPORT_SECRET_KEY="abcdefghijk")
+class CloneViewTests(APITestCase):
+    fixtures = ["meeting_test_fixture", "agenda_test_fixture", "full_ai_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.moderator = User.objects.get(username="moderator")
+        cls.meeting = Meeting.objects.get(pk=1)
+        cls.organisation = cls.meeting.organisation
+        cls.target_meeting = cls.organisation.meetings.create()
+        cls.target_meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+        cls.ongoing_meeting = cls.organisation.meetings.create(state="ongoing")
+        cls.ongoing_meeting.add_roles(cls.moderator, ROLE_MODERATOR)
+
+    def setUp(self):
+        self.client.force_login(self.moderator)
+        # Ensure a session key so lock tests work.
+        self.client.get(reverse("meeting-data-list"))
+        self.session_key = self.client.session.session_key
+
+    def tearDown(self):
+        if self.session_key:
+            cache.delete(_processing_key(self.session_key))
+            cache.delete(_cooldown_key(self.session_key))
+
+    def test_clone_success(self):
+        url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})
+        response = self.client.post(
+            url, data={"source": self.meeting.pk}, format="json"
+        )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        data = response.json()
+        self.assertGreater(data["agenda_items"], 0)
+        self.assertIsNone(cache.get(_processing_key(self.session_key)))
+        self.assertIsNotNone(cache.get(_cooldown_key(self.session_key)))
+
+    def test_clone_target_not_upcoming_rejected(self):
+        url = reverse("meeting-data-clone", kwargs={"pk": self.ongoing_meeting.pk})
+        response = self.client.post(
+            url, data={"source": self.meeting.pk}, format="json"
+        )
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertIn("upcoming", response.json()["detail"])
+
+    def test_clone_unknown_source_rejected(self):
+        url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})
+        response = self.client.post(url, data={"source": 99999}, format="json")
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertIn("source", response.json())
+
+    def test_clone_blocked_by_processing_lock(self):
+        cache.add(_processing_key(self.session_key), 1, 60)
+        url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})
+        response = self.client.post(
+            url, data={"source": self.meeting.pk}, format="json"
+        )
+        self.assertEqual(status.HTTP_409_CONFLICT, response.status_code)
+
+
+@override_settings(EXPORT_SECRET_KEY="abcdefghijk")
 class ImportLockTests(APITestCase):
     fixtures = ["meeting_test_fixture"]
 

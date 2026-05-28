@@ -6,6 +6,7 @@ from voteit.export_import.exceptions import SignatureVerificationFailed
 from voteit.export_import.utils import MAX_IMPORT_BYTES
 from voteit.export_import.utils import MAX_UNSIGNED_IMPORT_BYTES
 from voteit.export_import.utils import verify_stream
+from voteit.meeting.rest_api.fields import ModeratorMeetingField
 
 
 class ImportFileValidator:
@@ -75,3 +76,9 @@ class ExportFileSerializer(serializers.Serializer):
     include_buttons = fields.BooleanField(default=True)
     include_reactions = fields.BooleanField(default=False)
     # Don't allow notes here!
+
+
+class CloneSerializer(ExportFileSerializer):
+    source = ModeratorMeetingField()
+    add_participants = fields.BooleanField(default=False)
+    use_existing_groups = fields.BooleanField(default=True)
