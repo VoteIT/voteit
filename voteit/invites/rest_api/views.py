@@ -28,7 +28,6 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.utils import get_idproxy_user_data
 
-
 logger = getLogger(__name__)
 
 
@@ -56,6 +55,7 @@ class MeetingInviteViewSet(
         "import_invites": None,
         "clear_annotations": None,
     }
+    serializer_class = serializers.InviteCreateSerializer
 
     def get_queryset(self):
         """
