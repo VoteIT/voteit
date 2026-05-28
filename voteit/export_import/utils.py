@@ -105,7 +105,7 @@ def file_signature(fn):
     >>> from voteit.export_import.tests import FIXTURES_DIR
     >>> with override_settings(EXPORT_SECRET_KEY="abcdefghijk"):
     ...     file_signature(f"{FIXTURES_DIR}/ais_and_groups.yaml")
-    '81026901d5d0caa5c9114d301522c05809b69734aa53c5ffa423e6e7ef0bf5ba'
+    'c3f9fb1ed798735911f04bb3db6df72fff04550aa03395222ff6ccde3fd8cf15'
     """
     with open(fn, "r") as stream:
         return stream_signature(stream)
