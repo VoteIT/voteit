@@ -156,6 +156,7 @@ class DetectAndParseFileTests(TestCase):
 
     def test_file_too_large_raises(self):
         from voteit.invites.rest_api.import_utils import MAX_UPLOAD_BYTES
+
         raw = b"email\n" + b"a@b.com\n" * (MAX_UPLOAD_BYTES // 8)
         with self.assertRaises(ValueError) as cm:
             detect_and_parse_file(raw)
@@ -165,6 +166,7 @@ class DetectAndParseFileTests(TestCase):
         """A ZIP with a single XML entry larger than the per-entry limit must be rejected."""
         from voteit.invites.rest_api.import_utils import _MAX_XML_ENTRY_BYTES
         import zipfile as zf_mod
+
         buf = io.BytesIO()
         # Write a fake XLSX structure with an oversized sharedStrings entry
         with zf_mod.ZipFile(buf, "w", compression=zf_mod.ZIP_STORED) as zf:
@@ -455,6 +457,84 @@ class ImportFileFormatTests(APITestCase):
             URL, {"meeting": self.meeting.pk, "file": f}, format="multipart"
         )
         self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+
+
+# ---------------------------------------------------------------------------
+# Roles-column + empty-row fixture tests
+# ---------------------------------------------------------------------------
+
+
+class ImportRolesWithEmptyRowsTests(APITestCase):
+    """
+    roles_with_empty_rows.tsv is a CRLF tab-separated file that simulates a
+    copy-paste from Excel:
+      - header: email, roles, group
+      - vader: mo role, sw group
+      - (empty row — tabs only)
+      - luke: no explicit role (→ participant), sw group
+      - (blank line)
+      - din: pv role, sw group
+      - (whitespace-only row — spaces + tabs)
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org: Organisation = Organisation.objects.create()
+        cls.meeting: Meeting = cls.org.meetings.create()
+        cls.moderator = cls.org.users.create(username="mod", email="mod@x.com")
+        cls.meeting.add_roles(cls.moderator, "mo", "pa")
+        cls.group_sw = cls.meeting.groups.create(groupid="sw")
+
+    def setUp(self):
+        self.client.force_login(self.moderator)
+
+    def _post(self, dryrun: bool = False) -> dict:
+        f = fixture_file("roles_with_empty_rows.tsv")
+        data = {"meeting": self.meeting.pk, "file": f}
+        if dryrun:
+            data["dryrun"] = "true"
+        response = self.client.post(URL, data, format="multipart")
+        self.assertEqual(HTTPStatus.OK, response.status_code, response.json())
+        return response.json()
+
+    def test_empty_rows_are_ignored_and_three_invites_created(self):
+        data = self._post()
+        self.assertEqual(3, data["invites"]["added"])
+
+    def test_vader_gets_moderator_and_participant_roles(self):
+        self._post()
+        vader = MeetingInvite.objects.get(
+            meeting=self.meeting, user_data__email="vader@betahaus.net"
+        )
+        self.assertEqual(["mo", "pa"], vader.roles)
+
+    def test_luke_gets_only_participant_role(self):
+        self._post()
+        luke = MeetingInvite.objects.get(
+            meeting=self.meeting, user_data__email="luke@betahaus.net"
+        )
+        self.assertEqual(["pa"], luke.roles)
+
+    def test_din_gets_potential_voter_and_participant_roles(self):
+        self._post()
+        din = MeetingInvite.objects.get(
+            meeting=self.meeting, user_data__email="din@betahaus.net"
+        )
+        self.assertEqual(["pa", "pv"], din.roles)
+
+    def test_group_annotations_created_for_all_rows(self):
+        data = self._post()
+        self.assertEqual(3, data["annotations"][0]["added"])
+        self.assertEqual(
+            3,
+            MeetingGroupAnnotation.objects.filter(meeting_group=self.group_sw).count(),
+        )
+
+    def test_dryrun_does_not_persist(self):
+        data = self._post(dryrun=True)
+        self.assertTrue(data["dryrun"])
+        self.assertEqual(3, data["invites"]["added"])
+        self.assertFalse(MeetingInvite.objects.filter(meeting=self.meeting).exists())
 
 
 # ---------------------------------------------------------------------------
