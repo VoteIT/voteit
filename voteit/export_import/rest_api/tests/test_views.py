@@ -11,6 +11,8 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.proposal.models import Proposal
 from voteit.export_import.tests import FIXTURES_DIR
+from voteit.export_import.utils import MAX_IMPORT_BYTES
+from voteit.export_import.utils import MAX_UNSIGNED_IMPORT_BYTES
 from voteit.export_import.utils import sign_payload
 
 User = get_user_model()
@@ -37,13 +39,15 @@ class MeetingDataImportViewTests(APITestCase):
         )
 
     def test_junk_file(self):
+        # A small file with no sign header is allowed through the validator but
+        # rejected because it isn't valid YAML key-value data.
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with open(os.path.join(FIXTURES_DIR, "junk.txt"), "rb") as f:
             response = self.client.put(url, data={"file": f}, format="multipart")
         self.assertContains(
             response,
-            "Signature isn't valid for this file",
+            "Import file malformed",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -70,14 +74,33 @@ class MeetingDataImportViewTests(APITestCase):
         )
 
     def test_empty_sign(self):
+        # A small file with an empty/invalid signature is allowed through the
+        # validator (below the unsigned size limit). The import then fails because
+        # the file contains no agenda items or groups.
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with open(os.path.join(FIXTURES_DIR, "empty_sign.yaml"), "rb") as f:
             response = self.client.put(url, data={"file": f}, format="multipart")
         self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
         self.assertEqual(
-            {"file": ["Signature isn't valid for this file."]},
+            {"file": ["File doesn't contain any agenda items or groups"]},
             response.json(),
+        )
+
+    def test_unsigned_file_too_large_rejected(self):
+        # A file without a valid signature that exceeds MAX_UNSIGNED_IMPORT_BYTES
+        # must be rejected before any parsing takes place.
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        oversized = b"x" * (MAX_UNSIGNED_IMPORT_BYTES + 1)
+        with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp:
+            tmp.write(oversized)
+            tmp.seek(0)
+            response = self.client.put(url, data={"file": tmp}, format="multipart")
+        self.assertContains(
+            response,
+            "Unsigned file too large",
+            status_code=status.HTTP_400_BAD_REQUEST,
         )
 
     def test_ais_and_groups(self):
@@ -193,6 +216,23 @@ class MeetingDataImportViewTests(APITestCase):
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
+    def test_preview_unsigned_file_reports_lower_limit(self):
+        # A small unsigned file is accepted; preview reports signature_valid=False
+        # and the tighter unsigned size_limit.
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-preview", kwargs={"pk": self.meeting.pk})
+        unsigned_yaml = (
+            b"meta:\n  version: 1\nagenda_items:\n  - title: Hi\n    body: ''\n"
+        )
+        with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp:
+            tmp.write(unsigned_yaml)
+            tmp.seek(0)
+            response = self.client.post(url, data={"file": tmp}, format="multipart")
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        data = response.json()
+        self.assertFalse(data["signature_valid"])
+        self.assertEqual(MAX_UNSIGNED_IMPORT_BYTES, data["size_limit"])
+
     def test_yaml_alias_rejected_on_preview(self):
         alias_yaml = "a: &anchor value\nb: *anchor\n"
         self.client.force_login(self.moderator)
@@ -232,6 +272,9 @@ class MeetingDataImportViewTests(APITestCase):
             },
             data["agenda_items"][0],
         )
+        # Signature metadata
+        self.assertTrue(data["signature_valid"])
+        self.assertEqual(MAX_IMPORT_BYTES, data["size_limit"])
 
 
 @override_settings(EXPORT_SECRET_KEY="abcdefghijk")

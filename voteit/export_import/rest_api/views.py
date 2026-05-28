@@ -16,6 +16,8 @@ from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.utils import pydantic_to_drf_validation_error
 from voteit.export_import.exceptions import ImportFileError
 from voteit.export_import.exceptions import SignatureVerificationFailed
+from voteit.export_import.utils import MAX_IMPORT_BYTES
+from voteit.export_import.utils import MAX_UNSIGNED_IMPORT_BYTES
 from voteit.export_import.utils import sign_payload
 from voteit.export_import.exporter import Exporter
 from voteit.export_import.importer import Importer
@@ -54,17 +56,26 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             context={"meeting": instance, "request": request},
         )
         serializer.is_valid(raise_exception=True)
+        file_obj = request.data["file"]
+        signature_valid = getattr(file_obj, "_signature_valid", False)
         try:
             importer = Importer(
-                instance, **{k: v for k, v in serializer.data.items() if k != "file"}
+                instance,
+                verify=False,
+                **{k: v for k, v in serializer.data.items() if k != "file"},
             )
-            importer.from_stream(request.data["file"])
+            importer.from_stream(file_obj)
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
         except (ImportFileError, SignatureVerificationFailed, ReaderError) as exc:
             raise ValidationError(str(exc))
+        size_limit = MAX_IMPORT_BYTES if signature_valid else MAX_UNSIGNED_IMPORT_BYTES
         return Response(
-            data=importer.data.dict(exclude_unset=True, exclude={"meta", "sign"}),
+            data={
+                **importer.data.dict(exclude_unset=True, exclude={"meta", "sign"}),
+                "signature_valid": signature_valid,
+                "size_limit": size_limit,
+            },
             status=status.HTTP_200_OK,
         )
 
@@ -75,11 +86,14 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             context={"meeting": instance, "request": request},
         )
         serializer.is_valid(raise_exception=True)
+        file_obj = request.data["file"]
         try:
             importer = Importer(
-                instance, **{k: v for k, v in serializer.data.items() if k != "file"}
+                instance,
+                verify=False,
+                **{k: v for k, v in serializer.data.items() if k != "file"},
             )
-            importer.from_stream(request.data["file"])
+            importer.from_stream(file_obj)
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
         except (ImportFileError, SignatureVerificationFailed, ReaderError) as exc:

@@ -13,7 +13,8 @@ from voteit.export_import.exceptions import SignatureVerificationFailed
 if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
 
-MAX_IMPORT_BYTES = 2 * 1024 * 1024  # 2 MB
+MAX_IMPORT_BYTES = 2 * 1024 * 1024  # 2 MB — signed files
+MAX_UNSIGNED_IMPORT_BYTES = 300 * 1024  # 300 KB — unsigned / unverified files
 
 
 class _NoAliasLoader(yaml.SafeLoader):

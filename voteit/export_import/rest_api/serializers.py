@@ -4,6 +4,7 @@ from rest_framework.exceptions import ValidationError
 
 from voteit.export_import.exceptions import SignatureVerificationFailed
 from voteit.export_import.utils import MAX_IMPORT_BYTES
+from voteit.export_import.utils import MAX_UNSIGNED_IMPORT_BYTES
 from voteit.export_import.utils import verify_stream
 
 
@@ -11,17 +12,24 @@ class ImportFileValidator:
     requires_context = False
 
     def __call__(self, value):
+        # Hard ceiling — refuse anything larger regardless of signature.
         if value.size > MAX_IMPORT_BYTES:
             raise ValidationError(
                 f"File too large (max {MAX_IMPORT_BYTES // (1024 * 1024)} MB)"
             )
         try:
             verify_stream(value)
+            value._signature_valid = True
         except SignatureVerificationFailed:
-            raise ValidationError(
-                "Signature isn't valid for this file.", code="invalid_sign"
-            )
-        value.seek(0)  # Reset!
+            value._signature_valid = False
+            # Unsigned files get a tighter size cap to limit DoS surface.
+            if value.size > MAX_UNSIGNED_IMPORT_BYTES:
+                raise ValidationError(
+                    f"Unsigned file too large "
+                    f"(max {MAX_UNSIGNED_IMPORT_BYTES // 1024} KB). "
+                    f"Use a signed VoteIT export for larger imports."
+                )
+        value.seek(0)
 
 
 class ImportFileSerializer(serializers.Serializer):
