@@ -21,6 +21,10 @@ from voteit.export_import.utils import MAX_UNSIGNED_IMPORT_BYTES
 from voteit.export_import.utils import sign_payload
 from voteit.export_import.exporter import Exporter
 from voteit.export_import.importer import Importer
+from voteit.export_import.rest_api.lock import ImportAlreadyRunning
+from voteit.export_import.rest_api.lock import ImportCooldownActive
+from voteit.export_import.rest_api.lock import acquire_import_lock
+from voteit.export_import.rest_api.lock import release_import_lock
 from voteit.export_import.rest_api.serializers import ImportFileSerializer
 from voteit.export_import.rest_api.serializers import ExportFileSerializer
 from voteit.meeting.models import Meeting
@@ -56,28 +60,43 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             context={"meeting": instance, "request": request},
         )
         serializer.is_valid(raise_exception=True)
-        file_obj = request.data["file"]
-        signature_valid = getattr(file_obj, "_signature_valid", False)
+
         try:
-            importer = Importer(
-                instance,
-                verify=False,
-                **{k: v for k, v in serializer.data.items() if k != "file"},
+            acquire_import_lock(request)
+        except ImportAlreadyRunning as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except ImportCooldownActive as exc:
+            return Response(
+                {"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS
             )
-            importer.from_stream(file_obj)
-        except PydanticValidationError as exc:
-            raise pydantic_to_drf_validation_error(exc)
-        except (ImportFileError, SignatureVerificationFailed, ReaderError) as exc:
-            raise ValidationError(str(exc))
-        size_limit = MAX_IMPORT_BYTES if signature_valid else MAX_UNSIGNED_IMPORT_BYTES
-        return Response(
-            data={
-                **importer.data.dict(exclude_unset=True, exclude={"meta", "sign"}),
-                "signature_valid": signature_valid,
-                "size_limit": size_limit,
-            },
-            status=status.HTTP_200_OK,
-        )
+
+        try:
+            file_obj = request.data["file"]
+            signature_valid = getattr(file_obj, "_signature_valid", False)
+            try:
+                importer = Importer(
+                    instance,
+                    verify=False,
+                    **{k: v for k, v in serializer.data.items() if k != "file"},
+                )
+                importer.from_stream(file_obj)
+            except PydanticValidationError as exc:
+                raise pydantic_to_drf_validation_error(exc)
+            except (ImportFileError, SignatureVerificationFailed, ReaderError) as exc:
+                raise ValidationError(str(exc))
+            size_limit = (
+                MAX_IMPORT_BYTES if signature_valid else MAX_UNSIGNED_IMPORT_BYTES
+            )
+            return Response(
+                data={
+                    **importer.data.dict(exclude_unset=True, exclude={"meta", "sign"}),
+                    "signature_valid": signature_valid,
+                    "size_limit": size_limit,
+                },
+                status=status.HTTP_200_OK,
+            )
+        finally:
+            release_import_lock(request)
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -86,28 +105,41 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             context={"meeting": instance, "request": request},
         )
         serializer.is_valid(raise_exception=True)
-        file_obj = request.data["file"]
+
         try:
-            importer = Importer(
-                instance,
-                verify=False,
-                **{k: v for k, v in serializer.data.items() if k != "file"},
+            acquire_import_lock(request)
+        except ImportAlreadyRunning as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except ImportCooldownActive as exc:
+            return Response(
+                {"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS
             )
-            importer.from_stream(file_obj)
-        except PydanticValidationError as exc:
-            raise pydantic_to_drf_validation_error(exc)
-        except (ImportFileError, SignatureVerificationFailed, ReaderError) as exc:
-            raise ValidationError(str(exc))
-        if not (importer.data.groups or importer.data.agenda_items):
-            raise ValidationError(
-                {"file": ["File doesn't contain any agenda items or groups"]}
+
+        try:
+            file_obj = request.data["file"]
+            try:
+                importer = Importer(
+                    instance,
+                    verify=False,
+                    **{k: v for k, v in serializer.data.items() if k != "file"},
+                )
+                importer.from_stream(file_obj)
+            except PydanticValidationError as exc:
+                raise pydantic_to_drf_validation_error(exc)
+            except (ImportFileError, SignatureVerificationFailed, ReaderError) as exc:
+                raise ValidationError(str(exc))
+            if not (importer.data.groups or importer.data.agenda_items):
+                raise ValidationError(
+                    {"file": ["File doesn't contain any agenda items or groups"]}
+                )
+            with transaction.atomic(durable=True):
+                importer.run()
+            return Response(
+                data=importer.stats().dict(),
+                status=status.HTTP_200_OK,
             )
-        with transaction.atomic(durable=True):
-            importer.run()
-        return Response(
-            data=importer.stats().dict(),
-            status=status.HTTP_200_OK,
-        )
+        finally:
+            release_import_lock(request)
 
     @action(
         methods=["GET"],

@@ -2,6 +2,7 @@ import os
 import tempfile
 
 import yaml
+from django.core.cache import cache
 from django.test import override_settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -11,6 +12,8 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.proposal.models import Proposal
 from voteit.export_import.tests import FIXTURES_DIR
+from voteit.export_import.rest_api.lock import _cooldown_key
+from voteit.export_import.rest_api.lock import _processing_key
 from voteit.export_import.utils import MAX_IMPORT_BYTES
 from voteit.export_import.utils import MAX_UNSIGNED_IMPORT_BYTES
 from voteit.export_import.utils import sign_payload
@@ -339,3 +342,54 @@ class MeetingDataExportViewTests(APITestCase):
             },
             data,
         )
+
+
+@override_settings(EXPORT_SECRET_KEY="abcdefghijk")
+class ImportLockTests(APITestCase):
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.moderator = User.objects.get(username="moderator")
+        cls.meeting = Meeting.objects.get(pk=1)
+
+    def setUp(self):
+        self.client.force_login(self.moderator)
+        # Ensure a session key exists before each test.
+        self.client.get(reverse("meeting-data-list"))
+        self.session_key = self.client.session.session_key
+
+    def tearDown(self):
+        if self.session_key:
+            cache.delete(_processing_key(self.session_key))
+            cache.delete(_cooldown_key(self.session_key))
+
+    def test_lock_prevents_concurrent_import(self):
+        cache.add(_processing_key(self.session_key), 1, 60)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES_DIR, "ais_and_groups.yaml"), "rb") as f:
+            response = self.client.put(url, data={"file": f}, format="multipart")
+        self.assertEqual(status.HTTP_409_CONFLICT, response.status_code)
+        self.assertIn("already in progress", response.json()["detail"])
+
+    def test_cooldown_prevents_immediate_resubmit(self):
+        cache.add(_cooldown_key(self.session_key), 1, 60)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES_DIR, "ais_and_groups.yaml"), "rb") as f:
+            response = self.client.put(url, data={"file": f}, format="multipart")
+        self.assertEqual(status.HTTP_429_TOO_MANY_REQUESTS, response.status_code)
+        self.assertIn("wait", response.json()["detail"])
+
+    def test_lock_not_consumed_by_validation_error(self):
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES_DIR, "empty.txt"), "rb") as f:
+            self.client.put(url, data={"file": f}, format="multipart")
+        self.assertIsNone(cache.get(_processing_key(self.session_key)))
+
+    def test_lock_released_after_successful_import(self):
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES_DIR, "ais_and_groups.yaml"), "rb") as f:
+            response = self.client.put(url, data={"file": f}, format="multipart")
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.assertIsNone(cache.get(_processing_key(self.session_key)))
+        self.assertIsNotNone(cache.get(_cooldown_key(self.session_key)))
