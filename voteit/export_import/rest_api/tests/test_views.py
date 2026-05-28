@@ -11,6 +11,7 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.proposal.models import Proposal
 from voteit.export_import.tests import FIXTURES_DIR
+from voteit.export_import.utils import sign_payload
 
 User = get_user_model()
 
@@ -169,6 +170,39 @@ class MeetingDataImportViewTests(APITestCase):
                 "include_groups": "Groups are needed to set group authors - change 'clear_group_authors' or 'include_groups'"
             },
             response.json(),
+        )
+
+    def _signed_tempfile(self, content: str):
+        payload = content.encode()
+        signed = b"sign: " + sign_payload(payload).encode() + b"\n" + payload
+        tmp = tempfile.NamedTemporaryFile(suffix=".yaml", delete=False)
+        tmp.write(signed)
+        tmp.seek(0)
+        return tmp
+
+    def test_yaml_alias_rejected_on_import(self):
+        # A YAML file with anchors/aliases must be rejected to prevent alias-expansion attacks.
+        alias_yaml = "a: &anchor value\nb: *anchor\n"
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with self._signed_tempfile(alias_yaml) as f:
+            response = self.client.put(url, data={"file": f}, format="multipart")
+        self.assertContains(
+            response,
+            "YAML aliases are not permitted",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_yaml_alias_rejected_on_preview(self):
+        alias_yaml = "a: &anchor value\nb: *anchor\n"
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-preview", kwargs={"pk": self.meeting.pk})
+        with self._signed_tempfile(alias_yaml) as f:
+            response = self.client.post(url, data={"file": f}, format="multipart")
+        self.assertContains(
+            response,
+            "YAML aliases are not permitted",
+            status_code=status.HTTP_400_BAD_REQUEST,
         )
 
     def test_ais_and_groups_preview(self):
