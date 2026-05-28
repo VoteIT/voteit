@@ -17,6 +17,8 @@ from pydantic import constr
 from pydantic import root_validator
 from pydantic import validator
 
+from voteit.core.utils import strict_clean_html
+from voteit.core.utils import strip_html
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.workflows import AgendaItemWf
 from voteit.discussion.models import DiscussionPost
@@ -193,6 +195,10 @@ class TextDocumentData(BaseModel):
     class Config:
         orm_mode = True
 
+    @validator("title", "body", pre=True, allow_reuse=True)
+    def strip_html_from_text_doc(cls, v):
+        return strip_html(v) if isinstance(v, str) else v
+
     @validator("base_tag")
     def check_base_tag(cls, v):
         """
@@ -216,6 +222,10 @@ class ProposalData(BaseContentData, AuthorMixin, GroupMixin):
     prop_id: (
         constr(strip_whitespace=True, to_lower=True, max_length=50) | None
     )  # FIXME: Should we have prop_id here?
+
+    @validator("body", pre=True, allow_reuse=True)
+    def clean_proposal_body(cls, v):
+        return strict_clean_html(v) if isinstance(v, str) else v
 
     @validator("state")
     def check_state(cls, v):
@@ -293,6 +303,10 @@ class DiffProposalData(ProposalData):
 class DiscussionPostData(BaseContentData, AuthorMixin, GroupMixin):
     body: str
 
+    @validator("body", pre=True, allow_reuse=True)
+    def clean_discussion_body(cls, v):
+        return strict_clean_html(v) if isinstance(v, str) else v
+
 
 class ReactionData(BaseModel):
     username: str
@@ -348,6 +362,10 @@ class ReactionButtonData(BaseModel):
     class Config:
         orm_mode = True
 
+    @validator("title", "description", "icon", "color", pre=True, allow_reuse=True)
+    def strip_html_from_button_fields(cls, v):
+        return strip_html(v) if isinstance(v, str) else v
+
     @validator("reactions", pre=True)
     def resolve_reactions(cls, v):
         ctx = get_context()
@@ -386,6 +404,14 @@ class NoteData(BaseModel):
     class Config:
         orm_mode = True
 
+    @validator("body", pre=True, allow_reuse=True)
+    def clean_note_body(cls, v):
+        return strict_clean_html(v) if isinstance(v, str) else v
+
+    @validator("intent", pre=True, allow_reuse=True)
+    def strip_html_from_intent(cls, v):
+        return strip_html(v) if isinstance(v, str) else v
+
     @validator("proposal_id", pre=True)
     def convert_ids(cls, v):
         """
@@ -412,6 +438,14 @@ class MeetingGroupData(BaseContentData):
     post_as: bool = False
     show_on_speaker: bool = True
     delegate_to: int | None = None
+
+    @validator("title", pre=True, allow_reuse=True)
+    def strip_group_title_html(cls, v):
+        return strip_html(v) if isinstance(v, str) else v
+
+    @validator("body", pre=True, allow_reuse=True)
+    def clean_group_body(cls, v):
+        return strict_clean_html(v) if isinstance(v, str) else v
 
     @validator("title")
     def use_groupid_as_title_if_empty(cls, v, values: dict):
@@ -452,6 +486,14 @@ class AgendaItemData(BaseContentData):
 
     class Config:
         orm_mode = True
+
+    @validator("title", pre=True, allow_reuse=True)
+    def strip_ai_title_html(cls, v):
+        return strip_html(v) if isinstance(v, str) else v
+
+    @validator("body", pre=True, allow_reuse=True)
+    def clean_ai_body(cls, v):
+        return strict_clean_html(v) if isinstance(v, str) else v
 
     @validator("text_documents", pre=True)
     def fetch_related_text(cls, v):
@@ -698,6 +740,10 @@ class ImportMeetingMeta(BaseModel):
     created: datetime | None
     title: str = ""
     description: str = ""
+
+    @validator("title", "description", pre=True, allow_reuse=True)
+    def strip_html_from_meta(cls, v):
+        return strip_html(v) if isinstance(v, str) else v
 
 
 class ImportMeetingStructure(MeetingStructure):

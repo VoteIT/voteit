@@ -1,5 +1,7 @@
 import os
+from io import StringIO
 
+import yaml
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import IntegrityError
@@ -320,3 +322,130 @@ class ImporterTests(TestCase):
             {**self.default_result, "notes": 3, "reactions": 4},
             importer.stats().dict(),
         )
+
+
+@override_settings(EXPORT_SECRET_KEY="abcdefghijk")
+class InjectionSanitizationTests(TestCase):
+    """HTML, JS and SQL injection payloads in every schema field are sanitized on import."""
+
+    fixtures = ["meeting_test_fixture"]
+
+    # Every text field in the schema populated with at least one dangerous payload.
+    # Payloads chosen to cover: reflected XSS, event-handler injection, javascript: URLs,
+    # SVG/img vectors, and SQL injection (the last is harmless via ORM but worth noting).
+    _MALICIOUS = {
+        "meta": {
+            "version": 1,
+            "title": "<script>alert('meeting')</script>Evil Meeting",
+            "description": "'; DROP TABLE meetings; --",
+        },
+        "agenda_items": [
+            {
+                "title": "<script>alert(1)</script>Injected Title",
+                "body": "<b>bold kept</b><script>alert('body')</script><img src=x onerror=alert(1)>",
+                "state": "upcoming",
+                "proposals": [
+                    {
+                        "body": "<b>bold kept</b><script>alert('prop')</script><a href=\"javascript:alert(1)\">click</a>",
+                    }
+                ],
+                "discussions": [
+                    {
+                        "body": "<em>em kept</em><script>alert('disc')</script><svg onload=alert(1)>",
+                        "created": "2024-01-01T00:00:00+00:00",
+                    }
+                ],
+                "text_documents": [
+                    {
+                        "title": "<script>alert('td')</script>Evil Doc",
+                        "body": "'; DROP TABLE text_documents; --<script>alert('tdbody')</script>",
+                        "base_tag": "evil-doc",
+                        "created": "2024-01-01T00:00:00+00:00",
+                    }
+                ],
+            }
+        ],
+        "groups": [
+            {
+                "title": "<script>alert('group')</script>Evil Group",
+                "groupid": "evil-group",
+                "body": "' OR '1'='1 <b>bold kept</b><script>alert('groupbody')</script>",
+            }
+        ],
+    }
+
+    # Patterns that must never survive into the DB.
+    _DANGEROUS = ["<script>", "onerror", "onload", "javascript:", "alert("]
+
+    @classmethod
+    def setUpTestData(cls):
+        from voteit.export_import.importer import Importer
+        from voteit.export_import.utils import sign_payload
+
+        cls.meeting = Meeting.objects.get(pk=1)
+        payload = yaml.dump(cls._MALICIOUS, allow_unicode=True)
+        signed = "sign: " + sign_payload(payload) + "\n" + payload
+        importer = Importer(cls.meeting)
+        importer.from_stream(StringIO(signed))
+        importer.run()
+        cls.importer = importer
+        cls.ai = cls.meeting.agenda_items.get()
+        cls.group = cls.meeting.groups.get()
+        cls.proposal = cls.ai.proposals.get()
+        cls.discussion = cls.ai.discussions.get()
+        cls.text_doc = cls.ai.text_documents.get()
+
+    # --- plain-text title fields: absolutely no HTML markup ---
+
+    def test_agenda_item_title_has_no_html(self):
+        self.assertNotIn("<", self.ai.title)
+        self.assertIn("Injected Title", self.ai.title)
+
+    def test_group_title_has_no_html(self):
+        self.assertNotIn("<", self.group.title)
+        self.assertIn("Evil Group", self.group.title)
+
+    def test_text_document_title_has_no_html(self):
+        self.assertNotIn("<", self.text_doc.title)
+        self.assertIn("Evil Doc", self.text_doc.title)
+
+    def test_text_document_body_has_no_html(self):
+        # TextDocument.body is plaintext — strip_html removes everything
+        self.assertNotIn("<", self.text_doc.body)
+        self.assertNotIn(">", self.text_doc.body)
+
+    # --- rich-text body fields: dangerous patterns gone, safe tags kept ---
+
+    def test_agenda_item_body(self):
+        for pattern in self._DANGEROUS:
+            with self.subTest(pattern=pattern):
+                self.assertNotIn(pattern, self.ai.body)
+        self.assertIn("<b>", self.ai.body)
+
+    def test_proposal_body(self):
+        for pattern in self._DANGEROUS:
+            with self.subTest(pattern=pattern):
+                self.assertNotIn(pattern, self.proposal.body)
+        self.assertIn("<b>", self.proposal.body)
+
+    def test_discussion_body(self):
+        for pattern in self._DANGEROUS:
+            with self.subTest(pattern=pattern):
+                self.assertNotIn(pattern, self.discussion.body)
+        self.assertIn("<em>", self.discussion.body)
+
+    def test_group_body(self):
+        for pattern in self._DANGEROUS:
+            with self.subTest(pattern=pattern):
+                self.assertNotIn(pattern, self.group.body)
+        self.assertIn("<b>", self.group.body)
+
+    # --- meta fields are schema-only (not stored in DB) ---
+
+    def test_meta_title_sanitized(self):
+        self.assertNotIn("<script>", self.importer.data.meta.title)
+        self.assertIn("Evil Meeting", self.importer.data.meta.title)
+
+    def test_meta_description_sanitized(self):
+        # SQL payload is plain text — harmless via ORM, but must not contain markup
+        self.assertNotIn("<script>", self.importer.data.meta.description)
