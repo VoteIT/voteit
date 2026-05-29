@@ -5,11 +5,12 @@ from voteit.messaging.decorators import outgoing
 
 
 class VersionSchema(BaseModel):
-    version: str
+    backend: str
+    frontend: str
 
 
 @outgoing
-class FrontendVersion(Message):
-    name = "s.frontend_version"
+class VersionMessage(Message):
+    name = "s.versions"
     schema = VersionSchema
     data: VersionSchema

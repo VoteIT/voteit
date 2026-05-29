@@ -8,22 +8,19 @@ from django.test import override_settings
 from envelope.app.online_channel.channel import OnlineChannel
 from envelope.async_signals import consumer_connected
 from envelope.testing import mk_consumer
-
+from envelope.testing import testing_channel_layers_setting
 
 from voteit.core.messages.user import InvalidateUserCache
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
-@patch.dict(environ, {"FRONTEND_VERSION": "1.2.3"})
+@patch.dict(environ, {"FRONTEND_VERSION": "1.2.3", "BACKEND_VERSION": "1.2.4"})
 @override_settings(
-    CHANNEL_LAYERS=_channel_layers_setting,
+    CHANNEL_LAYERS=testing_channel_layers_setting,
     ENVELOPE_CONNECTIONS_QUEUE=None,
 )
-class FrontendVersionMessageTests(TestCase):
+class VersionMessageTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create(username="user")
@@ -34,8 +31,8 @@ class FrontendVersionMessageTests(TestCase):
             await consumer_connected.send(sender=consumer.__class__, consumer=consumer)
             self.assertIn(
                 {
-                    "t": "s.frontend_version",
-                    "p": {"version": "1.2.3"},
+                    "t": "s.versions",
+                    "p": {"backend": "1.2.4", "frontend": "1.2.3"},
                     "i": None,
                     "s": None,
                 },
@@ -43,7 +40,7 @@ class FrontendVersionMessageTests(TestCase):
             )
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class UserChangedSignalTests(TestCase):
     @classmethod
     def setUpTestData(cls):

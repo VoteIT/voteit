@@ -35,13 +35,15 @@ def deferred_register_model(sender: Model, **kw):
 
 
 @areceiver(consumer_connected)
-async def send_frontend_version(*, consumer: WebsocketConsumer, **kwargs):
+async def send_versions(*, consumer: WebsocketConsumer, **kwargs):
     if consumer.channel_name:
-        if FRONTEND_VERSION := getenv("FRONTEND_VERSION"):
-            from voteit.core.messages.frontend_version import FrontendVersion
+        from voteit.core.messages.version import VersionMessage
 
-            msg = FrontendVersion(version=FRONTEND_VERSION)
-            await consumer.send_ws_message(msg)
+        msg = VersionMessage(
+            backend=getenv("BACKEND_VERSION", ""),
+            frontend=getenv("FRONTEND_VERSION", ""),
+        )
+        await consumer.send_ws_message(msg)
 
 
 def post_init_registrations():
