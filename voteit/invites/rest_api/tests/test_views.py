@@ -789,6 +789,24 @@ class MeetingInviteViewSetClearAnnotationsTests(APITestCase):
         )
         self.assertEqual(response.status_code, 401)
 
+    @patch.object(MeetingInvitesChannel, "sync_publish")
+    def test_clear_sends_invite_changed_with_no_annotations(self, mock_publish):
+        """Clearing annotations must publish MeetingInviteChanged with has_annotations=False."""
+        self.client.force_login(self.moderator)
+        response = self._post({"meeting": self.meeting.pk, "invites": [self.invite.pk]})
+        self.assertEqual(response.status_code, 200)
+        changed_msgs = [
+            call.args[0]
+            for call in mock_publish.mock_calls
+            if isinstance(call.args[0], MeetingInviteChanged)
+            and call.args[0].data.pk == self.invite.pk
+        ]
+        self.assertTrue(
+            changed_msgs,
+            "MeetingInviteChanged was not published for the cleared invite",
+        )
+        self.assertFalse(changed_msgs[0].data.has_annotations)
+
 
 class InviteDataTypesViewSetTests(APITestCase):
     @classmethod

@@ -358,9 +358,14 @@ class MeetingInviteViewSet(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         vd = serializer.validated_data
+        invite_pks = vd["invites"]
         reg = get_invite_adapter_registry()
         with transaction.atomic(durable=True):
-            cleared = reg.clear_for_invites(vd["invites"])
+            cleared = reg.clear_for_invites(invite_pks)
+            send_updated_invites(
+                vd["meeting"],
+                MeetingInvite.objects.filter(pk__in=invite_pks),
+            )
         return Response({"cleared": cleared})
 
 
