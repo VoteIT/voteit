@@ -9,6 +9,8 @@ from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
+from social_django.models import UserSocialAuth
+
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation.models import OAuth2Provider
@@ -242,6 +244,15 @@ class UserViewSetTests(APITestCase):
         url = reverse("user-switch", kwargs={"pk": 3})
         response = self.client.post(url)
         self.assertEqual(404, response.status_code)
+
+    def test_switch_transfers_social_auths(self):
+        self.participant.social_auth.create(uid="abc", provider="idproxy")
+        self.client.force_login(self.participant)
+        url = reverse("user-switch", kwargs={"pk": self.moderator.pk})
+        response = self.client.post(url)
+        self.assertEqual(200, response.status_code)
+        social = UserSocialAuth.objects.get(provider="idproxy", uid="abc")
+        self.assertEqual(self.moderator, social.user)
 
     def test_logout(self):
         self.client.force_login(self.participant)

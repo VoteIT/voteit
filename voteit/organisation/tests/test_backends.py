@@ -34,4 +34,4 @@ class IDProxyBackendTests(TestCase):
         request.session = self.client.session
         strategy = DjangoStrategy(BaseDjangoStorage, request=request)
         backend = self._cut(strategy=strategy)
-        self.assertEqual(["hello", "identity", "world"], backend.get_scope())
+        self.assertEqual(["email", "hello", "identity", "world"], backend.get_scope())

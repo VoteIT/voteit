@@ -47,7 +47,6 @@ class IDProxyOAuth2(BaseOAuth2):
         ("user_data",),
         ("is_superuser", "is_superuser", True),
     ]
-    DEFAULT_SCOPE = ["identity"]
 
     def get_scope(self) -> list[str]:
         # Sort so we have a deterministic order
