@@ -240,6 +240,7 @@ class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
         "create": None,  # In serializer
         "retrieve": None,
         "bulk_create": None,  # Meeting field restricts to moderators
+        "bulk_delete": None,  # Meeting field restricts to upcoming + moderators
     }
 
     def get_serializer_class(self):
@@ -247,6 +248,8 @@ class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
             return serializers.CreateMeetingGroupSerializer
         if self.action == "bulk_create":
             return serializers.BulkCreateMeetingGroupsSerializer
+        if self.action == "bulk_delete":
+            return serializers.BulkDeleteMeetingGroupsSerializer
         return super().get_serializer_class()
 
     def get_queryset(self):
@@ -277,6 +280,31 @@ class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
             else:
                 updated_count += 1
         return Response({"created": created_count, "updated": updated_count})
+
+    @action(methods=["post"], detail=False, url_path="bulk-delete")
+    @transaction.atomic(durable=True)
+    def bulk_delete(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        groups = serializer.validated_data["groups"]
+        deleted_count = 0
+        restricted = []
+        for group in groups:
+            try:
+                group.delete()
+                deleted_count += 1
+            except RestrictedError:
+                restricted.append(group.title)
+        if restricted:
+            shown = restricted[:3]
+            label = ", ".join(f'"{t}"' for t in shown)
+            if len(restricted) > 3:
+                label += f" and {len(restricted) - 3} more"
+            raise PermissionDenied(
+                f"Meeting group(s) {label} are author of proposals and/or discussion posts or "
+                "have a relation to another group. Clear that first."
+            )
+        return Response({"deleted": deleted_count})
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):

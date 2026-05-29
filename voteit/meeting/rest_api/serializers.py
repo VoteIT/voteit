@@ -25,6 +25,7 @@ from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api.fields import ModeratorMeetingField
 from voteit.meeting.rest_api.fields import ViewableMeetingField
+from voteit.meeting.workflows import MeetingWf
 from voteit.meeting.rest_api.validators import RoleValidator
 from voteit.meeting.rest_api.validators import DialectInstallableValidator
 from voteit.meeting.roles import ROLE_DISCUSSER
@@ -518,6 +519,31 @@ class BulkCreateMeetingGroupsSerializer(serializers.Serializer):
         if errors:
             raise ValidationError(errors)
         return value
+
+
+class BulkDeleteMeetingGroupsSerializer(serializers.Serializer):
+    meeting = ModeratorMeetingField()
+    pks = serializers.ListField(
+        child=serializers.IntegerField(), min_length=1, max_length=250
+    )
+
+    def validate_meeting(self, value):
+        if value.state != MeetingWf.UPCOMING:
+            raise ValidationError(
+                f"Meeting must be in 'upcoming' state to bulk delete groups, current state is '{value.state}'."
+            )
+        return value
+
+    def validate(self, data):
+        meeting = data["meeting"]
+        pks = data["pks"]
+        qs = MeetingGroup.objects.filter(pk__in=pks, meeting=meeting)
+        if qs.count() != len(set(pks)):
+            raise ValidationError(
+                "One or more groups not found in the specified meeting."
+            )
+        data["groups"] = qs
+        return data
 
 
 class MeetingGroupExportSerializer(serializers.ModelSerializer):
