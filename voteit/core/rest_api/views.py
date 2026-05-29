@@ -25,6 +25,7 @@ from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.organisation.pipeline import _transfer_social_auths
 from voteit.organisation.utils import get_idproxy_user_data
 
 __all__ = ()
@@ -99,10 +100,11 @@ class UserView(
         return Response()
 
     @action(methods=["POST"], detail=True)
-    @transaction.atomic
+    @transaction.atomic(durable=True)
     def switch(self, request, pk):
         user = self.get_object()
         log_auth("Switch user", for_user=user, request=request)
+        _transfer_social_auths(request.user, user, "idproxy")
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         serializer = self.get_serializer(user)
         return Response(serializer.data)
