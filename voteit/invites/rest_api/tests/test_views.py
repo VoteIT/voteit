@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import override_settings
 from envelope.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
@@ -327,6 +328,9 @@ class MeetingInviteViewSetCreateTests(APITestCase):
 
     def _url(self):
         return reverse("meeting-invites-list")
+
+    def tearDown(self):
+        cache.clear()
 
     def _post(self, data, user=None):
         if user is None:

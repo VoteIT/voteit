@@ -22,10 +22,9 @@ from voteit.export_import.utils import MAX_UNSIGNED_IMPORT_BYTES
 from voteit.export_import.utils import sign_payload
 from voteit.export_import.exporter import Exporter
 from voteit.export_import.importer import Importer
-from voteit.export_import.rest_api.lock import ImportAlreadyRunning
-from voteit.export_import.rest_api.lock import ImportCooldownActive
-from voteit.export_import.rest_api.lock import acquire_import_lock
-from voteit.export_import.rest_api.lock import release_import_lock
+from voteit.core.rest_api.lock import LockAlreadyRunning
+from voteit.core.rest_api.lock import LockCooldownActive
+from voteit.export_import.rest_api.lock import import_lock
 from voteit.export_import.rest_api.serializers import CloneSerializer
 from voteit.export_import.rest_api.serializers import ImportFileSerializer
 from voteit.export_import.rest_api.serializers import ExportFileSerializer
@@ -66,10 +65,10 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
         serializer.is_valid(raise_exception=True)
 
         try:
-            acquire_import_lock(request)
-        except ImportAlreadyRunning as exc:
+            import_lock.acquire(request)
+        except LockAlreadyRunning as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
-        except ImportCooldownActive as exc:
+        except LockCooldownActive as exc:
             return Response(
                 {"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS
             )
@@ -100,7 +99,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
                 status=status.HTTP_200_OK,
             )
         finally:
-            release_import_lock(request)
+            import_lock.release(request)
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -111,10 +110,10 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
         serializer.is_valid(raise_exception=True)
 
         try:
-            acquire_import_lock(request)
-        except ImportAlreadyRunning as exc:
+            import_lock.acquire(request)
+        except LockAlreadyRunning as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
-        except ImportCooldownActive as exc:
+        except LockCooldownActive as exc:
             return Response(
                 {"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS
             )
@@ -143,7 +142,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
                 status=status.HTTP_200_OK,
             )
         finally:
-            release_import_lock(request)
+            import_lock.release(request)
 
     @action(
         methods=["POST"],
@@ -165,10 +164,10 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
         }
 
         try:
-            acquire_import_lock(request)
-        except ImportAlreadyRunning as exc:
+            import_lock.acquire(request)
+        except LockAlreadyRunning as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
-        except ImportCooldownActive as exc:
+        except LockCooldownActive as exc:
             return Response(
                 {"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS
             )
@@ -181,7 +180,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
         finally:
-            release_import_lock(request)
+            import_lock.release(request)
 
     @action(
         methods=["GET"],

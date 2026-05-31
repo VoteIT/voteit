@@ -6,6 +6,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils.functional import cached_property
 from rest_framework import mixins
+from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -15,9 +16,12 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from voteit.core.rest_api import router
+from voteit.core.rest_api.lock import LockAlreadyRunning
+from voteit.core.rest_api.lock import LockCooldownActive
 from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
+from voteit.invites.rest_api.lock import invites_lock
 from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api import serializers
 from voteit.invites.schemas import InviteDataTypesSchema
@@ -139,7 +143,18 @@ class MeetingInviteViewSet(
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return Response(serializer.save(), status=201)
+        try:
+            invites_lock.acquire(request)
+        except LockAlreadyRunning as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except LockCooldownActive as exc:
+            return Response(
+                {"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        try:
+            return Response(serializer.save(), status=201)
+        finally:
+            invites_lock.release(request)
 
     @action(
         methods=["post"],
@@ -252,80 +267,93 @@ class MeetingInviteViewSet(
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        vd = serializer.validated_data
-        meeting = vd["meeting"]
-        columns: list[str] = vd["columns"]
-        rows: list[list[str]] = vd["rows"]
-        roles_per_row: list[list[str]] = vd["roles_per_row"]
-        dryrun: bool = vd["dryrun"]
+        try:
+            invites_lock.acquire(request)
+        except LockAlreadyRunning as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except LockCooldownActive as exc:
+            return Response(
+                {"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        try:
+            vd = serializer.validated_data
+            meeting = vd["meeting"]
+            columns: list[str] = vd["columns"]
+            rows: list[list[str]] = vd["rows"]
+            roles_per_row: list[list[str]] = vd["roles_per_row"]
+            dryrun: bool = vd["dryrun"]
 
-        reg = get_invite_adapter_registry()
-        invite_result = InvitesResultSchema()
-        annotation_results = []
+            reg = get_invite_adapter_registry()
+            invite_result = InvitesResultSchema()
+            annotation_results = []
 
-        all_ud_items = list(reg.build_ud_query_seq(columns, rows))
-        serializers._raise_if_conflicting_partials(meeting, all_ud_items)
+            all_ud_items = list(reg.build_ud_query_seq(columns, rows))
+            serializers._raise_if_conflicting_partials(meeting, all_ud_items)
 
-        with transaction.atomic(durable=True):
-            # Group rows by unique role combination and create invites per group
-            indexed = sorted(enumerate(rows), key=lambda t: roles_per_row[t[0]])
-            for role_combo, group_iter in groupby(
-                indexed, key=lambda t: roles_per_row[t[0]]
-            ):
-                group_rows = [row for _, row in group_iter]
-                items = list(reg.build_ud_query_seq(columns, group_rows))
-                if not items:
-                    continue
-
-                serializers._raise_if_moderator_lockout(meeting, items, role_combo)
-                result = meeting.invites.create_or_update_mixed(
-                    data=items, roles=role_combo, meeting=meeting
-                )
-                invite_result.added += result.added
-                invite_result.changed += result.changed
-                invite_result.existed += result.existed
-
-            # Run annotations if annotation columns are present
-            newly_annotated_pks: set[int] = set()
-            if reg.get_annotations(columns):
-                try:
-                    reg.run_validators(columns=columns, rows=rows, meeting=meeting)
-                except ValueError as exc:
-                    raise ValidationError(str(exc))
-                invites_qs = meeting.invites.all()
-                for ann_result in reg.run_annotations(
-                    columns=columns,
-                    rows=rows,
-                    invites_qs=invites_qs,
-                    meeting=meeting,
+            with transaction.atomic(durable=True):
+                # Group rows by unique role combination and create invites per group
+                indexed = sorted(enumerate(rows), key=lambda t: roles_per_row[t[0]])
+                for role_combo, group_iter in groupby(
+                    indexed, key=lambda t: roles_per_row[t[0]]
                 ):
-                    if ann_result:
-                        annotation_results.append(
-                            {
-                                "name": ann_result.name,
-                                "added": ann_result.added,
-                                "changed": ann_result.changed,
-                                "existed": ann_result.existed,
-                            }
-                        )
-                        newly_annotated_pks.update(ann_result.newly_annotated_invites)
-                if newly_annotated_pks:
-                    send_updated_invites(
-                        meeting,
-                        meeting.invites.filter(pk__in=newly_annotated_pks),
-                        annotate=True,
+                    group_rows = [row for _, row in group_iter]
+                    items = list(reg.build_ud_query_seq(columns, group_rows))
+                    if not items:
+                        continue
+
+                    serializers._raise_if_moderator_lockout(meeting, items, role_combo)
+                    result = meeting.invites.create_or_update_mixed(
+                        data=items, roles=role_combo, meeting=meeting
                     )
+                    invite_result.added += result.added
+                    invite_result.changed += result.changed
+                    invite_result.existed += result.existed
 
-            if dryrun:
-                transaction.set_rollback(True)
+                # Run annotations if annotation columns are present
+                newly_annotated_pks: set[int] = set()
+                if reg.get_annotations(columns):
+                    try:
+                        reg.run_validators(columns=columns, rows=rows, meeting=meeting)
+                    except ValueError as exc:
+                        raise ValidationError(str(exc))
+                    invites_qs = meeting.invites.all()
+                    for ann_result in reg.run_annotations(
+                        columns=columns,
+                        rows=rows,
+                        invites_qs=invites_qs,
+                        meeting=meeting,
+                    ):
+                        if ann_result:
+                            annotation_results.append(
+                                {
+                                    "name": ann_result.name,
+                                    "added": ann_result.added,
+                                    "changed": ann_result.changed,
+                                    "existed": ann_result.existed,
+                                }
+                            )
+                            newly_annotated_pks.update(
+                                ann_result.newly_annotated_invites
+                            )
+                    if newly_annotated_pks:
+                        send_updated_invites(
+                            meeting,
+                            meeting.invites.filter(pk__in=newly_annotated_pks),
+                            annotate=True,
+                        )
 
-        return Response(
-            {
-                "invites": invite_result.dict(),
-                "annotations": annotation_results,
-                "dryrun": dryrun,
-            }
-        )
+                if dryrun:
+                    transaction.set_rollback(True)
+
+            return Response(
+                {
+                    "invites": invite_result.dict(),
+                    "annotations": annotation_results,
+                    "dryrun": dryrun,
+                }
+            )
+        finally:
+            invites_lock.release(request)
 
     @action(
         methods=["post"],

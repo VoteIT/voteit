@@ -5,12 +5,14 @@ import os
 from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from rest_framework.test import APITestCase
 
 from voteit.invites.models import MeetingGroupAnnotation
 from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api.import_utils import detect_and_parse_file
+from voteit.invites.rest_api.lock import invites_lock
 from voteit.invites.rest_api.import_utils import extract_roles_per_row
 from voteit.invites.rest_api.import_utils import parse_invite_file
 from voteit.meeting.models import Meeting
@@ -283,6 +285,9 @@ class ImportInvitesPermissionTests(APITestCase):
         )
         cls.other_meeting.add_roles(cls.other_moderator, "mo", "pa")
 
+    def tearDown(self):
+        cache.clear()
+
     def _post(self, user, meeting=None, content=b"email\nalice@example.com\n"):
         if user is not None:
             self.client.force_login(user)
@@ -350,6 +355,9 @@ class ImportFileFormatTests(APITestCase):
     def setUp(self):
         self.client.force_login(self.moderator)
 
+    def tearDown(self):
+        cache.clear()
+
     def _post_fixture(self, filename: str, dryrun: bool = False) -> dict:
         f = fixture_file(filename)
         data = {"meeting": self.meeting.pk, "file": f}
@@ -404,6 +412,10 @@ class ImportFileFormatTests(APITestCase):
             "open_document.ods",
         ):
             with self.subTest(filename=filename):
+                sk = self.client.session.session_key
+                if sk:
+                    cache.delete(invites_lock._processing_key(sk))
+                    cache.delete(invites_lock._cooldown_key(sk))
                 MeetingInvite.objects.filter(meeting=self.meeting).delete()
                 data = self._post_fixture(filename)
                 self.assertEqual(3, data["invites"]["added"], filename)
@@ -488,6 +500,9 @@ class ImportRolesWithEmptyRowsTests(APITestCase):
     def setUp(self):
         self.client.force_login(self.moderator)
 
+    def tearDown(self):
+        cache.clear()
+
     def _post(self, dryrun: bool = False) -> dict:
         f = fixture_file("roles_with_empty_rows.tsv")
         data = {"meeting": self.meeting.pk, "file": f}
@@ -555,6 +570,9 @@ class ImportInvitesFunctionalTests(APITestCase):
     def setUp(self):
         self.client.force_login(self.moderator)
 
+    def tearDown(self):
+        cache.clear()
+
     def _post(self, content: str | bytes, dryrun: bool = False):
         raw = content if isinstance(content, bytes) else content.encode("utf-8")
         f = io.BytesIO(raw)
@@ -573,6 +591,10 @@ class ImportInvitesFunctionalTests(APITestCase):
 
     def test_second_import_reports_existed(self):
         self._post("email\nalice@example.com\n")
+        sk = self.client.session.session_key
+        if sk:
+            cache.delete(invites_lock._processing_key(sk))
+            cache.delete(invites_lock._cooldown_key(sk))
         response = self._post("email\nalice@example.com\n")
         data = response.json()
         self.assertEqual({"added": 0, "changed": 0, "existed": 1}, data["invites"])
@@ -683,6 +705,9 @@ class ImportInvitesBadFileTests(APITestCase):
 
     def setUp(self):
         self.client.force_login(self.moderator)
+
+    def tearDown(self):
+        cache.clear()
 
     def _post_fixture(self, filename: str):
         f = fixture_file(filename)

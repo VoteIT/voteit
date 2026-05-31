@@ -12,8 +12,7 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.proposal.models import Proposal
 from voteit.export_import.tests import FIXTURES_DIR
-from voteit.export_import.rest_api.lock import _cooldown_key
-from voteit.export_import.rest_api.lock import _processing_key
+from voteit.export_import.rest_api.lock import import_lock
 from voteit.export_import.utils import MAX_IMPORT_BYTES
 from voteit.export_import.utils import MAX_UNSIGNED_IMPORT_BYTES
 from voteit.export_import.utils import sign_payload
@@ -365,9 +364,7 @@ class CloneViewTests(APITestCase):
         self.session_key = self.client.session.session_key
 
     def tearDown(self):
-        if self.session_key:
-            cache.delete(_processing_key(self.session_key))
-            cache.delete(_cooldown_key(self.session_key))
+        cache.clear()
 
     def test_clone_success(self):
         url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})
@@ -377,8 +374,8 @@ class CloneViewTests(APITestCase):
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         data = response.json()
         self.assertGreater(data["agenda_items"], 0)
-        self.assertIsNone(cache.get(_processing_key(self.session_key)))
-        self.assertIsNotNone(cache.get(_cooldown_key(self.session_key)))
+        self.assertIsNone(cache.get(import_lock._processing_key(self.session_key)))
+        self.assertIsNotNone(cache.get(import_lock._cooldown_key(self.session_key)))
 
     def test_clone_target_not_upcoming_rejected(self):
         url = reverse("meeting-data-clone", kwargs={"pk": self.ongoing_meeting.pk})
@@ -395,7 +392,7 @@ class CloneViewTests(APITestCase):
         self.assertIn("source", response.json())
 
     def test_clone_blocked_by_processing_lock(self):
-        cache.add(_processing_key(self.session_key), 1, 60)
+        cache.add(import_lock._processing_key(self.session_key), 1, 60)
         url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})
         response = self.client.post(
             url, data={"source": self.meeting.pk}, format="json"
@@ -419,12 +416,10 @@ class ImportLockTests(APITestCase):
         self.session_key = self.client.session.session_key
 
     def tearDown(self):
-        if self.session_key:
-            cache.delete(_processing_key(self.session_key))
-            cache.delete(_cooldown_key(self.session_key))
+        cache.clear()
 
     def test_lock_prevents_concurrent_import(self):
-        cache.add(_processing_key(self.session_key), 1, 60)
+        cache.add(import_lock._processing_key(self.session_key), 1, 60)
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with open(os.path.join(FIXTURES_DIR, "ais_and_groups.yaml"), "rb") as f:
             response = self.client.put(url, data={"file": f}, format="multipart")
@@ -432,7 +427,7 @@ class ImportLockTests(APITestCase):
         self.assertIn("already in progress", response.json()["detail"])
 
     def test_cooldown_prevents_immediate_resubmit(self):
-        cache.add(_cooldown_key(self.session_key), 1, 60)
+        cache.add(import_lock._cooldown_key(self.session_key), 1, 60)
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with open(os.path.join(FIXTURES_DIR, "ais_and_groups.yaml"), "rb") as f:
             response = self.client.put(url, data={"file": f}, format="multipart")
@@ -443,12 +438,12 @@ class ImportLockTests(APITestCase):
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with open(os.path.join(FIXTURES_DIR, "empty.txt"), "rb") as f:
             self.client.put(url, data={"file": f}, format="multipart")
-        self.assertIsNone(cache.get(_processing_key(self.session_key)))
+        self.assertIsNone(cache.get(import_lock._processing_key(self.session_key)))
 
     def test_lock_released_after_successful_import(self):
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with open(os.path.join(FIXTURES_DIR, "ais_and_groups.yaml"), "rb") as f:
             response = self.client.put(url, data={"file": f}, format="multipart")
         self.assertEqual(status.HTTP_200_OK, response.status_code)
-        self.assertIsNone(cache.get(_processing_key(self.session_key)))
-        self.assertIsNotNone(cache.get(_cooldown_key(self.session_key)))
+        self.assertIsNone(cache.get(import_lock._processing_key(self.session_key)))
+        self.assertIsNotNone(cache.get(import_lock._cooldown_key(self.session_key)))
