@@ -29,9 +29,7 @@ class RequestLock:
         *,
         processing_ttl: int = 120,
         cooldown_ttl: int = 5,
-        already_running_message: str | Promise = _(
-            "Operation already in progress for this session."
-        ),
+        already_running_message: str | Promise = _("Operation already in progress."),
         cooldown_message: str | Promise = _(
             "Please wait a few seconds before retrying."
         ),

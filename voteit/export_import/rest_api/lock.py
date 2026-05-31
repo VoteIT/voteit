@@ -3,6 +3,6 @@ from voteit.core.rest_api.lock import RequestLock
 
 import_lock = RequestLock(
     "meeting_data",
-    already_running_message=_("Import already in progress for this session."),
+    already_running_message=_("Import already in progress."),
     cooldown_message=_("Please wait a few seconds before running another import."),
 )
