@@ -18,9 +18,7 @@
 
 ## Checklist
 
-- [ ] `make test` and `make test-deps` are green
-- [ ] `uv run ruff check voteit/ src/` reports no issues
+- [ ] `make test` are green
+- [ ] `uv run ruff check voteit/` reports no issues
 - [ ] Migrations are included (if models changed)
-- [ ] `docs/narrative.md` / `docs/workflows.md` updated (if model behaviour, permissions, or state machines changed)
 - [ ] `CHANGELOG.md` entry added
-- [ ] New models have `get_additional_data()` for the auditlog and are decorated with `@auditlog.register()`
