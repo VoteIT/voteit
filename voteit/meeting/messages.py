@@ -15,6 +15,11 @@ class MeetingDeleted(BaseObjectDeleted):
 
 
 @outgoing
+class MeetingDialectChanged(BaseObjectChanged):
+    name = "meeting.dialect_changed"
+
+
+@outgoing
 class MeetingGroupAdded(BaseObjectAdded):
     name = "meeting_group.added"
 

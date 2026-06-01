@@ -38,6 +38,7 @@ from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api import serializers
 from voteit.meeting.rest_api.filters import MeetingRolesFilter
 from voteit.meeting.roles import ROLE_MODERATOR
+from voteit.meeting.utils import notify_dialect_changed
 
 __all__ = (
     "MeetingViewSet",
@@ -116,6 +117,7 @@ class MeetingViewSet(
                 serializer.validated_data["dialect"]
             )
             handler.install(meeting)
+        notify_dialect_changed(meeting)
         return Response(status=200)
 
     @action(methods=["post"], detail=True, url_path="remove-dialect")
@@ -135,6 +137,7 @@ class MeetingViewSet(
         with transaction.atomic(durable=True):
             handler = dialect_registry.get_merged_handler(meeting.installed_dialect)
             handler.remove(meeting, groups=serializer.validated_data["groups"])
+        notify_dialect_changed(meeting)
         return Response(status=200)
 
     def get_queryset(self) -> QuerySet:

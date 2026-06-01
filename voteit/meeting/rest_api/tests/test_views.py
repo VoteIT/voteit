@@ -15,8 +15,10 @@ from voteit.components.app.components.dialects import DialectsFilter
 from voteit.components.app.components.proposal_print import ProposalPrint
 from voteit.core.testing import run_permission_tests
 from voteit.core.workflows import EnabledWf
+from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.dialects import DialectHandler
 from voteit.meeting.dialects import get_named_paths
+from voteit.meeting.messages import MeetingDialectChanged
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -369,6 +371,20 @@ class MeetingViewSetTests(APITestCase):
         self.meeting.refresh_from_db()
         self.assertEqual("main_subst", self.meeting.installed_dialect)
 
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_install_dialect_sends_notification(self, mock_publish):
+        url = reverse("meeting-install-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        self.client.post(url, {"dialect": "main_subst"})
+        published_types = [type(c.args[0]) for c in mock_publish.mock_calls]
+        self.assertIn(MeetingDialectChanged, published_types)
+        msg = next(
+            c.args[0]
+            for c in mock_publish.mock_calls
+            if isinstance(c.args[0], MeetingDialectChanged)
+        )
+        self.assertEqual(self.meeting.pk, msg.data.pk)
+
     def test_install_dialect_already_installed(self):
         Meeting.objects.filter(pk=self.meeting.pk).update(
             installed_dialect="main_subst"
@@ -407,6 +423,23 @@ class MeetingViewSetTests(APITestCase):
         self.assertEqual(200, response.status_code)
         self.meeting.refresh_from_db()
         self.assertIsNone(self.meeting.installed_dialect)
+
+    @patch.object(MeetingChannel, "sync_publish")
+    def test_remove_dialect_sends_notification(self, mock_publish):
+        Meeting.objects.filter(pk=self.meeting.pk).update(
+            installed_dialect="main_subst"
+        )
+        url = reverse("meeting-remove-dialect", kwargs={"pk": self.meeting.pk})
+        self.client.force_login(self.moderator)
+        self.client.post(url, {})
+        published_types = [type(c.args[0]) for c in mock_publish.mock_calls]
+        self.assertIn(MeetingDialectChanged, published_types)
+        msg = next(
+            c.args[0]
+            for c in mock_publish.mock_calls
+            if isinstance(c.args[0], MeetingDialectChanged)
+        )
+        self.assertEqual(self.meeting.pk, msg.data.pk)
 
     def test_remove_dialect_none_installed(self):
         url = reverse("meeting-remove-dialect", kwargs={"pk": self.meeting.pk})

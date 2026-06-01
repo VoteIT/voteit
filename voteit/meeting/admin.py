@@ -23,6 +23,7 @@ from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
+from voteit.meeting.utils import notify_dialect_changed
 from voteit.meeting.utils import sort_agenda_items
 from voteit.meeting.workflows import MeetingWf
 
@@ -129,9 +130,11 @@ class MeetingDialectForm(forms.ModelForm):
                         self.instance.installed_dialect
                     )
                     handler.remove(self.instance)
+                    notify_dialect_changed(self.instance)
                 elif dialect and not self.instance.installed_dialect:
                     handler = dialect_registry.get_merged_handler(dialect)
                     handler.install(self.instance)
+                    notify_dialect_changed(self.instance)
         return super().save(commit=commit)
 
 
