@@ -113,23 +113,24 @@ class OrganisationAdmin(admin.ModelAdmin):
 
     def online_view(self, request):
         recent_threshold = now() - timedelta(minutes=10)
-        online_subquery = Subquery(
+        counts = list(
             Connection.objects.filter(
-                user__organisation=OuterRef("pk"),
                 online=True,
                 last_action__gt=recent_threshold,
+                user__organisation__isnull=False,
             )
             .values("user__organisation")
             .annotate(cnt=models.Count("user_id", distinct=True))
-            .values("cnt")[:1]
+            .order_by("-cnt")
         )
-        organisations = (
-            Organisation.objects.annotate(
-                online_users__count=Coalesce(online_subquery, 0)
-            )
-            .filter(online_users__count__gt=0)
-            .order_by("-online_users__count")
-        )
+        org_ids = [row["user__organisation"] for row in counts]
+        count_map = {row["user__organisation"]: row["cnt"] for row in counts}
+        orgs_by_id = Organisation.objects.in_bulk(org_ids)
+        organisations = []
+        for org_id in org_ids:
+            if org := orgs_by_id.get(org_id):
+                org.online_users__count = count_map[org_id]
+                organisations.append(org)
         context = {
             **self.admin_site.each_context(request),
             "title": "Online organisations",
