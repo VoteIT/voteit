@@ -53,6 +53,9 @@ Repository = "https://github.com/voteit/voteit.git"
 Issues = "https://github.com/voteit/voteit/issues"
 Changelog = "https://github.com/voteit/voteit/blob/main/CHANGELOG.md"
 
+[tool.uv]
+exclude-newer = "7 days"
+
 [tool.uv.workspace]
 members = ["src/voteit_org", "src/member_dialects"]
 
