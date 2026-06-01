@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.45 (2026-06-01)
+
+Continued REST migration, invite improvements, security hardening,
+and project housekeeping (AGPL licence, README, CONTRIBUTING).
+
+### New features
+
+- **Invite file upload endpoint**: Invites can now be imported via a file upload REST endpoint.
+  Blank lines are allowed (useful when pasting from Excel). Includes a session lock to prevent
+  concurrent imports, and improved importer structure with stricter validation.
+- **Invite and annotations combined**: Instead of separate actions, invites can be created and/or annotated
+  via the same REST action.
+- **Meeting clone endpoint**: New REST endpoint for cloning meeting data.
+
+### Changes
+
+- **Meeting groups — bulk REST endpoints**: `bulk_create` and `bulk_delete` for meeting groups
+  are now REST endpoints rather than WebSocket messages. `bulk_delete` is restricted to upcoming meetings.
+- **Management command aligned with REST**: The invite management command now mirrors the REST
+  interface behaviour.
+
+### Security
+
+- **XML anchor attack prevention**: Blocked anchor entities in XML/HTML input to prevent
+  billion-laughs-style attacks.
+- **Extra sanitisation layer in schemas**: An additional strip pass is applied in schemas to avoid
+  depending solely on downstream sanitisers.
+- **Rich-text field enforcement**: Fields that accept HTML are now `RichTextField` so that HTML
+  cleaning fires correctly (plain validators did not run on these fields).
+- **Unsigned file upload size limit**: Unsigned file uploads are permitted but at a reduced
+  maximum size.
+
+### Project
+
+- **AGPL licence**: The project is now licensed under AGPL. Licence files added.
+- **README and CONTRIBUTING docs**: New top-level documentation for contributors.
+- **GitHub PR template** and **security policy** added.
+- **ruff in pre-commit**: `ruff` is now run as a pre-commit hook.
+
 ## v0.44 (2026-05-25)
 
 Focused on optional meeting token-based API-access and moving messages that don't need to be websocket operations
