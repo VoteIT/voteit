@@ -810,20 +810,17 @@ class SpeakerViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual(response.status_code, 404, data)
 
-    def test_start_another_speaker_speaking(self):
+    def test_start_stops_active_speaker(self):
         self.system.active_list = self.slist
         self.system.save()
         url = reverse("speakers-start", kwargs={"pk": self.fifth_in_queue.pk})
         self.client.force_login(self.list_moderator)
         response = self.client.post(url)
-        data = response.json()
-        self.assertEqual(response.status_code, 403, data)
-        self.assertEqual(
-            {
-                "detail": f"You're missing the permission 'speaker.start_speaker' on Speaker id {self.fifth_in_queue.pk}."
-            },
-            data,
-        )
+        self.assertEqual(response.status_code, 200)
+        self.fourth_ongoing.refresh_from_db()
+        self.assertIsNotNone(self.fourth_ongoing.seconds)
+        self.fifth_in_queue.refresh_from_db()
+        self.assertIsNotNone(self.fifth_in_queue.started)
 
     def test_stop(self):
         url = reverse("speakers-stop", kwargs={"pk": self.fourth_ongoing.pk})

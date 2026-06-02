@@ -297,9 +297,24 @@ class SpeakerViewSet(
     @action(methods=["POST"], detail=True)
     def start(self, request, *args, **kwargs):
         speaker = self.get_object()
-        if speaker.start():
-            speaker.save()
-            return Response(status=200)
+        with transaction.atomic(durable=True):
+            speaker_list = self._get_locked_sl(speaker.speaker_list_id)
+            active = Speaker.objects.filter(
+                speaker_list_id=speaker.speaker_list_id,
+                started__isnull=False,
+                seconds__isnull=True,
+            ).first()
+            if active:
+                active.stop()
+                active.save()
+                speaker_list.order_list = [
+                    u for u in speaker_list.order_list if u != active.user_id
+                ]
+                speaker_list.save()
+            if speaker.start():
+                speaker.save()
+                return Response(status=200)
+            transaction.set_rollback(True)
         return Response(status=400)  # pragma: no coverage
 
     @action(methods=["POST"], detail=True)

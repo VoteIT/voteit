@@ -115,17 +115,6 @@ def not_currently_speaking(user: User, speaker_list: SpeakerList) -> bool:
     )  # pragma: no coverage
 
 
-@predicate
-def has_active_speaker_in_same_list(user: User, speaker: Speaker):
-    if isinstance(speaker, Speaker):
-        return Speaker.objects.filter(
-            seconds__isnull=True,
-            started__isnull=False,
-            speaker_list_id=speaker.speaker_list_id,
-        ).exists()
-    raise TypeError(f"{speaker} is not a Speaker instance")  # pragma: no coverage
-
-
 # Speaker list permissions
 rules.add_perm(
     SpeakerList.get_perm(PERM.ADD),  # Checked in serializer, not via perm
@@ -196,5 +185,5 @@ rules.add_perm(
 # We won't check validation stuff here, just permissions
 rules.add_perm(
     Speaker.get_perm(PERM_START),
-    is_active_list & ~has_active_speaker_in_same_list,
+    is_active_list,
 )
