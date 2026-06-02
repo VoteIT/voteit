@@ -390,7 +390,7 @@ class MeetingGroupAnnotation(models.Model):
     )
     group_role: GroupRole = models.ForeignKey(
         GroupRole,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="+",
         null=True,
         blank=True,
