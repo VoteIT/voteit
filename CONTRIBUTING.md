@@ -82,13 +82,13 @@ Linting is enforced with **ruff** (replaces flake8, isort, and more).
 
 ```bash
 # Check
-uv run ruff check voteit/ src/
+uv run ruff check voteit/
 
 # Auto-fix safe issues
-uv run ruff check --fix voteit/ src/
+uv run ruff check --fix voteit/
 
 # Format
-uv run ruff format voteit/ src/
+uv run ruff format voteit/
 ```
 
 Key rules to keep in mind:
