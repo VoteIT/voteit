@@ -29,7 +29,9 @@ class MajorityTests(TestCase):
         cls.voter_a = User.objects.create(username="a")
         cls.voter_b = User.objects.create(username="b")
         cls.voter_c = User.objects.create(username="c")
-        cls.er.set_voters_from_dict({cls.voter_a.pk: 1, cls.voter_b.pk: 1, cls.voter_c.pk: 1})
+        cls.er.set_voters_from_dict(
+            {cls.voter_a.pk: 1, cls.voter_b.pk: 1, cls.voter_c.pk: 1}
+        )
         cls.poll: Poll = Poll.objects.create(
             electoral_register=cls.er, method_name="majority"
         )
@@ -95,8 +97,8 @@ class MajorityTests(TestCase):
         )
         self.prop1.refresh_from_db()
         self.prop2.refresh_from_db()
-        self.assertEqual(ProposalWf.VOTING, self.prop1.state)
-        self.assertEqual(ProposalWf.VOTING, self.prop2.state)
+        self.assertEqual(ProposalWf.PUBLISHED, self.prop1.state)
+        self.assertEqual(ProposalWf.PUBLISHED, self.prop2.state)
 
     def test_result_clear(self):
         self.poll.upcoming()
