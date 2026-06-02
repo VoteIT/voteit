@@ -4,7 +4,8 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
-from django.test import TestCase, override_settings
+from django.test import TestCase
+from django.test import override_settings
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.agenda.models import AgendaItem
@@ -14,21 +15,19 @@ from voteit.meeting.workflows import MeetingWf
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 from voteit.poll.app.polls.simple import Simple
-from voteit.poll.exceptions import (
-    ElectoralRegisterMissing,
-    InvalidPollMethod,
-    NotAllowedToVote,
-)
-from voteit.poll.models import ElectoralRegister, Poll
-from voteit.poll.registries import er_policy, vote_transfer_policies
-from voteit.poll.testing import (
-    UnrestrictedVoteTransferER,
-    UnrestrictedVoteTransferPolicy,
-)
+from voteit.poll.app.polls.simple import SimplePollResult
+from voteit.poll.exceptions import ElectoralRegisterMissing
+from voteit.poll.exceptions import InvalidPollMethod
+from voteit.poll.exceptions import NotAllowedToVote
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.poll.registries import er_policy
+from voteit.poll.registries import vote_transfer_policies
+from voteit.poll.testing import UnrestrictedVoteTransferER
+from voteit.poll.testing import UnrestrictedVoteTransferPolicy
 from voteit.poll.workflows import PollWf
 from voteit.proposal.models import Proposal
 from voteit.proposal.workflows import ProposalWf
-
 
 User = get_user_model()
 
@@ -270,6 +269,31 @@ class PollTests(TestCase):
         other_prop = Proposal.objects.create()
         with self.assertRaises(IntegrityError):
             other_prop.polls.add(self.poll)
+
+    def test_set_proposals_from_result(self):
+        prop_approved = self.poll.proposals.create(
+            agenda_item=self.ai, state=ProposalWf.VOTING
+        )
+        prop_denied = self.poll.proposals.create(
+            agenda_item=self.ai, state=ProposalWf.VOTING
+        )
+        prop_neither = self.poll.proposals.create(
+            agenda_item=self.ai, state=ProposalWf.VOTING
+        )
+        self.poll.result = SimplePollResult(
+            yes=2,
+            no=1,
+            vote_count=None,
+            approved=[prop_approved.pk],
+            denied=[prop_denied.pk],
+        )
+        self.poll.set_proposals_from_result()
+        prop_approved.refresh_from_db()
+        prop_denied.refresh_from_db()
+        prop_neither.refresh_from_db()
+        self.assertEqual(ProposalWf.APPROVED, prop_approved.state)
+        self.assertEqual(ProposalWf.DENIED, prop_denied.state)
+        self.assertEqual(ProposalWf.PUBLISHED, prop_neither.state)
 
 
 class VoteWeightTests(TestCase):

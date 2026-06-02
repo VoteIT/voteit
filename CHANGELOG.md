@@ -16,6 +16,7 @@ and project housekeeping (AGPL licence, README, CONTRIBUTING).
 
 ### Changes
 
+- **Proposals no longer locked for vote after poll**: All proposals that aren't approved or denied are now published again.
 - **Meeting groups — bulk REST endpoints**: `bulk_create` and `bulk_delete` for meeting groups
   are now REST endpoints rather than WebSocket messages. `bulk_delete` is restricted to upcoming meetings.
 - **Management command aligned with REST**: The invite management command now mirrors the REST

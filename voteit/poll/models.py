@@ -387,17 +387,16 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
                 proposal.save()
 
     def set_proposals_from_result(self):
-        for proposal in self.proposals.filter(
-            pk__in=self.result.approved
-        ).select_subclasses():
+        approved_pks = set(self.result.approved)
+        denied_pks = set(self.result.denied)
+        for proposal in self.proposals.select_subclasses():
             with suppress(TransitionNotAllowed):
-                proposal.approved()
-                proposal.save()
-        for proposal in self.proposals.filter(
-            pk__in=self.result.denied
-        ).select_subclasses():
-            with suppress(TransitionNotAllowed):
-                proposal.denied()
+                if proposal.pk in approved_pks:
+                    proposal.approved()
+                elif proposal.pk in denied_pks:
+                    proposal.denied()
+                else:
+                    proposal.publish()
                 proposal.save()
 
     def set_result(self):
