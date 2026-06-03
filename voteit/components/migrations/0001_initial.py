@@ -3,7 +3,6 @@
 import django.core.serializers.json
 from django.db import migrations, models
 import django.db.models.deletion
-import django_fsm
 
 
 class Migration(migrations.Migration):
@@ -30,7 +29,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "state",
-                    django_fsm.FSMField(
+                    models.CharField(
                         choices=[("on", "On"), ("off", "Off")],
                         default="off",
                         editable=False,
@@ -75,7 +74,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "state",
-                    django_fsm.FSMField(
+                    models.CharField(
                         choices=[("on", "On"), ("off", "Off")],
                         default="off",
                         editable=False,
