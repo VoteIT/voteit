@@ -1,7 +1,9 @@
 from rest_framework import routers
+from rest_framework.renderers import BrowsableAPIRenderer
+from rest_framework.renderers import JSONRenderer
 
 
-router = routers.DefaultRouter()
+router = routers.DefaultRouter(root_renderers=[JSONRenderer, BrowsableAPIRenderer])
 
 
 def register_meeting_api(prefix: str, basename: str | None = None):
