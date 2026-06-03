@@ -7,10 +7,24 @@ Handles meeting invitations: creating them, matching identity data to users, acc
 **`MeetingInvite`** — the central model. Belongs to a `Meeting`. Key fields:
 - `user_data` — JSON dict of identity key/value pairs, e.g. `{"email": "jane@example.com"}` or `{"email": "...", "swedish_ssn": "..."}`. Validated to only contain string values. Unique per meeting.
 - `roles` — roles to grant on accept (sorted, stored as ArrayField).
-- `state` — FSM: `open` → `accepted` / `rejected` / `revoked` / `expired`.
+- `state` — plain `CharField` managed by `InviteStateMachine`. Values: `open` → `accepted` / `rejected` / `revoked` / `expired`.
 - `used_by` / `used_at` — set when accepted or rejected by a known user.
 
 **`MeetingGroupAnnotation`** — join table linking a `MeetingInvite` to a `MeetingGroup` (+ optional `GroupRole`). Stores pending group membership intent for invites that haven't been accepted yet.
+
+## State machine (`statemachines.py`)
+
+`InviteStateMachine(StateChart)` from `python-statemachine`. Bound to `MeetingInvite` via `MachineMixin`; access via `invite.sm`.
+
+States (all final except `open`): `open` (initial), `accepted`, `rejected`, `revoked`, `expired`.
+
+Events:
+- `accept` — `open → accepted`. `after_accept` sets `used_by`/`used_at`, grants roles, calls `reg.run_accepted()`.
+- `reject` — `open → rejected`. `after_reject` sets `used_by` if user has a pk.
+- `revoke` — `open → revoked`. Validator `has_change_permission` raises `PermissionDenied` unless the caller has `invites.change_meetinginvite` on the invite. Pass `force=True` to skip the permission check (used internally, e.g. in tests).
+- `expire` — `open → expired`. No permission guard (called from jobs/signals only).
+
+`MeetingInvite.accept()`, `.reject()`, and `.revoke()` are thin wrappers that delegate to `self.sm`. State string values come from `InviteStateMachine.<state>.id` (e.g. `"open"`, `"accepted"`).
 
 ## Adapter system
 
@@ -82,8 +96,8 @@ See `rest_api/CLAUDE.md` for details. Summary:
 ## Permissions
 
 - Add/change/delete `MeetingInvite`: requires `is_moderator & meeting_not_archived`.
-- `accept` and `reject` transitions use `PERM.NOT_ALLOWED` — they are intentionally not exposed as standard FSM transitions; callers handle auth via queryset scoping.
-- `revoke` transition checks `invites.change_meetinginvite` (i.e. moderator).
+- `accept` and `reject`: no object-level permission — auth is enforced entirely via queryset scoping in the calling ViewSet.
+- `revoke`: permission checked inside the state machine via the `has_change_permission` validator (`invites.change_meetinginvite`, i.e. moderator). Pass `force=True` to bypass (internal use only).
 
 ## Dialect integration
 

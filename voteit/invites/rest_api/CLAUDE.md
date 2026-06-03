@@ -5,7 +5,7 @@ REST API layer for the invites package. Three distinct audiences, each with its 
 ## ViewSets
 
 ### `MeetingInviteViewSet` (`/api/meeting-invites/`)
-Moderator-facing. Requires meeting moderator role. Registered via `@router.register`.
+Moderator-facing. Requires meeting moderator role. Registered via `@router.register`. Uses `StateMachineMixin` (replaces the old `TransitionsMixin`).
 
 - `POST /` — create/update invites from JSON. Supports annotations in the same request (see below).
 - `POST /import/` — create/update invites from an uploaded file (XLSX, ODS, CSV, TSV).
@@ -14,9 +14,10 @@ Moderator-facing. Requires meeting moderator role. Registered via `@router.regis
 - `POST /bulk-delete/` — delete multiple invites by PK list (validates all belong to same meeting).
 - `POST /bulk-revoke/` — transition multiple invites to `revoked`.
 - `POST /clear-annotations/` — remove all clearable annotations from a list of invite PKs.
-- `POST /{pk}/transitions/` — FSM transitions (currently only `revoke`).
+- `POST /{pk}/event/` — send a state machine event (currently only `revoke`). Request: `{"event": "revoke"}`. Response 200: `{"state": "revoked"}`.
+- `GET /state-machine/` — returns state machine definition (states, events) for the frontend.
 
-Queryset is scoped to meetings where the requesting user is a moderator, and excludes archived meeting states.
+Queryset is scoped to meetings where the requesting user is a moderator, and excludes archived meeting states. Uses `ForceMeetingWithRoleFilter` — requests without a `meeting` query param return no results.
 
 ### `MatchInvitesViewSet` (`/api/match-invites/`)
 Service endpoint for the external ID-proxy login system. Auth: `HasIDProxyAPIKey` (API key via `HTTP_API_KEY` header, setting `ID_PROXY_API_KEY`).
