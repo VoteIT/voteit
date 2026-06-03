@@ -17,17 +17,15 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
 from django.utils.timezone import now
-from django_fsm import FSMField
-from django_fsm import transition
 from rules.contrib.models import RulesModelMixin
+from statemachine.mixins import MachineMixin
 
-from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import ensure_atomic
 from voteit.core.decorators import has_exact_filter
 from voteit.core.fields import RolesField
+from voteit.invites.statemachines import InviteStateMachine
 from voteit.invites.utils import get_invite_adapter_registry
-from voteit.invites.workflows import InviteWf
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import MeetingRoles
@@ -61,7 +59,7 @@ class MeetingInviteManager(models.Manager):
         self, *, organisation: Organisation | None = None, **kw
     ) -> models.QuerySet[MeetingInvite]:
         kw["organisation"] = organisation
-        return self.find_invites(**kw).filter(state=InviteWf.OPEN)
+        return self.find_invites(**kw).filter(state=InviteStateMachine.open.id)
 
     def find_invites(
         self, *, organisation: Organisation | None = None, **kw
@@ -198,14 +196,17 @@ class MeetingInviteManager(models.Manager):
         for invite in needs_role_update_qs:
             invite.roles = roles
             # We've already excluded var exclude_states
-            if invite.state not in (InviteWf.OPEN, InviteWf.ACCEPTED):
-                invite.state = InviteWf.OPEN
+            if invite.state not in (
+                InviteStateMachine.open.id,
+                InviteStateMachine.accepted.id,
+            ):
+                invite.state = InviteStateMachine.open.id
             invite.save()
         # Change state of other invites that haven't been touched
         for invite in exact_qs.exclude(
-            state__in={InviteWf.OPEN, InviteWf.ACCEPTED}
+            state__in={InviteStateMachine.open.id, InviteStateMachine.accepted.id}
         ).exclude(pk__in=needs_role_update_qs):
-            invite.state = InviteWf.OPEN
+            invite.state = InviteStateMachine.open.id
             invite.save()
         self._update_assigned_roles(
             meeting, needs_role_update_qs, ignore_roles=ignore_roles
@@ -250,7 +251,9 @@ class MeetingInviteManager(models.Manager):
             state=MeetingWf.CLOSED, end_time__lt=threshold_ts
         )
         return MeetingInvite.objects.filter(
-            meeting__in=meeting_qs, state=InviteWf.OPEN, created__lt=threshold_ts
+            meeting__in=meeting_qs,
+            state=InviteStateMachine.open.id,
+            created__lt=threshold_ts,
         )
 
 
@@ -266,10 +269,14 @@ class MeetingInviteManager(models.Manager):
     mask_fields=["user_data"],
     mask_callable="voteit.invites.utils.user_data_mask",
 )
-class MeetingInvite(RulesModelMixin, MeetingContext):
+class MeetingInvite(RulesModelMixin, MeetingContext, MachineMixin):
     name = "meeting_invite"
-    state: str = FSMField(
-        default=InviteWf.initial, choices=InviteWf.choices(), editable=False
+    sm: InviteStateMachine
+    state_machine_name = "voteit.invites.statemachines.InviteStateMachine"
+    state_machine_attr = "sm"
+    state: str = models.CharField(
+        default=InviteStateMachine.open.id,
+        choices=[(x.id, str(x.name)) for x in InviteStateMachine.states],
     )
     created: datetime = models.DateTimeField(default=now, editable=False)
     modified: datetime = models.DateTimeField(auto_now=True, editable=False)
@@ -305,42 +312,17 @@ class MeetingInvite(RulesModelMixin, MeetingContext):
         )
 
     @ensure_atomic
-    @transition(
-        field=state,
-        source=InviteWf.OPEN,
-        target=InviteWf.ACCEPTED,
-        permission=PERM.NOT_ALLOWED,  # Special view, not a normal transition
-    )
     def accept(self, user: UserType):
         """
         Important! Must always run within an atomic block!
         """
-        self.used_by = user
-        self.used_at = now()
-        self.meeting.add_roles(user, *self.roles)
-        reg = get_invite_adapter_registry()
-        reg.run_accepted(self)
+        self.sm.accept(user=user)
 
-    @transition(
-        field=state,
-        source=InviteWf.OPEN,
-        target=InviteWf.REJECTED,
-        permission=PERM.NOT_ALLOWED,  # Special view, not a normal transition
-    )
     def reject(self, user: UserType | None = None):
-        if not user:
-            return
-        if user.pk is not None:
-            self.used_by = user
+        self.sm.reject(user=user)
 
-    @transition(
-        field=state,
-        source=InviteWf.OPEN,
-        target=InviteWf.REVOKED,
-        permission=f"invites.{PERM.CHANGE}_meetinginvite",
-    )
-    def revoke(self):
-        pass
+    def revoke(self, user: UserType = None, force=False):
+        self.sm.revoke(user=user, force=force)
 
     objects = MeetingInviteManager()
 

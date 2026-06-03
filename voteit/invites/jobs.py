@@ -8,7 +8,7 @@ from auditlog.context import disable_auditlog
 from django.utils.timezone import now
 from voteit.core.decorators import schedule_job
 from voteit.invites.models import MeetingInvite
-from voteit.invites.workflows import InviteWf
+from voteit.invites.statemachines import InviteStateMachine
 
 if TYPE_CHECKING:
     pass
@@ -27,7 +27,7 @@ def expire_unused_invites() -> int:
     """
     invites_qs = MeetingInvite.objects.should_expire()
     # We don't care about transition here
-    return invites_qs.update(state=InviteWf.EXPIRED)
+    return invites_qs.update(state=InviteStateMachine.expired.id)
 
 
 @schedule_job("50 3 * * *")
@@ -38,7 +38,7 @@ def cleanup_invites():
     """
     # There's really no reason to keep this around longer
     expired_revoked_qs = MeetingInvite.objects.filter(
-        state__in=[InviteWf.EXPIRED, InviteWf.REVOKED],
+        state__in=[InviteStateMachine.expired.id, InviteStateMachine.revoked.id],
         modified__lt=now() - timedelta(days=30),
     )
     expired_revoked_count = expired_revoked_qs.count()

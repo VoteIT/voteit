@@ -16,6 +16,7 @@ from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteChanged
 from voteit.invites.models import MeetingGroupAnnotation
 from voteit.invites.models import MeetingInvite
+from voteit.invites.statemachines import InviteStateMachine
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.organisation import IDPROXY_PROVIDER
@@ -46,22 +47,22 @@ class MeetingInviteViewSetTests(APITestCase):
         self.participant.refresh_from_db()
 
     def test_transition_moderator(self):
-        url = f"/api/meeting-invites/{self.invite.pk}/transitions/"
-        data = {"transition": "revoke"}
+        url = reverse("meeting-invites-event", kwargs={"pk": self.invite.pk})
+        data = {"event": "revoke"}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 200)
 
     def test_bad_transition_moderator(self):
-        url = f"/api/meeting-invites/{self.invite.pk}/transitions/"
-        data = {"transition": "wooohoooo"}
+        url = reverse("meeting-invites-event", kwargs={"pk": self.invite.pk})
+        data = {"event": "woho"}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 400)
 
     def test_transition_unauthorized_users(self):
-        url = f"/api/meeting-invites/{self.invite.pk}/transitions/"
-        data = {"transition": "revoke"}
+        url = reverse("meeting-invites-event", kwargs={"pk": self.invite.pk})
+        data = {"event": "revoke"}
         response = self.client.post(url, data)
         self.assertEqual(
             response.status_code,
@@ -166,7 +167,7 @@ class MatchInvitesViewSetTests(APITestCase):
         self.assertEqual(self.invite.pk, data[0]["pk"])
 
     def test_used_dont_show_up(self):
-        self.invite.revoke()
+        self.invite.revoke(force=True)
         self.invite.save()
         payload = [
             {
@@ -245,7 +246,7 @@ class UserMatchedInviteViewSetTests(APITestCase):
         self.assertEqual(self.invite_matching.pk, data[0]["pk"])
 
     def test_not_open(self):
-        self.invite_matching.revoke()
+        self.invite_matching.revoke(force=True)
         self.invite_matching.save()
         self.client.force_login(self.outsider)
         url = reverse("handle-matched-invites-list")
@@ -632,8 +633,6 @@ class MeetingInviteViewSetCreateTests(APITestCase):
 
     def test_create_moderator_lockout(self):
         """Importing without moderator role when existing moderators have accepted invites → 400."""
-        from voteit.invites.workflows import InviteWf
-
         moderator = self.meeting.participants.get(username="moderator")
         moderator.userid = "moderator"
         moderator.save()
@@ -641,7 +640,7 @@ class MeetingInviteViewSetCreateTests(APITestCase):
             user_data={"email": "moderator@example.com"},
             roles=["mo", "pa"],
             used_by=moderator,
-            state=InviteWf.ACCEPTED,
+            state=InviteStateMachine.accepted.value,
         )
         response = self._post(
             {

@@ -15,8 +15,8 @@ from voteit.invites.messages import MeetingInviteChanged
 from voteit.invites.messages import MeetingInviteDeleted
 from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api.serializers import MeetingInviteSerializer
+from voteit.invites.statemachines import InviteStateMachine
 from voteit.invites.utils import get_invite_adapter_registry
-from voteit.invites.workflows import InviteWf
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.signals import archive_meeting
 from voteit.meeting.signals import meeting_joined
@@ -30,7 +30,9 @@ if TYPE_CHECKING:
 @receiver(archive_meeting)
 def expire_unused_invites(meeting, **kw):
     # Note: This will bypass the transaction, but that should be fine. Remember to change if we need to.
-    meeting.invites.filter(state=InviteWf.OPEN).update(state=InviteWf.EXPIRED)
+    meeting.invites.filter(state=InviteStateMachine.open.id).update(
+        state=InviteStateMachine.expired.id
+    )
 
 
 @receiver(meeting_joined)

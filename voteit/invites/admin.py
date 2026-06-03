@@ -1,7 +1,6 @@
 from logging import getLogger
 
 from django.contrib import admin
-from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.invites.models import MeetingGroupAnnotation
 from voteit.invites.models import MeetingInvite
@@ -22,8 +21,7 @@ class MeetingGroupAnnotationInline(admin.TabularInline):
 
 
 @admin.register(MeetingInvite)
-class MeetingInviteAdmin(FSMTransitionMixin, MeetingAdminMixin, admin.ModelAdmin):
-    fsm_field = ("state",)
+class MeetingInviteAdmin(MeetingAdminMixin, admin.ModelAdmin):
     search_fields = (
         "user_data__email",
         "user_data__swedish_ssn",

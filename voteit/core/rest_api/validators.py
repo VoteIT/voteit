@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.utils.translation import gettext as _
@@ -7,10 +8,10 @@ from rest_framework.exceptions import ValidationError
 
 from voteit.agenda.models import AgendaItem
 from voteit.core import PERM
-from voteit.core.rest_api.serializers import BaseModelSerializer
 from voteit.meeting.models import Meeting
 
 if TYPE_CHECKING:
+    from voteit.core.rest_api.serializers import BaseModelSerializer
     from voteit.meeting.models import MeetingGroup
 
 
@@ -33,7 +34,6 @@ class ValidateGroupAIContext:
         Note the requirement on VoteITs BaseModelSerializer - it checks meeting groups so we don't need to do that.
         """
         if self.group_fieldname in value:
-            assert isinstance(serializer, BaseModelSerializer)
             user = serializer.get_request_user()
             if user is None or user.is_anonymous:  # pragma: no cover
                 # This should never really happen since create will always require authenticated users
@@ -76,3 +76,20 @@ class RoleValidator:
     def __call__(self, value):
         if value not in self.roles_cls.valid_roles:
             raise ValidationError(f'The role "{value}" is not valid for this context.')
+
+
+class SMEventValidator:
+    requires_context = True
+
+    def __init__(self, allow_anon=False):
+        self.allow_anon = allow_anon
+
+    def __call__(self, value, serializer_field):
+        instance = serializer_field.root.instance
+        if value not in instance.sm.events:
+            raise ValidationError(f"{value} is not a valid event for this instance")
+        user = serializer_field.context["request"].user
+        if user is None:
+            raise ValueError("Got user None")
+        if user.is_anonymous and not self.allow_anon:
+            raise AuthenticationFailed()

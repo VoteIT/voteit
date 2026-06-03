@@ -16,8 +16,12 @@ from rest_framework.serializers import Serializer
 from rules.contrib.rest_framework import (
     AutoPermissionViewSetMixin as RulesAutoPermissionViewSetMixin,
 )
+from statemachine import registry
+from statemachine.mixins import MachineMixin
 
 from voteit.core.rest_api.serializers import FSMTransitionSerializer
+from voteit.core.rest_api.serializers import SMEventSerializer
+from voteit.core.rest_api.serializers import StateMachineSerializer
 from voteit.core.rest_api.serializers import TransitionSerializer
 from voteit.core.rest_api.utils import drf_do_transition
 from voteit.core.rest_api.utils import get_valid_transitions
@@ -113,6 +117,44 @@ class ModelContextMixin(ABC):
                     "lookup_val": lookup_val,
                 }
             )
+
+
+class StateMachineMixin:
+    instance: MachineMixin
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        serializer_class=StateMachineSerializer,
+        permission_classes=[],
+        url_path="state-machine",
+    )
+    def state_machine(self, request, *args, **kwargs):
+        """
+        State machine for this model.
+        """
+        model = self.get_queryset().model
+        machine_cls = registry.get_machine_cls(model.state_machine_name)
+        sm = machine_cls(model())
+        serializer = self.get_serializer(sm)
+        return Response(data=serializer.data)
+
+    @action(
+        detail=True,
+        methods=["POST", "GET", "PATCH"],
+        serializer_class=SMEventSerializer,
+    )
+    @transaction.atomic(durable=True)
+    def event(self, request, *args, **kwargs):
+        """
+        Sends an event to the state machine. Events trigger transitions to new states.
+        """
+        obj = self.get_object()
+        if request.method != "GET":
+            serializer = self.get_serializer(obj, data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+        return Response(data={"state": obj.state})
 
 
 class TransitionsMixin(SerializerClassesMixin):

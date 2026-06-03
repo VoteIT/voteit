@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from logging import getLogger
+from typing import Mapping
 from typing import OrderedDict
 from typing import TYPE_CHECKING
 
@@ -15,10 +16,14 @@ from pydantic.main import BaseModel
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
+from statemachine import StateMachine
+from statemachine.exceptions import TransitionNotAllowed
+from statemachine.utils import qualname
 
 from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
+from voteit.core.rest_api.validators import SMEventValidator
 from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
 from voteit.core.validators import get_invalid_tags
@@ -226,6 +231,55 @@ class TransitionSerializer(serializers.Serializer):
 
     class Meta:
         fields = ("transition",)
+
+
+class SMEventSerializer(serializers.Serializer):
+    event = serializers.CharField(validators=[SMEventValidator()])
+
+    def update(self, instance, validated_data):
+        user = self.context["request"].user
+        try:
+            self.instance.sm.send(validated_data["event"], user=user)
+        except ValidationError as exc:
+            if isinstance(exc.detail, Mapping):
+                raise exc from exc
+            raise ValidationError({"event": exc.detail}) from exc
+        except TransitionNotAllowed as exc:
+            raise ValidationError({"event": str(exc)}) from exc
+        self.instance.save()
+        return self.instance
+
+
+class StateSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    id = serializers.CharField()
+
+
+class SMTransitionSerializer(serializers.Serializer):
+    source = StateSerializer()
+    target = StateSerializer()
+    events = serializers.ListSerializer(child=serializers.CharField())
+    validators = serializers.ListSerializer(child=serializers.CharField())
+    cond = serializers.ListSerializer(child=serializers.CharField())
+
+
+class StateDetailSerializer(StateSerializer):
+    transitions = SMTransitionSerializer(many=True)
+
+
+class EventDetailSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    id = serializers.CharField()
+
+
+class StateMachineSerializer(serializers.Serializer):
+    states = StateDetailSerializer(many=True)
+    events = serializers.ListSerializer(child=EventDetailSerializer())
+    qualname = serializers.SerializerMethodField()
+    name = serializers.CharField()
+
+    def get_qualname(self, sm: type[StateMachine]):
+        return qualname(sm.__class__)
 
 
 class PydanticFieldSerializer(serializers.JSONField):

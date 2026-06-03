@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from contextlib import contextmanager
+from contextlib import suppress
 from copy import deepcopy
 from inspect import isclass
 from random import randint
@@ -396,10 +397,12 @@ def prepare_available_transitions():
     for name, content in content_reg.items():
         # FIXME: This may change, but currently all models use "state" as attr.
         if hasattr(content, "state"):
-            serializer = BaseFSMTransitonSerializer(
-                list(content.state.field.get_all_transitions(content)), many=True
-            )
-            _cached_available_transitions[name] = serializer.data
+            # FIXME: Remove when refactored
+            with suppress(AttributeError):
+                serializer = BaseFSMTransitonSerializer(
+                    list(content.state.field.get_all_transitions(content)), many=True
+                )
+                _cached_available_transitions[name] = serializer.data
 
 
 def get_available_transitions() -> dict:

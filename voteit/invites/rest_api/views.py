@@ -18,7 +18,7 @@ from rest_framework.viewsets import ViewSet
 from voteit.core.rest_api import router
 from voteit.core.rest_api.lock import LockAlreadyRunning
 from voteit.core.rest_api.lock import LockCooldownActive
-from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.mixins import StateMachineMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.invites.rest_api.lock import invites_lock
@@ -28,6 +28,7 @@ from voteit.invites.schemas import InviteDataTypesSchema
 from voteit.invites.schemas import InvitesResultSchema
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.utils import send_updated_invites
+from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.workflows import MeetingWf
 from voteit.organisation.utils import get_idproxy_user_data
@@ -38,7 +39,7 @@ logger = getLogger(__name__)
 @router.register("meeting-invites", basename="meeting-invites")
 class MeetingInviteViewSet(
     VerboseAutoPermissionViewSetMixin,
-    TransitionsMixin,
+    StateMachineMixin,
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
@@ -50,6 +51,7 @@ class MeetingInviteViewSet(
     """
 
     filterset_fields = ("meeting",)
+    filterset_class = ForceMeetingWithRoleFilter
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "retrieve": None,
@@ -58,6 +60,8 @@ class MeetingInviteViewSet(
         "bulk_revoke": None,
         "import_invites": None,
         "clear_annotations": None,
+        "event": None,
+        "state_machine": None,
     }
     serializer_class = serializers.InviteCreateSerializer
 
@@ -65,10 +69,12 @@ class MeetingInviteViewSet(
         """
         Generic searches without meeting as part of the query aren't allowed for this view.
         """
-        return MeetingInvite.objects.filter(
-            meeting__roles__user=self.request.user,
-            meeting__roles__assigned__contains=ROLE_MODERATOR,
-        ).exclude(state__in=MeetingWf.archived_states)
+        if self.request.user.is_authenticated:
+            return MeetingInvite.objects.filter(
+                meeting__roles__user=self.request.user,
+                meeting__roles__assigned__contains=ROLE_MODERATOR,
+            ).exclude(state__in=MeetingWf.archived_states)
+        return MeetingInvite.objects.none()
 
     def retrieve(self, request, *args, **kwargs):
         """

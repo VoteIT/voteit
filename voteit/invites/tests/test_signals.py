@@ -13,6 +13,7 @@ from voteit.invites.messages import MeetingInviteAdded
 from voteit.invites.messages import MeetingInviteChanged
 from voteit.invites.messages import MeetingInviteDeleted
 from voteit.invites.models import MeetingInvite
+from voteit.invites.statemachines import InviteStateMachine
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -63,12 +64,10 @@ class InvitesExpireWhenMeetingArchivedTests(TestCase):
         )
 
     def test_expire(self):
-        from voteit.invites.workflows import InviteWf
-
-        self.assertEqual(InviteWf.OPEN, self.inv1.state)
+        self.assertEqual(InviteStateMachine.open.id, self.inv1.state)
         self.meeting.archive()
         self.inv1.refresh_from_db()
-        self.assertEqual(InviteWf.EXPIRED, self.inv1.state)
+        self.assertEqual(InviteStateMachine.expired.id, self.inv1.state)
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)

@@ -9,7 +9,7 @@ from django.utils.timezone import now
 from voteit.invites.jobs import cleanup_invites
 from voteit.invites.jobs import expire_unused_invites
 from voteit.invites.models import MeetingInvite
-from voteit.invites.workflows import InviteWf
+from voteit.invites.statemachines import InviteStateMachine
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.workflows import MeetingWf
@@ -59,19 +59,19 @@ class ExpireUnusedInvitesTests(TestCase):
             cls.old_revoked = cls.meeting.invites.create(
                 roles=[ROLE_PARTICIPANT],
                 user_data={},
-                state=InviteWf.REVOKED,
+                state=InviteStateMachine.revoked.id,
             )
 
     def test_expire_unused_invites(self):
         self.assertEqual(1, expire_unused_invites())
         self.inv_old.refresh_from_db()
-        self.assertEqual(InviteWf.EXPIRED, self.inv_old.state)
+        self.assertEqual(InviteStateMachine.expired.id, self.inv_old.state)
 
     def test_cleanup_unused_invites(self):
         recent_revoked = self.meeting.invites.create(
             roles=[ROLE_PARTICIPANT],
             user_data={},
-            state=InviteWf.REVOKED,
+            state=InviteStateMachine.revoked.id,
         )
         self.assertEqual(
             {"expired_revoked_count": 1, "other_states_count": 1},
