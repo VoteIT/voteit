@@ -45,6 +45,7 @@ dependencies = [
     "py-vote-core>=2.0.0",
     "python-magic>=0.4.27",
     "djangorestframework-api-key>=3.1.0",
+    "python-statemachine>=3.1.2",
 ]
 
 [project.urls]
