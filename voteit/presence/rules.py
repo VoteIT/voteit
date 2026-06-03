@@ -5,7 +5,6 @@ from rules import always_deny
 from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import predicate
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import is_participant
 from voteit.presence.components import PresenceCheckComponent
@@ -23,9 +22,7 @@ def is_check_open(user: AbstractUser, instance: PresenceCheck):
 @predicate
 def presence_component_active(user: AbstractUser, instance: MeetingContext):
     if instance.meeting:
-        return instance.meeting.components.filter(
-            component_name=PresenceCheckComponent.name, state=EnabledWf.ON
-        ).exists()
+        return instance.meeting.component_enabled(PresenceCheckComponent.name)
     return False
 
 

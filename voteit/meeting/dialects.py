@@ -17,7 +17,6 @@ from yaml import safe_load
 
 from voteit.components.app.components.dialects import DialectsFilter
 from voteit.core.decorators import ensure_atomic
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.exceptions import DialectError
 from voteit.meeting.models import Meeting
 from voteit.meeting.schemas import DialectSchema
@@ -211,7 +210,7 @@ class DialectHandler:
         if self.data.block_components:
             for component in meeting.components.filter(
                 component_name__in=self.data.block_components,
-                state=EnabledWf.ON,
+                enabled=True,
             ):
                 component.disable()
                 component.save()
@@ -220,7 +219,7 @@ class DialectHandler:
             # Reset component to trigger validation on state change
             component, _ = meeting.components.update_or_create(
                 component_name=cs.name,
-                defaults={"settings_data": cs.settings, "state": EnabledWf.OFF},
+                defaults={"settings_data": cs.settings, "enabled": False},
             )
             component.enable()
             component.save()

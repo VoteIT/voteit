@@ -23,7 +23,6 @@ from voteit.core.decorators import ensure_atomic
 from voteit.core.fields import RichTextField, RolesField
 from voteit.core.models import BaseContent, RoleContextMixin, Roles, User
 from voteit.core.utils import relaxed_clean_html
-from voteit.core.workflows import EnabledWf
 from voteit.meeting import roles
 from voteit.meeting.workflows import MeetingWf
 from voteit.poll.utils import (
@@ -276,7 +275,7 @@ class Meeting(
     def component_enabled(self, name: str, refresh=False) -> bool:
         if not hasattr(self, "_enabled_components") or refresh:
             self._enabled_components = set(
-                self.components.filter(state=EnabledWf.ON).values_list(
+                self.components.filter(enabled=True).values_list(
                     "component_name", flat=True
                 )
             )

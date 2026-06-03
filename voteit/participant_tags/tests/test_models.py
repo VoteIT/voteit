@@ -1,7 +1,6 @@
 from django.db import IntegrityError
 from django.test import TestCase
 
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import Meeting
 from voteit.participant_tags.components import GenderTags
 
@@ -16,7 +15,7 @@ class ParticipantTagTests(TestCase):
         cls.moderator = cls.meeting.participants.get(username="moderator")
         cls.component = cls.meeting.components.create(
             component_name=GenderTags.name,
-            state=EnabledWf.ON,
+            enabled=True,
             settings_data={"tags": ["f", "m", "nb"]},
         )
 

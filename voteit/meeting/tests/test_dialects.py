@@ -6,7 +6,6 @@ from pydantic import ValidationError
 from voteit.components.app.components.dialects import DialectsFilter
 from voteit.components.app.components.irv import RepeatedIRV
 from voteit.components.app.components.message import FlashMessage
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.dialects import get_named_paths
 from voteit.meeting.exceptions import DialectError
 from voteit.meeting.models import Meeting
@@ -218,7 +217,7 @@ class DialectHandlerTests(TestCase):
 
     def test_install_with_component_and_block(self):
         component_to_block = self.meeting.components.create(
-            component_name=RepeatedIRV.name, state=EnabledWf.ON
+            component_name=RepeatedIRV.name, enabled=True
         )
         handler = self._cut.load_from_dict(dialect_with_component)
         handler.install(self.meeting)
@@ -226,9 +225,9 @@ class DialectHandlerTests(TestCase):
             component_name=FlashMessage.name
         ).first()
         self.assertEqual({"msg": "Hello!"}, component.settings_data)
-        self.assertEqual(EnabledWf.ON, component.state)
+        self.assertTrue(component.enabled)
         component_to_block.refresh_from_db()
-        self.assertEqual(EnabledWf.OFF, component_to_block.state)
+        self.assertFalse(component_to_block.enabled)
 
     def test_install_participant_tags(self):
         handler = self._cut.load_from_dict(dialect_with_tags_component)
@@ -237,14 +236,14 @@ class DialectHandlerTests(TestCase):
             component_name=GenderTags.name
         ).first()
         self.assertEqual({"tags": ["f", "m", "nb"]}, gender_component.settings_data)
-        self.assertEqual(EnabledWf.ON, gender_component.state)
+        self.assertTrue(gender_component.enabled)
         pronoun_component = self.meeting.components.filter(
             component_name=PronounTags.name
         ).first()
         self.assertEqual(
             {"tags": ["he", "she", "ze"], "many": True}, pronoun_component.settings_data
         )
-        self.assertEqual(EnabledWf.ON, pronoun_component.state)
+        self.assertTrue(pronoun_component.enabled)
 
     def test_install_empty_room(self):
         handler = self._cut.load_from_dict(dialect_with_room)
@@ -354,7 +353,7 @@ class DialectRegistryTests(TestCase):
                 "exclude": ["main_subst", "three", "two"],
                 "include": ["one"],
             },
-            state=EnabledWf.ON,
+            enabled=True,
         )
         self.assertEqual(
             {"one": self.one},
@@ -388,7 +387,7 @@ class DialectRegistryTests(TestCase):
     #         component_name=ActiveUsersComponent.name
     #     ).first()
     #     self.failUnless(component)
-    #     self.assertEqual(EnabledWf.ON, component.state)
+    #     self.assertTrue(component.enabled)
 
 
 # class RecursiveLoadHandlersTests(TestCase):

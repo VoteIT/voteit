@@ -16,7 +16,6 @@ from voteit.active.utils import active_enabled_for_meeting
 from voteit.components.models import MeetingComponent
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
@@ -35,10 +34,7 @@ def send_active_users_appstruct(context: Meeting, app_state: AppState, **kwargs)
 
 @receiver(post_save, sender=MeetingComponent)
 def send_active_state_when_enabled(instance: MeetingComponent, **kwargs):
-    if (
-        instance.component_name == ActiveUsersComponent.name
-        and instance.state == EnabledWf.ON
-    ):
+    if instance.component_name == ActiveUsersComponent.name and instance.enabled:
         users = list(instance.meeting.active_users.values_list("user_id", flat=True))
         msg = ActiveUsers(users=users, meeting=instance.meeting.pk)
         ch = MeetingChannel.from_instance(instance.meeting)

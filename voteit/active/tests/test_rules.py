@@ -4,7 +4,6 @@ from django.test import TestCase
 from voteit.active.components import ActiveUsersComponent
 from voteit.active.models import ActiveUser
 from voteit.core import PERM
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import Meeting
 from voteit.meeting.workflows import MeetingWf
 
@@ -18,7 +17,7 @@ class ActiveUserPermissionsTests(TestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.component = cls.meeting.components.create(
-            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+            component_name=ActiveUsersComponent.name, enabled=True
         )
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")

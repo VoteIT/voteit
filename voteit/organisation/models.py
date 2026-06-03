@@ -15,7 +15,6 @@ from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.utils import relaxed_clean_html
-from voteit.core.workflows import EnabledWf
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
@@ -134,7 +133,7 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
         return self
 
     def enabled_components(self):
-        for component in self.components.filter(state=EnabledWf.ON):
+        for component in self.components.filter(enabled=True):
             if component.is_valid:
                 yield component
 

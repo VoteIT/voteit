@@ -8,7 +8,6 @@ from envelope.testing import ChannelMessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.agenda.channels import AgendaItemChannel
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import Meeting
 from voteit.notes import NoteIntent
 from voteit.notes.components import NotesComponent
@@ -34,7 +33,7 @@ class SignalTests(TestCase):
             intent=NoteIntent.APPROVE,
         )
         cls.component = cls.meeting.components.create(
-            component_name=NotesComponent.name, state=EnabledWf.ON
+            component_name=NotesComponent.name, enabled=True
         )
 
     def _mk_subs(self):

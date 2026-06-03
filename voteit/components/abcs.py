@@ -19,6 +19,7 @@ from voteit.core.component import Registry
 
 
 class Component(RulesModelMixin, ABCModel):
+    enabled: bool = models.BooleanField(default=False)
     component_name: str = models.CharField(max_length=30)
     settings_data: dict | None = models.JSONField(
         verbose_name="JSON-serialized settings",
@@ -29,13 +30,6 @@ class Component(RulesModelMixin, ABCModel):
 
     class Meta:
         abstract = True
-
-    @property
-    @abstractmethod
-    def state(self):
-        """
-        Django FSM field
-        """
 
     @abstractmethod
     def get_registry(self) -> Registry[str, ComponentAdapter]:
@@ -100,6 +94,18 @@ class Component(RulesModelMixin, ABCModel):
 
     def valid_settings(self) -> bool:
         return self.is_valid
+
+    def enable(self):
+        if not self.valid_component_name():
+            raise ValueError(
+                f"Component name '{self.component_name}' is not registered"
+            )
+        if not self.valid_settings():
+            raise ValueError("Component settings are not valid")
+        self.enabled = True
+
+    def disable(self):
+        self.enabled = False
 
     # Type annotations - relations
     objects: models.Manager

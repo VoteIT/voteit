@@ -7,7 +7,6 @@ from envelope.testing import ChannelMessageCatcher
 from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.organisation.models import Organisation
@@ -31,12 +30,12 @@ class SignalAndSubscribeTests(TestCase):
         cls.pronoun_component: NamespacedTags = cls.meeting.components.create(
             component_name=PronounTags.name,
             settings={"tags": ["han", "hon", "hen"], "many": True},
-            state=EnabledWf.ON,
+            enabled=True,
         )
         cls.gender_component: NamespacedTags = cls.meeting.components.create(
             component_name=GenderTags.name,
             settings={"tags": ["f", "m", "nb"]},
-            state=EnabledWf.ON,
+            enabled=True,
         )
         cls.participant = cls.org.users.get(username="participant")
         cls.moderator = cls.org.users.get(username="moderator")

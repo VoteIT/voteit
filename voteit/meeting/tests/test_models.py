@@ -4,7 +4,6 @@ from django.test import TestCase
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.components.app.components.proposal_print import ProposalPrint
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_DISCUSSER
@@ -93,11 +92,9 @@ class MeetingTests(TestCase):
 
     def test_component_enabled(self):
         self.meeting.components.create(
-            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+            component_name=ActiveUsersComponent.name, enabled=True
         )
-        self.meeting.components.create(
-            component_name=ProposalPrint.name, state=EnabledWf.ON
-        )
+        self.meeting.components.create(component_name=ProposalPrint.name, enabled=True)
         with self.assertNumQueries(1):
             self.meeting.component_enabled(ProposalPrint.name)
         with self.assertNumQueries(0):

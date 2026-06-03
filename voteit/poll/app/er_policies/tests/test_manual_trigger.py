@@ -3,7 +3,6 @@ from django.test import TestCase
 from django_fsm import TransitionNotAllowed
 
 from voteit.active.components import ActiveUsersComponent
-from voteit.core.workflows import EnabledWf
 from voteit.poll.models import Poll
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
@@ -35,7 +34,7 @@ class ManualTriggerTests(TestCase):
 
     def test_active_users_respected(self):
         self.meeting.components.create(
-            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+            component_name=ActiveUsersComponent.name, enabled=True
         )
         self.meeting.active_users.create(user=self.user1)
         self.meeting.er_policy.create_er()

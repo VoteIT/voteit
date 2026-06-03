@@ -63,7 +63,7 @@ class MeetingComponentViewSetTests(APITestCase):
                 "component_name": ProposalPrint.name,
                 "meeting": 1,
                 "settings": None,
-                "state": "off",
+                "enabled": False,
             },
             data,
         )
@@ -102,7 +102,7 @@ class MeetingComponentViewSetTests(APITestCase):
                 "component_name": ProposalPrint.name,
                 "meeting": 1,
                 "settings": None,
-                "state": "off",
+                "enabled": False,
                 "pk": self.print_component.pk,
                 "is_valid": True,
             },
@@ -146,13 +146,14 @@ class MeetingComponentViewSetTests(APITestCase):
         response = self.client.delete(url)
         self.assertEqual(403, response.status_code)
 
-    def test_transition_moderator(self):
+    def test_enable_moderator(self):
         self.client.force_login(self.moderator)
         url = reverse(
-            "meeting-components-transitions", kwargs={"pk": self.print_component.pk}
+            "meeting-components-detail", kwargs={"pk": self.print_component.pk}
         )
-        response = self.client.post(url, data={"transition": "enable"})
-        self.assertEqual(201, response.status_code)
+        response = self.client.patch(url, data={"enabled": True})
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.json()["enabled"])
 
     def test_get_print_moderator(self):
         self.client.force_login(self.moderator)
@@ -186,7 +187,7 @@ class OrganisationSendsComponentsViewSetTests(APITestCase):
         cls.organisation.host = "testserver"
         cls.organisation.save()
         cls.message_component = cls.organisation.components.create(
-            component_name=FlashMessage.name, settings={"msg": "Hello"}, state="on"
+            component_name=FlashMessage.name, settings={"msg": "Hello"}, enabled=True
         )
 
     def test_user_list(self):
@@ -203,7 +204,7 @@ class OrganisationSendsComponentsViewSetTests(APITestCase):
                     "settings": {"msg": "Hello", "type": "info"},
                     "is_valid": True,
                     "component_name": "flash_message",
-                    "state": "on",
+                    "enabled": True,
                     "organisation": 1,
                 }
             ],
@@ -223,7 +224,7 @@ class OrganisationSendsComponentsViewSetTests(APITestCase):
                     "settings": {"msg": "Hello", "type": "info"},
                     "is_valid": True,
                     "component_name": "flash_message",
-                    "state": "on",
+                    "enabled": True,
                     "organisation": 1,
                 }
             ],

@@ -10,7 +10,6 @@ from envelope.testing import testing_channel_layers_setting
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.core.testing import FakeCommit
-from voteit.core.workflows import EnabledWf
 from voteit.components.app.components.message import FlashMessage
 from voteit.components.app.components.proposal_print import ProposalPrint
 from voteit.meeting.models import Meeting
@@ -31,10 +30,10 @@ class MeetingChannelSubscribedTests(TestCase):
         cls.flash = cls.meeting.components.create(
             component_name=FlashMessage.name,
             settings={"msg": "Hello!"},
-            state=EnabledWf.ON,
+            enabled=True,
         )
         cls.prop_print = cls.meeting.components.create(
-            component_name=ProposalPrint.name, state=EnabledWf.ON
+            component_name=ProposalPrint.name, enabled=True
         )
 
     def _mk_subscribe(self):
@@ -61,7 +60,7 @@ class MeetingChannelSubscribedTests(TestCase):
                 "settings": {"msg": "Hello!", "type": "info"},
                 "meeting": self.meeting.pk,
                 "component_name": FlashMessage.name,
-                "state": EnabledWf.ON,
+                "enabled": True,
                 "is_valid": True,
             },
             payloads[0],
@@ -72,7 +71,7 @@ class MeetingChannelSubscribedTests(TestCase):
                 "settings": None,
                 "meeting": self.meeting.pk,
                 "component_name": ProposalPrint.name,
-                "state": EnabledWf.ON,
+                "enabled": True,
                 "is_valid": True,
             },
             payloads[1],
@@ -121,7 +120,7 @@ class MeetingChannelSubscribedTests(TestCase):
                 },
                 "meeting": self.meeting.pk,
                 "component_name": FlashMessage.name,
-                "state": EnabledWf.OFF,
+                "enabled": False,
                 "is_valid": True,
             },
         )
@@ -132,7 +131,7 @@ class MeetingChannelSubscribedTests(TestCase):
                 "settings": None,
                 "meeting": self.meeting.pk,
                 "component_name": ProposalPrint.name,
-                "state": EnabledWf.ON,
+                "enabled": True,
                 "is_valid": True,
             },
         )
@@ -160,7 +159,7 @@ class MeetingComponentChangedTests(TestCase):
 
         with FakeCommit():
             component = self.meeting.components.create(
-                component_name=ProposalPrint.name, state=EnabledWf.ON
+                component_name=ProposalPrint.name, enabled=True
             )
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
@@ -213,11 +212,11 @@ class MeetingComponentsDisabledWhenMeetingClosesTests(TestCase):
         cls.msg: MeetingComponent = cls.meeting.components.create(
             component_name=FlashMessage.name,
             settings={"msg": "Hello"},
-            state=EnabledWf.ON,
+            enabled=True,
         )
         cls.active: MeetingComponent = cls.meeting.components.create(
             component_name=ActiveUsersComponent.name,
-            state=EnabledWf.ON,
+            enabled=True,
         )
 
     def test_close_meeting(self):
@@ -225,5 +224,5 @@ class MeetingComponentsDisabledWhenMeetingClosesTests(TestCase):
         self.meeting.save()
         self.msg.refresh_from_db()
         self.active.refresh_from_db()
-        self.assertEqual(EnabledWf.ON, self.msg.state)
-        self.assertEqual(EnabledWf.OFF, self.active.state)
+        self.assertTrue(self.msg.enabled)
+        self.assertFalse(self.active.enabled)

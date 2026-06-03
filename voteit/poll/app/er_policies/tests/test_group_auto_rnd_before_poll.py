@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from voteit.active.components import ActiveUsersComponent
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import MeetingGroup
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
@@ -69,7 +68,7 @@ class GroupAutoRandomBeforePollTests(TestCase):
 
     def test_active_users_respected(self):
         self.meeting.components.create(
-            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+            component_name=ActiveUsersComponent.name, enabled=True
         )
         self.meeting.active_users.create(user=self.user1)
         self.poll.upcoming()
@@ -80,7 +79,7 @@ class GroupAutoRandomBeforePollTests(TestCase):
 
     def test_delegate_to(self):
         self.meeting.components.create(
-            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+            component_name=ActiveUsersComponent.name, enabled=True
         )
         self.meeting.active_users.create(user=self.user2)
         self.group_s.delegate_to = self.group_l

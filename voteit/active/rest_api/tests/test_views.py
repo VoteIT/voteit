@@ -12,7 +12,6 @@ from rest_framework.test import APITestCase
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.active.messages import ActiveUserChanged
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -30,7 +29,7 @@ class ActiveUserViewSetBase(APITestCase):
         cls.outsider = User.objects.create_user("outsider")
         cls.meeting: Meeting = Meeting.objects.create(state=MeetingWf.ONGOING)
         cls.component = cls.meeting.components.create(
-            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+            component_name=ActiveUsersComponent.name, enabled=True
         )
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
@@ -98,7 +97,7 @@ class ActiveActionTests(ActiveUserViewSetBase):
         self.assertEqual(401, response.status_code)
 
     def test_component_disabled_gets_404(self):
-        self.component.state = EnabledWf.OFF
+        self.component.enabled = False
         self.component.save()
         try:
             url = reverse("active-users-active", kwargs={"pk": self.meeting.pk})
@@ -106,7 +105,7 @@ class ActiveActionTests(ActiveUserViewSetBase):
             response = self.client.post(url, {"active": True})
             self.assertEqual(404, response.status_code)
         finally:
-            self.component.state = EnabledWf.ON
+            self.component.enabled = True
             self.component.save()
 
 

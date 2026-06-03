@@ -2,11 +2,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.contrib import admin
-from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.components.models import MeetingComponent
 from voteit.components.models import OrganisationComponent
-from voteit.core.workflows import EnabledWf
 
 if TYPE_CHECKING:
     from voteit.components.abcs import Component
@@ -19,12 +17,11 @@ class ComponentMixin:
 
     @admin.display(description="Enabled?", boolean=True)
     def component_enabled(self, obj: Component):
-        return obj.state == EnabledWf.ON
+        return obj.enabled
 
 
 @admin.register(MeetingComponent)
-class MeetingComponentAdmin(ComponentMixin, FSMTransitionMixin, admin.ModelAdmin):
-    fsm_field = ["state"]
+class MeetingComponentAdmin(ComponentMixin, admin.ModelAdmin):
     autocomplete_fields = ("meeting",)
     list_display = (
         "meeting",
@@ -35,7 +32,7 @@ class MeetingComponentAdmin(ComponentMixin, FSMTransitionMixin, admin.ModelAdmin
     list_filter = (
         "meeting__organisation",
         "component_name",
-        "state",
+        "enabled",
     )
     search_fields = (
         "component_name",
@@ -44,8 +41,7 @@ class MeetingComponentAdmin(ComponentMixin, FSMTransitionMixin, admin.ModelAdmin
 
 
 @admin.register(OrganisationComponent)
-class OrganisationComponentAdmin(ComponentMixin, FSMTransitionMixin, admin.ModelAdmin):
-    fsm_field = ["state"]
+class OrganisationComponentAdmin(ComponentMixin, admin.ModelAdmin):
     autocomplete_fields = ("organisation",)
     list_display = (
         "organisation",
@@ -56,5 +52,5 @@ class OrganisationComponentAdmin(ComponentMixin, FSMTransitionMixin, admin.Model
     list_filter = (
         "organisation",
         "component_name",
-        "state",
+        "enabled",
     )

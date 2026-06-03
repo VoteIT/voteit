@@ -2,7 +2,6 @@ from rest_framework.viewsets import ModelViewSet
 
 from voteit.components.rest_api import serializers
 from voteit.core.rest_api import router
-from voteit.core.rest_api.mixins import TransitionsMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.components.models import MeetingComponent
 
@@ -10,9 +9,7 @@ __all__ = ("MeetingComponentViewSet",)
 
 
 @router.register("meeting-components", basename="meeting-components")
-class MeetingComponentViewSet(
-    VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelViewSet
-):
+class MeetingComponentViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     model = MeetingComponent
     serializer_class = serializers.MeetingComponentSerializer
     permission_type_map = {

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -19,23 +18,28 @@ class ComponentSerializer(serializers.ModelSerializer):
 
     class Meta:
         exclude = ("id", "settings_data")
-        read_only_fields = ["state"]
 
-
-class UpdateComponentSerializer(serializers.ModelSerializer):
     def validate_settings(self, value):
+        if self.instance is None:
+            return value
         schema = self.instance.adapter.schema
         if schema:
             try:
                 schema(**value)
             except ValueError as exc:
-                # Better than nothing!
                 raise ValidationError(str(exc))
         else:
-            # No schema, so no values are allowed!
             if value is not None:
                 raise ValidationError("Component has no schema, so no settings allowed")
         return value
+
+    def validate(self, attrs):
+        if self.instance and attrs.get("enabled"):
+            if not self.instance.valid_component_name():
+                raise ValidationError({"enabled": "Component name is not registered"})
+            if "settings" not in attrs and not self.instance.valid_settings():
+                raise ValidationError({"enabled": "Component settings are not valid"})
+        return attrs
 
 
 class CreateMeetingComponentSerializer(ComponentSerializer):
@@ -46,7 +50,6 @@ class CreateMeetingComponentSerializer(ComponentSerializer):
         registry = get_meeting_component_adapters()
         if value not in registry:
             raise ValidationError("No such component name")
-        # Will raise error if meeting doesn't exist
         meeting = meeting_from_unsafe_data(self)
         if meeting.components.filter(component_name=value).exists():
             raise ValidationError(
@@ -59,32 +62,23 @@ class CreateMeetingComponentSerializer(ComponentSerializer):
         return value
 
 
-class MeetingComponentSerializer(
-    CreateMeetingComponentSerializer, UpdateComponentSerializer
-):
+class MeetingComponentSerializer(CreateMeetingComponentSerializer):
     is_valid = serializers.BooleanField(read_only=True)
     instance: MeetingComponent
 
     class Meta(CreateMeetingComponentSerializer.Meta):
-        read_only_fields = [
-            "component_name",
-            "meeting",
-        ] + CreateMeetingComponentSerializer.Meta.read_only_fields
+        read_only_fields = ["component_name", "meeting"]
 
 
 class OrganisationComponentSerializer(ComponentSerializer):
-    """
-    A readonly serializer
-    """
-
     is_valid = serializers.BooleanField(read_only=True)
     instance: OrganisationComponent
 
-    class Meta(CreateMeetingComponentSerializer.Meta):
+    class Meta(ComponentSerializer.Meta):
         model = OrganisationComponent
 
 
-class VerboseComponentSerializer(serializers.ModelSerializer):
+class VerboseComponentSerializer(serializers.Serializer):
     schema = serializers.SerializerMethodField()
 
     def get_schema(self, instance: MeetingComponent):

@@ -31,7 +31,7 @@ class MeetingComponentSerializerTests(TestCase):
         serializer = self._cut(self.print_component)
         self.assertEqual(
             {
-                "state": "off",
+                "enabled": False,
                 "pk": self.print_component.pk,
                 "meeting": self.meeting.pk,
                 "settings": None,
@@ -47,7 +47,7 @@ class MeetingComponentSerializerTests(TestCase):
         serializer = self._cut(self.flash_component)
         self.assertEqual(
             {
-                "state": "off",
+                "enabled": False,
                 "pk": self.flash_component.pk,
                 "meeting": self.meeting.pk,
                 "settings": None,
@@ -62,7 +62,7 @@ class MeetingComponentSerializerTests(TestCase):
         serializer = self._cut(bad_component)
         self.assertEqual(
             {
-                "state": "off",
+                "enabled": False,
                 "pk": bad_component.pk,
                 "meeting": self.meeting.pk,
                 "settings": None,
@@ -85,6 +85,20 @@ class MeetingComponentSerializerTests(TestCase):
         )
         serializer.is_valid()
         self.assertIn("settings", serializer.errors)
+
+    def test_enable_without_valid_settings(self):
+        component = self.meeting.components.create(component_name=FlashMessage.name)
+        serializer = self._cut(component, data={"enabled": True}, partial=True)
+        serializer.is_valid()
+        self.assertIn("enabled", serializer.errors)
+
+    def test_enable_with_settings_in_same_request(self):
+        component = self.meeting.components.create(component_name=FlashMessage.name)
+        serializer = self._cut(
+            component, data={"enabled": True, "settings": {"msg": "Hi"}}, partial=True
+        )
+        serializer.is_valid()
+        self.assertFalse(serializer.errors)
 
 
 class CreateMeetingComponentSerializerTests(TestCase):

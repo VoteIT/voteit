@@ -9,7 +9,6 @@ from envelope.testing import testing_channel_layers_setting
 from voteit.active.components import ActiveUsersComponent
 from voteit.active.messages import ActiveUserChanged
 from voteit.active.messages import ActiveUsers
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -25,7 +24,7 @@ class SignalsTests(TestCase):
         cls.active_user = User.objects.create(username="active")
         cls.meeting: Meeting = Meeting.objects.create()
         cls.component = cls.meeting.components.create(
-            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
+            component_name=ActiveUsersComponent.name, enabled=True
         )
         cls.meeting.add_roles(cls.participant, ROLE_PARTICIPANT)
         cls.meeting.add_roles(cls.active_user, ROLE_PARTICIPANT)

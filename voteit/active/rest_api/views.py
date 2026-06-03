@@ -11,7 +11,6 @@ from voteit.active.utils import get_inactive_qs
 from voteit.core import PERM
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import Meeting
 
 
@@ -28,7 +27,7 @@ class ActiveUserViewSet(VerboseAutoPermissionViewSetMixin, GenericViewSet):
         return Meeting.objects.filter(
             participants=self.request.user,
             components__component_name=ActiveUsersComponent.name,
-            components__state=EnabledWf.ON,
+            components__enabled=True,
         )
 
     def list(self, request, *args, **kwargs):

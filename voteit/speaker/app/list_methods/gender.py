@@ -3,7 +3,6 @@ from itertools import groupby
 from django.db import models
 from django.dispatch import receiver
 
-from voteit.core.workflows import EnabledWf
 from voteit.participant_tags.components import GenderTags
 from voteit.participant_tags.models import ParticipantTags
 from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema, Priority
@@ -77,7 +76,7 @@ class GenderAndPriority(Priority):
 def check_component_on_enable(instance: SpeakerListSystem, **kwargs):
     component, _ = instance.meeting.components.update_or_create(
         component_name=GenderTags.name,
-        defaults={"settings_data": {"tags": ["m", "f", "nb"]}, "state": EnabledWf.ON},
+        defaults={"settings_data": {"tags": ["m", "f", "nb"]}, "enabled": True},
     )
     assert component.is_valid
 
@@ -92,7 +91,7 @@ def maybe_remove_component_on_disable(instance: SpeakerListSystem, **kwargs):
         .exists()
     ):
         if component := instance.meeting.components.filter(
-            component_name=GenderTags.name, state=EnabledWf.ON
+            component_name=GenderTags.name, enabled=True
         ).first():
             component.disable()
             component.save()

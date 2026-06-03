@@ -4,7 +4,6 @@ from __future__ import annotations
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import Meeting
 from voteit.organisation.models import Organisation
 from voteit.participant_tags.components import GenderTags
@@ -23,12 +22,12 @@ class ParticipantTagsViewSetTests(APITestCase):
         cls.pronoun_component: NamespacedTags = cls.meeting.components.create(
             component_name=PronounTags.name,
             settings={"tags": ["han", "hon", "hen"], "many": True},
-            state=EnabledWf.ON,
+            enabled=True,
         )
         cls.gender_component: NamespacedTags = cls.meeting.components.create(
             component_name=GenderTags.name,
             settings={"tags": ["f", "m", "nb"]},
-            state=EnabledWf.ON,
+            enabled=True,
         )
         cls.participant = cls.org.users.get(username="participant")
         cls.participant_tags = cls.participant.meeting_tags.create(

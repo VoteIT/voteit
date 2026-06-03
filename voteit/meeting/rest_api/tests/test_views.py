@@ -14,7 +14,6 @@ from voteit.agenda.models import AgendaItem
 from voteit.components.app.components.dialects import DialectsFilter
 from voteit.components.app.components.proposal_print import ProposalPrint
 from voteit.core.testing import run_permission_tests
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.dialects import DialectHandler
 from voteit.meeting.dialects import get_named_paths
@@ -71,15 +70,11 @@ class MeetingViewSetTests(APITestCase):
             },
         )
         cls.meeting = cls.org.meetings.get(pk=1)
+        cls.meeting.components.create(component_name=ProposalPrint.name, enabled=True)
         cls.meeting.components.create(
-            component_name=ProposalPrint.name, state=EnabledWf.ON
+            component_name=ActiveUsersComponent.name, enabled=True
         )
-        cls.meeting.components.create(
-            component_name=ActiveUsersComponent.name, state=EnabledWf.ON
-        )
-        cls.meeting.components.create(
-            component_name=NotesComponent.name, state=EnabledWf.ON
-        )
+        cls.meeting.components.create(component_name=NotesComponent.name, enabled=True)
         cls.participant = User.objects.get(username="participant")
         cls.org_manager = User.objects.get(username="org_manager")
         cls.moderator = User.objects.get(username="moderator")

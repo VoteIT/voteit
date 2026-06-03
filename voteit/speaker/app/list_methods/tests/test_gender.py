@@ -3,7 +3,6 @@ from django.test import TestCase
 from django.utils.timezone import now
 
 from voteit.components.models import MeetingComponent
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.models import Meeting
 from voteit.participant_tags.components import GenderTags
 from voteit.speaker.app.list_methods.gender import GenderAndPriority
@@ -304,7 +303,7 @@ class GenderAndPriorityTests(TestCase):
         ).first()
         self.assertIsInstance(component, MeetingComponent)
         self.assertEqual({"tags": ["m", "f", "nb"]}, component.settings_data)
-        self.assertEqual(EnabledWf.ON, component.state)
+        self.assertTrue(component.enabled)
 
     def test_automatic_disable_on_delete(self):
         self.system.delete()
@@ -312,7 +311,7 @@ class GenderAndPriorityTests(TestCase):
             component_name=GenderTags.name
         ).first()
         self.assertIsInstance(component, MeetingComponent)
-        self.assertEqual(EnabledWf.OFF, component.state)
+        self.assertFalse(component.enabled)
 
     def test_automatic_disable_on_change(self):
         self.system.method_name = Simple.name
@@ -321,7 +320,7 @@ class GenderAndPriorityTests(TestCase):
             component_name=GenderTags.name
         ).first()
         self.assertIsInstance(component, MeetingComponent)
-        self.assertEqual(EnabledWf.OFF, component.state)
+        self.assertFalse(component.enabled)
 
     def test_keep_component_when_multiple_lists_exist(self):
         room2 = self.meeting.rooms.create()
@@ -332,4 +331,4 @@ class GenderAndPriorityTests(TestCase):
         component = self.meeting.components.filter(
             component_name=GenderTags.name
         ).first()
-        self.assertEqual(EnabledWf.ON, component.state)
+        self.assertTrue(component.enabled)

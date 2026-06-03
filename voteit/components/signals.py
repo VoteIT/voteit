@@ -15,7 +15,6 @@ from voteit.components.rest_api.serializers import MeetingComponentSerializer
 from voteit.components.utils import get_meeting_component_adapters
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
-from voteit.core.workflows import EnabledWf
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.components.models import MeetingComponent
@@ -85,7 +84,7 @@ def disable_components_when_meeting_closes(
             if v.disable_on_close
         ]
         for component in instance.meeting.components.filter(
-            component_name__in=disable_names, state=EnabledWf.ON
+            component_name__in=disable_names, enabled=True
         ):
             component.disable()
             component.save()
