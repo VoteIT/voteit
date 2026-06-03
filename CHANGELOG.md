@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.45 (2026-06-01)
+## v0.45 (2026-06-03)
 
 Continued REST migration, invite improvements, security hardening,
 and project housekeeping (AGPL licence, README, CONTRIBUTING).
@@ -21,6 +21,7 @@ and project housekeeping (AGPL licence, README, CONTRIBUTING).
   are now REST endpoints rather than WebSocket messages. `bulk_delete` is restricted to upcoming meetings.
 - **Management command aligned with REST**: The invite management command now mirrors the REST
   interface behaviour.
+- **Speaker lists**: Starting a new speaker while another is speaking was blocked before. Now the old speaker is simply stopped.
 
 ### Security
 
@@ -29,9 +30,9 @@ and project housekeeping (AGPL licence, README, CONTRIBUTING).
 - **Extra sanitisation layer in schemas**: An additional strip pass is applied in schemas to avoid
   depending solely on downstream sanitisers.
 - **Rich-text field enforcement**: Fields that accept HTML are now `RichTextField` so that HTML
-  cleaning fires correctly (plain validators did not run on these fields).
+  cleaning fires correctly. (The Django models `clean` methods never fire in DRF views.)
 - **Unsigned file upload size limit**: Unsigned file uploads are permitted but at a reduced
-  maximum size.
+  maximum size. (Related to imports)
 
 ### Project
 
