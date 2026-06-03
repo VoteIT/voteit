@@ -439,7 +439,3 @@ class ExportBaseSerializerMixin(serializers.Serializer):
         if hasattr(obj, "tags"):
             return ",".join(obj.tags)
         return ""
-
-
-class ForceDeleteSerializer(serializers.Serializer):
-    force: bool = serializers.BooleanField(default=False)
