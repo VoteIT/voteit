@@ -22,7 +22,7 @@ class GetAllTransitionsTests(TestCase):
         consumer.send_ws_message = mock.AsyncMock()
         response = await msg.run(consumer=consumer)
         self.assertIsInstance(response, AllTransitions)
-        # Meeting uses python-statemachine (not django-fsm), so it won't be in FSM transitions
+        # Meeting and proposal use python-statemachine (not django-fsm)
         self.assertNotIn("meeting", response.data.transitions)
-        self.assertIn("proposal", response.data.transitions)
+        self.assertNotIn("proposal", response.data.transitions)
         self.assertTrue(consumer.send_ws_message.called)

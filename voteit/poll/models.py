@@ -21,9 +21,9 @@ from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_fsm import FSMField
-from django_fsm import TransitionNotAllowed
 from django_fsm import post_transition
 from django_fsm import transition
+from statemachine.exceptions import TransitionNotAllowed
 from pydantic import ValidationError
 from pydantic.main import BaseModel
 from rules.contrib.models import RulesModelMixin
@@ -41,7 +41,7 @@ from voteit.poll.exceptions import PollNotFinished
 from voteit.poll.schemas import PollResult
 from voteit.poll.utils import get_poll_method_registry
 from voteit.poll.workflows import PollWf
-from voteit.proposal.workflows import ProposalWf
+from voteit.proposal.statemachines import ProposalStateMachine
 from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
@@ -373,19 +373,18 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
 
     def _lock_proposals(self):
         for proposal in self.proposals.filter(
-            state=ProposalWf.PUBLISHED
+            state=ProposalStateMachine.published.value
         ).select_subclasses():
             with suppress(TransitionNotAllowed):
-                proposal.lock_for_vote()
+                proposal.lock_for_vote(force=True)
                 proposal.save()
 
     def _publish_proposals(self):
         for proposal in self.proposals.filter(
-            state=ProposalWf.VOTING
+            state=ProposalStateMachine.voting.value
         ).select_subclasses():
             with suppress(TransitionNotAllowed):
-                # It doesn't really matter if this fails. Proposals might already be published for some reason.
-                proposal.publish()
+                proposal.publish(force=True)
                 proposal.save()
 
     def set_proposals_from_result(self):
@@ -394,11 +393,11 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         for proposal in self.proposals.select_subclasses():
             with suppress(TransitionNotAllowed):
                 if proposal.pk in approved_pks:
-                    proposal.approved()
+                    proposal.approved(force=True)
                 elif proposal.pk in denied_pks:
-                    proposal.denied()
+                    proposal.denied(force=True)
                 else:
-                    proposal.publish()
+                    proposal.publish(force=True)
                 proposal.save()
 
     def set_result(self):

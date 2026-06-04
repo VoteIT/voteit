@@ -24,7 +24,6 @@ from voteit.poll.registries import vote_transfer_policies
 from voteit.poll.testing import UnrestrictedVoteTransferER
 from voteit.poll.testing import UnrestrictedVoteTransferPolicy
 from voteit.poll.workflows import PollWf
-from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
 
@@ -302,7 +301,7 @@ class PollViewSetTests(APITestCase):
         self.assertEqual(201, response.status_code)
         self.assertEqual({"state": PollWf.WITHHELD}, response.json())
         self.prop.refresh_from_db()
-        self.assertEqual(ProposalWf.VOTING, self.prop.state)
+        self.assertEqual("voting", self.prop.state)
         poll.refresh_from_db()
         self.assertEqual(PollWf.WITHHELD, poll.state)
         # Publish result
@@ -310,7 +309,7 @@ class PollViewSetTests(APITestCase):
         self.assertEqual(201, response.status_code)
         self.assertEqual({"state": PollWf.FINISHED}, response.json())
         self.prop.refresh_from_db()
-        self.assertEqual(ProposalWf.APPROVED, self.prop.state)
+        self.assertEqual("approved", self.prop.state)
         poll.refresh_from_db()
         self.assertEqual(PollWf.FINISHED, poll.state)
 

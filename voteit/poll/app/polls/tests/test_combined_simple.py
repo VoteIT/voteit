@@ -6,7 +6,6 @@ from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.proposal.models import Proposal
-from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
 
@@ -78,5 +77,5 @@ class SimpleTests(TestCase):
                 "vote_count": 3,
             },
         )
-        self.assertEqual(self.poll.proposals.get(pk=prop.pk).state, ProposalWf.APPROVED)
-        self.assertEqual(self.poll.proposals.get(pk=prop2.pk).state, ProposalWf.DENIED)
+        self.assertEqual(self.poll.proposals.get(pk=prop.pk).state, "approved")
+        self.assertEqual(self.poll.proposals.get(pk=prop2.pk).state, "denied")

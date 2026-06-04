@@ -58,7 +58,7 @@ def populate_history_log(
     # Circular import funzies
     from voteit.invites.models import MeetingInvite
     from voteit.organisation.models import Organisation
-    from voteit.proposal.workflows import ProposalWf
+    from voteit.proposal.statemachines import ProposalStateMachine
     from voteit.speaker.models import Speaker
 
     if date is None:
@@ -102,7 +102,7 @@ def populate_history_log(
             .values_list("changes__state__1", flat=True)
         )
         # Published not an outcome
-        proposal_outcome_counter.pop(ProposalWf.PUBLISHED, None)
+        proposal_outcome_counter.pop(ProposalStateMachine.published.value, None)
 
         HistoryLog.objects.create(
             date=date,

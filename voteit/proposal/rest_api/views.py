@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from voteit.core.rest_api import router
-from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.mixins import StateMachineMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -28,14 +28,15 @@ __all__ = [
 
 @router.register("proposals", basename="proposal")
 class ProposalViewSet(
-    VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelViewSet
+    VerboseAutoPermissionViewSetMixin, StateMachineMixin, ModelViewSet
 ):
     serializer_class = serializers.GenericProposalSerializer  # Morphic
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "create": None,
         "preview": None,
-        "retract": "retract",
+        "event": None,
+        "state_machine": None,
     }
 
     def get_serializer_class(self):

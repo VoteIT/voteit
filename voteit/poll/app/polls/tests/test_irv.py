@@ -13,7 +13,6 @@ from voteit.poll.models import Poll
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.schemas import RankingSchema
 from voteit.poll.workflows import PollWf
-from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
 
@@ -71,9 +70,9 @@ class IRVTests(TestCase):
         self.assertEqual(len(result.approved), 1)
         self.assertEqual(len(result.denied), 9)
         for state, count in (
-            (ProposalWf.VOTING, 0),
-            (ProposalWf.APPROVED, 1),
-            (ProposalWf.DENIED, 9),
+            ("voting", 0),
+            ("approved", 1),
+            ("denied", 9),
         ):
             self.assertEqual(self.poll.proposals.filter(state=state).count(), count)
 
@@ -291,9 +290,9 @@ class RepeatedIRVTests(TestCase):
         self.assertEqual(len(result.approved), 2)
         self.assertEqual(len(result.denied), 8)
         for state, count in (
-            (ProposalWf.VOTING, 0),
-            (ProposalWf.APPROVED, 2),
-            (ProposalWf.DENIED, 8),
+            ("voting", 0),
+            ("approved", 2),
+            ("denied", 8),
         ):
             self.assertEqual(self.poll.proposals.filter(state=state).count(), count)
 

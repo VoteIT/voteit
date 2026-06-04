@@ -14,7 +14,6 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.notes import NoteIntent
 from voteit.proposal.models import Proposal
-from voteit.proposal.workflows import ProposalWf
 from voteit.export_import.schemas import MeetingStructure
 from voteit.export_import.tests import FIXTURES_DIR
 from voteit.export_import.tests import read_fixture
@@ -280,7 +279,7 @@ class ImporterTests(TestCase):
         importer.from_file(fn)
         importer.run()
         prop = Proposal.objects.get(prop_id="loeksas-1")
-        self.assertEqual(ProposalWf.APPROVED, prop.state)
+        self.assertEqual("approved", prop.state)
 
     def test_clear_proposal_states(self):
         fn = os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml")
@@ -288,7 +287,7 @@ class ImporterTests(TestCase):
         importer.from_file(fn)
         importer.run()
         prop = Proposal.objects.get(prop_id="loeksas-1")
-        self.assertEqual(ProposalWf.PUBLISHED, prop.state)
+        self.assertEqual("published", prop.state)
 
     def test_len(self):
         importer = self._cut(self.meeting)

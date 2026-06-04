@@ -7,7 +7,6 @@ from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.workflows import PollWf
 from voteit.proposal.models import Proposal
-from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
 
@@ -70,7 +69,7 @@ class SimpleTests(TestCase):
                 "vote_count": 3,
             },
         )
-        self.assertEqual(self.poll.proposals.get().state, ProposalWf.APPROVED)
+        self.assertEqual(self.poll.proposals.get().state, "approved")
 
     def test_close_without_votes(self):
         self.poll.proposals.create()

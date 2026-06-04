@@ -251,9 +251,9 @@ class ProposalsAPITests(APITestCase):
         self.assertFalse(mock_publish.called)
 
         self.client.force_login(self.moderator)
-        url = reverse("proposal-transitions", kwargs={"pk": diff_prop.pk})
-        response = self.client.post(url, data={"transition": "approved"})
-        self.assertEqual(201, response.status_code)
+        url = reverse("proposal-event", kwargs={"pk": diff_prop.pk})
+        response = self.client.post(url, data={"event": "approve"})
+        self.assertEqual(200, response.status_code)
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalChanged)

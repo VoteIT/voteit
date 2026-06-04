@@ -8,7 +8,6 @@ from django.utils import timezone
 from envelope.models import Connection
 
 from ...meeting.models import Meeting
-from ...proposal.workflows import ProposalWf
 from ..models import HistoryLog
 
 User = get_user_model()
@@ -129,11 +128,11 @@ class PopulateJobTests(TestCase):
             ai.proposals.create(body="<p>Unchanged content</p>")
             for i, states in enumerate(
                 (
-                    (ProposalWf.VOTING, ProposalWf.APPROVED),  # Once
-                    (ProposalWf.VOTING, ProposalWf.DENIED),  # Twice
-                    (ProposalWf.VOTING, ProposalWf.DENIED, ProposalWf.UNHANDLED),  # ...
-                    (ProposalWf.VOTING,),
-                    (ProposalWf.VOTING, ProposalWf.PUBLISHED),  # Not an outcome
+                    ("voting", "approved"),  # Once
+                    ("voting", "denied"),  # Twice
+                    ("voting", "denied", "unhandled"),  # ...
+                    ("voting",),
+                    ("voting", "published"),  # Not an outcome
                 ),
                 1,
             ):

@@ -11,7 +11,6 @@ from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.workflows import PollWf
 from voteit.proposal.models import Proposal
-from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
 
@@ -74,8 +73,8 @@ class MajorityTests(TestCase):
         )
         self.prop1.refresh_from_db()
         self.prop2.refresh_from_db()
-        self.assertEqual(ProposalWf.APPROVED, self.prop1.state)
-        self.assertEqual(ProposalWf.DENIED, self.prop2.state)
+        self.assertEqual("approved", self.prop1.state)
+        self.assertEqual("denied", self.prop2.state)
 
     def test_result_split(self):
         self.poll.upcoming()
@@ -97,8 +96,8 @@ class MajorityTests(TestCase):
         )
         self.prop1.refresh_from_db()
         self.prop2.refresh_from_db()
-        self.assertEqual(ProposalWf.PUBLISHED, self.prop1.state)
-        self.assertEqual(ProposalWf.PUBLISHED, self.prop2.state)
+        self.assertEqual("published", self.prop1.state)
+        self.assertEqual("published", self.prop2.state)
 
     def test_result_clear(self):
         self.poll.upcoming()
@@ -121,8 +120,8 @@ class MajorityTests(TestCase):
         )
         self.prop1.refresh_from_db()
         self.prop2.refresh_from_db()
-        self.assertEqual(ProposalWf.APPROVED, self.prop1.state)
-        self.assertEqual(ProposalWf.DENIED, self.prop2.state)
+        self.assertEqual("approved", self.prop1.state)
+        self.assertEqual("denied", self.prop2.state)
 
     def test_close_without_votes(self):
         self.poll.votes.create(user=self.voter_a, abstain=True)

@@ -15,7 +15,7 @@ from voteit.proposal import PERM_RETRACT
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
-from voteit.proposal.workflows import ProposalWf
+from voteit.proposal.statemachines import ProposalStateMachine
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -28,7 +28,10 @@ def is_not_used_in_poll(user: AbstractUser, proposal: Proposal):
 
 @predicate
 def is_published(user: AbstractUser, proposal: Proposal):
-    return isinstance(proposal, Proposal) and proposal.state == ProposalWf.PUBLISHED
+    return (
+        isinstance(proposal, Proposal)
+        and proposal.state == ProposalStateMachine.published.value
+    )
 
 
 @predicate

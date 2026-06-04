@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.meeting.models import Meeting
-from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
 
@@ -34,9 +33,7 @@ class ExporterTests(TestCase):
         )
         self.assertTrue(exporter.data.agenda_items[0].discussions)
         self.assertTrue(exporter.data.agenda_items[0].proposals)
-        self.assertEqual(
-            ProposalWf.APPROVED, exporter.data.agenda_items[0].proposals[0].state
-        )
+        self.assertEqual("approved", exporter.data.agenda_items[0].proposals[0].state)
         self.assertEqual(
             "loeksas-1", exporter.data.agenda_items[0].proposals[0].prop_id
         )

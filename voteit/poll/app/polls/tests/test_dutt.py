@@ -54,8 +54,6 @@ class DuttTests(TestCase):
         DuttVoteSchema(choices=[self.prop1.pk])
 
     def test_result_split(self):
-        from voteit.proposal.workflows import ProposalWf
-
         self.poll.upcoming()
         self.poll.ongoing()
         self.poll.votes.create(user=self.voter_a, vote=f"[{self.prop1.pk}]")
@@ -75,8 +73,8 @@ class DuttTests(TestCase):
         )
         self.prop1.refresh_from_db()
         self.prop2.refresh_from_db()
-        self.assertEqual(ProposalWf.PUBLISHED, self.prop1.state)
-        self.assertEqual(ProposalWf.PUBLISHED, self.prop2.state)
+        self.assertEqual("published", self.prop1.state)
+        self.assertEqual("published", self.prop2.state)
 
     def test_close_without_votes(self):
         self.poll.state = PollWf.ONGOING

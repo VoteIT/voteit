@@ -28,7 +28,7 @@ from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
 from voteit.proposal.models import TextDocument
 from voteit.proposal.models import TextParagraph
-from voteit.proposal.workflows import ProposalWf
+from voteit.proposal.statemachines import ProposalStateMachine
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
 
@@ -230,10 +230,10 @@ class ProposalData(BaseContentData, AuthorMixin, GroupMixin):
     @validator("state")
     def check_state(cls, v):
         """
-        >>> ProposalData.check_state(ProposalWf.PUBLISHED)
+        >>> ProposalData.check_state("published")
         'published'
         >>> with schema_context(clear_proposal_states=True):
-        ...     ProposalData.check_state(ProposalWf.PUBLISHED) == None
+        ...     ProposalData.check_state("published") == None
         True
         >>> _ = ProposalData.check_state(None)
         >>> ProposalData.check_state("404")
@@ -244,7 +244,7 @@ class ProposalData(BaseContentData, AuthorMixin, GroupMixin):
         ctx = get_context()
         if ctx.clear_proposal_states:
             return
-        if v and v not in ProposalWf.states:
+        if v and v not in {s.value for s in ProposalStateMachine.states}:
             raise ValueError(f"{v} is not a valid proposal state")
         return v
 

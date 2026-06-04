@@ -27,7 +27,6 @@ from voteit.poll.testing import UnrestrictedVoteTransferER
 from voteit.poll.testing import UnrestrictedVoteTransferPolicy
 from voteit.poll.workflows import PollWf
 from voteit.proposal.models import Proposal
-from voteit.proposal.workflows import ProposalWf
 
 User = get_user_model()
 
@@ -221,7 +220,7 @@ class PollTests(TestCase):
         self.assertTrue(self.poll.verify_checksum())
 
     def test_proposal_state_exceptions(self):
-        self.prop.unhandled()
+        self.prop.state = "unhandled"
         self.prop.save()
         # Must not cause exception
         self.poll.upcoming()
@@ -232,7 +231,7 @@ class PollTests(TestCase):
         self.poll.save()
         self.assertEqual(
             self.poll.proposals.get().state,
-            ProposalWf.UNHANDLED,
+            "unhandled",
             "Proposal state must not cause an exception if it can't change.",
         )
 
@@ -240,25 +239,23 @@ class PollTests(TestCase):
         self.poll.upcoming()
         self.poll.ongoing()
         self.prop.refresh_from_db()
-        self.prop2 = self.poll.proposals.create(
-            agenda_item=self.ai, state=ProposalWf.APPROVED
-        )
-        self.assertEqual(ProposalWf.VOTING, self.prop.state)
+        self.prop2 = self.poll.proposals.create(agenda_item=self.ai, state="approved")
+        self.assertEqual("voting", self.prop.state)
         self.poll.votes.create(user=self.moderator, vote="no")
         self.poll.votes.create(user=self.participant, vote="yes")
         self.poll.cancel()
         self.poll.save()
         self.prop.refresh_from_db()
-        self.assertEqual(ProposalWf.PUBLISHED, self.prop.state)
-        self.assertEqual(ProposalWf.APPROVED, self.prop2.state)
+        self.assertEqual("published", self.prop.state)
+        self.assertEqual("approved", self.prop2.state)
 
     def test_private_resets_proposals(self):
         self.poll.upcoming()
         self.prop.refresh_from_db()
-        self.assertEqual(ProposalWf.VOTING, self.prop.state)
+        self.assertEqual("voting", self.prop.state)
         self.poll.unpublish()
         self.prop.refresh_from_db()
-        self.assertEqual(ProposalWf.PUBLISHED, self.prop.state)
+        self.assertEqual("published", self.prop.state)
 
     def test_proposal_from_another_meeting(self):
         other_prop = Proposal.objects.create()
@@ -271,15 +268,9 @@ class PollTests(TestCase):
             other_prop.polls.add(self.poll)
 
     def test_set_proposals_from_result(self):
-        prop_approved = self.poll.proposals.create(
-            agenda_item=self.ai, state=ProposalWf.VOTING
-        )
-        prop_denied = self.poll.proposals.create(
-            agenda_item=self.ai, state=ProposalWf.VOTING
-        )
-        prop_neither = self.poll.proposals.create(
-            agenda_item=self.ai, state=ProposalWf.VOTING
-        )
+        prop_approved = self.poll.proposals.create(agenda_item=self.ai, state="voting")
+        prop_denied = self.poll.proposals.create(agenda_item=self.ai, state="voting")
+        prop_neither = self.poll.proposals.create(agenda_item=self.ai, state="voting")
         self.poll.result = SimplePollResult(
             yes=2,
             no=1,
@@ -291,9 +282,9 @@ class PollTests(TestCase):
         prop_approved.refresh_from_db()
         prop_denied.refresh_from_db()
         prop_neither.refresh_from_db()
-        self.assertEqual(ProposalWf.APPROVED, prop_approved.state)
-        self.assertEqual(ProposalWf.DENIED, prop_denied.state)
-        self.assertEqual(ProposalWf.PUBLISHED, prop_neither.state)
+        self.assertEqual("approved", prop_approved.state)
+        self.assertEqual("denied", prop_denied.state)
+        self.assertEqual("published", prop_neither.state)
 
 
 class VoteWeightTests(TestCase):

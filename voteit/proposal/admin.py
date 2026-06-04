@@ -1,5 +1,4 @@
 from django.contrib import admin
-from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.agenda.admin import AgendaItemAdminMixin
 from voteit.meeting.admin import MeetingAdminMixin
@@ -11,10 +10,7 @@ from voteit.proposal.models import TextParagraph
 
 
 @admin.register(Proposal)
-class ProposalAdmin(
-    AgendaItemAdminMixin, MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin
-):
-    fsm_field = ["state"]
+class ProposalAdmin(AgendaItemAdminMixin, MeetingAdminMixin, admin.ModelAdmin):
     list_display = (
         "prop_id",
         "__str__",
@@ -61,7 +57,6 @@ class ProposalAdmin(
 
 @admin.register(DiffProposal)
 class DiffProposalAdmin(ProposalAdmin):
-    fsm_field = ["state"]
     list_display = (
         "prop_id",
         "__str__",

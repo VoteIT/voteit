@@ -55,7 +55,6 @@ class ScottishTests(TestCase):
 
     def test_random_votes_result(self):
         from random import sample, randint
-        from voteit.proposal.workflows import ProposalWf
 
         self.poll.settings = dict(winners=3)
         for n in range(10):
@@ -81,9 +80,9 @@ class ScottishTests(TestCase):
         self.assertEqual(len(result.approved), 3)
         self.assertEqual(len(result.denied), 7)
         for state, count in (
-            (ProposalWf.VOTING, 0),
-            (ProposalWf.APPROVED, 3),
-            (ProposalWf.DENIED, 7),
+            ("voting", 0),
+            ("approved", 3),
+            ("denied", 7),
         ):
             self.assertEqual(self.poll.proposals.filter(state=state).count(), count)
 
