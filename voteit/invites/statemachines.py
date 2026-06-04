@@ -10,13 +10,14 @@ from statemachine import StateChart
 
 from voteit.core import PERM
 from voteit.core.rest_api.utils import perm_denied_msg
+from voteit.core.statemachines import TransitionSignalMixin
 from voteit.invites.utils import get_invite_adapter_registry
 
 if TYPE_CHECKING:
     from voteit.core.models import User
 
 
-class InviteStateMachine(StateChart):
+class InviteStateMachine(StateChart, TransitionSignalMixin):
     open = State(value="open", name=_("Open"), initial=True)
     accepted = State(value="accepted", name=_("Accepted"), final=True)
     rejected = State(value="rejected", name=_("Rejected"), final=True)

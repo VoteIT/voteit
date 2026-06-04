@@ -23,6 +23,14 @@ if TYPE_CHECKING:
 # The following signals will provide arguments "sender", "instance" and "roles"
 roles_added = Signal()
 roles_removed = Signal()
+# Sends signals based on python-statemachine transitions. Use helper in utils to send signal
+# sender    instance class
+# instance  the wrapped model
+# source    source state instance
+# target    target state instance
+# event     sm event instance
+before_sm_transition = Signal()
+after_sm_transition = Signal()
 
 
 @receiver(class_prepared)
