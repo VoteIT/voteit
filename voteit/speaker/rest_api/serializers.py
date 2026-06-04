@@ -63,7 +63,7 @@ class CreateSpeakerListSerializer(serializers.ModelSerializer):
     class Meta:
         model = SpeakerList
         read_only_fields = [
-            "state",
+            "is_open",
             "pk",
             "queue",
             "current",
@@ -106,11 +106,17 @@ class CreateSpeakerListSerializer(serializers.ModelSerializer):
 class SpeakerListSerializer(CreateSpeakerListSerializer):
     class Meta(CreateSpeakerListSerializer.Meta):
         read_only_fields = [
-            "state",
             "agenda_item",
             "speaker_system",
             "meeting",
             "room",
+        ]
+        fields = read_only_fields + [
+            "pk",
+            "title",
+            "is_open",
+            "queue",
+            "current",
         ]
 
 

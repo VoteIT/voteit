@@ -22,7 +22,7 @@ from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 from voteit.speaker.roles import ROLE_SPEAKER
-from voteit.speaker.workflows import SpeakerSystemWf
+from voteit.speaker.statemachines import SpeakerSystemStateMachine
 
 User = get_user_model()
 
@@ -129,30 +129,21 @@ class SpeakerListsViewTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(0, len(response.json()))
 
-    def test_transition_close(self):
-        data = {"transition": "close"}
+    def test_close_via_patch(self):
         slist = self.system.speaker_lists.create()
         for func, args in run_permission_tests(
             self,
-            url=reverse("speaker-lists-transitions", kwargs={"pk": slist.pk}),
-            data=data,
-            method="post",
+            url=reverse("speaker-lists-detail", kwargs={"pk": slist.pk}),
+            data={"is_open": False},
+            method="patch",
             expected=[
                 [None, 401],
-                [self.list_moderator, 201],
-                [self.moderator, 201],
+                [self.list_moderator, 200],
+                [self.moderator, 200],
                 [self.participant, 403],
             ],
         ):
             func(*args)
-
-    def test_bad_transition_moderator(self):
-        self.client.force_login(self.list_moderator)
-        slist = self.system.speaker_lists.create()
-        url = f"/api/speaker-lists/{slist.pk}/transitions/"
-        data = {"transition": "woho"}
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 400)
 
     def test_patch(self):
         data = {"title": "Sup?"}
@@ -214,7 +205,7 @@ class SpeakerListsViewTests(APITestCase):
                         "title": "",
                         "speaker_system": self.system.pk,
                         "agenda_item": None,
-                        "state": "open",
+                        "is_open": True,
                         "queue": [self.participant.pk],
                         "current": None,
                         "room": self.room.pk,
@@ -335,7 +326,9 @@ class SpeakerListSystemViewTests(APITestCase):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.room = cls.meeting.rooms.create()
         cls.system = cls.meeting.speaker_systems.create(
-            method_name="simple", state=SpeakerSystemWf.INACTIVE, room=cls.room
+            method_name="simple",
+            state=SpeakerSystemStateMachine.inactive.value,
+            room=cls.room,
         )
         cls.slist = cls.system.speaker_lists.create()
         cls.participant: User = cls.meeting.participants.get(username="participant")
@@ -350,7 +343,9 @@ class SpeakerListSystemViewTests(APITestCase):
         cls.other_meeting: Meeting = Meeting.objects.create(title="Other meeting")
         cls.other_room = cls.other_meeting.rooms.create()
         cls.other_system = cls.other_meeting.speaker_systems.create(
-            method_name="simple", state=SpeakerSystemWf.INACTIVE, room=cls.other_room
+            method_name="simple",
+            state=SpeakerSystemStateMachine.inactive.value,
+            room=cls.other_room,
         )
         cls.other_list = cls.other_system.speaker_lists.create()
 
@@ -566,17 +561,17 @@ class SpeakerListSystemViewTests(APITestCase):
         data = response.json()
         self.assertEqual({"max_times": 3}, data["settings"])
 
-    def test_transition_moderator(self):
-        url = reverse("speaker-list-systems-transitions", kwargs={"pk": self.system.pk})
+    def test_activate_moderator(self):
+        url = reverse("speaker-list-systems-event", kwargs={"pk": self.system.pk})
         self.client.force_login(self.moderator)
-        data = {"transition": "activate"}
+        data = {"event": "activate"}
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 200)
 
-    def test_transition_list_moderator_not_allowed(self):
-        url = reverse("speaker-list-systems-transitions", kwargs={"pk": self.system.pk})
+    def test_activate_list_moderator_not_allowed(self):
+        url = reverse("speaker-list-systems-event", kwargs={"pk": self.system.pk})
         self.client.force_login(self.list_moderator)
-        data = {"transition": "activate"}
+        data = {"event": "activate"}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 403)
 

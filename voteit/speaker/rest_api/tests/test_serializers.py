@@ -53,7 +53,7 @@ class SpeakerListSerializerTests(TestCase):
                 "title": "",
                 "speaker_system": self.system.pk,
                 "agenda_item": self.ai.pk,
-                "state": "open",
+                "is_open": True,
                 "queue": [self.participant.pk, self.moderator.pk],
                 "current": self.participant.pk,
                 "room": self.room.pk,

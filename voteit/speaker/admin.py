@@ -1,5 +1,4 @@
 from django.contrib import admin
-from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.meeting.admin import MeetingAdminMixin
 from voteit.speaker.models import Speaker
@@ -9,8 +8,7 @@ from voteit.speaker.models import SpeakerSystemRoles
 
 
 @admin.register(SpeakerListSystem)
-class SLSystemAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
-    fsm_field = "state"
+class SLSystemAdmin(MeetingAdminMixin, admin.ModelAdmin):
     list_display = (
         "room",
         "meeting_link",
@@ -42,8 +40,7 @@ class SLSystemAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
 
 
 @admin.register(SpeakerList)
-class SLAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
-    fsm_field = "state"
+class SLAdmin(MeetingAdminMixin, admin.ModelAdmin):
     autocomplete_fields = (
         "agenda_item",
         "speaker_system",

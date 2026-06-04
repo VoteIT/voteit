@@ -17,7 +17,6 @@ from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 from voteit.speaker.roles import ROLE_SPEAKER
-from voteit.speaker.workflows import SpeakerListWf
 
 if TYPE_CHECKING:
     from voteit.core.models import User
@@ -62,7 +61,7 @@ def has_speaker_role(user: User, context: SpeakerSystemContext) -> bool:
 @predicate
 def is_list_open(user: User, speaker_list: SpeakerList) -> bool:
     if isinstance(speaker_list, SpeakerList):
-        return speaker_list.state == SpeakerListWf.OPEN
+        return speaker_list.is_open
     raise TypeError(
         f"{speaker_list} is not an instance of SpeakerList"
     )  # pragma: no coverage

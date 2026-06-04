@@ -6,9 +6,10 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.test import TestCase
 from django.utils.timezone import now
-from django_fsm import TransitionNotAllowed
+from rest_framework.exceptions import ValidationError
 
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.speaker.app.list_methods.priority import Priority
 from voteit.speaker.app.list_methods.priority import PrioritySettingsSchema
 from voteit.speaker.app.list_methods.simple import Simple
@@ -17,7 +18,7 @@ from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.models import SpeakerList
 from voteit.speaker.signals import list_method_added
 from voteit.speaker.signals import list_method_removed
-from voteit.speaker.workflows import SpeakerSystemWf
+from voteit.speaker.statemachines import SpeakerSystemStateMachine
 
 User = get_user_model()
 
@@ -185,8 +186,12 @@ class SpeakerListSystemsTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.create()
         room = cls.meeting.rooms.create()
         cls.system = SpeakerListSystem.objects.create(
-            method_name="simple", state=SpeakerSystemWf.ACTIVE, room=room
+            method_name="simple",
+            state=SpeakerSystemStateMachine.active.value,
+            room=room,
         )
+        cls.moderator = User.objects.create(username="test_moderator")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
 
     def test_set_settings_from_schema_directly(self):
         self.system.method_name = "priority"
@@ -216,7 +221,8 @@ class SpeakerListSystemsTests(TestCase):
     def test_inactivating_causes_active_list_to_become_inactive(self):
         slist = self.system.speaker_lists.create()
         self.system.active_list = slist
-        self.system.inactivate()
+        self.system.save()
+        self.system.inactivate(user=self.moderator)
         self.assertIsNone(self.system.active_list)
 
     def test_archiving_causes_list_to_clear_order(self):
@@ -233,11 +239,11 @@ class SpeakerListSystemsTests(TestCase):
         self.system.save()
         speaker = slist.speaker_items.create(user=user, started=now())
         slist.active_speaker(refresh=True)
-        with self.assertRaises(TransitionNotAllowed):
-            self.system.inactivate()
+        with self.assertRaises(ValidationError):
+            self.system.inactivate(user=self.moderator)
         speaker.delete()
         slist.refresh_from_db()
-        self.system.inactivate()
+        self.system.inactivate(user=self.moderator)
 
     def test_adding_method_triggers_add_signal(self):
         self.system.method_name = ""

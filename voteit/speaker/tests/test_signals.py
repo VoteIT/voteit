@@ -30,8 +30,7 @@ from voteit.speaker.models import SpeakerList
 from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 from voteit.speaker.roles import ROLE_SPEAKER
-from voteit.speaker.workflows import SpeakerListWf
-from voteit.speaker.workflows import SpeakerSystemWf
+from voteit.speaker.statemachines import SpeakerSystemStateMachine
 
 User = get_user_model()
 
@@ -88,7 +87,7 @@ class WFEffectsTests(TestCase):
         self.system.refresh_from_db()
         self.speaker_list.refresh_from_db()
         self.assertFalse(self.speaker_list.is_active_list)
-        self.assertEqual(SpeakerListWf.CLOSED, self.speaker_list.state)
+        self.assertFalse(self.speaker_list.is_open)
         self.assertIsNone(self.system.active_list)
 
     def test_archive_meeting_archives_systems(self):
@@ -96,7 +95,7 @@ class WFEffectsTests(TestCase):
         self.meeting.save()
         self.system.refresh_from_db()
         self.assertEqual(MeetingStateMachine.archived.value, self.meeting.state)
-        self.assertEqual(SpeakerSystemWf.ARCHIVED, self.system.state)
+        self.assertEqual(SpeakerSystemStateMachine.archived.value, self.system.state)
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
@@ -183,7 +182,7 @@ class AppStateTests(TestCase):
                 "safe_positions": None,
                 "settings": None,
                 "show_time": False,
-                "state": SpeakerSystemWf.ACTIVE,
+                "state": SpeakerSystemStateMachine.active.value,
             },
             system_payload[0],
         )
@@ -227,7 +226,7 @@ class AppStateTests(TestCase):
                 "agenda_item": self.ai.pk,
                 "queue": [],
                 "current": None,
-                "state": SpeakerListWf.OPEN,
+                "is_open": True,
                 "title": "Hello",
                 "pk": self.speaker_list.pk,
                 "room": self.room.pk,
@@ -274,7 +273,7 @@ class SendStateChangesTestsTests(TestCase):
                 "queue": [],
                 "current": None,
                 "speaker_system": self.system.pk,
-                "state": "open",
+                "is_open": True,
                 "title": "Hello",
                 "room": self.room.pk,
                 "meeting": self.meeting.pk,
@@ -345,7 +344,7 @@ class SendStateChangesTestsTests(TestCase):
                 "safe_positions": 2,
                 "settings": None,
                 "show_time": False,
-                "state": SpeakerSystemWf.ACTIVE,
+                "state": SpeakerSystemStateMachine.active.value,
             },
             messages[0].data.dict(),
         )
@@ -365,7 +364,7 @@ class SendStateChangesTestsTests(TestCase):
                 "safe_positions": None,
                 "settings": None,
                 "show_time": False,
-                "state": SpeakerSystemWf.ACTIVE,
+                "state": SpeakerSystemStateMachine.active.value,
             },
             messages[0].data.dict(),
         )
@@ -392,7 +391,7 @@ class SendStateChangesTestsTests(TestCase):
                 "agenda_item": self.ai.pk,
                 "speaker_system": self.system.pk,
                 "pk": new_list.pk,
-                "state": SpeakerListWf.OPEN,
+                "is_open": True,
                 "queue": [],
                 "current": None,
                 "title": "",
@@ -412,7 +411,7 @@ class SendStateChangesTestsTests(TestCase):
             {
                 "speaker_system": self.system.pk,
                 "pk": self.speaker_list.pk,
-                "state": SpeakerListWf.OPEN,
+                "is_open": True,
                 "title": "Hello",
                 "agenda_item": self.ai.pk,
                 "queue": [],
@@ -458,7 +457,7 @@ class SendStateChangesTestsTests(TestCase):
             {
                 "speaker_system": self.system.pk,
                 "pk": self.speaker_list.pk,
-                "state": SpeakerListWf.OPEN,
+                "is_open": True,
                 "title": "Hello",
                 "agenda_item": self.ai.pk,
                 "queue": [],

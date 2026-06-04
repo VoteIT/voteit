@@ -49,8 +49,7 @@ from voteit.speaker.models import SpeakerSystemRoles
 from voteit.speaker.rest_api.serializers import SpeakerListSerializer
 from voteit.speaker.rest_api.serializers import SpeakerListSystemSerializer
 from voteit.speaker.rest_api.serializers import SpeakerSerializer
-from voteit.speaker.workflows import SpeakerListWf
-from voteit.speaker.workflows import SpeakerSystemWf
+from voteit.speaker.statemachines import SpeakerSystemStateMachine
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -258,7 +257,7 @@ def close_and_deactivate_when_ai_closes(
             .select_related("speaker_system")
             .select_for_update()
         ):
-            if speaker_list.state == SpeakerListWf.OPEN:
+            if speaker_list.is_open:
                 speaker_list.close()
                 speaker_list.save()
             if speaker_list.speaker_system.active_list_id == speaker_list.pk:
@@ -321,7 +320,7 @@ def ai_channel_subscribed(
     """
     # FIXME: So... inactive systems... What happens when they get enabled again?
     lists_qs = context.speaker_lists.filter(
-        speaker_system__state=SpeakerSystemWf.ACTIVE
+        speaker_system__state=SpeakerSystemStateMachine.active.value
     )
     serializer = SpeakerListSerializer(lists_qs, many=True)
     for item in serializer.data:

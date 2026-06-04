@@ -22,7 +22,7 @@ from rest_framework.viewsets import GenericViewSet
 from voteit.core import PERM
 from voteit.core.loggers import log_roles_change
 from voteit.core.rest_api import router
-from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.mixins import StateMachineMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.speaker.models import Speaker
@@ -38,9 +38,7 @@ logger = getLogger(__name__)
 
 
 @router.register("speaker-lists", basename="speaker-lists")
-class SpeakerListViewSet(
-    VerboseAutoPermissionViewSetMixin, TransitionsMixin, viewsets.ModelViewSet
-):
+class SpeakerListViewSet(VerboseAutoPermissionViewSetMixin, viewsets.ModelViewSet):
     model = SpeakerList
     serializer_class = serializers.SpeakerListSerializer
     serializer_classes = {"create": serializers.CreateSpeakerListSerializer}
@@ -52,6 +50,9 @@ class SpeakerListViewSet(
         "shuffle": "shuffle",
         "retrieve": None,  # Checked via qs
     }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action, self.serializer_class)
 
     def get_queryset(self):
         if self.detail:
@@ -127,7 +128,7 @@ class HistoricSpeakerViewSet(
 @router.register("speaker-list-systems", basename="speaker-list-systems")
 class SpeakerListSystemViewSet(
     VerboseAutoPermissionViewSetMixin,
-    TransitionsMixin,
+    StateMachineMixin,
     viewsets.ModelViewSet,
 ):
     model = SpeakerListSystem
@@ -137,7 +138,12 @@ class SpeakerListSystemViewSet(
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "create": None,  # Handled in serializer
         "retrieve": None,  # Already checked in qs
+        "event": None,
+        "state_machine": None,
     }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action, self.serializer_class)
 
     def get_queryset(self):
         if self.detail:
@@ -231,7 +237,6 @@ class SpeakerSystemRolesViewSet(ListModelMixin, GenericViewSet):
 @router.register("speakers", basename="speakers")
 class SpeakerViewSet(
     VerboseAutoPermissionViewSetMixin,
-    TransitionsMixin,
     viewsets.ModelViewSet,
 ):
     model = Speaker
@@ -247,6 +252,9 @@ class SpeakerViewSet(
         "undo": None,  # Handled by qs
         "retrieve": None,  # Handled by qs
     }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action, self.serializer_class)
 
     def get_queryset(self):
         if self.detail:

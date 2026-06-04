@@ -16,14 +16,11 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
 from django.utils.timezone import now
-from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField
-from django_fsm import transition
 from pydantic.main import BaseModel
+from statemachine.mixins import MachineMixin
 from rules.contrib.models import RulesModelMixin
 
 from voteit.agenda.models import AgendaItem
-from voteit.core import PERM
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import ensure_atomic
@@ -36,9 +33,8 @@ from voteit.meeting.models import MeetingRoles
 from voteit.speaker.abcs import SpeakerSystemContext
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
 from voteit.speaker.roles import ROLE_SPEAKER
+from voteit.speaker.statemachines import SpeakerSystemStateMachine
 from voteit.speaker.utils import get_list_method_registry
-from voteit.speaker.workflows import SpeakerListWf
-from voteit.speaker.workflows import SpeakerSystemWf
 from voteit.room.models import Room
 from voteit.stats.registry import history_log
 
@@ -93,7 +89,11 @@ class SpeakerSystemRoles(Roles, MeetingContext):
     ],
 )
 class SpeakerListSystem(
-    RulesModelMixin, RoleContextMixin, MeetingContext, SpeakerSystemContext
+    RulesModelMixin,
+    RoleContextMixin,
+    MeetingContext,
+    SpeakerSystemContext,
+    MachineMixin,
 ):
     """
     All speaker list things relate here, while this in turn might relate to a meeting.
@@ -101,10 +101,13 @@ class SpeakerListSystem(
     """
 
     name = "speaker_system"
-    state: str = FSMField(
-        default=SpeakerSystemWf.initial,
-        choices=SpeakerSystemWf.choices(),
-        editable=False,
+    state_machine_name = "voteit.speaker.statemachines.SpeakerSystemStateMachine"
+    state_machine_attr = "sm"
+    sm: SpeakerSystemStateMachine
+    state: str = models.CharField(
+        default=SpeakerSystemStateMachine.initial_state.value,
+        choices=[(s.value, str(s.name)) for s in SpeakerSystemStateMachine.states],
+        max_length=20,
     )
     room: Room = models.OneToOneField(
         Room,
@@ -209,49 +212,15 @@ class SpeakerListSystem(
     def organisation(self) -> Organisation:
         return self.meeting.organisation
 
-    def no_active_speaker_guard(self) -> bool:
-        if self.active_list:
-            return not bool(self.active_list.active_speaker())
-        return True
+    def activate(self, user):
+        self.sm.send("activate", user=user)
 
-    @transition(
-        field=state,
-        source=SpeakerSystemWf.INACTIVE,
-        target=SpeakerSystemWf.ACTIVE,
-        permission=f"speaker.{PERM.CHANGE}_speakerlistsystem",
-        custom={"title": _("Make active")},
-    )
-    def activate(self):
-        """
-        Set system as active
-        """
+    def inactivate(self, user):
+        self.sm.send("inactivate", user=user)
 
-    @transition(
-        field=state,
-        source=SpeakerSystemWf.ACTIVE,
-        target=SpeakerSystemWf.INACTIVE,
-        permission=f"speaker.{PERM.CHANGE}_speakerlistsystem",
-        conditions=[no_active_speaker_guard],
-        custom={"title": _("Inactivate")},
-    )
-    def inactivate(self):
-        """
-        Make system disabled and hidden for users. This is not a permission though,
-        so users can still view the information if they dig around in the frontends source.
-        """
-        if self.active_list is not None:
-            self.active_list = None
-        self.save()
-
-    @transition(
-        field=state,
-        source=["+"],
-        target=SpeakerSystemWf.ARCHIVED,
-        permission=PERM.NOT_ALLOWED,
-        custom={"title": _("Archive")},
-    )
     @ensure_atomic
     def archive(self):
+        self.state = SpeakerSystemStateMachine.archived.value
         self.active_list = None
         Speaker.objects.filter(
             speaker_list__speaker_system=self, seconds__isnull=True
@@ -310,11 +279,11 @@ class SpeakerListSystem(
 
     @property
     def is_archived(self):
-        return self.state == SpeakerSystemWf.ARCHIVED
+        return self.state == SpeakerSystemStateMachine.archived.value
 
     @property
     def is_active(self):
-        return self.state == SpeakerSystemWf.ACTIVE
+        return self.state == SpeakerSystemStateMachine.active.value
 
     # Type hinting
     objects: models.Manager
@@ -443,9 +412,7 @@ class SpeakerList(
     name = "speaker_list"
     _active_speaker: Speaker | None
     title = models.CharField(max_length=200)
-    state = FSMField(
-        default=SpeakerListWf.initial, choices=SpeakerListWf.choices(), editable=False
-    )
+    is_open: bool = models.BooleanField(default=True)
     speaker_system: SpeakerListSystem = models.ForeignKey(
         SpeakerListSystem, on_delete=models.CASCADE, related_name="speaker_lists"
     )
@@ -505,25 +472,11 @@ class SpeakerList(
         [int(x) for x in value]
         self.order = ",".join(str(x) for x in value)
 
-    @transition(
-        field=state,
-        source=SpeakerListWf.CLOSED,
-        target=SpeakerListWf.OPEN,
-        permission=f"speaker.{PERM.CHANGE}_speakerlist",
-        custom={"title": _("Open")},
-    )
     def open(self):
-        pass
+        self.is_open = True
 
-    @transition(
-        field=state,
-        source=SpeakerListWf.OPEN,
-        target=SpeakerListWf.CLOSED,
-        permission=f"speaker.{PERM.CHANGE}_speakerlist",
-        custom={"title": _("Close")},
-    )
     def close(self):
-        pass
+        self.is_open = False
 
     def active_speaker(self, refresh=False) -> Speaker | None:
         if refresh or not hasattr(self, "_active_speaker"):
