@@ -20,7 +20,6 @@ from statemachine.exceptions import TransitionNotAllowed
 
 from voteit.core import PERM
 from voteit.meeting.models import Meeting
-from voteit.meeting.workflows import MeetingWf
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
@@ -128,7 +127,7 @@ class AgendaItemBulkDelete(ContextAction):
 
     def run_job(self):
         self.assert_perm()
-        if self.context.state == MeetingWf.ONGOING:
+        if self.context.is_ongoing:
             raise BadRequestError.from_message(
                 self, msg=_("Can't bulk delete in ongoing meeting")
             )

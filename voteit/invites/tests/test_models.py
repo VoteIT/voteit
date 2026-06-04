@@ -1,4 +1,5 @@
 from datetime import timedelta
+from django.utils import timezone
 
 from auditlog.models import LogEntry
 from django.contrib.auth import get_user_model
@@ -342,8 +343,8 @@ class MeetingInviteManagerTests(TestCase):
         self.inv1.save()
         self.assertFalse(self.meeting.invites.should_expire())
         self.assertFalse(MeetingInvite.objects.should_expire())
-        self.meeting.ongoing()
-        self.meeting.close()
+        self.meeting.state = "closed"
+        self.meeting.end_time = timezone.now()
         self.meeting.save()
         self.assertFalse(self.meeting.invites.should_expire())
         self.assertFalse(MeetingInvite.objects.should_expire())

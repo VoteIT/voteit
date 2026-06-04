@@ -16,7 +16,7 @@ from voteit.invites.rest_api.lock import invites_lock
 from voteit.invites.rest_api.import_utils import extract_roles_per_row
 from voteit.invites.rest_api.import_utils import parse_invite_file
 from voteit.meeting.models import Meeting
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.organisation.models import Organisation
 
 User = get_user_model()
@@ -325,13 +325,13 @@ class ImportInvitesPermissionTests(APITestCase):
         self.assertEqual(HTTPStatus.OK, response.status_code)
 
     def test_archived_meeting_returns_400(self):
-        self.meeting.state = MeetingWf.ARCHIVED
+        self.meeting.state = MeetingStateMachine.archived.value
         self.meeting.save()
         try:
             response = self._post(self.moderator)
             self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
         finally:
-            self.meeting.state = MeetingWf.ONGOING
+            self.meeting.state = MeetingStateMachine.ongoing.value
             self.meeting.save()
 
 

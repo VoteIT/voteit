@@ -11,7 +11,7 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.organisation.models import Organisation
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 
@@ -127,7 +127,7 @@ class MeetingPermissionTests(TestCase):
         self.assertFalse(self.org_manager.has_perm(CHANGE, self.meeting))
 
     def test_can_change_meeting_archive_requested(self):
-        self.meeting.state = MeetingWf.ARCHIVING
+        self.meeting.state = MeetingStateMachine.archiving.value
         self.meeting.save()
         CHANGE = Meeting.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting))
@@ -143,7 +143,7 @@ class MeetingPermissionTests(TestCase):
         self.assertFalse(self.org_manager.has_perm(CHANGE_DIALECT, self.meeting))
 
     def test_can_change_dialect_ongoing(self):
-        self.meeting.state = MeetingWf.ONGOING
+        self.meeting.state = MeetingStateMachine.ongoing.value
         self.meeting.save()
         CHANGE_DIALECT = Meeting.get_perm(PERM_CHANGE_DIALECT)
         self.assertFalse(self.anon_user.has_perm(CHANGE_DIALECT, self.meeting))
@@ -197,7 +197,7 @@ class MeetingPermissionTests(TestCase):
 
     def test_can_archive_meeting_abort_state(self):
         # Essentially the archive permission is used to request abort too
-        self.meeting.state = MeetingWf.ARCHIVING
+        self.meeting.state = MeetingStateMachine.archiving.value
         self.meeting.save()
         ARCHIVE = Meeting.get_perm(PERM.ARCHIVE)
         self.assertFalse(self.anon_user.has_perm(ARCHIVE, self.meeting))

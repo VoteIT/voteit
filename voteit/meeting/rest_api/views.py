@@ -27,7 +27,7 @@ from envelope.channels.messages import RecheckChannelSubscriptions
 from voteit.core import PERM
 from voteit.core.loggers import log_roles_change
 from voteit.core.rest_api import router
-from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.mixins import StateMachineMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting import PERM_CHANGE_DIALECT
 from voteit.meeting.dialects import dialect_registry
@@ -52,7 +52,7 @@ __all__ = (
 @router.register("meetings", basename="meeting")
 class MeetingViewSet(
     VerboseAutoPermissionViewSetMixin,
-    TransitionsMixin,
+    StateMachineMixin,
     viewsets.ModelViewSet,
 ):
     model = Meeting
@@ -79,8 +79,12 @@ class MeetingViewSet(
             "install_dialect": PERM_CHANGE_DIALECT,
             "remove_dialect": PERM_CHANGE_DIALECT,
             "retrieve": None,  # Handled by queryset
-            "transitions": None,  # Checked in transitions
+            "event": None,  # Permission checked inside SM validators
+            "state_machine": None,
         }
+
+    def get_serializer_class(self):
+        return self.serializer_classes.get(self.action, self.serializer_class)
 
     @action(methods=["post"], detail=True)
     def set_agenda_order(self, request, pk):

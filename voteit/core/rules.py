@@ -6,7 +6,7 @@ from django.db.models import Model
 
 from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.core.decorators import predicate
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -47,7 +47,9 @@ def is_user(user: AbstractUser, instance: Model) -> bool:
     return getattr(instance, "user", _MARKER) == user
 
 
-_ARCHIVED_STATES = MeetingWf.archived_states | AgendaItemStateMachine.archived_states
+_ARCHIVED_STATES = (
+    MeetingStateMachine.archived_states | AgendaItemStateMachine.archived_states
+)
 
 
 @predicate
@@ -60,7 +62,9 @@ def is_not_archived(user: AbstractUser, instance: Meeting | AgendaItem) -> bool:
     return state is not None and state not in _ARCHIVED_STATES
 
 
-_FINISHED_STATES = MeetingWf.finished_states | AgendaItemStateMachine.finished_states
+_FINISHED_STATES = (
+    MeetingStateMachine.finished_states | AgendaItemStateMachine.finished_states
+)
 
 
 @predicate

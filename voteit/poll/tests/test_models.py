@@ -11,7 +11,7 @@ from envelope.testing import testing_channel_layers_setting
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 from voteit.poll.app.polls.simple import Simple
@@ -369,7 +369,7 @@ class ElectoralRegisterTests(TestCase):
         self.assertEqual({self.moderator.pk: 3}, self.er.weight_dict)
 
     def test_create_er_on_closed_meeting(self):
-        self.meeting.state = MeetingWf.CLOSED
+        self.meeting.state = MeetingStateMachine.closed.value
         self.meeting.save()
         self.meeting.remove_roles(self.participant, ROLE_POTENTIAL_VOTER)
         self.assertFalse(self.meeting.er_policy.new_er_needed())
@@ -403,7 +403,7 @@ class ElectoralRegisterManagerTests(TestCase):
             title="Test meeting",
             er_policy_name=AutoBeforePoll.name,
         )
-        meeting.ongoing()
+        meeting.state = "ongoing"
         meeting.save()
         user = User.objects.create(username=f"user-{_id}")
         meeting.add_roles(user, ROLE_POTENTIAL_VOTER)

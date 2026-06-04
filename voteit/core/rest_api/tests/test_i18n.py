@@ -22,49 +22,48 @@ class TranslationTests(APITestCase):
             username="moderator", organisation=org
         )
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
-        cls.url = reverse("meeting-transitions", kwargs={"pk": cls.meeting.pk})
+        cls.url = reverse("meeting-event", kwargs={"pk": cls.meeting.pk})
 
     def setUp(self):
         self.meeting.refresh_from_db()
 
-    def test_get_list_with_nested_translations(self):
+    def test_get_state_with_language_header(self):
         self.client.force_login(self.moderator)
         response = self.client.get(self.url, HTTP_ACCEPT_LANGUAGE="sv")
         self.assertEqual(200, response.status_code)
-        # Break out the transition to ongoing
-        transition = None
-        for x in response.json():
-            if x.get("target") == "ongoing":
-                transition = x
-                break
-        self.assertIsNotNone(transition)
         self.assertEqual("sv", response.headers.get("Content-Language"))
-        self.assertEqual("Gör pågående", transition["title"])
+        self.assertEqual({"state": "upcoming"}, response.json())
 
     def test_missing_field(self):
         self.client.force_login(self.moderator)
         response = self.client.post(
-            self.url, data={"bla": "haha"}, HTTP_ACCEPT_LANGUAGE="sv"
+            self.url,
+            data={"bla": "haha"},
+            content_type="application/json",
+            HTTP_ACCEPT_LANGUAGE="sv",
         )
         self.assertEqual(400, response.status_code)
         self.assertEqual("sv", response.headers.get("Content-Language"))
         data = response.json()
-        # No clue why this is a list but we're testing translations here :)
-        self.assertEqual(["Handling måste anges"], data["transition"])
+        self.assertIn("event", data)
 
-    def test_bad_transition(self):
+    def test_bad_event(self):
         self.client.force_login(self.moderator)
         response = self.client.post(
-            self.url, data={"transition": "hello"}, HTTP_ACCEPT_LANGUAGE="sv"
+            self.url,
+            data={"event": "hello"},
+            content_type="application/json",
+            HTTP_ACCEPT_LANGUAGE="sv",
         )
         self.assertEqual(400, response.status_code)
         self.assertEqual("sv", response.headers.get("Content-Language"))
-        data = response.json()
-        self.assertEqual(["Ogiltig handling: hello"], data["transition"])
 
     def test_unauthenticated(self):
         response = self.client.post(
-            self.url, data={"transition": "ongoing"}, HTTP_ACCEPT_LANGUAGE="sv"
+            self.url,
+            data={"event": "make_ongoing"},
+            content_type="application/json",
+            HTTP_ACCEPT_LANGUAGE="sv",
         )
         self.assertEqual("sv", response.headers.get("Content-Language"))
         data = response.json()

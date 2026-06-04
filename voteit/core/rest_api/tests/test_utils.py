@@ -7,48 +7,36 @@ from voteit.core.rest_api.utils import get_valid_transitions_dict
 
 
 class UtilsTests(TestCase):
+    """
+    These utilities are for django-fsm models only. Testing against Poll (still FSM).
+    Meeting has been migrated to python-statemachine.
+    """
+
     @classmethod
     def setUpTestData(cls):
         from voteit.meeting.models import Meeting
         from voteit.organisation.models import Organisation
+        from voteit.poll.models import Poll
 
         org = Organisation.objects.create()
-        cls.meeting = Meeting.objects.create(
-            er_policy_name="auto_before_poll", organisation=org, state="upcoming"
+        cls.meeting = Meeting.objects.create(organisation=org, state="upcoming")
+        cls.ai = cls.meeting.agenda_items.create(state="upcoming")
+        cls.poll = Poll.objects.create(
+            method_name="simple", agenda_item=cls.ai, meeting=cls.meeting
         )
 
-    def setUp(self):
-        self.meeting.refresh_from_db()
-
-    def test_valid_states_upcoming(self):
+    def test_valid_states_poll_private(self):
         self.assertEqual(
-            ["ongoing", "request_delete"],
-            [x.name for x in get_valid_transitions(self.meeting)],
+            ["ongoing", "upcoming"],
+            sorted(x.name for x in get_valid_transitions(self.poll)),
         )
 
-    def test_valid_states_ongoing(self):
-        self.meeting.ongoing()
-        self.meeting.save()
-        self.assertEqual(
-            [
-                "close",
-                "request_delete",
-                "upcoming",
-            ],
-            [x.name for x in get_valid_transitions(self.meeting)],
-        )
-
-    def test_drf_do_transition(self):
-        user = self.meeting.participants.create()
-        valid_transitions = get_valid_transitions_dict(self.meeting)
-        self.meeting.er_policy_name = "jeff"
-        with self.assertRaises(ValidationError) as cm:
+    def test_drf_do_transition_poll(self):
+        valid_transitions = get_valid_transitions_dict(self.poll)
+        with self.assertRaises(ValidationError):
             drf_do_transition(
-                instance=self.meeting,
+                instance=self.poll,
                 valid_transitions=dict(valid_transitions),
                 transition_name="ongoing",
-                user=user,
+                user=None,
             )
-        self.assertIn(
-            "Must have valid electoral register policy name", str(cm.exception)
-        )

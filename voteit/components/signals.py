@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-from django_fsm import post_transition
+from voteit.core.signals import after_sm_transition
 from envelope.signals import channel_subscribed
 
 from voteit.components.messages import MeetingComponentAdded
@@ -18,7 +18,7 @@ from voteit.core.decorators import on_transaction_commit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.components.models import MeetingComponent
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -73,11 +73,11 @@ def meeting_component_delete(instance=None, **kw):
     meeting_ch.sync_publish(msg)
 
 
-@receiver(post_transition, sender=Meeting)
+@receiver(after_sm_transition, sender=Meeting)
 def disable_components_when_meeting_closes(
-    instance: Meeting, source: str, target: str, **kw
+    instance: Meeting, source, target, event, **kw
 ):
-    if target == MeetingWf.CLOSED:
+    if target.value == MeetingStateMachine.closed.value:
         disable_names = [
             k
             for (k, v) in get_meeting_component_adapters().items()

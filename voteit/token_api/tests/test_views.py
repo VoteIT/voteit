@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.token_api.models import MeetingAPIKey
 from voteit.token_api.models import create_api_key_user
 from voteit.organisation.models import Organisation
@@ -34,7 +34,7 @@ class MeetingApiTokenViewSetTest(APITestCase):
         return obj, key
 
     def _close_meeting(self):
-        self.meeting.state = MeetingWf.CLOSED
+        self.meeting.state = MeetingStateMachine.closed.value
         self.meeting.save(update_fields=["state"])
 
     # --- list ---
@@ -239,7 +239,9 @@ class MeetingApiTokenViewSetTest(APITestCase):
         for resource in ("meeting", "invites"):
             wildcard_idx = data.index(f"{resource}.*")
             action_indices = [
-                i for i, s in enumerate(data) if s.startswith(f"{resource}.") and s != f"{resource}.*"
+                i
+                for i, s in enumerate(data)
+                if s.startswith(f"{resource}.") and s != f"{resource}.*"
             ]
             self.assertTrue(all(wildcard_idx < i for i in action_indices))
 

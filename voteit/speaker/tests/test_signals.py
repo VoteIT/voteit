@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
-from django_fsm import TransitionNotAllowed
 from rest_framework.exceptions import ValidationError
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
@@ -16,7 +15,7 @@ from voteit.core.messages.role_updates import RolesAdded
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.room.channels import RoomChannel
 from voteit.speaker.messages import SpeakerAdded
 from voteit.speaker.messages import SpeakerChanged
@@ -45,7 +44,7 @@ class WFEffectsTests(TestCase):
     def setUpTestData(cls):
         cls.moderator = User.objects.get(username="moderator")
         cls.meeting = Meeting.objects.get(pk=1)
-        cls.meeting.ongoing()
+        cls.meeting.state = MeetingStateMachine.ongoing.value
         cls.meeting.save()
         cls.room = cls.meeting.rooms.create()
         cls.ai = cls.meeting.agenda_items.create()
@@ -71,14 +70,14 @@ class WFEffectsTests(TestCase):
         self.ai.close(user=self.moderator)
 
     def test_meeting(self):
-        with self.assertRaises(TransitionNotAllowed) as cm:
-            self.meeting.close()
-        self.assertEqual(
+        with self.assertRaises(ValidationError) as cm:
+            self.meeting.close(user=self.moderator)
+        self.assertIn(
             "Finish active speaker on speaker list Hello first!", str(cm.exception)
         )
         self.speaker.stop()
         self.speaker.save()
-        self.meeting.close()
+        self.meeting.close(user=self.moderator)
 
     def test_close_lists_automatically_when_ai_closes(self):
         self.speaker.delete()
@@ -96,7 +95,7 @@ class WFEffectsTests(TestCase):
         self.meeting.archive()
         self.meeting.save()
         self.system.refresh_from_db()
-        self.assertEqual(MeetingWf.ARCHIVED, self.meeting.state)
+        self.assertEqual(MeetingStateMachine.archived.value, self.meeting.state)
         self.assertEqual(SpeakerSystemWf.ARCHIVED, self.system.state)
 
 

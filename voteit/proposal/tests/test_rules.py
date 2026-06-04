@@ -81,8 +81,7 @@ class RulesTests(TestCase):
 
     def test_add_closed_meeting_closed_ai(self):
         # Note: Meetings shouldn't be able to close without closing the AIs
-        self.meeting.ongoing()
-        self.meeting.close()
+        self.meeting.state = "closed"
         self.ai.state = "closed"
         self.ai.save()
         ADD = Proposal.get_perm(PERM.ADD)
@@ -115,7 +114,7 @@ class RulesTests(TestCase):
         self.assertFalse(self.group_participant.has_perm(CHANGE, self.proposal))
 
     def test_change_closed_ai_ongoing_meeting(self):
-        self.meeting.ongoing()
+        self.meeting.state = "ongoing"
         self.meeting.save()
         self.ai.state = "closed"
         self.ai.save()
@@ -130,8 +129,7 @@ class RulesTests(TestCase):
         self.assertFalse(self.group_participant.has_perm(CHANGE, self.proposal))
 
     def test_change_closed_meeting_closed_ai(self):
-        self.meeting.ongoing()
-        self.meeting.close()
+        self.meeting.state = "closed"
         self.meeting.save()
         self.ai.state = "closed"
         self.ai.save()
@@ -167,7 +165,7 @@ class RulesTests(TestCase):
         self.assertFalse(self.group_participant.has_perm(DELETE, self.proposal))
 
     def test_delete_closed_ai_ongoing_meeting(self):
-        self.meeting.ongoing()
+        self.meeting.state = "ongoing"
         self.meeting.save()
         self.ai.state = "closed"
         self.ai.save()
@@ -182,8 +180,7 @@ class RulesTests(TestCase):
         self.assertFalse(self.group_participant.has_perm(DELETE, self.proposal))
 
     def test_delete_closed_meeting_closed_ai(self):
-        self.meeting.ongoing()
-        self.meeting.close()
+        self.meeting.state = "closed"
         self.meeting.save()
         self.ai.state = "closed"
         self.ai.save()
@@ -258,8 +255,7 @@ class RulesTests(TestCase):
     def test_retract_closed_meeting_closed_ai(self):
         self.ai.state = "closed"
         self.ai.save()
-        self.meeting.ongoing()
-        self.meeting.close()
+        self.meeting.state = "closed"
         RETRACT = Proposal.get_perm(PERM_RETRACT)
         self.assertFalse(self.anon_user.has_perm(RETRACT, self.proposal))
         self.assertFalse(self.participant.has_perm(RETRACT, self.proposal))

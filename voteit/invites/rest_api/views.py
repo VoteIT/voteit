@@ -30,7 +30,7 @@ from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.utils import send_updated_invites
 from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.meeting.roles import ROLE_MODERATOR
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.organisation.utils import get_idproxy_user_data
 
 logger = getLogger(__name__)
@@ -73,7 +73,7 @@ class MeetingInviteViewSet(
             return MeetingInvite.objects.filter(
                 meeting__roles__user=self.request.user,
                 meeting__roles__assigned__contains=ROLE_MODERATOR,
-            ).exclude(state__in=MeetingWf.archived_states)
+            ).exclude(state__in=MeetingStateMachine.archived_states)
         return MeetingInvite.objects.none()
 
     def retrieve(self, request, *args, **kwargs):

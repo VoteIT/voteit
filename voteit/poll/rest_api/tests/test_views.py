@@ -12,7 +12,7 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 from voteit.poll.app.er_policies.manual import Manual
@@ -281,7 +281,7 @@ class PollViewSetTests(APITestCase):
     def test_publish_result(self):
         self.meeting.add_roles(self.participant, ROLE_POTENTIAL_VOTER)
         self.meeting.er_policy_name = AutoAlways.name
-        self.meeting.state = MeetingWf.ONGOING
+        self.meeting.state = MeetingStateMachine.ongoing.value
         self.meeting.save()
         self.meeting.er_policy.create_er()
         poll = self.meeting.polls.create(
@@ -711,7 +711,7 @@ class TriggerCreateERViewTests(APITestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create(
             title="Trigger ER test meeting",
-            state=MeetingWf.UPCOMING,
+            state=MeetingStateMachine.upcoming.value,
             er_policy_name=AutoBeforePoll.name,
         )
         cls.moderator: User = User.objects.create_user("trigger_er_moderator")
@@ -777,7 +777,7 @@ class ManualCreateERViewTests(APITestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create(
             title="Manual ER test meeting",
-            state=MeetingWf.UPCOMING,
+            state=MeetingStateMachine.upcoming.value,
             er_policy_name=Manual.name,
         )
         cls.moderator: User = User.objects.create_user("manual_er_moderator")

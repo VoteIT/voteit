@@ -209,6 +209,8 @@ class MeetingComponentsDisabledWhenMeetingClosesTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create(state="ongoing")
+        cls.moderator = User.objects.create(username="test_moderator_cmp")
+        cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.msg: MeetingComponent = cls.meeting.components.create(
             component_name=FlashMessage.name,
             settings={"msg": "Hello"},
@@ -220,7 +222,7 @@ class MeetingComponentsDisabledWhenMeetingClosesTests(TestCase):
         )
 
     def test_close_meeting(self):
-        self.meeting.close()
+        self.meeting.close(user=self.moderator)
         self.meeting.save()
         self.msg.refresh_from_db()
         self.active.refresh_from_db()

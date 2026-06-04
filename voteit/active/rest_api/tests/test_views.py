@@ -16,7 +16,7 @@ from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 
 User = get_user_model()
 
@@ -27,7 +27,9 @@ class ActiveUserViewSetBase(APITestCase):
         cls.participant = User.objects.create_user("participant")
         cls.moderator = User.objects.create_user("moderator")
         cls.outsider = User.objects.create_user("outsider")
-        cls.meeting: Meeting = Meeting.objects.create(state=MeetingWf.ONGOING)
+        cls.meeting: Meeting = Meeting.objects.create(
+            state=MeetingStateMachine.ongoing.value
+        )
         cls.component = cls.meeting.components.create(
             component_name=ActiveUsersComponent.name, enabled=True
         )

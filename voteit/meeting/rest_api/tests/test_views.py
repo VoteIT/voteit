@@ -266,29 +266,29 @@ class MeetingViewSetTests(APITestCase):
         )
 
     def test_transition_moderator(self):
-        url = reverse("meeting-transitions", kwargs={"pk": 1})
-        data = {"transition": "ongoing"}
+        url = reverse("meeting-event", kwargs={"pk": 1})
+        data = {"event": "make_ongoing"}
         self.client.force_login(self.moderator)
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 201)
+        response = self.client.post(url, data, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
 
     def test_bad_transition_moderator(self):
-        url = reverse("meeting-transitions", kwargs={"pk": 1})
-        data = {"transition": "wooohoooo"}
+        url = reverse("meeting-event", kwargs={"pk": 1})
+        data = {"event": "wooohoooo"}
         self.client.force_login(self.moderator)
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, content_type="application/json")
         self.assertEqual(response.status_code, 400)
 
     def test_transition_unauthorized_users(self):
-        url = reverse("meeting-transitions", kwargs={"pk": 1})
-        data = {"transition": "ongoing"}
-        response = self.client.post(url, data)
+        url = reverse("meeting-event", kwargs={"pk": 1})
+        data = {"event": "make_ongoing"}
+        response = self.client.post(url, data, content_type="application/json")
         self.assertEqual(
             response.status_code,
             401,
         )
         self.client.force_login(self.participant)
-        response = self.client.post(url, data)
+        response = self.client.post(url, data, content_type="application/json")
         self.assertEqual(response.status_code, 403)
 
     def test_delete(self):

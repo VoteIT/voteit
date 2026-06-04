@@ -28,8 +28,7 @@ class MeetingInvitePermissionsTests(TestCase):
         self.invite.refresh_from_db()
 
     def _archive(self):
-        self.meeting.ongoing()
-        self.meeting.close()
+        self.meeting.state = "closed"
         self.meeting.archive()
         self.meeting.save()
         self.invite.refresh_from_db()  # will be expired

@@ -41,7 +41,7 @@ class AgendaItemBulkChangeTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.get(pk=1)
-        cls.meeting.ongoing()
+        cls.meeting.state = "ongoing"
         cls.meeting.save()
         cls.ai_1: AgendaItem = cls.meeting.agenda_items.get(pk=1)
         cls.ai_2: AgendaItem = cls.meeting.agenda_items.get(pk=2)
@@ -73,7 +73,7 @@ class AgendaItemBulkChangeTests(TestCase):
         self.assertEqual(3, len(messages))
 
     def test_message_meeting_not_ongoing(self):
-        self.meeting.upcoming()
+        self.meeting.state = "upcoming"
         self.meeting.save()
         msg = self._mk_one(
             self.moderator,
@@ -172,7 +172,7 @@ class AgendaItemBulkDeleteTests(TestCase):
         self.assertEqual({1, 2, 3}, {x.data.pk for x in messages})
 
     def test_message_meeting_not_ongoing(self):
-        self.meeting.ongoing()
+        self.meeting.state = "ongoing"
         self.meeting.save()
         msg = self._mk_one(self.moderator, agenda_items=[1, 2, 3])
         with self.assertRaises(BadRequestError):

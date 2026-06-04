@@ -9,9 +9,9 @@ from voteit.speaker.app.list_methods.simple import Simple
 User = get_user_model()
 
 
-class TransitionsMixinTests(APITestCase):
+class StateMachineMixinTests(APITestCase):
     """
-    We'll test this view against the regular meeting endpoint
+    Tests for StateMachineMixin via the meeting endpoint.
     """
 
     fixtures = ["meeting_test_fixture"]
@@ -30,119 +30,46 @@ class TransitionsMixinTests(APITestCase):
         cls.speaker = cls.slist.speaker_items.create(user=cls.participant)
 
     @property
-    def _cut(self):
-        from voteit.core.rest_api.mixins import TransitionsMixin
+    def _event_url(self):
+        return reverse("meeting-event", kwargs={"pk": self.meeting.pk})
 
-        return TransitionsMixin
-
-    @property
-    def _url(self):
-        return reverse("meeting-transitions", kwargs={"pk": self.meeting.pk})
-
-    def test_available_upcoming(self):
+    def test_get_state(self):
         self.client.force_login(self.moderator)
-        response = self.client.get(self._url)
+        response = self.client.get(self._event_url)
         self.assertEqual(200, response.status_code)
-        self.assertEqual(
-            [
-                {
-                    "name": "ongoing",
-                    "permission": "meeting.moderate_meeting",
-                    "source": "upcoming",
-                    "target": "ongoing",
-                    "title": "Make ongoing",
-                    "has_perm": True,
-                    "allowed": True,
-                    "conditions": [
-                        {
-                            "allowed": True,
-                            "title": "Must have valid electoral register policy name",
-                            "name": "valid_er_policy_guard",
-                        }
-                    ],
-                },
-                {
-                    "name": "request_delete",
-                    "permission": "meeting.delete_meeting",
-                    "source": "upcoming",
-                    "target": "deleting",
-                    "title": "Request delete...",
-                    "conditions": [],
-                    "has_perm": True,
-                    "allowed": True,
-                },
-            ],
-            response.json(),
-        )
-
-    def test_available_ongoing(self):
-        self.meeting.ongoing()
-        self.meeting.save()
-        self.client.force_login(self.moderator)
-        response = self.client.get(self._url)
-        self.assertEqual(200, response.status_code)
-        self.assertEqual(
-            [
-                {
-                    "name": "close",
-                    "permission": "meeting.moderate_meeting",
-                    "source": "ongoing",
-                    "target": "closed",
-                    "title": "Close",
-                    "conditions": [
-                        {
-                            "allowed": True,
-                            "title": "Meeting has ongoing polls - close them first",
-                            "name": "no_ongoing_polls_guard",
-                        }
-                    ],
-                    "has_perm": True,
-                    "allowed": True,
-                },
-                {
-                    "name": "request_delete",
-                    "permission": "meeting.delete_meeting",
-                    "source": "ongoing",
-                    "target": "deleting",
-                    "title": "Request delete...",
-                    "conditions": [],
-                    "has_perm": True,
-                    "allowed": True,
-                },
-                {
-                    "name": "upcoming",
-                    "permission": "meeting.moderate_meeting",
-                    "source": "ongoing",
-                    "target": "upcoming",
-                    "title": "Back to upcoming",
-                    "conditions": [],
-                    "has_perm": True,
-                    "allowed": True,
-                },
-            ],
-            response.json(),
-        )
+        self.assertEqual({"state": "upcoming"}, response.json())
 
     def test_do_transition(self):
         self.client.force_login(self.moderator)
-        response = self.client.post(self._url, data={"transition": "ongoing"})
-        self.assertEqual(201, response.status_code)
+        response = self.client.post(
+            self._event_url,
+            data={"event": "make_ongoing"},
+            content_type="application/json",
+        )
+        self.assertEqual(200, response.status_code)
         self.meeting.refresh_from_db()
         self.assertEqual("ongoing", self.meeting.state)
 
-    def test_transition_to_same_state(self):
+    def test_bad_event(self):
         self.client.force_login(self.moderator)
-        response = self.client.post(self._url, data={"transition": "upcoming"})
+        response = self.client.post(
+            self._event_url,
+            data={"event": "upcoming"},
+            content_type="application/json",
+        )
         self.assertEqual(400, response.status_code)
 
     def test_transition_permission(self):
-        url = reverse("meeting-transitions", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.participant)
-        response = self.client.post(url, data={"transition": "ongoing"})
+        response = self.client.post(
+            self._event_url,
+            data={"event": "make_ongoing"},
+            content_type="application/json",
+        )
         self.assertEqual(403, response.status_code)
 
     def test_transition_guard(self):
-        self.meeting.ongoing()
+        self.meeting.state = "ongoing"
         self.meeting.save()
         self.ai.state = "ongoing"
         self.ai.save()
@@ -154,7 +81,7 @@ class TransitionsMixinTests(APITestCase):
         self.assertIn("transition", response.json())
 
     def test_transition_with_exception(self):
-        self.meeting.ongoing()
+        self.meeting.state = "ongoing"
         self.meeting.save()
         self.ai.state = "ongoing"
         self.ai.save()

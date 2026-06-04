@@ -337,7 +337,9 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     def valid_er_policy_guard(self):
         if self.meeting is None:
             return True  # Skip for unittests
-        return self.meeting.valid_er_policy_guard()
+        from voteit.poll.utils import get_electoral_policy_registry
+
+        return self.meeting.er_policy_name in get_electoral_policy_registry()
 
     valid_er_policy_guard.title = _(
         "There's no electoral register method on this meeting - check configuration"

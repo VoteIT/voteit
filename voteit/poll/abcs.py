@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from pydantic.main import BaseModel
 
 from voteit.core.decorators import ensure_atomic
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.poll.exceptions import ElectoralRegisterError
 
 if TYPE_CHECKING:
@@ -135,7 +135,10 @@ class ElectoralRegisterPolicy(ABC):
         """
         Is a new ER needed?
         """
-        if self.meeting.state not in (MeetingWf.ONGOING, MeetingWf.UPCOMING):
+        if self.meeting.state not in (
+            MeetingStateMachine.ongoing.value,
+            MeetingStateMachine.upcoming.value,
+        ):
             return False
         if self.meeting.latest_er is None:
             if self.allow_poll_er_change:

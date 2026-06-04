@@ -30,8 +30,8 @@ from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.models import MeetingGroup
-from voteit.meeting.workflows import MeetingWf
 from voteit.meeting.models import Meeting
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.stats.registry import history_log
 
 if TYPE_CHECKING:
@@ -248,7 +248,7 @@ class MeetingInviteManager(models.Manager):
         """
         threshold_ts = now() - timedelta(days=days)
         meeting_qs = Meeting.objects.filter(
-            state=MeetingWf.CLOSED, end_time__lt=threshold_ts
+            state=MeetingStateMachine.closed.value, end_time__lt=threshold_ts
         )
         return MeetingInvite.objects.filter(
             meeting__in=meeting_qs,

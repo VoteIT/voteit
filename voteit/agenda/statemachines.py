@@ -10,7 +10,6 @@ from statemachine import StateChart
 from voteit.core import PERM
 from voteit.core.rest_api.utils import perm_denied_msg
 from voteit.core.statemachines import TransitionSignalMixin
-from voteit.meeting.workflows import MeetingWf
 from voteit.poll.workflows import PollWf
 
 
@@ -78,7 +77,7 @@ class AgendaItemStateMachine(StateChart, TransitionSignalMixin):
             raise ValidationError({"transition": [_("There are ongoing polls")]})
 
     def meeting_is_ongoing(self, **kw):
-        if self.model.meeting.state != MeetingWf.ONGOING:
+        if not self.model.meeting.is_ongoing:
             raise ValidationError({"transition": [_("Meeting must be ongoing")]})
 
     def not_allowed(self, **kw):

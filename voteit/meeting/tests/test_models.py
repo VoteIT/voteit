@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
+from rest_framework.exceptions import ValidationError
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.components.app.components.proposal_print import ProposalPrint
@@ -23,17 +24,21 @@ class MeetingTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.get(pk=1)
+        cls.moderator = User.objects.get(username="moderator")
 
     def test_workflow_transitions(self):
+        from voteit.poll.app.er_policies.auto_always import AutoAlways
+
         meeting = self.meeting
-        meeting.ongoing()
-        meeting.upcoming()
-        meeting.ongoing()
-        meeting.close()
-        meeting.ongoing()
-        meeting.close()
-        meeting.request_archiving()
-        meeting.abort_archiving()
+        meeting.er_policy_name = AutoAlways.name
+        meeting.make_ongoing(user=self.moderator)
+        meeting.make_upcoming(user=self.moderator)
+        meeting.make_ongoing(user=self.moderator)
+        meeting.close(user=self.moderator)
+        meeting.make_ongoing(user=self.moderator)
+        meeting.close(user=self.moderator)
+        meeting.request_archiving(user=self.moderator)
+        meeting.abort_archiving(user=self.moderator)
         meeting.archive()
         self.assertEqual("archived", meeting.state)
 
@@ -77,18 +82,23 @@ class MeetingTests(TestCase):
         self.assertEqual("archived", ai.state)
 
     def test_valid_er_policy_guard(self):
-        self.meeting.er_policy_name = None
-        self.assertFalse(self.meeting.valid_er_policy_guard())
-        self.meeting.er_policy_name = AutoAlways.name
-        self.assertTrue(self.meeting.valid_er_policy_guard())
+        meeting = self.meeting
+        meeting.er_policy_name = None
+        meeting.state = "upcoming"
+        with self.assertRaises(ValidationError):
+            meeting.make_ongoing(user=self.moderator)
+        meeting.er_policy_name = AutoAlways.name
+        meeting.make_ongoing(user=self.moderator)
+        self.assertEqual("ongoing", meeting.state)
 
     def test_no_ongoing_polls_guard(self):
         meeting = self.meeting
+        meeting.state = "ongoing"
         poll: Poll = meeting.polls.create(method_name="simple")
-        self.assertTrue(meeting.no_ongoing_polls_guard())
         poll.state = "ongoing"
         poll.save()
-        self.assertFalse(meeting.no_ongoing_polls_guard())
+        with self.assertRaises(ValidationError):
+            meeting.close(user=self.moderator)
 
     def test_component_enabled(self):
         self.meeting.components.create(

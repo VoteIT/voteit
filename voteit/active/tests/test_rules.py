@@ -5,7 +5,7 @@ from voteit.active.components import ActiveUsersComponent
 from voteit.active.models import ActiveUser
 from voteit.core import PERM
 from voteit.meeting.models import Meeting
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 
 User = get_user_model()
 
@@ -30,7 +30,7 @@ class ActiveUserPermissionsTests(TestCase):
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.meeting))
 
     def test_change_closed_meeting(self):
-        self.meeting.state = MeetingWf.CLOSED
+        self.meeting.state = MeetingStateMachine.closed.value
         self.meeting.save()
         CHANGE = ActiveUser.get_perm(PERM.CHANGE)
         self.assertFalse(self.moderator.has_perm(CHANGE, self.meeting))

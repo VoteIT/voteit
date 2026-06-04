@@ -15,8 +15,6 @@ from django.urls import NoReverseMatch
 from django.urls import path
 from django.urls import reverse
 from django.utils.html import format_html
-from fsm_admin.mixins import FSMTransitionMixin
-
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
@@ -25,7 +23,7 @@ from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.utils import notify_dialect_changed
 from voteit.meeting.utils import sort_agenda_items
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 
 if TYPE_CHECKING:
     from voteit.core.abcs import MeetingContext
@@ -60,7 +58,7 @@ class CloneMeetingForm(ImportMeetingForm):
         self.fields["target_meeting"] = forms.ModelChoiceField(
             label="Välj kommande möte att populera",
             queryset=self.instance.organisation.meetings.filter(
-                state__in=[MeetingWf.UPCOMING]
+                state__in=[MeetingStateMachine.upcoming.value]
             ).exclude(pk=self.instance.pk),
         )
         self.stats = None
@@ -186,8 +184,7 @@ class DialectFilter(admin.SimpleListFilter):
 
 
 @admin.register(Meeting)
-class MeetingAdmin(FSMTransitionMixin, admin.ModelAdmin):
-    fsm_field = ["state"]
+class MeetingAdmin(admin.ModelAdmin):
     autocomplete_fields = ("organisation",)
     list_display = (
         "title",

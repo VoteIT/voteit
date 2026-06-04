@@ -21,7 +21,7 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.organisation.rules import is_manager
 from voteit.organisation.rules import is_meeting_creator
 
@@ -108,7 +108,7 @@ def meeting_not_fully_archived(user: AbstractUser, context: MeetingContext) -> b
     return (
         isinstance(context, MeetingContext)
         and context.meeting is not None
-        and context.meeting.state != MeetingWf.ARCHIVED
+        and context.meeting.state != MeetingStateMachine.archived.value
     )
 
 
@@ -117,7 +117,8 @@ def meeting_upcoming_ongoing(user: AbstractUser, context: MeetingContext) -> boo
     return (
         isinstance(context, MeetingContext)
         and context.meeting is not None
-        and context.meeting.state in (MeetingWf.ONGOING, MeetingWf.UPCOMING)
+        and context.meeting.state
+        in (MeetingStateMachine.ongoing.value, MeetingStateMachine.upcoming.value)
     )
 
 
@@ -126,7 +127,7 @@ def meeting_upcoming(user: AbstractUser, context: MeetingContext) -> bool:
     return (
         isinstance(context, MeetingContext)
         and context.meeting is not None
-        and context.meeting.state == MeetingWf.UPCOMING
+        and context.meeting.state == MeetingStateMachine.upcoming.value
     )
 
 

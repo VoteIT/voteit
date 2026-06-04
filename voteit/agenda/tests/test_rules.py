@@ -27,8 +27,7 @@ class RulesTests(TestCase):
         return AgendaItem.get_perm(perm)
 
     def _archive(self):
-        self.meeting.ongoing()
-        self.meeting.close()
+        self.meeting.state = "closed"
         self.meeting.archive()
         self.meeting.save()
         self.ai.refresh_from_db()

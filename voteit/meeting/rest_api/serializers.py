@@ -25,7 +25,6 @@ from voteit.meeting.models import MeetingGroup
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.rest_api.fields import ModeratorMeetingField
 from voteit.meeting.rest_api.fields import ViewableMeetingField
-from voteit.meeting.workflows import MeetingWf
 from voteit.meeting.rest_api.validators import RoleValidator
 from voteit.meeting.rest_api.validators import DialectInstallableValidator
 from voteit.meeting.roles import ROLE_DISCUSSER
@@ -527,8 +526,8 @@ class BulkDeleteMeetingGroupsSerializer(serializers.Serializer):
         child=serializers.IntegerField(), min_length=1, max_length=250
     )
 
-    def validate_meeting(self, value):
-        if value.state != MeetingWf.UPCOMING:
+    def validate_meeting(self, value: Meeting):
+        if not value.is_upcoming:
             raise ValidationError(
                 f"Meeting must be in 'upcoming' state to bulk delete groups, current state is '{value.state}'."
             )

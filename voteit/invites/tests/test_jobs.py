@@ -12,7 +12,7 @@ from voteit.invites.models import MeetingInvite
 from voteit.invites.statemachines import InviteStateMachine
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 
 User = get_user_model()
@@ -23,7 +23,9 @@ class ExpireUnusedInvitesTests(TestCase):
     def setUpTestData(cls):
         before = now() - timedelta(days=40)
         cls.meeting: Meeting = Meeting.objects.create(
-            er_policy_name=AutoBeforePoll.name, state=MeetingWf.CLOSED, end_time=before
+            er_policy_name=AutoBeforePoll.name,
+            state=MeetingStateMachine.closed.value,
+            end_time=before,
         )
         cls.inv_old: MeetingInvite = cls.meeting.invites.create(
             roles=[ROLE_PARTICIPANT],

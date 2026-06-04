@@ -17,7 +17,7 @@ from voteit.meeting.rest_api.fields import UserInSameMeetingsField
 from voteit.meeting.rest_api.fields import ParticipantMeetingField
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.poll.abcs import PollMethod
 from voteit.poll.app.er_policies.manual import Manual
 from voteit.poll.models import ElectoralRegister
@@ -211,7 +211,10 @@ class ElectoralRegisterSerializer(serializers.ModelSerializer):
 class ActiveModeratorMeetingField(serializers.PrimaryKeyRelatedField):
     def get_queryset(self):
         return Meeting.objects.filter(
-            state__in=[MeetingWf.UPCOMING, MeetingWf.ONGOING],
+            state__in=[
+                MeetingStateMachine.upcoming.value,
+                MeetingStateMachine.ongoing.value,
+            ],
             roles__user=self.context["request"].user,
             roles__assigned__contains=ROLE_MODERATOR,
         )
@@ -222,7 +225,9 @@ class TriggerCreateERSerializer(serializers.Serializer):
 
     def validate_meeting(self, value):
         validate_model_add(self, ElectoralRegister, value)
-        if not value.valid_er_policy_guard():
+        from voteit.poll.utils import get_electoral_policy_registry
+
+        if value.er_policy_name not in get_electoral_policy_registry():
             raise ValidationError("No valid electoral register policy")
         if not value.er_policy.allow_trigger:
             raise ValidationError("Electoral register can't be triggered this way")
@@ -250,7 +255,12 @@ class ManualCreateERSerializer(serializers.Serializer):
 
     def validate_meeting(self, value):
         validate_model_add(self, ElectoralRegister, value)
-        if not value.valid_er_policy_guard() or not value.er_policy.allow_manual:
+        from voteit.poll.utils import get_electoral_policy_registry
+
+        if (
+            value.er_policy_name not in get_electoral_policy_registry()
+            or not value.er_policy.allow_manual
+        ):
             raise ValidationError(
                 "Electoral register can't be manually created for this meeting"
             )

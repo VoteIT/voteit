@@ -7,11 +7,10 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
-from django_fsm import TransitionNotAllowed
-from django_fsm import pre_transition
 from envelope.app.user_channel.channel import UserChannel
 from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
+from rest_framework.exceptions import ValidationError
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
@@ -32,7 +31,7 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.signals import archive_meeting
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.room.channels import RoomChannel
 from voteit.speaker.messages import SpeakerAdded
 from voteit.speaker.messages import SpeakerChanged
@@ -223,25 +222,28 @@ def check_no_active_speaker(instance: AgendaItem, source, target, event, **kwarg
             speaker_list__agenda_item=instance,
         ).exists()
     ):
-        from rest_framework.exceptions import ValidationError
-
         raise ValidationError({"transition": ["Finish active speaker first"]})
 
 
-@receiver(pre_transition, sender=Meeting)
+@receiver(before_sm_transition, sender=Meeting)
 def check_no_active_speaker_when_meeting_closes(
-    instance: Meeting, source: str, target: str, **kwargs
+    instance: Meeting, source, target, event, **kwargs
 ):
-    if target in (MeetingWf.CLOSED, MeetingWf.DELETING):
+    if target.value in (
+        MeetingStateMachine.closed.value,
+        MeetingStateMachine.deleting.value,
+    ):
         if speaker := Speaker.objects.filter(
             seconds__isnull=True,
             started__isnull=False,
             speaker_list__meeting=instance,
         ).first():
-            raise TransitionNotAllowed(
-                f"Finish active speaker on speaker list {speaker.speaker_list.title} first!",
-                object=instance,
-                method="close",
+            raise ValidationError(
+                {
+                    "transition": [
+                        f"Finish active speaker on speaker list {speaker.speaker_list.title} first!"
+                    ]
+                }
             )
 
 

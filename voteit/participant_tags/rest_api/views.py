@@ -11,7 +11,7 @@ from rest_framework.viewsets import GenericViewSet
 
 from voteit.core.rest_api import router
 from voteit.meeting.models import Meeting
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.participant_tags.rest_api.serializers import DeleteNamespaceSerializer
 from voteit.participant_tags.rest_api.serializers import SetTagsSerializer
 from voteit.participant_tags.rest_api.serializers import TagsSerializer
@@ -34,7 +34,10 @@ class ParticipantTagsViewSet(
 
     def get_queryset(self):
         return Meeting.objects.filter(
-            state__in=[MeetingWf.UPCOMING, MeetingWf.ONGOING],
+            state__in=[
+                MeetingStateMachine.upcoming.value,
+                MeetingStateMachine.ongoing.value,
+            ],
             participants=self.request.user,
         )
 

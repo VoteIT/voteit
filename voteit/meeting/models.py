@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from logging import getLogger
 from random import sample
 from string import ascii_lowercase
@@ -9,13 +9,10 @@ from typing import TYPE_CHECKING, Generator
 from auditlog.registry import auditlog
 from django.conf import settings
 from django.db import models
-from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.text import slugify
-from django.utils.timezone import now
-from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField, transition
 from rules.contrib.models import RulesModelMixin
+from statemachine.mixins import MachineMixin
 
 from voteit.core import PERM
 from voteit.core.abcs import MeetingContext, OrganisationContext
@@ -24,7 +21,7 @@ from voteit.core.fields import RichTextField, RolesField
 from voteit.core.models import BaseContent, RoleContextMixin, Roles, User
 from voteit.core.utils import relaxed_clean_html
 from voteit.meeting import roles
-from voteit.meeting.workflows import MeetingWf
+from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.poll.utils import (
     get_electoral_policy_registry,
     get_vote_transfer_policy_registry,
@@ -130,13 +127,18 @@ class MeetingRoles(Roles, MeetingContext):
     ],
 )
 class Meeting(
-    BaseContent, RoleContextMixin, MeetingContext, OrganisationContext, RulesModelMixin
+    BaseContent,
+    RoleContextMixin,
+    MeetingContext,
+    OrganisationContext,
+    RulesModelMixin,
+    MachineMixin,
 ):
     """
     The primary container for all democratic activity within VoteIT.
 
     Every agenda item, proposal, poll, and discussion belongs to a meeting.
-    Lifecycle (``MeetingWf``): ``upcoming → ongoing ↔ closed → archiving → archived``,
+    Lifecycle (``MeetingStateMachine``): ``upcoming → ongoing ↔ closed → archiving → archived``,
     plus a ``deleting`` state reachable from any live state.
 
     Key configuration fields:
@@ -152,13 +154,19 @@ class Meeting(
     where they are a participant, or that are public/visible-in-lists.
     """
 
+    state_machine_name = "voteit.meeting.statemachines.MeetingStateMachine"
+    state_machine_attr = "sm"
+    sm: MeetingStateMachine
+
     name = "meeting"
     _er_policy_name = None
 
     title: str = models.CharField(max_length=100)
     body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
-    state: str = FSMField(
-        default=MeetingWf.initial, choices=MeetingWf.choices(), editable=False
+    state: str = models.CharField(
+        default=MeetingStateMachine.initial_state.value,
+        choices=[(s.value, str(s.name)) for s in MeetingStateMachine.states],
+        max_length=20,
     )
     start_time: datetime | None = models.DateTimeField(
         verbose_name="When the meeting starts/started.", null=True, blank=True
@@ -281,120 +289,45 @@ class Meeting(
             )
         return name in self._enabled_components
 
-    def valid_er_policy_guard(self) -> bool:
-        return self.er_policy_name in get_electoral_policy_registry()
+    def make_upcoming(self, user):
+        self.sm.send("make_upcoming", user=user)
 
-    valid_er_policy_guard.title = _("Must have valid electoral register policy name")
+    def make_ongoing(self, user):
+        self.sm.send("make_ongoing", user=user)
 
-    def no_ongoing_polls_guard(self) -> bool:
-        return not self.polls.filter(state="ongoing").exists()
+    def close(self, user):
+        self.sm.send("close", user=user)
 
-    no_ongoing_polls_guard.title = _("Meeting has ongoing polls - close them first")
+    def request_archiving(self, user):
+        self.sm.send("request_archiving", user=user)
 
-    @transition(
-        field=state,
-        source=MeetingWf.ONGOING,
-        target=MeetingWf.UPCOMING,
-        permission=f"meeting.{PERM.MODERATE}_meeting",
-        custom={"title": _("Back to upcoming")},
-    )
-    def upcoming(self):
-        pass
+    def abort_archiving(self, user):
+        self.sm.send("abort_archiving", user=user)
 
-    @transition(
-        field=state,
-        source=[MeetingWf.UPCOMING, MeetingWf.CLOSED],
-        target=MeetingWf.ONGOING,
-        permission=f"meeting.{PERM.MODERATE}_meeting",
-        conditions=[valid_er_policy_guard],
-        custom={"title": _("Make ongoing")},
-    )
-    def ongoing(self):
-        self.start_time = timezone.now()
+    def request_delete(self, user):
+        self.sm.send("request_delete", user=user)
 
-    @transition(
-        field=state,
-        source=MeetingWf.ONGOING,
-        target=MeetingWf.CLOSED,
-        permission=f"meeting.{PERM.MODERATE}_meeting",
-        conditions=[no_ongoing_polls_guard],
-        custom={"title": _("Close")},
-    )
-    def close(self):
-        self.end_time = timezone.now()
+    def abort_delete(self, user):
+        self.sm.send("abort_delete", user=user)
 
-    @transition(
-        field=state,
-        source=MeetingWf.CLOSED,
-        target=MeetingWf.ARCHIVING,
-        permission=f"meeting.{PERM.ARCHIVE}_meeting",
-        custom={"title": _("Request archiving")},
-    )
-    def request_archiving(self):
-        self.archive_after = now() + timedelta(days=3)
-        # FIXME: Do lots of checks here later on, make sure ais are closed etc
-
-    @transition(
-        field=state,
-        source=MeetingWf.ARCHIVING,
-        target=MeetingWf.CLOSED,
-        permission=f"meeting.{PERM.ARCHIVE}_meeting",
-        custom={"title": _("Abort archiving")},
-    )
-    def abort_archiving(self):
-        self.archive_after = None
-
-    @transition(
-        field=state,
-        source="+",
-        target=MeetingWf.ARCHIVED,
-        permission=PERM.NOT_ALLOWED,
-    )
     @ensure_atomic
     def archive(self):
         from voteit.meeting.signals import archive_meeting  # Avoid circular import
 
+        self.state = MeetingStateMachine.archived.value
         archive_meeting.send(sender=self.__class__, meeting=self)
-
-    @transition(
-        field=state,
-        source=[
-            MeetingWf.UPCOMING,
-            MeetingWf.ONGOING,
-            MeetingWf.CLOSED,
-            MeetingWf.ARCHIVED,
-            MeetingWf.ARCHIVING,
-        ],
-        target=MeetingWf.DELETING,
-        permission=f"meeting.{PERM.DELETE}_meeting",
-        custom={"title": _("Request delete...")},
-    )
-    def request_delete(self):
-        self.pre_delete_state = self.state
-        self.delete_requested = now()
-
-    @transition(
-        field=state,
-        source=MeetingWf.DELETING,
-        target=None,
-        permission=f"meeting.{PERM.DELETE}_meeting",
-        custom={"title": _("Abort delete")},
-    )
-    def abort_delete(self):
-        self.state = self.pre_delete_state
-        self.delete_requested = None
 
     @property
     def is_upcoming(self):
-        return self.state == MeetingWf.UPCOMING
+        return self.state == MeetingStateMachine.upcoming.value
 
     @property
     def is_ongoing(self):
-        return self.state == MeetingWf.ONGOING
+        return self.state == MeetingStateMachine.ongoing.value
 
     @property
     def is_archived(self):
-        return self.state in MeetingWf.archived_states
+        return self.state in MeetingStateMachine.archived_states
 
     @property
     def meeting(self) -> Meeting:
