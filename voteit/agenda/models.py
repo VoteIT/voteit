@@ -8,20 +8,15 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.timezone import now
-from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField
-from django_fsm import transition
+from statemachine.mixins import MachineMixin
 
-from voteit.agenda.workflows import AgendaItemWf
-from voteit.core import PERM
+from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.fields import RichTextField
 from voteit.core.models import BaseContent
 from voteit.core.utils import relaxed_clean_html
 from voteit.meeting.models import Meeting
-from voteit.meeting.workflows import MeetingWf
-from voteit.poll.workflows import PollWf
 
 __all__ = ("AgendaItem", "LastRead")
 
@@ -40,12 +35,12 @@ from voteit.stats.registry import history_log
         "tags",
     ],
 )
-class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
+class AgendaItem(BaseContent, MeetingContext, AgendaItemContext, MachineMixin):
     """
     A structured discussion/voting point within a meeting.
 
     Agenda items are the containers that hold proposals, polls, and discussion posts.
-    Lifecycle (``AgendaItemWf``): ``private → upcoming → ongoing → closed → archived``.
+    Lifecycle (``AgendaItemStateMachine``): ``private → upcoming → ongoing → closed → archived``.
     State combinations with the parent meeting are documented in ``docs/workflows.md``.
 
     ``order`` is auto-assigned as the next sequential value for the meeting.
@@ -57,12 +52,15 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
     """
 
     name: str = "agenda_item"
+    state_machine_name = "voteit.agenda.statemachines.AgendaItemStateMachine"
+    state_machine_attr = "sm"
+    sm: AgendaItemStateMachine
     body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
     title: str = models.CharField(max_length=100)
-    state: str = FSMField(
-        default=AgendaItemWf.initial,
-        choices=AgendaItemWf.choices(),
-        editable=False,
+    state: str = models.CharField(
+        default=AgendaItemStateMachine.initial_state.value,
+        choices=[(s.value, str(s.name)) for s in AgendaItemStateMachine.states],
+        max_length=20,
     )
     meeting: Meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="agenda_items"
@@ -109,7 +107,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
 
     def maybe_mark_related_modified(self):
         """This is a "poor man's" avoid duplicate pushes."""
-        if self.state != AgendaItemWf.ARCHIVED:
+        if self.state != AgendaItemStateMachine.archived.value:
             really_now = now()
             # Check if we really need to touch the database
             if (
@@ -129,7 +127,7 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
         set related_modified to the highest reasonable value.
         No need to notify users that content was changed if it's just missing.
         """
-        if self.state != AgendaItemWf.ARCHIVED:
+        if self.state != AgendaItemStateMachine.archived.value:
             candidates = [
                 x.modified
                 for x in [
@@ -149,84 +147,24 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext):
                 self.related_modified = None
                 self.save()
 
-    def guard_no_ongoing_polls(self) -> bool:
-        return not self.polls.filter(state=PollWf.ONGOING).exists()
+    def make_upcoming(self, user):
+        self.sm.send("make_upcoming", user=user)
 
-    guard_no_ongoing_polls.title = "There are ongoing polls"
+    def unpublish(self, user):
+        self.sm.send("unpublish", user=user)
 
-    def guard_meeting_ongoing(self) -> bool:
-        return self.meeting.state == MeetingWf.ONGOING
+    def make_ongoing(self, user):
+        self.sm.send("make_ongoing", user=user)
 
-    guard_meeting_ongoing.title = "Meeting must be ongoing"
+    def close(self, user):
+        self.sm.send("close", user=user)
 
-    @transition(
-        field=state,
-        target=AgendaItemWf.UPCOMING,
-        source=[AgendaItemWf.PRIVATE, AgendaItemWf.CLOSED, AgendaItemWf.ONGOING],
-        permission=f"agenda.{PERM.CHANGE}_agendaitem",
-        custom={"title": _("Make upcoming")},
-        conditions=[guard_no_ongoing_polls],
-    )
-    def upcoming(self):
-        """
-        Make agenda item upcoming
-        """
-        pass
-
-    @transition(
-        field=state,
-        source=[AgendaItemWf.UPCOMING, AgendaItemWf.CLOSED, AgendaItemWf.ONGOING],
-        target=AgendaItemWf.PRIVATE,
-        permission=f"agenda.{PERM.CHANGE}_agendaitem",
-        custom={"title": _("Unpublish")},
-        conditions=[guard_no_ongoing_polls],
-    )
-    def unpublish(self):
-        """
-        Make agenda item private
-        """
-        pass
-
-    @transition(
-        field=state,
-        source=[AgendaItemWf.PRIVATE, AgendaItemWf.UPCOMING, AgendaItemWf.CLOSED],
-        target=AgendaItemWf.ONGOING,
-        permission=f"agenda.{PERM.CHANGE}_agendaitem",
-        conditions=[guard_meeting_ongoing],
-        custom={"title": _("Make ongoing")},
-    )
-    def ongoing(self):
-        """Make agenda item ongoing"""
-        pass
-
-    @transition(
-        field=state,
-        target=AgendaItemWf.CLOSED,
-        source=[AgendaItemWf.PRIVATE, AgendaItemWf.UPCOMING, AgendaItemWf.ONGOING],
-        permission=f"agenda.{PERM.CHANGE}_agendaitem",
-        conditions=[guard_no_ongoing_polls],
-        custom={"title": _("Close")},
-    )
-    def close(self):
-        """
-        Close agenda item
-        """
-        pass
-
-    @transition(
-        field=state,
-        target=AgendaItemWf.ARCHIVED,
-        source="*",
-        permission=PERM.NOT_ALLOWED,  # Handled by scripts
-    )
     def archive(self):
-        # Mark agenda item as archived. Handled by scripts.
-        # It should be able to go to archived from any state.
-        pass
+        self.state = AgendaItemStateMachine.archived.value
 
     @property
     def is_private(self) -> bool:
-        return self.state == AgendaItemWf.PRIVATE
+        return self.state == AgendaItemStateMachine.private.value
 
     def mark_read(self, user: AbstractUser) -> LastRead:
         last_read, _ = self.last_read_set.update_or_create(

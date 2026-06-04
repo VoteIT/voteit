@@ -16,9 +16,9 @@ from pydantic import root_validator
 from pydantic import validator
 from rest_framework.exceptions import ValidationError
 
+from statemachine.exceptions import TransitionNotAllowed
+
 from voteit.core import PERM
-from voteit.core.rest_api.utils import drf_do_transition
-from voteit.core.rest_api.utils import get_valid_transitions
 from voteit.meeting.models import Meeting
 from voteit.meeting.workflows import MeetingWf
 from voteit.messaging.base import BaseObjectAdded
@@ -84,21 +84,21 @@ class AgendaItemBulkChange(ContextAction):
             for ai in agenda_items:
                 if ai.state == self.data.state:
                     continue
-                for transition in get_valid_transitions(ai):
-                    if transition.target == self.data.state:
-                        try:
-                            drf_do_transition(
-                                instance=ai,
-                                transition_name=transition.name,
-                                valid_transitions={
-                                    transition.name: transition
-                                },  # We're cheating here
-                                user=self.user,
-                            )
-                            must_save.add(ai)
-                        except ValidationError:
-                            logger.debug("Transition failed", exc_info=True)
-                        break
+                for event in ai.sm.allowed_events:
+                    transitions = [
+                        t
+                        for state in ai.sm.configuration
+                        for t in state.transitions
+                        if event in t.events
+                    ]
+                    for trans in transitions:
+                        if trans.target.value == self.data.state:
+                            try:
+                                ai.sm.send(event.id, user=self.user)
+                                must_save.add(ai)
+                            except (ValidationError, TransitionNotAllowed):
+                                logger.debug("Transition failed", exc_info=True)
+                            break
         if self.data.block_proposals is not None:
             for ai in agenda_items:
                 if ai.block_proposals != self.data.block_proposals:

@@ -8,7 +8,6 @@ from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
 from django_fsm import TransitionNotAllowed
-from django_fsm import post_transition
 from django_fsm import pre_transition
 from envelope.app.user_channel.channel import UserChannel
 from envelope.messages.common import Batch
@@ -16,7 +15,9 @@ from envelope.signals import channel_subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.workflows import AgendaItemWf
+from voteit.agenda.statemachines import AgendaItemStateMachine
+from voteit.core.signals import after_sm_transition
+from voteit.core.signals import before_sm_transition
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import ensure_atomic
 from voteit.core.decorators import on_transaction_commit
@@ -212,19 +213,19 @@ def push_speaker_deleted(instance: Speaker, **kwargs):
         room_ch.sync_publish(msg)
 
 
-@receiver(pre_transition, sender=AgendaItem)
-def check_no_active_speaker(instance: AgendaItem, source: str, target: str, **kwargs):
+@receiver(before_sm_transition, sender=AgendaItem)
+def check_no_active_speaker(instance: AgendaItem, source, target, event, **kwargs):
     if (
-        target == AgendaItemWf.CLOSED
+        target.value == AgendaItemStateMachine.closed.value
         and Speaker.objects.filter(
             seconds__isnull=True,
             started__isnull=False,
             speaker_list__agenda_item=instance,
         ).exists()
     ):
-        raise TransitionNotAllowed(
-            "Finish active speaker first", object=instance, method="close"
-        )
+        from rest_framework.exceptions import ValidationError
+
+        raise ValidationError({"transition": ["Finish active speaker first"]})
 
 
 @receiver(pre_transition, sender=Meeting)
@@ -244,12 +245,12 @@ def check_no_active_speaker_when_meeting_closes(
             )
 
 
-@receiver(post_transition, sender=AgendaItem)
+@receiver(after_sm_transition, sender=AgendaItem)
 @ensure_atomic
 def close_and_deactivate_when_ai_closes(
-    instance: AgendaItem, source: str, target: str, **kw
+    instance: AgendaItem, source, target, event, **kw
 ):
-    if target == AgendaItemWf.CLOSED:
+    if target.value == AgendaItemStateMachine.closed.value:
         for speaker_list in (
             instance.speaker_lists.all()
             .select_related("speaker_system")

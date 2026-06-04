@@ -12,14 +12,14 @@ from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
 from django_fsm import pre_transition
-from django_fsm.signals import post_transition
 from envelope.app.user_channel.channel import UserChannel
 from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
 from sql_util.aggregates import SubqueryCount
 
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.workflows import AgendaItemWf
+from voteit.agenda.statemachines import AgendaItemStateMachine
+from voteit.core.signals import after_sm_transition
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.meeting.channels import MeetingChannel
@@ -71,7 +71,9 @@ def send_ongoing_meeting_poll_stats(context: Meeting, app_state: AppState, **kw)
         .annotate(voted=SubqueryCount("votes"))
         .select_related("electoral_register")
     ):
-        total = len(poll.electoral_register.voter_data) if poll.electoral_register else 0
+        total = (
+            len(poll.electoral_register.voter_data) if poll.electoral_register else 0
+        )
         batch.append(
             PollStatus(
                 pk=poll.pk,
@@ -91,7 +93,7 @@ def participants_subscribed(
     """
     qs = (
         context.polls.exclude(state=PollWf.PRIVATE)
-        .exclude(agenda_item__state=AgendaItemWf.PRIVATE)
+        .exclude(agenda_item__state=AgendaItemStateMachine.private.value)
         .prefetch_related("proposals")
     )
     serializer = PollDetailSerializer(qs, many=True)
@@ -198,13 +200,16 @@ def poll_delete(*, instance: Poll, **kw):
                 participants_ch.sync_publish(msg)
 
 
-@receiver(post_transition, sender=AgendaItem)
-def private_ai_published(instance: AgendaItem, source: str, **kw):
+@receiver(after_sm_transition, sender=AgendaItem)
+def private_ai_published(instance: AgendaItem, source, target, event, **kw):
     """
     Notify participants of any existing polls
     Note that polls may appear before the agenda item does!
     """
-    if source == AgendaItemWf.PRIVATE and instance.meeting is not None:
+    if (
+        source.value == AgendaItemStateMachine.private.value
+        and instance.meeting is not None
+    ):
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         for poll in instance.polls.exclude(state=PollWf.PRIVATE):
             data = PollDetailSerializer(poll).data

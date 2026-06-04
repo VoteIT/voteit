@@ -24,7 +24,7 @@ class RulesTests(TestCase):
         cls.meeting.add_roles(cls.discusser, ROLE_DISCUSSER)
         cls.meeting.add_roles(cls.discusser_author, ROLE_DISCUSSER)
         cls.ai = cls.meeting.agenda_items.create()
-        cls.ai.upcoming()
+        cls.ai.state = "upcoming"
         cls.ai.save()
         cls.discussion_post = cls.ai.discussions.create(author=cls.discusser_author)
 

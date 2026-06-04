@@ -18,6 +18,7 @@ from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.app.er_policies.auto_always import AutoAlways
@@ -381,12 +382,14 @@ class PrivateAIPublishedTests(TestCase):
         )
         self.user = User.objects.create(username="user")
         self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
+        self.moderator = User.objects.create(username="moderator")
+        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_ai_made_public_private_poll(self, mock_publish):
         from voteit.agenda.messages import AgendaChanged
 
-        self.ai.upcoming()
+        self.ai.make_upcoming(user=self.moderator)
         self.ai.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
@@ -401,7 +404,7 @@ class PrivateAIPublishedTests(TestCase):
         self.poll.upcoming()
         self.poll.save()
         mock_publish.reset_mock()
-        self.ai.upcoming()
+        self.ai.make_upcoming(user=self.moderator)
         self.ai.save()
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]

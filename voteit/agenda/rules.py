@@ -2,7 +2,7 @@ import rules
 from django.contrib.auth.models import AbstractUser
 
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.workflows import AgendaItemWf
+from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.core import PERM
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.decorators import predicate
@@ -17,8 +17,8 @@ def upcoming_or_ongoing_ai(user: AbstractUser, context: AgendaItemContext):
         and context.agenda_item is not None
         and context.agenda_item.state
         in (
-            AgendaItemWf.UPCOMING,
-            AgendaItemWf.ONGOING,
+            AgendaItemStateMachine.upcoming.value,
+            AgendaItemStateMachine.ongoing.value,
         )
     )
 
@@ -30,7 +30,11 @@ def upcoming_ongoing_or_private_ai(user: AbstractUser, context: AgendaItemContex
         isinstance(context, AgendaItemContext)
         and context.agenda_item is not None
         and context.agenda_item.state
-        in (AgendaItemWf.UPCOMING, AgendaItemWf.ONGOING, AgendaItemWf.PRIVATE)
+        in (
+            AgendaItemStateMachine.upcoming.value,
+            AgendaItemStateMachine.ongoing.value,
+            AgendaItemStateMachine.private.value,
+        )
     )
 
 

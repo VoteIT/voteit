@@ -13,9 +13,9 @@ from rest_framework.viewsets import ModelViewSet
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api import serializers
-from voteit.agenda.workflows import AgendaItemWf
+from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.core.rest_api import router
-from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.mixins import StateMachineMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
@@ -23,7 +23,7 @@ from voteit.meeting.roles import ROLE_MODERATOR
 
 
 @router.register("agenda-items")
-class AgendaViewSet(VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelViewSet):
+class AgendaViewSet(VerboseAutoPermissionViewSetMixin, StateMachineMixin, ModelViewSet):
     serializer_class = serializers.AgendaItemSerializer
     filterset_class = ForceMeetingWithRoleFilter
     queryset = AgendaItem.objects.all()
@@ -33,6 +33,8 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelVi
         "create": None,  # Checked in serializer
         "retrieve": None,  # Limited by queryset
         "update_last_read": None,  # Limited by queryset
+        "event": None,  # Permission checked inside SM validators
+        "state_machine": None,
     }
     expected_default_http_status = 400
 
@@ -64,7 +66,7 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelVi
                 )
                 # Participants see non-private items in their meetings
                 | models.Q(meeting__roles__user=user)
-                & ~models.Q(state=AgendaItemWf.PRIVATE)
+                & ~models.Q(state=AgendaItemStateMachine.private.value)
             )
             .select_related("meeting")
             .distinct()

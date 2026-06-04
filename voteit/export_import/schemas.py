@@ -20,7 +20,7 @@ from pydantic import validator
 from voteit.core.utils import strict_clean_html
 from voteit.core.utils import strip_html
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.workflows import AgendaItemWf
+from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.discussion.models import DiscussionPost
 from voteit.meeting.models import MeetingGroup
 from voteit.notes.models import Note
@@ -540,10 +540,10 @@ class AgendaItemData(BaseContentData):
     @validator("state")
     def check_state(cls, v):
         """
-        >>> AgendaItemData.check_state(AgendaItemWf.UPCOMING)
+        >>> AgendaItemData.check_state("upcoming")
         'upcoming'
         >>> with schema_context(clear_ai_states=True):
-        ...     AgendaItemData.check_state(AgendaItemWf.UPCOMING) == None
+        ...     AgendaItemData.check_state("upcoming") == None
         True
         >>> _ = AgendaItemData.check_state(None)
         >>> AgendaItemData.check_state("404")
@@ -554,7 +554,7 @@ class AgendaItemData(BaseContentData):
         ctx = get_context()
         if ctx.clear_ai_states:
             return
-        if v and v not in AgendaItemWf.states:
+        if v and v not in {s.value for s in AgendaItemStateMachine.states}:
             raise ValueError(f"{v} is not a valid Agenda item state")
         return v
 

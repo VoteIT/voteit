@@ -144,25 +144,25 @@ class TransitionsMixinTests(APITestCase):
     def test_transition_guard(self):
         self.meeting.ongoing()
         self.meeting.save()
-        self.ai.ongoing()
+        self.ai.state = "ongoing"
         self.ai.save()
         self.ai.polls.create(state="ongoing", method_name="simple")
-        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
+        url = reverse("agendaitem-event", kwargs={"pk": self.ai.pk})
         self.client.force_login(self.moderator)
-        response = self.client.post(url, data={"transition": "upcoming"})
+        response = self.client.post(url, data={"event": "make_upcoming"})
         self.assertEqual(400, response.status_code)
         self.assertIn("transition", response.json())
 
     def test_transition_with_exception(self):
         self.meeting.ongoing()
         self.meeting.save()
-        self.ai.ongoing()
+        self.ai.state = "ongoing"
         self.ai.save()
         self.speaker.start()
         self.speaker.save()
         self.client.force_login(self.moderator)
-        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
-        response = self.client.post(url, data={"transition": "close"})
+        url = reverse("agendaitem-event", kwargs={"pk": self.ai.pk})
+        response = self.client.post(url, data={"event": "close"})
         data = response.json()
         self.assertEqual(400, response.status_code, data)
         self.assertEqual({"transition": ["Finish active speaker first"]}, data)
@@ -200,22 +200,22 @@ class TransitionMixinAgendaTest(APITestCase):
         self.ai.refresh_from_db()
 
     def test_transition_moderator(self):
-        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
-        data = {"transition": "upcoming"}
+        url = reverse("agendaitem-event", kwargs={"pk": self.ai.pk})
+        data = {"event": "make_upcoming"}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 200)
 
     def test_bad_transition_moderator(self):
-        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
-        data = {"transition": "wooohoooo"}
+        url = reverse("agendaitem-event", kwargs={"pk": self.ai.pk})
+        data = {"event": "wooohoooo"}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 400)
 
     def test_transition_unauthorized_users(self):
-        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai.pk})
-        data = {"transition": "upcoming"}
+        url = reverse("agendaitem-event", kwargs={"pk": self.ai.pk})
+        data = {"event": "make_upcoming"}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 401)
         self.client.force_login(self.participant)
@@ -225,8 +225,8 @@ class TransitionMixinAgendaTest(APITestCase):
     def test_transition_conditions_not_met(self):
         self.meeting.state = "upcoming"
         self.meeting.save()
-        url = reverse("agendaitem-transitions", kwargs={"pk": self.ai_private.pk})
-        data = {"transition": "ongoing"}
+        url = reverse("agendaitem-event", kwargs={"pk": self.ai_private.pk})
+        data = {"event": "make_ongoing"}
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, 400)

@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase
-from voteit.agenda.workflows import AgendaItemWf
+from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.core import PERM
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -18,9 +18,7 @@ class PollRulesTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create()
-        cls.ai = cls.meeting.agenda_items.create(meeting=cls.meeting)
-        cls.ai.upcoming()
-        cls.ai.save()
+        cls.ai = cls.meeting.agenda_items.create(meeting=cls.meeting, state="upcoming")
         cls.poll = Poll.objects.create(
             method_name="simple", agenda_item=cls.ai, meeting=cls.meeting
         )
@@ -130,7 +128,7 @@ class PollRulesTests(TestCase):
 
     def test_delete_poll_closed_ai(self):
         self.poll.state = PollWf.CLOSED
-        self.ai.state = AgendaItemWf.CLOSED
+        self.ai.state = AgendaItemStateMachine.closed.value
         DELETE = Poll.get_perm(PERM.DELETE)
         self.assertFalse(self.anon.has_perm(DELETE, self.poll))
         self.assertFalse(self.outsider.has_perm(DELETE, self.poll))

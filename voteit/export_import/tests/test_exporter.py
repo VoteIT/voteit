@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.test import override_settings
 from pydantic import ValidationError
 
-from voteit.agenda.workflows import AgendaItemWf
+from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.meeting.models import Meeting
 from voteit.proposal.workflows import ProposalWf
 
@@ -29,7 +29,9 @@ class ExporterTests(TestCase):
         exporter()
         self.assertEqual("Testfixture meeting", exporter.data.meta.title)
         self.assertEqual(3, len(exporter.data.agenda_items))
-        self.assertEqual(AgendaItemWf.UPCOMING, exporter.data.agenda_items[0].state)
+        self.assertEqual(
+            AgendaItemStateMachine.upcoming.value, exporter.data.agenda_items[0].state
+        )
         self.assertTrue(exporter.data.agenda_items[0].discussions)
         self.assertTrue(exporter.data.agenda_items[0].proposals)
         self.assertEqual(

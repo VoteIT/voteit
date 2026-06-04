@@ -22,7 +22,7 @@ class AgendaSubscribedTests(TestCase):
     def setUp(self):
         self.meeting = Meeting.objects.create()
         self.ai = self.meeting.agenda_items.create()
-        self.ai.upcoming()
+        self.ai.state = "upcoming"
         self.ai.save()
         self.disc1 = self.ai.discussions.create()
         self.disc2 = self.ai.discussions.create()

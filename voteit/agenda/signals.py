@@ -6,7 +6,6 @@ from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-from django_fsm import post_transition
 
 from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
@@ -23,7 +22,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import AgendaItemBodySerializer
 from voteit.agenda.rest_api.serializers import AgendaItemListSerializer
 from voteit.agenda.rest_api.serializers import LastReadSerializer
-from voteit.agenda.workflows import AgendaItemWf
+from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.decorators import disable_on_raw_save
 from voteit.discussion.models import DiscussionPost
@@ -31,6 +30,7 @@ from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
+from voteit.core.signals import after_sm_transition
 from voteit.meeting.signals import archive_meeting
 from voteit.proposal.models import Proposal
 
@@ -57,7 +57,8 @@ def participants_channel_subscribed(
     Send non-private agenda items to regular users.
     """
     _attach_agenda_items(
-        context.agenda_items.exclude(state=AgendaItemWf.PRIVATE), app_state
+        context.agenda_items.exclude(state=AgendaItemStateMachine.private.value),
+        app_state,
     )
 
 
@@ -77,7 +78,9 @@ def meeting_channel_subscribed(
 ):
     # This will cause last read to be sent for private agenda items that the user has visited,
     # but that shouldn't be a problem.
-    serializer = LastReadSerializer(context.last_read_set.filter(user=user).select_related("agenda_item"), many=True)
+    serializer = LastReadSerializer(
+        context.last_read_set.filter(user=user).select_related("agenda_item"), many=True
+    )
     if serializer.data:
         batch = Batch(t=LastReadChanged.name, payloads=[])
         for item in serializer.data:
@@ -119,13 +122,16 @@ def agenda_change(instance: AgendaItem = None, created=None, **kw):
     ai_ch.sync_publish(msg)
 
 
-@receiver(post_transition, sender=AgendaItem)
-def ai_made_private(instance: AgendaItem, source: str, target: str, **kw):
+@receiver(after_sm_transition, sender=AgendaItem)
+def ai_made_private(instance: AgendaItem, source, target, event, **kw):
     """
     Set as deleted for participants.
     Body won't receive a message so cleanup has to be handled differently.
     """
-    if target == AgendaItemWf.PRIVATE and instance.meeting is not None:
+    if (
+        target.value == AgendaItemStateMachine.private.value
+        and instance.meeting is not None
+    ):
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         msg_deleted = AgendaDeleted(pk=instance.pk)
         participants_ch.sync_publish(msg_deleted)

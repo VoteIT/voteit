@@ -32,9 +32,9 @@ class SubscribedTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
-        cls.ai: AgendaItem = cls.meeting.agenda_items.create(body="Hello world")
-        cls.ai.upcoming()
-        cls.ai.save()
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(
+            body="Hello world", state="upcoming"
+        )
         cls.ai_private: AgendaItem = cls.meeting.agenda_items.create()
         cls.user = User.objects.create(username="user")
         cls.meeting.add_roles(cls.user, ROLE_MODERATOR)
@@ -145,7 +145,7 @@ class AgendaChangedTests(TestCase):
         self.ai.save()
         # Still private, so nothing sent
         self.assertFalse(mock_publish.called)
-        self.ai.upcoming()
+        self.ai.state = "upcoming"
         self.ai.save()
         # But now it's published
         msg = mock_publish.mock_calls[0].args[0]

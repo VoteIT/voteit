@@ -6,7 +6,6 @@ from django.db import models
 from django.urls import NoReverseMatch
 from django.urls import reverse
 from django.utils.html import format_html
-from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.admin import MeetingAdminMixin
@@ -17,8 +16,7 @@ if TYPE_CHECKING:
 
 
 @admin.register(AgendaItem)
-class AgendaAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
-    fsm_field = ["state"]
+class AgendaAdmin(MeetingAdminMixin, admin.ModelAdmin):
     list_display = (
         "title",
         "meeting_link",
@@ -42,8 +40,10 @@ class AgendaAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
     readonly_fields = ("order",)
 
     def get_queryset(self, request):
-        return super().get_queryset(request).annotate(
-            _proposal_count=models.Count("proposals", distinct=True)
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(_proposal_count=models.Count("proposals", distinct=True))
         )
 
     @admin.display(description="Proposals")

@@ -409,7 +409,7 @@ class ElectoralRegisterManagerTests(TestCase):
         meeting.add_roles(user, ROLE_POTENTIAL_VOTER)
 
         ai = meeting.agenda_items.create(title="Test agenda item")
-        ai.ongoing()
+        ai.state = "ongoing"
         ai.save()
 
         poll = ai.polls.create(

@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
 from django_fsm import TransitionNotAllowed
+from rest_framework.exceptions import ValidationError
 from envelope.channels.messages import Subscribe
 from envelope.channels.messages import Subscribed
 from envelope.messages.common import Batch
@@ -60,12 +61,14 @@ class WFEffectsTests(TestCase):
         )
 
     def test_ai(self):
-        with self.assertRaises(TransitionNotAllowed) as cm:
-            self.ai.close()
-        self.assertEqual("Finish active speaker first", str(cm.exception))
+        with self.assertRaises(ValidationError) as cm:
+            self.ai.close(user=self.moderator)
+        self.assertEqual(
+            {"transition": ["Finish active speaker first"]}, cm.exception.detail
+        )
         self.speaker.stop()
         self.speaker.save()
-        self.ai.close()
+        self.ai.close(user=self.moderator)
 
     def test_meeting(self):
         with self.assertRaises(TransitionNotAllowed) as cm:
@@ -82,7 +85,7 @@ class WFEffectsTests(TestCase):
         self.system.active_list = self.speaker_list
         self.system.save()
         self.assertTrue(self.speaker_list.is_active_list)
-        self.ai.close()
+        self.ai.close(user=self.moderator)
         self.system.refresh_from_db()
         self.speaker_list.refresh_from_db()
         self.assertFalse(self.speaker_list.is_active_list)

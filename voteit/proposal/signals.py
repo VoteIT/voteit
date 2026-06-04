@@ -6,13 +6,13 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-from django_fsm import post_transition
 from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
-from voteit.agenda.workflows import AgendaItemWf
+from voteit.agenda.statemachines import AgendaItemStateMachine
+from voteit.core.signals import after_sm_transition
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import receiver_all_subclasses
 from voteit.core.utils import get_model_shortname
@@ -65,7 +65,7 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
         agenda_item__meeting=meeting, diffproposal__isnull=True
     )
     if not include_private:
-        qs = qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
+        qs = qs.exclude(agenda_item__state=AgendaItemStateMachine.private.value)
     batch = Batch(t=ProposalAdded.name, payloads=[])
     shortname = get_model_shortname(Proposal)
     items = list(qs.values(*proposal_fields))
@@ -83,7 +83,9 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
         para_body=models.F("paragraph__body")
     )
     if not include_private:
-        diff_qs = diff_qs.exclude(agenda_item__state=AgendaItemWf.PRIVATE)
+        diff_qs = diff_qs.exclude(
+            agenda_item__state=AgendaItemStateMachine.private.value
+        )
     shortname = get_model_shortname(DiffProposal)
     diff_items = list(diff_qs.values(*diff_fields))
     diff_mentions_map = _fetch_mentions_map([item["pk"] for item in diff_items])
@@ -151,13 +153,16 @@ def proposal_delete(instance: Proposal = None, **kw):
         participants_ch.sync_publish(msg)
 
 
-@receiver(post_transition, sender=AgendaItem)
-def private_ai_published(instance: AgendaItem, source: str, **kw):
+@receiver(after_sm_transition, sender=AgendaItem)
+def private_ai_published(instance: AgendaItem, source, target, event, **kw):
     """
     Notify participants of any existing proposals
     Note that proposals may appear before the agenda item does!
     """
-    if source == AgendaItemWf.PRIVATE and instance.meeting_id is not None:
+    if (
+        source.value == AgendaItemStateMachine.private.value
+        and instance.meeting_id is not None
+    ):
         meeting_pk = instance.meeting_id
         participants_ch = ParticipantsChannel(meeting_pk)
         # select_subclasses() is required so DiffProposals are returned as DiffProposal

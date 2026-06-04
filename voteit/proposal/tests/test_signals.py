@@ -37,7 +37,7 @@ class MeetingSubscribedTests(TestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
         cls.ai = cls.meeting.agenda_items.create()
-        cls.ai.upcoming()
+        cls.ai.state = "upcoming"
         cls.ai.save()
         cls.prop1 = cls.ai.proposals.create()
         cls.prop2 = cls.ai.proposals.create()
@@ -65,7 +65,7 @@ class MeetingSubscribedTests(TestCase):
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_app_state_sent_private_moderators(self):
-        self.ai.unpublish()
+        self.ai.state = "private"
         self.ai.save()
         command = Subscribe(
             mm={"consumer_name": "abc", "user_pk": self.user.pk},
@@ -121,7 +121,7 @@ class MeetingSubscribedTests(TestCase):
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_app_state_sent_private_participants(self):
-        self.ai.unpublish()
+        self.ai.state = "private"
         self.ai.save()
         command = Subscribe(
             mm={"consumer_name": "abc", "user_pk": self.user.pk},
@@ -158,7 +158,7 @@ class AnyProposalChangedTests(TestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
         cls.ai = cls.meeting.agenda_items.create()
-        cls.ai.upcoming()
+        cls.ai.state = "upcoming"
         cls.ai.save()
         cls.text_doc: TextDocument = cls.ai.text_documents.create(
             body="Hello", base_tag="hi"
@@ -188,7 +188,7 @@ class AnyProposalChangedTests(TestCase):
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_added_in_private_ai_participant(self, mock_publish):
         self.assertFalse(mock_publish.called)
-        self.ai.unpublish()
+        self.ai.state = "private"
         self.ai.save()
         mock_publish.reset_mock()
         self.ai.proposals.create()
@@ -216,7 +216,7 @@ class AnyProposalChangedTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalAdded)
         self.assertEqual(prop.pk, msg.data.pk)
-        self.ai.unpublish()
+        self.ai.state = "private"
         self.ai.save()
         mock_publish.reset_mock()
         self.ai.proposals.create()
@@ -251,7 +251,7 @@ class AnyProposalChangedTests(TestCase):
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed_private_ai_participant(self, mock_publish):
-        self.ai.unpublish()
+        self.ai.state = "private"
         self.ai.save()
         mock_publish.reset_mock()
         self.assertFalse(mock_publish.called)
@@ -270,7 +270,7 @@ class AnyProposalChangedTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalChanged)
         self.assertEqual(self.prop.pk, msg.data.pk)
-        self.ai.unpublish()
+        self.ai.state = "private"
         self.ai.save()
         mock_publish.reset_mock()
         self.prop.body = "World"
@@ -303,7 +303,7 @@ class AnyProposalChangedTests(TestCase):
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted_participants_private_ai(self, mock_publish):
-        self.ai.unpublish()
+        self.ai.state = "private"
         self.ai.save()
         mock_publish.reset_mock()
         self.assertFalse(mock_publish.called)
@@ -321,7 +321,7 @@ class AnyProposalChangedTests(TestCase):
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalDeleted)
         self.assertEqual(prop_pk, msg.data.pk)
-        self.ai.unpublish()
+        self.ai.state = "private"
         self.ai.save()
         prop = self.ai.proposals.create()
         prop_pk = prop.pk
@@ -341,13 +341,15 @@ class PrivateAIPublishedTests(TestCase):
         self.ai.proposals.create(body="Hello")
         self.user = User.objects.create(username="user")
         self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
+        self.moderator = User.objects.create(username="moderator")
+        self.meeting.add_roles(self.moderator, ROLE_MODERATOR)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_ai_made_public(self, mock_publish):
         from voteit.agenda.messages import AgendaChanged
         from voteit.proposal.messages import ProposalAdded
 
-        self.ai.upcoming()
+        self.ai.make_upcoming(user=self.moderator)
         self.ai.save()
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]

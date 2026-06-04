@@ -16,9 +16,7 @@ class RulesTests(TestCase):
         cls.outsider = User.objects.create(username="outsider")
         cls.participant = User.objects.get(username="participant")
         cls.moderator = User.objects.get(username="moderator")
-        cls.ai = cls.meeting.agenda_items.create()
-        cls.ai.upcoming()
-        cls.ai.save()
+        cls.ai = cls.meeting.agenda_items.create(state="upcoming")
 
     def setUp(self):
         super().setUp()
@@ -36,7 +34,7 @@ class RulesTests(TestCase):
         self.ai.refresh_from_db()
 
     def test_view_private(self):
-        self.ai.unpublish()
+        self.ai.state = "private"
         self.ai.save()
         VIEW = self.p(PERM.VIEW)
         self.assertFalse(self.outsider.has_perm(VIEW, self.ai))
@@ -50,7 +48,7 @@ class RulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(VIEW, self.ai))
 
     def test_view_public_meeting_private_ai(self):
-        self.ai.unpublish()
+        self.ai.state = "private"
         self.ai.save()
         self.meeting.public = True
         self.meeting.save()

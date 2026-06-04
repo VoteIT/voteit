@@ -12,7 +12,7 @@ from voteit.agenda.messages import AgendaDeleted
 from voteit.agenda.messages import LastReadChangedSchema
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import LastReadSerializer
-from voteit.agenda.workflows import AgendaItemWf
+from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
@@ -60,33 +60,39 @@ class AgendaItemBulkChangeTests(TestCase):
 
     def test_message_job_state(self):
         msg = self._mk_one(
-            self.moderator, agenda_items=[1, 2, 3], state=AgendaItemWf.ONGOING
+            self.moderator,
+            agenda_items=[1, 2, 3],
+            state=AgendaItemStateMachine.ongoing.value,
         )
         with ChannelMessageCatcher(ModeratorsChannel, AgendaChanged) as messages:
             msg.run_job()
         self.ai_1.refresh_from_db()
-        self.assertEqual(AgendaItemWf.ONGOING, self.ai_1.state)
+        self.assertEqual(AgendaItemStateMachine.ongoing.value, self.ai_1.state)
         self.ai_3.refresh_from_db()
-        self.assertEqual(AgendaItemWf.ONGOING, self.ai_3.state)
+        self.assertEqual(AgendaItemStateMachine.ongoing.value, self.ai_3.state)
         self.assertEqual(3, len(messages))
 
     def test_message_meeting_not_ongoing(self):
         self.meeting.upcoming()
         self.meeting.save()
         msg = self._mk_one(
-            self.moderator, agenda_items=[1, 3], state=AgendaItemWf.ONGOING
+            self.moderator,
+            agenda_items=[1, 3],
+            state=AgendaItemStateMachine.ongoing.value,
         )
         with ChannelMessageCatcher(ModeratorsChannel, AgendaChanged) as messages:
             msg.run_job()
         self.ai_1.refresh_from_db()
-        self.assertEqual(AgendaItemWf.UPCOMING, self.ai_1.state)
+        self.assertEqual(AgendaItemStateMachine.upcoming.value, self.ai_1.state)
         self.ai_3.refresh_from_db()
-        self.assertEqual(AgendaItemWf.PRIVATE, self.ai_3.state)
+        self.assertEqual(AgendaItemStateMachine.private.value, self.ai_3.state)
         self.assertEqual(0, len(messages))
 
     def test_participant(self):
         msg = self._mk_one(
-            self.participant, agenda_items=[1, 3], state=AgendaItemWf.ONGOING
+            self.participant,
+            agenda_items=[1, 3],
+            state=AgendaItemStateMachine.ongoing.value,
         )
         with self.assertRaises(UnauthorizedError):
             msg.run_job()
@@ -117,7 +123,7 @@ class AgendaItemBulkChangeTests(TestCase):
             agenda_items=[1, 2, 3],
             block_proposals=True,
             block_discussion=True,
-            state=AgendaItemWf.ONGOING,
+            state=AgendaItemStateMachine.ongoing.value,
         )
         with ChannelMessageCatcher(ModeratorsChannel, AgendaChanged) as messages:
             msg.run_job()

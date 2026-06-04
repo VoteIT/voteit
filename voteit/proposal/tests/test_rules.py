@@ -31,7 +31,7 @@ class RulesTests(TestCase):
         cls.meeting.add_roles(cls.proposer, ROLE_PROPOSER)
         cls.meeting.add_roles(cls.proposer_author, ROLE_PROPOSER)
         cls.ai = cls.meeting.agenda_items.create()
-        cls.ai.upcoming()
+        cls.ai.state = "upcoming"
         cls.ai.save()
         cls.group = cls.meeting.groups.create()
         cls.group.members.add(cls.group_proposer, cls.group_participant)
@@ -69,7 +69,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.group_participant.has_perm(ADD, self.ai))
 
     def test_add_closed_ai_ongoing_meeting(self):
-        self.ai.close()
+        self.ai.state = "closed"
+        self.ai.save()
         ADD = Proposal.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
@@ -82,7 +83,8 @@ class RulesTests(TestCase):
         # Note: Meetings shouldn't be able to close without closing the AIs
         self.meeting.ongoing()
         self.meeting.close()
-        self.ai.close()
+        self.ai.state = "closed"
+        self.ai.save()
         ADD = Proposal.get_perm(PERM.ADD)
         self.assertFalse(self.anon_user.has_perm(ADD, self.ai))
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
@@ -115,7 +117,8 @@ class RulesTests(TestCase):
     def test_change_closed_ai_ongoing_meeting(self):
         self.meeting.ongoing()
         self.meeting.save()
-        self.ai.close()
+        self.ai.state = "closed"
+        self.ai.save()
         self.ai.save()
         CHANGE = Proposal.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.proposal))
@@ -130,7 +133,8 @@ class RulesTests(TestCase):
         self.meeting.ongoing()
         self.meeting.close()
         self.meeting.save()
-        self.ai.close()
+        self.ai.state = "closed"
+        self.ai.save()
         self.ai.save()
         CHANGE = Proposal.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.proposal))
@@ -165,7 +169,8 @@ class RulesTests(TestCase):
     def test_delete_closed_ai_ongoing_meeting(self):
         self.meeting.ongoing()
         self.meeting.save()
-        self.ai.close()
+        self.ai.state = "closed"
+        self.ai.save()
         self.ai.save()
         DELETE = Proposal.get_perm(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.proposal))
@@ -180,7 +185,8 @@ class RulesTests(TestCase):
         self.meeting.ongoing()
         self.meeting.close()
         self.meeting.save()
-        self.ai.close()
+        self.ai.state = "closed"
+        self.ai.save()
         self.ai.save()
         DELETE = Proposal.get_perm(PERM.DELETE)
         self.assertFalse(self.anon_user.has_perm(DELETE, self.proposal))
@@ -224,7 +230,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.group_participant.has_perm(RETRACT, self.proposal))
 
     def test_retract_private_ai(self):
-        self.ai.unpublish()
+        self.ai.state = "private"
+        self.ai.save()
         self.ai.save()
         RETRACT = Proposal.get_perm(PERM_RETRACT)
         self.assertFalse(self.anon_user.has_perm(RETRACT, self.proposal))
@@ -236,7 +243,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.group_participant.has_perm(RETRACT, self.proposal))
 
     def test_retract_closed_ai_ongoing_meeting(self):
-        self.ai.close()
+        self.ai.state = "closed"
+        self.ai.save()
         self.ai.save()
         RETRACT = Proposal.get_perm(PERM_RETRACT)
         self.assertFalse(self.anon_user.has_perm(RETRACT, self.proposal))
@@ -248,7 +256,8 @@ class RulesTests(TestCase):
         self.assertFalse(self.group_participant.has_perm(RETRACT, self.proposal))
 
     def test_retract_closed_meeting_closed_ai(self):
-        self.ai.close()
+        self.ai.state = "closed"
+        self.ai.save()
         self.meeting.ongoing()
         self.meeting.close()
         RETRACT = Proposal.get_perm(PERM_RETRACT)
@@ -305,7 +314,8 @@ class TextDocumentPermissionsTests(TestCase):
         self.assertFalse(self.outsider.has_perm(ADD, self.ai))
 
     def test_add_closed_ai(self):
-        self.ai.close()
+        self.ai.state = "closed"
+        self.ai.save()
         ADD = TextDocument.get_perm(PERM.ADD)
         self.assertFalse(self.participant.has_perm(ADD, self.ai))
         self.assertFalse(self.moderator.has_perm(ADD, self.ai))
@@ -318,7 +328,8 @@ class TextDocumentPermissionsTests(TestCase):
         self.assertFalse(self.outsider.has_perm(CHANGE, self.text_doc))
 
     def test_change_closed_ai(self):
-        self.ai.close()
+        self.ai.state = "closed"
+        self.ai.save()
         CHANGE = TextDocument.get_perm(PERM.CHANGE)
         self.assertFalse(self.participant.has_perm(CHANGE, self.text_doc))
         self.assertFalse(self.moderator.has_perm(CHANGE, self.text_doc))
@@ -338,7 +349,8 @@ class TextDocumentPermissionsTests(TestCase):
         self.assertFalse(self.outsider.has_perm(DELETE, self.text_doc))
 
     def test_delete_closed_ai(self):
-        self.ai.close()
+        self.ai.state = "closed"
+        self.ai.save()
         DELETE = TextDocument.get_perm(PERM.DELETE)
         self.assertFalse(self.participant.has_perm(DELETE, self.text_doc))
         self.assertFalse(self.moderator.has_perm(DELETE, self.text_doc))
