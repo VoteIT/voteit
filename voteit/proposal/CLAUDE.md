@@ -10,8 +10,8 @@ python manage.py test voteit.proposal --keepdb --failfast
 
 ## Key files
 
-- `models.py` — `Proposal`, `DiffProposal` (MTI), `TextDocument`, `TextParagraph`; FSM transitions live here as methods
-- `workflows.py` — `ProposalWf`: states PUBLISHED / RETRACTED / VOTING / APPROVED / DENIED / UNHANDLED
+- `models.py` — `Proposal`, `DiffProposal` (MTI), `TextDocument`, `TextParagraph`; bind to state machine via `MachineMixin` (access as `proposal.sm`)
+- `statemachines.py` — `ProposalStateMachine`: states PUBLISHED / RETRACTED / VOTING / APPROVED / DENIED / UNHANDLED
 - `rules.py` — django-rules permission predicates for ADD / CHANGE / DELETE / RETRACT
 - `signals.py` — post-save/pre-delete handlers that broadcast to ParticipantsChannel and ModeratorsChannel
 - `messages.py` — `ProposalAdded`, `ProposalChanged`, `ProposalDeleted`, `TextDocumentAdded/Changed/Deleted` WebSocket messages
@@ -35,8 +35,8 @@ python manage.py test voteit.proposal --keepdb --failfast
 ### prop_id is always added to tags
 `Proposal.save()` ensures `prop_id` appears in the `tags` list. This is how proposals can be cross-referenced by tag from other content.
 
-### FSM transitions carry permission guards
-Transitions such as `retract()`, `lock_for_vote()`, `approved()`, `denied()` check permissions inside the transition decorator (not only at the API layer). The `RETRACT` permission string is exposed as `PERM_RETRACT = "retract"` in `__init__.py`.
+### State machine transitions carry permission guards
+Events such as `retract`, `lock_for_vote`, `approve`, `deny` are defined in `ProposalStateMachine` with `validators` that check permissions (not only at the API layer). The `RETRACT` permission string is exposed as `PERM_RETRACT = "retract"` in `__init__.py`. Trigger events via `proposal.sm.send(event_name, user=request.user)` or through the `POST /{id}/event/` REST endpoint.
 
 ### Signal-driven WebSocket broadcasting
 `signals.py` uses post_save / pre_delete signals to publish to envelope channels. `attach_proposals()` bundles proposals into `Batch` messages on channel subscribe (efficient initial load). Private agenda items are only sent to ModeratorsChannel. `@disable_on_raw_save` prevents broadcasts during data migrations.

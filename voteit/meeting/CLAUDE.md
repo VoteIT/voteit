@@ -6,7 +6,7 @@ Manages meetings and their participants. A Meeting is the primary context for al
 
 ### Meeting
 Central model. Key fields:
-- `state` — drives `MeetingWf` (see Workflows below)
+- `state` — drives `MeetingStateMachine` (see State Machine below); access via `meeting.sm`
 - `group_votes_active` / `group_roles_active` — toggles for group delegation and dynamic role assignment
 - `er_policy_name` — references an electoral register policy from the registry
 - `installed_dialect` — name of the currently installed dialect (just a name, handler re-instantiated from registry on demand)
@@ -38,13 +38,15 @@ Defined in `roles.py`. All non-participant roles require `ROLE_PARTICIPANT`:
 | `di` | Discusser | `ROLE_DISCUSSER` |
 | `pr` | Proposer | `ROLE_PROPOSER` |
 
-## Workflows
+## State Machine
 
-`MeetingWf` (in `workflows.py`) states: `upcoming → ongoing ↔ closed → archiving → archived`, plus `deleting` reachable from any state. Key guards:
-- `ongoing()` requires a valid electoral register policy (`valid_er_policy_guard`)
-- `close()` requires no ongoing polls (`no_ongoing_polls_guard`)
-- `request_archiving()` sets `archive_after = now + 3 days`; archived by background task
-- `request_delete()` / `abort_delete()` store and restore the previous state in `pre_delete_state`
+`MeetingStateMachine` (in `statemachines.py`) states: `upcoming → ongoing ↔ closed → archiving → archived`, plus `deleting` reachable from any state. Key guards:
+- `make_ongoing` event requires a valid electoral register policy (`validate_er_policy` validator)
+- `close` event requires no ongoing polls (`no_ongoing_polls` validator)
+- `request_archiving` event sets `archive_after = now + 3 days`; archived by background task
+- `request_delete` / `abort_delete` events store and restore the previous state in `pre_delete_state`
+
+State transitions are triggered via `meeting.sm.send(event_name, ...)` or the `POST /meetings/{id}/event/` REST endpoint (`StateMachineMixin`).
 
 ## REST API
 

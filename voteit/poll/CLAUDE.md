@@ -20,11 +20,11 @@ The poll app handles the full lifecycle of a vote: creation, configuration, vote
 
 ## State Machine
 
-Transitions are guarded:
-- `private/upcoming → ongoing`: validates settings (Pydantic), ER policy, method `start_check()`, and if manual ER is required
-- `closed → finished`: calls `finalize_vote_data()` then `calculate_result()` then `set_proposals_from_result()`
-- `closed → no_result`: when all votes are abstentions or ballot is empty
-- Transitions in the opposite direction (e.g. `withheld → finished`) publish results
+`PollStateMachine` in `statemachines.py`. Events are sent via `poll.sm.send(event_name, ...)` or `POST /polls/{id}/event/` (`StateMachineMixin`). Key guarded events:
+- `make_upcoming` / `make_ongoing`: validates settings (Pydantic), ER policy, method `start_check()`, and if manual ER is required
+- `close → finish`: calls `finalize_vote_data()` then `calculate_result()` then `set_proposals_from_result()`
+- `close → no_result`: when all votes are abstentions or ballot is empty
+- `withheld → finish`: publishes results
 
 **Signal-driven automation** (`signals.py`):
 - On `upcoming`/`ongoing` transition: `maybe_apply_er_when_poll_changes_state` calls the ER policy's `apply()`
@@ -89,7 +89,7 @@ ViewSets registered in `rest_api/views.py` (all under `/api/`):
 
 | ViewSet | Basename | Notable actions |
 |---------|----------|-----------------|
-| `PollViewSet` | `poll` | CRUD + state transitions via `FsmTransitionsMixin` |
+| `PollViewSet` | `poll` | CRUD + state transitions via `StateMachineMixin` (`POST /polls/{id}/event/`) |
 | `ElectoralRegisterViewSet` | `electoral-registers` | read-only + `trigger-create` + `manual-create` |
 | `VoteTransferViewSet` | `vote-transfer` | CRUD + `reassign` action |
 | `ElectoralRegisterPoliciesViewSet` | `electoral-register-policies` | list only (metadata) |

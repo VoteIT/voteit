@@ -62,7 +62,7 @@ Abstract base classes enforce consistent context properties across all models:
 
 ### State Machines
 
-`django-fsm` is used on most models. State classes follow the pattern `*Wf` (e.g. `MeetingWf`, `PollWf`, `ProposalWf`). Transitions have permission guards and condition guards.
+`python-statemachine` is used on most models. State machine classes follow the pattern `*StateMachine` (e.g. `MeetingStateMachine`, `PollStateMachine`, `ProposalStateMachine`) and live in each app's `statemachines.py`. They subclass `StateChart` and mix in `TransitionSignalMixin`. Models bind to their machine via `statemachine.mixins.MachineMixin` (accessed as `instance.sm`). Transitions are `Event` objects with `validators` for permission and condition guards. The REST layer exposes a `POST /{id}/event/` endpoint via `StateMachineMixin`.
 
 ### REST API
 
@@ -82,7 +82,7 @@ YAML-based meeting configuration profiles loaded from `src/dialect_configs/diale
 
 ### Components
 
-Pluggable per-meeting or per-org features (`MeetingComponent`, `OrganisationComponent`) with `on`/`off` state via `EnabledWf`. Registered in `meeting_components` / `organisation_components` registries.
+Pluggable per-meeting or per-org features (`MeetingComponent`, `OrganisationComponent`) with `on`/`off` state via a plain `enabled` BooleanField. Registered in `meeting_components` / `organisation_components` registries.
 
 ### Notable Conventions
 

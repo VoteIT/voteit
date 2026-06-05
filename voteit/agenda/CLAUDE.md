@@ -6,8 +6,8 @@ Manages the `AgendaItem` model — the structural unit within a `Meeting`. Each 
 
 ### AgendaItem
 
-State machine model (`AgendaItemWf`). Key fields:
-- `state` — FSM field; initial state is `PRIVATE`
+State machine model (`AgendaItemStateMachine`). Key fields:
+- `state` — initial state is `private`; access state machine via `agenda_item.sm`
 - `order` — auto-assigned as next sequential value per meeting on creation
 - `block_discussion` / `block_proposals` — moderator flags that prevent new content
 - `related_modified` — timestamp updated when nested proposals/discussions are created; frontend compares this against `LastRead.timestamp` to show "unread" indicators
@@ -20,17 +20,17 @@ One record per `(user, agenda_item, meeting)`. Created/updated by `mark_read()`.
 
 ## State Machine
 
-States: `PRIVATE → UPCOMING → ONGOING → CLOSED → ARCHIVED`
+`AgendaItemStateMachine` in `statemachines.py`. States: `private → upcoming → ongoing → closed → archived`
 
-| Transition | From | Guard |
+| Event | From | Guard |
 |---|---|---|
-| `upcoming()` | PRIVATE | no ongoing polls |
-| `unpublish()` | UPCOMING / CLOSED / ONGOING | no ongoing polls |
-| `ongoing()` | PRIVATE / UPCOMING / CLOSED | meeting must be ONGOING |
-| `close()` | PRIVATE / UPCOMING / ONGOING | no ongoing polls |
-| `archive()` | any | script-only (NOT_ALLOWED for users) |
+| `make_upcoming` | private, closed, ongoing | no ongoing polls; `has_change_permission` |
+| `unpublish` | upcoming, closed, ongoing | no ongoing polls; `has_change_permission` |
+| `make_ongoing` | private, upcoming, closed | meeting must be ongoing; `has_change_permission` |
+| `close` | private, upcoming, ongoing | no ongoing polls; `has_change_permission` |
+| `archive` | any | `force=True` only (script-only, raises `PermissionDenied` for users) |
 
-`archive()` is called automatically by `archive_agenda_items` signal when the meeting is archived.
+`archive` is triggered by the `archive_agenda_items` signal when the meeting is archived. Events are sent via `ai.sm.send(event_name, ...)` or `POST /agenda-items/{id}/event/` (`StateMachineMixin`).
 
 ## Permissions (rules.py)
 
@@ -41,11 +41,11 @@ States: `PRIVATE → UPCOMING → ONGOING → CLOSED → ARCHIVED`
 | `agenda.change_agendaitem` | Moderator, meeting not archived |
 | `agenda.delete_agendaitem` | Moderator, meeting not archived |
 
-FSM transitions use `agenda.change_agendaitem` as the permission guard.
+State machine events use `agenda.change_agendaitem` as the permission guard.
 
 ## REST API (rest_api/)
 
-`AgendaViewSet` at `agenda-items/`. Queryset hides PRIVATE items from non-moderators. Uses `TransitionsMixin` for state transitions at `agenda-items/{id}/transitions/`.
+`AgendaViewSet` at `agenda-items/`. Queryset hides private items from non-moderators. Uses `StateMachineMixin` for state transitions at `POST /agenda-items/{id}/event/`.
 
 Serializers:
 - `AgendaItemSerializer` — full detail (read-only: meeting, order, related_modified, state, pk)
