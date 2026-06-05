@@ -231,11 +231,9 @@ class MeetingDetailSerializer(UserRolesMixin, BaseModelSerializer):
         ]
 
     def validate_er_policy_name(self, value):
-        from voteit.poll.workflows import PollWf
-
         self.instance: Meeting
         value = validate_er_policy_name(self.instance, value)
-        if self.instance.polls.filter(state=PollWf.ONGOING).exists():
+        if self.instance.polls.filter(state="ongoing").exists():
             raise ValidationError(
                 "There are ongoing polls - close them before changing policy."
             )
