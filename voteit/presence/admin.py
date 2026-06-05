@@ -1,5 +1,4 @@
 from django.contrib import admin
-from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.meeting.admin import MeetingAdminMixin
 from voteit.presence.models import PresenceCheck
@@ -7,8 +6,7 @@ from voteit.presence.models import Presence
 
 
 @admin.register(PresenceCheck)
-class PresenceCheckAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
-    fsm_field = ["state"]
+class PresenceCheckAdmin(MeetingAdminMixin, admin.ModelAdmin):
     list_display = "state", "meeting_link", "opened", "closed"
     list_filter = ("state", "meeting__organisation")
     exclude = ("state",)

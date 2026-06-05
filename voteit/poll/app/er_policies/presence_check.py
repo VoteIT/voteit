@@ -2,17 +2,14 @@ from __future__ import annotations
 
 from logging import getLogger
 
-from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
-from django_fsm import post_transition
 
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.abcs import ElectoralRegisterPolicy
 from voteit.poll.app.er_policies.utils import calc_group_votes_equal
 from voteit.poll.exceptions import ElectoralRegisterError
 from voteit.poll.registries import er_policy
-from voteit.presence.models import PresenceCheck
-from voteit.presence.workflows import PresenceCheckWf
+
 
 __all__ = ("PresenceCheckPolicy",)
 
@@ -53,12 +50,3 @@ class PresenceCheckPolicy(ElectoralRegisterPolicy):
             )
         else:
             return {x: 1 for x in present_potential_voters.values_list("pk", flat=True)}
-
-
-@receiver(post_transition, sender=PresenceCheck)
-def create_new_er_from_present_users(
-    instance: PresenceCheck, source: str, target: str, **kwargs
-):
-    if target == PresenceCheckWf.CLOSED:
-        if instance.meeting.er_policy_name == PresenceCheckPolicy.name:
-            instance.meeting.er_policy.create_er(presence_check=instance)

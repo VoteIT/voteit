@@ -4,17 +4,12 @@ from datetime import datetime
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
-from django.db import IntegrityError
 from django.db import models
 from django.utils.timezone import now
-from django_fsm import FSMField
-from django_fsm import transition
 from rules.contrib.models import RulesModelMixin
 
-from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.meeting.models import Meeting
-from voteit.presence.workflows import PresenceCheckWf
 
 
 class Presence(MeetingContext):
@@ -71,10 +66,7 @@ class PresenceCheck(RulesModelMixin, MeetingContext):
 
     name = "presence_check"
 
-    state: str = FSMField(
-        default=PresenceCheckWf.initial,
-        choices=PresenceCheckWf.choices(),
-    )
+    state: str = models.CharField(max_length=30, editable=False)
     present_users = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through=Presence, related_name="presences"
     )
@@ -86,36 +78,10 @@ class PresenceCheck(RulesModelMixin, MeetingContext):
         editable=False, null=True, blank=True
     )
 
-    @transition(
-        field=state,
-        source=PresenceCheckWf.OPEN,
-        target=PresenceCheckWf.CLOSED,
-        permission=f"presence.{PERM.CHANGE}_presencecheck",
-    )
-    def close(self) -> None:
-        self.closed = now()
-
     def present_user_pks(self) -> list[int]:
         return list(self.presences.values_list("user_id"))
 
     def __str__(self):
         return f"Presence check ({self.pk})"
 
-    def save(self, **kw):
-        if self.state == PresenceCheckWf.OPEN:
-            qs = self.meeting.presence_checks.filter(state=PresenceCheckWf.OPEN)
-            if self.pk is None and qs.exists() or qs.exclude(pk=self.pk).exists():
-                raise IntegrityError("There's already an ongoing presence check here")
-        super().save(**kw)
-
-    class Manager(models.Manager):
-        """Methods to get filtered QuerySets or currently open presence check."""
-
-        def open(self) -> models.QuerySet:
-            return self.get_queryset().filter(state=PresenceCheckWf.OPEN)
-
-        def latest_open(self) -> PresenceCheck | None:
-            return self.open().latest("opened")
-
-    objects = Manager()
     presences: models.QuerySet
