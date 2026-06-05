@@ -1,8 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django_fsm import TransitionNotAllowed
 
 from voteit.active.components import ActiveUsersComponent
+from voteit.poll.exceptions import ElectoralRegisterManualError
 from voteit.poll.models import Poll
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
@@ -14,7 +14,9 @@ User = get_user_model()
 class ManualTriggerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create(er_policy_name=ManualTrigger.name)
+        cls.meeting: Meeting = Meeting.objects.create(
+            er_policy_name=ManualTrigger.name, state="ongoing"
+        )
         cls.ai = cls.meeting.agenda_items.create()
         cls.user1 = User.objects.create(username="one")
         cls.user2 = User.objects.create(username="two")
@@ -27,10 +29,9 @@ class ManualTriggerTests(TestCase):
         self.poll.refresh_from_db()
 
     def test_no_new_er_on_poll_change(self):
-        self.poll.upcoming()
         self.assertIsNone(self.poll.electoral_register)
-        with self.assertRaises(TransitionNotAllowed):
-            self.poll.ongoing()
+        with self.assertRaises(ElectoralRegisterManualError):
+            self.poll.ongoing(force=True)
 
     def test_active_users_respected(self):
         self.meeting.components.create(

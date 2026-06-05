@@ -9,7 +9,6 @@ from voteit.poll.app.polls.majority import MajorityVoteSchema
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
-from voteit.poll.workflows import PollWf
 from voteit.proposal.models import Proposal
 
 User = get_user_model()
@@ -44,8 +43,7 @@ class MajorityTests(TestCase):
         self.assertRaises(InvalidProposalCount, method.start_check)
 
     def test_vote_schema(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         vote = self.poll.votes.create(
             user=self.voter_a, vote=f'{{"choice": {self.prop1.pk}}}'
         )
@@ -56,10 +54,9 @@ class MajorityTests(TestCase):
         MajorityVoteSchema(choice=1)
 
     def test_result_unanimous(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.votes.create(user=self.voter_a, vote=f'{{"choice": {self.prop1.pk}}}')
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertEqual(
             self.poll.result,
             {
@@ -77,11 +74,10 @@ class MajorityTests(TestCase):
         self.assertEqual("denied", self.prop2.state)
 
     def test_result_split(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.votes.create(user=self.voter_a, vote=f'{{"choice": {self.prop1.pk}}}')
         self.poll.votes.create(user=self.voter_b, vote=f'{{"choice": {self.prop2.pk}}}')
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertEqual(
             self.poll.result,
             {
@@ -100,12 +96,11 @@ class MajorityTests(TestCase):
         self.assertEqual("published", self.prop2.state)
 
     def test_result_clear(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.votes.create(user=self.voter_a, vote=f'{{"choice": {self.prop1.pk}}}')
         self.poll.votes.create(user=self.voter_b, vote=f'{{"choice": {self.prop1.pk}}}')
         self.poll.votes.create(user=self.voter_c, vote=f'{{"choice": {self.prop2.pk}}}')
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertEqual(
             self.poll.result,
             {
@@ -125,10 +120,10 @@ class MajorityTests(TestCase):
 
     def test_close_without_votes(self):
         self.poll.votes.create(user=self.voter_a, abstain=True)
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.save()
-        self.poll.close()
-        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+        self.poll.close(force=True)
+        self.assertEqual("no_result", self.poll.state)
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
@@ -139,7 +134,7 @@ class AddMajorityVoteTests(TestCase):
         cls.voter = User.objects.create(username="a")
         cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.poll: Poll = Poll.objects.create(
-            electoral_register=cls.er, method_name="majority", state=PollWf.ONGOING
+            electoral_register=cls.er, method_name="majority", state="ongoing"
         )
         cls.prop1: Proposal = cls.poll.proposals.create()
         cls.prop2: Proposal = cls.poll.proposals.create()

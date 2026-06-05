@@ -17,7 +17,9 @@ class GroupVotesBeforePollTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create(
-            er_policy_name=GroupVotesBeforePoll.name, group_votes_active=True
+            er_policy_name=GroupVotesBeforePoll.name,
+            group_votes_active=True,
+            state="ongoing",
         )
         # cls.ai = cls.meeting.agenda_items.create()
         cls.user1 = User.objects.create(username="one")
@@ -63,8 +65,10 @@ class GroupVotesBeforePollTests(TestCase):
         with self.assertRaises(ElectoralRegisterError):
             self.meeting.er_policy.create_er()
 
-    def test_new_er_on_upcoming(self):
-        self.poll.upcoming()
+    def test_new_er_on_ongoing(self):
+        ai = self.meeting.agenda_items.create()
+        self.poll.proposals.create(agenda_item=ai)
+        self.poll.ongoing(force=True)
         self.assertIsInstance(self.poll.electoral_register, ElectoralRegister)
         self.assertEqual(
             {self.user1.pk: 6, self.user2.pk: 5},
@@ -78,11 +82,13 @@ class GroupVotesBeforePollTests(TestCase):
         self.assertIsNone(self.mem_two_l.votes)
 
     def test_changed_er_ref_on_poll(self):
+        ai = self.meeting.agenda_items.create()
         first_er = self.meeting.er_policy.create_er()
         self.poll.electoral_register = first_er
         self.mem_one_s.votes = 0
         self.mem_one_s.save()
-        self.poll.upcoming()
+        self.poll.proposals.create(agenda_item=ai)
+        self.poll.ongoing(force=True)
         self.assertNotEqual(first_er, self.poll.electoral_register)
         self.assertEqual(
             {self.user1.pk: 5, self.user2.pk: 5},

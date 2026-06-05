@@ -3,12 +3,11 @@ from __future__ import annotations
 from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-
 from auditlog.context import set_actor
+from django.utils.translation import gettext as _
+
 from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
-from voteit.core.rest_api.utils import drf_do_transition
-from voteit.core.rest_api.utils import get_valid_transitions_dict
 from voteit.core.rest_api.utils import validate_model_add
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
@@ -20,10 +19,12 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.poll.abcs import PollMethod
 from voteit.poll.app.er_policies.manual import Manual
+from voteit.poll.exceptions import MeetingERMissingError
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
 from voteit.poll.models import VoteTransfer
+from voteit.poll.utils import get_electoral_policy_registry
 from voteit.poll.utils import get_poll_method_registry
 
 __all__ = (
@@ -48,7 +49,6 @@ class PollDetailSerializer(serializers.ModelSerializer):
             "agenda_item",
             "closed",
             "electoral_register",
-            "initial_electoral_register",
             "withheld_result",
             "meeting",
             "method_name",
@@ -149,13 +149,7 @@ class PollCreateSerializer(serializers.ModelSerializer):
             poll = super().create(validated_data)
             if start:
                 user = self.context["request"].user
-                valid_transitions = get_valid_transitions_dict(poll)
-                drf_do_transition(
-                    instance=poll,
-                    transition_name="ongoing",
-                    valid_transitions=valid_transitions,
-                    user=user,
-                )
+                poll.ongoing(user=user)
                 poll.save()
         return poll
 
@@ -164,7 +158,6 @@ class PollCreateSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "closed",
             "electoral_register",
-            "initial_electoral_register",
             "pk",
             "started",
             "state",
@@ -224,11 +217,11 @@ class TriggerCreateERSerializer(serializers.Serializer):
     meeting = ActiveModeratorMeetingField()
 
     def validate_meeting(self, value):
+        if not value.is_ongoing:
+            raise ValidationError(_("Meeting isn't ongoing"))
         validate_model_add(self, ElectoralRegister, value)
-        from voteit.poll.utils import get_electoral_policy_registry
-
         if value.er_policy_name not in get_electoral_policy_registry():
-            raise ValidationError("No valid electoral register policy")
+            raise MeetingERMissingError()
         if not value.er_policy.allow_trigger:
             raise ValidationError("Electoral register can't be triggered this way")
         return value
@@ -254,6 +247,8 @@ class ManualCreateERSerializer(serializers.Serializer):
     weights = VoterWeightItemSerializer(many=True)
 
     def validate_meeting(self, value):
+        if not value.is_ongoing:
+            raise ValidationError(_("Meeting isn't ongoing"))
         validate_model_add(self, ElectoralRegister, value)
         from voteit.poll.utils import get_electoral_policy_registry
 

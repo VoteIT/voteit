@@ -2,13 +2,12 @@ from collections import Counter
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django_fsm import TransitionNotAllowed
+from rest_framework.exceptions import ValidationError
 
 from envelope.messages.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
-from voteit.poll.workflows import PollWf
 
 User = get_user_model()
 
@@ -37,7 +36,7 @@ class ScottishTests(TestCase):
 
     def test_without_settings(self):
         self.poll.settings_data = None
-        self.assertRaises(TransitionNotAllowed, self.poll.upcoming)
+        self.assertRaises(ValidationError, self.poll.upcoming, force=True)
 
     def test_vote_schema(self):
         from voteit.poll.schemas import RankingSchema
@@ -46,8 +45,7 @@ class ScottishTests(TestCase):
         one = self.poll.proposals.create()
         two = self.poll.proposals.create()
         self.poll.proposals.create()
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         vote = self.poll.votes.create(user=self.voter, vote=f"{one.pk},{two.pk}")
         vote_data = vote.vote
         self.assertIsInstance(vote_data, RankingSchema)
@@ -66,8 +64,7 @@ class ScottishTests(TestCase):
         self.er.set_voters_from_dict(
             {**self.er.voter_data, **{u.pk: 1 for u in new_voters}}
         )
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         for voter in User.objects.filter(pk__in=self.er.voter_data.keys()):
             self.poll.votes.create(
                 user=voter,
@@ -75,7 +72,7 @@ class ScottishTests(TestCase):
                     str(pk) for pk in sample(proposal_pks, randint(3, 10))
                 ),
             )
-        self.poll.close()
+        self.poll.close(force=True)
         result = self.poll.result
         self.assertEqual(len(result.approved), 3)
         self.assertEqual(len(result.denied), 7)
@@ -100,10 +97,10 @@ class ScottishTests(TestCase):
         self.assertIsInstance(result.json(), str)
 
     def test_close_without_votes(self):
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.save()
-        self.poll.close()
-        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+        self.poll.close(force=True)
+        self.assertEqual("no_result", self.poll.state)
 
 
 class AddVoteTests(TestCase):
@@ -121,8 +118,7 @@ class AddVoteTests(TestCase):
         cls.prop2 = cls.poll.proposals.create()
         cls.prop3 = cls.poll.proposals.create()
         cls.poll.settings = {"winners": 2}
-        cls.poll.upcoming()
-        cls.poll.ongoing()
+        cls.poll.ongoing(force=True)
         cls.poll.save()
 
     @property

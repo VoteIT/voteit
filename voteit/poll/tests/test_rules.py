@@ -8,7 +8,6 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.poll.models import Poll
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Vote
-from voteit.poll.workflows import PollWf
 from voteit.meeting.models import Meeting
 
 User = get_user_model()
@@ -79,7 +78,7 @@ class PollRulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(ADD, self.meeting))
 
     def test_change_poll_upcoming(self):
-        self.poll.upcoming()
+        self.poll.upcoming(force=True)
         CHANGE = Poll.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon.has_perm(CHANGE, self.poll))
         self.assertFalse(self.outsider.has_perm(CHANGE, self.poll))
@@ -87,7 +86,7 @@ class PollRulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(CHANGE, self.poll))
 
     def test_change_poll_ongoing(self):
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         CHANGE = Poll.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon.has_perm(CHANGE, self.poll))
         self.assertFalse(self.outsider.has_perm(CHANGE, self.poll))
@@ -95,7 +94,7 @@ class PollRulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(CHANGE, self.poll))
 
     def test_change_poll_closed(self):
-        self.poll.state = PollWf.CLOSED
+        self.poll.state = "closed"
         CHANGE = Poll.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon.has_perm(CHANGE, self.poll))
         self.assertFalse(self.outsider.has_perm(CHANGE, self.poll))
@@ -103,7 +102,7 @@ class PollRulesTests(TestCase):
         self.assertFalse(self.moderator.has_perm(CHANGE, self.poll))
 
     def test_delete_poll_upcoming(self):
-        self.poll.upcoming()
+        self.poll.upcoming(force=True)
         DELETE = Poll.get_perm(PERM.DELETE)
         self.assertFalse(self.anon.has_perm(DELETE, self.poll))
         self.assertFalse(self.outsider.has_perm(DELETE, self.poll))
@@ -111,7 +110,7 @@ class PollRulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(DELETE, self.poll))
 
     def test_delete_poll_ongoing(self):
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         DELETE = Poll.get_perm(PERM.DELETE)
         self.assertFalse(self.anon.has_perm(DELETE, self.poll))
         self.assertFalse(self.outsider.has_perm(DELETE, self.poll))
@@ -119,7 +118,7 @@ class PollRulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(DELETE, self.poll))
 
     def test_delete_poll_closed(self):
-        self.poll.state = PollWf.CLOSED
+        self.poll.state = "closed"
         DELETE = Poll.get_perm(PERM.DELETE)
         self.assertFalse(self.anon.has_perm(DELETE, self.poll))
         self.assertFalse(self.outsider.has_perm(DELETE, self.poll))
@@ -127,7 +126,7 @@ class PollRulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(DELETE, self.poll))
 
     def test_delete_poll_closed_ai(self):
-        self.poll.state = PollWf.CLOSED
+        self.poll.state = "closed"
         self.ai.state = AgendaItemStateMachine.closed.value
         DELETE = Poll.get_perm(PERM.DELETE)
         self.assertFalse(self.anon.has_perm(DELETE, self.poll))
@@ -136,7 +135,7 @@ class PollRulesTests(TestCase):
         self.assertTrue(self.moderator.has_perm(DELETE, self.poll))
 
     def test_delete_poll_archived_meeting(self):
-        self.poll.state = PollWf.FINISHED
+        self.poll.state = "finished"
         self.poll.save()
         self.meeting.archive()
         self.meeting.save()
@@ -199,7 +198,7 @@ class VoteRulesTests(TestCase):
         self.poll.refresh_from_db()
 
     def test_add_upcoming(self):
-        self.poll.upcoming()
+        self.poll.upcoming(force=True)
         self.poll.save()
         self.assertEqual("upcoming", self.poll.state)
         ADD = Vote.get_perm(PERM.ADD)
@@ -211,7 +210,7 @@ class VoteRulesTests(TestCase):
         self.assertFalse(self.anon.has_perm(ADD, self.poll))
 
     def test_add_ongoing(self):
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.save()
         self.assertEqual("ongoing", self.poll.state)
         ADD = Vote.get_perm(PERM.ADD)
@@ -223,8 +222,8 @@ class VoteRulesTests(TestCase):
         self.assertFalse(self.anon.has_perm(ADD, self.poll))
 
     def test_add_closed(self):
-        self.poll.state = PollWf.ONGOING
-        self.poll.close()
+        self.poll.state = "ongoing"
+        self.poll.close(force=True)
         self.poll.save()
         self.assertEqual("finished", self.poll.state)
         ADD = Vote.get_perm(PERM.ADD)
@@ -236,7 +235,7 @@ class VoteRulesTests(TestCase):
         self.assertFalse(self.anon.has_perm(ADD, self.poll))
 
     def test_delete_ongoing(self):
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.save()
         self.assertEqual("ongoing", self.poll.state)
         DELETE = Vote.get_perm(PERM.DELETE)
@@ -248,8 +247,8 @@ class VoteRulesTests(TestCase):
         self.assertFalse(self.anon.has_perm(DELETE, self.vote))
 
     def test_delete_closed(self):
-        self.poll.state = PollWf.ONGOING
-        self.poll.close()
+        self.poll.state = "ongoing"
+        self.poll.close(force=True)
         self.poll.save()
         self.assertEqual("finished", self.poll.state)
         DELETE = Vote.get_perm(PERM.DELETE)
@@ -262,7 +261,7 @@ class VoteRulesTests(TestCase):
 
     def test_view(self):
         # View state always behaves the same way
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.save()
         self.assertEqual("ongoing", self.poll.state)
         VIEW = Vote.get_perm(PERM.VIEW)

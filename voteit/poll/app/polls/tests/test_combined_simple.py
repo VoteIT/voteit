@@ -35,12 +35,11 @@ class SimpleTests(TestCase):
         self.assertIsNone(method.start_check())
 
     def test_vote_schema(self):
-        self.poll.upcoming()
         proposal = self.poll.proposals.create()
         proposal2 = self.poll.proposals.create()
         voter = User.objects.create(username="a")
         self.er.set_voters_from_dict({voter.pk: 1})
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         vote = self.poll.votes.create(
             user=voter, vote=f'{{"yes": [{proposal2.pk},{proposal.pk}]}}'
         )
@@ -51,20 +50,19 @@ class SimpleTests(TestCase):
             CombinedSimpleVoteSchema(yes=["bad"])
 
     def test_result(self):
-        self.poll.upcoming()
         prop = self.poll.proposals.create()
         prop2 = self.poll.proposals.create()
         ua = User.objects.create(username="a")
         ub = User.objects.create(username="b")
         uc = User.objects.create(username="c")
         self.er.set_voters_from_dict({u.pk: 1 for u in [ua, ub, uc]})
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.votes.create(
             user=ua, vote=f'{{"yes": [{prop.pk}], "no": [{prop2.pk}]}}'
         )
         self.poll.votes.create(user=ub, vote=f'{{"yes": [{prop.pk}]}}')
         self.poll.votes.create(user=uc, vote=f'{{"no": [{prop.pk},{prop2.pk}]}}')
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertEqual(
             self.poll.result,
             {

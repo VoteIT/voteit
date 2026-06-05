@@ -22,7 +22,9 @@ class CalcGroupVotesEqualTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create(
-            er_policy_name=GroupAutoRandomBeforePoll.name, group_votes_active=True
+            er_policy_name=GroupAutoRandomBeforePoll.name,
+            group_votes_active=True,
+            state="ongoing",
         )
         cls.one = User.objects.create(username="one")
         cls.two = User.objects.create(username="two")

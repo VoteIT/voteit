@@ -3,6 +3,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.test import override_settings
+from django.utils import timezone
 from envelope.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
@@ -23,7 +24,6 @@ from voteit.poll.registries import er_policy
 from voteit.poll.registries import vote_transfer_policies
 from voteit.poll.testing import UnrestrictedVoteTransferER
 from voteit.poll.testing import UnrestrictedVoteTransferPolicy
-from voteit.poll.workflows import PollWf
 
 User = get_user_model()
 
@@ -270,12 +270,12 @@ class PollViewSetTests(APITestCase):
             method_name="simple", title="First", state="upcoming"
         )
         poll.proposals.add(self.prop)
-        url = reverse("poll-transitions", kwargs={"pk": poll.pk})
+        url = reverse("poll-event", kwargs={"pk": poll.pk})
         self.client.force_login(self.moderator)
-        response = self.client.post(url, data={"transition": "ongoing"})
-        self.assertContains(
-            response, "no electoral register method on this meeting", status_code=400
-        )
+        response = self.client.post(url, data={"event": "make_ongoing"})
+        data = response.json()
+        self.assertEqual(response.status_code, 400, data)
+        self.assertEqual({"event": "Poll has no electoral register."}, data)
 
     def test_publish_result(self):
         self.meeting.add_roles(self.participant, ROLE_POTENTIAL_VOTER)
@@ -286,32 +286,34 @@ class PollViewSetTests(APITestCase):
         poll = self.meeting.polls.create(
             method_name=CombinedSimple.name,
             title="First",
-            state="upcoming",
+            state="ongoing",
+            started=timezone.now(),
             withheld_result=True,
+            electoral_register=self.meeting.latest_er,
         )
         poll.proposals.add(self.prop)
-        poll.ongoing()
-        poll.save()
+        self.prop.state = "voting"
+        self.prop.save()
         poll.votes.create(user=self.participant, vote=f'{{"yes": [{self.prop.pk}]}}')
 
-        url = reverse("poll-transitions", kwargs={"pk": poll.pk})
+        url = reverse("poll-event", kwargs={"pk": poll.pk})
         self.client.force_login(self.moderator)
         # Close poll
-        response = self.client.post(url, data={"transition": "close"})
-        self.assertEqual(201, response.status_code)
-        self.assertEqual({"state": PollWf.WITHHELD}, response.json())
+        response = self.client.post(url, data={"event": "close"})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"state": "withheld"}, response.json())
         self.prop.refresh_from_db()
         self.assertEqual("voting", self.prop.state)
         poll.refresh_from_db()
-        self.assertEqual(PollWf.WITHHELD, poll.state)
+        self.assertEqual("withheld", poll.state)
         # Publish result
-        response = self.client.post(url, data={"transition": "publish_result"})
-        self.assertEqual(201, response.status_code)
-        self.assertEqual({"state": PollWf.FINISHED}, response.json())
+        response = self.client.post(url, data={"event": "publish_result"})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"state": "finished"}, response.json())
         self.prop.refresh_from_db()
         self.assertEqual("approved", self.prop.state)
         poll.refresh_from_db()
-        self.assertEqual(PollWf.FINISHED, poll.state)
+        self.assertEqual("finished", poll.state)
 
 
 class ElectoralRegisterViewSetTests(APITestCase):
@@ -710,8 +712,8 @@ class TriggerCreateERViewTests(APITestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create(
             title="Trigger ER test meeting",
-            state=MeetingStateMachine.upcoming.value,
             er_policy_name=AutoBeforePoll.name,
+            state="ongoing",
         )
         cls.moderator: User = User.objects.create_user("trigger_er_moderator")
         cls.participant: User = User.objects.create_user("trigger_er_participant")
@@ -755,20 +757,35 @@ class TriggerCreateERViewTests(APITestCase):
         response = self.client.post(
             self.url, data={"meeting": self.meeting.pk}, format="json"
         )
-        self.assertContains(
-            response, "Electoral register can't be triggered", status_code=400
+        data = response.json()
+        self.assertEqual(400, response.status_code, data)
+        self.assertEqual(
+            {"meeting": ["Electoral register can't be triggered this way"]}, data
         )
 
-    def test_no_valid_policy_gets_400(self):
+    def test_no_valid_policy(self):
         self.meeting.er_policy_name = None
         self.meeting.save()
         self.client.force_login(self.moderator)
         response = self.client.post(
             self.url, data={"meeting": self.meeting.pk}, format="json"
         )
-        self.assertContains(
-            response, "No valid electoral register policy", status_code=400
+        data = response.json()
+        self.assertEqual(400, response.status_code, data)
+        self.assertEqual(
+            {"meeting": ["Electoral register settings missing for this meeting."]}, data
         )
+
+    def test_meeting_not_ongoing(self):
+        self.meeting.make_upcoming(self.moderator)
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.url, data={"meeting": self.meeting.pk}, format="json"
+        )
+        data = response.json()
+        self.assertEqual(400, response.status_code, data)
+        self.assertEqual({"meeting": ["Meeting isn't ongoing"]}, data)
 
 
 class ManualCreateERViewTests(APITestCase):
@@ -776,7 +793,7 @@ class ManualCreateERViewTests(APITestCase):
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create(
             title="Manual ER test meeting",
-            state=MeetingStateMachine.upcoming.value,
+            state="ongoing",
             er_policy_name=Manual.name,
         )
         cls.moderator: User = User.objects.create_user("manual_er_moderator")
@@ -848,3 +865,14 @@ class ManualCreateERViewTests(APITestCase):
         self.assertContains(
             response, "Electoral register can't be manually created", status_code=400
         )
+
+    def test_upcoming_meeting_gets_400(self):
+        self.meeting.make_upcoming(self.moderator)
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            self.url,
+            data={"meeting": self.meeting.pk, "weights": self.weights},
+            format="json",
+        )
+        self.assertContains(response, "Meeting isn't ongoing", status_code=400)

@@ -7,7 +7,6 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
-from voteit.poll.workflows import PollWf
 
 User = get_user_model()
 
@@ -18,6 +17,8 @@ class PollDetailSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.meeting.state = "ongoing"
+        cls.meeting.save()
         cls.moderator = User.objects.get(username="moderator")
         cls.participant = User.objects.get(username="participant")
         cls.meeting.add_roles(cls.moderator, ROLE_POTENTIAL_VOTER)
@@ -65,7 +66,6 @@ class PollDetailSerializerTests(TestCase):
                 "title": "world",
                 "agenda_item": self.ai.pk,
                 "electoral_register": None,
-                "initial_electoral_register": None,
                 "meeting": self.meeting.pk,
                 "method_name": "simple",
                 "proposals": [self.prop1.pk, self.prop2.pk],
@@ -95,7 +95,6 @@ class PollDetailSerializerTests(TestCase):
                 "title": "world",
                 "agenda_item": self.ai.pk,
                 "electoral_register": None,
-                "initial_electoral_register": None,
                 "meeting": self.meeting.pk,
                 "method_name": "simple",
                 "proposals": [self.prop1.pk, self.prop2.pk],
@@ -112,7 +111,7 @@ class PollDetailSerializerTests(TestCase):
 
     def test_serializer_simple_withheld(self):
         self.poll.abstains = 5
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.withheld_result = True
         self.poll.electoral_register = self.er
         self.poll.proposals.remove(self.prop2)
@@ -121,8 +120,8 @@ class PollDetailSerializerTests(TestCase):
         self.poll.votes.create(user=self.participant, vote="yes")
         serializer = self._cut(self.poll)
         self.assertEqual(serializer.data["result"], None)
-        self.poll.close()
-        self.assertEqual(PollWf.WITHHELD, self.poll.state)
+        self.poll.close(force=True)
+        self.assertEqual("withheld", self.poll.state)
         serializer = self._cut(self.poll)
         self.assertEqual(serializer.data["result"], None)
         self.assertIsNotNone(self.poll.result_data)
@@ -164,7 +163,7 @@ class PollDetailSerializerTests(TestCase):
         }
         formatted_fake_result = self.poll.method.schulze_to_poll_result(fake_result)
         self.poll.result = formatted_fake_result
-        self.poll.state = PollWf.FINISHED
+        self.poll.state = "finished"
         self.poll.save()
         serializer = self._cut(self.poll)
         expected_data = serializer.data.copy()
@@ -229,8 +228,7 @@ class PollCreateSerializerTests(TestCase):
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
         instance.electoral_register = self.er
-        instance.upcoming()
-        instance.ongoing()
+        instance.ongoing(force=True)
         instance.save()
 
     def test_serializer_wrong_ai(self):
@@ -279,8 +277,7 @@ class PollCreateSerializerTests(TestCase):
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
         instance.electoral_register = self.er
-        instance.upcoming()
-        instance.ongoing()
+        instance.ongoing(force=True)
         instance.save()
 
     def test_serializer_repeated_schulze_with_deny(self):
@@ -294,8 +291,7 @@ class PollCreateSerializerTests(TestCase):
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
         instance.electoral_register = self.er
-        instance.upcoming()
-        instance.ongoing()
+        instance.ongoing(force=True)
         instance.save()
 
     def test_serializer_scottish_stv(self):
@@ -310,8 +306,7 @@ class PollCreateSerializerTests(TestCase):
         self.assertTrue(serializer.is_valid())
         instance = serializer.save()
         instance.electoral_register = self.er
-        instance.upcoming()
-        instance.ongoing()
+        instance.ongoing(force=True)
         instance.save()
 
     def test_serializer_start(self):
@@ -438,6 +433,7 @@ class VoterExportSerializerTests(TestCase):
 
     def _export_data(self):
         from django.contrib.auth import get_user_model
+
         User = get_user_model()
         voter_data = self.er.voter_data
         users = User.objects.filter(pk__in=voter_data.keys()).order_by("first_name")

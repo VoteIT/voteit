@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from envelope.messages.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
-from voteit.poll.workflows import PollWf
 
 User = get_user_model()
 _channel_layers_setting = {
@@ -44,8 +43,7 @@ class DuttTests(TestCase):
     def test_vote_schema(self):
         from voteit.poll.app.polls.dutt import DuttVoteSchema
 
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         vote = self.poll.votes.create(user=self.voter_a, vote=f"[{self.prop1.pk}]")
         self.assertIsInstance(vote.vote, DuttVoteSchema)
         self.assertEqual(vote.vote.choices, [self.prop1.pk])
@@ -54,11 +52,10 @@ class DuttTests(TestCase):
         DuttVoteSchema(choices=[self.prop1.pk])
 
     def test_result_split(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.votes.create(user=self.voter_a, vote=f"[{self.prop1.pk}]")
         self.poll.votes.create(user=self.voter_b, vote=f"[{self.prop2.pk}]")
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertEqual(
             self.poll.result.dict(),
             {
@@ -77,11 +74,11 @@ class DuttTests(TestCase):
         self.assertEqual("published", self.prop2.state)
 
     def test_close_without_votes(self):
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.save()
         self.poll.votes.create(user=self.voter_a, abstain=True)
-        self.poll.close()
-        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+        self.poll.close(force=True)
+        self.assertEqual("no_result", self.poll.state)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -92,14 +89,13 @@ class AddDuttVoteTests(TestCase):
         from voteit.poll.models import ElectoralRegister
         from voteit.poll.app.polls.dutt import Dutt
         from voteit.proposal.models import Proposal
-        from voteit.poll.workflows import PollWf
 
         cls.Dutt = Dutt
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter = User.objects.create(username="a")
         cls.er.set_voters_from_dict({cls.voter.pk: 1})
         cls.poll: Poll = Poll.objects.create(
-            electoral_register=cls.er, method_name=Dutt.name, state=PollWf.ONGOING
+            electoral_register=cls.er, method_name=Dutt.name, state="ongoing"
         )
         cls.prop1: Proposal = cls.poll.proposals.create()
         cls.prop2: Proposal = cls.poll.proposals.create()

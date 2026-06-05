@@ -12,7 +12,6 @@ from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.models import Poll
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.schemas import RankingSchema
-from voteit.poll.workflows import PollWf
 
 User = get_user_model()
 
@@ -38,8 +37,7 @@ class IRVTests(TestCase):
         one = self.poll.proposals.create()
         two = self.poll.proposals.create()
         self.poll.proposals.create()
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         vote = self.poll.votes.create(user=self.voter, vote=f"{one.pk},{two.pk}")
         vote_data = vote.vote
         self.assertIsInstance(vote_data, RankingSchema)
@@ -55,8 +53,7 @@ class IRVTests(TestCase):
         self.er.set_voters_from_dict(
             {**self.er.voter_data, **{u.pk: 1 for u in new_voters}}
         )
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         for voter in User.objects.filter(pk__in=self.er.voter_data.keys()):
             self.poll.votes.create(
                 user=voter,
@@ -65,8 +62,9 @@ class IRVTests(TestCase):
                 ),
             )
         with SetSeed():
-            self.poll.close()
+            self.poll.close(force=True)
         result = self.poll.result
+
         self.assertEqual(len(result.approved), 1)
         self.assertEqual(len(result.denied), 9)
         for state, count in (
@@ -104,10 +102,10 @@ class IRVTests(TestCase):
     def test_close_without_votes(self):
         self.poll.proposals.create()
         self.poll.proposals.create()
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.save()
-        self.poll.close()
-        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+        self.poll.close(force=True)
+        self.assertEqual("no_result", self.poll.state)
 
 
 class AddVoteTests(TestCase):
@@ -127,8 +125,7 @@ class AddVoteTests(TestCase):
         cls.prop3 = cls.irv_poll.proposals.create()
         cls.repeated_irv_poll.proposals.add(cls.prop1, cls.prop2, cls.prop3)
         for poll in (cls.irv_poll, cls.repeated_irv_poll):
-            poll.upcoming()
-            poll.ongoing()
+            poll.ongoing(force=True)
             poll.save()
 
     @property
@@ -256,8 +253,7 @@ class RepeatedIRVTests(TestCase):
             self.poll.method.start_check()
 
     def test_vote_schema(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         vote = self.poll.votes.create(
             user=self.voter, vote=f"{self.prop_one.pk},{self.prop_two.pk}"
         )
@@ -275,8 +271,7 @@ class RepeatedIRVTests(TestCase):
         self.er.set_voters_from_dict(
             {**self.er.voter_data, **{u.pk: 1 for u in new_voters}}
         )
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         with SetSeed():
             for voter in User.objects.filter(pk__in=self.er.voter_data.keys()):
                 self.poll.votes.create(
@@ -285,7 +280,7 @@ class RepeatedIRVTests(TestCase):
                         str(pk) for pk in sample(proposal_pks, randint(3, 10))
                     ),
                 )
-            self.poll.close()
+            self.poll.close(force=True)
         result = self.poll.result
         self.assertEqual(len(result.approved), 2)
         self.assertEqual(len(result.denied), 8)

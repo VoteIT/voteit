@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 from pydantic.main import BaseModel
 
 from voteit.core.decorators import ensure_atomic
-from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.poll.exceptions import ElectoralRegisterError
 
 if TYPE_CHECKING:
@@ -135,10 +134,7 @@ class ElectoralRegisterPolicy(ABC):
         """
         Is a new ER needed?
         """
-        if self.meeting.state not in (
-            MeetingStateMachine.ongoing.value,
-            MeetingStateMachine.upcoming.value,
-        ):
+        if not self.meeting.is_ongoing:
             return False
         if self.meeting.latest_er is None:
             if self.allow_poll_er_change:
@@ -148,18 +144,19 @@ class ElectoralRegisterPolicy(ABC):
         # Create empty is okay if it differs from last ER
         return self.get_voters(**kwargs) != self.meeting.latest_er.weight_dict
 
-    def pre_apply(self, poll: Poll, target: str):
+    def pre_apply(self, poll: Poll):
         """
         Some methods create ER on the fly when polls start. Use this hook for those cases.
         """
 
+    @ensure_atomic
     def apply(self, poll: Poll, target: str | None = None):
         """
         (Maybe) apply the policy to this poll.
         Target is the workflow state the poll will soon enter, if this was triggered by workflow.
         Note that WF only trigger on upcoming and ongoing
         """
-        self.pre_apply(poll, target)
+        self.pre_apply(poll)
         meeting = poll.meeting
         if meeting is None:  # pragma: no coverage
             # FIXME: We don't support this yet
@@ -181,7 +178,6 @@ class ElectoralRegisterPolicy(ABC):
             else:
                 self.logger.debug("%s already has the correct electoral register", poll)
                 return
-            # FIXME: This should probably be wrapped in a transaction
             poll.save()
 
     @ensure_atomic

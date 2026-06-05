@@ -41,5 +41,5 @@ class AutoBeforePoll(ElectoralRegisterPolicy):
             )
         return {x: 1 for x in voters}
 
-    def pre_apply(self, poll: Poll, target: str):
+    def pre_apply(self, poll: Poll):
         self.create_er()  # Won't trigger unless needed

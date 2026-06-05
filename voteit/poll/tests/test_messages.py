@@ -27,7 +27,7 @@ class AddVoteTests(TestCase):
             electoral_register=cls.er, method_name="simple"
         )
         cls.poll.proposals.create()
-        cls.poll.upcoming()
+        cls.poll.upcoming(force=True)
         cls.poll.save()
 
     def setUp(self):
@@ -45,7 +45,7 @@ class AddVoteTests(TestCase):
         return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
 
     def test_add_and_change(self):
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.save()
         msg = self._mk_one()
         msg.run_job()
@@ -63,14 +63,14 @@ class AddVoteTests(TestCase):
         self.assertRaises(UnauthorizedError, msg.run_job)
 
     def test_add_closed_poll(self):
-        self.poll.ongoing()
-        self.poll.close()
+        self.poll.ongoing(force=True)
+        self.poll.close(force=True)
         self.poll.save()
         msg = self._mk_one()
         self.assertRaises(UnauthorizedError, msg.run_job)
 
     def test_add_vote_exists(self):
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.save()
         self.vote = self.poll.votes.create(user=self.voter, vote_data="no")
         msg = self._mk_one()
@@ -90,8 +90,8 @@ class AbstainTests(TestCase):
             electoral_register=cls.er, method_name="simple"
         )
         cls.poll.proposals.create()
-        cls.poll.upcoming()
-        cls.poll.ongoing()
+        cls.poll.upcoming(force=True)
+        cls.poll.ongoing(force=True)
         cls.poll.save()
 
     def setUp(self):
@@ -139,8 +139,8 @@ class ChangeVoteTests(TestCase):
             electoral_register=cls.er, method_name="simple"
         )
         cls.poll.proposals.create()
-        cls.poll.upcoming()
-        cls.poll.ongoing()
+        cls.poll.upcoming(force=True)
+        cls.poll.ongoing(force=True)
         cls.poll.save()
         cls.vote = cls.poll.votes.create(user=cls.voter, vote_data="yes")
 
@@ -162,9 +162,7 @@ class ChangeVoteTests(TestCase):
         self.assertEqual("no", self.vote.vote_data)
 
     def test_change_closed(self):
-        self.poll.close()
+        self.poll.close(force=True)
         self.poll.save()
         msg = self._mk_one()
         self.assertRaises(UnauthorizedError, msg.run_job)
-
-

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import itertools
 from collections import Counter
 from contextlib import suppress
 from datetime import datetime
@@ -16,15 +15,11 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.db import models
 from django.db.models import UniqueConstraint
-from django.dispatch import receiver
 from django.utils.functional import cached_property
 from django.utils.timezone import now
-from django.utils.translation import gettext_lazy as _
-from django_fsm import FSMField
-from django_fsm import post_transition
-from django_fsm import transition
-from statemachine.exceptions import TransitionNotAllowed
 from pydantic import ValidationError
+from statemachine.exceptions import TransitionNotAllowed
+from statemachine.mixins import MachineMixin
 from pydantic.main import BaseModel
 from rules.contrib.models import RulesModelMixin
 
@@ -32,15 +27,13 @@ from voteit.core import PERM
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.abcs import MeetingContext
 from voteit.core.models import BaseContent
-from voteit.poll.exceptions import BallotChecksumError
 from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidPollMethod
 from voteit.poll.exceptions import NotAllowedToVote
 from voteit.poll.exceptions import PollError
-from voteit.poll.exceptions import PollNotFinished
 from voteit.poll.schemas import PollResult
 from voteit.poll.utils import get_poll_method_registry
-from voteit.poll.workflows import PollWf
+from voteit.poll.statemachines import PollStateMachine
 from voteit.proposal.statemachines import ProposalStateMachine
 from voteit.stats.registry import history_log
 
@@ -161,7 +154,6 @@ class ElectoralRegister(RulesModelMixin, MeetingContext):
 
     objects = Manager()
     polls: models.QuerySet
-    polls_initial: models.QuerySet
     meeting_id: int | None
 
     def __str__(self):
@@ -182,30 +174,33 @@ class ElectoralRegister(RulesModelMixin, MeetingContext):
         "withheld_result",
     ],
 )
-class Poll(BaseContent, MeetingContext, AgendaItemContext):
+class Poll(BaseContent, MeetingContext, AgendaItemContext, MachineMixin):
     """
     A vote taken on a set of proposals within an agenda item.
 
-    Lifecycle (``PollWf``): ``private → upcoming → ongoing → finished → published``.
+    Lifecycle (``PollStateMachine``): ``private → upcoming → ongoing → finished``.
     The poll method (``method_name``) determines how votes are counted; methods
     are registered in the poll method registry and may carry a Pydantic settings
     schema (``settings_data``) and a result schema (``result_data``).
 
-    Two electoral registers are attached on start:
-    - ``initial_electoral_register`` — the register that existed when the poll opened.
-    - ``electoral_register`` — the register actually used for counting (may differ if
-      the register was regenerated before closing).
+    ``electoral_register`` is the register used for counting. It may be updated
+    during an ongoing poll if the ER policy regenerates it before closing.
 
     ``ballot_data`` and ``ballot_checksum`` (SHA-512) are written once when the poll
-    closes and are immutable afterwards; use ``verify_checksum()`` to validate integrity.
+    closes and are immutable afterwards.
     """
 
     P_ORD_CHOICES = (("c", "Chronological"), ("a", "Alphabetical"), ("r", "Random"))
     PERM_CHANGE_STATE = f"poll.{PERM.CHANGE_STATE}_poll"
 
     name = "poll"
-    state: str = FSMField(
-        default=PollWf.initial, choices=PollWf.choices(), editable=False
+    state_machine_name = "voteit.poll.statemachines.PollStateMachine"
+    state_machine_attr = "sm"
+    sm: PollStateMachine
+    state: str = models.CharField(
+        default=PollStateMachine.initial_state.value,
+        choices=[(s.value, str(s.name)) for s in PollStateMachine.states],
+        max_length=20,
     )
     title: str = models.CharField(max_length=70)
     meeting: Meeting | None = models.ForeignKey(
@@ -220,13 +215,6 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     created: datetime = models.DateTimeField(editable=False, default=now)
     started: datetime | None = models.DateTimeField(editable=False, null=True)
     closed: datetime | None = models.DateTimeField(editable=False, null=True)
-    initial_electoral_register: ElectoralRegister | None = models.ForeignKey(
-        "ElectoralRegister",
-        on_delete=models.SET_NULL,
-        editable=False,
-        null=True,
-        related_name="polls_initial",
-    )
     electoral_register: ElectoralRegister | None = models.ForeignKey(
         "ElectoralRegister",
         on_delete=models.SET_NULL,
@@ -266,7 +254,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
     )
 
     def get_method_class(self) -> type[PollMethod]:
-        """Fetch the poll method class, a django proxy model."""
+        """Fetch the poll method class, an adapter."""
         reg = get_poll_method_registry()
         if self.method_name not in reg:
             raise InvalidPollMethod(f"{self.method_name} is not a valid poll method.")
@@ -332,45 +320,6 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
             return False
         return pset is None or isinstance(pset, BaseModel)
 
-    validate_settings_guard.title = _("Invalid settings")
-
-    def valid_er_policy_guard(self):
-        if self.meeting is None:
-            return True  # Skip for unittests
-        from voteit.poll.utils import get_electoral_policy_registry
-
-        return self.meeting.er_policy_name in get_electoral_policy_registry()
-
-    valid_er_policy_guard.title = _(
-        "There's no electoral register method on this meeting - check configuration"
-    )
-
-    def method_guard(self):
-        try:
-            method = self.method  # Will raise exception if doesn't exist
-            # And check the specifics for the poll method
-            method.start_check()
-        except PollError:
-            logger.exception("Poll can't start")
-            return False
-        return True
-
-    method_guard.title = _("Poll method settings invalid")
-
-    def manual_er_needed_guard(self):
-        if (
-            self.meeting  # Skip unittests!
-            and not self.meeting.latest_er
-            and self.valid_er_policy_guard()
-            and self.meeting.er_policy.require_manual
-        ):
-            return False
-        return True
-
-    manual_er_needed_guard.title = _(
-        "This electoral register method requires you to create electoral registers manually before starting a poll."
-    )
-
     def _lock_proposals(self):
         for proposal in self.proposals.filter(
             state=ProposalStateMachine.published.value
@@ -410,146 +359,49 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         result.vote_count = sum(counter.values())
         self.result = result
 
-    @transition(
-        field=state,
-        source=PollWf.PRIVATE,
-        target=PollWf.UPCOMING,
-        conditions=[validate_settings_guard],
-        permission=PERM_CHANGE_STATE,
-        custom={"title": _("Make upcoming")},
-    )
-    def upcoming(self):
-        self._lock_proposals()
+    def upcoming(self, user=None, force=False):
+        self.sm.send("make_upcoming", user=user, force=force)
 
-    @transition(
-        field=state,
-        source=[PollWf.UPCOMING, PollWf.PRIVATE],
-        target=PollWf.ONGOING,
-        conditions=[
-            validate_settings_guard,
-            valid_er_policy_guard,
-            manual_er_needed_guard,
-            method_guard,
-        ],
-        permission=PERM_CHANGE_STATE,
-        custom={"title": _("Start")},
-    )
-    def ongoing(self):
-        if self.electoral_register:
-            self.initial_electoral_register = self.electoral_register
-        self.started = now()
-        self._lock_proposals()
+    def ongoing(self, user=None, force=False):
+        self.sm.send("make_ongoing", user=user, force=force)
 
-    @transition(
-        field=state,
-        source=[PollWf.ONGOING, PollWf.FAILED, PollWf.CANCELED],
-        target=PollWf.CLOSED,
-        permission=PERM_CHANGE_STATE,
-        custom={"title": _("Close")},
-    )
-    def close(self):
-        """
-        Close the poll for further votes.
-        The next step is always to count the votes via the method finish()
-        """
+    def close(self, user=None, force=False):
+        self.sm.send("close", user=user, force=force)
+
+    def cancel(self, user=None, force=False):
+        self.sm.send("cancel", user=user, force=force)
+
+    def unpublish(self, user=None, force=False):
+        self.sm.send("unpublish", user=user, force=force)
+
+    def publish_result(self, user=None, force=False):
+        self.sm.send("publish_result", user=user, force=force)
+
+    def withhold_result(self, user=None, force=False):
+        self.sm.send("withhold_result", user=user, force=force)
+
+    def _finish(self):
+        """Count the votes. Transitions to finished or withheld based on self.withheld_result."""
+        try:
+            if self.withheld_result:
+                self.state = PollStateMachine.withheld.value
+                self.set_result()
+            else:
+                self.state = PollStateMachine.finished.value
+                self.set_result()
+                self.set_proposals_from_result()
+        except Exception:
+            self.state = PollStateMachine.failed.value
+            raise
+
+    def _no_result(self):
+        """No valid votes to calculate the result from."""
+        self.state = PollStateMachine.no_result.value
         self._mark_closed()
 
-    @transition(
-        field=state,
-        source=PollWf.CLOSED,
-        target=PollWf.FINISHED,
-        on_error=PollWf.FAILED,
-        permission=PERM.NOT_ALLOWED,
-        custom={"title": _("Finish")},
-    )
-    def finish(self):
-        """
-        Count the votes and finish up.
-        """
-        self.set_result()
-        self.set_proposals_from_result()
-
-    @transition(
-        field=state,
-        source=PollWf.CLOSED,
-        target=PollWf.WITHHELD,
-        on_error=PollWf.FAILED,
-        permission=PERM.NOT_ALLOWED,
-    )
-    def finish_withhold(self):
-        """
-        Count the votes and finish up but don't publish the result just yet.
-        """
-        self.set_result()
-
-    @transition(
-        field=state,
-        source=PollWf.WITHHELD,
-        target=PollWf.FINISHED,
-        on_error=PollWf.FAILED,
-        permission=PERM_CHANGE_STATE,
-        custom={"title": _("Publish result")},
-    )
-    def publish_result(self):
-        self.set_proposals_from_result()
-        self.withheld_result = False
-
-    @transition(
-        field=state,
-        source=PollWf.FINISHED,
-        target=PollWf.WITHHELD,
-        on_error=PollWf.FAILED,
-        permission=PERM_CHANGE_STATE,
-        custom={"title": _("Withold detailed result")},
-    )
-    def withhold_result(self):
-        self.withheld_result = True
-
-    @transition(
-        field=state,
-        source=PollWf.ONGOING,
-        target=PollWf.CANCELED,
-        permission=PERM_CHANGE_STATE,
-        custom={"title": _("Cancel")},
-    )
-    def cancel(self):
-        self._mark_closed()
-        self._publish_proposals()
-
-    @transition(
-        field=state,
-        source=PollWf.UPCOMING,
-        target=PollWf.PRIVATE,
-        permission=PERM_CHANGE_STATE,
-        custom={"title": _("Revert to private")},
-    )
-    def unpublish(self):
-        self._publish_proposals()
-
-    @transition(
-        field=state,
-        source="+",
-        target=PollWf.FAILED,
-        permission=PERM.NOT_ALLOWED,
-        custom={"title": _("Failed")},
-    )
     def failed(self):
-        """
-        Transition to failed when we have some sort of error that's not recoverable.
-        """
-        self._mark_closed()
-
-    @transition(
-        field=state,
-        source=PollWf.CLOSED,
-        target=PollWf.NO_RESULT,
-        permission=PERM.NOT_ALLOWED,
-        custom={"title": _("No result")},
-    )
-    def no_result(self):
-        """
-        No valid votes to calculate the result from. If there are no votes or all votes are abstentions.
-        """
+        """Transition to failed when we have some sort of unrecoverable error."""
+        self.state = PollStateMachine.failed.value
         self._mark_closed()
 
     def _mark_closed(self):
@@ -581,73 +433,42 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext):
         )
         return counter
 
-    def verify_checksum(self):
-        if self.state != PollWf.FINISHED:
-            raise PollNotFinished()
-        if not self.ballot_checksum:
-            raise BallotChecksumError(f"Checksum empty for {self}")
-        if not self.ballot_data:
-            raise BallotChecksumError(f"Ballot data empty for {self}")
-        checksum = sha512(self.ballot_data.encode("utf-8")).hexdigest()
-        if self.ballot_checksum == checksum:
-            return True
-        else:
-            raise BallotChecksumError(
-                f"Checksum doesn't match for {self}. Stored: {self.ballot_checksum}, Current: {checksum}"
-            )
-
     def vote_cleanup_set(self) -> models.QuerySet:
         """
         Votes that shouldn't be here if the poll closes.
         Essentially that someone has voted but aren't in the current electoral register.
         """
         if self.electoral_register is None:
-            raise PollError("No electoral register")
+            raise ElectoralRegisterMissing()
         voter_pks = [int(k) for k in self.electoral_register.voter_data.keys()]
         return self.votes.exclude(user_id__in=voter_pks)
 
-    def save(self, **kw):
-        """Make sure meeting is set, from agenda_items meeting.
-        Also set title automatically."""
-        self.get_method_class()  # Will raise error
-        if self.pk is None:
-            # FIXME: This "helper" seems to cause a lot more problems than it's worth... :( /Robin
-            if (
-                self.meeting is None
-                and getattr(self.agenda_item, "meeting", None) is not None
-            ):
-                self.meeting = self.agenda_item.meeting
-            if (
-                not self.title
-                and self.agenda_item is not None
-                and self.meeting is not None
-            ):
-                # Create a unique slugified title
-                base = self.agenda_item.title
-                for x in itertools.count(1):
-                    self.title = f"{base} {x}"
-                    if not self.meeting.polls.filter(title=self.title).exists():
-                        break
-        # At this point we must have an attached valid electoral register
-        # if self.state == PollWf.ONGOING and self.electoral_register is None:
-        #     raise ElectoralRegisterMissing()
-        # Make sure we don't have bad settings
-        if not self.validate_settings_guard():
-            raise IntegrityError("Invalid settings")
-        super().save(**kw)
+    @property
+    def is_ongoing(self) -> bool:
+        return self.state == PollStateMachine.ongoing.value
 
     @property
     def is_private(self) -> bool:
-        return self.state == PollWf.PRIVATE
+        return self.state == PollStateMachine.private.value
+
+    @property
+    def is_upcoming(self) -> bool:
+        return self.state == PollStateMachine.upcoming.value
 
     @property
     def is_finished(self) -> bool:
-        return self.state in PollWf.finished_states
+        return self.state in PollStateMachine.finished_states
 
     # Annotations
     objects: models.Manager
     votes: models.QuerySet
     meeting_id: int | None
+    agenda_item_id: int | None
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and self.meeting_id is None and self.agenda_item_id:
+            self.meeting_id = self.agenda_item.meeting_id
+        super().save(*args, **kwargs)
 
 
 def _remove_all_mask(value: str) -> str:
@@ -714,7 +535,7 @@ class Vote(RulesModelMixin, models.Model):
         if not er:
             raise ElectoralRegisterMissing()
         if not er.has_voter(self.user_id):
-            raise NotAllowedToVote("Not allowed to vote")
+            raise NotAllowedToVote()
         if self.abstain and self.vote_data is not None:
             self.vote_data = None
         super().save(**kw)
@@ -753,11 +574,6 @@ class VoteTransfer(MeetingContext, RulesModelMixin):
 
     class Meta:
         constraints = [
-            # Not true for liquid
-            # UniqueConstraint(
-            #    fields=["target", "meeting"],
-            #    name="%(app_label)s_%(class)s_meeting_target",
-            # ),
             # A user can only give away their vote once
             UniqueConstraint(
                 fields=["source", "meeting"],
@@ -778,28 +594,3 @@ class VoteTransfer(MeetingContext, RulesModelMixin):
     meeting_id: int
     source_id: int
     target_id: int
-
-
-@receiver(post_transition, sender=Poll)
-def finish_closed_poll(
-    sender: Poll, instance: Poll, source: str, target: str, **kwargs
-):
-    """
-    As soon as the poll has closed, calculate the result.
-    This method should probably offload this transition change to a worker later on.
-    """
-    if target == PollWf.CLOSED:
-        # Sometimes polls can exist without an electoral register, in that case fail!
-        if instance.electoral_register is None:
-            instance.no_result()
-            return
-        # Remove bad votes due to a change in electoral register during the poll.
-        # This is probably not allowed in most meetings.
-        instance.vote_cleanup_set().delete()
-        if instance.votes.filter(abstain=False).count():
-            if instance.withheld_result:
-                instance.finish_withhold()
-            else:
-                instance.finish()
-        else:
-            instance.no_result()

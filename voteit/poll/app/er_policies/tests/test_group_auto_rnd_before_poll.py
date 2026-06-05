@@ -20,7 +20,9 @@ class GroupAutoRandomBeforePollTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create(
-            er_policy_name=GroupAutoRandomBeforePoll.name, group_votes_active=True
+            er_policy_name=GroupAutoRandomBeforePoll.name,
+            group_votes_active=True,
+            state="ongoing",
         )
         cls.ai = cls.meeting.agenda_items.create()
         cls.user1 = User.objects.create(username="one")
@@ -37,8 +39,9 @@ class GroupAutoRandomBeforePollTests(TestCase):
         self.meeting.refresh_from_db()
         self.poll.refresh_from_db()
 
-    def test_new_er_on_upcoming(self):
-        self.poll.upcoming()
+    def test_new_er_on_ongoing(self):
+        self.poll.proposals.create(agenda_item=self.ai)
+        self.poll.ongoing(force=True)
         self.assertIsInstance(self.poll.electoral_register, ElectoralRegister)
         self.assertEqual(
             {self.user1.pk: 6, self.user2.pk: 5},
@@ -71,7 +74,8 @@ class GroupAutoRandomBeforePollTests(TestCase):
             component_name=ActiveUsersComponent.name, enabled=True
         )
         self.meeting.active_users.create(user=self.user1)
-        self.poll.upcoming()
+        self.poll.proposals.create(agenda_item=self.ai)
+        self.poll.ongoing(force=True)
         self.assertEqual(
             {self.user1.pk},
             {int(k) for k in self.poll.electoral_register.voter_data.keys()},

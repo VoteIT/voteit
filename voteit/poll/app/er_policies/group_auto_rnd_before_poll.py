@@ -47,5 +47,5 @@ class GroupAutoRandomBeforePoll(ElectoralRegisterPolicy):
             )
         return calc_group_votes_equal(meeting=self.meeting)
 
-    def pre_apply(self, poll: Poll, target: str):
+    def pre_apply(self, poll: Poll):
         self.create_er()  # Won't trigger unless needed

@@ -5,7 +5,6 @@ from voteit.poll.app.polls.simple import SimpleVoteSchema
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
-from voteit.poll.workflows import PollWf
 from voteit.proposal.models import Proposal
 
 User = get_user_model()
@@ -36,11 +35,10 @@ class SimpleTests(TestCase):
         self.assertRaises(InvalidProposalCount, method.start_check)
 
     def test_vote_schema(self):
-        self.poll.upcoming()
         self.poll.proposals.create()
         voter = User.objects.create(username="a")
         self.er.set_voters_from_dict({voter.pk: 1})
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         vote = self.poll.votes.create(user=voter, vote="yes")
         self.assertIsInstance(vote.vote, SimpleVoteSchema)
         self.assertEqual(vote.vote.choice, "yes")
@@ -48,17 +46,16 @@ class SimpleTests(TestCase):
             SimpleVoteSchema(choice="abstain")
 
     def test_result(self):
-        self.poll.upcoming()
         prop = self.poll.proposals.create()
         ua = User.objects.create(username="a")
         ub = User.objects.create(username="b")
         uc = User.objects.create(username="c")
         self.er.set_voters_from_dict({u.pk: 1 for u in [ua, ub, uc]})
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.votes.create(user=ua, vote="yes")
         self.poll.votes.create(user=ub, vote="yes")
         self.poll.votes.create(user=uc, vote="no")
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertEqual(
             self.poll.result,
             {
@@ -73,7 +70,7 @@ class SimpleTests(TestCase):
 
     def test_close_without_votes(self):
         self.poll.proposals.create()
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.save()
-        self.poll.close()
-        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+        self.poll.close(force=True)
+        self.assertEqual("no_result", self.poll.state)

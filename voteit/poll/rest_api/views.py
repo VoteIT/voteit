@@ -18,7 +18,7 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.viewsets import ViewSet
 
 from voteit.core.rest_api import router
-from voteit.core.rest_api.mixins import TransitionsMixin
+from voteit.core.rest_api.mixins import StateMachineMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -35,12 +35,14 @@ User = get_user_model()
 
 
 @router.register("polls", basename="poll")
-class PollViewSet(VerboseAutoPermissionViewSetMixin, TransitionsMixin, ModelViewSet):
+class PollViewSet(VerboseAutoPermissionViewSetMixin, StateMachineMixin, ModelViewSet):
     serializer_class = serializers.PollDetailSerializer
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "retrieve": None,
         "create": None,  # In serializer
+        "event": None,
+        "state_machine": None,
     }
     filterset_fields = (
         "agenda_item",

@@ -15,13 +15,15 @@ class AuditlogIntegrationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.meeting.state = "ongoing"
+        cls.meeting.save()
         cls.moderator = User.objects.get(username="moderator")
         cls.ai = cls.meeting.agenda_items.create()
         cls.prop = cls.ai.proposals.create()
 
     def test_create(self):
         with set_actor(self.moderator):
-            poll = self.ai.polls.create(method_name="simple")
+            poll = self.ai.polls.create(method_name="simple", meeting=self.meeting)
         entry = LogEntry.objects.get_for_object(poll).last()
         self.assertEqual(
             {
@@ -30,7 +32,7 @@ class AuditlogIntegrationTests(TestCase):
                 "method_name": ["None", "simple"],
                 "p_ord": ["None", "c"],
                 "state": ["None", "private"],
-                "title": ["None", " 1"],
+                "title": ["None", ""],
                 "withheld_result": ["None", "False"],
             },
             entry.changes_dict,
@@ -41,8 +43,8 @@ class AuditlogIntegrationTests(TestCase):
             self.meeting.add_roles(self.moderator, ROLE_POTENTIAL_VOTER)
             poll = self.ai.polls.create(method_name="simple")
             poll.proposals.add(self.prop)
-            poll.upcoming()
-            poll.ongoing()
+            poll.upcoming(force=True)
+            poll.ongoing(force=True)
             poll.save()
             vote = poll.votes.create(vote_data="", user=self.moderator)
         entry = LogEntry.objects.get_for_object(vote).last()

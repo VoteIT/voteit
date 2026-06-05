@@ -1,5 +1,4 @@
 from django.contrib import admin
-from fsm_admin.mixins import FSMTransitionMixin
 
 from voteit.meeting.admin import MeetingAdminMixin
 from voteit.meeting.admin import MeetingFilter
@@ -26,8 +25,7 @@ class ERAdmin(MeetingAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(Poll)
-class PollAdmin(MeetingAdminMixin, FSMTransitionMixin, admin.ModelAdmin):
-    fsm_field = ["state"]
+class PollAdmin(MeetingAdminMixin, admin.ModelAdmin):
     list_display = (
         "title",
         "meeting_link",

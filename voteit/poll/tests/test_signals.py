@@ -31,7 +31,6 @@ from voteit.poll.registries import er_policy
 from voteit.poll.registries import vote_transfer_policies
 from voteit.poll.testing import UnrestrictedVoteTransferER
 from voteit.poll.testing import UnrestrictedVoteTransferPolicy
-from voteit.poll.workflows import PollWf
 
 User = get_user_model()
 
@@ -169,10 +168,10 @@ class MeetingSubscribedTests(TestCase):
         self.meeting.save()
         self.meeting.add_roles(self.user, ROLE_POTENTIAL_VOTER)
         self.poll.withheld_result = True
-        self.poll.ongoing()
-        self.poll.close()
+        self.poll.ongoing(force=True)
+        self.poll.close(force=True)
         self.poll.save()
-        self.assertEqual(PollWf.WITHHELD, self.poll.state)
+        self.assertEqual("withheld", self.poll.state)
         command = Subscribe(
             mm={"consumer_name": "abc", "user_pk": self.user.pk},
             pk=self.meeting.pk,
@@ -202,10 +201,10 @@ class MeetingSubscribedTests(TestCase):
         self.meeting.save()
         self.meeting.add_roles(self.user, ROLE_POTENTIAL_VOTER)
         self.poll.withheld_result = True
-        self.poll.ongoing()
-        self.poll.close()
+        self.poll.ongoing(force=True)
+        self.poll.close(force=True)
         self.poll.save()
-        self.assertEqual(PollWf.WITHHELD, self.poll.state)
+        self.assertEqual("withheld", self.poll.state)
         command = Subscribe(
             mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
             pk=self.meeting.pk,
@@ -261,7 +260,7 @@ class MeetingSubscribedTests(TestCase):
             pk=self.meeting.pk,
             channel_type="meeting",
         )
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.save()
         self.poll.votes.create(user=self.moderator, vote="yes")
         self.poll2.votes.create(user=self.moderator, vote="yes")
@@ -287,7 +286,7 @@ class PollChangedTests(TestCase):
             method_name="simple", electoral_register=cls.er
         )
         cls.poll_pk = cls.poll.pk
-        cls.poll.upcoming()
+        cls.poll.upcoming(force=True)
         cls.poll.save()
         cls.user = User.objects.create(username="user")
         cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT)
@@ -331,7 +330,7 @@ class PollChangedTests(TestCase):
         self.assertEqual(self.poll.pk, msg.data.pk)
         mock_publish.reset_mock()
         with self.captureOnCommitCallbacks(execute=True):
-            self.poll.unpublish()
+            self.poll.unpublish(force=True)
             self.poll.save()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
@@ -401,7 +400,7 @@ class PrivateAIPublishedTests(TestCase):
         from voteit.agenda.messages import AgendaChanged
         from voteit.poll.messages import PollAdded
 
-        self.poll.upcoming()
+        self.poll.upcoming(force=True)
         self.poll.save()
         mock_publish.reset_mock()
         self.ai.make_upcoming(user=self.moderator)
@@ -416,7 +415,7 @@ class PrivateAIPublishedTests(TestCase):
 class NewERSentToMeetingTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.meeting = Meeting.objects.create(er_policy_name="manual")
+        cls.meeting = Meeting.objects.create(er_policy_name="manual", state="ongoing")
         cls.user = User.objects.create(username="user")
         cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER)
 
@@ -441,15 +440,16 @@ class NewERSentToMeetingTests(TestCase):
 class VoteSignalsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.meeting = Meeting.objects.create(er_policy_name=AutoAlways.name)
+        cls.meeting = Meeting.objects.create(
+            er_policy_name=AutoAlways.name, state="ongoing"
+        )
         cls.user = User.objects.create(username="user")
         cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER)
         cls.ai = cls.meeting.agenda_items.create()
         cls.prop = cls.ai.proposals.create()
         cls.poll = cls.meeting.polls.create(method_name="simple")
         cls.poll.proposals.add(cls.prop)
-        cls.poll.upcoming()
-        cls.poll.ongoing()
+        cls.poll.ongoing(force=True)
         cls.poll.save()
 
     @patch.object(UserChannel, "sync_publish")

@@ -11,7 +11,7 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
-from django_fsm import pre_transition
+from voteit.core.signals import after_sm_transition
 from envelope.app.user_channel.channel import UserChannel
 from envelope.messages.common import Batch
 from envelope.signals import channel_subscribed
@@ -19,7 +19,6 @@ from sql_util.aggregates import SubqueryCount
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.statemachines import AgendaItemStateMachine
-from voteit.core.signals import after_sm_transition
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.meeting.channels import MeetingChannel
@@ -45,7 +44,6 @@ from voteit.poll.rest_api.serializers import ElectoralRegisterSerializer
 from voteit.poll.rest_api.serializers import PollDetailSerializer
 from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.rest_api.serializers import VoteTransferSerializer
-from voteit.poll.workflows import PollWf
 
 if TYPE_CHECKING:
     from envelope.utils import AppState
@@ -67,7 +65,7 @@ def send_ongoing_meeting_poll_stats(context: Meeting, app_state: AppState, **kw)
     """
     batch = Batch(t=PollStatus.name, payloads=[])
     for poll in (
-        context.polls.filter(state=PollWf.ONGOING)
+        context.polls.filter(state="ongoing")
         .annotate(voted=SubqueryCount("votes"))
         .select_related("electoral_register")
     ):
@@ -92,7 +90,7 @@ def participants_subscribed(
     Populate app_state with current meeting polls, except private ones
     """
     qs = (
-        context.polls.exclude(state=PollWf.PRIVATE)
+        context.polls.exclude(state="private")
         .exclude(agenda_item__state=AgendaItemStateMachine.private.value)
         .prefetch_related("proposals")
     )
@@ -211,25 +209,10 @@ def private_ai_published(instance: AgendaItem, source, target, event, **kw):
         and instance.meeting is not None
     ):
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
-        for poll in instance.polls.exclude(state=PollWf.PRIVATE):
+        for poll in instance.polls.exclude(state="private"):
             data = PollDetailSerializer(poll).data
             msg = PollAdded(data=data)
             participants_ch.sync_publish(msg)
-
-
-@receiver(pre_transition, sender=Poll)
-def maybe_apply_er_when_poll_changes_state(
-    instance: Poll, source: str, target: str, **kwargs
-):
-    if target not in (PollWf.UPCOMING, PollWf.ONGOING):
-        return
-    try:
-        er_policy = instance.meeting.er_policy
-    except (KeyError, AttributeError):
-        logger.warning("Poll %s lacks valid meeting or er policy", instance)
-        # No need to die here
-        return
-    er_policy.apply(instance, target)
 
 
 @receiver(new_er_created)

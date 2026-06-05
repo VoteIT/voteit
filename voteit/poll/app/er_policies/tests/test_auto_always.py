@@ -13,7 +13,9 @@ User = get_user_model()
 class AutoAlwaysTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.meeting = Meeting.objects.create(er_policy_name=AutoAlways.name)
+        cls.meeting = Meeting.objects.create(
+            er_policy_name=AutoAlways.name, state="ongoing"
+        )
         cls.ai = cls.meeting.agenda_items.create()
         cls.user1 = User.objects.create(username="one")
         cls.user2 = User.objects.create(username="two")
@@ -25,8 +27,10 @@ class AutoAlwaysTests(TestCase):
     def setUp(self):
         self.poll.refresh_from_db()
 
-    def test_new_er_on_upcoming(self):
-        self.poll.upcoming()
+    def test_new_er_on_ongoing(self):
+        self.poll.upcoming(force=True)
+        self.assertIsNone(self.poll.electoral_register)
+        self.poll.ongoing(force=True)
         self.assertIsInstance(self.poll.electoral_register, ElectoralRegister)
         self.assertEqual(
             {self.user1.pk, self.user2.pk},
@@ -34,44 +38,28 @@ class AutoAlwaysTests(TestCase):
         )
 
     def test_new_er_for_started_poll_when_roles_removed(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.save()
-        self.assertEqual(
-            self.poll.initial_electoral_register, self.poll.electoral_register
-        )
+        first_er = self.poll.electoral_register
         self.meeting.remove_roles(self.user1, ROLE_POTENTIAL_VOTER)
-        self.poll.refresh_from_db(
-            fields=("initial_electoral_register", "electoral_register")
-        )
-        self.assertNotEqual(
-            self.poll.initial_electoral_register, self.poll.electoral_register
-        )
+        self.poll.refresh_from_db(fields=("electoral_register",))
+        self.assertNotEqual(first_er, self.poll.electoral_register)
 
     def test_new_er_for_started_poll_when_roles_added(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.save()
-        initial_er = self.poll.initial_electoral_register
         first_er = self.poll.electoral_register
-        self.assertEqual(initial_er, first_er)
         self.meeting.remove_roles(self.user1, ROLE_POTENTIAL_VOTER)
-        self.poll.refresh_from_db(
-            fields=("initial_electoral_register", "electoral_register")
-        )
-        self.assertNotEqual(initial_er, self.poll.electoral_register)
+        self.poll.refresh_from_db(fields=("electoral_register",))
+        self.assertNotEqual(first_er, self.poll.electoral_register)
         second_er = self.poll.electoral_register
         self.meeting.add_roles(self.user1, ROLE_POTENTIAL_VOTER)
-        self.poll.refresh_from_db(
-            fields=("initial_electoral_register", "electoral_register")
-        )
+        self.poll.refresh_from_db(fields=("electoral_register",))
         self.assertNotEqual(second_er, self.poll.electoral_register)
         # But adding the same role has no effect
         third_er = self.poll.electoral_register
         self.meeting.add_roles(self.user1, ROLE_POTENTIAL_VOTER)
-        self.poll.refresh_from_db(
-            fields=("initial_electoral_register", "electoral_register")
-        )
+        self.poll.refresh_from_db(fields=("electoral_register",))
         self.assertEqual(third_er, self.poll.electoral_register)
 
     def test_cleanup_unused_ers(self):
@@ -83,7 +71,7 @@ class AutoAlwaysTests(TestCase):
         self.assertNotIn(one, self.meeting.electoral_registers.all())
         # We'll keep this er though
         two = self.meeting.get_latest_er()
-        self.poll.upcoming()
+        self.poll.ongoing(force=True)
         self.poll.save()
         self.assertEqual(two, self.poll.electoral_register)
         self.poll.state = "closed"

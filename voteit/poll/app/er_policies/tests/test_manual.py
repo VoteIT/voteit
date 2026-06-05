@@ -12,7 +12,9 @@ User = get_user_model()
 class ManualERTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create(er_policy_name=Manual.name)
+        cls.meeting: Meeting = Meeting.objects.create(
+            er_policy_name=Manual.name, state="ongoing"
+        )
         cls.user1 = User.objects.create(username="one")
         cls.user2 = User.objects.create(username="two")
         cls.meeting.add_roles(cls.user1, ROLE_POTENTIAL_VOTER)

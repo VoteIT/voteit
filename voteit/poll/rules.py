@@ -18,25 +18,24 @@ from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 from voteit.poll.models import Vote
 from voteit.poll.models import VoteTransfer
-from voteit.poll.workflows import PollWf
+from voteit.poll.statemachines import PollStateMachine
 
 
 @predicate
 def is_voter(user: AbstractUser, poll: Poll):
-    return (
-        poll.electoral_register is not None
-        and poll.electoral_register.has_voter(user)
+    return poll.electoral_register is not None and poll.electoral_register.has_voter(
+        user
     )
 
 
 @predicate
 def is_poll_ongoing(user: AbstractUser, poll: Poll):
-    return isinstance(poll, Poll) and poll.state == PollWf.ONGOING
+    return isinstance(poll, Poll) and poll.is_ongoing
 
 
 @predicate
 def is_poll_in_permissive_state(user: AbstractUser, poll: Poll):
-    return isinstance(poll, Poll) and poll.state in PollWf.permissive_states
+    return isinstance(poll, Poll) and poll.state in PollStateMachine.permissive_states
 
 
 @predicate

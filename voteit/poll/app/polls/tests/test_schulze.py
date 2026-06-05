@@ -10,7 +10,6 @@ from voteit.poll.app.polls.schulze import RepeatedSchulzeResult
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
-from voteit.poll.workflows import PollWf
 
 User = get_user_model()
 
@@ -43,7 +42,7 @@ class SchulzeTests(TestCase):
     def setUpTestData(cls):
         cls.er = ElectoralRegister.objects.create()
         cls.poll = Poll.objects.create(electoral_register=cls.er, method_name="schulze")
-        cls.poll.upcoming()
+        cls.poll.upcoming(force=True)
         cls.poll.save()
 
     @property
@@ -183,10 +182,10 @@ class SchulzeTests(TestCase):
         self.assertSetEqual(set(result.tied_winners), {10, 20})
 
     def test_close_without_votes(self):
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.save()
-        self.poll.close()
-        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+        self.poll.close(force=True)
+        self.assertEqual("no_result", self.poll.state)
 
 
 class RepeatedSchulzeTests(TestCase):
@@ -196,7 +195,7 @@ class RepeatedSchulzeTests(TestCase):
         cls.poll = Poll.objects.create(
             electoral_register=cls.er, method_name="repeated_schulze"
         )
-        cls.poll.upcoming()
+        cls.poll.upcoming(force=True)
         cls.poll.save()
 
     @property
@@ -340,10 +339,10 @@ class RepeatedSchulzeTests(TestCase):
         self.assertEqual(4, result.rounds[1].winner)
 
     def test_close_without_votes(self):
-        self.poll.state = PollWf.ONGOING
+        self.poll.state = "ongoing"
         self.poll.save()
-        self.poll.close()
-        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+        self.poll.close(force=True)
+        self.assertEqual("no_result", self.poll.state)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -357,7 +356,7 @@ class AddSchulzeVoteTests(TestCase):
         cls.prop3 = cls.poll.proposals.create()
         cls.voter = User.objects.create(username="voter")
         cls.er.set_voters_from_dict({cls.voter.pk: 1})
-        cls.poll.upcoming()
+        cls.poll.upcoming(force=True)
         cls.poll.save()
 
     @property
@@ -377,13 +376,13 @@ class AddSchulzeVoteTests(TestCase):
     def test_add_vote(self):
         from voteit.poll.app.polls.schulze import SchulzePollResult
 
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.save()
         self.assertFalse(self.poll.votes.filter(user=self.voter).exists())
         msg = self._mk_one()
         msg.run_job()
         self.assertTrue(self.poll.votes.filter(user=self.voter).exists())
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertIsInstance(self.poll.result, SchulzePollResult)
         self.assertEqual(self.prop1.pk, self.poll.result.winner)
 
@@ -391,18 +390,18 @@ class AddSchulzeVoteTests(TestCase):
         self.poll.method_name = RepeatedSchulze.name
         self.poll.method = RepeatedSchulze(self.poll)  # Remove chached property
         self.poll.settings = {"winners": 2}
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.save()
         self.assertFalse(self.poll.votes.filter(user=self.voter).exists())
         msg = self._mk_one()
         msg.run_job()
         self.assertTrue(self.poll.votes.filter(user=self.voter).exists())
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertIsInstance(self.poll.result, RepeatedSchulzeResult)
         self.assertEqual({self.prop1.pk, self.prop2.pk}, set(self.poll.result.approved))
 
     def test_add_vote_invalid_proposal(self):
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         self.poll.save()
         msg = self._mk_one()
         msg.data.vote.ranking.append((-1, 10))

@@ -25,7 +25,6 @@ from voteit.poll.registries import er_policy
 from voteit.poll.registries import vote_transfer_policies
 from voteit.poll.testing import UnrestrictedVoteTransferER
 from voteit.poll.testing import UnrestrictedVoteTransferPolicy
-from voteit.poll.workflows import PollWf
 from voteit.proposal.models import Proposal
 
 User = get_user_model()
@@ -71,6 +70,8 @@ class PollTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.meeting.state = "ongoing"
+        cls.meeting.save()
         cls.ai: AgendaItem = cls.meeting.agenda_items.create()
         cls.poll: Poll = cls.ai.polls.create(method_name="simple")
         cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
@@ -90,29 +91,29 @@ class PollTests(TestCase):
         self.assertIsInstance(self.poll.method, Simple)
 
     def test_broken_er_name_checked(self):
-        self.assertTrue(self.poll.valid_er_policy_guard())
         self.poll.meeting.er_policy_name = "broken"
         self.poll.meeting.save()
-        self.assertFalse(self.poll.valid_er_policy_guard())
+        with self.assertRaises(ElectoralRegisterMissing):
+            self.poll.ongoing(force=True)
 
     def test_opening_poll(self):
-        self.poll.upcoming()
-        self.assertIsNone(self.poll.ongoing())
+        self.poll.ongoing(force=True)
         self.assertEqual("ongoing", self.poll.state)
 
     def test_assigning_bad_poll_method(self):
         self.poll.method_name = "jeff"
-        self.assertRaises(InvalidPollMethod, self.poll.save)
+        self.poll.save()
+        with self.assertRaises(InvalidPollMethod):
+            self.poll.ongoing(force=True)
 
     def test_closing_poll(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.ongoing(force=True)
         vote1 = self.poll.votes.create(user=self.participant, vote="yes")
         vote2 = self.poll.votes.create(user=self.moderator, vote="yes")
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertIn(vote2, votes)
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertEqual(
             self.poll.result.dict(),
             {
@@ -126,8 +127,8 @@ class PollTests(TestCase):
 
     def test_closing_de_facto_empty_poll(self):
         # Add bad votes and close it
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.upcoming(force=True)
+        self.poll.ongoing(force=True)
         vote1 = self.poll.votes.create(user=self.participant, vote="yes")
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
@@ -137,13 +138,13 @@ class PollTests(TestCase):
         er.set_voters_from_dict(
             {k: v for k, v in er.get_weight_dict().items() if k != self.participant.pk}
         )
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertFalse(self.poll.votes.count())
-        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+        self.assertEqual("no_result", self.poll.state)
 
     def test_votes_from_non_voters_removed_on_close(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.upcoming(force=True)
+        self.poll.ongoing(force=True)
         vote1 = self.poll.votes.create(user=self.participant, vote="yes")
         vote2 = self.poll.votes.create(user=self.moderator, vote="yes")
         votes = self.poll.votes.all()
@@ -156,7 +157,7 @@ class PollTests(TestCase):
         }
         er.voter_data = {}  # To allow set_voters_from_dict
         er.set_voters_from_dict(new_vals)
-        self.poll.close()
+        self.poll.close(force=True)
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertNotIn(vote2, votes)
@@ -172,27 +173,27 @@ class PollTests(TestCase):
         )
 
     def test_no_er_causes_poll_to_have_no_result(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.upcoming(force=True)
+        self.poll.ongoing(force=True)
         vote1 = self.poll.votes.create(user=self.participant, vote="yes")
         vote2 = self.poll.votes.create(user=self.moderator, vote="yes")
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertIn(vote2, votes)
         self.poll.electoral_register = None
-        self.poll.close()
+        self.poll.close(force=True)
         self.poll.save()
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertIn(vote2, votes)
-        self.assertEqual(PollWf.NO_RESULT, self.poll.state)
+        self.assertEqual("no_result", self.poll.state)
 
     def test_abstentions(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.upcoming(force=True)
+        self.poll.ongoing(force=True)
         self.poll.votes.create(user=self.moderator, abstain=True)
         self.poll.votes.create(user=self.participant, vote="yes")
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertEqual(
             self.poll.result.dict(),
             {
@@ -206,28 +207,27 @@ class PollTests(TestCase):
         self.assertEqual(1, self.poll.abstains)
 
     def test_checksum(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.upcoming(force=True)
+        self.poll.ongoing(force=True)
         self.poll.votes.create(user=self.moderator, vote="no")
         self.poll.votes.create(user=self.participant, vote="yes")
-        self.poll.close()
+        self.poll.close(force=True)
         self.poll.save()
         self.assertEqual(
             self.poll.ballot_checksum,
             "062cb36e77dd5f6c5d7fb29b96b43d2c54a7f993d37c1887e987acb47f3b03d80dd3e95a30e4197946264234595bd503782114deb1ce2d84aca0e674ab68d76f",
         )
         self.assertEqual('{"no": 1, "yes": 1}', self.poll.ballot_data)
-        self.assertTrue(self.poll.verify_checksum())
 
     def test_proposal_state_exceptions(self):
         self.prop.state = "unhandled"
         self.prop.save()
         # Must not cause exception
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.upcoming(force=True)
+        self.poll.ongoing(force=True)
         self.poll.votes.create(user=self.moderator, vote="no")
         # Must not cause exception
-        self.poll.close()
+        self.poll.close(force=True)
         self.poll.save()
         self.assertEqual(
             self.poll.proposals.get().state,
@@ -236,24 +236,24 @@ class PollTests(TestCase):
         )
 
     def test_cancel_resets_locked_proposals(self):
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.upcoming(force=True)
+        self.poll.ongoing(force=True)
         self.prop.refresh_from_db()
         self.prop2 = self.poll.proposals.create(agenda_item=self.ai, state="approved")
         self.assertEqual("voting", self.prop.state)
         self.poll.votes.create(user=self.moderator, vote="no")
         self.poll.votes.create(user=self.participant, vote="yes")
-        self.poll.cancel()
+        self.poll.cancel(force=True)
         self.poll.save()
         self.prop.refresh_from_db()
         self.assertEqual("published", self.prop.state)
         self.assertEqual("approved", self.prop2.state)
 
     def test_private_resets_proposals(self):
-        self.poll.upcoming()
+        self.poll.upcoming(force=True)
         self.prop.refresh_from_db()
         self.assertEqual("voting", self.prop.state)
-        self.poll.unpublish()
+        self.poll.unpublish(force=True)
         self.prop.refresh_from_db()
         self.assertEqual("published", self.prop.state)
 
@@ -299,12 +299,12 @@ class VoteWeightTests(TestCase):
 
     def test_poll_result(self):
         prop = self.poll.proposals.create(body="I propose!")
-        self.poll.upcoming()
-        self.poll.ongoing()
+        self.poll.upcoming(force=True)
+        self.poll.ongoing(force=True)
         self.poll.votes.create(user=self.user1, vote_data="yes")
         self.poll.votes.create(user=self.user2, vote_data="yes")
         self.poll.votes.create(user=self.user3, vote_data="no")
-        self.poll.close()
+        self.poll.close(force=True)
         self.assertEqual(
             self.poll.result.dict(),
             {
@@ -330,6 +330,8 @@ class ElectoralRegisterTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.get(pk=1)
+        cls.meeting.state = "ongoing"
+        cls.meeting.save()
         cls.participant = User.objects.get(username="participant")
         cls.moderator = User.objects.get(username="moderator")
         cls.meeting.add_roles(cls.participant, ROLE_POTENTIAL_VOTER)
@@ -408,8 +410,8 @@ class ElectoralRegisterManagerTests(TestCase):
             method_name=Simple.name,
         )
         poll.proposals.add(ai.proposals.create(author=user))
-        poll.upcoming()
-        poll.ongoing()
+        poll.upcoming(force=True)
+        poll.ongoing(force=True)
         poll.save()
         return meeting, user
 
@@ -433,14 +435,14 @@ class VoteTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
+        cls.meeting.state = "ongoing"
+        cls.meeting.save()
         cls.ai: AgendaItem = cls.meeting.agenda_items.create()
         cls.poll: Poll = cls.ai.polls.create(method_name="simple")
         cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
         cls.voter = User.objects.get(username="participant")
         cls.meeting.add_roles(cls.voter, ROLE_POTENTIAL_VOTER)
-        # cls.er: ElectoralRegister = cls.meeting.new_electoral_register()
-        cls.poll.upcoming()
-        cls.poll.ongoing()
+        cls.poll.ongoing(force=True)
         cls.poll.save()
 
     def setUp(self):
@@ -495,6 +497,7 @@ class VoteTransferTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.get(pk=1)
+        cls.meeting.state = "ongoing"
         cls.meeting.er_policy_name = UnrestrictedVoteTransferER.name
         cls.meeting.save()
         cls.participant = cls.meeting.participants.get(username="participant")
