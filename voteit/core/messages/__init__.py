@@ -1,2 +1,2 @@
 def register():
-    from . import version, role_updates, transitions  # noqa: F401
+    from . import version, role_updates  # noqa: F401
