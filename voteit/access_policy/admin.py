@@ -23,22 +23,3 @@ class AutomaticAccessAdmin(admin.ModelAdmin):
 
     def get_roles_given(self, instance: AutomaticAccess):
         return instance.roles_given
-
-
-# @admin.register(ModeratorApprovedAccess)
-# class ModeratorApprovedAccessAdmin(admin.ModelAdmin):
-#     list_display = (
-#         "meeting",
-#         "active",
-#     )
-#     list_filter = (
-#         "meeting",
-#         "active",
-#     )
-#     autocomplete_fields = ("meeting",)
-#
-#
-# @admin.register(AccessRequest)
-# class AccessRequestAdmin(FSMTransitionMixin, admin.ModelAdmin):
-#     fsm_field = ["state"]
-#     readonly_fields = ("state",)
