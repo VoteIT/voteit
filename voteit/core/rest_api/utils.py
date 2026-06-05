@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 from typing import Any
-from typing import Callable
-from typing import Generator
 from typing import TYPE_CHECKING
 from typing import TypeVar
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
-from django_fsm import TransitionNotAllowed
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rules.contrib.models import RulesModelMixin
@@ -19,10 +16,7 @@ from voteit.core import PERM
 
 if TYPE_CHECKING:
     from pydantic import ValidationError as PydanticValidationError
-    from django.db.models import Model
-    from voteit.core.models import User
     from voteit.meeting.models import Meeting
-    from django_fsm import Transition
 
 T = TypeVar("T", bound=RulesModelMixin)
 
@@ -39,96 +33,6 @@ def validate_model_add(serializer, model: T | type[T], context: Any = None) -> N
     model_perm = model.get_perm(PERM.ADD)
     if not user.has_perm(model_perm, context):
         raise PermissionDenied(perm_denied_msg(model_perm, context))
-
-
-def get_valid_transitions(
-    instance,
-    attr="state",
-) -> Generator[Transition]:
-    """
-    Return all transitions that make any sense to test from a specific state.
-
-    The reason for duplicating this functionality from FSM is that we'll want to conduct the tests one by one
-    to give the user meaningful feedback.
-
-    Required user checks are permission and condition.
-    """
-    descriptor = getattr(instance.__class__, attr)
-    field = descriptor.field
-    curr_state = field.get_state(instance)
-    transitions = field.transitions[instance.__class__]
-    for transition in transitions.values():
-        # This is the decorated method on the model, not the transition object!
-        transition: Callable
-        meta = transition._django_fsm
-        if valid_transition := meta.has_transition(curr_state) and meta.get_transition(
-            curr_state
-        ):
-            valid_transition: Transition
-            # Is this a hidden transition?
-            if valid_transition.permission != PERM.NOT_ALLOWED:
-                yield valid_transition
-
-
-def get_valid_transitions_dict(
-    instance: Model,
-    attr: str = "state",
-) -> dict[str, Transition]:
-    return {x.name: x for x in get_valid_transitions(instance, attr=attr)}
-
-
-def drf_do_transition(
-    *,
-    instance: Model,
-    transition_name,
-    valid_transitions: dict,
-    user: User,
-    field_name: str = "state",
-):
-    """
-    This method produces predictable exceptions when running transitions. It's meant for DRF contexts.
-    """
-    if transition_name is None:
-        raise ValidationError(detail={"transition": [_("Transition not specified")]})
-    if transition_name not in valid_transitions:
-        raise ValidationError(
-            detail={
-                "transition": [
-                    _("Invalid transition: %(name)s") % {"name": transition_name}
-                ]
-            }
-        )
-    transition = valid_transitions[transition_name]
-    meta = transition.method._django_fsm
-    current_state = getattr(instance, field_name)
-    if not meta.has_transition(current_state):
-        raise ValidationError(
-            detail={
-                "transition": [
-                    _("Can't switch from state '%(state)s' using method '%(method)s'")
-                    % {
-                        "state": current_state,
-                        "method": transition.method.__name__,
-                    }
-                ]
-            }
-        )
-    for condition in transition.conditions:
-        if not condition(instance):
-            if hasattr(condition, "title"):
-                msg = condition.title
-            else:
-                msg = _("Guard %(guard)s blocks transition %(name)s") % {
-                    "name": transition_name,
-                    "guard": condition.__name__,
-                }
-            raise ValidationError(detail={"transition": [msg]})
-    if not transition.has_perm(instance, user):
-        raise PermissionDenied(perm_denied_msg(transition.permission, instance))
-    try:
-        getattr(instance, transition_name)()
-    except TransitionNotAllowed as exc:
-        raise ValidationError(detail={"transition": [str(exc)]})
 
 
 def _pos_int_or_validation_error(value) -> int:

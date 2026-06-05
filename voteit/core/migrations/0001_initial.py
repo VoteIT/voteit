@@ -4,7 +4,6 @@ import django.contrib.auth.models
 import django.contrib.auth.validators
 from django.db import migrations, models
 import django.utils.timezone
-import django_fsm
 import voteit.core.validators
 
 
@@ -31,7 +30,7 @@ class Migration(migrations.Migration):
                 ('is_staff', models.BooleanField(default=False, help_text='Designates whether the user can log into this admin site.', verbose_name='staff status')),
                 ('is_active', models.BooleanField(default=True, help_text='Designates whether this user should be treated as active. Unselect this instead of deleting accounts.', verbose_name='active')),
                 ('date_joined', models.DateTimeField(default=django.utils.timezone.now, verbose_name='date joined')),
-                ('state', django_fsm.FSMField(choices=[('incomplete', 'Incomplete'), ('active', 'Active')], default='incomplete', editable=False, max_length=50)),
+                ('state', models.CharField(choices=[('incomplete', 'Incomplete'), ('active', 'Active')], default='incomplete', editable=False, max_length=50)),
                 ('userid', models.CharField(blank=True, max_length=50, null=True, validators=[voteit.core.validators.UserIDValidator()])),
                 ('identity_id', models.CharField(blank=True, max_length=80, null=True)),
                 ('img_url', models.URLField(blank=True, null=True, verbose_name='Profile image url')),

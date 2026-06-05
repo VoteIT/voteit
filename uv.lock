@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.12"
 
 [options]
-exclude-newer = "2026-05-27T08:56:40.798778Z"
+exclude-newer = "2026-05-29T14:51:24.131659Z"
 exclude-newer-span = "P7D"
 
 [manifest]
@@ -638,25 +638,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/2c/e4/465d2699cd388c000
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c1/40/6a02495c5658beb1f31eb09952d8aa12ef3c2a66342331ce3a35f7132439/django_filter-25.2-py3-none-any.whl", hash = "sha256:9c0f8609057309bba611062fe1b720b4a873652541192d232dd28970383633e3", size = 94145, upload-time = "2025-10-05T09:51:29.728Z" },
 ]
-
-[[package]]
-name = "django-fsm"
-version = "2.8.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b6/5d/4d0aa7365097af11c373761d4d29e4cff59ac3e9a63b79a479b586a8fa7b/django-fsm-2.8.2.tar.gz", hash = "sha256:fe3be8fa916470360632b2a86aefcb342d67916fa4c5749caaa7760f88c0c49c", size = 15196, upload-time = "2024-04-09T07:32:53.712Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/44/fb/b121db1d293d5ebced04e081a685c91d94279a26e7f39147187592dcac04/django_fsm-2.8.2-py2.py3-none-any.whl", hash = "sha256:0b4d346a8de1c2c30c2206ced649e25695f567c072358030544a604fc937d235", size = 11975, upload-time = "2024-04-09T07:32:52.124Z" },
-]
-
-[[package]]
-name = "django-fsm-admin-django-4"
-version = "1.2.7"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-    { name = "django-fsm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/8c/de/806617180fc7f8fff9172686618cf11c4cd7a3feffa9ca302020596f7055/django-fsm-admin-django-4-1.2.7.tar.gz", hash = "sha256:729d455444f1116d25affdf8d3956aad7ece4e532893db71ab46c82524558b9e", size = 11799, upload-time = "2024-01-03T12:46:39.649Z" }
 
 [[package]]
 name = "django-hijack"
@@ -2040,8 +2021,6 @@ dependencies = [
     { name = "django-controlcenter" },
     { name = "django-cors-headers" },
     { name = "django-filter" },
-    { name = "django-fsm" },
-    { name = "django-fsm-admin-django-4" },
     { name = "django-model-utils" },
     { name = "django-rq" },
     { name = "django-sql-utils" },
@@ -2097,8 +2076,6 @@ requires-dist = [
     { name = "django-controlcenter", specifier = ">=0.3.3" },
     { name = "django-cors-headers", specifier = ">=4.9.0,<5.0.0" },
     { name = "django-filter", specifier = ">=25.2,<26.0" },
-    { name = "django-fsm", specifier = "<3" },
-    { name = "django-fsm-admin-django-4", specifier = ">=1.2.7,<2.0.0" },
     { name = "django-model-utils", specifier = ">=5.0.0,<6.0.0" },
     { name = "django-rq", specifier = ">=3.1,<4.0" },
     { name = "django-sql-utils", specifier = ">=0.7.0,<0.8.0" },

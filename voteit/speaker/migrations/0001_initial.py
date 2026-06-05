@@ -5,7 +5,6 @@ import django.contrib.postgres.fields
 import django.core.serializers.json
 from django.db import migrations, models
 import django.db.models.deletion
-import django_fsm
 
 
 class Migration(migrations.Migration):
@@ -35,7 +34,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('title', models.CharField(max_length=200)),
-                ('state', django_fsm.FSMField(choices=[('open', 'Open'), ('closed', 'Closed')], default='open', editable=False, max_length=50)),
+                ('state', models.CharField(choices=[('open', 'Open'), ('closed', 'Closed')], default='open', editable=False, max_length=50)),
                 ('agenda_item', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='speaker_lists', to='agenda.agendaitem')),
                 ('current', models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='speaker.speaker', verbose_name='Current speaker, if any')),
             ],
@@ -47,7 +46,7 @@ class Migration(migrations.Migration):
             name='SpeakerListSystem',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('state', django_fsm.FSMField(choices=[('inactive', 'inactive'), ('active', 'Active'), ('archived', 'Archived')], default='inactive', editable=False, max_length=50)),
+                ('state', models.CharField(choices=[('inactive', 'inactive'), ('active', 'Active'), ('archived', 'Archived')], default='inactive', editable=False, max_length=50)),
                 ('title', models.CharField(max_length=200, null=True)),
                 ('method_name', models.CharField(max_length=20)),
                 ('settings_data', models.JSONField(editable=False, encoder=django.core.serializers.json.DjangoJSONEncoder, null=True, verbose_name='JSON-serialized settings data')),

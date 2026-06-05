@@ -48,8 +48,6 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_api_key",
     "django_filters",
-    "django_fsm",
-    "fsm_admin",
     "channels",
     "envelope.app.online_channel",
     "envelope.app.user_channel",

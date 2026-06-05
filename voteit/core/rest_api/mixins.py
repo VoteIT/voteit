@@ -9,7 +9,6 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models.query import QuerySet
 from rest_framework import exceptions
-from rest_framework import permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
@@ -19,13 +18,8 @@ from rules.contrib.rest_framework import (
 from statemachine import registry
 from statemachine.mixins import MachineMixin
 
-from voteit.core.rest_api.serializers import FSMTransitionSerializer
 from voteit.core.rest_api.serializers import SMEventSerializer
 from voteit.core.rest_api.serializers import StateMachineSerializer
-from voteit.core.rest_api.serializers import TransitionSerializer
-from voteit.core.rest_api.utils import drf_do_transition
-from voteit.core.rest_api.utils import get_valid_transitions
-from voteit.core.rest_api.utils import get_valid_transitions_dict
 from voteit.core.rest_api.utils import perm_denied_msg
 
 logger = getLogger(__name__)
@@ -155,54 +149,3 @@ class StateMachineMixin:
             serializer.is_valid(raise_exception=True)
             serializer.save()
         return Response(data={"state": obj.state})
-
-
-class TransitionsMixin(SerializerClassesMixin):
-    """
-    Note that it only works if the FSM field is called 'state'.
-    """
-
-    fsm_field_name: str = "state"
-
-    @action(
-        methods=["post", "get"],
-        detail=True,
-        permission_classes=[permissions.IsAuthenticated],
-    )
-    def transitions(self, request, pk):
-        """
-        Generic transitions action for field.
-        Checks against available transitions for current user before calling.
-        """
-        instance = self.get_object()
-        if request.method == "GET":
-            transitions = sorted(
-                get_valid_transitions(instance, attr=self.fsm_field_name),
-                key=lambda x: x.name,
-            )
-            transition_serializer = FSMTransitionSerializer(
-                transitions,
-                many=True,
-                context={"request": request, "instance": instance},
-            )
-            return Response(transition_serializer.data)
-        else:
-            transition_name = request.data.get("transition", None)
-            valid_transitions = get_valid_transitions_dict(instance)
-            with transaction.atomic(durable=True):
-                drf_do_transition(
-                    instance=instance,
-                    field_name=self.fsm_field_name,
-                    transition_name=transition_name,
-                    valid_transitions=valid_transitions,
-                    user=request.user,
-                )
-                instance.save()
-            # TODO Possibly return serialized object, but strictly speaking not necessary.
-            new_state = getattr(instance, self.fsm_field_name)
-            return Response(status=201, data={self.fsm_field_name: new_state})
-
-    def get_serializer_class(self):
-        if self.action == "transitions":
-            return TransitionSerializer
-        return super().get_serializer_class()

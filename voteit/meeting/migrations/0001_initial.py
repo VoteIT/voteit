@@ -4,7 +4,6 @@ from django.conf import settings
 import django.contrib.postgres.fields
 from django.db import migrations, models
 import django.db.models.deletion
-import django_fsm
 import voteit.core.fields
 
 
@@ -27,7 +26,7 @@ class Migration(migrations.Migration):
                 ('tags', django.contrib.postgres.fields.ArrayField(base_field=models.CharField(max_length=100), blank=True, default=list, size=None)),
                 ('title', models.CharField(max_length=100)),
                 ('body', voteit.core.fields.RichTextField(blank=True, default='')),
-                ('state', django_fsm.FSMField(choices=[('upcoming', 'Upcoming'), ('ongoing', 'Ongoing'), ('closed', 'Closed'), ('archiving', 'Archiving'), ('archived', 'Archived')], default='upcoming', editable=False, max_length=50)),
+                ('state', models.CharField(choices=[('upcoming', 'Upcoming'), ('ongoing', 'Ongoing'), ('closed', 'Closed'), ('archiving', 'Archiving'), ('archived', 'Archived')], default='upcoming', editable=False, max_length=50)),
                 ('start_time', models.DateTimeField(blank=True, null=True, verbose_name='When the meeting starts/started.')),
                 ('end_time', models.DateTimeField(blank=True, null=True, verbose_name='When the meeting ends/ended.')),
                 ('public', models.BooleanField(default=False, verbose_name='Is this meeting viewable by anyone?')),

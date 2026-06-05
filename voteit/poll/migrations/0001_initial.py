@@ -5,7 +5,6 @@ import django.contrib.postgres.fields
 import django.core.serializers.json
 from django.db import migrations, models
 import django.db.models.deletion
-import django_fsm
 import voteit.core.fields
 
 
@@ -39,7 +38,7 @@ class Migration(migrations.Migration):
                 ('body', voteit.core.fields.RichTextField(blank=True, default='')),
                 ('modified', models.DateTimeField(auto_now=True)),
                 ('tags', django.contrib.postgres.fields.ArrayField(base_field=models.CharField(max_length=100), blank=True, default=list, size=None)),
-                ('state', django_fsm.FSMField(choices=[('private', 'Private'), ('upcoming', 'Upcoming'), ('ongoing', 'Ongoing'), ('closed', 'Closed'), ('finished', 'Finished'), ('canceled', 'Canceled'), ('failed', 'Failed')], default='private', editable=False, max_length=50)),
+                ('state', models.CharField(choices=[('private', 'Private'), ('upcoming', 'Upcoming'), ('ongoing', 'Ongoing'), ('closed', 'Closed'), ('finished', 'Finished'), ('canceled', 'Canceled'), ('failed', 'Failed')], default='private', editable=False, max_length=50)),
                 ('title', models.CharField(max_length=70)),
                 ('description', models.CharField(max_length=200)),
                 ('method_name', models.CharField(max_length=20)),

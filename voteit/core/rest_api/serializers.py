@@ -10,7 +10,6 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.utils import translation
 from django.utils.translation import gettext as _
 from pydantic.main import BaseModel
 from rest_framework import serializers
@@ -32,7 +31,6 @@ from voteit.organisation.utils import get_idproxy_user_data
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
-    from django_fsm import Transition
     from voteit.core.models import BaseContent
     from voteit.meeting.models import Meeting
     from voteit.agenda.models import AgendaItem
@@ -226,13 +224,6 @@ class MessageSerializer(serializers.Serializer):
     tags = serializers.CharField()
 
 
-class TransitionSerializer(serializers.Serializer):
-    transition = serializers.CharField(max_length=20)
-
-    class Meta:
-        fields = ("transition",)
-
-
 class SMEventSerializer(serializers.Serializer):
     event = serializers.CharField(validators=[SMEventValidator()])
 
@@ -336,56 +327,6 @@ class PydanticFieldSerializer(serializers.JSONField):
         if isinstance(value, BaseModel):
             value = value.dict()
         return super().to_representation(value)
-
-
-class BaseFSMTransitonSerializer(serializers.Serializer):
-    """Basic details with no checks"""
-
-    name: str = serializers.CharField()
-    permission: str | None = serializers.CharField(required=False)
-    source: str = serializers.CharField(required=False)
-    target: str = serializers.CharField()
-    title: str = serializers.SerializerMethodField()
-
-    def get_title(self, transition: Transition) -> str:
-        # Title might be a lazy gettext, which doesn't work
-        return translation.gettext(
-            transition.custom.get("title", transition.name.title())
-        )
-
-
-class FSMTransitionSerializer(BaseFSMTransitonSerializer):
-    has_perm: bool | None = serializers.SerializerMethodField()
-    conditions: list[dict] = serializers.SerializerMethodField()
-    allowed: bool = serializers.BooleanField(required=False)
-
-    def to_representation(self, transition: Transition):
-        res = super().to_representation(transition)
-        res["allowed"] = res["has_perm"] and all(
-            x["allowed"] for x in res["conditions"]
-        )
-        return res
-
-    def get_has_perm(self, transition: Transition) -> bool | None:
-        return transition.has_perm(
-            self.context["instance"], self.context["request"].user
-        )
-
-    def get_conditions(self, transition: Transition):
-        result = []
-        for condition in transition.conditions:
-            if hasattr(condition, "title"):
-                title = condition.title
-            else:
-                title = condition.__name__
-            result.append(
-                {
-                    "allowed": condition(self.context["instance"]),
-                    "title": title,
-                    "name": condition.__name__,
-                }
-            )
-        return result
 
 
 class RichTextSerializerMixin:

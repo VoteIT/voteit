@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from contextlib import contextmanager
-from contextlib import suppress
 from copy import deepcopy
 from inspect import isclass
 from random import randint
@@ -385,28 +384,6 @@ def get_model_by_type(value: type[Model] | Model | str) -> set[type[Model]]:
         if issubclass(klass, model):
             found.add(klass)
     return found
-
-
-_cached_available_transitions = {}
-
-
-def prepare_available_transitions():
-    from voteit.core.rest_api.serializers import BaseFSMTransitonSerializer
-
-    content_reg = get_content_registry()
-    for name, content in content_reg.items():
-        # FIXME: This may change, but currently all models use "state" as attr.
-        if hasattr(content, "state"):
-            # FIXME: Remove when refactored
-            with suppress(AttributeError):
-                serializer = BaseFSMTransitonSerializer(
-                    list(content.state.field.get_all_transitions(content)), many=True
-                )
-                _cached_available_transitions[name] = serializer.data
-
-
-def get_available_transitions() -> dict:
-    return _cached_available_transitions
 
 
 def generate_valid_userid(user: AbstractUser) -> str | None:

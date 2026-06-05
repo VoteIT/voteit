@@ -3,7 +3,6 @@
 import django.contrib.postgres.fields
 import django.core.serializers.json
 from django.db import migrations, models
-import django_fsm
 import voteit.core.fields
 
 
@@ -19,7 +18,7 @@ class Migration(migrations.Migration):
             name='AccessRequest',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('state', django_fsm.FSMField(choices=[('unhandled', 'Unhandled'), ('accepted', 'Accepted'), ('rejected', 'Rejected')], default='unhandled', editable=False, max_length=50, protected=True)),
+                ('state', models.CharField(choices=[('unhandled', 'Unhandled'), ('accepted', 'Accepted'), ('rejected', 'Rejected')], default='unhandled', editable=False, max_length=50)),
                 ('message', models.TextField(blank=True, null=True)),
                 ('moderator_message', models.TextField(blank=True, null=True)),
                 ('created', models.DateTimeField(auto_now_add=True)),
@@ -55,8 +54,8 @@ class Migration(migrations.Migration):
             name='MeetingInvite',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('state', django_fsm.FSMField(choices=[('open', 'Open'), ('expired', 'Expired'), ('revoked', 'Revoked'), ('accepted', 'Accepted'), ('rejected', 'Rejected')], default='open', editable=False, max_length=50)),
-                ('send_state', django_fsm.FSMField(choices=[('created', 'Created'), ('scheduled', 'Scheduled'), ('sending', 'Sending'), ('sent', 'Sent'), ('failed', 'Failed')], default='created', editable=False, max_length=50)),
+                ('state', models.CharField(choices=[('open', 'Open'), ('expired', 'Expired'), ('revoked', 'Revoked'), ('accepted', 'Accepted'), ('rejected', 'Rejected')], default='open', editable=False, max_length=50)),
+                ('send_state', models.CharField(choices=[('created', 'Created'), ('scheduled', 'Scheduled'), ('sending', 'Sending'), ('sent', 'Sent'), ('failed', 'Failed')], default='created', editable=False, max_length=50)),
                 ('last_sent', models.DateTimeField(blank=True, null=True)),
                 ('created', models.DateTimeField(auto_now_add=True)),
                 ('modified', models.DateTimeField(auto_now=True)),

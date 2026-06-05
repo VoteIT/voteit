@@ -4,7 +4,6 @@ from django.conf import settings
 import django.contrib.postgres.fields
 from django.db import migrations, models
 import django.db.models.deletion
-import django_fsm
 import voteit.core.fields
 
 
@@ -27,7 +26,7 @@ class Migration(migrations.Migration):
                 ('created', models.DateTimeField(auto_now_add=True)),
                 ('modified', models.DateTimeField(auto_now=True)),
                 ('tags', django.contrib.postgres.fields.ArrayField(base_field=models.CharField(max_length=100), blank=True, default=list, size=None)),
-                ('state', django_fsm.FSMField(choices=[('published', 'Published'), ('retracted', 'Retracted'), ('voting', 'Voting'), ('approved', 'Approved'), ('denied', 'Denied'), ('unhandled', 'Unhandled')], default='published', max_length=50, protected=True)),
+                ('state', models.CharField(choices=[('published', 'Published'), ('retracted', 'Retracted'), ('voting', 'Voting'), ('approved', 'Approved'), ('denied', 'Denied'), ('unhandled', 'Unhandled')], default='published', max_length=50)),
                 ('prop_id', models.CharField(max_length=50)),
                 ('agenda_item', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='proposals', to='agenda.agendaitem')),
                 ('author', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='proposals', to=settings.AUTH_USER_MODEL)),

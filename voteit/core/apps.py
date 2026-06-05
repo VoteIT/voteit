@@ -13,7 +13,6 @@ class CoreConfig(AppConfig):
     def ready(self):
         from voteit.core.registries import content_types
         from voteit.core import models_to_register
-        from voteit.core.utils import prepare_available_transitions
         from voteit.core.rest_api import views  # noqa
         from voteit.core import jobs  # noqa
 
@@ -21,9 +20,6 @@ class CoreConfig(AppConfig):
             model = models_to_register.pop()
             if not model._meta.proxy:
                 register_model(model, content_types)
-
-        # Cache all workflow transitions
-        prepare_available_transitions()
 
         # Register messages
         from voteit.core.messages import register
