@@ -225,6 +225,15 @@ class MessageSerializer(serializers.Serializer):
 class SMEventSerializer(serializers.Serializer):
     event = serializers.CharField(validators=[SMEventValidator()])
 
+    def __init__(self, instance=None, *args, **kwargs):
+        super().__init__(instance=instance, *args, **kwargs)
+        if instance is not None and hasattr(instance, "sm"):
+            choices = [(e.id, str(e.name)) for e in instance.sm.allowed_events]
+            self.fields["event"] = serializers.ChoiceField(choices=choices)
+
+    def to_representation(self, instance):
+        return {}
+
     def update(self, instance, validated_data):
         user = self.context["request"].user
         try:

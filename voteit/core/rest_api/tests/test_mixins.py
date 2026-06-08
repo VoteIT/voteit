@@ -37,7 +37,28 @@ class StateMachineMixinTests(APITestCase):
         self.client.force_login(self.moderator)
         response = self.client.get(self._event_url)
         self.assertEqual(200, response.status_code)
-        self.assertEqual({"state": "upcoming"}, response.json())
+        data = response.json()
+        self.assertEqual("upcoming", data["state"])
+        self.assertIn("events", data)
+
+    def test_get_events_match_allowed(self):
+        self.client.force_login(self.moderator)
+        response = self.client.get(self._event_url)
+        self.assertEqual(200, response.status_code)
+        returned_events = set(response.json()["events"])
+        expected_events = {e.id for e in self.meeting.sm.allowed_events}
+        self.assertEqual(expected_events, returned_events)
+
+    def test_get_events_change_with_state(self):
+        self.meeting.state = "ongoing"
+        self.meeting.save()
+        self.client.force_login(self.moderator)
+        response = self.client.get(self._event_url)
+        self.assertEqual(200, response.status_code)
+        returned_events = set(response.json()["events"])
+        expected_events = {e.id for e in self.meeting.sm.allowed_events}
+        self.assertEqual(expected_events, returned_events)
+        self.assertNotIn("make_ongoing", returned_events)
 
     def test_do_transition(self):
         self.client.force_login(self.moderator)

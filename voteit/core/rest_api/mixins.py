@@ -114,6 +114,18 @@ class ModelContextMixin(ABC):
 class StateMachineMixin:
     instance: MachineMixin
 
+    def get_serializer(self, *args, **kwargs):
+        if (
+            getattr(self, "action", None) == "event"
+            and not args
+            and "instance" not in kwargs
+        ):
+            try:
+                kwargs["instance"] = self.get_object()
+            except Exception:
+                pass
+        return super().get_serializer(*args, **kwargs)
+
     @action(
         detail=True,
         methods=["POST", "GET", "PATCH"],
@@ -129,4 +141,9 @@ class StateMachineMixin:
             serializer = self.get_serializer(obj, data=request.data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-        return Response(data={"state": obj.state})
+        return Response(
+            data={
+                "state": obj.state,
+                "events": [e.id for e in obj.sm.allowed_events],
+            }
+        )
