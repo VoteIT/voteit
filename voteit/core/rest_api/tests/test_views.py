@@ -1,16 +1,25 @@
-import tempfile
+from __future__ import annotations
 
+import tempfile
+from contextlib import ExitStack
+from unittest.mock import patch
+
+import statemachine.registry as sm_registry
 from django.contrib.auth import get_user_model
 from django.contrib.messages import success
 from django.contrib.messages.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory
+from django.test import TestCase
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
-
 from social_django.models import UserSocialAuth
+from statemachine import Event
+from statemachine import State
+from statemachine import StateChart
 
+from voteit.core.statemachines import TransitionSignalMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.organisation.models import OAuth2Provider
@@ -420,6 +429,46 @@ class UserImageAPITests(APITestCase):
     def test_anon_cannot_upload(self):
         response = self._patch(_JPEG)
         self.assertEqual(401, response.status_code)
+
+
+class StateMachinesViewTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with patch.object(sm_registry, "_REGISTRY", {}):
+
+            class DummyWorkflow(StateChart, TransitionSignalMixin):
+                draft = State(value="draft", initial=True)
+                published = State(value="published", final=True)
+
+                publish = Event(draft.to(published))
+
+            cls.DummyWorkflow = DummyWorkflow
+        cls.qualname = f"{DummyWorkflow.__module__}.{DummyWorkflow.__qualname__}"
+
+    def _get(self):
+        with ExitStack() as stack:
+            stack.enter_context(
+                patch.object(
+                    sm_registry, "_REGISTRY", {self.qualname: self.DummyWorkflow}
+                )
+            )
+            stack.enter_context(patch.object(sm_registry, "_initialized", True))
+            return self.client.get("/api/state-machines/")
+
+    def test_list_returns_200(self):
+        self.assertEqual(self._get().status_code, 200)
+
+    def test_list_includes_workflow(self):
+        self.assertIn(self.qualname, self._get().data)
+
+    def test_workflow_has_states_and_events(self):
+        data = self._get().data[self.qualname]
+        state_ids = [s["id"] for s in data["states"]]
+        event_ids = [e["id"] for e in data["events"]]
+        self.assertIn("draft", state_ids)
+        self.assertIn("published", state_ids)
+        self.assertIn("publish", event_ids)
 
 
 class HealthTests(APITestCase):

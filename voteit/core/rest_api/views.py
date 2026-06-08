@@ -13,6 +13,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from statemachine import registry as sm_registry
 
 from voteit.core import PERM
 from voteit.core.loggers import log_auth
@@ -20,6 +21,7 @@ from voteit.core.rest_api import router
 from voteit.core.rest_api.filters import ActionAnnotatedDjangoFilterBackend
 from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.serializers import MessageSerializer
+from voteit.core.rest_api.serializers import StateMachineSerializer
 from voteit.core.rest_api.serializers import UserAndRolesSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
@@ -141,3 +143,17 @@ class HealthCheckView(GenericViewSet):
 
     def list(self, request):
         return Response("OK!")
+
+
+@router.register("state-machines", basename="state-machines")
+class StateMachinesViewSet(GenericViewSet):
+    permission_classes = [permissions.AllowAny]
+
+    def list(self, request, *args, **kwargs):
+        sm_registry.init_registry()
+        result = {}
+        for qualname, machine_cls in sm_registry._REGISTRY.items():
+            if not qualname.startswith("voteit."):
+                continue
+            result[qualname] = StateMachineSerializer(machine_cls()).data
+        return Response(result)
