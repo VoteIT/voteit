@@ -661,6 +661,36 @@ class MeetingGroupViewSetTests(APITestCase):
             response, "Other groups delegates to your group", status_code=400
         )
 
+    def _mk_bulk_delete_request(self):
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-bulk-delete")
+        return self.client.post(
+            url,
+            {
+                "meeting": self.meeting.pk,
+                "pks": [self.meeting_group.pk, self.meeting_group_two.pk],
+            },
+            format="json",
+        )
+
+    def test_bulk_delete_no_proposals(self):
+        response = self._mk_bulk_delete_request()
+        self.assertEqual(200, response.status_code)
+        self.assertEqual({"deleted": 2}, response.json())
+
+    def test_bulk_delete_with_personal_proposal(self):
+        # Note, this protection may get dropped in future.
+        self.meeting_group.proposals.create()
+        response = self._mk_bulk_delete_request()
+        self.assertEqual(400, response.status_code)
+        self.assertIn("pks", response.json())
+
+    def test_bulk_delete_with_group_proposal(self):
+        self.meeting_group.proposals.create(as_group=True)
+        response = self._mk_bulk_delete_request()
+        self.assertEqual(400, response.status_code)
+        self.assertIn("pks", response.json())
+
 
 class BulkCreateMeetingGroupsTests(APITestCase):
     fixtures = ["meeting_test_fixture"]

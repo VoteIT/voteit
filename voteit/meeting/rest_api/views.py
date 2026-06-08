@@ -3,13 +3,15 @@ import csv
 from auditlog.context import disable_auditlog
 from django.db import models
 from django.db import transaction
-from django.db.models import QuerySet
 from django.db.models import F
+from django.db.models import QuerySet
 from django.db.models import RestrictedError
 from django.http import Http404
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
+from envelope import INTERNAL
 from envelope.app.user_channel.channel import UserChannel
+from envelope.channels.messages import RecheckChannelSubscriptions
 from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
@@ -20,9 +22,6 @@ from rest_framework.filters import SearchFilter
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-
-from envelope import INTERNAL
-from envelope.channels.messages import RecheckChannelSubscriptions
 
 from voteit.core import PERM
 from voteit.core.loggers import log_roles_change
@@ -249,10 +248,6 @@ class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     def get_serializer_class(self):
         if self.action == "create":
             return serializers.CreateMeetingGroupSerializer
-        if self.action == "bulk_create":
-            return serializers.BulkCreateMeetingGroupsSerializer
-        if self.action == "bulk_delete":
-            return serializers.BulkDeleteMeetingGroupsSerializer
         return super().get_serializer_class()
 
     def get_queryset(self):
@@ -260,7 +255,12 @@ class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
             return MeetingGroup.objects.none()
         return MeetingGroup.objects.filter(meeting__participants=self.request.user)
 
-    @action(methods=["post"], detail=False, url_path="bulk-create")
+    @action(
+        methods=["post"],
+        detail=False,
+        serializer_class=serializers.BulkCreateMeetingGroupsSerializer,
+        url_path="bulk-create",
+    )
     @transaction.atomic(durable=True)
     def bulk_create(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -284,7 +284,12 @@ class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
                 updated_count += 1
         return Response({"created": created_count, "updated": updated_count})
 
-    @action(methods=["post"], detail=False, url_path="bulk-delete")
+    @action(
+        methods=["post"],
+        detail=False,
+        serializer_class=serializers.BulkDeleteMeetingGroupsSerializer,
+        url_path="bulk-delete",
+    )
     @transaction.atomic(durable=True)
     def bulk_delete(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -303,9 +308,13 @@ class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
             label = ", ".join(f'"{t}"' for t in shown)
             if len(restricted) > 3:
                 label += f" and {len(restricted) - 3} more"
-            raise PermissionDenied(
-                f"Meeting group(s) {label} are author of proposals and/or discussion posts or "
-                "have a relation to another group. Clear that first."
+            raise ValidationError(
+                {
+                    "pks": [
+                        f"Meeting group(s) {label} are author of proposals and/or discussion posts or "
+                        "have a relation to another group. Clear that first."
+                    ]
+                }
             )
         return Response({"deleted": deleted_count})
 
