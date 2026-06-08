@@ -54,14 +54,14 @@ class IRVTests(TestCase):
             {**self.er.voter_data, **{u.pk: 1 for u in new_voters}}
         )
         self.poll.ongoing(force=True)
-        for voter in User.objects.filter(pk__in=self.er.voter_data.keys()):
-            self.poll.votes.create(
-                user=voter,
-                vote_data=",".join(
-                    str(pk) for pk in sample(proposal_pks, randint(3, 10))
-                ),
-            )
         with SetSeed():
+            for voter in User.objects.filter(pk__in=self.er.voter_data.keys()):
+                self.poll.votes.create(
+                    user=voter,
+                    vote_data=",".join(
+                        str(pk) for pk in sample(proposal_pks, randint(3, 10))
+                    ),
+                )
             self.poll.close(force=True)
         result = self.poll.result
 

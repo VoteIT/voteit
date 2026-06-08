@@ -103,15 +103,15 @@ class FakeCommit:
 
 
 class SetSeed:
-    """
-    Simply set a specific seed then go back to sys default
-    """
+    def __init__(self, seed=1337):
+        self.seed = seed
 
-    def __enter__(self, seed=1337):
-        random.seed(seed)
+    def __enter__(self):
+        self._state = random.getstate()
+        random.seed(self.seed)
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        random.seed()
+    def __exit__(self, *args):
+        random.setstate(self._state)
 
 
 def run_permission_tests(
