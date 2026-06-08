@@ -147,6 +147,40 @@ class HealthCheckView(GenericViewSet):
 
 @router.register("state-machines", basename="state-machines")
 class StateMachinesViewSet(GenericViewSet):
+    """
+    Read-only schema registry for all VoteIT state machines. No authentication required.
+
+    Each entry describes the states, events, and transitions of one state machine class.
+    The frontend uses this to render state labels, available action buttons, and transition
+    graphs without needing per-resource requests.
+
+    Response shape:
+
+        {
+          "<MachineName>": {
+            "states": {
+              "<state_id>": {"name": "...", "initial": true}   // initial/final only present when true
+            },
+            "events": {
+              "<event_id>": {
+                "name": "...",
+                "transitions": [
+                  {
+                    "from": "<state_id>",
+                    "to": "<state_id>",
+                    "validators": ["<name>", ...],  // backend guards; mirrored in frontend checks
+                    "cond": ["<name>", ...]          // conditional guards (evaluated server-side)
+                  }
+                ]
+              }
+            }
+          }
+        }
+
+    List:    GET /api/state-machines/                    — all machines
+    Detail:  GET /api/state-machines/<MachineName>/      — single machine, 404 if unknown
+    """
+
     permission_classes = [permissions.AllowAny]
 
     def _voteit_machines(self):
