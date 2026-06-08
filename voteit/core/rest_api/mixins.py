@@ -15,11 +15,9 @@ from rest_framework.serializers import Serializer
 from rules.contrib.rest_framework import (
     AutoPermissionViewSetMixin as RulesAutoPermissionViewSetMixin,
 )
-from statemachine import registry
 from statemachine.mixins import MachineMixin
 
 from voteit.core.rest_api.serializers import SMEventSerializer
-from voteit.core.rest_api.serializers import StateMachineSerializer
 from voteit.core.rest_api.utils import perm_denied_msg
 
 logger = getLogger(__name__)
@@ -115,23 +113,6 @@ class ModelContextMixin(ABC):
 
 class StateMachineMixin:
     instance: MachineMixin
-
-    @action(
-        detail=False,
-        methods=["GET"],
-        serializer_class=StateMachineSerializer,
-        permission_classes=[],
-        url_path="state-machine",
-    )
-    def state_machine(self, request, *args, **kwargs):
-        """
-        State machine for this model.
-        """
-        model = self.get_queryset().model
-        machine_cls = registry.get_machine_cls(model.state_machine_name)
-        sm = machine_cls(model())
-        serializer = self.get_serializer(sm)
-        return Response(data=serializer.data)
 
     @action(
         detail=True,
