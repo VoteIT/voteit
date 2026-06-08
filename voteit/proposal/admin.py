@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from voteit.agenda.admin import AgendaItemAdminMixin
+from voteit.core.admin import StateMachineAdminMixin
 from voteit.meeting.admin import MeetingAdminMixin
 from voteit.meeting.admin import MeetingViaAIFilter
 from voteit.proposal.models import DiffProposal
@@ -10,7 +11,9 @@ from voteit.proposal.models import TextParagraph
 
 
 @admin.register(Proposal)
-class ProposalAdmin(AgendaItemAdminMixin, MeetingAdminMixin, admin.ModelAdmin):
+class ProposalAdmin(
+    StateMachineAdminMixin, AgendaItemAdminMixin, MeetingAdminMixin, admin.ModelAdmin
+):
     list_display = (
         "prop_id",
         "__str__",

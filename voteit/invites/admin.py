@@ -2,6 +2,7 @@ from logging import getLogger
 
 from django.contrib import admin
 
+from voteit.core.admin import StateMachineAdminMixin
 from voteit.invites.models import MeetingGroupAnnotation
 from voteit.invites.models import MeetingInvite
 from voteit.meeting.admin import MeetingAdminMixin
@@ -21,7 +22,7 @@ class MeetingGroupAnnotationInline(admin.TabularInline):
 
 
 @admin.register(MeetingInvite)
-class MeetingInviteAdmin(MeetingAdminMixin, admin.ModelAdmin):
+class MeetingInviteAdmin(StateMachineAdminMixin, MeetingAdminMixin, admin.ModelAdmin):
     search_fields = (
         "user_data__email",
         "user_data__swedish_ssn",

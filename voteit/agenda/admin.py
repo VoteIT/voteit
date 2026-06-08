@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 
 from voteit.agenda.models import AgendaItem
+from voteit.core.admin import StateMachineAdminMixin
 from voteit.meeting.admin import MeetingAdminMixin
 from voteit.meeting.admin import MeetingFilter
 
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
 
 
 @admin.register(AgendaItem)
-class AgendaAdmin(MeetingAdminMixin, admin.ModelAdmin):
+class AgendaAdmin(StateMachineAdminMixin, MeetingAdminMixin, admin.ModelAdmin):
     list_display = (
         "title",
         "meeting_link",

@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from voteit.core.admin import StateMachineAdminMixin
 from voteit.meeting.admin import MeetingAdminMixin
 from voteit.meeting.admin import MeetingFilter
 from voteit.poll.models import ElectoralRegister
@@ -25,7 +26,7 @@ class ERAdmin(MeetingAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(Poll)
-class PollAdmin(MeetingAdminMixin, admin.ModelAdmin):
+class PollAdmin(StateMachineAdminMixin, MeetingAdminMixin, admin.ModelAdmin):
     list_display = (
         "title",
         "meeting_link",

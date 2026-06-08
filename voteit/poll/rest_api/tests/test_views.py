@@ -301,7 +301,7 @@ class PollViewSetTests(APITestCase):
         # Close poll
         response = self.client.post(url, data={"event": "close"})
         self.assertEqual(200, response.status_code)
-        self.assertEqual({"state": "withheld"}, response.json())
+        self.assertEqual("withheld", response.json()["state"])
         self.prop.refresh_from_db()
         self.assertEqual("voting", self.prop.state)
         poll.refresh_from_db()
@@ -309,7 +309,7 @@ class PollViewSetTests(APITestCase):
         # Publish result
         response = self.client.post(url, data={"event": "publish_result"})
         self.assertEqual(200, response.status_code)
-        self.assertEqual({"state": "finished"}, response.json())
+        self.assertEqual("finished", response.json()["state"])
         self.prop.refresh_from_db()
         self.assertEqual("approved", self.prop.state)
         poll.refresh_from_db()

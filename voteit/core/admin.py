@@ -4,10 +4,12 @@ from django import forms
 from django.contrib import admin
 from django.contrib import messages
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.db import models
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import NoReverseMatch
+from django.utils.module_loading import import_string
 from django.urls import path
 from django.urls import reverse
 from django.utils.html import format_html
@@ -313,6 +315,109 @@ class UserAdmin(DefaultUserAdmin):
         return render(request, "admin/core/user_merge_confirm.html", context)
 
 
+def _sm_event_action(modeladmin, request, queryset):
+    """
+    Two-step admin action for sending a state machine event to selected objects.
+
+    Step 1: show event selector with from-state hints + list of selected objects.
+    Step 2: show eligible/ineligible split and require confirmation.
+    Execute: send event to eligible objects, report results.
+    """
+    sm_class = import_string(queryset.model.state_machine_name)
+
+    selected_event_id = request.POST.get("sm_event")
+    confirm = request.POST.get("confirm")
+
+    if selected_event_id and confirm:
+        succeeded, skipped, errors = [], [], []
+        for obj in queryset:
+            if any(e.id == selected_event_id for e in obj.sm.allowed_events):
+                try:
+                    obj.sm.send(selected_event_id, user=request.user)
+                    obj.save()
+                    succeeded.append(obj)
+                except Exception as exc:
+                    errors.append((obj, str(exc)))
+            else:
+                skipped.append(obj)
+        if succeeded:
+            modeladmin.message_user(
+                request,
+                f"Sent '{selected_event_id}' to {len(succeeded)} object(s).",
+                messages.SUCCESS,
+            )
+        if skipped:
+            modeladmin.message_user(
+                request,
+                f"{len(skipped)} object(s) skipped — event not valid from their current state.",
+                messages.WARNING,
+            )
+        for obj, err in errors:
+            modeladmin.message_user(request, f"{obj}: {err}", messages.ERROR)
+        return
+
+    # Build event metadata for the selection step: id, name, valid source states.
+    event_info = []
+    for event in sm_class.events:
+        sources = sorted(
+            {
+                state.id
+                for state in sm_class.states
+                for t in state.transitions
+                if event in t.events
+            }
+        )
+        event_info.append({"id": event.id, "name": str(event.name), "sources": sources})
+
+    if selected_event_id:
+        # Step 2: split into eligible vs ineligible and ask for confirmation.
+        eligible, ineligible = [], []
+        for obj in queryset:
+            (
+                eligible
+                if any(e.id == selected_event_id for e in obj.sm.allowed_events)
+                else ineligible
+            ).append(obj)
+        context = dict(
+            modeladmin.admin_site.each_context(request),
+            title=f"Confirm: send '{selected_event_id}'",
+            opts=queryset.model._meta,
+            queryset=queryset,
+            action_checkbox_name=ACTION_CHECKBOX_NAME,
+            selected_event=selected_event_id,
+            eligible=eligible,
+            ineligible=ineligible,
+        )
+    else:
+        # Step 1: event selection form.
+        context = dict(
+            modeladmin.admin_site.each_context(request),
+            title="Send state machine event",
+            opts=queryset.model._meta,
+            queryset=queryset,
+            action_checkbox_name=ACTION_CHECKBOX_NAME,
+            event_info=event_info,
+        )
+
+    return render(request, "admin/sm_event_action.html", context)
+
+
+_sm_event_action.short_description = "Send state machine event..."
+
+
+class StateMachineAdminMixin:
+    """Add to any ModelAdmin whose model uses MachineMixin to get the SM event action."""
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions["send_sm_event"] = (
+            _sm_event_action,
+            "send_sm_event",
+            _sm_event_action.short_description,
+        )
+        return actions
+
+
 # Replace existing
 admin.site.unregister(LogEntry)
 
@@ -334,5 +439,7 @@ class VoteITLogEntryAdmin(LogEntryAdmin):
                 link = reverse(viewname, args=[meeting.pk])
             except NoReverseMatch:
                 return "%s" % meeting
-            return format_html('<a href="{link}">{meeting}</a>', link=link, meeting=meeting)
+            return format_html(
+                '<a href="{link}">{meeting}</a>', link=link, meeting=meeting
+            )
         return "-"

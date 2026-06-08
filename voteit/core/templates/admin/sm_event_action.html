@@ -1,0 +1,105 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+{% if selected_event %}
+
+  {# ── Step 2: confirmation ─────────────────────────────────────────────── #}
+  <h2>Send event <em>{{ selected_event }}</em></h2>
+
+  {% if eligible %}
+  <p>
+    The following <strong>{{ eligible|length }}</strong> object(s) are in a state where
+    <em>{{ selected_event }}</em> is valid and will be updated:
+  </p>
+  <ul>
+    {% for obj in eligible %}
+    <li>{{ obj }} &mdash; <code>{{ obj.state }}</code></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if ineligible %}
+  <p>
+    The following <strong>{{ ineligible|length }}</strong> object(s) cannot receive
+    <em>{{ selected_event }}</em> from their current state and will be <strong>skipped</strong>:
+  </p>
+  <ul>
+    {% for obj in ineligible %}
+    <li>{{ obj }} &mdash; <code>{{ obj.state }}</code></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if eligible %}
+  <form method="post">
+    {% csrf_token %}
+    {% for obj in queryset %}
+    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk }}">
+    {% endfor %}
+    <input type="hidden" name="action" value="send_sm_event">
+    <input type="hidden" name="sm_event" value="{{ selected_event }}">
+    <input type="hidden" name="confirm" value="yes">
+    <p>
+      <input type="submit" value="Yes, send '{{ selected_event }}' to {{ eligible|length }} object(s)" class="default button">
+      &nbsp;
+      <a href="{% url opts|admin_urlname:'changelist' %}" class="button cancel-link">Cancel</a>
+    </p>
+  </form>
+  {% else %}
+  <p>
+    No selected objects are in a valid state for this event.
+    <a href="{% url opts|admin_urlname:'changelist' %}">Go back</a>
+  </p>
+  {% endif %}
+
+{% else %}
+
+  {# ── Step 1: event selection ──────────────────────────────────────────── #}
+  <p>Select the event to send to the <strong>{{ queryset|length }}</strong> selected object(s):</p>
+
+  <table>
+    <thead>
+      <tr><th>Object</th><th>Current state</th></tr>
+    </thead>
+    <tbody>
+      {% for obj in queryset %}
+      <tr><td>{{ obj }}</td><td><code>{{ obj.state }}</code></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <form method="post" style="margin-top: 1em;">
+    {% csrf_token %}
+    {% for obj in queryset %}
+    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk }}">
+    {% endfor %}
+    <input type="hidden" name="action" value="send_sm_event">
+    <p>
+      <label for="sm_event"><strong>Event:</strong></label>
+      <select name="sm_event" id="sm_event">
+        {% for ev in event_info %}
+        <option value="{{ ev.id }}">
+          {{ ev.name }} ({{ ev.id }}){% if ev.sources %} — from: {% for s in ev.sources %}{{ s }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </p>
+    <p>
+      <input type="submit" value="Preview effect" class="default button">
+      &nbsp;
+      <a href="{% url opts|admin_urlname:'changelist' %}" class="button cancel-link">Cancel</a>
+    </p>
+  </form>
+
+{% endif %}
+{% endblock %}

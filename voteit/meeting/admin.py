@@ -15,6 +15,8 @@ from django.urls import NoReverseMatch
 from django.urls import path
 from django.urls import reverse
 from django.utils.html import format_html
+
+from voteit.core.admin import StateMachineAdminMixin
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
@@ -184,7 +186,7 @@ class DialectFilter(admin.SimpleListFilter):
 
 
 @admin.register(Meeting)
-class MeetingAdmin(admin.ModelAdmin):
+class MeetingAdmin(StateMachineAdminMixin, admin.ModelAdmin):
     autocomplete_fields = ("organisation",)
     list_display = (
         "title",

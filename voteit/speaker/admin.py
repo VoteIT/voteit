@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from voteit.core.admin import StateMachineAdminMixin
 from voteit.meeting.admin import MeetingAdminMixin
 from voteit.speaker.models import Speaker
 from voteit.speaker.models import SpeakerList
@@ -8,7 +9,7 @@ from voteit.speaker.models import SpeakerSystemRoles
 
 
 @admin.register(SpeakerListSystem)
-class SLSystemAdmin(MeetingAdminMixin, admin.ModelAdmin):
+class SLSystemAdmin(StateMachineAdminMixin, MeetingAdminMixin, admin.ModelAdmin):
     list_display = (
         "room",
         "meeting_link",

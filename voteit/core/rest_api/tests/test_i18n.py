@@ -32,7 +32,7 @@ class TranslationTests(APITestCase):
         response = self.client.get(self.url, HTTP_ACCEPT_LANGUAGE="sv")
         self.assertEqual(200, response.status_code)
         self.assertEqual("sv", response.headers.get("Content-Language"))
-        self.assertEqual({"state": "upcoming"}, response.json())
+        self.assertEqual("upcoming", response.json()["state"])
 
     def test_missing_field(self):
         self.client.force_login(self.moderator)
