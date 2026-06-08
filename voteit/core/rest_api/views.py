@@ -21,7 +21,7 @@ from voteit.core.rest_api import router
 from voteit.core.rest_api.filters import ActionAnnotatedDjangoFilterBackend
 from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.serializers import MessageSerializer
-from voteit.core.rest_api.serializers import StateMachineSerializer
+from voteit.core.rest_api.serializers import StateMachineSchemaSerializer
 from voteit.core.rest_api.serializers import UserAndRolesSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
@@ -149,11 +149,24 @@ class HealthCheckView(GenericViewSet):
 class StateMachinesViewSet(GenericViewSet):
     permission_classes = [permissions.AllowAny]
 
-    def list(self, request, *args, **kwargs):
+    def _voteit_machines(self):
         sm_registry.init_registry()
-        result = {}
-        for qualname, machine_cls in sm_registry._REGISTRY.items():
-            if not qualname.startswith("voteit."):
-                continue
-            result[qualname] = StateMachineSerializer(machine_cls()).data
-        return Response(result)
+        return {
+            cls.__name__: cls
+            for qn, cls in sm_registry._REGISTRY.items()
+            if qn.startswith("voteit.")
+        }
+
+    def list(self, request, *args, **kwargs):
+        return Response(
+            {
+                name: StateMachineSchemaSerializer(cls()).data
+                for name, cls in self._voteit_machines().items()
+            }
+        )
+
+    def retrieve(self, request, pk=None, *args, **kwargs):
+        machines = self._voteit_machines()
+        if pk not in machines:
+            return Response(status=404)
+        return Response(StateMachineSchemaSerializer(machines[pk]()).data)

@@ -15,9 +15,7 @@ from pydantic.main import BaseModel
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
-from statemachine import StateMachine
 from statemachine.exceptions import TransitionNotAllowed
-from statemachine.utils import qualname
 
 from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
@@ -241,36 +239,54 @@ class SMEventSerializer(serializers.Serializer):
         return self.instance
 
 
-class StateSerializer(serializers.Serializer):
-    name = serializers.CharField()
-    id = serializers.CharField()
+class StateMachineSchemaSerializer(serializers.Serializer):
+    """
+    Serializes a StateMachine instance into a dict-based schema.
 
+    Shape:
+      {
+        "states": { "<id>": {"name": "...", "initial": true} },
+        "events": {
+          "<id>": {
+            "name": "...",
+            "transitions": [{"from": "...", "to": "...", "validators": [...], "cond": [...]}]
+          }
+        }
+      }
+    """
 
-class SMTransitionSerializer(serializers.Serializer):
-    source = StateSerializer()
-    target = StateSerializer()
-    events = serializers.ListSerializer(child=serializers.CharField())
-    validators = serializers.ListSerializer(child=serializers.CharField())
-    cond = serializers.ListSerializer(child=serializers.CharField())
+    def to_representation(self, sm):
+        event_names = {e.id: str(e.name) for e in sm.events}
 
+        states = {}
+        for state in sm.states:
+            entry = {"name": str(state.name)}
+            if state.initial:
+                entry["initial"] = True
+            if state.final:
+                entry["final"] = True
+            states[state.id] = entry
 
-class StateDetailSerializer(StateSerializer):
-    transitions = SMTransitionSerializer(many=True)
+        events = {}
+        for state in sm.states:
+            for trans in state.transitions:
+                for event in trans.events:
+                    event_id = event.id
+                    if event_id not in events:
+                        events[event_id] = {
+                            "name": event_names.get(event_id, event_id),
+                            "transitions": [],
+                        }
+                    events[event_id]["transitions"].append(
+                        {
+                            "from": trans.source.id,
+                            "to": trans.target.id,
+                            "validators": [v.attr_name for v in trans.validators],
+                            "cond": [c.attr_name for c in trans.cond],
+                        }
+                    )
 
-
-class EventDetailSerializer(serializers.Serializer):
-    name = serializers.CharField()
-    id = serializers.CharField()
-
-
-class StateMachineSerializer(serializers.Serializer):
-    states = StateDetailSerializer(many=True)
-    events = serializers.ListSerializer(child=EventDetailSerializer())
-    qualname = serializers.SerializerMethodField()
-    name = serializers.CharField()
-
-    def get_qualname(self, sm: type[StateMachine]):
-        return qualname(sm.__class__)
+        return {"states": states, "events": events}
 
 
 class PydanticFieldSerializer(serializers.JSONField):

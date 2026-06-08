@@ -431,6 +431,13 @@ class UserImageAPITests(APITestCase):
         self.assertEqual(401, response.status_code)
 
 
+class HealthTests(APITestCase):
+    def test_healthcheck(self):
+        url = reverse("health-list")
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+
+
 class StateMachinesViewTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -444,35 +451,75 @@ class StateMachinesViewTests(TestCase):
                 publish = Event(draft.to(published))
 
             cls.DummyWorkflow = DummyWorkflow
-        cls.qualname = f"{DummyWorkflow.__module__}.{DummyWorkflow.__qualname__}"
 
-    def _get(self):
+    def _registry_patch(self):
+        qn = f"{self.DummyWorkflow.__module__}.{self.DummyWorkflow.__qualname__}"
+        return (
+            patch.object(sm_registry, "_REGISTRY", {qn: self.DummyWorkflow}),
+            patch.object(sm_registry, "_initialized", True),
+        )
+
+    def _get_list(self):
+        key = self.DummyWorkflow.__name__
         with ExitStack() as stack:
-            stack.enter_context(
-                patch.object(
-                    sm_registry, "_REGISTRY", {self.qualname: self.DummyWorkflow}
-                )
-            )
-            stack.enter_context(patch.object(sm_registry, "_initialized", True))
-            return self.client.get("/api/state-machines/")
+            for p in self._registry_patch():
+                stack.enter_context(p)
+            return self.client.get("/api/state-machines/"), key
+
+    def _get_detail(self, name=None):
+        key = name or self.DummyWorkflow.__name__
+        with ExitStack() as stack:
+            for p in self._registry_patch():
+                stack.enter_context(p)
+            return self.client.get(f"/api/state-machines/{key}/"), key
 
     def test_list_returns_200(self):
-        self.assertEqual(self._get().status_code, 200)
+        response, _ = self._get_list()
+        self.assertEqual(response.status_code, 200)
 
     def test_list_includes_workflow(self):
-        self.assertIn(self.qualname, self._get().data)
+        response, key = self._get_list()
+        self.assertIn(key, response.data)
 
-    def test_workflow_has_states_and_events(self):
-        data = self._get().data[self.qualname]
-        state_ids = [s["id"] for s in data["states"]]
-        event_ids = [e["id"] for e in data["events"]]
-        self.assertIn("draft", state_ids)
-        self.assertIn("published", state_ids)
-        self.assertIn("publish", event_ids)
+    def test_states_are_dict_keyed_by_id(self):
+        response, key = self._get_list()
+        states = response.data[key]["states"]
+        self.assertIn("draft", states)
+        self.assertIn("published", states)
 
+    def test_state_has_name_and_flags(self):
+        response, key = self._get_list()
+        states = response.data[key]["states"]
+        self.assertTrue(states["draft"]["initial"])
+        self.assertTrue(states["published"]["final"])
+        self.assertNotIn("initial", states["published"])
 
-class HealthTests(APITestCase):
-    def test_healthcheck(self):
-        url = reverse("health-list")
-        response = self.client.get(url)
-        self.assertEqual(200, response.status_code)
+    def test_events_are_dict_keyed_by_id(self):
+        response, key = self._get_list()
+        events = response.data[key]["events"]
+        self.assertIn("publish", events)
+
+    def test_event_transition_from_to(self):
+        response, key = self._get_list()
+        transition = response.data[key]["events"]["publish"]["transitions"][0]
+        self.assertEqual(transition["from"], "draft")
+        self.assertEqual(transition["to"], "published")
+
+    def test_transition_includes_validators_and_cond(self):
+        response, key = self._get_list()
+        transition = response.data[key]["events"]["publish"]["transitions"][0]
+        self.assertIn("validators", transition)
+        self.assertIn("cond", transition)
+
+    def test_detail_returns_200(self):
+        response, _ = self._get_detail()
+        self.assertEqual(response.status_code, 200)
+
+    def test_detail_returns_single_machine(self):
+        response, _ = self._get_detail()
+        self.assertIn("states", response.data)
+        self.assertIn("events", response.data)
+
+    def test_detail_unknown_name_returns_404(self):
+        response, _ = self._get_detail(name="NoSuchMachine")
+        self.assertEqual(response.status_code, 404)
