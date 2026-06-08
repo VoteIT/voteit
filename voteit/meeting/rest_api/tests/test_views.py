@@ -586,14 +586,28 @@ class MeetingGroupViewSetTests(APITestCase):
         ):
             func(*params)
 
-    def test_delete_with_related_proposal(self):
+    def test_delete_with_related_proposal_no_author(self):
         self.meeting_group.proposals.create()
         self.client.force_login(self.moderator)
         url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
         response = self.client.delete(url)
-        self.assertContains(
-            response, "Meeting group is author of proposals", status_code=403
-        )
+        self.assertContains(response, "referenced by proposals", status_code=400)
+
+    def test_delete_with_related_proposal_as_group(self):
+        self.meeting_group.proposals.create(as_group=True)
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.delete(url)
+        self.assertContains(response, "referenced by proposals", status_code=400)
+
+    def test_delete_with_related_proposal_with_author(self):
+        proposal = self.meeting_group.proposals.create(author=self.moderator)
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-groups-detail", kwargs={"pk": self.meeting_group.pk})
+        response = self.client.delete(url)
+        self.assertEqual(204, response.status_code)
+        proposal.refresh_from_db()
+        self.assertIsNone(proposal.meeting_group_id)
 
     def test_delete_with_relation_to_other_group(self):
         self.meeting.groups.create(delegate_to=self.meeting_group)

@@ -4,6 +4,7 @@ from auditlog.context import disable_auditlog
 from django.db import models
 from django.db import transaction
 from django.db.models import F
+from django.db.models import Q
 from django.db.models import QuerySet
 from django.db.models import RestrictedError
 from django.http import Http404
@@ -238,6 +239,30 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         return Response(serializers.MeetingRolesSerializer(roles_obj).data)
 
 
+def _detach_group_if_safe(group: MeetingGroup) -> None:
+    """Null out meeting_group on proposals/discussions that are safe to detach.
+
+    Raises ValidationError if any reference has as_group=True or no author,
+    since those records were explicitly posted on behalf of the group.
+
+    Important: Discussions and Proposals won't be transmitted to frontend,
+    but deleting groups is quite uncommon
+    so we don't care in this case.
+    """
+    if group.proposals.filter(Q(as_group=True) | Q(author_id=None)).exists():
+        raise ValidationError(
+            "Meeting group is referenced by proposals that were posted as group or have no author. "
+            "Clear those references first."
+        )
+    if group.discussions.filter(Q(as_group=True) | Q(author_id=None)).exists():
+        raise ValidationError(
+            "Meeting group is referenced by discussion posts that were posted as group or have no author. "
+            "Clear those references first."
+        )
+    group.proposals.all().update(meeting_group=None)
+    group.discussions.all().update(meeting_group=None)
+
+
 @router.register("meeting-groups", basename="meeting-groups")
 class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     serializer_class = serializers.MeetingGroupSerializer
@@ -303,9 +328,10 @@ class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
         restricted = []
         for group in groups:
             try:
+                _detach_group_if_safe(group)
                 group.delete()
                 deleted_count += 1
-            except RestrictedError:
+            except (ValidationError, RestrictedError):
                 restricted.append(group.title)
         if restricted:
             shown = restricted[:3]
@@ -332,13 +358,15 @@ class MeetingGroupViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
 
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):
+        group = self.get_object()
+        _detach_group_if_safe(group)
         try:
-            return super().destroy(request, *args, **kwargs)
+            group.delete()
         except RestrictedError as exc:
             raise PermissionDenied(
-                "Meeting group is author of proposals and/or discussion posts or "
-                "has a relation to another group. Clear that first."
+                "Meeting group has a relation to another group. Clear that first."
             ) from exc
+        return Response(status=204)
 
 
 @router.register("group-memberships", basename="group-memberships")
