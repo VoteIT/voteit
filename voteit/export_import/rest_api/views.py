@@ -17,6 +17,7 @@ from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.utils import pydantic_to_drf_validation_error
 from voteit.export_import.exceptions import ImportFileError
 from voteit.export_import.exceptions import SignatureVerificationFailed
+from voteit.export_import.rest_api.lock import import_preview_lock
 from voteit.export_import.utils import MAX_IMPORT_BYTES
 from voteit.export_import.utils import MAX_UNSIGNED_IMPORT_BYTES
 from voteit.export_import.utils import sign_payload
@@ -65,7 +66,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
         serializer.is_valid(raise_exception=True)
 
         try:
-            import_lock.acquire(request)
+            import_preview_lock.acquire(request)
         except LockAlreadyRunning as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         except LockCooldownActive as exc:
@@ -99,7 +100,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
                 status=status.HTTP_200_OK,
             )
         finally:
-            import_lock.release(request)
+            import_preview_lock.release(request)
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
