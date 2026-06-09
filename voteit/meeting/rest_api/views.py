@@ -1,4 +1,5 @@
 import csv
+from typing import cast
 
 from auditlog.context import disable_auditlog
 from django.db import models
@@ -371,19 +372,15 @@ class GroupMembershipViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
         # if serializer.instance.role is None:
         role_added = None
         role_removed = None
-        serializer.instance: GroupMembership
+        membership = cast(GroupMembership, serializer.instance)
         if "role" in serializer.validated_data:
-            role_added = (
-                serializer.validated_data["role"] and serializer.instance.role is None
-            )
-            role_removed = (
-                not serializer.validated_data["role"] and serializer.instance.role
-            )
+            role_added = serializer.validated_data["role"] and membership.role is None
+            role_removed = not serializer.validated_data["role"] and membership.role
         serializer.save()
         if role_added:
-            serializer.instance.signal_role_added()
+            membership.signal_role_added()
         if role_removed:
-            serializer.instance.signal_role_removed(role=role_removed)
+            membership.signal_role_removed(role=role_removed)
 
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):
