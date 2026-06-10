@@ -1,4 +1,3 @@
-from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import PermissionDenied
 from statemachine import Event
 from statemachine import State
@@ -13,38 +12,38 @@ from voteit.proposal import PERM_RETRACT
 class ProposalStateMachine(StateChart, TransitionSignalMixin):
     catch_errors_as_events = False
 
-    published = State(value="published", name=_("Published"), initial=True)
-    retracted = State(value="retracted", name=_("Retracted"))
-    voting = State(value="voting", name=_("Voting"))
-    approved = State(value="approved", name=_("Approved"))
-    denied = State(value="denied", name=_("Denied"))
-    unhandled = State(value="unhandled", name=_("Unhandled"))
+    published = State(value="published", name="Published", initial=True)
+    retracted = State(value="retracted", name="Retracted")
+    voting = State(value="voting", name="Voting")
+    approved = State(value="approved", name="Approved")
+    denied = State(value="denied", name="Denied")
+    unhandled = State(value="unhandled", name="Unhandled")
 
     retract = Event(
         published.to(retracted, validators=["has_retract_permission"]),
-        name=_("Retract"),
+        name="Retract",
     )
     lock_for_vote = Event(
         published.to(voting, validators=["has_change_permission"])
         | retracted.to(voting, validators=["has_change_permission"]),
-        name=_("Lock for vote"),
+        name="Lock for vote",
     )
     # Event names differ from state names to avoid class-attribute clash
     approve = Event(
         published.to(approved, validators=["has_change_permission"])
         | voting.to(approved, validators=["has_change_permission"])
         | denied.to(approved, validators=["has_change_permission"]),
-        name=_("Approve"),
+        name="Approve",
     )
     deny = Event(
         published.to(denied, validators=["has_change_permission"])
         | voting.to(denied, validators=["has_change_permission"])
         | approved.to(denied, validators=["has_change_permission"]),
-        name=_("Deny"),
+        name="Deny",
     )
     mark_unhandled = Event(
         published.to(unhandled, validators=["has_change_permission"]),
-        name=_("Mark as unhandled"),
+        name="Mark as unhandled",
     )
     publish = Event(
         retracted.to(published, validators=["has_change_permission"])
@@ -52,7 +51,7 @@ class ProposalStateMachine(StateChart, TransitionSignalMixin):
         | approved.to(published, validators=["has_change_permission"])
         | denied.to(published, validators=["has_change_permission"])
         | unhandled.to(published, validators=["has_change_permission"]),
-        name=_("Publish"),
+        name="Publish",
     )
 
     def has_change_permission(self, *, user=None, force=False, **kw):

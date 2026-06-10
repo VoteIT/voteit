@@ -1,13 +1,13 @@
 from logging import getLogger
 
 from django.utils.timezone import now
-from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import PermissionDenied
 from pydantic import ValidationError as PydanticValidationError
 from statemachine import Event
 from statemachine import State
 from statemachine import StateChart
 
+from voteit.core import NOT_ALLOWED_SM_GUARD
 from voteit.core.rest_api.utils import perm_denied_msg
 from voteit.core.statemachines import TransitionSignalMixin
 from voteit.poll.exceptions import ElectoralRegisterManualError
@@ -20,22 +20,22 @@ logger = getLogger(__name__)
 class PollStateMachine(StateChart, TransitionSignalMixin):
     catch_errors_as_events = False
 
-    private = State(value="private", name=_("Private"), initial=True)
-    upcoming = State(value="upcoming", name=_("Upcoming"))
-    ongoing = State(value="ongoing", name=_("Ongoing"))
-    closed = State(value="closed", name=_("Closed"))
-    finished = State(value="finished", name=_("Finished"))
-    withheld = State(value="withheld", name=_("Withheld"))
-    canceled = State(value="canceled", name=_("Canceled"))
-    failed = State(value="failed", name=_("Failed"))
-    no_result = State(value="no_result", name=_("No result"), final=True)
+    private = State(value="private", name="Private", initial=True)
+    upcoming = State(value="upcoming", name="Upcoming")
+    ongoing = State(value="ongoing", name="Ongoing")
+    closed = State(value="closed", name="Closed")
+    finished = State(value="finished", name="Finished")
+    withheld = State(value="withheld", name="Withheld")
+    canceled = State(value="canceled", name="Canceled")
+    failed = State(value="failed", name="Failed")
+    no_result = State(value="no_result", name="No result", final=True)
 
     # User-triggered events
     make_upcoming = Event(
         private.to(
             upcoming, validators=["has_change_state_permission", "validate_settings"]
         ),
-        name=_("Make upcoming"),
+        name="Make upcoming",
     )
     make_ongoing = Event(
         upcoming.to(
@@ -58,55 +58,55 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
                 "validate_method",
             ],
         ),
-        name=_("Start"),
+        name="Start",
     )
     close = Event(
         ongoing.to(closed, validators=["has_change_state_permission"])
         | failed.to(closed, validators=["has_change_state_permission"])
         | canceled.to(closed, validators=["has_change_state_permission"]),
-        name=_("Close"),
+        name="Close",
     )
     publish_result = Event(
         withheld.to(finished, validators=["has_change_state_permission"]),
-        name=_("Publish result"),
+        name="Publish result",
     )
     withhold_result = Event(
         finished.to(withheld, validators=["has_change_state_permission"]),
-        name=_("Withold detailed result"),
+        name="Withold detailed result",
     )
     cancel = Event(
         ongoing.to(canceled, validators=["has_change_state_permission"]),
-        name=_("Cancel"),
+        name="Cancel",
     )
     unpublish = Event(
         upcoming.to(private, validators=["has_change_state_permission"]),
-        name=_("Revert to private"),
+        name="Revert to private",
     )
 
     # Internal-only events — not reachable via the REST API (guarded by not_allowed).
     # These define the valid state-graph paths for finished/withheld/no_result/failed,
     # which are actually executed via direct model.state assignment in _finish()/_no_result().
     finish = Event(
-        closed.to(finished, validators=["not_allowed"]),
-        name=_("Finish"),
+        closed.to(finished, cond=[NOT_ALLOWED_SM_GUARD]),
+        name="Finish",
     )
     finish_withheld = Event(
-        closed.to(withheld, validators=["not_allowed"]),
-        name=_("Finish (withheld)"),
+        closed.to(withheld, cond=[NOT_ALLOWED_SM_GUARD]),
+        name="Finish (withheld)",
     )
     mark_no_result = Event(
-        closed.to(no_result, validators=["not_allowed"]),
-        name=_("No result"),
+        closed.to(no_result, cond=[NOT_ALLOWED_SM_GUARD]),
+        name="No result",
     )
     fail = Event(
-        private.to(failed, validators=["not_allowed"])
-        | upcoming.to(failed, validators=["not_allowed"])
-        | ongoing.to(failed, validators=["not_allowed"])
-        | closed.to(failed, validators=["not_allowed"])
-        | finished.to(failed, validators=["not_allowed"])
-        | withheld.to(failed, validators=["not_allowed"])
-        | canceled.to(failed, validators=["not_allowed"]),
-        name=_("Failed"),
+        private.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
+        | upcoming.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
+        | ongoing.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
+        | closed.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
+        | finished.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
+        | withheld.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
+        | canceled.to(failed, cond=[NOT_ALLOWED_SM_GUARD]),
+        name="Failed",
     )
 
     permissive_states = frozenset({"private", "upcoming"})
@@ -149,8 +149,8 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
                 {"event": ElectoralRegisterManualError.default_detail}
             )
 
-    def not_allowed(self, **kw):
-        raise PermissionDenied("This transition is not available via the API.")
+    def not_allowed(self, force=False, **kw):
+        return force
 
     def validate_method(self, **kw):
         self.model.method.start_check()

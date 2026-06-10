@@ -18,33 +18,33 @@ from voteit.core.statemachines import TransitionSignalMixin
 class MeetingStateMachine(StateChart, TransitionSignalMixin):
     catch_errors_as_events = False
 
-    upcoming = State(value="upcoming", name=_("Upcoming"), initial=True)
-    ongoing = State(value="ongoing", name=_("Ongoing"))
-    closed = State(value="closed", name=_("Closed"))
-    archiving = State(value="archiving", name=_("Archiving"))
-    archived = State(value="archived", name=_("Archived"))
-    deleting = State(value="deleting", name=_("Deleting"))
+    upcoming = State(value="upcoming", name="Upcoming", initial=True)
+    ongoing = State(value="ongoing", name="Ongoing")
+    closed = State(value="closed", name="Closed")
+    archiving = State(value="archiving", name="Archiving")
+    archived = State(value="archived", name="Archived")
+    deleting = State(value="deleting", name="Deleting")
 
     make_upcoming = Event(
         ongoing.to(upcoming, validators=["has_moderate_permission"]),
-        name=_("Back to upcoming"),
+        name="Back to upcoming",
     )
     make_ongoing = Event(
         upcoming.to(ongoing, validators=["has_moderate_permission", "valid_er_policy"])
         | closed.to(ongoing, validators=["has_moderate_permission", "valid_er_policy"]),
-        name=_("Make ongoing"),
+        name="Make ongoing",
     )
     close = Event(
         ongoing.to(closed, validators=["has_moderate_permission", "no_ongoing_polls"]),
-        name=_("Close"),
+        name="Close",
     )
     request_archiving = Event(
         closed.to(archiving, validators=["has_archive_permission"]),
-        name=_("Request archiving"),
+        name="Request archiving",
     )
     abort_archiving = Event(
         archiving.to(closed, validators=["has_archive_permission"]),
-        name=_("Abort archiving"),
+        name="Abort archiving",
     )
     request_delete = Event(
         upcoming.to(deleting, validators=["has_delete_permission"])
@@ -52,7 +52,7 @@ class MeetingStateMachine(StateChart, TransitionSignalMixin):
         | closed.to(deleting, validators=["has_delete_permission"])
         | archiving.to(deleting, validators=["has_delete_permission"])
         | archived.to(deleting, validators=["has_delete_permission"]),
-        name=_("Request delete..."),
+        name="Request delete...",
     )
     abort_delete = Event(
         deleting.to(
@@ -80,7 +80,7 @@ class MeetingStateMachine(StateChart, TransitionSignalMixin):
             cond="pre_delete_state_is_archived",
             validators=["has_delete_permission"],
         ),
-        name=_("Abort delete"),
+        name="Abort delete",
     )
 
     finished_states = frozenset({"closed", "archiving", "archived", "deleting"})

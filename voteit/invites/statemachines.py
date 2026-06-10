@@ -2,7 +2,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.utils.timezone import now
-from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import PermissionDenied
 from statemachine import Event
 from statemachine import State
@@ -18,18 +17,18 @@ if TYPE_CHECKING:
 
 
 class InviteStateMachine(StateChart, TransitionSignalMixin):
-    open = State(value="open", name=_("Open"), initial=True)
-    accepted = State(value="accepted", name=_("Accepted"), final=True)
-    rejected = State(value="rejected", name=_("Rejected"), final=True)
-    revoked = State(value="revoked", name=_("Revoked"), final=True)
-    expired = State(value="expired", name=_("Expired"), final=True)
+    open = State(value="open", name="Open", initial=True)
+    accepted = State(value="accepted", name="Accepted", final=True)
+    rejected = State(value="rejected", name="Rejected", final=True)
+    revoked = State(value="revoked", name="Revoked", final=True)
+    expired = State(value="expired", name="Expired", final=True)
 
-    accept = Event(open.to(accepted), name=_("Accept"))
-    reject = Event(open.to(rejected), name=_("Reject"))
+    accept = Event(open.to(accepted), name="Accept")
+    reject = Event(open.to(rejected), name="Reject")
     revoke = Event(
-        open.to(revoked, validators=["has_change_permission"]), name=_("Revoke")
+        open.to(revoked, validators=["has_change_permission"]), name="Revoke"
     )
-    expire = Event(open.to(expired), name=_("Expire"))
+    expire = Event(open.to(expired), name="Expire")
 
     def after_accept(self, *, user):
         self.model.used_by = user
