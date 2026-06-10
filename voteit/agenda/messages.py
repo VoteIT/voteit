@@ -94,7 +94,8 @@ class AgendaItemBulkChange(ContextAction):
                         if trans.target.value == self.data.state:
                             try:
                                 ai.sm.send(event.id, user=self.user)
-                                must_save.add(ai)
+                                if ai.state == self.data.state:
+                                    must_save.add(ai)
                             except (ValidationError, TransitionNotAllowed):
                                 logger.debug("Transition failed", exc_info=True)
                             break

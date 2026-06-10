@@ -17,11 +17,11 @@ class AgendaItemStateMachine(StateChart, TransitionSignalMixin):
     # instead of swallowing them as StateChart does by default.
     catch_errors_as_events = False
 
-    private = State(value="private", name=_("Private"), initial=True)
-    upcoming = State(value="upcoming", name=_("Upcoming"))
-    ongoing = State(value="ongoing", name=_("Ongoing"))
-    closed = State(value="closed", name=_("Closed"))
-    archived = State(value="archived", name=_("Archived"), final=True)
+    private = State(value="private", name="Private", initial=True)
+    upcoming = State(value="upcoming", name="Upcoming")
+    ongoing = State(value="ongoing", name="Ongoing")
+    closed = State(value="closed", name="Closed")
+    archived = State(value="archived", name="Archived", final=True)
 
     make_upcoming = Event(
         private.to(upcoming, validators=["has_change_permission"])
@@ -29,37 +29,51 @@ class AgendaItemStateMachine(StateChart, TransitionSignalMixin):
         | ongoing.to(
             upcoming, validators=["has_change_permission", "no_ongoing_polls"]
         ),
-        name=_("Make upcoming"),
+        name="Make upcoming",
     )
     unpublish = Event(
         upcoming.to(private, validators=["has_change_permission"])
         | closed.to(private, validators=["has_change_permission"])
         | ongoing.to(private, validators=["has_change_permission", "no_ongoing_polls"]),
-        name=_("Unpublish"),
+        name="Unpublish",
     )
     make_ongoing = Event(
-        private.to(ongoing, validators=["has_change_permission", "meeting_is_ongoing"])
+        private.to(
+            ongoing, cond=["meeting_is_ongoing"], validators=["has_change_permission"]
+        )
         | upcoming.to(
-            ongoing, validators=["has_change_permission", "meeting_is_ongoing"]
+            ongoing, cond=["meeting_is_ongoing"], validators=["has_change_permission"]
         )
         | closed.to(
-            ongoing, validators=["has_change_permission", "meeting_is_ongoing"]
+            ongoing, cond=["meeting_is_ongoing"], validators=["has_change_permission"]
         ),
-        name=_("Make ongoing"),
+        name="Make ongoing",
     )
     close = Event(
-        private.to(closed, validators=["has_change_permission", "no_ongoing_polls"])
-        | upcoming.to(closed, validators=["has_change_permission", "no_ongoing_polls"])
-        | ongoing.to(closed, validators=["has_change_permission", "no_ongoing_polls"]),
-        name=_("Close"),
+        private.to(
+            closed,
+            cond=["meeting_not_upcoming"],
+            validators=["has_change_permission", "no_ongoing_polls"],
+        )
+        | upcoming.to(
+            closed,
+            cond=["meeting_not_upcoming"],
+            validators=["has_change_permission", "no_ongoing_polls"],
+        )
+        | ongoing.to(
+            closed,
+            cond=["meeting_not_upcoming"],
+            validators=["has_change_permission", "no_ongoing_polls"],
+        ),
+        name="Close",
     )
     # Script-only: not exposed via REST. Model.archive() uses direct state assignment.
     archive = Event(
-        private.to(archived, validators=["not_allowed"])
-        | upcoming.to(archived, validators=["not_allowed"])
-        | ongoing.to(archived, validators=["not_allowed"])
-        | closed.to(archived, validators=["not_allowed"]),
-        name=_("Archive"),
+        private.to(archived, cond=["not_allowed"])
+        | upcoming.to(archived, cond=["not_allowed"])
+        | ongoing.to(archived, cond=["not_allowed"])
+        | closed.to(archived, cond=["not_allowed"]),
+        name="Archive",
     )
 
     finished_states = frozenset({"closed", "archived"})
@@ -76,8 +90,10 @@ class AgendaItemStateMachine(StateChart, TransitionSignalMixin):
             raise ValidationError({"transition": [_("There are ongoing polls")]})
 
     def meeting_is_ongoing(self, **kw):
-        if not self.model.meeting.is_ongoing:
-            raise ValidationError({"transition": [_("Meeting must be ongoing")]})
+        return self.model.meeting.is_ongoing
 
-    def not_allowed(self, **kw):
-        raise PermissionDenied(_("This transition is not available via the API."))
+    def meeting_not_upcoming(self, **kw):
+        return not self.model.meeting.is_upcoming
+
+    def not_allowed(self, force=False, **kw):
+        return force
