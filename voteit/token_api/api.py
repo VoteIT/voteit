@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db import models
 from django.utils import timezone
 from rest_framework import mixins
 from rest_framework import serializers
@@ -15,6 +16,8 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.token_api.models import MeetingAPIKey
 from voteit.token_api.models import create_api_key_user
 from voteit.token_api.validators import _valid_scopes_map
+
+MAX_ACTIVE_KEYS_PER_MEETING = 5
 
 
 class MeetingAPIKeySerializer(serializers.ModelSerializer):
@@ -50,6 +53,21 @@ class MeetingAPIKeyCreateSerializer(serializers.ModelSerializer):
 
     def validate_meeting(self, value):
         validate_model_add(self, MeetingAPIKey, value)
+        active_count = (
+            MeetingAPIKey.objects.filter(
+                meeting=value,
+                revoked=False,
+            )
+            .filter(
+                models.Q(expiry_date__isnull=True)
+                | models.Q(expiry_date__gt=timezone.now())
+            )
+            .count()
+        )
+        if active_count >= MAX_ACTIVE_KEYS_PER_MEETING:
+            raise serializers.ValidationError(
+                f"A meeting may have at most {MAX_ACTIVE_KEYS_PER_MEETING} active API keys."
+            )
         return value
 
 

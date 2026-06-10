@@ -123,6 +123,44 @@ class MeetingApiTokenViewSetTest(APITestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_create_blocked_when_max_active_keys_reached(self):
+        for i in range(5):
+            self._create_key(name=f"Key {i}")
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            reverse("meeting-api-token-list"),
+            {"name": "One too many", "scopes": [], "meeting": self.meeting.pk},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_create_allowed_when_revoked_keys_do_not_count_toward_limit(self):
+        for i in range(5):
+            obj, _ = self._create_key(name=f"Key {i}")
+            obj.revoked = True
+            obj.save(update_fields=["revoked"])
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            reverse("meeting-api-token-list"),
+            {"name": "Fresh key", "scopes": [], "meeting": self.meeting.pk},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_create_allowed_when_expired_keys_do_not_count_toward_limit(self):
+        past = timezone.now() - timedelta(days=1)
+        for i in range(5):
+            obj, _ = self._create_key(name=f"Key {i}")
+            obj.expiry_date = past
+            obj.save(update_fields=["expiry_date"])
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            reverse("meeting-api-token-list"),
+            {"name": "Fresh key", "scopes": [], "meeting": self.meeting.pk},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+
     # --- retrieve ---
 
     def test_retrieve_returns_key_object(self):
