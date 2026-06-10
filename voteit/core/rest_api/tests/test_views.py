@@ -523,3 +523,72 @@ class StateMachinesViewTests(TestCase):
     def test_detail_unknown_name_returns_404(self):
         response, _ = self._get_detail(name="NoSuchMachine")
         self.assertEqual(response.status_code, 404)
+
+    def test_not_allowed_cond_excludes_transition(self):
+        from voteit.core import NOT_ALLOWED_SM_GUARD
+
+        with patch.object(sm_registry, "_REGISTRY", {}):
+
+            class WorkflowWithRestricted(StateChart, TransitionSignalMixin):
+                draft = State(value="draft", initial=True)
+                published = State(value="published")
+                archived = State(value="archived", final=True)
+
+                publish = Event(draft.to(published))
+                archive = Event(
+                    draft.to(archived, cond=[NOT_ALLOWED_SM_GUARD])
+                    | published.to(archived, cond=[NOT_ALLOWED_SM_GUARD])
+                )
+
+                def not_allowed(self, **kw):
+                    return False
+
+            qn = f"{WorkflowWithRestricted.__module__}.{WorkflowWithRestricted.__qualname__}"
+            patches = (
+                patch.object(sm_registry, "_REGISTRY", {qn: WorkflowWithRestricted}),
+                patch.object(sm_registry, "_initialized", True),
+            )
+            key = WorkflowWithRestricted.__name__
+            with ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                response = self.client.get(f"/api/state-machines/{key}/")
+
+        events = response.data["events"]
+        self.assertIn("publish", events)
+        self.assertNotIn("archive", events)
+
+    def test_not_allowed_cond_on_some_transitions_keeps_event(self):
+        from voteit.core import NOT_ALLOWED_SM_GUARD
+
+        with patch.object(sm_registry, "_REGISTRY", {}):
+
+            class WorkflowPartialRestricted(StateChart, TransitionSignalMixin):
+                draft = State(value="draft", initial=True)
+                review = State(value="review")
+                archived = State(value="archived", final=True)
+
+                submit = Event(
+                    draft.to(review) | review.to(archived, cond=[NOT_ALLOWED_SM_GUARD])
+                )
+
+                def not_allowed(self, **kw):
+                    return False
+
+            qn = f"{WorkflowPartialRestricted.__module__}.{WorkflowPartialRestricted.__qualname__}"
+            patches = (
+                patch.object(sm_registry, "_REGISTRY", {qn: WorkflowPartialRestricted}),
+                patch.object(sm_registry, "_initialized", True),
+            )
+            key = WorkflowPartialRestricted.__name__
+            with ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                response = self.client.get(f"/api/state-machines/{key}/")
+
+        events = response.data["events"]
+        self.assertIn("submit", events)
+        transitions = events["submit"]["transitions"]
+        self.assertEqual(1, len(transitions))
+        self.assertEqual("draft", transitions[0]["from"])
+        self.assertEqual("review", transitions[0]["to"])

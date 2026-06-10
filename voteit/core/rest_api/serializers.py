@@ -17,6 +17,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from statemachine.exceptions import TransitionNotAllowed
 
+from voteit.core import NOT_ALLOWED_SM_GUARD
 from voteit.core import PERM
 from voteit.core.abcs import MeetingContext
 from voteit.core.rest_api.utils import meeting_from_unsafe_data
@@ -279,6 +280,9 @@ class StateMachineSchemaSerializer(serializers.Serializer):
         events = {}
         for state in sm.states:
             for trans in state.transitions:
+                cond_names = [c.attr_name for c in trans.cond]
+                if NOT_ALLOWED_SM_GUARD in cond_names:
+                    continue
                 for event in trans.events:
                     event_id = event.id
                     if event_id not in events:
@@ -291,9 +295,11 @@ class StateMachineSchemaSerializer(serializers.Serializer):
                             "from": trans.source.id,
                             "to": trans.target.id,
                             "validators": [v.attr_name for v in trans.validators],
-                            "cond": [c.attr_name for c in trans.cond],
+                            "cond": cond_names,
                         }
                     )
+
+        events = {eid: edata for eid, edata in events.items() if edata["transitions"]}
 
         return {"states": states, "events": events}
 
