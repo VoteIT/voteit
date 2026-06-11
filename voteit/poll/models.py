@@ -17,7 +17,6 @@ from django.db import models
 from django.db.models import UniqueConstraint
 from django.utils.functional import cached_property
 from django.utils.timezone import now
-from pydantic import ValidationError
 from statemachine.exceptions import TransitionNotAllowed
 from statemachine.mixins import MachineMixin
 from pydantic.main import BaseModel
@@ -310,15 +309,60 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext, MachineMixin):
             raise ValueError(f"{value} is not a result schema or a dict")
         self.result_data = data.dict()
 
-    def validate_settings_guard(self) -> bool:
+    def cleanup_removed_from_er_votes(self) -> int | None:
+        voter_pks = [int(k) for k in self.electoral_register.voter_data.keys()]
+        if removed_votes := self.votes.exclude(user_id__in=voter_pks).delete()[0]:
+            logger.info(
+                "Removed %s votes from poll %s before calculating.",
+                removed_votes,
+                self.pk,
+            )
+            return removed_votes
+
+    def finalize_vote_data(self) -> Counter:
         """
-        Guard for transitions to upcoming or ongoing.
+        Return JSON-serializable result counter.
+
+        * Removes votes in case the electoral register changed for the poll. (Uncommon case with AlwaysAutomatic method)
+        * Creates a serializable ballot package in preparation for count.
+        * Calculates and stores ballot checksum.
         """
-        try:
-            pset = self.settings  # Will raise exceptions on bad settings
-        except ValidationError:
-            return False
-        return pset is None or isinstance(pset, BaseModel)
+        if self.ballot_data is not None:
+            raise PollError("Poll already finalized")
+        if self.electoral_register is None:
+            raise ElectoralRegisterMissing()
+        weights = {int(k): v for k, v in self.electoral_register.voter_data.items()}
+        counter = Counter()
+        abstains = 0
+        for v in self.votes.order_by("pk"):
+            w = weights.get(v.user_id, 1)
+            if v.abstain:
+                abstains += w
+            else:
+                counter[v.vote_data] += w
+        self.abstains = abstains
+        self.ballot_data = dumps(counter)
+        self.ballot_checksum = sha512(self.ballot_data.encode("utf-8")).hexdigest()
+        logger.debug(
+            "Finalized ballots for poll %s. Checksum: %s", self.pk, self.ballot_checksum
+        )
+        return counter
+
+    def calculate_result(self) -> BaseModel | None:
+        """
+        Do the result calculation after ballots have been finalized.
+        Delegates the actual calculation to the vote method.
+        """
+        if self.result_data is None:
+            # Remove bad votes due to a change in electoral register during the poll.
+            # This is probably not allowed in most meetings.
+            counter = self.finalize_vote_data()
+            result = self.method.calculate_result(counter)
+            # Ensure vote count is same as the poll method uses, including vote weight.
+            # Abstains aren't included here
+            result.vote_count = sum(counter.values())
+            self.result = result
+        return self.result
 
     def _lock_proposals(self):
         for proposal in self.proposals.filter(
@@ -349,16 +393,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext, MachineMixin):
                     proposal.publish(force=True)
                 proposal.save()
 
-    def set_result(self):
-        counter = self.finalize_vote_data()
-        assert self.ballot_data
-        assert self.ballot_checksum
-        result = self.method.calculate_result(counter)
-        # Ensure vote count is same as the poll method uses, including vote weight.
-        # Abstains aren't included here
-        result.vote_count = sum(counter.values())
-        self.result = result
-
+    # Same methods as the old transitions in FSM but now delegated to SM.
     def upcoming(self, user=None, force=False):
         self.sm.send("make_upcoming", user=user, force=force)
 
@@ -379,69 +414,6 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext, MachineMixin):
 
     def withhold_result(self, user=None, force=False):
         self.sm.send("withhold_result", user=user, force=force)
-
-    def _finish(self):
-        """Count the votes. Transitions to finished or withheld based on self.withheld_result."""
-        try:
-            if self.withheld_result:
-                self.state = PollStateMachine.withheld.value
-                self.set_result()
-            else:
-                self.state = PollStateMachine.finished.value
-                self.set_result()
-                self.set_proposals_from_result()
-        except Exception:
-            self.state = PollStateMachine.failed.value
-            raise
-
-    def _no_result(self):
-        """No valid votes to calculate the result from."""
-        self.state = PollStateMachine.no_result.value
-        self._mark_closed()
-
-    def failed(self):
-        """Transition to failed when we have some sort of unrecoverable error."""
-        self.state = PollStateMachine.failed.value
-        self._mark_closed()
-
-    def _mark_closed(self):
-        if not self.closed:
-            self.closed = now()
-
-    def finalize_vote_data(self) -> Counter:
-        """
-        Return JSON-serializable result counter.
-        Will also save ballot data and create a checksum + store abstentions.
-        """
-        if self.ballot_data is not None:
-            raise PollError("Poll already finalized")
-        er = self.electoral_register
-        weights = {int(k): v for k, v in er.voter_data.items()} if er else {}
-        counter = Counter()
-        abstains = 0
-        for v in self.votes.order_by("pk"):
-            w = weights.get(v.user_id, 1)
-            if v.abstain:
-                abstains += w
-            else:
-                counter[v.vote_data] += w
-        self.abstains = abstains
-        self.ballot_data = dumps(counter)
-        self.ballot_checksum = sha512(self.ballot_data.encode("utf-8")).hexdigest()
-        logger.debug(
-            "Finalized ballots for poll %s. Checksum: %s", self.pk, self.ballot_checksum
-        )
-        return counter
-
-    def vote_cleanup_set(self) -> models.QuerySet:
-        """
-        Votes that shouldn't be here if the poll closes.
-        Essentially that someone has voted but aren't in the current electoral register.
-        """
-        if self.electoral_register is None:
-            raise ElectoralRegisterMissing()
-        voter_pks = [int(k) for k in self.electoral_register.voter_data.keys()]
-        return self.votes.exclude(user_id__in=voter_pks)
 
     @property
     def is_ongoing(self) -> bool:

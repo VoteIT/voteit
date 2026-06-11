@@ -1,4 +1,6 @@
+from __future__ import annotations
 from logging import getLogger
+from typing import TYPE_CHECKING
 
 from django.utils.timezone import now
 from rest_framework.exceptions import PermissionDenied
@@ -14,11 +16,16 @@ from voteit.poll.exceptions import ElectoralRegisterManualError
 from voteit.poll.exceptions import ElectoralRegisterMissing
 from voteit.poll.exceptions import InvalidPollSettings
 
+if TYPE_CHECKING:
+    from voteit.poll.models import Poll
+
 logger = getLogger(__name__)
 
 
 class PollStateMachine(StateChart, TransitionSignalMixin):
-    catch_errors_as_events = False
+    model: Poll
+    catch_errors_as_events = False  # We want to propagate as ValidationErrors
+    validate_final_reachability = False  # withheld <-> finished makes this impossible
 
     private = State(value="private", name="Private", initial=True)
     upcoming = State(value="upcoming", name="Upcoming")
@@ -67,7 +74,11 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
         name="Close",
     )
     publish_result = Event(
-        withheld.to(finished, validators=["has_change_state_permission"]),
+        withheld.to(
+            finished,
+            validators=["has_change_state_permission"],
+            on=["set_proposals_from_result"],
+        ),
         name="Publish result",
     )
     withhold_result = Event(
@@ -83,31 +94,20 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
         name="Revert to private",
     )
 
-    # Internal-only events — not reachable via the REST API (guarded by not_allowed).
-    # These define the valid state-graph paths for finished/withheld/no_result/failed,
-    # which are actually executed via direct model.state assignment in _finish()/_no_result().
-    finish = Event(
-        closed.to(finished, cond=[NOT_ALLOWED_SM_GUARD]),
-        name="Finish",
+    # Auto-transitions
+    closed.to(
+        withheld,
+        cond=["is_withheld", "has_populated_er", "has_valid_votes"],
+        on=["calculate_result"],
     )
-    finish_withheld = Event(
-        closed.to(withheld, cond=[NOT_ALLOWED_SM_GUARD]),
-        name="Finish (withheld)",
+    closed.to(
+        finished,
+        cond=["!is_withheld", "has_populated_er", "has_valid_votes"],
+        on=["calculate_result", "set_proposals_from_result"],
     )
-    mark_no_result = Event(
-        closed.to(no_result, cond=[NOT_ALLOWED_SM_GUARD]),
-        name="No result",
-    )
-    fail = Event(
-        private.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
-        | upcoming.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
-        | ongoing.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
-        | closed.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
-        | finished.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
-        | withheld.to(failed, cond=[NOT_ALLOWED_SM_GUARD])
-        | canceled.to(failed, cond=[NOT_ALLOWED_SM_GUARD]),
-        name="Failed",
-    )
+    closed.to(no_result, cond=["!has_valid_votes"])
+
+    fail = Event(closed.to(failed, cond=[NOT_ALLOWED_SM_GUARD]), name="Failed")
 
     permissive_states = frozenset({"private", "upcoming"})
     finished_states = frozenset({"finished", "withheld"})
@@ -149,15 +149,28 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
                 {"event": ElectoralRegisterManualError.default_detail}
             )
 
-    def not_allowed(self, force=False, **kw):
-        return force
-
     def validate_method(self, **kw):
         self.model.method.start_check()
 
-    def on_enter_closed(self, **kw):
-        self._complete_closed_poll()
+    # --- Conditions ---
 
+    def not_allowed(self, force=False, **kw):
+        return force
+
+    def is_withheld(self, **kw) -> bool:
+        return self.model.withheld_result
+
+    def has_valid_votes(self, **kw) -> bool:
+        if not hasattr(self.model, "_valid_votes"):
+            self.model._valid_votes = self.model.votes.filter(abstain=False).exists()
+        return self.model._valid_votes
+
+    def has_populated_er(self) -> bool:
+        if self.model.electoral_register is None:
+            return False
+        return bool(self.model.electoral_register.voter_data)
+
+    # --- Actions ---
     def on_enter_ongoing(self):
         try:
             er_policy = self.model.meeting.er_policy
@@ -165,17 +178,6 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
             logger.warning("Poll %s lacks valid meeting or er policy", self.model)
             return
         er_policy.apply(self.model)
-
-    def _complete_closed_poll(self):
-        """Auto-transition from closed to finished, withheld, or no_result."""
-        if self.model.electoral_register is None:
-            self.model._no_result()
-            return
-        self.model.vote_cleanup_set().delete()
-        if self.model.votes.filter(abstain=False).count():
-            self.model._finish()
-        else:
-            self.model._no_result()
 
     def on_make_upcoming(self, **kw):
         self.model._lock_proposals()
@@ -185,17 +187,15 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
         self.model._lock_proposals()
 
     def on_close(self, **kw):
-        self.model._mark_closed()
+        self.model.closed = now()
+        if self.model.electoral_register is not None:
+            self.model.cleanup_removed_from_er_votes()
 
     def on_cancel(self, **kw):
-        self.model._mark_closed()
-        self.model._publish_proposals()
-
-    def on_unpublish(self, **kw):
+        self.model.closed = now()
         self.model._publish_proposals()
 
     def on_publish_result(self, **kw):
-        self.model.set_proposals_from_result()
         self.model.withheld_result = False
 
     def on_withhold_result(self, **kw):

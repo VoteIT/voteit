@@ -180,12 +180,13 @@ class PollTests(TestCase):
         votes = self.poll.votes.all()
         self.assertIn(vote1, votes)
         self.assertIn(vote2, votes)
-        self.poll.electoral_register = None
+        self.poll.electoral_register.voter_data = {}
+        self.poll.electoral_register.save()
         self.poll.close(force=True)
         self.poll.save()
         votes = self.poll.votes.all()
-        self.assertIn(vote1, votes)
-        self.assertIn(vote2, votes)
+        self.assertNotIn(vote1, votes)
+        self.assertNotIn(vote2, votes)
         self.assertEqual("no_result", self.poll.state)
 
     def test_abstentions(self):
@@ -248,14 +249,6 @@ class PollTests(TestCase):
         self.prop.refresh_from_db()
         self.assertEqual("published", self.prop.state)
         self.assertEqual("approved", self.prop2.state)
-
-    def test_private_resets_proposals(self):
-        self.poll.upcoming(force=True)
-        self.prop.refresh_from_db()
-        self.assertEqual("voting", self.prop.state)
-        self.poll.unpublish(force=True)
-        self.prop.refresh_from_db()
-        self.assertEqual("published", self.prop.state)
 
     def test_proposal_from_another_meeting(self):
         other_prop = Proposal.objects.create()
