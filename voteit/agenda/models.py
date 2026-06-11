@@ -166,6 +166,10 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext, MachineMixin):
     def is_private(self) -> bool:
         return self.state == AgendaItemStateMachine.private.value
 
+    @property
+    def is_ongoing(self) -> bool:
+        return self.state == AgendaItemStateMachine.ongoing.value
+
     def mark_read(self, user: AbstractUser) -> LastRead:
         last_read, _ = self.last_read_set.update_or_create(
             user=user, defaults={"timestamp": now()}

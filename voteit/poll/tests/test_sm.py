@@ -5,6 +5,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import ValidationError
 
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import Meeting
@@ -45,7 +46,7 @@ class PollSMTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.meeting.state = "ongoing"
         cls.meeting.save()
-        cls.ai: AgendaItem = cls.meeting.agenda_items.create()
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="ongoing")
         cls.poll: Poll = cls.ai.polls.create(method_name="simple")
         cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
         cls.voter = User.objects.get(username="participant")
@@ -162,6 +163,17 @@ class PollSMTests(TestCase):
         poll = self.ai.polls.create(method_name="schulze", settings_data={"stars": 100})
         with self.assertRaises(InvalidPollSettings):
             poll.upcoming(force=True)
+
+    def test_make_ongoing_blocked_when_ai_not_ongoing(self):
+        ai = self.meeting.agenda_items.create()  # default state: private
+        poll = ai.polls.create(method_name="simple")
+        poll.proposals.create(
+            agenda_item=ai
+        )  # satisfy validate_method so it doesn't fire first
+
+        with self.assertRaises(ValidationError) as cm:
+            poll.ongoing(force=True)
+        self.assertIn("Agenda item must be ongoing", str(cm.exception.detail))
 
     def test_failed_to_no_result_on_close(self):
         poll = self.ai.polls.create(method_name="simple")

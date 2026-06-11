@@ -18,7 +18,7 @@ class AuditlogIntegrationTests(TestCase):
         cls.meeting.state = "ongoing"
         cls.meeting.save()
         cls.moderator = User.objects.get(username="moderator")
-        cls.ai = cls.meeting.agenda_items.create()
+        cls.ai = cls.meeting.agenda_items.create(state="ongoing")
         cls.prop = cls.ai.proposals.create()
 
     def test_create(self):

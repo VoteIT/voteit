@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from django.utils.timezone import now
 from rest_framework.exceptions import PermissionDenied
 from pydantic import ValidationError as PydanticValidationError
+from rest_framework.exceptions import ValidationError
 from statemachine import Event
 from statemachine import State
 from statemachine import StateChart
@@ -52,6 +53,7 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
                 "validate_er_policy",
                 "manual_er_not_needed",
                 "validate_method",
+                "meeting_and_ai_ongoing",
             ],
         )
         | private.to(
@@ -62,6 +64,7 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
                 "validate_er_policy",
                 "manual_er_not_needed",
                 "validate_method",
+                "meeting_and_ai_ongoing",
             ],
         ),
         name="Start",
@@ -159,6 +162,14 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
 
     def validate_method(self, **kw):
         self.model.method.start_check()
+
+    def meeting_and_ai_ongoing(self, **kwargs):
+        if self.model.meeting_id is None or self.model.agenda_item_id is None:
+            return True  # Unittests, we don't care
+        if not self.model.agenda_item.is_ongoing:
+            raise ValidationError({"event": "Agenda item must be ongoing"})
+        if not self.model.meeting.is_ongoing:
+            raise ValidationError({"event": "Meeting must be ongoing"})
 
     # --- Conditions ---
 

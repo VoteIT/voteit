@@ -72,7 +72,7 @@ class PollTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.meeting.state = "ongoing"
         cls.meeting.save()
-        cls.ai: AgendaItem = cls.meeting.agenda_items.create()
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="ongoing")
         cls.poll: Poll = cls.ai.polls.create(method_name="simple")
         cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
         cls.moderator = User.objects.get(username="moderator")
@@ -430,7 +430,7 @@ class VoteTests(TestCase):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.meeting.state = "ongoing"
         cls.meeting.save()
-        cls.ai: AgendaItem = cls.meeting.agenda_items.create()
+        cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="ongoing")
         cls.poll: Poll = cls.ai.polls.create(method_name="simple")
         cls.prop = cls.poll.proposals.create(agenda_item=cls.ai)
         cls.voter = User.objects.get(username="participant")

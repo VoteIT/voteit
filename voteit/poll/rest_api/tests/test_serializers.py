@@ -182,9 +182,9 @@ class PollCreateSerializerTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create(
-            er_policy_name=AutoBeforePoll.name
+            er_policy_name=AutoBeforePoll.name, state="ongoing"
         )
-        cls.ai = cls.meeting.agenda_items.create(title="Hello")
+        cls.ai = cls.meeting.agenda_items.create(title="Hello", state="ongoing")
         cls.prop = cls.ai.proposals.create()
         cls.er = cls.meeting.electoral_registers.create()
         cls.voter = User.objects.create(username="one")
