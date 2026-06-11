@@ -9,7 +9,6 @@ from statemachine import Event
 from statemachine import State
 from statemachine import StateChart
 
-from voteit.core import NOT_ALLOWED_SM_GUARD
 from voteit.core.rest_api.utils import perm_denied_msg
 from voteit.core.statemachines import TransitionSignalMixin
 from voteit.poll.exceptions import ElectoralRegisterManualError
@@ -94,20 +93,29 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
         name="Revert to private",
     )
 
-    # Auto-transitions
+    # These are auto-transitions: bare State.to(...) expressions that
+    # python-statemachine evaluates immediately on entering `closed`, in
+    # declaration order, taking the first whose `cond` passes.  They are
+    # NOT user-triggered events — closing a poll always resolves to one of
+    # withheld / finished / failed / no_result without any further action required.
+    #
+    # calculate_result() is called inside on_close (not here) so that errors can
+    # be caught and logged without rolling back the ongoing → closed transition.
+    # The `has_result` condition then routes here based on whether it succeeded.
     closed.to(
         withheld,
-        cond=["is_withheld", "has_populated_er", "has_valid_votes"],
-        on=["calculate_result"],
+        cond=["is_withheld", "has_populated_er", "has_valid_votes", "has_result"],
     )
     closed.to(
         finished,
-        cond=["!is_withheld", "has_populated_er", "has_valid_votes"],
-        on=["calculate_result", "set_proposals_from_result"],
+        cond=["!is_withheld", "has_populated_er", "has_valid_votes", "has_result"],
+        on=["set_proposals_from_result"],
     )
     closed.to(no_result, cond=["!has_valid_votes"])
-
-    fail = Event(closed.to(failed, cond=[NOT_ALLOWED_SM_GUARD]), name="Failed")
+    closed.to(no_result, cond=["!has_populated_er"])
+    # Fallback: ER and votes exist but result is still None — calculation error
+    # was caught and logged in on_close.  Moderator can retry via the close event.
+    closed.to(failed)
 
     permissive_states = frozenset({"private", "upcoming"})
     finished_states = frozenset({"finished", "withheld"})
@@ -154,9 +162,6 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
 
     # --- Conditions ---
 
-    def not_allowed(self, force=False, **kw):
-        return force
-
     def is_withheld(self, **kw) -> bool:
         return self.model.withheld_result
 
@@ -167,6 +172,9 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
         if self.model.electoral_register is None:
             return False
         return bool(self.model.electoral_register.voter_data)
+
+    def has_result(self, **kw) -> bool:
+        return self.model.result_data is not None
 
     # --- Actions ---
     def on_enter_ongoing(self):
@@ -188,6 +196,22 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
         self.model.closed = now()
         if self.model.electoral_register is not None:
             self.model.cleanup_removed_from_er_votes()
+        # Attempt calculation before auto-transitions evaluate.  Exceptions are
+        # caught here so the ongoing → closed transition is not rolled back.
+        # A failed calculation leaves result_data=None; the auto-transition to
+        # `failed` then fires and the moderator can retry via the close event.
+        if self.model.votes.filter(abstain=False).exists():
+            try:
+                self.model.calculate_result()
+            except Exception:
+                logger.exception("Poll %s: result calculation failed", self.model.pk)
+
+    def on_enter_failed(self):
+        # Clear any partial ballot data written by finalize_vote_data() before
+        # the calculation error, so that retrying via close can re-finalize.
+        self.model.ballot_data = None
+        self.model.ballot_checksum = None
+        self.model.abstains = 0
 
     def on_cancel(self, **kw):
         self.model.closed = now()

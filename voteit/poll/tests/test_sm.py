@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.exceptions import PermissionDenied
@@ -7,13 +9,32 @@ from rest_framework.exceptions import PermissionDenied
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
+from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidPollSettings
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
+from voteit.poll.registries import poll_methods
 from voteit.poll.statemachines import PollStateMachine
 from voteit.proposal.models import Proposal
 
 User = get_user_model()
+
+
+class _FailingCalculateMethod(PollMethod):
+    """Poll method that always raises during result calculation — for error-path tests only."""
+
+    name = "failing_calculate"
+    vote_schema = None
+    result_schema = None
+
+    def vote_to_str(self, data):
+        return str(data)
+
+    def vote_to_obj(self, text):
+        return text
+
+    def calculate_result(self, counter):
+        raise RuntimeError("calculate_result failed")
 
 
 class PollSMTests(TestCase):
@@ -155,3 +176,35 @@ class PollSMTests(TestCase):
         self.assertEqual("canceled", self.poll.state)
         self.poll.close(force=True)
         self.assertEqual("no_result", self.poll.state)
+
+    # --- Error handling during calculation ---
+
+    @patch.dict(poll_methods, {"failing_calculate": _FailingCalculateMethod})
+    def test_calculation_error_routes_to_failed(self):
+        """
+        When calculate_result raises, the exception is caught in on_close and
+        logged.  The auto-transition sees result_data=None and routes to 'failed'.
+        ballot_data is cleared by on_enter_failed so the poll can be retried.
+        """
+        poll = self.ai.polls.create(method_name="failing_calculate")
+        poll.ongoing(force=True)
+        poll.votes.create(user=self.voter, vote_data="yes")
+
+        poll.close(force=True)
+
+        self.assertEqual("failed", poll.state)
+        self.assertIsNone(poll.result_data)
+        self.assertIsNone(poll.ballot_data)
+
+    @patch.dict(poll_methods, {"failing_calculate": _FailingCalculateMethod})
+    def test_retry_from_failed_still_fails(self):
+        """Retrying close from 'failed' re-runs calculation; still fails if method is broken."""
+        poll = self.ai.polls.create(method_name="failing_calculate")
+        poll.ongoing(force=True)
+        poll.votes.create(user=self.voter, vote_data="yes")
+        poll.close(force=True)
+        self.assertEqual("failed", poll.state)
+
+        poll.close(force=True)
+        self.assertEqual("failed", poll.state)
+        self.assertIsNone(poll.ballot_data)

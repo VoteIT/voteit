@@ -7,8 +7,8 @@ The poll app handles the full lifecycle of a vote: creation, configuration, vote
 **Poll** — the primary model. Belongs to an `AgendaItem` (and transitively a `Meeting`). Key fields:
 - `method_name`: selects the voting algorithm from the `poll_methods` registry
 - `settings_data` / result via `settings` property: Pydantic model specific to the poll method
-- `ballot_data` + `ballot_checksum`: SHA-512–protected immutable vote tally written on close; never touch these after `finalize_vote_data()` runs
-- `initial_electoral_register` / `electoral_register`: snapshot taken at poll open; `initial_electoral_register` is frozen at that point
+- `ballot_data` + `ballot_checksum`: SHA-512–protected vote tally written on close; cleared when entering `failed` to allow retry, then immutable once in `finished`/`withheld`
+- `electoral_register`: snapshot of eligible voters taken at poll open
 - `proposals` (M2M): the proposals being voted on; locked into VOTING state while poll is ongoing
 - `withheld_result`: when True the result is finished but hidden from participants
 
@@ -22,13 +22,12 @@ The poll app handles the full lifecycle of a vote: creation, configuration, vote
 
 `PollStateMachine` in `statemachines.py`. Events are sent via `poll.sm.send(event_name, ...)` or `POST /polls/{id}/event/` (`StateMachineMixin`). Key guarded events:
 - `make_upcoming` / `make_ongoing`: validates settings (Pydantic), ER policy, method `start_check()`, and if manual ER is required
-- `close → finish`: calls `finalize_vote_data()` then `calculate_result()` then `set_proposals_from_result()`
-- `close → no_result`: when all votes are abstentions or ballot is empty
-- `withheld → finish`: publishes results
-
-**Signal-driven automation** (`signals.py`):
-- On `upcoming`/`ongoing` transition: `maybe_apply_er_when_poll_changes_state` calls the ER policy's `apply()`
-- On `closed`: `finish_closed_poll` auto-transitions to `finished` or `withheld_result` based on the flag
+- `close`: `on_close` sets the timestamp, cleans up any votes no longer in the ER, then calls `calculate_result()`. Exceptions from `calculate_result` are caught and logged (not re-raised) so the `ongoing → closed` transition is never rolled back.
+- Auto-transitions from `closed` (evaluated immediately, in order):
+  - `→ withheld` / `→ finished`: when ER is populated, valid votes exist, and result was computed successfully
+  - `→ no_result`: when there are no valid non-abstain votes, or the ER is empty/missing
+  - `→ failed`: catch-all when ER and votes exist but `result_data` is still `None` (calculation error). Moderator can retry by calling `close` again once the underlying issue is fixed.
+- `withheld → finished` (`publish_result` event): publishes results and sets proposals
 
 ## Registries (Pluggable Components)
 
@@ -137,7 +136,7 @@ Tests are under `tests/` (models, rules, signals, messages, auditlog) and `rest_
 
 ## Key Invariants
 
-- `ballot_data` and `ballot_checksum` are immutable after `finalize_vote_data()` runs. Never modify them.
+- `ballot_data` and `ballot_checksum` are immutable once the poll reaches `finished` or `withheld`. In `failed` state they are cleared by `on_enter_failed` so retrying via `close` can re-run `finalize_vote_data()`.
 - `ElectoralRegister.voter_data` is write-protected after creation.
 - One vote per (user, poll) — enforced by DB unique constraint; use `update_or_create`.
 - A poll with only abstentions → `no_result`, not `finished`.
