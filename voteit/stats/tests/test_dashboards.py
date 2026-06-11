@@ -22,7 +22,7 @@ class DashboardTests(TestCase):
                     er_policy_name="auto_always",
                     state="ongoing",
                 )
-                .agenda_items.create(title="First on agenda")
+                .agenda_items.create(title="First on agenda", state="ongoing")
                 .polls.create(title="Vote me!", method_name="simple")
             )
             poll.proposals.create(
