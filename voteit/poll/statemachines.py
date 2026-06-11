@@ -161,9 +161,7 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
         return self.model.withheld_result
 
     def has_valid_votes(self, **kw) -> bool:
-        if not hasattr(self.model, "_valid_votes"):
-            self.model._valid_votes = self.model.votes.filter(abstain=False).exists()
-        return self.model._valid_votes
+        return self.model.votes.filter(abstain=False).exists()
 
     def has_populated_er(self) -> bool:
         if self.model.electoral_register is None:
