@@ -206,3 +206,11 @@ class ExportParticipantsViewSetTests(APITestCase):
             b"upcoming,1,Pickles,could be tasty,",
             rows,
         )
+
+
+class AgendaItemStateMachineSchemaTests(APITestCase):
+    def test_detail(self):
+        response = self.client.get("/api/state-machines/AgendaItemStateMachine/")
+        self.assertEqual(200, response.status_code)
+        self.assertIn("states", response.data)
+        self.assertIn("events", response.data)

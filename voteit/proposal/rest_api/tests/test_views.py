@@ -536,3 +536,11 @@ class ExportProposalsViewSetTests(APITestCase):
             header,
         )
         self.assertEqual(4, len(rows))
+
+
+class ProposalStateMachineSchemaTests(APITestCase):
+    def test_detail(self):
+        response = self.client.get("/api/state-machines/ProposalStateMachine/")
+        self.assertEqual(200, response.status_code)
+        self.assertIn("states", response.data)
+        self.assertIn("events", response.data)

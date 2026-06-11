@@ -876,3 +876,11 @@ class ManualCreateERViewTests(APITestCase):
             format="json",
         )
         self.assertContains(response, "Meeting isn't ongoing", status_code=400)
+
+
+class PollStateMachineSchemaTests(APITestCase):
+    def test_detail(self):
+        response = self.client.get("/api/state-machines/PollStateMachine/")
+        self.assertEqual(200, response.status_code)
+        self.assertIn("states", response.data)
+        self.assertIn("events", response.data)

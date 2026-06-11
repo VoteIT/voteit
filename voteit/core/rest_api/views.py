@@ -194,7 +194,7 @@ class StateMachinesViewSet(GenericViewSet):
     def list(self, request, *args, **kwargs):
         return Response(
             {
-                name: StateMachineSchemaSerializer(cls()).data
+                name: StateMachineSchemaSerializer(cls).data
                 for name, cls in self._voteit_machines().items()
             }
         )
@@ -203,4 +203,4 @@ class StateMachinesViewSet(GenericViewSet):
         machines = self._voteit_machines()
         if pk not in machines:
             return Response(status=404)
-        return Response(StateMachineSchemaSerializer(machines[pk]()).data)
+        return Response(StateMachineSchemaSerializer(machines[pk]).data)

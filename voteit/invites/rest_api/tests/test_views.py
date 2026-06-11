@@ -851,3 +851,11 @@ class InviteDataTypesViewSetTests(APITestCase):
         url = reverse("invite-data-types-list")
         response = self.client.get(url)
         self.assertEqual(401, response.status_code)
+
+
+class InviteStateMachineSchemaTests(APITestCase):
+    def test_detail(self):
+        response = self.client.get("/api/state-machines/InviteStateMachine/")
+        self.assertEqual(200, response.status_code)
+        self.assertIn("states", response.data)
+        self.assertIn("events", response.data)

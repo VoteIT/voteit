@@ -1266,3 +1266,11 @@ class SpeakerSystemRolesAvailableRolesTests(APITestCase):
             self.assertIn("title", item)
             self.assertIn("description", item)
             self.assertIn("require_names", item)
+
+
+class SpeakerSystemStateMachineSchemaTests(APITestCase):
+    def test_detail(self):
+        response = self.client.get("/api/state-machines/SpeakerSystemStateMachine/")
+        self.assertEqual(200, response.status_code)
+        self.assertIn("states", response.data)
+        self.assertIn("events", response.data)
