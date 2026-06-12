@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from django.db import models
 
+from voteit.active.utils import active_enabled_for_meeting
 from voteit.app.skr import KOMMUN_TAG
 from voteit.app.skr import REGION_TAG
 from voteit.app.skr import SKR_GROUP_ID
@@ -28,6 +29,7 @@ class SKRAgarradERP(ElectoralRegisterPolicy):
     )
     logger = getLogger(__name__)
     handles_vote_weight = True
+    handles_active_check = True
     available = False
     allow_trigger = True
 
@@ -56,7 +58,11 @@ class SKRAgarradERP(ElectoralRegisterPolicy):
 
         memberships = GroupMembership.objects.filter(
             meeting_group__in=kommun_groups_qs | region_groups_qs
-        ).filter(user__in=self.meeting.active_users.values_list("user_id", flat=True))
+        )
+        if active_enabled_for_meeting(self.meeting):
+            memberships = memberships.filter(
+                user__in=self.meeting.active_users.values_list("user_id", flat=True)
+            )
         group_to_user = {}
         for membership in memberships:
             if membership.meeting_group_id in group_to_user:
