@@ -31,12 +31,6 @@ jobs:
           repository: voteit/voteit_org
           path: src/voteit_org
 
-      - name: Checkout / member_dialects
-        uses: actions/checkout@v6
-        with:
-          repository: voteit/member_dialects
-          path: src/member_dialects
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
 

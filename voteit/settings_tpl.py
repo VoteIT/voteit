@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "auditlog",
     "django_rq",
     "social_django",
+    "controlcenter",
     "voteit.core",
     "voteit.meeting",
     "voteit.export_import",
@@ -76,7 +77,9 @@ INSTALLED_APPS = [
     "voteit.room",
     "voteit.participant_tags",
     "voteit.token_api",
-    "controlcenter",
+    "voteit.app.sfs",
+    "voteit.app.skk",
+    "voteit.app.skr",
 ]
 
 CONTROLCENTER_DASHBOARDS = (

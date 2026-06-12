@@ -28,7 +28,7 @@ run:
 test:
 	python manage.py test voteit --keepdb --failfast
 test-deps:
-	python manage.py test dialects voteit_org --keepdb --failfast
+	python manage.py test voteit_org --keepdb --failfast
 build:
 	uv build --all-packages -o ./dist
 dev: build

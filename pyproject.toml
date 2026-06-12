@@ -56,10 +56,9 @@ Changelog = "https://github.com/voteit/voteit/blob/main/CHANGELOG.md"
 exclude-newer = "7 days"
 
 [tool.uv.workspace]
-members = ["src/voteit_org", "src/member_dialects"]
+members = ["src/voteit_org"]
 
 [tool.uv.sources]
-member_dialects = { workspace = true }
 voteit_org = { workspace = true }
 voteit = { workspace = true }
 
@@ -93,7 +92,6 @@ dev = [
     "responses (>=0.25.8,<0.26.0)",
     "pre-commit (>=4.3.0,<5.0.0)",
     "voteit-org>=1.0.0",
-    "member-dialects>=1.0.0",
     "djangorestframework-stubs>=3.16.9",
 ]
 

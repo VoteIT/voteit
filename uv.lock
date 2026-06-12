@@ -3,12 +3,11 @@ revision = 3
 requires-python = ">=3.12"
 
 [options]
-exclude-newer = "2026-05-29T14:51:24.131659Z"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
 [manifest]
 members = [
-    "member-dialects",
     "voteit",
     "voteit-org",
 ]
@@ -1005,21 +1004,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/bd/c0/9f7c9a46090390368a4d7bcb76bb87a4a36c421e4c0792cdb53486ffac7a/matplotlib_inline-0.2.2.tar.gz", hash = "sha256:72f3fe8fce36b70d4a5b612f899090cd0401deddc4ea90e1572b9f4bfb058c79", size = 8150, upload-time = "2026-05-08T17:33:33.49Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/41/09/5b161152e2d90f7b87f781c2e1267494aef9c32498df793f73ad0a0a494a/matplotlib_inline-0.2.2-py3-none-any.whl", hash = "sha256:3c821cf1c209f59fb2d2d64abbf5b23b67bcb2210d663f9918dd851c6da1fcf6", size = 9534, upload-time = "2026-05-08T17:33:32.055Z" },
-]
-
-[[package]]
-name = "member-dialects"
-version = "1.0.0"
-source = { editable = "src/member_dialects" }
-dependencies = [
-    { name = "django" },
-    { name = "voteit" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "django" },
-    { name = "voteit", editable = "." },
 ]
 
 [[package]]
@@ -2051,7 +2035,6 @@ dev = [
     { name = "djangorestframework-stubs" },
     { name = "fakeredis" },
     { name = "ipython" },
-    { name = "member-dialects" },
     { name = "personnummer" },
     { name = "pre-commit" },
     { name = "python-dotenv" },
@@ -2106,7 +2089,6 @@ dev = [
     { name = "djangorestframework-stubs", specifier = ">=3.16.9" },
     { name = "fakeredis", specifier = ">=2.32.0,<3.0.0" },
     { name = "ipython", specifier = ">=9.6.0,<10.0.0" },
-    { name = "member-dialects", editable = "src/member_dialects" },
     { name = "personnummer", specifier = ">=3.2.1,<4.0.0" },
     { name = "pre-commit", specifier = ">=4.3.0,<5.0.0" },
     { name = "python-dotenv", specifier = ">=1.1.1,<2.0.0" },
