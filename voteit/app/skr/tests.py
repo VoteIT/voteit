@@ -1,10 +1,13 @@
+import os
 from collections import Counter
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.test import override_settings
 
 from voteit.app.skr import KOMMUN_TAG
 from voteit.app.skr import REGION_TAG
+from voteit.app.testing import DIALECT_FIXTURES
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -12,8 +15,10 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.exceptions import ElectoralRegisterError
 
 User = get_user_model()
+os.path.join(__file__)
 
 
+@override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
 class SKRAgarradERPTests(TestCase):
     @classmethod
     def setUpTestData(cls):

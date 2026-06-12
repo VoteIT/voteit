@@ -1,0 +1,23 @@
+title: SFSFum
+description: Delegationsledare och gruppmedlemmar enligt SFS
+installable: false
+roles:
+  - title: Delegationsledare
+    role_id: leader
+    roles:
+      - proposer
+      - potential_voter
+      - discusser
+  - title: Medlem
+    role_id: member
+    roles:
+      - proposer
+      - potential_voter
+      - discusser
+er_policy_name: gv_auto_before_p
+group_votes_active: true
+group_roles_active: true
+view_components:
+  votes_management: sfsfum
+block_roles:
+  - potential_voter

@@ -1,0 +1,14 @@
+title: SKR Ägarråd
+description: Alla som är i en grupp med taggen kommun eller region får rösträtt om de är närvarande. Bara en person som grupp. En specifik grupp för SKR som får röster baserat på formeln närvarande - 1.
+installable: false
+er_policy_name: skr_agarrad
+group_votes_active: false
+groups_can_delegate: true
+configure_components:
+  - name: active_users
+block_components:
+  - presence_check
+block_roles:
+  - potential_voter
+run_scripts:
+  - voteit.app.skr.dialect.CreateSKRGroups

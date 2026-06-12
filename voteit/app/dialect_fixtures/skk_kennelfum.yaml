@@ -1,0 +1,29 @@
+title: SKK Kennelfullmäktige
+description: ...
+installable: false
+er_policy_name: skk_kfum
+group_votes_active: true
+group_roles_active: true
+roles:
+  - title: Delegat fullmakt
+    role_id: del_2
+    roles:
+      - proposer
+      - potential_voter
+      - discusser
+  - title: Delegat
+    role_id: del_1
+    roles:
+      - proposer
+      - potential_voter
+      - discusser
+  - title: Suppleant
+    role_id: suppleant
+    roles:
+      - proposer
+      - potential_voter
+      - discusser
+block_components:
+  - presence_check
+block_roles:
+  - potential_voter

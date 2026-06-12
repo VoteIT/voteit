@@ -1,10 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.test import override_settings
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.app.skk.er import DELEGAT
 from voteit.app.skk.er import DELEGAT_FULLMAKT
 from voteit.app.skk.er import SUPPLEANT
+from voteit.app.testing import DIALECT_FIXTURES
 from voteit.meeting.dialects import dialect_registry
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -13,6 +15,7 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 User = get_user_model()
 
 
+@override_settings(MEETING_DIALECTS_DIR=DIALECT_FIXTURES)
 class SKKFumERPTests(TestCase):
     @classmethod
     def setUpTestData(cls):
