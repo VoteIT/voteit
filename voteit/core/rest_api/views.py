@@ -105,7 +105,7 @@ class UserView(
         user = self.get_object()
         log_auth("Switch user", for_user=user, request=request)
         _transfer_social_auths(request.user, user, "idproxy")
-        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        login(request, user, backend="voteit.core.backends.PrefetchedModelBackend")
         serializer = self.get_serializer(user)
         return Response(serializer.data)
 
