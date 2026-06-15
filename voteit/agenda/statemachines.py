@@ -29,13 +29,13 @@ class AgendaItemStateMachine(StateChart, TransitionSignalMixin):
         | ongoing.to(
             upcoming, validators=["has_change_permission", "no_ongoing_polls"]
         ),
-        name="Make upcoming",
+        name=_("Make upcoming"),
     )
     unpublish = Event(
         upcoming.to(private, validators=["has_change_permission"])
         | closed.to(private, validators=["has_change_permission"])
         | ongoing.to(private, validators=["has_change_permission", "no_ongoing_polls"]),
-        name="Unpublish",
+        name=_("Unpublish"),
     )
     make_ongoing = Event(
         private.to(
@@ -47,7 +47,7 @@ class AgendaItemStateMachine(StateChart, TransitionSignalMixin):
         | closed.to(
             ongoing, cond=["meeting_is_ongoing"], validators=["has_change_permission"]
         ),
-        name="Make ongoing",
+        name=_("Make ongoing"),
     )
     close = Event(
         private.to(
@@ -65,7 +65,7 @@ class AgendaItemStateMachine(StateChart, TransitionSignalMixin):
             cond=["meeting_not_upcoming"],
             validators=["has_change_permission", "no_ongoing_polls"],
         ),
-        name="Close",
+        name=_("Close"),
     )
     # Script-only: not exposed via REST. Model.archive() uses direct state assignment.
     archive = Event(
@@ -73,7 +73,7 @@ class AgendaItemStateMachine(StateChart, TransitionSignalMixin):
         | upcoming.to(archived, cond=["not_allowed"])
         | ongoing.to(archived, cond=["not_allowed"])
         | closed.to(archived, cond=["not_allowed"]),
-        name="Archive",
+        name=_("Archive"),
     )
 
     finished_states = frozenset({"closed", "archived"})

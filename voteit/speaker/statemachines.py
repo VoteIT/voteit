@@ -19,17 +19,17 @@ class SpeakerSystemStateMachine(StateChart, TransitionSignalMixin):
     archived = State(value="archived", name="Archived", final=True)
 
     activate = Event(
-        inactive.to(active, validators=["has_change_permission"]), name="Make active"
+        inactive.to(active, validators=["has_change_permission"]), name=_("Make active")
     )
     inactivate = Event(
         active.to(inactive, validators=["has_change_permission", "no_active_speaker"]),
-        name="Inactivate",
+        name=_("Inactivate"),
     )
     # Script-only: not exposed via REST. Model.archive() uses direct state assignment.
     archive = Event(
         inactive.to(archived, cond=[NOT_ALLOWED_SM_GUARD])
         | active.to(archived, cond=[NOT_ALLOWED_SM_GUARD]),
-        name="Archive",
+        name=_("Archive"),
     )
 
     def has_change_permission(self, *, user, **kw):
@@ -39,7 +39,7 @@ class SpeakerSystemStateMachine(StateChart, TransitionSignalMixin):
 
     def no_active_speaker(self, **kw):
         if self.model.active_list and self.model.active_list.active_speaker():
-            raise ValidationError({"event": [_("Deactivate active speaker first")]})
+            raise ValidationError({"event": [_("Stop current speaker first")]})
 
     def not_allowed(self, force=False, **kw):
         return force

@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.utils.timezone import now
+from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import PermissionDenied
 from statemachine import Event
 from statemachine import State
@@ -23,12 +24,12 @@ class InviteStateMachine(StateChart, TransitionSignalMixin):
     revoked = State(value="revoked", name="Revoked", final=True)
     expired = State(value="expired", name="Expired", final=True)
 
-    accept = Event(open.to(accepted), name="Accept")
-    reject = Event(open.to(rejected), name="Reject")
+    accept = Event(open.to(accepted), name=_("Accept"))
+    reject = Event(open.to(rejected), name=_("Reject"))
     revoke = Event(
-        open.to(revoked, validators=["has_change_permission"]), name="Revoke"
+        open.to(revoked, validators=["has_change_permission"]), name=_("Revoke")
     )
-    expire = Event(open.to(expired), name="Expire")
+    expire = Event(open.to(expired), name=_("Expire"))
 
     def after_accept(self, *, user):
         self.model.used_by = user

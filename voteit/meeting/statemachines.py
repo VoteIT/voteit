@@ -27,24 +27,24 @@ class MeetingStateMachine(StateChart, TransitionSignalMixin):
 
     make_upcoming = Event(
         ongoing.to(upcoming, validators=["has_moderate_permission"]),
-        name="Back to upcoming",
+        name=_("Back to upcoming"),
     )
     make_ongoing = Event(
         upcoming.to(ongoing, validators=["has_moderate_permission", "valid_er_policy"])
         | closed.to(ongoing, validators=["has_moderate_permission", "valid_er_policy"]),
-        name="Make ongoing",
+        name=_("Make ongoing"),
     )
     close = Event(
         ongoing.to(closed, validators=["has_moderate_permission", "no_ongoing_polls"]),
-        name="Close",
+        name=_("Close"),
     )
     request_archiving = Event(
         closed.to(archiving, validators=["has_archive_permission"]),
-        name="Request archiving",
+        name=_("Request archiving"),
     )
     abort_archiving = Event(
         archiving.to(closed, validators=["has_archive_permission"]),
-        name="Abort archiving",
+        name=_("Abort archiving"),
     )
     request_delete = Event(
         upcoming.to(deleting, validators=["has_delete_permission"])
@@ -52,7 +52,7 @@ class MeetingStateMachine(StateChart, TransitionSignalMixin):
         | closed.to(deleting, validators=["has_delete_permission"])
         | archiving.to(deleting, validators=["has_delete_permission"])
         | archived.to(deleting, validators=["has_delete_permission"]),
-        name="Request delete...",
+        name=_("Request delete..."),
     )
     abort_delete = Event(
         deleting.to(
@@ -80,7 +80,7 @@ class MeetingStateMachine(StateChart, TransitionSignalMixin):
             cond="pre_delete_state_is_archived",
             validators=["has_delete_permission"],
         ),
-        name="Abort delete",
+        name=_("Abort delete"),
     )
 
     finished_states = frozenset({"closed", "archiving", "archived", "deleting"})

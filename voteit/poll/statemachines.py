@@ -3,6 +3,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from django.utils.timezone import now
+from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import PermissionDenied
 from pydantic import ValidationError as PydanticValidationError
 from rest_framework.exceptions import ValidationError
@@ -42,7 +43,7 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
         private.to(
             upcoming, validators=["has_change_state_permission", "validate_settings"]
         ),
-        name="Make upcoming",
+        name=_("Make upcoming"),
     )
     make_ongoing = Event(
         upcoming.to(
@@ -67,13 +68,13 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
                 "meeting_and_ai_ongoing",
             ],
         ),
-        name="Start",
+        name=_("Start"),
     )
     close = Event(
         ongoing.to(closed, validators=["has_change_state_permission"])
         | failed.to(closed, validators=["has_change_state_permission"])
         | canceled.to(closed, validators=["has_change_state_permission"]),
-        name="Close",
+        name=_("Close"),
     )
     publish_result = Event(
         withheld.to(
@@ -81,19 +82,19 @@ class PollStateMachine(StateChart, TransitionSignalMixin):
             validators=["has_change_state_permission"],
             on=["set_proposals_from_result"],
         ),
-        name="Publish result",
+        name=_("Publish result"),
     )
     withhold_result = Event(
         finished.to(withheld, validators=["has_change_state_permission"]),
-        name="Withold detailed result",
+        name=_("Withold detailed result"),
     )
     cancel = Event(
         ongoing.to(canceled, validators=["has_change_state_permission"]),
-        name="Cancel",
+        name=_("Cancel"),
     )
     unpublish = Event(
         upcoming.to(private, validators=["has_change_state_permission"]),
-        name="Revert to private",
+        name=_("Revert to private"),
     )
 
     # These are auto-transitions: bare State.to(...) expressions that
