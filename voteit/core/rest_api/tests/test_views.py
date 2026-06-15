@@ -248,6 +248,13 @@ class UserViewSetTests(APITestCase):
             data,
         )
 
+    def test_switch_logs_in_new_user(self):
+        self.client.force_login(self.participant)
+        self.client.post(reverse("user-switch", kwargs={"pk": self.moderator.pk}))
+        response = self.client.get(reverse("user-list"))
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(self.moderator.pk, response.json()["pk"])
+
     def test_switch_authenticated_non_allowed_user(self):
         self.client.force_login(self.participant)
         url = reverse("user-switch", kwargs={"pk": 3})
