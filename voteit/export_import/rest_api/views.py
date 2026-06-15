@@ -51,7 +51,9 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
         )
 
     def list(self, request, *args, **kwargs):
-        return Response(data=[])
+        return Response(
+            data=[{"pk": o.pk, "title": o.title} for o in self.get_queryset()]
+        )
 
     @action(
         methods=["POST"],
@@ -187,10 +189,11 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
     @action(
         methods=["GET"],
         detail=True,
+        serializer_class=ExportFileSerializer,
     )
     def yaml(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = ExportFileSerializer(
+        serializer = self.get_serializer(
             data=request.query_params,
         )
         serializer.is_valid(raise_exception=True)

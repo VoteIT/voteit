@@ -180,6 +180,63 @@ class MeetingDataImportViewTests(APITestCase):
         prop = Proposal.objects.first()
         self.assertEqual(None, prop.meeting_group)
 
+    def test_combined_reactions_excluded_by_default(self):
+        # include_reactions defaults to False, so reactions are not imported even if present in the file.
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(
+            os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml"), "rb"
+        ) as f:
+            response = self.client.put(url, data={"file": f}, format="multipart")
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.assertEqual(0, response.json()["reactions"])
+
+    def test_combined_reactions_included(self):
+        # When include_reactions=True, reactions from the fixture are imported.
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(
+            os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml"), "rb"
+        ) as f:
+            response = self.client.put(
+                url, data={"file": f, "include_reactions": True}, format="multipart"
+            )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.assertEqual(4, response.json()["reactions"])
+
+    def test_combined_buttons_excluded(self):
+        # include_buttons=False skips both buttons and their reactions.
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(
+            os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml"), "rb"
+        ) as f:
+            response = self.client.put(
+                url, data={"file": f, "include_buttons": False}, format="multipart"
+            )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        data = response.json()
+        self.assertEqual(0, data["buttons"])
+        self.assertEqual(0, data["reactions"])
+
+    def test_buttons_reactions_bad_combination(self):
+        # include_buttons=False with include_reactions=True is rejected because reactions require buttons.
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES_DIR, "ais_and_groups.yaml"), "rb") as f:
+            response = self.client.put(
+                url,
+                data={"file": f, "include_buttons": False, "include_reactions": True},
+                format="multipart",
+            )
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertEqual(
+            {
+                "include_reactions": "Buttons are needed to set reactions - change 'include_buttons'"
+            },
+            response.json(),
+        )
+
     def test_ais_and_groups_bad_combination(self):
         self.client.force_login(self.moderator)
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
