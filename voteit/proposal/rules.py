@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 import rules
 
+from voteit.agenda.rules import ai_not_archived
 from voteit.agenda.rules import ai_proposals_not_blocked
 from voteit.agenda.rules import upcoming_ongoing_or_private_ai
 from voteit.agenda.rules import upcoming_or_ongoing_ai
@@ -11,6 +12,7 @@ from voteit.core.decorators import predicate
 from voteit.core.rules import is_author_or_group_author_member
 from voteit.meeting.rules import is_moderator
 from voteit.meeting.rules import is_proposer
+from voteit.meeting.rules import meeting_upcoming_ongoing
 from voteit.proposal import PERM_RETRACT
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
@@ -58,7 +60,8 @@ for pmodel in (Proposal, DiffProposal):
     )
     # View props not needed, managed by querysets
     rules.add_perm(
-        pmodel.get_perm(PERM.CHANGE), upcoming_ongoing_or_private_ai & is_moderator
+        pmodel.get_perm(PERM.CHANGE),
+        ai_not_archived & meeting_upcoming_ongoing & is_moderator,
     )
     rules.add_perm(
         pmodel.get_perm(PERM.DELETE),

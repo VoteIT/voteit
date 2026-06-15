@@ -122,7 +122,7 @@ class RulesTests(TestCase):
         CHANGE = Proposal.get_perm(PERM.CHANGE)
         self.assertFalse(self.anon_user.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.participant.has_perm(CHANGE, self.proposal))
-        self.assertFalse(self.moderator.has_perm(CHANGE, self.proposal))
+        self.assertTrue(self.moderator.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.proposer_author.has_perm(CHANGE, self.proposal))
         self.assertFalse(self.group_proposer.has_perm(CHANGE, self.proposal))
