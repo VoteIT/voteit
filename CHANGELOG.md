@@ -1,5 +1,53 @@
 # Changelog
 
+## v0.46 (date?)
+
+The headline change is a full replacement of `django-fsm` with `python-statemachine` across all
+workflow-driven models. The new state machines are more explicit, testable, and expose a uniform
+REST interface. Several smaller improvements and fixes accompany the refactoring.
+
+### Breaking changes
+
+- **`django-fsm` removed**: All state-machine logic now lives in `python-statemachine` (`StateChart`
+  subclasses). Models no longer carry FSM field helpers — state is stored in the existing
+  `state` field but driven by `instance.sm`. Any code that called FSM transition methods
+  directly must be updated to use `instance.sm.<event>()`.
+- **Component state replaced with `enabled` bool**: `MeetingComponent` and `OrganisationComponent`
+  no longer use a workflow for on/off state.
+
+### New features
+
+- **Unified statemachine REST endpoint**: `GET /api/state-machines/` returns all
+  state machines (state, available events, metadata).
+- **Event endpoint returns available transitions**: The `POST /{id}/event/` endpoint now includes
+  the current state and the list of currently allowed events in its response.
+- **Admin action for statemachine transitions**: Admins can now trigger state-machine events
+  directly from the Django admin change list.
+- **Member dialects moved into core repo**: The `sfs`, `skk`, and `skr` voting-behaviour plugins
+  (previously in the separate `member_dialects` sub-package) are now part of `voteit/app/` and
+  no longer require a separate install. The `member_dialects` dependency has been dropped.
+
+### Changes
+
+- **Poll execution restructured**: Several poll transitions (collect → calculate → finish) are
+  now automatic, reducing the need for explicit moderator actions. Ballot finalisation
+  (checksum, weight application, ER-cleanup) is a dedicated method on the model.
+- **Polls require ongoing meeting and agenda item**: A poll can no longer be started if the
+  meeting or agenda item is not in an ongoing state.
+- **Group deletion allowed**: Meeting groups can now be deleted through the rest interface. Bulk operation requires upcoming meeting.
+- **Token API: cap at 5 active keys per meeting**: Creating a sixth active API key for a meeting
+  is now blocked.
+
+### Fixes
+
+- **Switch user authentication backend fixed**: The wrong authentication backend was selected, causing
+  users to never be authenticated. Only applied to the switch user operation.
+- **Proposals editable when agenda item is closed** (#378): Proposal editing was
+  blocked when the parent agenda item was closed; this is now allowed.
+- **Empty electoral register not created when disabled**: An empty ER record was created even
+  when the ER policy was disabled; the guard now prevents this.
+- **Preview cooldown removed**: The preview transition had an unintended cooldown.
+
 ## v0.45 (2026-06-03)
 
 Continued REST migration, invite improvements, security hardening,
