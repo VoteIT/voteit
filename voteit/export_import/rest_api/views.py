@@ -149,6 +149,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
         methods=["POST"],
         detail=True,
         parser_classes=[JSONParser, MultiPartParser],
+        serializer_class=CloneSerializer,
     )
     def clone(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -156,7 +157,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             raise ValidationError(
                 {"detail": "Target meeting must be in upcoming state."}
             )
-        serializer = CloneSerializer(data=request.data, context={"request": request})
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         source = serializer.validated_data["source"]
