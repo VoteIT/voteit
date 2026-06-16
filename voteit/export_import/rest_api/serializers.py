@@ -82,3 +82,4 @@ class CloneSerializer(ExportFileSerializer):
     source = ModeratorMeetingField()
     add_participants = fields.BooleanField(default=False)
     use_existing_groups = fields.BooleanField(default=True)
+    include_notes = fields.BooleanField(default=False)

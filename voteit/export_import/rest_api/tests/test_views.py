@@ -448,6 +448,26 @@ class CloneViewTests(APITestCase):
         self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
         self.assertIn("source", response.json())
 
+    def test_clone_include_notes(self):
+        url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})
+        response = self.client.post(
+            url,
+            data={"source": self.meeting.pk, "include_notes": True},
+            format="json",
+        )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        data = response.json()
+        self.assertEqual(3, data["notes"])
+
+    def test_clone_exclude_notes_by_default(self):
+        url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})
+        response = self.client.post(
+            url, data={"source": self.meeting.pk}, format="json"
+        )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        data = response.json()
+        self.assertEqual(0, data["notes"])
+
     def test_clone_blocked_by_processing_lock(self):
         cache.add(import_lock._processing_key(self.session_key), 1, 60)
         url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})

@@ -95,7 +95,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             )
             return Response(
                 data={
-                    **importer.data.dict(exclude_unset=True, exclude={"meta", "sign"}),
+                    **importer.data.dict(exclude_unset=True, exclude={"sign"}),
                     "signature_valid": signature_valid,
                     "size_limit": size_limit,
                 },
