@@ -135,7 +135,13 @@ def stream_signature(stream):
     return sign_payload(stream.read())
 
 
-def direct_clone(*, source: Meeting, target: Meeting, dry_run=True, **kwargs):
+def prepare_clone_importer(*, source: Meeting, target: Meeting, **kwargs):
+    """
+    Export ``source`` and prep an ``Importer`` for ``target`` without running it.
+
+    Used both by ``direct_clone`` and by clone preview, since previewing only
+    needs the parsed/validated data - not an actual (rolled back) DB write.
+    """
     from voteit.export_import.exporter import Exporter
     from voteit.export_import.importer import Importer
 
@@ -153,7 +159,11 @@ def direct_clone(*, source: Meeting, target: Meeting, dry_run=True, **kwargs):
         **import_only_kwargs,
     )
     importer.prep_data(data)
+    return importer
 
+
+def direct_clone(*, source: Meeting, target: Meeting, dry_run=True, **kwargs):
+    importer = prepare_clone_importer(source=source, target=target, **kwargs)
     with transaction.atomic(durable=True):
         importer()
         if dry_run:

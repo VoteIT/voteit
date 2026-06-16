@@ -17,7 +17,6 @@ from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.utils import pydantic_to_drf_validation_error
 from voteit.export_import.exceptions import ImportFileError
 from voteit.export_import.exceptions import SignatureVerificationFailed
-from voteit.export_import.rest_api.lock import import_preview_lock
 from voteit.export_import.utils import MAX_IMPORT_BYTES
 from voteit.export_import.utils import MAX_UNSIGNED_IMPORT_BYTES
 from voteit.export_import.utils import sign_payload
@@ -26,10 +25,12 @@ from voteit.export_import.importer import Importer
 from voteit.core.rest_api.lock import LockAlreadyRunning
 from voteit.core.rest_api.lock import LockCooldownActive
 from voteit.export_import.rest_api.lock import import_lock
+from voteit.export_import.rest_api.lock import import_preview_lock
 from voteit.export_import.rest_api.serializers import CloneSerializer
 from voteit.export_import.rest_api.serializers import ImportFileSerializer
 from voteit.export_import.rest_api.serializers import ExportFileSerializer
 from voteit.export_import.utils import direct_clone
+from voteit.export_import.utils import prepare_clone_importer
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 
@@ -40,7 +41,6 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
     parser_classes = (MultiPartParser, FileUploadParser)
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
-        "preview": None,
         "yaml": None,
         "clone": None,
     }
@@ -55,20 +55,27 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             data=[{"pk": o.pk, "title": o.title} for o in self.get_queryset()]
         )
 
-    @action(
-        methods=["POST"],
-        detail=True,
-    )
-    def preview(self, request, *args, **kwargs):
+    def _preview_response(self, importer: Importer, signature_valid: bool = None):
+        data = importer.data.dict(exclude_unset=True, exclude={"sign"})
+        if signature_valid is not None:
+            data["signature_valid"] = signature_valid
+            data["size_limit"] = (
+                MAX_IMPORT_BYTES if signature_valid else MAX_UNSIGNED_IMPORT_BYTES
+            )
+        return Response(data=data, status=status.HTTP_200_OK)
+
+    def update(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(
             data=request.data,
             context={"meeting": instance, "request": request},
         )
         serializer.is_valid(raise_exception=True)
+        preview = serializer.validated_data["preview"]
+        lock = import_preview_lock if preview else import_lock
 
         try:
-            import_preview_lock.acquire(request)
+            lock.acquire(request)
         except LockAlreadyRunning as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         except LockCooldownActive as exc:
@@ -83,57 +90,19 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
                 importer = Importer(
                     instance,
                     verify=False,
-                    **{k: v for k, v in serializer.data.items() if k != "file"},
+                    **{
+                        k: v
+                        for k, v in serializer.data.items()
+                        if k not in ("file", "preview")
+                    },
                 )
                 importer.from_stream(file_obj)
             except PydanticValidationError as exc:
                 raise pydantic_to_drf_validation_error(exc)
             except (ImportFileError, SignatureVerificationFailed, ReaderError) as exc:
                 raise ValidationError(str(exc))
-            size_limit = (
-                MAX_IMPORT_BYTES if signature_valid else MAX_UNSIGNED_IMPORT_BYTES
-            )
-            return Response(
-                data={
-                    **importer.data.dict(exclude_unset=True, exclude={"sign"}),
-                    "signature_valid": signature_valid,
-                    "size_limit": size_limit,
-                },
-                status=status.HTTP_200_OK,
-            )
-        finally:
-            import_preview_lock.release(request)
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(
-            data=request.data,
-            context={"meeting": instance, "request": request},
-        )
-        serializer.is_valid(raise_exception=True)
-
-        try:
-            import_lock.acquire(request)
-        except LockAlreadyRunning as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
-        except LockCooldownActive as exc:
-            return Response(
-                {"detail": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS
-            )
-
-        try:
-            file_obj = request.data["file"]
-            try:
-                importer = Importer(
-                    instance,
-                    verify=False,
-                    **{k: v for k, v in serializer.data.items() if k != "file"},
-                )
-                importer.from_stream(file_obj)
-            except PydanticValidationError as exc:
-                raise pydantic_to_drf_validation_error(exc)
-            except (ImportFileError, SignatureVerificationFailed, ReaderError) as exc:
-                raise ValidationError(str(exc))
+            if preview:
+                return self._preview_response(importer, signature_valid=signature_valid)
             if not (importer.data.groups or importer.data.agenda_items):
                 raise ValidationError(
                     {"file": ["File doesn't contain any agenda items or groups"]}
@@ -145,7 +114,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
                 status=status.HTTP_200_OK,
             )
         finally:
-            import_lock.release(request)
+            lock.release(request)
 
     @action(
         methods=["POST"],
@@ -163,12 +132,16 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
         serializer.is_valid(raise_exception=True)
 
         source = serializer.validated_data["source"]
+        preview = serializer.validated_data["preview"]
         clone_kwargs = {
-            k: v for k, v in serializer.validated_data.items() if k != "source"
+            k: v
+            for k, v in serializer.validated_data.items()
+            if k not in ("source", "preview")
         }
+        lock = import_preview_lock if preview else import_lock
 
         try:
-            import_lock.acquire(request)
+            lock.acquire(request)
         except LockAlreadyRunning as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
         except LockCooldownActive as exc:
@@ -177,6 +150,11 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             )
 
         try:
+            if preview:
+                importer = prepare_clone_importer(
+                    source=source, target=instance, **clone_kwargs
+                )
+                return self._preview_response(importer)
             importer = direct_clone(
                 source=source, target=instance, dry_run=False, **clone_kwargs
             )
@@ -184,7 +162,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
         finally:
-            import_lock.release(request)
+            lock.release(request)
 
     @action(
         methods=["GET"],

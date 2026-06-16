@@ -13,6 +13,7 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.proposal.models import Proposal
 from voteit.export_import.tests import FIXTURES_DIR
 from voteit.export_import.rest_api.lock import import_lock
+from voteit.export_import.rest_api.lock import import_preview_lock
 from voteit.export_import.utils import MAX_IMPORT_BYTES
 from voteit.export_import.utils import MAX_UNSIGNED_IMPORT_BYTES
 from voteit.export_import.utils import sign_payload
@@ -279,25 +280,31 @@ class MeetingDataImportViewTests(APITestCase):
         # A small unsigned file is accepted; preview reports signature_valid=False
         # and the tighter unsigned size_limit.
         self.client.force_login(self.moderator)
-        url = reverse("meeting-data-preview", kwargs={"pk": self.meeting.pk})
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         unsigned_yaml = (
             b"meta:\n  version: 1\nagenda_items:\n  - title: Hi\n    body: ''\n"
         )
         with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp:
             tmp.write(unsigned_yaml)
             tmp.seek(0)
-            response = self.client.post(url, data={"file": tmp}, format="multipart")
+            response = self.client.put(
+                url, data={"file": tmp, "preview": True}, format="multipart"
+            )
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         data = response.json()
         self.assertFalse(data["signature_valid"])
         self.assertEqual(MAX_UNSIGNED_IMPORT_BYTES, data["size_limit"])
+        # Nothing was actually imported.
+        self.assertEqual(0, self.meeting.agenda_items.count())
 
     def test_yaml_alias_rejected_on_preview(self):
         alias_yaml = "a: &anchor value\nb: *anchor\n"
         self.client.force_login(self.moderator)
-        url = reverse("meeting-data-preview", kwargs={"pk": self.meeting.pk})
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with self._signed_tempfile(alias_yaml) as f:
-            response = self.client.post(url, data={"file": f}, format="multipart")
+            response = self.client.put(
+                url, data={"file": f, "preview": True}, format="multipart"
+            )
         self.assertContains(
             response,
             "YAML aliases are not permitted",
@@ -306,9 +313,11 @@ class MeetingDataImportViewTests(APITestCase):
 
     def test_ais_and_groups_preview(self):
         self.client.force_login(self.moderator)
-        url = reverse("meeting-data-preview", kwargs={"pk": self.meeting.pk})
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
         with open(os.path.join(FIXTURES_DIR, "ais_and_groups.yaml"), "rb") as f:
-            response = self.client.post(url, data={"file": f}, format="multipart")
+            response = self.client.put(
+                url, data={"file": f, "preview": True}, format="multipart"
+            )
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         data = response.json()
         self.assertIn("groups", data)
@@ -334,6 +343,18 @@ class MeetingDataImportViewTests(APITestCase):
         # Signature metadata
         self.assertTrue(data["signature_valid"])
         self.assertEqual(MAX_IMPORT_BYTES, data["size_limit"])
+        # Nothing was actually imported.
+        self.assertEqual(0, self.meeting.agenda_items.count())
+
+    def test_preview_does_not_require_agenda_items_or_groups(self):
+        # Unlike a real import, preview of an empty file is not rejected.
+        self.client.force_login(self.moderator)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES_DIR, "empty_import.yaml"), "rb") as f:
+            response = self.client.put(
+                url, data={"file": f, "preview": True}, format="multipart"
+            )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
 
 
 @override_settings(EXPORT_SECRET_KEY="abcdefghijk")
@@ -476,6 +497,48 @@ class CloneViewTests(APITestCase):
         )
         self.assertEqual(status.HTTP_409_CONFLICT, response.status_code)
 
+    def test_clone_preview(self):
+        url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})
+        response = self.client.post(
+            url,
+            data={"source": self.meeting.pk, "preview": True},
+            format="json",
+        )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        data = response.json()
+        self.assertIn("groups", data)
+        self.assertIn("agenda_items", data)
+        self.assertGreater(len(data["agenda_items"]), 0)
+        # Nothing was actually cloned into the target meeting.
+        self.assertEqual(0, self.target_meeting.agenda_items.count())
+        self.assertEqual(0, self.target_meeting.groups.count())
+
+    def test_clone_preview_uses_preview_lock(self):
+        # The preview lock has no cooldown, so a second preview can run right away...
+        url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})
+        response = self.client.post(
+            url,
+            data={"source": self.meeting.pk, "preview": True},
+            format="json",
+        )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.assertIsNone(
+            cache.get(import_preview_lock._cooldown_key(self.session_key))
+        )
+        # ...and it doesn't interfere with the real-import lock.
+        self.assertIsNone(cache.get(import_lock._processing_key(self.session_key)))
+        self.assertIsNone(cache.get(import_lock._cooldown_key(self.session_key)))
+
+    def test_clone_preview_blocked_by_preview_processing_lock(self):
+        cache.add(import_preview_lock._processing_key(self.session_key), 1, 60)
+        url = reverse("meeting-data-clone", kwargs={"pk": self.target_meeting.pk})
+        response = self.client.post(
+            url,
+            data={"source": self.meeting.pk, "preview": True},
+            format="json",
+        )
+        self.assertEqual(status.HTTP_409_CONFLICT, response.status_code)
+
 
 @override_settings(EXPORT_SECRET_KEY="abcdefghijk")
 class ImportLockTests(APITestCase):
@@ -516,6 +579,42 @@ class ImportLockTests(APITestCase):
         with open(os.path.join(FIXTURES_DIR, "empty.txt"), "rb") as f:
             self.client.put(url, data={"file": f}, format="multipart")
         self.assertIsNone(cache.get(import_lock._processing_key(self.session_key)))
+
+    def test_preview_uses_separate_lock_without_cooldown(self):
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES_DIR, "ais_and_groups.yaml"), "rb") as f:
+            response = self.client.put(
+                url, data={"file": f, "preview": True}, format="multipart"
+            )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.assertIsNone(
+            cache.get(import_preview_lock._processing_key(self.session_key))
+        )
+        self.assertIsNone(
+            cache.get(import_preview_lock._cooldown_key(self.session_key))
+        )
+        # Doesn't touch the real-import lock either.
+        self.assertIsNone(cache.get(import_lock._processing_key(self.session_key)))
+        self.assertIsNone(cache.get(import_lock._cooldown_key(self.session_key)))
+
+    def test_preview_blocked_by_preview_processing_lock(self):
+        cache.add(import_preview_lock._processing_key(self.session_key), 1, 60)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES_DIR, "ais_and_groups.yaml"), "rb") as f:
+            response = self.client.put(
+                url, data={"file": f, "preview": True}, format="multipart"
+            )
+        self.assertEqual(status.HTTP_409_CONFLICT, response.status_code)
+
+    def test_preview_not_blocked_by_real_import_cooldown(self):
+        # A cooldown on the real-import lock must not block previews.
+        cache.add(import_lock._cooldown_key(self.session_key), 1, 60)
+        url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})
+        with open(os.path.join(FIXTURES_DIR, "ais_and_groups.yaml"), "rb") as f:
+            response = self.client.put(
+                url, data={"file": f, "preview": True}, format="multipart"
+            )
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
 
     def test_lock_released_after_successful_import(self):
         url = reverse("meeting-data-detail", kwargs={"pk": self.meeting.pk})

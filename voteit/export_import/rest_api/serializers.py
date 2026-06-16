@@ -50,6 +50,7 @@ class ImportFileSerializer(serializers.Serializer):
     """
 
     file = fields.FileField(max_length=1000000, validators=[ImportFileValidator()])
+    preview = fields.BooleanField(default=False)
     add_participants = fields.BooleanField()
     use_existing_groups = fields.BooleanField(default=True)
     clear_group_authors = fields.BooleanField()
@@ -80,6 +81,7 @@ class ExportFileSerializer(serializers.Serializer):
 
 class CloneSerializer(ExportFileSerializer):
     source = ModeratorMeetingField()
+    preview = fields.BooleanField(default=False)
     add_participants = fields.BooleanField(default=False)
     use_existing_groups = fields.BooleanField(default=True)
     include_notes = fields.BooleanField(default=False)
