@@ -11,9 +11,11 @@ from django.test import TestCase
 from voteit.discussion.models import DiscussionPost
 from voteit.export_import.exceptions import SignatureVerificationFailed
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingGroup
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.notes import NoteIntent
 from voteit.proposal.models import Proposal
+from voteit.export_import.schemas import MeetingGroupData
 from voteit.export_import.schemas import MeetingStructure
 from voteit.export_import.tests import FIXTURES_DIR
 from voteit.export_import.tests import read_fixture
@@ -204,6 +206,20 @@ class ImporterTests(TestCase):
         self.assertEqual({self.participant}, set(meeting_group.members.all()))
         meeting_group.refresh_from_db()
         self.assertEqual("The Hellos", meeting_group.title)
+
+    def test_import_groups_with_delegate_to(self):
+        importer = self._cut(self.meeting, use_existing_groups=False)
+        importer.data = MeetingStructure(
+            groups=[
+                MeetingGroupData(groupid="board", delegate_to="the-hellos"),
+                MeetingGroupData(groupid="the-hellos"),
+            ]
+        )
+        importer.collect_users()
+        importer.populate()
+        board: MeetingGroup = self.meeting.groups.get(groupid="board")
+        the_hellos: MeetingGroup = self.meeting.groups.get(groupid="the-hellos")
+        self.assertEqual(the_hellos, board.delegate_to)
 
     def test_import_with_missing_user_abort(self):
         self.participant.delete()

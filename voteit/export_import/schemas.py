@@ -437,7 +437,7 @@ class MeetingGroupData(BaseContentData):
     members: list[str] = []
     post_as: bool = False
     show_on_speaker: bool = True
-    delegate_to: int | None = None
+    delegate_to: str | None = None
 
     @validator("title", pre=True, allow_reuse=True)
     def strip_group_title_html(cls, v):

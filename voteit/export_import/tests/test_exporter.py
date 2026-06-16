@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.meeting.models import Meeting
+from voteit.meeting.models import MeetingGroup
 
 User = get_user_model()
 
@@ -170,3 +171,17 @@ class ExporterTests(TestCase):
         exporter = self._cut(self.meeting, clear_proposal_id=True)
         exporter()
         self.assertEqual(None, exporter.data.agenda_items[0].proposals[0].prop_id)
+
+    def test_group_with_delegate_to(self):
+        the_hellos = self.meeting.groups.get(groupid="the-hellos")
+        delegating = MeetingGroup.objects.create(
+            meeting=self.meeting,
+            title="Delegating group",
+            delegate_to=the_hellos,
+        )
+        exporter = self._cut(self.meeting)
+        exporter()
+        delegating_data = next(
+            g for g in exporter.data.groups if g.groupid == delegating.groupid
+        )
+        self.assertEqual("the-hellos", delegating_data.delegate_to)

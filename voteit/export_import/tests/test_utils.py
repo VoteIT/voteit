@@ -87,6 +87,19 @@ class UtilsTests(TestCase):
             importer.stats().dict(),
         )
 
+    def test_direct_clone_group_with_delegate_to(self):
+        the_hellos = self.meeting.groups.get(groupid="the-hellos")
+        self.meeting.groups.create(title="Delegating group", delegate_to=the_hellos)
+        importer = direct_clone(
+            source=self.meeting,
+            target=self.new_meeting,
+            dry_run=False,
+        )
+        self.assertEqual({**self.default_stats, "groups": 2}, importer.stats().dict())
+        cloned_the_hellos = self.new_meeting.groups.get(groupid="the-hellos")
+        cloned_delegating = self.new_meeting.groups.get(groupid="delegating-group")
+        self.assertEqual(cloned_the_hellos, cloned_delegating.delegate_to)
+
     def test_direct_clone_bad_options(self):
         with self.assertRaises(ValidationError) as cm:
             direct_clone(

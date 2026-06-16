@@ -151,7 +151,8 @@ class Importer:
                 group, _created = self.meeting.groups.update_or_create(
                     groupid=mgd.groupid,
                     defaults=mgd.dict(
-                        exclude={"members", "groupid", "pk"}, exclude_none=True
+                        exclude={"members", "groupid", "pk", "delegate_to"},
+                        exclude_none=True,
                     ),
                 )
                 group: MeetingGroup
@@ -160,7 +161,9 @@ class Importer:
 
             else:
                 group: MeetingGroup = self.meeting.groups.create(
-                    **mgd.dict(exclude={"members", "pk"}, exclude_none=True)
+                    **mgd.dict(
+                        exclude={"members", "pk", "delegate_to"}, exclude_none=True
+                    )
                 )
             self.mg_map[group.groupid] = group
             if mgd.members:
@@ -170,6 +173,15 @@ class Importer:
                         members.add(user.pk)
                 if members:
                     group.members.add(*members)
+        # Delegate_to is resolved in a second pass since the target group may not
+        # have been created yet during the loop above.
+        for mgd in self.data.groups:
+            if mgd.delegate_to:
+                group = self.mg_map[mgd.groupid]
+                delegate_to = self.mg_map[mgd.delegate_to]
+                if group.delegate_to_id != delegate_to.pk:
+                    group.delegate_to = delegate_to
+                    group.save()
         for aid in self.data.agenda_items:
             ai: AgendaItem = self.meeting.agenda_items.create(
                 **aid.dict(
