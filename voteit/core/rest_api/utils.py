@@ -111,6 +111,34 @@ def meeting_from_unsafe_data(serializer) -> Meeting:
     raise ValidationError(_("Can't find meeting"))
 
 
+def _nested_set(container, path, value):
+    """Insert value into a nested dict/list structure, creating nodes as needed.
+
+    Integer path segments indicate list positions; string segments indicate dict keys.
+    Lists are padded with empty dicts when the index exceeds the current length.
+    """
+    key = path[0]
+    if len(path) == 1:
+        if isinstance(container, list):
+            while len(container) <= key:
+                container.append({})
+            container[key] = value
+        else:
+            container[key] = value
+        return
+    next_key = path[1]
+    child_type = list if isinstance(next_key, int) else dict
+    if isinstance(container, list):
+        while len(container) <= key:
+            container.append(child_type())
+        if not isinstance(container[key], child_type):
+            container[key] = child_type()
+    else:
+        if key not in container or not isinstance(container[key], child_type):
+            container[key] = child_type()
+    _nested_set(container[key], path[1:], value)
+
+
 def pydantic_to_drf_validation_error(error: PydanticValidationError) -> ValidationError:
     """
     >>> import pydantic
@@ -125,9 +153,42 @@ def pydantic_to_drf_validation_error(error: PydanticValidationError) -> Validati
     True
     >>> new_exc
     ValidationError({'num': 'value is not a valid integer'})
+
+    Nested model errors are placed under their full field path, so they
+    never overwrite sibling fields at a shallower level:
+
+    >>> class Inner(pydantic.BaseModel):
+    ...     value: int
+    ...
+    >>> class Outer(pydantic.BaseModel):
+    ...     count: int
+    ...     inner: Inner
+    ...
+    >>> Outer.update_forward_refs(Inner=Inner)
+    >>> try:
+    ...     Outer(count='bad', inner={'value': 'also-bad'})
+    ... except pydantic.ValidationError as exc:
+    ...     new_exc = pydantic_to_drf_validation_error(exc)
+    >>> new_exc.detail == {'count': 'value is not a valid integer', 'inner': {'value': 'value is not a valid integer'}}
+    True
+
+    List errors preserve per-element positions as a list, padded with empty
+    dicts for valid entries, so the index of each failure is unambiguous:
+
+    >>> class OuterList(pydantic.BaseModel):
+    ...     inner: list[Inner]
+    ...
+    >>> OuterList.update_forward_refs(Inner=Inner)
+    >>> try:
+    ...     OuterList(inner=[{'value': 1}, {'value': 'also-bad'}, {'value': 'very-bad'}])
+    ... except pydantic.ValidationError as exc:
+    ...     list_exc = pydantic_to_drf_validation_error(exc)
+    >>> list_exc.detail == {'inner': [{}, {'value': 'value is not a valid integer'}, {'value': 'value is not a valid integer'}]}
+    True
     """
     eoutput = {}
-    for error in error.errors():
-        for loc in error["loc"]:
-            eoutput[loc] = error["msg"]
+    for err in error.errors():
+        loc = err["loc"]
+        if loc:
+            _nested_set(eoutput, loc, err["msg"])
     return ValidationError(eoutput)
