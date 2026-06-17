@@ -453,15 +453,18 @@ class MeetingGroup(BaseContent, MeetingContext):
 
     def save(self, **kwargs):
         if not self.groupid:
-            existing_groupids = self.meeting.groups.all().values_list(
-                "groupid", flat=True
+            existing_groupids = set(
+                self.meeting.groups.all().values_list("groupid", flat=True)
             )
-            base = groupid = slugify(self.title) or _rnd_role_id()
-            for i in range(5):
+            _max = self._meta.get_field("groupid").max_length
+            base = (slugify(self.title) or _rnd_role_id())[:_max]
+            groupid = base
+            for i in range(1, 6):
                 if groupid not in existing_groupids:
-                    self.groupid = groupid
                     break
-                groupid = f"{base}-{i + 1}"
+                suffix = f"-{i}"
+                groupid = base[: _max - len(suffix)] + suffix
+            self.groupid = groupid
         if not self.title:
             self.title = self.groupid
         super().save(**kwargs)
