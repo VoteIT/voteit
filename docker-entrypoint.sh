@@ -5,7 +5,7 @@ if [[ "$1" == "run" ]]; then
   echo "Starting Daphne"
   exec ./wait-for-it.sh db:5432 -s -- \
     ./wait-for-it.sh redis:6379 -s -- \
-    daphne --access-log - -p 8000 -b 0.0.0.0 --ping-interval 10 --proxy-headers project.routing:application
+    daphne --access-log - -p 8000 -b 0.0.0.0 --ping-interval 10 --proxy-headers --websocket-max-message-size 5242880 --websocket-max-frame-size 5242880 project.routing:application
 elif [[ "$1" == "worker" ]]; then
   QUEUES=("${@:2}")
   if [[ ${#QUEUES[@]} -eq 0 ]]; then
