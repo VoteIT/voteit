@@ -42,6 +42,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
     permission_type_map = {
         **VerboseAutoPermissionViewSetMixin.permission_type_map,
         "yaml": None,
+        "import_file": None,
         "clone": None,
     }
 
@@ -64,7 +65,12 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             )
         return Response(data=data, status=status.HTTP_200_OK)
 
-    def update(self, request, *args, **kwargs):
+    @action(
+        methods=["POST"],
+        detail=True,
+        url_path="import",
+    )
+    def import_file(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(
             data=request.data,
