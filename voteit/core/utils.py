@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html as _html
 import re
 from contextlib import contextmanager
 from copy import deepcopy
@@ -305,14 +306,20 @@ def strip_html(text: str) -> str:
     """
     Strip all HTML tags, keeping only plain text. Use for fields that must never contain markup.
 
+    HTML entities are decoded so that the result is always plain text (never &amp; etc).
+
     >>> strip_html('<script>alert(1)</script>Hello')
     'Hello'
     >>> strip_html('<b>bold</b> and <i>italic</i>')
     'bold and italic'
     >>> strip_html('plain text')
     'plain text'
+    >>> strip_html('A & B')
+    'A & B'
+    >>> strip_html('Already &amp; encoded')
+    'Already & encoded'
     """
-    return nh3.clean(text, tags=set(), attributes={})
+    return _html.unescape(nh3.clean(text, tags=set(), attributes={}))
 
 
 def get_content_registry() -> ContentRegistry:

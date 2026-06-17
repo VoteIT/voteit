@@ -152,3 +152,44 @@ class UtilsTests(TestCase):
         new_gilla_btn = self.new_meeting.reaction_buttons.get(title="Gilla")
         # New proposals with reactions intact!
         self.assertEqual(6, new_gilla_btn.reactions.count())
+
+
+class CloneMaxLengthTitleTests(TestCase):
+    """Clone must handle group/agenda-item titles of exactly 100 characters.
+
+    Titles containing special HTML characters like '&' were broken because
+    strip_html (nh3.clean) escapes them to entities (&amp;), making a 100-char
+    title exceed the schema's max_length=100 constraint.
+    """
+
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Meeting.objects.get(pk=1).organisation
+        cls.source = cls.org.meetings.create()
+        # 97 plain chars + ' & ' = 100 chars, but '&' expands to '&amp;' in nh3
+        cls.amp_title = "Meeting group & subcommittee on budget" + "X" * 62
+        cls.plain_title = "A" * 100
+        cls.source.groups.create(title=cls.amp_title, groupid="amp-group")
+        cls.source.groups.create(title=cls.plain_title, groupid="a" * 100)
+        cls.source.agenda_items.create(title=cls.amp_title)
+        cls.source.agenda_items.create(title=cls.plain_title)
+
+    def setUp(self):
+        self.target = self.org.meetings.create()
+
+    def test_clone_with_special_char_titles_at_max_length(self):
+        importer = direct_clone(
+            source=self.source,
+            target=self.target,
+            dry_run=False,
+        )
+        self.assertEqual(2, self.target.groups.count())
+        self.assertEqual(2, self.target.agenda_items.count())
+        stats = importer.stats().dict()
+        self.assertEqual(2, stats["groups"])
+        self.assertEqual(2, stats["agenda_items"])
+        titles = set(self.target.agenda_items.values_list("title", flat=True))
+        self.assertIn(self.amp_title, titles)
+        self.assertIn(self.plain_title, titles)
