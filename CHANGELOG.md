@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.46 (date?)
+## v0.46 (2026-06-18)
 
 The headline change is a full replacement of `django-fsm` with `python-statemachine` across all
 workflow-driven models. The new state machines are more explicit, testable, and expose a uniform
