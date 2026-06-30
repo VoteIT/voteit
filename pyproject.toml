@@ -54,7 +54,9 @@ Issues = "https://github.com/voteit/voteit/issues"
 Changelog = "https://github.com/voteit/voteit/blob/main/CHANGELOG.md"
 
 [tool.uv]
-exclude-newer = "7 days"
+exclude-newer = "3 days"
+exclude-newer-package = { django = false }
+environments = ["sys_platform != 'win32' and platform_python_implementation != 'PyPy'"]
 
 [tool.uv.workspace]
 members = ["src/voteit_org"]
