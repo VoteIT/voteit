@@ -5,11 +5,9 @@ from pydantic import validator
 from pydantic.main import BaseModel
 from stvpoll.abcs import STVPollBase
 from stvpoll.scottish_stv import ScottishSTV as _ScottishSTV
-from envelope.messages.errors import ValidationErrorMsg
+from rest_framework.exceptions import ValidationError
 
-from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
-from voteit.poll.app.polls.ranked import AddRankedVote
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import PollResult
@@ -31,11 +29,6 @@ class ScottishSTVSettings(BaseModel):
 
     class Config:
         allow_mutation = False
-
-
-@incoming
-class AddSTVVote(AddRankedVote):
-    name = "scottish_stv_vote.add"
 
 
 class STVResultRoundSchema(BaseModel):
@@ -142,27 +135,19 @@ class ScottishSTV(PollMethod):
         )
         return self.finalize_stv_result(counter, poll_counter)
 
-    def validate_vote(self, msg: AddRankedVote) -> None:
+    def validate_vote(self, vote: RankingSchema) -> None:
         matched_pks = set(
-            self.poll.proposals.filter(pk__in=msg.data.vote.ranking).values_list(
-                "pk", flat=True
-            )
+            self.poll.proposals.filter(pk__in=vote.ranking).values_list("pk", flat=True)
         )
-        unmatched = set(msg.data.vote.ranking) - matched_pks
+        unmatched = set(vote.ranking) - matched_pks
         if unmatched:
-            raise ValidationErrorMsg.from_message(
-                msg,
-                msg=_("Invalid vote"),
-                errors=[
-                    {
-                        "loc": ("vote.ranking",),
-                        "msg": _(
-                            "Invalid choice, the following proposals don't exist: %s"
-                        )
-                        % ",".join([str(x) for x in unmatched]),
-                        "type": "value.error",
-                    }
-                ],
+            raise ValidationError(
+                {
+                    "ranking": _(
+                        "Invalid choice, the following proposals don't exist: %s"
+                    )
+                    % ",".join([str(x) for x in unmatched])
+                }
             )
 
     def start_check(self):

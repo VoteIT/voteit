@@ -4,10 +4,10 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.exceptions import ValidationError
 
-from envelope.messages.errors import ValidationErrorMsg
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
+from voteit.poll.schemas import RankingSchema
 
 User = get_user_model()
 
@@ -103,7 +103,12 @@ class ScottishTests(TestCase):
         self.assertEqual("no_result", self.poll.state)
 
 
-class AddVoteTests(TestCase):
+class ValidateVoteTests(TestCase):
+    """
+    Unit-level coverage of ScottishSTV.validate_vote - the extra method-specific
+    validation run by VoteAddSerializer before a vote is stored (rest_api/serializers.py).
+    """
+
     @classmethod
     def setUpTestData(cls):
         cls.er = ElectoralRegister.objects.create()
@@ -117,32 +122,13 @@ class AddVoteTests(TestCase):
         cls.prop1 = cls.poll.proposals.create()
         cls.prop2 = cls.poll.proposals.create()
         cls.prop3 = cls.poll.proposals.create()
-        cls.poll.settings = {"winners": 2}
         cls.poll.ongoing(force=True)
         cls.poll.save()
 
-    @property
-    def _cut(self):
-        from voteit.poll.app.polls.scottish_stv import AddSTVVote
+    def test_valid_ranking(self):
+        vote = RankingSchema(ranking=[self.prop1.pk, self.prop2.pk, self.prop3.pk])
+        self.assertIsNone(self.poll.method.validate_vote(vote))
 
-        return AddSTVVote
-
-    def _mk_one(self, **kw):
-        kw.setdefault(
-            "vote", {"ranking": [self.prop1.pk, self.prop2.pk, self.prop3.pk]}
-        )
-        kw.setdefault("poll", self.poll.pk)
-        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
-
-    def test_add(self):
-        msg = self._mk_one()
-        msg.run_job()
-        vote = self.poll.votes.filter(user=self.voter).first()
-        self.assertIsNotNone(vote)
-        self.assertEqual(
-            f"{self.prop1.pk},{self.prop2.pk},{self.prop3.pk}", vote.vote_data
-        )
-
-    def test_add_bad_vote(self):
-        msg = self._mk_one(vote={"ranking": [-1, self.prop2.pk]})
-        self.assertRaises(ValidationErrorMsg, msg.run_job)
+    def test_bad_proposal(self):
+        vote = RankingSchema(ranking=[-1, self.prop2.pk])
+        self.assertRaises(ValidationError, self.poll.method.validate_vote, vote)

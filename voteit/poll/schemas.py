@@ -10,10 +10,6 @@ class _GenericVoteSchema(BaseModel):
     abstain: bool = False
 
 
-class GenericAddVoteSchema(_GenericVoteSchema):
-    poll: int  # Poll pk for votes
-
-
 class AddedVoteSchema(_GenericVoteSchema):
     pk: int
     poll: int
@@ -28,10 +24,6 @@ class PollResult(BaseModel):
 
 class RankingSchema(BaseModel):
     ranking: list[int]  # Validation...?
-
-
-class AddRankedVoteSchema(GenericAddVoteSchema):
-    vote: RankingSchema
 
 
 class VoterWeightSchema(BaseModel):

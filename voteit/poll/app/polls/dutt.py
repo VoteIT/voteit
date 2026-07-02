@@ -8,13 +8,11 @@ from pydantic import BaseModel
 from pydantic import root_validator
 from pydantic import validator
 
-from envelope.messages.errors import ValidationErrorMsg
-from voteit.messaging.decorators import incoming
+from rest_framework.exceptions import ValidationError
+
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
-from voteit.poll.messages import AddVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericAddVoteSchema
 from voteit.poll.schemas import PollResult
 
 
@@ -68,17 +66,6 @@ class DuttScore(BaseModel):
 
 class DuttResultSchema(PollResult):
     results: list[DuttScore]
-
-
-class AddVoteSchema(GenericAddVoteSchema):
-    vote: DuttVoteSchema
-
-
-@incoming
-class AddDuttVote(AddVote):
-    name = "dutt_vote.add"
-    schema = AddVoteSchema
-    data: AddVoteSchema
 
 
 @poll_methods
@@ -141,53 +128,25 @@ class Dutt(PollMethod):
             results.append(DuttScore(proposal=prop, votes=votes))
         return self.result_schema(results=results)
 
-    def validate_vote(self, msg: AddDuttVote) -> None:
-        picked_count = len(msg.data.vote.choices)
+    def validate_vote(self, vote: DuttVoteSchema) -> None:
+        picked_count = len(vote.choices)
         settings: DuttSettingsSchema = self.poll.settings
         if settings.min and settings.min > picked_count:
-            raise ValidationErrorMsg.from_message(
-                msg,
-                msg=_("Invalid vote"),
-                errors=[
-                    {
-                        "loc": ("vote.choices",),
-                        "msg": _("Too few proposals picked"),
-                        "type": "value.error",
-                    }
-                ],
-            )
+            raise ValidationError({"choices": _("Too few proposals picked")})
         if settings.max and settings.max < picked_count:
-            raise ValidationErrorMsg.from_message(
-                msg,
-                msg=_("Invalid vote"),
-                errors=[
-                    {
-                        "loc": ("vote.choices",),
-                        "msg": _("Too many proposals picked"),
-                        "type": "value.error",
-                    }
-                ],
-            )
+            raise ValidationError({"choices": _("Too many proposals picked")})
         matched_pks = set(
-            self.poll.proposals.filter(pk__in=msg.data.vote.choices).values_list(
-                "pk", flat=True
-            )
+            self.poll.proposals.filter(pk__in=vote.choices).values_list("pk", flat=True)
         )
-        unmatched = set(msg.data.vote.choices) - matched_pks
+        unmatched = set(vote.choices) - matched_pks
         if unmatched:
-            raise ValidationErrorMsg.from_message(
-                msg,
-                msg=_("Invalid vote"),
-                errors=[
-                    {
-                        "loc": ("vote.choices",),
-                        "msg": _(
-                            "Invalid choice, the following proposals don't exist: %s"
-                        )
-                        % ",".join([str(x) for x in unmatched]),
-                        "type": "value.error",
-                    }
-                ],
+            raise ValidationError(
+                {
+                    "choices": _(
+                        "Invalid choice, the following proposals don't exist: %s"
+                    )
+                    % ",".join([str(x) for x in unmatched])
+                }
             )
 
     def start_check(self):

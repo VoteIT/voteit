@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from voteit.poll.models import Poll
     from voteit.poll.models import ElectoralRegister
     from voteit.meeting.models import Meeting
-    from voteit.poll.messages import VoteBase
     from voteit.poll.schemas import PollResult
     from voteit.core.models import User
     from voteit.poll.models import VoteTransfer
@@ -64,11 +63,12 @@ class PollMethod(ABC):
     def calculate_result(self, counter) -> BaseModel:
         """Takes the counted ballots, calculate the result and store it."""
 
-    def validate_vote(self, msg: VoteBase) -> None:
+    def validate_vote(self, vote: BaseModel) -> None:
         """
         Run extra validation based on how the vote itself looks.
         For instance checking that a ranked vote actually ranks real proposals.
-        May raise ValidationErrorMsg in case something goes wrong.
+        ``vote`` is an instance of ``vote_schema``. May raise
+        rest_framework.exceptions.ValidationError in case something goes wrong.
         """
 
     def start_check(self) -> None:  # pragma: no cover

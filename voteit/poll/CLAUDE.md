@@ -93,8 +93,20 @@ ViewSets registered in `rest_api/views.py` (all under `/api/`):
 | `VoteTransferViewSet` | `vote-transfer` | CRUD + `reassign` action |
 | `ElectoralRegisterPoliciesViewSet` | `electoral-register-policies` | list only (metadata) |
 | `ExportERViewSet` | `export-electoral-register` | `csv` and `json` actions |
+| `VoteViewSet` | `vote` | create-only, `POST /votes/` |
 
-Vote creation/update is handled via WebSocket messages (`messages.py`), not a REST endpoint.
+`POST /votes/` — `{"poll": 1, "vote": {...}}` or `{"poll": 1, "abstain": true}` (mutually
+exclusive - sending both is a `vote` validation error). Upserts (`update_or_create` on
+`user` + `poll`) - there's no separate "change vote" endpoint, casting again just
+overwrites the existing row, and abstaining overwrites any existing vote (and vice
+versa). Returns `201` when the vote row was created, `200` when an existing one was
+updated. Permission (`poll.add_vote`: poll must be ongoing and the user must be in its
+electoral register) is checked via `validate_model_add` on the `poll` field, so a
+non-voter or a poll in the wrong state gets a 403, not 400. `vote` is validated against
+`poll.method.vote_schema`, then run through `poll.method.validate_vote(vote)`
+(method-specific checks, e.g. that a ranked vote only refers to real proposals) - both
+raise/convert to DRF `ValidationError` under the `vote` key. `vote` is required unless
+`abstain` is `true`.
 
 ## WebSocket / Channels
 
@@ -102,9 +114,13 @@ Handlers in `signals.py` (subscribed to `channels-envelope` events):
 
 - **On subscription**: push current poll state, votes, ER, vote transfers to the joining user
 - **On poll change**: broadcast `PollAdded`/`PollChanged`/`PollDeleted` to appropriate channels
-- **On vote cast**: send `PollStatus` (aggregate counts) to meeting channel; send `GenericVoteResponse` to the voter's user channel
+- **On vote cast**: send `PollStatus` (aggregate counts, only for polls attached to a meeting) to
+  meeting channel; send `GenericVoteResponse` to the voter's user channel. This is a `Vote`
+  `post_save` signal, so it fires the same way regardless of whether the vote was written via
+  the REST endpoint above or directly through the ORM.
 
-Message types are Pydantic models in `messages.py`. `AddVote` (abstract) is the base for vote messages; subclass it to add a new vote type.
+Message types are Pydantic models in `messages.py`. There's no longer an incoming vote
+message - votes are cast via the REST endpoint above.
 
 ## Permissions
 
@@ -130,7 +146,7 @@ Run poll tests:
 python manage.py test voteit.poll --keepdb --failfast
 ```
 
-Tests are under `tests/` (models, rules, signals, messages, auditlog) and `rest_api/tests/` (views, serializers) and `app/polls/tests/` and `app/er_policies/tests/` (one file per method/policy).
+Tests are under `tests/` (models, rules, signals, auditlog) and `rest_api/tests/` (views, serializers - including vote add/abstain) and `app/polls/tests/` and `app/er_policies/tests/` (one file per method/policy).
 
 `testing.py` exports `UnrestrictedVoteTransferPolicy` and `UnrestrictedVoteTransferER` for use in other apps' tests that need a poll without transfer restrictions.
 

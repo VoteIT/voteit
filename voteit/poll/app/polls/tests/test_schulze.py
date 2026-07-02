@@ -2,9 +2,8 @@ from collections import Counter
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
+from rest_framework.exceptions import ValidationError
 
-from envelope.messages.errors import ValidationErrorMsg
 from voteit.poll.app.polls.schulze import RepeatedSchulze
 from voteit.poll.app.polls.schulze import RepeatedSchulzeResult
 from voteit.poll.exceptions import InvalidProposalCount
@@ -12,10 +11,6 @@ from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
 
 User = get_user_model()
-
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
 def wiki_example_ballots(method) -> Counter:
@@ -345,8 +340,14 @@ class RepeatedSchulzeTests(TestCase):
         self.assertEqual("no_result", self.poll.state)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
-class AddSchulzeVoteTests(TestCase):
+class VoteCastingTests(TestCase):
+    """
+    Covers casting real votes through to a poll result and the extra
+    method-specific validation run by VoteAddSerializer before a vote is
+    stored (rest_api/serializers.py) - previously exercised via the
+    AddSchulzeVote WS message.
+    """
+
     @classmethod
     def setUpTestData(cls):
         cls.er = ElectoralRegister.objects.create()
@@ -359,50 +360,41 @@ class AddSchulzeVoteTests(TestCase):
         cls.poll.upcoming(force=True)
         cls.poll.save()
 
-    @property
-    def _cut(self):
-        from voteit.poll.app.polls.schulze import AddSchulzeVote
-
-        return AddSchulzeVote
-
-    def _mk_one(self, **kw):
-        kw.setdefault("poll", self.poll.pk)
-        kw.setdefault(
-            "vote",
-            {"ranking": ((self.prop1.pk, 10), (self.prop2.pk, 5), (self.prop3.pk, 1))},
+    def _cast(self, poll=None):
+        poll = poll or self.poll
+        vote = poll.method.vote_schema(
+            ranking=((self.prop1.pk, 10), (self.prop2.pk, 5), (self.prop3.pk, 1))
         )
-        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
+        poll.method.validate_vote(vote)
+        poll.votes.update_or_create(
+            user=self.voter, defaults={"vote": vote, "abstain": False}
+        )
 
-    def test_add_vote(self):
+    def test_cast_vote(self):
         from voteit.poll.app.polls.schulze import SchulzePollResult
 
         self.poll.ongoing(force=True)
         self.poll.save()
         self.assertFalse(self.poll.votes.filter(user=self.voter).exists())
-        msg = self._mk_one()
-        msg.run_job()
+        self._cast()
         self.assertTrue(self.poll.votes.filter(user=self.voter).exists())
         self.poll.close(force=True)
         self.assertIsInstance(self.poll.result, SchulzePollResult)
         self.assertEqual(self.prop1.pk, self.poll.result.winner)
 
-    def test_add_vote_on_repeated(self):
+    def test_cast_vote_on_repeated(self):
         self.poll.method_name = RepeatedSchulze.name
         self.poll.method = RepeatedSchulze(self.poll)  # Remove chached property
         self.poll.settings = {"winners": 2}
         self.poll.ongoing(force=True)
         self.poll.save()
         self.assertFalse(self.poll.votes.filter(user=self.voter).exists())
-        msg = self._mk_one()
-        msg.run_job()
+        self._cast()
         self.assertTrue(self.poll.votes.filter(user=self.voter).exists())
         self.poll.close(force=True)
         self.assertIsInstance(self.poll.result, RepeatedSchulzeResult)
         self.assertEqual({self.prop1.pk, self.prop2.pk}, set(self.poll.result.approved))
 
-    def test_add_vote_invalid_proposal(self):
-        self.poll.ongoing(force=True)
-        self.poll.save()
-        msg = self._mk_one()
-        msg.data.vote.ranking.append((-1, 10))
-        self.assertRaises(ValidationErrorMsg, msg.run_job)
+    def test_validate_vote_invalid_proposal(self):
+        vote = self.poll.method.vote_schema(ranking=((self.prop1.pk, 10), (-1, 5)))
+        self.assertRaises(ValidationError, self.poll.method.validate_vote, vote)

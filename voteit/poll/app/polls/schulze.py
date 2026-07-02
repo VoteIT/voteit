@@ -8,13 +8,11 @@ from py3votecore.schulze_method import SchulzeMethod
 from pydantic import BaseModel
 from pydantic import validator
 
-from envelope.messages.errors import ValidationErrorMsg
-from voteit.messaging.decorators import incoming
+from rest_framework.exceptions import ValidationError
+
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
-from voteit.poll.messages import AddVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericAddVoteSchema
 from voteit.poll.schemas import PollResult
 
 __all__ = ("Schulze", "RepeatedSchulze")
@@ -23,24 +21,6 @@ __all__ = ("Schulze", "RepeatedSchulze")
 class SchulzeVoteSchema(BaseModel):
     # FIXME Will not serialize: https://github.com/django/channels_redis/issues/216
     ranking: list[tuple[int, int]]
-
-
-class AddVoteSchema(GenericAddVoteSchema):
-    vote: SchulzeVoteSchema
-
-
-@incoming
-class AddSchulzeVote(AddVote):
-    name = "schulze_vote.add"
-    schema = AddVoteSchema
-    data: AddVoteSchema
-
-
-@incoming
-class AddRepeatedSchulzeVote(AddVote):
-    name = "repeated_schulze_vote.add"
-    schema = AddVoteSchema
-    data: AddVoteSchema
 
 
 class SchulzePollResult(PollResult):
@@ -158,8 +138,8 @@ class Schulze(PollMethod):
             res.denied.extend([x for x in res.candidates if x and x != res.winner])
         return res
 
-    def validate_vote(self, msg: AddSchulzeVote) -> None:
-        ranked_pks = [x[0] for x in msg.data.vote.ranking]
+    def validate_vote(self, vote: SchulzeVoteSchema) -> None:
+        ranked_pks = [x[0] for x in vote.ranking]
         matched_pks = set(
             self.poll.proposals.filter(pk__in=ranked_pks).values_list("pk", flat=True)
         )
@@ -167,19 +147,13 @@ class Schulze(PollMethod):
             matched_pks.add(0)
         unmatched = set(ranked_pks) - matched_pks
         if unmatched:
-            raise ValidationErrorMsg.from_message(
-                msg,
-                msg=_("Invalid vote"),
-                errors=[
-                    {
-                        "loc": ("vote.ranking",),
-                        "msg": _(
-                            "Invalid choice, the following proposals don't exist: %s"
-                        )
-                        % ",".join([str(x) for x in unmatched]),
-                        "type": "value.error",
-                    }
-                ],
+            raise ValidationError(
+                {
+                    "ranking": _(
+                        "Invalid choice, the following proposals don't exist: %s"
+                    )
+                    % ",".join([str(x) for x in unmatched])
+                }
             )
 
     def start_check(self):

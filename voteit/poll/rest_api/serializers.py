@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.db import transaction
+from pydantic import ValidationError as PydanticValidationError
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from auditlog.context import set_actor
@@ -8,6 +9,7 @@ from django.utils.translation import gettext as _
 
 from voteit.core.rest_api.serializers import OptionalHyperlinkedIdentityField
 from voteit.core.rest_api.serializers import PydanticFieldSerializer
+from voteit.core.rest_api.utils import pydantic_to_drf_validation_error
 from voteit.core.rest_api.utils import validate_model_add
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
@@ -33,6 +35,7 @@ __all__ = (
     "PollDetailSerializer",
     "PollCreateSerializer",
     "VoteSerializer",
+    "VoteAddSerializer",
 )
 
 
@@ -250,8 +253,6 @@ class ManualCreateERSerializer(serializers.Serializer):
         if not value.is_ongoing:
             raise ValidationError(_("Meeting isn't ongoing"))
         validate_model_add(self, ElectoralRegister, value)
-        from voteit.poll.utils import get_electoral_policy_registry
-
         if (
             value.er_policy_name not in get_electoral_policy_registry()
             or not value.er_policy.allow_manual
@@ -310,6 +311,62 @@ class VoteSerializer(serializers.ModelSerializer):
             "abstain",
             "vote",
         )
+
+
+class VoteAddSerializer(serializers.Serializer):
+    """
+    Casts or updates the requesting user's vote in a poll (upsert - there's no
+    separate "change vote" operation). Set ``abstain`` to abstain instead of voting.
+    """
+
+    poll = serializers.PrimaryKeyRelatedField(queryset=Poll.objects.all())
+    vote = PydanticFieldSerializer(allow_null=True, required=False)
+    abstain = serializers.BooleanField(required=False, default=False)
+
+    def validate_poll(self, poll: Poll):
+        # Encodes both "poll is ongoing" and "user is in the electoral register"
+        validate_model_add(self, Vote, poll)
+        return poll
+
+    def validate(self, attrs):
+        if attrs.get("abstain"):
+            if attrs.get("vote"):
+                raise ValidationError(
+                    {"vote": _("Can't provide a vote when abstaining.")}
+                )
+            attrs["vote"] = None
+            return attrs
+        poll: Poll = attrs["poll"]
+        vote_data = attrs.get("vote")
+        if not isinstance(vote_data, dict):
+            raise ValidationError(
+                {"vote": _("Must be an object matching this poll's vote format.")}
+            )
+        try:
+            vote = poll.method.vote_schema(**vote_data)
+        except PydanticValidationError as exc:
+            raise ValidationError(
+                {"vote": pydantic_to_drf_validation_error(exc).detail}
+            ) from exc
+        try:
+            poll.method.validate_vote(vote)
+        except ValidationError as exc:
+            raise ValidationError({"vote": exc.detail}) from exc
+        attrs["vote"] = vote
+        return attrs
+
+    def create(self, validated_data):
+        poll: Poll = validated_data["poll"]
+        user = self.context["request"].user
+        vote, created = poll.votes.update_or_create(
+            user=user,
+            defaults={
+                "vote": validated_data["vote"],
+                "abstain": validated_data["abstain"],
+            },
+        )
+        self._created = created
+        return vote
 
 
 class VoteTransferSerializer(serializers.ModelSerializer):

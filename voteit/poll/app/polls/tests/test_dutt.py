@@ -1,25 +1,20 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
-from pydantic import ValidationError
+from rest_framework.exceptions import ValidationError
 
-from envelope.messages.errors import ValidationErrorMsg
+from voteit.poll.app.polls.dutt import Dutt
+from voteit.poll.app.polls.dutt import DuttVoteSchema
 from voteit.poll.exceptions import InvalidProposalCount
+from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
+from voteit.proposal.models import Proposal
 
 User = get_user_model()
-_channel_layers_setting = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
-}
 
 
 class DuttTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-        from voteit.poll.app.polls.dutt import Dutt
-        from voteit.proposal.models import Proposal
-
         cls.Dutt = Dutt
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter_a = User.objects.create(username="a")
@@ -41,8 +36,6 @@ class DuttTests(TestCase):
         self.assertRaises(InvalidProposalCount, method.start_check)
 
     def test_vote_schema(self):
-        from voteit.poll.app.polls.dutt import DuttVoteSchema
-
         self.poll.ongoing(force=True)
         vote = self.poll.votes.create(user=self.voter_a, vote=f"[{self.prop1.pk}]")
         self.assertIsInstance(vote.vote, DuttVoteSchema)
@@ -81,16 +74,14 @@ class DuttTests(TestCase):
         self.assertEqual("no_result", self.poll.state)
 
 
-@override_settings(CHANNEL_LAYERS=_channel_layers_setting)
-class AddDuttVoteTests(TestCase):
+class ValidateVoteTests(TestCase):
+    """
+    Unit-level coverage of Dutt.validate_vote - the extra method-specific
+    validation run by VoteAddSerializer before a vote is stored (rest_api/serializers.py).
+    """
+
     @classmethod
     def setUpTestData(cls):
-        from voteit.poll.models import Poll
-        from voteit.poll.models import ElectoralRegister
-        from voteit.poll.app.polls.dutt import Dutt
-        from voteit.proposal.models import Proposal
-
-        cls.Dutt = Dutt
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
         cls.voter = User.objects.create(username="a")
         cls.er.set_voters_from_dict({cls.voter.pk: 1})
@@ -100,30 +91,23 @@ class AddDuttVoteTests(TestCase):
         cls.prop1: Proposal = cls.poll.proposals.create()
         cls.prop2: Proposal = cls.poll.proposals.create()
 
-    @property
-    def _cut(self):
-        from voteit.poll.app.polls.dutt import AddDuttVote
+    def test_valid_choice(self):
+        vote = DuttVoteSchema(choices=[self.prop1.pk])
+        self.assertIsNone(self.poll.method.validate_vote(vote))
 
-        return AddDuttVote
-
-    def _mk_one(self, choices, **kw):
-        kw.setdefault("vote", {"choices": choices})
-        kw.setdefault("poll", self.poll.pk)
-        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
-
-    def test_add_msg(self):
-        msg = self._mk_one([self.prop1.pk])
-        msg.run_job()
-        self.assertEqual(1, self.voter.vote_set.count())
-        vote = self.voter.vote_set.first()
-        self.assertEqual([self.prop1.pk], vote.vote.choices)
-
-    def test_add_msg_obvious_bad_choice(self):
-        # Handled by pydantic
-        with self.assertRaises(ValidationError):
-            self._mk_one([0])
-
-    def test_add_msg_bad_proposal(self):
+    def test_bad_proposal(self):
         bad_prop_pk = self.prop1.pk - 5
-        msg = self._mk_one([bad_prop_pk])
-        self.assertRaises(ValidationErrorMsg, msg.run_job)
+        vote = DuttVoteSchema(choices=[bad_prop_pk])
+        self.assertRaises(ValidationError, self.poll.method.validate_vote, vote)
+
+    def test_too_few(self):
+        self.poll.settings = {"min": 2}
+        self.poll.save()
+        vote = DuttVoteSchema(choices=[self.prop1.pk])
+        self.assertRaises(ValidationError, self.poll.method.validate_vote, vote)
+
+    def test_too_many(self):
+        self.poll.settings = {"max": 1}
+        self.poll.save()
+        vote = DuttVoteSchema(choices=[self.prop1.pk, self.prop2.pk])
+        self.assertRaises(ValidationError, self.poll.method.validate_vote, vote)

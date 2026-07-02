@@ -6,13 +6,11 @@ from django.utils.translation import gettext as _
 from pydantic import BaseModel
 from pydantic import validator
 
-from envelope.messages.errors import ValidationErrorMsg
-from voteit.messaging.decorators import incoming
+from rest_framework.exceptions import ValidationError
+
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
-from voteit.poll.messages import AddVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericAddVoteSchema
 from voteit.poll.schemas import PollResult
 
 __all__ = ("Majority",)
@@ -35,17 +33,6 @@ class MajorityVoteSchema(BaseModel):
         if v < 1:
             raise ValueError("Must be a positive int")
         return v
-
-
-class AddVoteSchema(GenericAddVoteSchema):
-    vote: MajorityVoteSchema
-
-
-@incoming
-class AddMajorityVote(AddVote):
-    name = "majority_vote.add"
-    schema = AddVoteSchema
-    data: AddVoteSchema
 
 
 class ProposalResult(BaseModel):
@@ -123,16 +110,6 @@ class Majority(PollMethod):
         if self.poll.proposals.count() < 2:
             raise InvalidProposalCount(_("Must have at least 2 proposals"))
 
-    def validate_vote(self, msg: AddMajorityVote) -> None:
-        if not self.poll.proposals.filter(pk=msg.data.vote.choice).exists():
-            raise ValidationErrorMsg.from_message(
-                msg,
-                msg=_("Invalid vote"),
-                errors=[
-                    {
-                        "loc": ("vote.choice",),
-                        "msg": "Invalid choice",
-                        "type": "value.error",
-                    }
-                ],
-            )
+    def validate_vote(self, vote: MajorityVoteSchema) -> None:
+        if not self.poll.proposals.filter(pk=vote.choice).exists():
+            raise ValidationError({"choice": _("Invalid choice")})

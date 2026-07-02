@@ -5,7 +5,7 @@ from random import sample
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from pydantic import ValidationError
-from envelope.messages.errors import ValidationErrorMsg
+from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from voteit.core.testing import SetSeed
 from voteit.poll.exceptions import InvalidProposalCount
@@ -108,7 +108,12 @@ class IRVTests(TestCase):
         self.assertEqual("no_result", self.poll.state)
 
 
-class AddVoteTests(TestCase):
+class ValidateVoteTests(TestCase):
+    """
+    Unit-level coverage of IRV/RepeatedIRV.validate_vote - the extra method-specific
+    validation run by VoteAddSerializer before a vote is stored (rest_api/serializers.py).
+    """
+
     @classmethod
     def setUpTestData(cls):
         cls.er = ElectoralRegister.objects.create()
@@ -128,93 +133,33 @@ class AddVoteTests(TestCase):
             poll.ongoing(force=True)
             poll.save()
 
-    @property
-    def _cut(self):
-        from voteit.poll.app.polls.irv import AddIRVVote
-
-        return AddIRVVote
-
-    def _mk_one(self, **kw):
-        kw.setdefault(
-            "vote", {"ranking": [self.prop1.pk, self.prop2.pk, self.prop3.pk]}
-        )
-        kw.setdefault("poll", self.irv_poll.pk)
-        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
-
-    def test_add(self):
-        msg = self._mk_one()
-        msg.run_job()
-        vote = self.irv_poll.votes.filter(user=self.voter).first()
-        self.assertIsNotNone(vote)
-        self.assertEqual(
-            f"{self.prop1.pk},{self.prop2.pk},{self.prop3.pk}", vote.vote_data
-        )
-
-    def test_add_bad_vote(self):
-        msg = self._mk_one(vote={"ranking": [-1, self.prop2.pk]})
-        self.assertRaises(ValidationErrorMsg, msg.run_job)
-
-    def test_add_repeated(self):
-        msg = self._mk_one(poll=self.repeated_irv_poll.pk)
-        msg.run_job()
-        vote = self.repeated_irv_poll.votes.filter(user=self.voter).first()
-        self.assertIsNotNone(vote)
-        self.assertEqual(
-            f"{self.prop1.pk},{self.prop2.pk},{self.prop3.pk}", vote.vote_data
-        )
+    def test_bad_ranking(self):
+        vote = RankingSchema(ranking=[-1, self.prop2.pk])
+        self.assertRaises(DRFValidationError, self.irv_poll.method.validate_vote, vote)
 
     def test_min(self):
         settings = self.repeated_irv_poll.settings.dict()
         settings["min"] = 2
         self.repeated_irv_poll.settings = settings
         self.repeated_irv_poll.save()
-        msg = self._mk_one(
-            poll=self.repeated_irv_poll.pk,
-            vote={"ranking": [self.prop1.pk, self.prop2.pk]},
-        )
-        msg.run_job()
-        msg = self._mk_one(
-            poll=self.repeated_irv_poll.pk, vote={"ranking": [self.prop1.pk]}
-        )
-        with self.assertRaises(ValidationErrorMsg) as cm:
-            msg.run_job()
-        self.assertEqual(
-            [
-                {
-                    "loc": ("vote.ranking",),
-                    "msg": "Too few selected",
-                    "type": "value.error",
-                }
-            ],
-            cm.exception.data.errors,
-        )
+        method = self.repeated_irv_poll.method
+        method.validate_vote(RankingSchema(ranking=[self.prop1.pk, self.prop2.pk]))
+        with self.assertRaises(DRFValidationError) as cm:
+            method.validate_vote(RankingSchema(ranking=[self.prop1.pk]))
+        self.assertEqual({"ranking": "Too few selected"}, cm.exception.detail)
 
     def test_max(self):
         settings = self.repeated_irv_poll.settings.dict()
         settings["max"] = 2
         self.repeated_irv_poll.settings = settings
         self.repeated_irv_poll.save()
-        msg = self._mk_one(
-            poll=self.repeated_irv_poll.pk,
-            vote={"ranking": [self.prop1.pk, self.prop2.pk]},
-        )
-        msg.run_job()
-        msg = self._mk_one(
-            poll=self.repeated_irv_poll.pk,
-            vote={"ranking": [self.prop1.pk, self.prop2.pk, self.prop3.pk]},
-        )
-        with self.assertRaises(ValidationErrorMsg) as cm:
-            msg.run_job()
-        self.assertEqual(
-            [
-                {
-                    "loc": ("vote.ranking",),
-                    "msg": "Too many selected",
-                    "type": "value.error",
-                }
-            ],
-            cm.exception.data.errors,
-        )
+        method = self.repeated_irv_poll.method
+        method.validate_vote(RankingSchema(ranking=[self.prop1.pk, self.prop2.pk]))
+        with self.assertRaises(DRFValidationError) as cm:
+            method.validate_vote(
+                RankingSchema(ranking=[self.prop1.pk, self.prop2.pk, self.prop3.pk])
+            )
+        self.assertEqual({"ranking": "Too many selected"}, cm.exception.detail)
 
 
 class RepeatedIRVTests(TestCase):

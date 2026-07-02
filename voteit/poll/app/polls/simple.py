@@ -6,12 +6,9 @@ from django.utils.translation import gettext_lazy as _
 from pydantic import BaseModel
 from pydantic import validator
 
-from voteit.messaging.decorators import incoming
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
-from voteit.poll.messages import AddVote
 from voteit.poll.registries import poll_methods
-from voteit.poll.schemas import GenericAddVoteSchema
 from voteit.poll.schemas import PollResult
 
 __all__ = ("Simple",)
@@ -30,17 +27,6 @@ class SimpleVoteSchema(BaseModel):
         if v not in [YES, NO]:
             raise ValueError("Not a valid choice")
         return v
-
-
-class AddVoteSchema(GenericAddVoteSchema):
-    vote: SimpleVoteSchema
-
-
-@incoming
-class AddSimpleVote(AddVote):
-    name = "simple_vote.add"
-    schema = AddVoteSchema
-    data: AddVoteSchema
 
 
 class SimplePollResult(PollResult):

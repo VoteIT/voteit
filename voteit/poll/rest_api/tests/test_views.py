@@ -4,6 +4,8 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.test import override_settings
 from django.utils import timezone
+from envelope.app.user_channel.channel import UserChannel
+from envelope.testing import ChannelMessageCatcher
 from envelope.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
@@ -18,8 +20,12 @@ from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
 from voteit.poll.app.er_policies.manual import Manual
 from voteit.poll.app.polls.combined_simple import CombinedSimple
+from voteit.poll.app.polls.majority import Majority
 from voteit.poll.app.polls.schulze import RepeatedSchulze
+from voteit.poll.app.polls.schulze import Schulze
+from voteit.poll.messages import GenericVoteResponse
 from voteit.poll.models import ElectoralRegister
+from voteit.poll.models import Poll
 from voteit.poll.registries import er_policy
 from voteit.poll.registries import vote_transfer_policies
 from voteit.poll.testing import UnrestrictedVoteTransferER
@@ -884,3 +890,268 @@ class PollStateMachineSchemaTests(APITestCase):
         self.assertEqual(200, response.status_code)
         self.assertIn("states", response.data)
         self.assertIn("events", response.data)
+
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+class VoteViewSetTests(APITestCase):
+    """Covers the add/change/abstain vote upsert, previously the AddVote/AbstainVote
+    WS messages. Uses the "simple" poll method as the base, same as the old tests.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        # No meeting attached - same as the old message-based tests. Keeps the
+        # state machine's meeting/AI/ER-policy guards out of scope (see
+        # PollStateMachine's "Skip for unittests" branches) since this class
+        # only exercises the vote add/abstain upsert and permission checks.
+        cls.er: ElectoralRegister = ElectoralRegister.objects.create()
+        cls.voter: User = User.objects.create(username="voter")
+        cls.outsider: User = User.objects.create(username="outsider")
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
+        cls.poll: Poll = Poll.objects.create(
+            electoral_register=cls.er, method_name="simple"
+        )
+        cls.poll.proposals.create()
+        cls.poll.upcoming(force=True)
+        cls.poll.save()
+
+    def setUp(self):
+        self.poll.refresh_from_db()
+
+    def _url(self):
+        return reverse("vote-list")
+
+    def test_permissions(self):
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        data = {"poll": self.poll.pk, "vote": {"choice": "yes"}}
+        for func, args in run_permission_tests(
+            self,
+            url=self._url(),
+            data=data,
+            method="post",
+            expected=[
+                [None, 401],
+                [self.outsider, 403],
+                [self.voter, 201],
+            ],
+        ):
+            func(*args)
+
+    def test_add_not_started(self):
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(),
+            {"poll": self.poll.pk, "vote": {"choice": "yes"}},
+            format="json",
+        )
+        self.assertEqual(403, response.status_code)
+
+    def test_add_closed_poll(self):
+        self.poll.ongoing(force=True)
+        self.poll.close(force=True)
+        self.poll.save()
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(),
+            {"poll": self.poll.pk, "vote": {"choice": "yes"}},
+            format="json",
+        )
+        self.assertEqual(403, response.status_code)
+
+    def test_add_and_change(self):
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(),
+            {"poll": self.poll.pk, "vote": {"choice": "yes"}},
+            format="json",
+        )
+        self.assertEqual(201, response.status_code)
+        vote = self.poll.votes.get(user=self.voter)
+        self.assertEqual("yes", vote.vote_data)
+        # Casting again updates the same row (upsert - there's no separate "change")
+        response = self.client.post(
+            self._url(),
+            {"poll": self.poll.pk, "vote": {"choice": "no"}},
+            format="json",
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(1, self.poll.votes.filter(user=self.voter).count())
+        vote.refresh_from_db()
+        self.assertEqual({"choice": "no"}, vote.vote.dict())
+
+    def test_add_vote_exists(self):
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        self.poll.votes.create(user=self.voter, vote_data="no")
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(),
+            {"poll": self.poll.pk, "vote": {"choice": "yes"}},
+            format="json",
+        )
+        self.assertEqual(200, response.status_code)
+        vote = self.poll.votes.get(user=self.voter)
+        self.assertEqual("yes", vote.vote_data)
+
+    def test_abstain(self):
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(), {"poll": self.poll.pk, "abstain": True}, format="json"
+        )
+        self.assertEqual(201, response.status_code)
+        vote = self.poll.votes.get(user=self.voter)
+        self.assertIsNone(vote.vote_data)
+        self.assertIs(vote.abstain, True)
+
+    def test_abstain_overwrites_existing_vote(self):
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        self.client.force_login(self.voter)
+        self.client.post(
+            self._url(),
+            {"poll": self.poll.pk, "vote": {"choice": "yes"}},
+            format="json",
+        )
+        response = self.client.post(
+            self._url(), {"poll": self.poll.pk, "abstain": True}, format="json"
+        )
+        self.assertEqual(200, response.status_code)
+        vote = self.poll.votes.get(user=self.voter)
+        self.assertIsNone(vote.vote_data)
+        self.assertIs(vote.abstain, True)
+
+    def test_vote_overwrites_existing_abstain(self):
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        self.poll.votes.create(user=self.voter, abstain=True)
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(),
+            {"poll": self.poll.pk, "vote": {"choice": "yes"}},
+            format="json",
+        )
+        self.assertEqual(200, response.status_code)
+        vote = self.poll.votes.get(user=self.voter)
+        self.assertEqual("yes", vote.vote_data)
+        self.assertIs(vote.abstain, False)
+
+    def test_bad_vote_shape(self):
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(),
+            {"poll": self.poll.pk, "vote": {"choice": "banana"}},
+            format="json",
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("vote", response.json())
+        self.assertFalse(self.poll.votes.filter(user=self.voter).exists())
+
+    def test_vote_not_an_object(self):
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(), {"poll": self.poll.pk, "vote": ["yes"]}, format="json"
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("vote", response.json())
+
+    def test_missing_vote_when_not_abstaining(self):
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        self.client.force_login(self.voter)
+        response = self.client.post(self._url(), {"poll": self.poll.pk}, format="json")
+        self.assertEqual(400, response.status_code)
+        self.assertIn("vote", response.json())
+
+    def test_vote_and_abstain_together_rejected(self):
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(),
+            {"poll": self.poll.pk, "vote": {"choice": "yes"}, "abstain": True},
+            format="json",
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("vote", response.json())
+        self.assertFalse(self.poll.votes.filter(user=self.voter).exists())
+
+    def test_broadcasts_vote_added(self):
+        """
+        Broadcasting is done entirely via the Vote/Poll post_save signal
+        (signals.py), so it fires the same way regardless of REST vs WS origin.
+        (PollStatus is only sent for polls attached to a meeting, out of scope
+        for this test class - see the fixture note in setUpTestData.)
+        """
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        self.client.force_login(self.voter)
+        with ChannelMessageCatcher(UserChannel, GenericVoteResponse) as vote_msgs:
+            response = self.client.post(
+                self._url(),
+                {"poll": self.poll.pk, "vote": {"choice": "yes"}},
+                format="json",
+            )
+        self.assertEqual(201, response.status_code)
+        self.assertEqual(1, len(vote_msgs))
+
+
+class VoteViewSetPollMethodValidationTests(APITestCase):
+    """
+    PollMethod.validate_vote() is method-specific extra validation (e.g. checking
+    that a ranked/chosen vote actually refers to real proposals on the poll).
+    Covers the error path for a few methods that override it.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.voter: User = User.objects.create(username="voter")
+        cls.er: ElectoralRegister = ElectoralRegister.objects.create()
+        cls.er.set_voters_from_dict({cls.voter.pk: 1})
+
+    def _mk_ongoing_poll(self, **kw) -> Poll:
+        # Bypass the state machine's start_check() (proposal-count guards
+        # unrelated to what's being tested here) - same as the old message-based
+        # tests, which used state="ongoing" directly.
+        kw.setdefault("state", "ongoing")
+        return Poll.objects.create(electoral_register=self.er, **kw)
+
+    def _url(self):
+        return reverse("vote-list")
+
+    def test_majority_bad_proposal(self):
+        poll = self._mk_ongoing_poll(method_name=Majority.name)
+        prop1 = poll.proposals.create()
+        poll.proposals.create()
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(),
+            {"poll": poll.pk, "vote": {"choice": prop1.pk - 1000}},
+            format="json",
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("vote", response.json())
+        self.assertIn("choice", response.json()["vote"])
+
+    def test_schulze_bad_ranking(self):
+        poll = self._mk_ongoing_poll(method_name=Schulze.name)
+        prop1 = poll.proposals.create()
+        poll.proposals.create()
+        poll.proposals.create()
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(),
+            {"poll": poll.pk, "vote": {"ranking": [[prop1.pk - 1000, 10]]}},
+            format="json",
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("vote", response.json())
+        self.assertIn("ranking", response.json()["vote"])

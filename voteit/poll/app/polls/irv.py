@@ -1,29 +1,23 @@
 from typing import Counter
 
 from django.utils.translation import gettext_lazy as _
-from envelope.messages.errors import ValidationErrorMsg
 from pydantic import BaseModel
 from pydantic import PositiveInt
 from pydantic import validator
+from rest_framework.exceptions import ValidationError
 from stvpoll.abcs import STVPollBase
 from stvpoll.irv import IRV as IRVBase
 from stvpoll.exceptions import IncompleteResult
 from stvpoll.irv import irv_quota
 from stvpoll.types import SelectionMethod
 
-from voteit.messaging.decorators import incoming
-from voteit.poll.app.polls.ranked import AddRankedVote
 from voteit.poll.app.polls.scottish_stv import STVResultSchema
 from voteit.poll.app.polls.scottish_stv import ScottishSTV
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.registries import poll_methods
+from voteit.poll.schemas import RankingSchema
 
 __all__ = ("IRV",)
-
-
-@incoming
-class AddIRVVote(AddRankedVote):
-    name = "irv_vote.add"
 
 
 class IRVSettings(BaseModel):
@@ -92,11 +86,6 @@ class RepeatedIRVPoll(STVPollBase):
         elected = singular_irv.result[0]
         winner = next(c for c in self.candidates if c == elected)
         self.elect(winner, SelectionMethod.Direct)
-
-
-@incoming
-class AddRepeatedIRVVote(AddRankedVote):
-    name = "repeated_irv_vote.add"
 
 
 class RepeatedIRVSettings(BaseModel):
@@ -191,35 +180,9 @@ class RepeatedIRV(ScottishSTV):
                 "Can't have less proposals than required min rankings"
             )
 
-    def validate_vote(self, msg: AddRankedVote) -> None:
-        if (
-            self.poll.settings.min
-            and len(msg.data.vote.ranking) < self.poll.settings.min
-        ):
-            raise ValidationErrorMsg.from_message(
-                msg,
-                msg=str(_("Invalid vote")),
-                errors=[
-                    {
-                        "loc": ("vote.ranking",),
-                        "msg": str(_("Too few selected")),
-                        "type": "value.error",
-                    }
-                ],
-            )
-        if (
-            self.poll.settings.max
-            and len(msg.data.vote.ranking) > self.poll.settings.max
-        ):
-            raise ValidationErrorMsg.from_message(
-                msg,
-                msg=str(_("Invalid vote")),
-                errors=[
-                    {
-                        "loc": ("vote.ranking",),
-                        "msg": str(_("Too many selected")),
-                        "type": "value.error",
-                    }
-                ],
-            )
-        return super().validate_vote(msg)
+    def validate_vote(self, vote: RankingSchema) -> None:
+        if self.poll.settings.min and len(vote.ranking) < self.poll.settings.min:
+            raise ValidationError({"ranking": str(_("Too few selected"))})
+        if self.poll.settings.max and len(vote.ranking) > self.poll.settings.max:
+            raise ValidationError({"ranking": str(_("Too many selected"))})
+        return super().validate_vote(vote)

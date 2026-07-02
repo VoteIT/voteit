@@ -24,6 +24,7 @@ from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.poll.models import ElectoralRegister
 from voteit.poll.models import Poll
+from voteit.poll.models import Vote
 from voteit.poll.models import VoteTransfer
 from voteit.poll.rest_api import serializers
 from voteit.poll.schemas import ElectoralRegistryPolicySchema
@@ -150,6 +151,33 @@ class VoteTransferViewSet(
         if self.action in ("update", "partial_update"):
             return serializers.VoteTransferReassignSerializer
         return super().get_serializer_class()
+
+
+@router.register("votes", basename="vote")
+class VoteViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericViewSet):
+    """Create-only - there's no list/retrieve, votes are fetched via WS on subscribe."""
+
+    queryset = Vote.objects.none()
+    serializer_class = serializers.VoteAddSerializer
+    permission_type_map = {
+        **VerboseAutoPermissionViewSetMixin.permission_type_map,
+        "create": None,  # Checked in serializer via poll field
+    }
+    expected_default_http_status = 405
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        vote = serializer.save()
+        response_status = (
+            status.HTTP_201_CREATED if serializer._created else status.HTTP_200_OK
+        )
+        return Response(
+            serializers.VoteSerializer(
+                vote, context=self.get_serializer_context()
+            ).data,
+            status=response_status,
+        )
 
 
 @router.register("electoral-register-policies", basename="electoral-register-policies")

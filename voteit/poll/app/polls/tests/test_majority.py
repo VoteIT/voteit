@@ -1,9 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.test import override_settings
-from pydantic import ValidationError
-from envelope.messages.errors import ValidationErrorMsg
-from envelope.testing import testing_channel_layers_setting
+from rest_framework.exceptions import ValidationError
 
 from voteit.poll.app.polls.majority import MajorityVoteSchema
 from voteit.poll.exceptions import InvalidProposalCount
@@ -126,8 +123,12 @@ class MajorityTests(TestCase):
         self.assertEqual("no_result", self.poll.state)
 
 
-@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
-class AddMajorityVoteTests(TestCase):
+class ValidateVoteTests(TestCase):
+    """
+    Unit-level coverage of Majority.validate_vote - the extra method-specific
+    validation run by VoteAddSerializer before a vote is stored (rest_api/serializers.py).
+    """
+
     @classmethod
     def setUpTestData(cls):
         cls.er: ElectoralRegister = ElectoralRegister.objects.create()
@@ -139,30 +140,11 @@ class AddMajorityVoteTests(TestCase):
         cls.prop1: Proposal = cls.poll.proposals.create()
         cls.prop2: Proposal = cls.poll.proposals.create()
 
-    @property
-    def _cut(self):
-        from voteit.poll.app.polls.majority import AddMajorityVote
+    def test_valid_choice(self):
+        vote = MajorityVoteSchema(choice=self.prop1.pk)
+        self.assertIsNone(self.poll.method.validate_vote(vote))
 
-        return AddMajorityVote
-
-    def _mk_one(self, choice, **kw):
-        kw.setdefault("vote", {"choice": choice})
-        kw.setdefault("poll", self.poll.pk)
-        return self._cut(mm={"user_pk": self.voter.pk, "consumer_name": "abc"}, **kw)
-
-    def test_add_msg(self):
-        msg = self._mk_one(self.prop1.pk)
-        msg.run_job()
-        self.assertEqual(1, self.voter.vote_set.count())
-        vote = self.voter.vote_set.first()
-        self.assertEqual(self.prop1.pk, vote.vote.choice)
-
-    def test_add_msg_obvious_bad_choice(self):
-        # Handled by pydantic
-        with self.assertRaises(ValidationError):
-            self._mk_one(0)
-
-    def test_add_msg_bad_proposal(self):
+    def test_bad_proposal(self):
         bad_prop_pk = self.prop1.pk - 5
-        msg = self._mk_one(bad_prop_pk)
-        self.assertRaises(ValidationErrorMsg, msg.run_job)
+        vote = MajorityVoteSchema(choice=bad_prop_pk)
+        self.assertRaises(ValidationError, self.poll.method.validate_vote, vote)
