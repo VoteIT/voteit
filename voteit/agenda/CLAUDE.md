@@ -52,17 +52,19 @@ Serializers:
 - `AgendaItemListSerializer` — abbreviated, no body
 - `AgendaItemBodySerializer` — body + pk only
 - `CreateAgendaItemSerializer` — writable, used on POST
+- `BulkAgendaItemSerializer` / `BulkAgendaItemChangeSerializer` / `BulkAgendaItemDeleteSerializer` — used by the bulk actions below; `meeting` is a `ModeratorMeetingField` so non-moderators get a 400 (field-level rejection) rather than a 403
 
 `ExportAgendaItemsViewSet` at `export-agenda-items/` — moderator-only CSV/JSON export.
+
+### Bulk actions
+
+- `POST /agenda-items/bulk-change/` — `{"meeting": 1, "agenda_items": [1,2,3], "state": "ongoing", "block_discussion": true, "block_proposals": true}` (at least one of `state`/`block_discussion`/`block_proposals` required). State changes go through `ai.sm.send(...)` (same guards as the single-item `/event/` endpoint), so items where the transition isn't allowed are silently skipped rather than raising. Returns `{"changed": N}` — the count of items actually saved (deduped across the three fields, so an item touched on two axes only counts/saves once).
+- `POST /agenda-items/bulk-delete/` — `{"meeting": 1, "agenda_items": [1,2,3]}`. Blocked (400) if the meeting is ONGOING. Returns `{"deleted": N}`.
+- Both cap `agenda_items` at 250 entries — the state-machine guards (`has_change_permission`, `no_ongoing_polls`) run once per item, so this bounds worst-case query count. The item-fetch/validation step itself is a single query regardless of list size (`ai.meeting` is assigned from the already-validated `meeting` field to avoid a per-item FK query in the `meeting_is_ongoing`/`meeting_not_upcoming` guards).
 
 ## WebSocket (channels.py / messages.py)
 
 **`AgendaItemChannel`** — per-item channel; permission `agenda.view_agendaitem`. Sends full body on subscription.
-
-**Incoming messages:**
-- `last_read.change` — marks item read, returns `LastReadChanged`
-- `agenda_item.bulk_update` — bulk state/block_discussion/block_proposals change (skips items where transition is invalid)
-- `agenda_item.bulk_delete` — bulk delete; blocked if meeting is ONGOING
 
 **Outgoing broadcasts via signals (signals.py):**
 - `AgendaAdded` / `AgendaChanged` / `AgendaDeleted` → `ParticipantsChannel` (non-private only) and `ModeratorsChannel` (all)

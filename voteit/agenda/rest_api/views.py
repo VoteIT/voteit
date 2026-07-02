@@ -1,15 +1,19 @@
 import csv
+from logging import getLogger
 
 from django.db import models
+from django.db import transaction
 from django.db.models import QuerySet
 from django.http import Http404
 from django.http import HttpResponse
 from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+from statemachine.exceptions import TransitionNotAllowed
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api import serializers
@@ -20,6 +24,8 @@ from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.meeting.roles import ROLE_MODERATOR
+
+logger = getLogger(__name__)
 
 
 @router.register("agenda-items")
@@ -35,6 +41,8 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, StateMachineMixin, ModelV
         "update_last_read": None,  # Limited by queryset
         "event": None,  # Permission checked inside SM validators
         "state_machine": None,
+        "bulk_change": None,  # Meeting field restricts to moderators
+        "bulk_delete": None,  # Meeting field restricts to moderators
     }
     expected_default_http_status = 400
 
@@ -54,6 +62,92 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, StateMachineMixin, ModelV
         last_read = instance.mark_read(request.user)
         serializer = self.get_serializer(last_read)
         return Response(serializer.data)
+
+    @action(
+        methods=["post"],
+        detail=False,
+        serializer_class=serializers.BulkAgendaItemChangeSerializer,
+        url_path="bulk-change",
+    )
+    def bulk_change(self, request, *args, **kwargs):
+        """
+        POST /api/agenda-items/bulk-change/
+
+        Request:  {"meeting": 1, "agenda_items": [1, 2, 3], "state": "ongoing"}
+        Response: {"changed": 2}
+
+        `state`, `block_discussion` and/or `block_proposals` may be combined
+        in one request; at least one is required. State changes go through
+        the state machine (`ai.sm.send`), so items where the transition isn't
+        allowed (e.g. wrong source state, ongoing polls) are silently skipped
+        rather than raising - mirrors the single-item /event/ endpoint's guards.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        vd = serializer.validated_data
+        agenda_items: list[AgendaItem] = vd["agenda_items"]
+        must_save = set()
+        target_state = vd.get("state")
+        # Remember! We can't reload or change queryset when we touch several attributes.
+        if target_state:
+            for ai in agenda_items:
+                if ai.state == target_state:
+                    continue
+                for event in ai.sm.allowed_events:
+                    transitions = [
+                        t
+                        for state in ai.sm.configuration
+                        for t in state.transitions
+                        if event in t.events
+                    ]
+                    for trans in transitions:
+                        if trans.target.value == target_state:
+                            try:
+                                ai.sm.send(event.id, user=request.user)
+                                if ai.state == target_state:
+                                    must_save.add(ai)
+                            except (ValidationError, TransitionNotAllowed):
+                                logger.debug("Transition failed", exc_info=True)
+                            break
+        block_proposals = vd.get("block_proposals")
+        if block_proposals is not None:
+            for ai in agenda_items:
+                if ai.block_proposals != block_proposals:
+                    ai.block_proposals = block_proposals
+                    must_save.add(ai)
+        block_discussion = vd.get("block_discussion")
+        if block_discussion is not None:
+            for ai in agenda_items:
+                if ai.block_discussion != block_discussion:
+                    ai.block_discussion = block_discussion
+                    must_save.add(ai)
+        with transaction.atomic(durable=True):
+            for ai in must_save:
+                ai.save()
+        return Response({"changed": len(must_save)})
+
+    @action(
+        methods=["post"],
+        detail=False,
+        serializer_class=serializers.BulkAgendaItemDeleteSerializer,
+        url_path="bulk-delete",
+    )
+    def bulk_delete(self, request, *args, **kwargs):
+        """
+        POST /api/agenda-items/bulk-delete/
+
+        Request:  {"meeting": 1, "agenda_items": [1, 2, 3]}
+        Response: {"deleted": 3}
+
+        Raises 400 if the meeting is ongoing.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        agenda_items: list[AgendaItem] = serializer.validated_data["agenda_items"]
+        pks = [ai.pk for ai in agenda_items]
+        with transaction.atomic(durable=True):
+            AgendaItem.objects.filter(pk__in=pks).delete()
+        return Response({"deleted": len(pks)})
 
     def get_queryset(self):
         user = self.request.user
