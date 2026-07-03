@@ -135,11 +135,7 @@ class Dutt(PollMethod):
             raise ValidationError({"choices": _("Too few proposals picked")})
         if settings.max and settings.max < picked_count:
             raise ValidationError({"choices": _("Too many proposals picked")})
-        matched_pks = set(
-            self.poll.proposals.filter(pk__in=vote.choices).values_list("pk", flat=True)
-        )
-        unmatched = set(vote.choices) - matched_pks
-        if unmatched:
+        if unmatched := self.unmatched_proposal_pks(vote.choices):
             raise ValidationError(
                 {
                     "choices": _(

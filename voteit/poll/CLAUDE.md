@@ -52,7 +52,7 @@ Required interface:
 - `vote_to_str(data)` / `vote_to_obj(text)`: string ↔ Pydantic round-trip
 - `calculate_result(counter)`: receives `Counter({vote_data_str: weight})`, returns `result_schema` instance
 - `start_check()`: raise `PollStartError` if poll can't start (e.g. wrong proposal count)
-- Optional: `settings_schema`, `validate_vote(msg)`, `historic = True`
+- Optional: `settings_schema`, `validate_vote(vote)`, `historic = True`
 
 Available methods in `app/polls/`: `simple`, `majority`, `combined_simple`, `ranked`, `irv`, `schulze`, `scottish_stv`, `dutt`.
 

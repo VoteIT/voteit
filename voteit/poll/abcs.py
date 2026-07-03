@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
+from collections.abc import Iterable
 from logging import getLogger
 from typing import TYPE_CHECKING
 
@@ -70,6 +71,20 @@ class PollMethod(ABC):
         ``vote`` is an instance of ``vote_schema``. May raise
         rest_framework.exceptions.ValidationError in case something goes wrong.
         """
+
+    def unmatched_proposal_pks(
+        self, pks: Iterable[int], extra_valid_pks: Iterable[int] = ()
+    ) -> set[int]:
+        """
+        Given proposal pks referenced by a vote, return the ones that don't
+        correspond to a real proposal on this poll. ``extra_valid_pks`` allows
+        a method to accept virtual pks not backed by a real proposal (e.g.
+        Schulze's ``deny_proposal`` option, which uses pk 0).
+        """
+        matched = set(
+            self.poll.proposals.filter(pk__in=pks).values_list("pk", flat=True)
+        ) | set(extra_valid_pks)
+        return set(pks) - matched
 
     def start_check(self) -> None:  # pragma: no cover
         """

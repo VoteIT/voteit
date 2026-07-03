@@ -330,7 +330,7 @@ class VoteAddSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if attrs.get("abstain"):
-            if attrs.get("vote"):
+            if attrs.get("vote") is not None:
                 raise ValidationError(
                     {"vote": _("Can't provide a vote when abstaining.")}
                 )

@@ -136,11 +136,7 @@ class ScottishSTV(PollMethod):
         return self.finalize_stv_result(counter, poll_counter)
 
     def validate_vote(self, vote: RankingSchema) -> None:
-        matched_pks = set(
-            self.poll.proposals.filter(pk__in=vote.ranking).values_list("pk", flat=True)
-        )
-        unmatched = set(vote.ranking) - matched_pks
-        if unmatched:
+        if unmatched := self.unmatched_proposal_pks(vote.ranking):
             raise ValidationError(
                 {
                     "ranking": _(

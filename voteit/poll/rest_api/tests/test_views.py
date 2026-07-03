@@ -1084,6 +1084,21 @@ class VoteViewSetTests(APITestCase):
         self.assertIn("vote", response.json())
         self.assertFalse(self.poll.votes.filter(user=self.voter).exists())
 
+    def test_empty_vote_and_abstain_together_rejected(self):
+        # An empty dict/list is falsy in Python - make sure that doesn't let
+        # a malformed "both vote and abstain" request slip past the guard.
+        self.poll.ongoing(force=True)
+        self.poll.save()
+        self.client.force_login(self.voter)
+        response = self.client.post(
+            self._url(),
+            {"poll": self.poll.pk, "vote": {}, "abstain": True},
+            format="json",
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("vote", response.json())
+        self.assertFalse(self.poll.votes.filter(user=self.voter).exists())
+
     def test_broadcasts_vote_added(self):
         """
         Broadcasting is done entirely via the Vote/Poll post_save signal

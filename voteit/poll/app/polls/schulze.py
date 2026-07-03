@@ -140,13 +140,8 @@ class Schulze(PollMethod):
 
     def validate_vote(self, vote: SchulzeVoteSchema) -> None:
         ranked_pks = [x[0] for x in vote.ranking]
-        matched_pks = set(
-            self.poll.proposals.filter(pk__in=ranked_pks).values_list("pk", flat=True)
-        )
-        if self.poll.settings.deny_proposal:
-            matched_pks.add(0)
-        unmatched = set(ranked_pks) - matched_pks
-        if unmatched:
+        extra_valid_pks = (0,) if self.poll.settings.deny_proposal else ()
+        if unmatched := self.unmatched_proposal_pks(ranked_pks, extra_valid_pks):
             raise ValidationError(
                 {
                     "ranking": _(
