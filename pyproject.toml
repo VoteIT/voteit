@@ -38,7 +38,6 @@ dependencies = [
     "django-sql-utils (>=0.7.0,<0.8.0)",
     "rq-scheduler (>=0.14.0,<0.15.0)",
     "python-graph-core (>=1.8.2,<2.0.0)",
-    "setuptools (>=80.9.0,<81.0.0)",
     "django-controlcenter>=0.3.3",
     "py-vote-core>=2.0.0",
     "python-magic>=0.4.27",

@@ -528,9 +528,6 @@ sentry-sdk==2.63.0 ; platform_python_implementation != 'PyPy' and sys_platform !
 service-identity==26.1.0 ; platform_python_implementation != 'PyPy' and sys_platform != 'win32' \
     --hash=sha256:6358c52882c96e66ac4a55eb3a72c7dd4a70763f8cc6fa4e70abde2656f4bf3b \
     --hash=sha256:68c32dadbb69135fb951077677e07cd7f6031020f3a8c8f47a28cda8a0742118
-setuptools==80.10.2 ; platform_python_implementation != 'PyPy' and sys_platform != 'win32' \
-    --hash=sha256:8b0e9d10c784bf7d262c4e5ec5d4ec94127ce206e8738f29a437945fbc219b70 \
-    --hash=sha256:95b30ddfb717250edb492926c92b5221f7ef3fbcc2b07579bcd4a27da21d0173
 six==1.17.0 ; platform_python_implementation != 'PyPy' and sys_platform != 'win32' \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81
