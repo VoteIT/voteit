@@ -7,6 +7,7 @@ from envelope.testing import ChannelMessageCatcher
 from envelope.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
+from rest_framework.test import APITransactionTestCase
 
 from voteit.agenda.messages import AgendaChanged
 from voteit.agenda.models import AgendaItem
@@ -354,6 +355,37 @@ class AgendaItemBulkChangeViewTests(APITestCase):
         # be saved/notified once.
         self.assertEqual(3, len(messages))
 
+    def test_state_change_blocked_by_ongoing_poll_mixed(self):
+        self.meeting.state = "ongoing"
+        self.meeting.save()
+        ai1 = AgendaItem.objects.get(pk=1)
+        ai1.state = AgendaItemStateMachine.ongoing.value
+        ai1.save()
+        ai1.polls.create(method_name="simple", state="ongoing")
+        ai2 = AgendaItem.objects.get(pk=2)
+        ai2.state = AgendaItemStateMachine.ongoing.value
+        ai2.save()
+        self.client.force_login(self.moderator)
+        with ChannelMessageCatcher(ModeratorsChannel, AgendaChanged) as messages:
+            response = self.client.post(
+                self._url(),
+                {
+                    "meeting": self.meeting.pk,
+                    "agenda_items": [1, 2],
+                    "state": AgendaItemStateMachine.closed.value,
+                },
+                format="json",
+            )
+        self.assertEqual(200, response.status_code, response.content)
+        self.assertEqual({"changed": 1}, response.json())
+        self.assertEqual(1, len(messages))
+        self.assertEqual(
+            AgendaItemStateMachine.ongoing.value, AgendaItem.objects.get(pk=1).state
+        )
+        self.assertEqual(
+            AgendaItemStateMachine.closed.value, AgendaItem.objects.get(pk=2).state
+        )
+
     def test_requires_at_least_one_field(self):
         self.client.force_login(self.moderator)
         response = self.client.post(
@@ -392,6 +424,44 @@ class AgendaItemBulkChangeViewTests(APITestCase):
         )
         self.assertEqual(400, response.status_code)
         self.assertIn("agenda_items", response.json())
+
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+class AgendaItemBulkChangeNoAmbientAtomicTests(APITransactionTestCase):
+    """
+    Uses APITransactionTestCase (no wrapping test-transaction) to check whether
+    bulk_change's ai.sm.send() calls actually need an ambient atomic block, since
+    close_and_deactivate_when_ai_closes (voteit.speaker.signals) is @ensure_atomic.
+    """
+
+    fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
+
+    def _url(self):
+        return reverse("agendaitem-bulk-change")
+
+    def test_close_agenda_item_via_bulk_change(self):
+        meeting = Meeting.objects.get(pk=1)
+        meeting.state = "ongoing"
+        meeting.save()
+        moderator = meeting.participants.get(username="moderator")
+        ai = AgendaItem.objects.get(pk=1)
+        ai.state = AgendaItemStateMachine.ongoing.value
+        ai.save()
+        self.client.force_login(moderator)
+        response = self.client.post(
+            self._url(),
+            {
+                "meeting": meeting.pk,
+                "agenda_items": [1],
+                "state": AgendaItemStateMachine.closed.value,
+            },
+            format="json",
+        )
+        self.assertEqual(200, response.status_code, response.content)
+        self.assertEqual({"changed": 1}, response.json())
+        self.assertEqual(
+            AgendaItemStateMachine.closed.value, AgendaItem.objects.get(pk=1).state
+        )
 
 
 class BulkAgendaItemSerializerQueryTests(APITestCase):

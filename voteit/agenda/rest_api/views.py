@@ -88,40 +88,45 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, StateMachineMixin, ModelV
         agenda_items: list[AgendaItem] = vd["agenda_items"]
         must_save = set()
         target_state = vd.get("state")
-        # Remember! We can't reload or change queryset when we touch several attributes.
-        if target_state:
-            for ai in agenda_items:
-                if ai.state == target_state:
-                    continue
-                for event in ai.sm.allowed_events:
-                    transitions = [
-                        t
-                        for state in ai.sm.configuration
-                        for t in state.transitions
-                        if event in t.events
-                    ]
-                    for trans in transitions:
-                        if trans.target.value == target_state:
-                            try:
-                                ai.sm.send(event.id, user=request.user)
-                                if ai.state == target_state:
-                                    must_save.add(ai)
-                            except (ValidationError, TransitionNotAllowed):
-                                logger.debug("Transition failed", exc_info=True)
-                            break
-        block_proposals = vd.get("block_proposals")
-        if block_proposals is not None:
-            for ai in agenda_items:
-                if ai.block_proposals != block_proposals:
-                    ai.block_proposals = block_proposals
-                    must_save.add(ai)
-        block_discussion = vd.get("block_discussion")
-        if block_discussion is not None:
-            for ai in agenda_items:
-                if ai.block_discussion != block_discussion:
-                    ai.block_discussion = block_discussion
-                    must_save.add(ai)
+        # One durable transaction for the whole request: some after_sm_transition
+        # receivers (e.g. speaker list cleanup on close) require an active atomic
+        # block, same as the single-item /event/ endpoint. Exceptions caught below
+        # are handled inline (no nested atomic()), so a skipped item never marks
+        # the transaction for rollback - it just doesn't reach must_save.
         with transaction.atomic(durable=True):
+            # Remember! We can't reload or change queryset when we touch several attributes.
+            if target_state:
+                for ai in agenda_items:
+                    if ai.state == target_state:
+                        continue
+                    for event in ai.sm.allowed_events:
+                        transitions = [
+                            t
+                            for state in ai.sm.configuration
+                            for t in state.transitions
+                            if event in t.events
+                        ]
+                        for trans in transitions:
+                            if trans.target.value == target_state:
+                                try:
+                                    ai.sm.send(event.id, user=request.user)
+                                    if ai.state == target_state:
+                                        must_save.add(ai)
+                                except (ValidationError, TransitionNotAllowed):
+                                    logger.debug("Transition failed", exc_info=True)
+                                break
+            block_proposals = vd.get("block_proposals")
+            if block_proposals is not None:
+                for ai in agenda_items:
+                    if ai.block_proposals != block_proposals:
+                        ai.block_proposals = block_proposals
+                        must_save.add(ai)
+            block_discussion = vd.get("block_discussion")
+            if block_discussion is not None:
+                for ai in agenda_items:
+                    if ai.block_discussion != block_discussion:
+                        ai.block_discussion = block_discussion
+                        must_save.add(ai)
             for ai in must_save:
                 ai.save()
         return Response({"changed": len(must_save)})
