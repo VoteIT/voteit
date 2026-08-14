@@ -10,7 +10,7 @@ requirements:
 shell:
 	python manage.py shell
 coverage:
-	coverage run && coverage report
+	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 coverage run && coverage report
 migrations:
 	python manage.py makemigrations
 migrate:
@@ -26,9 +26,9 @@ down:
 run:
 	python -W once manage.py runserver
 test:
-	python manage.py test voteit --keepdb --failfast
+	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 python manage.py test voteit --keepdb --failfast
 test-deps:
-	python manage.py test voteit_org --keepdb --failfast
+	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 python manage.py test voteit_org --keepdb --failfast
 build:
 	uv build --all-packages -o ./dist
 dev: build
