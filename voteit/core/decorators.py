@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from functools import wraps
 from logging import getLogger
 from typing import TYPE_CHECKING
@@ -177,6 +178,76 @@ def has_exact_filter(*names: str):
     return wrapper
 
 
+def redis_is_reachable(connection, timeout: float = 3) -> bool:
+    """
+    Check that a redis connection responds to PING within ``timeout`` seconds.
+
+    A plain ``connection.ping()`` can hang far longer than any configured socket
+    timeout when the host is unreachable (rather than just refusing the
+    connection), which is what makes test runs stall. Running the ping in a
+    daemon thread lets us give up after ``timeout`` seconds regardless of what
+    the underlying socket is doing.
+
+    >>> from fakeredis import FakeRedis
+    >>> redis_is_reachable(FakeRedis())
+    True
+
+    >>> class _Never:
+    ...     def ping(self):
+    ...         import time
+    ...         time.sleep(10)
+    >>> redis_is_reachable(_Never(), timeout=0.1)
+    False
+
+    >>> class _Broken:
+    ...     def ping(self):
+    ...         raise ConnectionError("nope")
+    >>> redis_is_reachable(_Broken(), timeout=0.1)
+    False
+    """
+    result = {}
+
+    def _ping():
+        try:
+            result["ok"] = connection.ping()
+        except Exception as exc:
+            result["error"] = exc
+
+    thread = threading.Thread(target=_ping, daemon=True)
+    thread.start()
+    thread.join(timeout)
+    if thread.is_alive():
+        logger.error(
+            "Timed out after %s seconds while checking redis connection", timeout
+        )
+        return False
+    if "error" in result:
+        logger.warning(
+            "Connection error from redis when checking connection: %s", result["error"]
+        )
+        return False
+    return True
+
+
+_reachable_cache: dict[tuple, bool] = {}
+
+
+def _cached_redis_is_reachable(connection, timeout: float = 3) -> bool:
+    """
+    Same as ``redis_is_reachable``, but memoised per (host, port, db) for the
+    life of the process. Several ``@schedule_job``-decorated functions
+    typically share the same redis config at startup, so this avoids spinning
+    up a check thread per job when one probe already answered the question.
+    """
+    kwargs = getattr(
+        getattr(connection, "connection_pool", None), "connection_kwargs", {}
+    )
+    cache_key = (kwargs.get("host"), kwargs.get("port"), kwargs.get("db"))
+    if cache_key not in _reachable_cache:
+        _reachable_cache[cache_key] = redis_is_reachable(connection, timeout=timeout)
+    return _reachable_cache[cache_key]
+
+
 def schedule_job(
     cron_string: str,  # Cron string,
     *,
@@ -209,6 +280,9 @@ def schedule_job(
 
     def wrapper(f):
         scheduler = django_rq.get_scheduler(queue_name)
+        if not _cached_redis_is_reachable(scheduler.connection):
+            logger.warning("Redis unreachable, skipping scheduling of %s", f)
+            return f
         # FIXME: django_rqs wrapper of scheduler doesn't really respect the default values,
         try:
             scheduler.cron(
