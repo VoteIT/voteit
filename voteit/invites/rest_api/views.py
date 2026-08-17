@@ -217,7 +217,7 @@ class MeetingInviteViewSet(
         qs = MeetingInvite.objects.filter(id__in=invites)
         count = qs.count()
         for invite in qs:
-            invite.revoke()
+            invite.revoke(user=request.user)
             invite.save()
         return Response({"revoked": count})
 

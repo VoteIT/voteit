@@ -98,6 +98,16 @@ class MeetingInviteViewSetTests(APITestCase):
         response = self.client.patch(url, {"roles": ["participant"]})
         self.assertEqual(response.status_code, 405)
 
+    def test_bulk_revoke(self):
+        url = reverse("meeting-invites-bulk-revoke")
+        data = {"meeting": self.meeting.pk, "invites": [self.invite.pk]}
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"revoked": 1})
+        self.invite.refresh_from_db()
+        self.assertEqual(self.invite.state, InviteStateMachine.revoked.id)
+
     def test_annotations(self):
         grp = self.meeting.groups.create()
         self.invite.group_annotations.create(meeting_group=grp)

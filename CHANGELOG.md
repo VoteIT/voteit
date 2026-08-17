@@ -32,6 +32,10 @@ the release.
 - **Tests use a dedicated Redis db**: `make test`, `make test-deps` and `make coverage`
   now point `REDIS_CACHE_LOCATION` at db `9` instead of sharing the dev cache's db.
 
+### Fixes
+
+- **`/invites/bulk-revoke/` contained a bug that caused server error.
+
 ## v0.46 (2026-06-18)
 
 The headline change is a full replacement of `django-fsm` with `python-statemachine` across all
