@@ -67,12 +67,14 @@ All permissions require the meeting to not be archived (`meeting_not_archived`).
 | `PATCH/PUT` | `rooms/<pk>/` | `partial_update` / `update` | `CHANGE` | `RoomDetailSerializer` |
 | `PATCH` | `rooms/<pk>/handle/` | `handle` | `HANDLE` | `RoomHandleSerializer` |
 | `PATCH` | `rooms/<pk>/handle-speaker/` | `handle_speaker` | `handle_speaker` | `SpeakerManagerRoomDetailSerializer` |
+| `POST` | `rooms/<pk>/mark-text/` | `mark_text` | `HANDLE` | `RoomMarkTextSerializer` |
 | `GET` | `rooms/<pk>/status/` | `status` | none (queryset) | — |
 | `DELETE` | `rooms/<pk>/` | `destroy` | `DELETE` | — |
 
 Notable action behaviour:
 - `handle` — the primary moderator action. Updates `highlighted`, `poll`, `agenda_item`, `send_proposals`, `show_ballot`. Automatically sets `open=True` and reassigns `handler` to the requesting user. Uses `select_for_update()` to prevent concurrent order corruption on `highlighted_proposals`.
 - `handle_speaker` — restricted fields: `body`, `open`, `show_time`, `send_sls`. Only the speaker-list moderator fields.
+- `mark_text` — relays a text selection (`start`, `end`, `proposal`) to `RoomChannel` subscribers via a `RoomMarked` WebSocket message. Nothing is persisted; validated by `RoomMarkTextSerializer` (start/end must both be set or both be `None`; `proposal` is required if start/end are given — same rules as the retired `RoomMarkTextSchema`-based WebSocket message).
 - `status` — preflight check returning `{"speakers": N, "speaker_lists": N}` to let the frontend warn before deleting a room with active speaker data.
 - `destroy` — deletes the associated `SpeakerListSystem` first (cascades speakers), then the room. Both happen inside a `durable=True` atomic block.
 
@@ -83,6 +85,7 @@ Notable action behaviour:
 - `RoomDetailSerializer` — all fields writable except `handler` and `meeting` (read-only); used for retrieve and full update. Wrapped in `@ensure_atomic`.
 - `RoomHandleSerializer` — accepts `highlighted` (list of proposal PKs), `poll`, `agenda_item`, `send_proposals`, `show_ballot`, `token`. Validates that all highlighted PKs belong to the same meeting. The `update()` method only calls `super().update()` when non-highlighted fields have actually changed, preventing redundant `post_save` signals.
 - `SpeakerManagerRoomDetailSerializer` — restricts writable fields to `body`, `open`, `show_time`, `send_sls`.
+- `RoomMarkTextSerializer` — plain (non-model) serializer for the `mark_text` action; `start`, `end`, `proposal` all optional/nullable with the same cross-field validation as `RoomMarkTextSchema`.
 
 ## WebSocket
 
@@ -92,7 +95,7 @@ Notable action behaviour:
 
 ### Messages (`messages.py`)
 
-Outgoing messages are published to `MeetingChannel` (for room-level CRUD) or `RoomChannel` (for highlighted-proposals updates):
+All messages are outgoing, published to `MeetingChannel` (for room-level CRUD) or `RoomChannel` (for highlighted-proposals updates and text marking):
 
 | Message name | Class | Channel | Payload |
 |---|---|---|---|
@@ -102,7 +105,7 @@ Outgoing messages are published to `MeetingChannel` (for room-level CRUD) or `Ro
 | `room.highlighted` | `RoomHighlighted` | `RoomChannel` | `{pk, highlighted: [int], token}` |
 | `room.marked` | `RoomMarked` | `RoomChannel` | `{room, start, end, proposal}` |
 
-`RoomMarkText` is the one incoming message: a `ContextAction` carrying optional text selection coordinates (`start`, `end`) and a `proposal` PK. Validated via `RoomMarkTextSchema` (start/end must both be set or both be None; proposal is required if start/end are given). Requires `HANDLE` permission. The handler publishes `RoomMarked` directly to `RoomChannel` without persisting anything.
+`RoomMarked` is published from the REST `mark_text` action (see REST API above), not from a WebSocket-incoming message — there is no incoming message in this app.
 
 ### Signal handlers (`signals.py`)
 
@@ -134,8 +137,8 @@ Sending a PATCH to `handle/` always claims the room: `open` is forced to `True` 
 ### `token` is a transient instance attribute
 `Room.token` is never persisted. It is attached to the model instance during a request by the serializer (`instance.token = validated_data.pop("token", None)`) so that signal handlers can include it in the outgoing WebSocket message. The frontend uses the token to correlate its own request with the resulting broadcast and suppress duplicate UI updates.
 
-### `RoomMarkText` does not persist or raise errors
-The text-marking message (`room.mark_text`) relays text selection coordinates to all subscribers of a `RoomChannel` without storing anything. Errors are silently swallowed (the handler returns early if the permission check fails) to avoid noise for moderators rapidly selecting text.
+### `mark_text` does not persist anything
+The `mark_text` REST action relays text selection coordinates to all subscribers of a `RoomChannel` without storing anything on the `Room`. Unlike its retired WebSocket-message predecessor (which silently swallowed permission failures to avoid noise for moderators rapidly selecting text), the REST action uses the normal `VerboseAutoPermissionViewSetMixin` permission check and returns a standard 403 on failure.
 
 ## Tests
 

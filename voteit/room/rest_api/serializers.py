@@ -151,6 +151,33 @@ class RoomDetailSerializer(RoomSerializer):
         return super().update(instance, validated_data)
 
 
+class RoomMarkTextSerializer(serializers.Serializer):
+    """
+    For relaying a text selection to be highlighted in the room, without persisting anything.
+    """
+
+    start = serializers.IntegerField(required=False, allow_null=True, default=None)
+    end = serializers.IntegerField(required=False, allow_null=True, default=None)
+    proposal = serializers.IntegerField(required=False, allow_null=True, default=None)
+
+    def validate(self, attrs):
+        start = attrs.get("start")
+        end = attrs.get("end")
+        if (start is None) != (end is None):
+            raise serializers.ValidationError(
+                {"non_field_errors": ["Both start and end must be a number or None"]}
+            )
+        if start is not None and not start < end:
+            raise serializers.ValidationError(
+                {"end": ["end must be higher than start"]}
+            )
+        if start is not None and attrs.get("proposal") is None:
+            raise serializers.ValidationError(
+                {"proposal": ["proposal must be specified if start and end is set"]}
+            )
+        return attrs
+
+
 class SpeakerManagerRoomDetailSerializer(RoomDetailSerializer):
     class Meta:
         model = Room

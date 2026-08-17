@@ -10,10 +10,13 @@ from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.room import ROOM_PERM_HANDLE_SPEAKER
+from voteit.room.channels import RoomChannel
+from voteit.room.messages import RoomMarked
 from voteit.room.models import Room
 from voteit.room.rest_api.serializers import CreateRoomSerializer
 from voteit.room.rest_api.serializers import RoomDetailSerializer
 from voteit.room.rest_api.serializers import RoomHandleSerializer
+from voteit.room.rest_api.serializers import RoomMarkTextSerializer
 from voteit.room.rest_api.serializers import RoomSerializer
 from voteit.room.rest_api.serializers import SpeakerManagerRoomDetailSerializer
 from voteit.speaker.models import Speaker
@@ -31,6 +34,7 @@ class RoomsViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
         "create": None,  # In serializer
         "handle": PERM.HANDLE,
         "handle_speaker": ROOM_PERM_HANDLE_SPEAKER,
+        "mark_text": PERM.HANDLE,
         "set_handler": PERM.CHANGE,
         "status": None,
         "retrieve": None,
@@ -78,6 +82,25 @@ class RoomsViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
     )
     def handle_speaker(self, request, *args, **kwargs):
         return self.partial_update(request, *args, **kwargs)
+
+    @action(
+        methods=["post"],
+        detail=True,
+        url_path="mark-text",
+        serializer_class=RoomMarkTextSerializer,
+    )
+    def mark_text(self, request, *args, **kwargs):
+        """Relay a text selection to RoomChannel subscribers. Nothing is persisted."""
+        room = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        msg = RoomMarked(
+            mm={"user_pk": request.user.pk},
+            room=room.pk,
+            **serializer.validated_data,
+        )
+        RoomChannel.from_instance(room).sync_publish(msg, on_commit=False)
+        return Response(msg.data.dict())
 
     @action(methods=["get"], detail=True)
     def status(self, request, *args, **kwargs):

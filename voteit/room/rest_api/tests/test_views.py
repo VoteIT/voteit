@@ -11,6 +11,7 @@ from voteit.poll.app.polls.simple import Simple as SimplePoll
 from voteit.room.channels import RoomChannel
 from voteit.room.messages import RoomChanged
 from voteit.room.messages import RoomHighlighted
+from voteit.room.messages import RoomMarked
 from voteit.speaker.app.list_methods.simple import Simple
 from voteit.speaker.models import Speaker
 from voteit.speaker.roles import ROLE_LIST_MODERATOR
@@ -263,6 +264,91 @@ class RoomsViewTestCase(APITestCase):
         self.assertEqual(self.room.pk, msg.data.pk)
         self.assertEqual("abc", msg.data.token)
         self.assertEqual([self.prop1.pk, self.prop2.pk], msg.data.highlighted)
+
+    @patch.object(RoomChannel, "sync_publish")
+    def test_mark_text(self, mock_publish):
+        url = reverse("rooms-mark-text", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        data = {"start": 1, "end": 2, "proposal": self.prop1.pk}
+        response = self.client.post(url, data)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            {
+                "room": self.room.pk,
+                "start": 1,
+                "end": 2,
+                "proposal": self.prop1.pk,
+            },
+            response.json(),
+        )
+        self.assertTrue(mock_publish.called)
+        messages = [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if isinstance(x.args[0], RoomMarked)
+        ]
+        self.assertEqual(1, len(messages))
+        msg = messages[0]
+        self.assertEqual(self.room.pk, msg.data.room)
+        self.assertEqual(1, msg.data.start)
+        self.assertEqual(2, msg.data.end)
+        self.assertEqual(self.prop1.pk, msg.data.proposal)
+        self.assertEqual(self.moderator.pk, msg.mm.user_pk)
+
+    def test_mark_text_without_selection(self):
+        url = reverse("rooms-mark-text", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, {})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            {
+                "room": self.room.pk,
+                "start": None,
+                "end": None,
+                "proposal": None,
+            },
+            response.json(),
+        )
+
+    def test_mark_text_anon(self):
+        url = reverse("rooms-mark-text", kwargs={"pk": self.room.pk})
+        response = self.client.post(url, {})
+        self.assertEqual(401, response.status_code)
+
+    def test_mark_text_participant_forbidden(self):
+        url = reverse("rooms-mark-text", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.participant)
+        response = self.client.post(url, {})
+        self.assertEqual(403, response.status_code)
+
+    def test_mark_text_only_start(self):
+        url = reverse("rooms-mark-text", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, {"start": 1})
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            {"non_field_errors": ["Both start and end must be a number or None"]},
+            response.json(),
+        )
+
+    def test_mark_text_end_not_higher_than_start(self):
+        url = reverse("rooms-mark-text", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(
+            url, {"start": 2, "end": 1, "proposal": self.prop1.pk}
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertEqual({"end": ["end must be higher than start"]}, response.json())
+
+    def test_mark_text_missing_proposal(self):
+        url = reverse("rooms-mark-text", kwargs={"pk": self.room.pk})
+        self.client.force_login(self.moderator)
+        response = self.client.post(url, {"start": 1, "end": 2})
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(
+            {"proposal": ["proposal must be specified if start and end is set"]},
+            response.json(),
+        )
 
     def test_room_status(self):
         """Delete preflight check"""

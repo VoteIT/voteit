@@ -2,16 +2,11 @@ from pydantic import BaseModel
 from pydantic import validator
 
 from envelope.core import Message
-from envelope.deferred_jobs.message import ContextAction
 
-from voteit.core import PERM
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
-from voteit.messaging.decorators import incoming
 from voteit.messaging.decorators import outgoing
-from voteit.room.channels import RoomChannel
-from voteit.room.models import Room
 
 
 @outgoing
@@ -85,26 +80,6 @@ class RoomMarkTextSchema(BaseModel):
         if isinstance(start, int) and not isinstance(v, int):
             raise ValueError("proposal must be specified if start and end is set")
         return v
-
-
-@incoming
-class RoomMarkText(ContextAction):
-    context_schema_attr = "room"
-    name = "room.mark_text"
-    permission = Room.get_perm(PERM.HANDLE)
-    model = Room
-    schema = RoomMarkTextSchema
-    data: RoomMarkTextSchema
-
-    def run_job(self):
-        # We won't raise errors or send responses for these kind of messages
-        # since that will only be annoying for moderators
-        if self.allowed():
-            ch = RoomChannel.from_instance(self.context)
-            msg = RoomMarked.from_message(self, **self.data.dict())
-            ch.sync_publish(msg, on_commit=False)
-            # No effect but might be nice for testing
-            return msg
 
 
 @outgoing
