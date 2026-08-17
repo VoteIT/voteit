@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.47 (2026-08-17)
+
+Continued WebSocket-to-REST migration: vote casting, bulk agenda item operations,
+SFS delegation vote weights, and room text-marking are now REST endpoints instead of
+incoming WebSocket messages. Dependency cleanup and a couple of small fixes round out
+the release.
+
+### Breaking changes
+
+- **Vote casting moved to REST**: Votes are now cast via `POST /api/votes/`
+  (`{"poll": 1, "vote": {...}}` or `{"poll": 1, "abstain": true}`) instead of an
+  incoming WebSocket message. It's an upsert — casting again just overwrites the
+  existing vote, and abstaining overwrites a previous vote (and vice versa). Returns
+  `201` on first cast, `200` on update.
+- **Bulk agenda item operations moved to REST**: `POST /api/agenda-items/bulk-change/`
+  (state, `block_discussion`, `block_proposals`, combinable) and
+  `POST /api/agenda-items/bulk-delete/` (blocked while the meeting is ongoing) replace
+  the equivalent WebSocket messages.
+- **SFS delegation vote weights moved to REST**: `POST /api/sfs-delegation-voters/{pk}/set/`
+- **Room text-marking moved to REST**: `POST /api/rooms/{pk}/mark-text/` relays a text
+  selection to `RoomChannel` subscribers.
+
+### Changes
+
+- **`python-graph-core` and `setuptools` dependencies dropped**: Both were legacy
+  leftovers from `python3-vote-core`, unrelated to VoteIT itself.
+- **Poll vote validation generalised**: The "does this vote reference real proposals"
+  check used by Dutt, Schulze and Scottish STV is now a shared
+  `PollMethod.unmatched_proposal_pks()` helper.
+- **Tests use a dedicated Redis db**: `make test`, `make test-deps` and `make coverage`
+  now point `REDIS_CACHE_LOCATION` at db `9` instead of sharing the dev cache's db.
+
 ## v0.46 (2026-06-18)
 
 The headline change is a full replacement of `django-fsm` with `python-statemachine` across all
