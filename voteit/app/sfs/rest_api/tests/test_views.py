@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.test import override_settings
+from envelope.testing import testing_channel_layers_setting
 from rest_framework.test import APITestCase
 
 from voteit.app.sfs.rest_api.views import DELEGATION_LEADER_ROLE_ID
@@ -15,6 +17,7 @@ from voteit.poll.app.er_policies.group_votes_before_poll import GroupVotesBefore
 User = get_user_model()
 
 
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class SetDelegationVotersViewSetTests(APITestCase):
     @classmethod
     def setUpTestData(cls):
