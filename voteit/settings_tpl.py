@@ -1,3 +1,5 @@
+import os
+
 # Base required settings
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 AUTH_USER_MODEL = "core.User"
@@ -152,6 +154,10 @@ RQ_QUEUES = {
         "DB": 1,
     },
 }
+
+# How long (seconds) to coalesce bursts of votes on the same poll before
+# broadcasting an updated PollStatus - see voteit.poll.jobs.
+POLL_STATUS_THROTTLE_SECONDS = float(os.getenv("POLL_STATUS_THROTTLE_SECONDS", 1.5))
 
 # DRF
 REST_FRAMEWORK = {

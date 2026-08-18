@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from django.contrib.auth.models import AbstractUser
 from django.db import IntegrityError
 from django.db import models
+from django.db import transaction
 from django.db.models.signals import m2m_changed
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
@@ -26,6 +27,7 @@ from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
+from voteit.poll.jobs import schedule_poll_status_publish
 from voteit.poll.messages import ElectoralRegisterAdded
 from voteit.poll.messages import ElectoralRegisterDeleted
 from voteit.poll.messages import GenericVoteResponse
@@ -279,13 +281,9 @@ def vote_added(instance: Vote, *, created: bool, **kw):
     if created:
         poll = instance.poll
         if poll.meeting_id is not None:
-            msg = PollStatus(
-                pk=poll.pk,
-                voted=poll.votes.count(),
-                total=len(poll.electoral_register.voter_data),
+            transaction.on_commit(
+                lambda poll_pk=poll.pk: schedule_poll_status_publish(poll_pk)
             )
-            ch = MeetingChannel(poll.meeting_id)
-            ch.sync_publish(msg)
     # We need to send the vote to the user too, so they have access to their own data in case they're using several tabs
     user_ch = UserChannel.from_instance(instance.user)
     serializer = VoteSerializer(instance)

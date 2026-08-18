@@ -22,7 +22,6 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.app.er_policies.auto_always import AutoAlways
-from voteit.poll.messages import PollStatus
 from voteit.poll.messages import VoteTransferAdded
 from voteit.poll.messages import VoteTransferChanged
 from voteit.poll.messages import VoteTransferDeleted
@@ -491,19 +490,11 @@ class VoteSignalsTests(TestCase):
         msg = messages[0]
         self.assertEqual({"choice": "no"}, msg.data.vote)
 
-    @patch.object(MeetingChannel, "sync_publish")
-    def test_count_sent_to_meeting_ch(self, mock_publish):
+    @patch("voteit.poll.signals.schedule_poll_status_publish")
+    def test_count_sent_to_meeting_ch(self, mock_schedule):
         with self.captureOnCommitCallbacks(execute=True):
             self.poll.votes.create(user=self.user, vote="yes")
-        self.assertTrue(mock_publish.called)
-        messages = [
-            x.args[0]
-            for x in mock_publish.mock_calls
-            if isinstance(x.args[0], PollStatus)
-        ]
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        self.assertEqual(1, msg.data.voted)
+        mock_schedule.assert_called_once_with(self.poll.pk)
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
