@@ -4,6 +4,7 @@ COPY --from=ghcr.io/astral-sh/uv /uv /uvx /bin/
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     VIRTUAL_ENV=/opt/venv \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     PATH="/opt/venv/bin:$PATH"
@@ -11,10 +12,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=requirements.txt,target=requirements.txt \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=src/voteit_org,target=src/voteit_org \
     --mount=type=bind,source=dist,target=dist \
-    uv venv $VIRTUAL_ENV && \
-    uv pip install -r requirements.txt && \
+    uv sync --frozen --no-dev --group docker --no-install-workspace --no-install-project && \
     uv pip install dist/*.whl --no-deps
 
 # Clean stage

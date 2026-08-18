@@ -47,7 +47,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-        #cache: 'pip' <- Requires requirements.txt to be specified and NOT contain this package!!!
 
     - name: Install dependencies
       run: |

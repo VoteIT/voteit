@@ -4,9 +4,8 @@
 
 install:
 	cat INSTALL.md
-requirements:
-	uv export --no-dev --frozen --no-install-workspace --group docker --no-annotate --no-header -q -o requirements.txt
-	uvx pip-audit -r requirements.txt --disable-pip
+audit:
+	tmp=$$(mktemp) && uv export --frozen --no-dev --no-install-workspace --group docker --no-annotate --no-header -q -o $$tmp && uvx pip-audit -r $$tmp --disable-pip; rm -f $$tmp
 shell:
 	python manage.py shell
 coverage:

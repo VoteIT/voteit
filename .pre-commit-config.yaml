@@ -13,20 +13,6 @@ repos:
   # uv version.
   rev: 0.9.29
   hooks:
-    - id: uv-export
-      args:
-        - "--frozen"
-        - "--no-install-workspace"
-        - "--no-dev"
-        - "--group=docker"
-        - "--no-annotate"
-        - "--no-header"
-        - "-o=requirements.txt"
-        - "-q"
-- repo: https://github.com/astral-sh/uv-pre-commit
-  # uv version.
-  rev: 0.9.29
-  hooks:
     # Update the uv lockfile
     - id: uv-lock
 
