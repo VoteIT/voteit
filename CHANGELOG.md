@@ -24,6 +24,9 @@ the release.
 
 ### Changes
 
+- **New votes schedules jobs**: Rather than sending one message per vote to all
+  subscribers, new votes schedules exactly one job unless it already exists.
+  This removes one of the major bottlenecks with voting throughput.
 - **`python-graph-core` and `setuptools` dependencies dropped**: Both were legacy
   leftovers from `python3-vote-core`, unrelated to VoteIT itself.
 - **Poll vote validation generalised**: The "does this vote reference real proposals"
