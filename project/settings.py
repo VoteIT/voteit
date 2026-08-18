@@ -98,19 +98,21 @@ LOGIN_REDIRECT_URL = "/"
 LOGIN_ERROR_URL = "/error"
 
 # RQ
-RQ_QUEUES["default"]["HOST"] = "redis_rq"
-RQ_QUEUES["long"]["HOST"] = "redis_rq"
+REDIS_RQ_HOST = os.getenv("REDIS_RQ_HOST", "redis_rq")
+RQ_QUEUES["default"]["HOST"] = REDIS_RQ_HOST
+RQ_QUEUES["long"]["HOST"] = REDIS_RQ_HOST
 RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["DB"] = 2
-RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["HOST"] = "redis_rq"
+RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["HOST"] = REDIS_RQ_HOST
 RQ_QUEUES[ENVELOPE_TIMESTAMP_QUEUE]["DB"] = 3
-RQ_QUEUES[ENVELOPE_TIMESTAMP_QUEUE]["HOST"] = "redis_rq"
+RQ_QUEUES[ENVELOPE_TIMESTAMP_QUEUE]["HOST"] = REDIS_RQ_HOST
 
 # Channels
+REDIS_CHANNEL_HOST = os.getenv("REDIS_CHANNEL_HOST", "redis")
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("redis", 6379)],
+            "hosts": [(REDIS_CHANNEL_HOST, 6379)],
             "capacity": 1500,  # default 100
             "expiry": 60,  # default 60
             "group_expiry": 86400,  # default 86400

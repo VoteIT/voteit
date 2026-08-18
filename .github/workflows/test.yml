@@ -63,4 +63,6 @@ jobs:
         OAUTHLIB_INSECURE_TRANSPORT: 1
         HOST: .voteit.se
         REDIS_CACHE_LOCATION: redis://127.0.0.1:6379/4
+        REDIS_RQ_HOST: 127.0.0.1
+        REDIS_CHANNEL_HOST: 127.0.0.1
         DJANGO_SECRET_KEY: very-secret
