@@ -25,8 +25,8 @@ class GetPoliciesTests(TestCase):
         return get_policies
 
     def test_function(self):
-        self.assertEqual(set(), {x.name for x in self._fut(self.meeting)})
+        self.assertEqual(set(), {x.action for x in self._fut(self.meeting)})
         self.assertEqual(
             {"automatic"},
-            {x.name for x in self._fut(self.meeting, only_active=False)},
+            {x.action for x in self._fut(self.meeting, only_active=False)},
         )

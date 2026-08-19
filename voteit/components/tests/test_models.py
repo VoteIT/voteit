@@ -1,6 +1,5 @@
 from django.test import TestCase
 
-from voteit.messaging.testing import action_of
 
 from voteit.components.app.components.message import FlashMessage
 from voteit.components.app.components.proposal_print import ProposalPrint
@@ -11,9 +10,7 @@ class MeetingComponentTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create()
-        cls.message = cls.meeting.components.create(
-            component_name=action_of(FlashMessage)
-        )
+        cls.message = cls.meeting.components.create(component_name=FlashMessage.name)
         cls.print = cls.meeting.components.create(component_name=ProposalPrint.name)
 
     def test_enable_validates_settings(self):

@@ -106,7 +106,7 @@ class MeetingChannelSubscribedTests(TestCase):
         added_meeting_roles = [
             x
             for x in app_state
-            if x.action == "roles.changed" and x.payload["pk"] == self.meeting.pk
+            if x.action == "roles.changed" and x.payload.pk == self.meeting.pk
         ]
         self.assertEqual(1, len(added_meeting_roles))
         payload = added_meeting_roles[0].p

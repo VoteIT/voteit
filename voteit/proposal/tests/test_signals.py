@@ -380,7 +380,5 @@ class AgendaItemChannelTests(TestCase):
     def test_subscribe_fetches_text_doc(self):
         command = build_app_state("agenda_item", self.ai.pk, self.user.pk)
         app_state = command
-        pks = {
-            x.payload["pk"] for x in app_state if x.action == "text_document.changed"
-        }
+        pks = {x.payload.pk for x in app_state if x.action == "text_document.changed"}
         self.assertEqual({self.text_document.pk}, pks)

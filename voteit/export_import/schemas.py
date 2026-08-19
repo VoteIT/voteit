@@ -322,13 +322,24 @@ class DiffProposalData(ProposalData):
     @model_validator(mode="before")
     @classmethod
     def transform_paragraph(cls, data):
-        if not isinstance(data, dict):
+        # Input is either a dict or, via model_validate on a queryset, a
+        # Proposal instance -- hence the getattr branch.
+        if isinstance(data, dict):
+            paragraph = data.get("paragraph")
+        else:
+            paragraph = getattr(data, "paragraph", None)
+        if not isinstance(paragraph, TextParagraph):
             return data
-        paragraph = data.get("paragraph")
-        if isinstance(paragraph, TextParagraph):
+        if isinstance(data, dict):
             data = dict(data)
-            data["text_document"] = paragraph.text_document.base_tag
-            data["paragraph"] = paragraph.paragraph_id
+        else:
+            data = {
+                name: getattr(data, name)
+                for name in cls.model_fields
+                if hasattr(data, name)
+            }
+        data["text_document"] = paragraph.text_document.base_tag
+        data["paragraph"] = paragraph.paragraph_id
         return data
 
 
@@ -550,10 +561,15 @@ class AgendaItemData(BaseContentData):
     @field_validator("proposals", mode="before")
     @classmethod
     def fetch_related_proposals(cls, v):
+        # Both steps live in one validator because v2 runs mode="before"
+        # validators in reverse declaration order, where v1 ran pre=True ones
+        # in declaration order -- as two validators the manager would reach
+        # select_proposal_type unresolved.
         ctx = get_context()
         if not ctx.include_proposals:
             return []
-        return resolve_potential_manager(v, select={"meeting_group", "author"})
+        v = resolve_potential_manager(v, select={"meeting_group", "author"})
+        return cls.select_proposal_type(v)
 
     @field_validator("discussions", mode="before")
     @classmethod
@@ -563,7 +579,6 @@ class AgendaItemData(BaseContentData):
             return []
         return resolve_potential_manager(v, select={"meeting_group", "author"})
 
-    @field_validator("proposals", mode="before")
     @classmethod
     def select_proposal_type(cls, v: list[dict | ProposalData | DiffProposalData]):
         """

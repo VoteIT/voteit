@@ -4,7 +4,6 @@ from __future__ import annotations
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
-from voteit.messaging.testing import action_of
 
 from voteit.meeting.models import Meeting
 from voteit.organisation.models import Organisation
@@ -22,12 +21,12 @@ class ParticipantTagsViewSetTests(APITestCase):
         cls.org: Organisation = Organisation.objects.get(pk=1)
         cls.meeting = Meeting.objects.get(pk=1)
         cls.pronoun_component: NamespacedTags = cls.meeting.components.create(
-            component_name=action_of(PronounTags),
+            component_name=PronounTags.name,
             settings={"tags": ["han", "hon", "hen"], "many": True},
             enabled=True,
         )
         cls.gender_component: NamespacedTags = cls.meeting.components.create(
-            component_name=action_of(GenderTags),
+            component_name=GenderTags.name,
             settings={"tags": ["f", "m", "nb"]},
             enabled=True,
         )

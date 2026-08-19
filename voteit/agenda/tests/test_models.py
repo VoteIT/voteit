@@ -85,8 +85,8 @@ class AgendaItemTests(TestCase):
         mock_channel.reset_mock()
         ai.proposals.create()
         ai.proposals.create()
-        messages = {x.args[0] for x in mock_channel.mock_calls}
-        agenda_messages = [x for x in messages if x.name == "agenda_item.changed"]
+        messages = [x.args[0] for x in mock_channel.mock_calls]
+        agenda_messages = [x for x in messages if x.action == "agenda_item.changed"]
         self.assertEqual(1, len(agenda_messages))
 
 

@@ -216,7 +216,7 @@ class RelatedItemsTests(TestCase):
                 [
                     x.args[0]
                     for x in mock_publish.mock_calls
-                    if x.args[0].name == "agenda_item.changed"
+                    if x.args[0].action == "agenda_item.changed"
                 ]
             ),
         )
@@ -230,7 +230,7 @@ class RelatedItemsTests(TestCase):
                 [
                     x.args[0]
                     for x in mock_publish.mock_calls
-                    if x.args[0].name == "agenda_item.changed"
+                    if x.args[0].action == "agenda_item.changed"
                 ]
             ),
         )
@@ -242,7 +242,7 @@ class RelatedItemsTests(TestCase):
             [
                 x.args[0]
                 for x in mock_publish.mock_calls
-                if x.args[0].name == "agenda_item.changed"
+                if x.args[0].action == "agenda_item.changed"
             ]
         )
 
@@ -254,7 +254,7 @@ class RelatedItemsTests(TestCase):
             [
                 x.args[0]
                 for x in mock_publish.mock_calls
-                if x.args[0].name == "agenda_item.changed"
+                if x.args[0].action == "agenda_item.changed"
             ]
         )
 
@@ -265,7 +265,7 @@ class RelatedItemsTests(TestCase):
             [
                 x.args[0]
                 for x in mock_publish.mock_calls
-                if x.args[0].name == "agenda_item.changed"
+                if x.args[0].action == "agenda_item.changed"
             ]
         )
 
@@ -277,6 +277,6 @@ class RelatedItemsTests(TestCase):
             [
                 x.args[0]
                 for x in mock_publish.mock_calls
-                if x.args[0].name == "agenda_item.changed"
+                if x.args[0].action == "agenda_item.changed"
             ]
         )

@@ -47,7 +47,7 @@ class OrganisationChannelSubscribedTests(TestCase):
         added_org_roles = [
             x
             for x in app_state
-            if x.action == "roles.changed" and x.payload["pk"] == self.org.pk
+            if x.action == "roles.changed" and x.payload.pk == self.org.pk
         ]
         self.assertEqual(1, len(added_org_roles))
         payload = added_org_roles[0].p

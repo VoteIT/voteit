@@ -1502,5 +1502,5 @@ class MeetingStateMachineSchemaTests(APITestCase):
     def test_detail(self):
         response = self.client.get("/api/state-machines/MeetingStateMachine/")
         self.assertEqual(200, response.status_code)
-        self.assertIn("states", response.payload)
-        self.assertIn("events", response.payload)
+        self.assertIn("states", response.data)
+        self.assertIn("events", response.data)

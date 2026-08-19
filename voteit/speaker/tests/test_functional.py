@@ -146,5 +146,5 @@
 #                 "speaker_list.deleted",
 #                 "speaker_system.deleted",
 #             ],
-#             [x.args[0].name for x in mock_publish.mock_calls],
+#             [x.args[0].action for x in mock_publish.mock_calls],
 #         )

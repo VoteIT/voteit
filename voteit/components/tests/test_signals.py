@@ -3,7 +3,6 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
 from voteit.messaging.testing import testing_channel_layers_setting
 
@@ -27,7 +26,7 @@ class MeetingChannelSubscribedTests(TestCase):
         cls.user: User = cls.meeting.participants.create(username="user")
         cls.meeting.add_roles(cls.user, ROLE_MODERATOR)
         cls.flash = cls.meeting.components.create(
-            component_name=action_of(FlashMessage),
+            component_name=FlashMessage.name,
             settings={"msg": "Hello!"},
             enabled=True,
         )
@@ -49,7 +48,7 @@ class MeetingChannelSubscribedTests(TestCase):
                 "pk": self.flash.pk,
                 "settings": {"msg": "Hello!", "type": "info"},
                 "meeting": self.meeting.pk,
-                "component_name": action_of(FlashMessage),
+                "component_name": FlashMessage.name,
                 "enabled": True,
                 "is_valid": True,
             },
@@ -99,7 +98,7 @@ class MeetingChannelSubscribedTests(TestCase):
                     "type": "info",
                 },
                 "meeting": self.meeting.pk,
-                "component_name": action_of(FlashMessage),
+                "component_name": FlashMessage.name,
                 "enabled": False,
                 "is_valid": True,
             },
@@ -123,7 +122,7 @@ class MeetingComponentChangedTests(TestCase):
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create()
         cls.component: MeetingComponent = cls.meeting.components.create(
-            component_name=action_of(FlashMessage), settings={"msg": "Hello"}
+            component_name=FlashMessage.name, settings={"msg": "Hello"}
         )
 
     @patch.object(MeetingChannel, "sync_publish")
@@ -192,7 +191,7 @@ class MeetingComponentsDisabledWhenMeetingClosesTests(TestCase):
         cls.moderator = User.objects.create(username="test_moderator_cmp")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.msg: MeetingComponent = cls.meeting.components.create(
-            component_name=action_of(FlashMessage),
+            component_name=FlashMessage.name,
             settings={"msg": "Hello"},
             enabled=True,
         )

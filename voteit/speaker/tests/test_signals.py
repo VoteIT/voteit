@@ -166,8 +166,7 @@ class AppStateTests(TestCase):
         speaker_roles_payload = [
             x.payload
             for x in app_state
-            if x.action == action_of(RolesChanged)
-            and ROLE_SPEAKER in x.payload["roles"]
+            if x.action == action_of(RolesChanged) and ROLE_SPEAKER in x.payload.roles
         ]
         self.assertEqual(1, len(speaker_roles_payload))
         self.assertEqual(

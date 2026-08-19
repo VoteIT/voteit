@@ -105,7 +105,7 @@ class SignalButtonTests(TestCase):
         self.assertEqual(self.button.pk, payloads[0].button)
         counts = [m for m in app_state if m.action == "reaction.count"]
         self.assertEqual(len(counts), 2)
-        self.assertEqual(sum(c.payload["count"] for c in counts), 3)
+        self.assertEqual(sum(c.payload.count for c in counts), 3)
 
     def test_ai_channel_subscribed_n1_problem(self):
         from voteit.reactions.signals import ai_channel_subscribed

@@ -42,7 +42,7 @@ class SignalsTests(TestCase):
     def test_app_state_sent(self):
         command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user_a.pk)
         app_state = command
-        pks = {x.payload["pk"] for x in app_state if x.action == "pn.changed"}
+        pks = {x.payload.pk for x in app_state if x.action == "pn.changed"}
         self.assertEqual({self.one.pk, self.two.pk}, pks)
 
     @patch.object(MeetingChannel, "sync_publish")

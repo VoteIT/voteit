@@ -108,13 +108,13 @@ class MeetingSubscribedTests(TestCase):
     def test_app_state_sent_votes(self):
         command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
         app_state = command
-        pks = {x.payload["pk"] for x in app_state if x.action == "vote.changed"}
+        pks = {x.payload.pk for x in app_state if x.action == "vote.changed"}
         self.assertEqual({self.vote.pk, self.vote2.pk, self.vote_private.pk}, pks)
 
     def test_app_state_sent_latest_er(self):
         command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
         app_state = command
-        pks = {x.payload["pk"] for x in app_state if x.action == "er.changed"}
+        pks = {x.payload.pk for x in app_state if x.action == "er.changed"}
         self.assertEqual({self.er.pk}, pks)
 
     def test_app_state_doesnt_break_without_er(self):

@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils.timezone import now
 
-from voteit.messaging.testing import action_of
 
 from voteit.components.models import MeetingComponent
 from voteit.meeting.models import Meeting
@@ -301,7 +300,7 @@ class GenderAndPriorityTests(TestCase):
 
     def test_automatic_settings_on_add(self):
         component = self.meeting.components.filter(
-            component_name=action_of(GenderTags)
+            component_name=GenderTags.name
         ).first()
         self.assertIsInstance(component, MeetingComponent)
         self.assertEqual({"tags": ["m", "f", "nb"]}, component.settings_data)
@@ -310,7 +309,7 @@ class GenderAndPriorityTests(TestCase):
     def test_automatic_disable_on_delete(self):
         self.system.delete()
         component = self.meeting.components.filter(
-            component_name=action_of(GenderTags)
+            component_name=GenderTags.name
         ).first()
         self.assertIsInstance(component, MeetingComponent)
         self.assertFalse(component.enabled)
@@ -319,7 +318,7 @@ class GenderAndPriorityTests(TestCase):
         self.system.method_name = Simple.name
         self.system.save()
         component = self.meeting.components.filter(
-            component_name=action_of(GenderTags)
+            component_name=GenderTags.name
         ).first()
         self.assertIsInstance(component, MeetingComponent)
         self.assertFalse(component.enabled)
@@ -331,6 +330,6 @@ class GenderAndPriorityTests(TestCase):
         )
         self.system.delete()
         component = self.meeting.components.filter(
-            component_name=action_of(GenderTags)
+            component_name=GenderTags.name
         ).first()
         self.assertTrue(component.enabled)

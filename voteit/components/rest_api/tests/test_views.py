@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
-from voteit.messaging.testing import action_of
 
 from voteit.components.app.components.message import FlashMessage
 from voteit.components.app.components.proposal_print import ProposalPrint
@@ -24,7 +23,7 @@ class MeetingComponentViewSetTests(APITestCase):
             component_name=ProposalPrint.name
         )
         cls.message_component = cls.meeting.components.create(
-            component_name=action_of(FlashMessage), settings={"msg": "Hello"}
+            component_name=FlashMessage.name, settings={"msg": "Hello"}
         )
 
     def test_moderator_list(self):
@@ -191,7 +190,7 @@ class OrganisationSendsComponentsViewSetTests(APITestCase):
         cls.organisation.host = "testserver"
         cls.organisation.save()
         cls.message_component = cls.organisation.components.create(
-            component_name=action_of(FlashMessage),
+            component_name=FlashMessage.name,
             settings={"msg": "Hello"},
             enabled=True,
         )

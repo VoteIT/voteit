@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.test import TestCase
-from voteit.messaging.testing import action_of
 
 from voteit.components.app.components.message import FlashMessage
 from voteit.components.app.components.proposal_print import ProposalPrint
@@ -20,7 +19,7 @@ class MeetingComponentSerializerTests(TestCase):
             component_name=ProposalPrint.name
         )
         cls.flash_component = cls.meeting.components.create(
-            component_name=action_of(FlashMessage), settings={"msg": "Hello"}
+            component_name=FlashMessage.name, settings={"msg": "Hello"}
         )
 
     @property
@@ -53,7 +52,7 @@ class MeetingComponentSerializerTests(TestCase):
                 "pk": self.flash_component.pk,
                 "meeting": self.meeting.pk,
                 "settings": None,
-                "component_name": action_of(FlashMessage),
+                "component_name": FlashMessage.name,
                 "is_valid": False,
             },
             serializer.data,
@@ -89,17 +88,13 @@ class MeetingComponentSerializerTests(TestCase):
         self.assertIn("settings", serializer.errors)
 
     def test_enable_without_valid_settings(self):
-        component = self.meeting.components.create(
-            component_name=action_of(FlashMessage)
-        )
+        component = self.meeting.components.create(component_name=FlashMessage.name)
         serializer = self._cut(component, data={"enabled": True}, partial=True)
         serializer.is_valid()
         self.assertIn("enabled", serializer.errors)
 
     def test_enable_with_settings_in_same_request(self):
-        component = self.meeting.components.create(
-            component_name=action_of(FlashMessage)
-        )
+        component = self.meeting.components.create(component_name=FlashMessage.name)
         serializer = self._cut(
             component, data={"enabled": True, "settings": {"msg": "Hi"}}, partial=True
         )
@@ -117,7 +112,7 @@ class CreateMeetingComponentSerializerTests(TestCase):
             component_name=ProposalPrint.name
         )
         cls.flash_component = cls.meeting.components.create(
-            component_name=action_of(FlashMessage), settings={"msg": "Hello"}
+            component_name=FlashMessage.name, settings={"msg": "Hello"}
         )
         cls.moderator = cls.meeting.participants.get(username="moderator")
 

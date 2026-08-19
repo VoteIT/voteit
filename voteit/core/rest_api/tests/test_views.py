@@ -486,35 +486,35 @@ class StateMachinesViewTests(TestCase):
 
     def test_list_includes_workflow(self):
         response, key = self._get_list()
-        self.assertIn(key, response.payload)
+        self.assertIn(key, response.data)
 
     def test_states_are_dict_keyed_by_id(self):
         response, key = self._get_list()
-        states = response.payload[key]["states"]
+        states = response.data[key]["states"]
         self.assertIn("draft", states)
         self.assertIn("published", states)
 
     def test_state_has_name_and_flags(self):
         response, key = self._get_list()
-        states = response.payload[key]["states"]
+        states = response.data[key]["states"]
         self.assertTrue(states["draft"]["initial"])
         self.assertTrue(states["published"]["final"])
         self.assertNotIn("initial", states["published"])
 
     def test_events_are_dict_keyed_by_id(self):
         response, key = self._get_list()
-        events = response.payload[key]["events"]
+        events = response.data[key]["events"]
         self.assertIn("publish", events)
 
     def test_event_transition_from_to(self):
         response, key = self._get_list()
-        transition = response.payload[key]["events"]["publish"]["transitions"][0]
+        transition = response.data[key]["events"]["publish"]["transitions"][0]
         self.assertEqual(transition["from"], "draft")
         self.assertEqual(transition["to"], "published")
 
     def test_transition_includes_validators_and_cond(self):
         response, key = self._get_list()
-        transition = response.payload[key]["events"]["publish"]["transitions"][0]
+        transition = response.data[key]["events"]["publish"]["transitions"][0]
         self.assertIn("validators", transition)
         self.assertIn("cond", transition)
 
@@ -524,8 +524,8 @@ class StateMachinesViewTests(TestCase):
 
     def test_detail_returns_single_machine(self):
         response, _ = self._get_detail()
-        self.assertIn("states", response.payload)
-        self.assertIn("events", response.payload)
+        self.assertIn("states", response.data)
+        self.assertIn("events", response.data)
 
     def test_detail_unknown_name_returns_404(self):
         response, _ = self._get_detail(name="NoSuchMachine")
@@ -561,7 +561,7 @@ class StateMachinesViewTests(TestCase):
                     stack.enter_context(p)
                 response = self.client.get(f"/api/state-machines/{key}/")
 
-        events = response.payload["events"]
+        events = response.data["events"]
         self.assertIn("publish", events)
         self.assertNotIn("archive", events)
 
@@ -593,7 +593,7 @@ class StateMachinesViewTests(TestCase):
                     stack.enter_context(p)
                 response = self.client.get(f"/api/state-machines/{key}/")
 
-        events = response.payload["events"]
+        events = response.data["events"]
         self.assertIn("submit", events)
         transitions = events["submit"]["transitions"]
         self.assertEqual(1, len(transitions))
