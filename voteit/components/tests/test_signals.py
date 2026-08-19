@@ -40,7 +40,9 @@ class MeetingChannelSubscribedTests(TestCase):
     def test_meeting_components_in_app_state(self):
         app_state = self._mk_subscribe()
         payloads = [
-            x.payload for x in app_state if x.action == "meeting_component.changed"
+            x.payload.model_dump()
+            for x in app_state
+            if x.action == "meeting_component.changed"
         ]
         self.assertEqual(2, len(payloads))
         self.assertEqual(
@@ -73,7 +75,9 @@ class MeetingChannelSubscribedTests(TestCase):
         self.flash.save()
         app_state = self._mk_subscribe()
         payloads = [
-            x.payload for x in app_state if x.action == "meeting_component.changed"
+            x.payload.model_dump()
+            for x in app_state
+            if x.action == "meeting_component.changed"
         ]
         # Only prop_print here, flash should have invalid settings
         self.assertEqual(1, len(payloads))
@@ -84,7 +88,9 @@ class MeetingChannelSubscribedTests(TestCase):
         self.flash.save()
         app_state = self._mk_subscribe()
         payloads = [
-            x.payload for x in app_state if x.action == "meeting_component.changed"
+            x.payload.model_dump()
+            for x in app_state
+            if x.action == "meeting_component.changed"
         ]
         # All sent, but one is disabled
         self.assertEqual(2, len(payloads))

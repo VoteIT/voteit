@@ -50,7 +50,7 @@ class OrganisationChannelSubscribedTests(TestCase):
             if x.action == "roles.changed" and x.payload.pk == self.org.pk
         ]
         self.assertEqual(1, len(added_org_roles))
-        payload = added_org_roles[0].p
+        payload = added_org_roles[0].payload
         self.assertEqual(set(payload["roles"]), {"org_manager"})
         self.assertEqual(payload["user_pk"], self.user.pk)
         self.assertEqual(payload["model"], "organisation")

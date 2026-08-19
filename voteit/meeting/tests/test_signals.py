@@ -109,7 +109,7 @@ class MeetingChannelSubscribedTests(TestCase):
             if x.action == "roles.changed" and x.payload.pk == self.meeting.pk
         ]
         self.assertEqual(1, len(added_meeting_roles))
-        payload = added_meeting_roles[0].p
+        payload = added_meeting_roles[0].payload
         self.assertEqual(set(payload["roles"]), {ROLE_MODERATOR, ROLE_PARTICIPANT})
         self.assertEqual(payload["user_pk"], self.user.pk)
         self.assertEqual(payload["model"], "meeting")
@@ -122,8 +122,7 @@ class MeetingChannelSubscribedTests(TestCase):
         added = [
             x
             for x in app_state
-            if x.action.endswith(".batch")
-            and x.payload.action == "meeting_group.changed"
+            if x.action.endswith(".batch") and x.action == "meeting_group.changed"
         ]
         self.assertEqual(1, len(added))
         payload = added[0].p["payloads"][0]
@@ -137,8 +136,7 @@ class MeetingChannelSubscribedTests(TestCase):
         added = [
             x
             for x in app_state
-            if x.action.endswith(".batch")
-            and x.payload.action == "group_membership.changed"
+            if x.action.endswith(".batch") and x.action == "group_membership.changed"
         ]
         self.assertEqual(1, len(added))
         payload = added[0].p["payloads"][0]

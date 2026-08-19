@@ -249,7 +249,7 @@ class SendStateChangesTestsTests(TestCase):
                 "room": self.room.pk,
                 "meeting": self.meeting.pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
         self.assertDictEqual(
             {
@@ -265,7 +265,7 @@ class SendStateChangesTestsTests(TestCase):
                     }
                 ],
             },
-            messages[1].data.dict(),
+            messages[1].payload.model_dump(),
         )
         with ChannelMessageCatcher(RoomChannel, SpeakerListChanged) as messages:
             # Same list
@@ -316,7 +316,7 @@ class SendStateChangesTestsTests(TestCase):
                 "show_time": False,
                 "state": SpeakerSystemStateMachine.active.value,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
     def test_meeting_channel_receives_system_changed(self):
@@ -335,7 +335,7 @@ class SendStateChangesTestsTests(TestCase):
                 "show_time": False,
                 "state": SpeakerSystemStateMachine.active.value,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
     def test_meeting_channel_receives_system_deleted(self):
@@ -346,7 +346,7 @@ class SendStateChangesTestsTests(TestCase):
             {
                 "pk": system_pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
     def test_ai_channel_receives_list_added(self):
@@ -365,7 +365,7 @@ class SendStateChangesTestsTests(TestCase):
                 "room": self.room.pk,
                 "meeting": self.meeting.pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
     def test_ai_channel_receives_list_changed(self):
@@ -385,7 +385,7 @@ class SendStateChangesTestsTests(TestCase):
                 "room": self.room.pk,
                 "meeting": self.meeting.pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
     def test_ai_channel_receives_list_deleted(self):
@@ -396,7 +396,7 @@ class SendStateChangesTestsTests(TestCase):
             {
                 "pk": list_pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
     def test_room_channel_ignores_list_added(self):
@@ -429,7 +429,7 @@ class SendStateChangesTestsTests(TestCase):
                 "room": self.room.pk,
                 "meeting": self.meeting.pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
     def test_room_channel_receives_speaker_added_if_active(self):
@@ -452,7 +452,7 @@ class SendStateChangesTestsTests(TestCase):
                 "user": self.moderator.pk,
                 "room": self.room.pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
     def test_room_channel_receives_speaker_changed_if_active(self):
@@ -474,7 +474,7 @@ class SendStateChangesTestsTests(TestCase):
                 "user": self.participant.pk,
                 "room": self.room.pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
     def test_room_channel_receives_speaker_deleted_if_active(self):
@@ -493,7 +493,7 @@ class SendStateChangesTestsTests(TestCase):
             {
                 "pk": speaker_pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
     def test_ai_channel_receives_speaker_changed_if_active(self):
@@ -515,7 +515,7 @@ class SendStateChangesTestsTests(TestCase):
                 "user": self.participant.pk,
                 "room": self.room.pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
 

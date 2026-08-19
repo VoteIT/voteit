@@ -89,9 +89,7 @@ class InvitesSubscribedTests(TestCase):
         app_state = command
         batch = None
         for item in app_state:
-            if item.action == "s.batch" and item.payload.action == action_of(
-                MeetingInviteChanged
-            ):
+            if item.action == f"{action_of(MeetingInviteChanged)}.batch":
                 batch = item
         payloads = batch.payload.items
         self.assertEqual({self.invite.pk, self.invite2.pk}, {x.pk for x in payloads})

@@ -725,8 +725,8 @@ class MeetingInviteViewSetAnnotationWsTests(APITestCase):
             changed_msgs,
             "MeetingInviteChanged was not published after annotation was added",
         )
-        self.assertEqual(self.invite.pk, changed_msgs[0].data.pk)
-        self.assertTrue(changed_msgs[0].data.has_annotations)
+        self.assertEqual(self.invite.pk, changed_msgs[0].payload.pk)
+        self.assertTrue(changed_msgs[0].payload.has_annotations)
 
 
 class MeetingInviteViewSetClearAnnotationsTests(APITestCase):
@@ -812,13 +812,13 @@ class MeetingInviteViewSetClearAnnotationsTests(APITestCase):
             call.args[0]
             for call in mock_publish.mock_calls
             if isinstance(call.args[0], MeetingInviteChanged)
-            and call.args[0].data.pk == self.invite.pk
+            and call.args[0].payload.pk == self.invite.pk
         ]
         self.assertTrue(
             changed_msgs,
             "MeetingInviteChanged was not published for the cleared invite",
         )
-        self.assertFalse(changed_msgs[0].data.has_annotations)
+        self.assertFalse(changed_msgs[0].payload.has_annotations)
 
 
 class InviteDataTypesViewSetTests(APITestCase):

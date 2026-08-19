@@ -66,14 +66,12 @@ class SubscribedTests(TestCase):
         self.assertTrue(ch.allow_subscribe(self.user))
         app_state = command
         batch_msgs = [
-            x
-            for x in app_state
-            if x.action.endswith(".batch") and x["p"].t == action_of(LastReadChanged)
+            x for x in app_state if x.action == f"{action_of(LastReadChanged)}.batch"
         ]
         self.assertEqual(1, len(batch_msgs))
         batch = batch_msgs[0]
         self.assertEqual(
-            {self.ai_private.pk}, {x.agenda_item for x in batch["p"].payloads}
+            {self.ai_private.pk}, {x.agenda_item for x in batch.payload.items}
         )
 
     def test_app_state_sends_body(self):

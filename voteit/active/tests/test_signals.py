@@ -59,8 +59,7 @@ class SignalsTests(TestCase):
         app_state = msg
         active_msgs = [x for x in app_state if x.action == action_of(ActiveUsers)]
         self.assertEqual(1, len(active_msgs))
-        msg_dict = active_msgs[0]
-        self.assertEqual([self.active.user_id], msg_dict["p"].users)
+        self.assertEqual([self.active.user_id], active_msgs[0].payload.users)
 
     def test_meeting_channel_subscribed_not_sent_when_disabled(self):
         self.component.delete()

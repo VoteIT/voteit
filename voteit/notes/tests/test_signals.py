@@ -45,7 +45,7 @@ class SignalTests(TestCase):
                     proposal=self.prop2,
                     intent=NoteIntent.APPROVE,
                 )
-        data = messages[0].data.dict()
+        data = messages[0].payload.model_dump()
         self.assertIsInstance(data.pop("pk"), int)
         self.assertIsInstance(data.pop("created"), str)
         self.assertEqual(
@@ -65,7 +65,7 @@ class SignalTests(TestCase):
             with self.captureOnCommitCallbacks(execute=True):
                 self.note.body = "I really don't know about this"
                 self.note.save()
-        data = messages[0].data.dict()
+        data = messages[0].payload.model_dump()
         self.assertIsInstance(data.pop("created"), str)
         self.assertEqual(
             {
@@ -85,7 +85,7 @@ class SignalTests(TestCase):
         with ChannelMessageCatcher(UserChannel, NoteDeleted) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 self.note.delete()
-        data = messages[0].data.dict()
+        data = messages[0].payload.model_dump()
         self.assertEqual(
             {"pk": note_pk},
             data,
@@ -95,9 +95,7 @@ class SignalTests(TestCase):
         msg = self._mk_subs()
         app_state = msg
         batch_msg = [
-            x
-            for x in app_state
-            if x.action.endswith(".batch") and x["p"].t == action_of(NoteChanged)
+            x for x in app_state if x.action == f"{action_of(NoteChanged)}.batch"
         ]
         self.assertEqual(1, len(batch_msg))
         batch_msg = batch_msg[0]
@@ -121,9 +119,7 @@ class SignalTests(TestCase):
         msg = self._mk_subs()
         app_state = msg
         batch_msg = [
-            x
-            for x in app_state
-            if x.action.endswith(".batch") and x["p"].t == action_of(NoteChanged)
+            x for x in app_state if x.action == f"{action_of(NoteChanged)}.batch"
         ]
         self.assertEqual(0, len(batch_msg))
 

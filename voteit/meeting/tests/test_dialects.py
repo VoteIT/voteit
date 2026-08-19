@@ -333,7 +333,7 @@ class DialectRegistryTests(TestCase):
                 "title": "Two!",
                 "view_components": {},
             },
-            handler.data.dict(exclude_none=True, skip_defaults=True),
+            handler.data.model_dump(exclude_none=True, exclude_unset=True),
         )
 
     @override_settings(MEETING_DIALECTS_DIR=CYCLIC_DIALECT_FIXTURES)

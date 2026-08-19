@@ -39,7 +39,9 @@ class SubscriptionTests(TestCase):
     def test_subscribe_meeting(self):
         command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
         app_state = command
-        payloads = [x.payload for x in app_state if x.action == "room.changed"]
+        payloads = [
+            x.payload.model_dump() for x in app_state if x.action == "room.changed"
+        ]
         self.assertEqual(1, len(payloads))
         data = payloads[0]
         self.assertTrue(data.pop("created", None))

@@ -77,7 +77,7 @@ class SignalAndSubscribeTests(TestCase):
                 "tags": {"pron": ["hon", "hen"], "gen": "nb"},
                 "user": self.moderator.pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )
 
     def test_deleted_sent_as_changed(self):
@@ -89,5 +89,5 @@ class SignalAndSubscribeTests(TestCase):
                 "tags": {},
                 "user": self.moderator.pk,
             },
-            messages[0].data.dict(),
+            messages[0].payload.model_dump(),
         )

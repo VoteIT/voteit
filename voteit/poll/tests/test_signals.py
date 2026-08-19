@@ -210,7 +210,7 @@ class MeetingSubscribedTests(TestCase):
         self.poll2.votes.create(user=self.moderator, vote="yes")
         app_state = command
         message = [x.payload for x in app_state if x.action.endswith(".batch")][0]
-        dict_payloads = [x.dict() for x in message["payloads"]]
+        dict_payloads = [x.model_dump() for x in message.payload.items]
         self.assertIn({"pk": self.poll.pk, "voted": 2, "total": 2}, dict_payloads)
         self.assertIn({"pk": self.poll2.pk, "voted": 2, "total": 2}, dict_payloads)
 
