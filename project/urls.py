@@ -17,3 +17,8 @@ urlpatterns = [
     path("", include("social_django.urls")),
 ]
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+if settings.DEBUG:
+    # /asyncapi/schema/ and /asyncapi/docs/ - the websocket message contract,
+    # generated from the registered message types.
+    urlpatterns += [path("asyncapi/", include("chanx.channels.urls"))]

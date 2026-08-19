@@ -100,13 +100,22 @@ class SocketUser(HttpUser):
     @task
     def subscribe_meeting(self):
         payload = {"pk": MEETING_ID, "channel_type": "meeting"}
-        self.ws.send(json.dumps({"t": "channel.subscribe", "p": payload}))
-        # response = self.ws.recv()
-        # print(f"Received: {response}")
+        self.ws.send(json.dumps({"action": "channel.subscribe", "payload": payload}))
+        # The initial state now arrives as a stream terminated by
+        # channel.state_complete, rather than inside the subscribed frame.
+        self._drain_until("channel.state_complete")
         sleep(1)
-        self.ws.send(json.dumps({"t": "channel.leave", "p": payload}))
-        # response = self.ws.recv()
-        # print(f"Received: {response}")
+        self.ws.send(json.dumps({"action": "channel.leave", "payload": payload}))
+
+    def _drain_until(self, action: str, limit: int = 200):
+        """Read frames until the given action arrives, or we give up."""
+        for _ in range(limit):
+            try:
+                frame = json.loads(self.ws.recv())
+            except Exception:
+                return
+            if frame.get("action") == action:
+                return
 
     def on_start(self):
         self.user_id = next(self._id_counter) % USER_COUNT

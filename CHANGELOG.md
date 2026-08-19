@@ -1,5 +1,69 @@
 # Changelog
 
+## Unreleased
+
+Replaces the `channels-envelope` websocket library with
+[chanx](https://pypi.org/project/chanx/), and upgrades pydantic from v1 to v2.
+The two had to land together: envelope is pydantic v1 throughout, so it pinned
+the whole codebase to v1.
+
+### Breaking changes — frontend
+
+- **Wire format**: `{"t": ..., "p": ..., "i": ..., "s": ...}` becomes
+  `{"action": ..., "payload": ...}`. The `i` (message id) and `s` (state) fields
+  are gone. Action names are otherwise unchanged apart from the next point.
+- **`*.added` messages are gone.** Every one is now `*.changed`; the client
+  should upsert. The 20 types that had both actions lose the `.added` one, and
+  the four that only had `.added` (`er`, `vote`, `reaction`, `roles`) are
+  renamed. 82 outgoing message types become 62.
+  Note `reaction.changed` and `roles.changed` are *deltas*, not object upserts,
+  and keep their partner actions (`reaction.deleted`, `roles.removed`) — branch
+  on the action pair rather than inferring intent from the name.
+- **`s.batch` and `s.batch2` are gone.** Runs of the same message now collapse
+  into a generated per-type `<action>.batch`, whose payload is
+  `{"items": [<the normal payload>, ...]}` — typed, and described in the schema.
+- **`channel.subscribed` no longer carries `app_state`.** Subscribing now
+  streams: `channel.subscribed` (channel metadata only), then the initial state
+  as a series of messages, then the new **`channel.state_complete`**. Large
+  meetings no longer arrive as one very big frame.
+- **Component settings JSON Schema** (`/api/*-components/`) is now pydantic v2
+  output: `$defs` rather than `definitions`, `anyOf` for optional fields, and
+  draft 2020-12 refs.
+- **AsyncAPI**: `/asyncapi/docs/` and `/asyncapi/schema/` (DEBUG only) publish
+  the full message contract, and `chanx generate-client` can generate a typed
+  client from it.
+
+### Breaking changes — deployment
+
+- **The `conn` and `ts` RQ queues are removed.** Connection tracking is now done
+  inline from the consumer. Workers should run `default long`; running the old
+  queue names will simply idle. Update any process manager or compose file.
+- **`ASGI_APPLICATION` moves to `project.asgi.application`** (was
+  `project.routing.application`).
+- **New `messaging_connection` table** replaces `envelope_connection`. The
+  migration copies existing rows; `envelope_connection` is deliberately left in
+  place so this release can be rolled back, and will be dropped in a later one.
+- The websocket now enforces `AllowedHostsOriginValidator`, which it did not
+  before. Verify `ALLOWED_HOSTS` covers the SPA's origin.
+
+### Changes
+
+- **pydantic v2**. User-facing validation messages are unchanged: v2's
+  `"Value error, "` prefix is stripped before the message reaches the API.
+- Vote serialisation is byte-for-byte identical to v1, deliberately. Serialised
+  votes are used verbatim as counter keys and are hashed into
+  `ballot_checksum`, so a formatting change would have split identical ballots
+  across two keys for any poll open across the upgrade.
+- `conlist(unique_items=True)` is replaced by an explicit validator that runs
+  *after* field coercion, so duplicates differing only in case or whitespace
+  are now correctly rejected on invite CSV upload — the misbehaviour noted in
+  the old code.
+- `Connection` gains indexes; the equivalent lookup went from a 38ms sequential
+  scan to 0.1ms on a table of ~860k rows.
+- First end-to-end websocket tests: previously everything was tested at the
+  signal level and nothing exercised the consumer itself.
+
+
 ## v0.47 (2026-08-17)
 
 Continued WebSocket-to-REST migration: vote casting, bulk agenda item operations,

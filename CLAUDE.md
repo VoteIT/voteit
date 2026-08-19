@@ -70,7 +70,27 @@ DRF with a central router at `voteit/core/rest_api/router.py`. Apps register Vie
 
 ### WebSocket / Real-time
 
-Django Channels at `ws/`. The `channels-envelope` library provides the typed message-passing protocol. Each app's `channels.py` defines message handlers. RQ worker queues handle deferred WebSocket jobs (queues: `default`, `long`, `conn`, `ts`).
+Django Channels at `ws/`, using the `chanx` library. One consumer for the whole app:
+`voteit/messaging/consumer.py`. Wire format is `{"action": ..., "payload": ...}`.
+
+The socket is **push-only** apart from subscription control (`channel.subscribe`,
+`channel.leave`, `channel.list_subscriptions`) and `s.ping` — every app-level incoming
+message was migrated to REST.
+
+- `voteit/*/channels.py` declares `ContextChannel` subclasses: a channel-layer group
+  (`"<name>_<pk>"`) plus the object and permission that decide who may subscribe.
+- `voteit/*/messages.py` declares outgoing messages — `chanx` `BaseMessage` subclasses
+  with a `Literal` action and a pydantic payload, registered with `@outgoing`. There is
+  no `*.added`; the client upserts on `*.changed`.
+- Each outgoing type also gets a generated `<action>.batch` sibling. Runs of the same
+  message to the same target within one transaction collapse into one batch on commit
+  (`voteit/messaging/utils.py::TransactionBatcher`, threshold `VOTEIT_BATCH_THRESHOLD`).
+- Subscribing is deferred to RQ. The worker streams `channel.subscribed`, then the
+  initial state (built by the `channel_subscribed` signal receivers in `*/signals.py`),
+  then `channel.state_complete`.
+- Connection rows live in `voteit/messaging/models.py`; `code` is null while open.
+- RQ queues: `default`, `long`.
+- `/asyncapi/docs/` (DEBUG only) publishes the full message schema.
 
 ### Registry Pattern
 
@@ -88,7 +108,7 @@ Pluggable per-meeting or per-org features (`MeetingComponent`, `OrganisationComp
 
 - **Narrative docs as doctests**: `docs/narrative.md` and `docs/workflows.md` are runnable as doctests, asserted in each app's `test_docs.py`. These serve as integration-level documentation and must stay passing.
 - **Auditlog context**: All models using `django-auditlog` implement `get_additional_data()` returning `{o, m, ai}` context keys.
-- **Pydantic v1** (pinned `<2`) is used for schemas/validation — not v2.
+- **Pydantic v2** is used for schemas/validation.
 - **Test runner**: Django's built-in `manage.py test`, not pytest. Coverage via the `coverage` package.
 - **Package manager**: `uv` with `uv.lock`. Do not use pip or poetry.
 - **Linting**: `ruff` only (includes isort with `force-single-line = true`).

@@ -5,7 +5,6 @@
 # from django.contrib.auth import get_user_model
 # from django.test import TestCase
 # from django.test import override_settings
-# from envelope.channels.models import ContextChannel
 #
 # from voteit.meeting.models import Meeting
 # from voteit.meeting.roles import ROLE_PARTICIPANT
