@@ -3,6 +3,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
+from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
 
 from voteit.messaging.state import AppState
@@ -37,8 +38,7 @@ class SubscriptionTests(TestCase):
         cls.hl1 = cls.room.highlighted_proposals.create(proposal=cls.prop1)
 
     def test_subscribe_meeting(self):
-        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
         payloads = [
             x.payload.model_dump() for x in app_state if x.action == "room.changed"
         ]
@@ -64,8 +64,7 @@ class SubscriptionTests(TestCase):
         )
 
     def test_subscribe_room(self):
-        command = build_app_state(RoomChannel.name, self.room.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state(RoomChannel.name, self.room.pk, self.user.pk)
         self.assertEqual(
             [
                 {
@@ -74,7 +73,11 @@ class SubscriptionTests(TestCase):
                     "token": None,
                 }
             ],
-            [x.payload for x in app_state if x.action == RoomHighlighted.name],
+            [
+                x.payload.model_dump()
+                for x in app_state
+                if x.action == action_of(RoomHighlighted)
+            ],
         )
 
     def test_subscribe_room_queries(self):

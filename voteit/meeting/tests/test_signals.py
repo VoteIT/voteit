@@ -119,27 +119,19 @@ class MeetingChannelSubscribedTests(TestCase):
         self.meeting.save()
         app_state = self._mk_subscribe()
         # MeetingGroup
-        added = [
-            x
-            for x in app_state
-            if x.action.endswith(".batch") and x.action == "meeting_group.changed"
-        ]
+        added = [x for x in app_state if x.action == "meeting_group.changed.batch"]
         self.assertEqual(1, len(added))
-        payload = added[0].p["payloads"][0]
+        payload = added[0].payload.items[0]
         self.assertEqual(self.group.pk, payload.pk)
         # GroupRole
         added = [x for x in app_state if x.action == "group_role.changed"]
         self.assertEqual(1, len(added))
-        payload = added[0].p
+        payload = added[0].payload
         self.assertEqual(self.group_role.pk, payload.pk)
         # GroupMembership
-        added = [
-            x
-            for x in app_state
-            if x.action.endswith(".batch") and x.action == "group_membership.changed"
-        ]
+        added = [x for x in app_state if x.action == "group_membership.changed.batch"]
         self.assertEqual(1, len(added))
-        payload = added[0].p["payloads"][0]
+        payload = added[0].payload.items[0]
         self.assertEqual(self.group_membership.pk, payload.pk)
         self.assertEqual(self.meeting.pk, payload.m)
 

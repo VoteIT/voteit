@@ -1,5 +1,7 @@
 from collections import Counter
 
+from pydantic import ValidationError as PydanticValidationError
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.exceptions import ValidationError
@@ -225,7 +227,9 @@ class RepeatedSchulzeTests(TestCase):
         self.assertRaises(InvalidProposalCount, self.poll.method.start_check)
 
     def test_direct_change_of_settings(self):
-        with self.assertRaises(TypeError):
+        # frozen=True raises pydantic's ValidationError; the v1 form
+        # (allow_mutation=False) raised TypeError.
+        with self.assertRaises(PydanticValidationError):
             self.poll.settings.winners = 2
 
     def test_calc_results(self):

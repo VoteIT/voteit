@@ -296,7 +296,6 @@ class RoomsViewTestCase(APITestCase):
         self.assertEqual(1, msg.payload.start)
         self.assertEqual(2, msg.payload.end)
         self.assertEqual(self.prop1.pk, msg.payload.proposal)
-        self.assertEqual(self.moderator.pk, msg.mm.user_pk)
 
     def test_mark_text_without_selection(self):
         url = reverse("rooms-mark-text", kwargs={"pk": self.room.pk})

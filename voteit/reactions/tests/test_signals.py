@@ -75,11 +75,10 @@ class SignalButtonTests(TestCase):
         self.assertEqual(button_pk, msg.payload.pk)
 
     def test_meeting_channel_subscribed(self):
-        command = build_app_state("meeting", self.meeting.pk, self.moderator.pk)
-        app_state = command
+        app_state = build_app_state("meeting", self.meeting.pk, self.moderator.pk)
         unpacked = {x.action: x.payload for x in app_state}
         self.assertIn("reaction_button.changed", unpacked)
-        self.assertEqual(self.button.pk, unpacked["reaction_button.changed"]["pk"])
+        self.assertEqual(self.button.pk, unpacked["reaction_button.changed"].pk)
 
     def test_ai_channel_subscribed(self):
         other = User.objects.create(username="other")
@@ -92,8 +91,7 @@ class SignalButtonTests(TestCase):
         self.disc.reaction_set.create(
             user=self.moderator, button=self.button, agenda_item=self.ai
         )
-        command = build_app_state("agenda_item", self.ai.pk, self.moderator.pk)
-        app_state = command
+        app_state = build_app_state("agenda_item", self.ai.pk, self.moderator.pk)
         batched_payload = [
             x.payload.items for x in app_state if x.action == "reaction.changed.batch"
         ]

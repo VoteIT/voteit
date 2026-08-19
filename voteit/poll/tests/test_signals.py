@@ -75,10 +75,9 @@ class MeetingSubscribedTests(TestCase):
         return meeting_subscribed
 
     def test_app_state_sent_participants_poll_added(self):
-        command = build_app_state(
+        app_state = build_app_state(
             ParticipantsChannel.name, self.meeting.pk, self.user.pk
         )
-        app_state = command
         batched_payload = [
             x.payload.items for x in app_state if x.action == "poll.changed.batch"
         ]
@@ -87,10 +86,9 @@ class MeetingSubscribedTests(TestCase):
         self.assertEqual({self.poll.pk, self.poll2.pk}, {x.pk for x in payloads})
 
     def test_app_state_sent_moderators(self):
-        command = build_app_state(
+        app_state = build_app_state(
             ModeratorsChannel.name, self.meeting.pk, self.moderator.pk
         )
-        app_state = command
         batched_payload = [
             x.payload.items for x in app_state if x.action == "poll.changed.batch"
         ]
@@ -102,21 +100,18 @@ class MeetingSubscribedTests(TestCase):
         )
 
     def test_app_state_sent_votes(self):
-        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
         pks = {x.payload.pk for x in app_state if x.action == "vote.changed"}
         self.assertEqual({self.vote.pk, self.vote2.pk, self.vote_private.pk}, pks)
 
     def test_app_state_sent_latest_er(self):
-        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
         pks = {x.payload.pk for x in app_state if x.action == "er.changed"}
         self.assertEqual({self.er.pk}, pks)
 
     def test_app_state_doesnt_break_without_er(self):
         self.er.delete()
-        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
         self.assertFalse([x for x in app_state if x.action == "er.changed"])
 
     def test_n1_problem(self):
@@ -133,10 +128,9 @@ class MeetingSubscribedTests(TestCase):
         self.poll.close(force=True)
         self.poll.save()
         self.assertEqual("withheld", self.poll.state)
-        command = build_app_state(
+        app_state = build_app_state(
             ParticipantsChannel.name, self.meeting.pk, self.user.pk
         )
-        app_state = command
         batched_payload = [
             x.payload.items for x in app_state if x.action == "poll.changed.batch"
         ]
@@ -159,10 +153,9 @@ class MeetingSubscribedTests(TestCase):
         self.poll.close(force=True)
         self.poll.save()
         self.assertEqual("withheld", self.poll.state)
-        command = build_app_state(
+        app_state = build_app_state(
             ModeratorsChannel.name, self.meeting.pk, self.moderator.pk
         )
-        app_state = command
         batched_payload = [
             x.payload.items for x in app_state if x.action == "poll.changed.batch"
         ]
@@ -186,8 +179,7 @@ class MeetingSubscribedTests(TestCase):
         )
 
     def test_app_state_ongoing_poll(self):
-        command = build_app_state("meeting", self.meeting.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state("meeting", self.meeting.pk, self.user.pk)
         message = [x for x in app_state if x.action.endswith(".batch")][0]
         self.assertEqual(1, len(message.payload.items))
         self.assertEqual(
@@ -196,12 +188,13 @@ class MeetingSubscribedTests(TestCase):
         )
 
     def test_app_state_multiple_ongoing_poll(self):
-        command = build_app_state("meeting", self.meeting.pk, self.user.pk)
         self.poll.state = "ongoing"
         self.poll.save()
         self.poll.votes.create(user=self.moderator, vote="yes")
         self.poll2.votes.create(user=self.moderator, vote="yes")
-        app_state = command
+        # Build after the mutations: build_app_state runs the receivers now,
+        # where the old Subscribe message was only evaluated on run_job().
+        app_state = build_app_state("meeting", self.meeting.pk, self.user.pk)
         message = [x for x in app_state if x.action.endswith(".batch")][0]
         dict_payloads = [x.model_dump() for x in message.payload.items]
         self.assertIn({"pk": self.poll.pk, "voted": 2, "total": 2}, dict_payloads)

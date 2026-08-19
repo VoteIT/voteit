@@ -48,10 +48,9 @@ class SignalAndSubscribeTests(TestCase):
         )
 
     def test_ptags_to_meeting_ch(self):
-        command = build_app_state(
+        app_state = build_app_state(
             MeetingChannel.name, self.meeting.pk, self.participant.pk
         )
-        app_state = command
         tags_payload = [
             x.payload.model_dump()
             for x in app_state

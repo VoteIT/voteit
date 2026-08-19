@@ -85,8 +85,7 @@ class InvitesSubscribedTests(TestCase):
         cls.invite.group_annotations.create(meeting_group=cls.group)
 
     def test_app_state_sent(self):
-        command = build_app_state("invites", self.meeting.pk, self.moderator.pk)
-        app_state = command
+        app_state = build_app_state("invites", self.meeting.pk, self.moderator.pk)
         batch = None
         for item in app_state:
             if item.action == f"{action_of(MeetingInviteChanged)}.batch":

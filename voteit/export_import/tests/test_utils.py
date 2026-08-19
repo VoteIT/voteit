@@ -108,6 +108,8 @@ class UtilsTests(TestCase):
                 include_reactions=True,
                 include_buttons=False,
             )
+        # pydantic v2 errors() also carries ctx/url and prefixes the message
+        # with "Value error, ", so assert on the parts that carry meaning.
         self.assertEqual(
             [
                 {
@@ -116,7 +118,14 @@ class UtilsTests(TestCase):
                     "type": "value_error",
                 }
             ],
-            cm.exception.errors(),
+            [
+                {
+                    "loc": e["loc"],
+                    "msg": e["msg"].removeprefix("Value error, "),
+                    "type": e["type"],
+                }
+                for e in cm.exception.errors()
+            ],
         )
 
     def test_clone_flags(self):

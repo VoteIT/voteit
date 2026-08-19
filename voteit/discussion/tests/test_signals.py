@@ -29,8 +29,7 @@ class AgendaSubscribedTests(TestCase):
         self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
 
     def test_app_state_sent(self):
-        command = build_app_state("agenda_item", self.ai.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state("agenda_item", self.ai.pk, self.user.pk)
         batched_payload = [
             x.payload.items
             for x in app_state

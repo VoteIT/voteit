@@ -41,10 +41,9 @@ class SubscribedTests(TestCase):
         cls.ai_private.mark_read(cls.user)
 
     def test_app_state_sent_participants(self):
-        command = build_app_state(
+        app_state = build_app_state(
             ParticipantsChannel.name, self.meeting.pk, self.user.pk
         )
-        app_state = command
         pks = set()
         for msg in app_state:
             if msg.action == "agenda_item.changed.batch":
@@ -52,8 +51,9 @@ class SubscribedTests(TestCase):
         self.assertEqual({self.ai.pk}, pks)
 
     def test_app_state_sent_moderators(self):
-        command = build_app_state(ModeratorsChannel.name, self.meeting.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state(
+            ModeratorsChannel.name, self.meeting.pk, self.user.pk
+        )
         pks = set()
         for msg in app_state:
             if msg.action == "agenda_item.changed.batch":

@@ -40,8 +40,9 @@ class SignalsTests(TestCase):
         self.one.refresh_from_db()
 
     def test_app_state_sent(self):
-        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user_a.pk)
-        app_state = command
+        app_state = build_app_state(
+            MeetingChannel.name, self.meeting.pk, self.user_a.pk
+        )
         pks = {x.payload.pk for x in app_state if x.action == "pn.changed"}
         self.assertEqual({self.one.pk, self.two.pk}, pks)
 

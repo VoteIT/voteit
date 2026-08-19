@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
 from rest_framework.exceptions import ValidationError
+from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
 from voteit.messaging.testing import ChannelMessageCatcher
@@ -119,18 +120,15 @@ class AppStateTests(TestCase):
             )
 
     def test_speakers_sent_to_room_if_active(self):
-        command = build_app_state(RoomChannel.name, self.room.pk, self.moderator.pk)
-        app_state = command
+        app_state = build_app_state(RoomChannel.name, self.room.pk, self.moderator.pk)
         self.assertEqual(self.speaker_list.speaker_items.count(), 5)
-        self.assertEqual(
-            sum(x.action == action_of(SpeakerChanged) for x in app_state), 0
-        )
+        # payloads_of unwraps the batch, so the test does not care whether the
+        # receiver chose to batch these.
+        self.assertEqual(0, len(payloads_of(app_state, SpeakerChanged)))
         self.system.active_list = self.speaker_list
         self.system.save()
-        app_state = command
-        self.assertEqual(
-            sum(x.action == action_of(SpeakerChanged) for x in app_state), 5
-        )
+        app_state = build_app_state(RoomChannel.name, self.room.pk, self.moderator.pk)
+        self.assertEqual(5, len(payloads_of(app_state, SpeakerChanged)))
 
     def test_dont_kill_signal_when_room_changes(self):
         self.system.delete()
@@ -140,10 +138,9 @@ class AppStateTests(TestCase):
         build_app_state(RoomChannel.name, self.room.pk, self.moderator.pk)
 
     def test_system_and_roles_sent_to_meeting(self):
-        command = build_app_state(
+        app_state = build_app_state(
             MeetingChannel.name, self.meeting.pk, self.participant.pk
         )
-        app_state = command
         system_payload = [
             x.payload.model_dump()
             for x in app_state
@@ -166,7 +163,7 @@ class AppStateTests(TestCase):
             system_payload[0],
         )
         speaker_roles_payload = [
-            x.payload
+            x.payload.model_dump()
             for x in app_state
             if x.action == action_of(RolesChanged) and ROLE_SPEAKER in x.payload.roles
         ]
@@ -182,8 +179,9 @@ class AppStateTests(TestCase):
         )
 
     def test_lists_sent_to_agenda_item(self):
-        command = build_app_state(AgendaItemChannel.name, self.ai.pk, self.moderator.pk)
-        app_state = command
+        app_state = build_app_state(
+            AgendaItemChannel.name, self.ai.pk, self.moderator.pk
+        )
         self.assertEqual(
             sum(x.action == action_of(SpeakerListChanged) for x in app_state), 1
         )
@@ -255,10 +253,10 @@ class SendStateChangesTestsTests(TestCase):
             },
             messages[0].payload.model_dump(),
         )
+        self.assertEqual(f"{action_of(SpeakerChanged)}.batch", messages[1].action)
         self.assertDictEqual(
             {
-                "t": action_of(SpeakerChanged),
-                "payloads": [
+                "items": [
                     {
                         "user": self.participant.pk,
                         "pk": self.speaker.pk,

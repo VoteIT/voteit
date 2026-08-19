@@ -47,8 +47,7 @@ class MeetingSubscribedTests(TestCase):
         self.ai.refresh_from_db()
 
     def test_app_state_sent_moderators(self):
-        command = build_app_state("moderators", self.meeting.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state("moderators", self.meeting.pk, self.user.pk)
         pks = set()
         for msg in app_state:
             if msg.action == "proposal.changed.batch":
@@ -58,8 +57,7 @@ class MeetingSubscribedTests(TestCase):
     def test_app_state_sent_private_moderators(self):
         self.ai.state = "private"
         self.ai.save()
-        command = build_app_state("moderators", self.meeting.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state("moderators", self.meeting.pk, self.user.pk)
         pks = set()
         for msg in app_state:
             if msg.action == "proposal.changed.batch":
@@ -67,8 +65,7 @@ class MeetingSubscribedTests(TestCase):
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_date_of_proposals_on_subscribe(self):
-        command = build_app_state("moderators", self.meeting.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state("moderators", self.meeting.pk, self.user.pk)
         for msg in app_state:
             if msg.action == "proposal.changed.batch":
                 break
@@ -79,8 +76,7 @@ class MeetingSubscribedTests(TestCase):
         )
 
     def test_app_state_sent_participants(self):
-        command = build_app_state("participants", self.meeting.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state("participants", self.meeting.pk, self.user.pk)
         pks = set()
         for msg in app_state:
             if msg.action == "proposal.changed.batch":
@@ -90,8 +86,7 @@ class MeetingSubscribedTests(TestCase):
     def test_app_state_sent_private_participants(self):
         self.ai.state = "private"
         self.ai.save()
-        command = build_app_state("participants", self.meeting.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state("participants", self.meeting.pk, self.user.pk)
         pks = set()
         for msg in app_state:
             if msg.action == "proposal.changed.batch":
@@ -378,7 +373,6 @@ class AgendaItemChannelTests(TestCase):
         self.assertEqual("Blaha", msg.payload.body)
 
     def test_subscribe_fetches_text_doc(self):
-        command = build_app_state("agenda_item", self.ai.pk, self.user.pk)
-        app_state = command
+        app_state = build_app_state("agenda_item", self.ai.pk, self.user.pk)
         pks = {x.payload.pk for x in app_state if x.action == "text_document.changed"}
         self.assertEqual({self.text_document.pk}, pks)
