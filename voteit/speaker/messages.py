@@ -1,25 +1,10 @@
 from __future__ import annotations
 
-from abc import ABC
-
-from envelope.deferred_jobs.message import ContextAction
-from pydantic.main import BaseModel
 
 from voteit.messaging.base import BaseObjectAdded
 from voteit.messaging.base import BaseObjectChanged
 from voteit.messaging.base import BaseObjectDeleted
 from voteit.messaging.decorators import outgoing
-from voteit.speaker.models import SpeakerList
-
-
-class SpeakerListActionSchema(BaseModel):
-    pk: int  # which list to perform the action on
-
-
-class ListMessage(ContextAction, ABC):
-    model = SpeakerList
-    schema = SpeakerListActionSchema
-    data: SpeakerListActionSchema
 
 
 @outgoing

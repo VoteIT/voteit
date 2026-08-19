@@ -6,10 +6,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from envelope import WS_INCOMING
 from envelope import WS_OUTGOING
-from envelope.utils import get_message_registry
 from envelope.utils import get_context_channel_registry
+from envelope.utils import get_global_message_registry
 
 if TYPE_CHECKING:
     from envelope.channels.models import ContextChannel
@@ -23,12 +22,9 @@ def channel(channel: type[ContextChannel]):
 
 
 def outgoing(message: type[Message]):
-    reg = get_message_registry(WS_OUTGOING)
-    reg[message.name] = message
-    return message
-
-
-def incoming(message: type[Message]):
-    reg = get_message_registry(WS_INCOMING)
+    # setdefault rather than get_message_registry(): django.contrib.admin autodiscovery
+    # imports app messages.py modules before envelope's AppConfig.ready() has run
+    # register_envelopes(), so the namespace may not exist yet.
+    reg = get_global_message_registry().setdefault(WS_OUTGOING, {})
     reg[message.name] = message
     return message
