@@ -80,9 +80,7 @@ class MeetingSubscribedTests(TestCase):
         )
         app_state = command
         batched_payload = [
-            x.payload.items
-            for x in app_state
-            if x.action == "s.batch" and x.action == "poll.changed"
+            x.payload.items for x in app_state if x.action == "poll.changed.batch"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]
@@ -94,9 +92,7 @@ class MeetingSubscribedTests(TestCase):
         )
         app_state = command
         batched_payload = [
-            x.payload.items
-            for x in app_state
-            if x.action == "s.batch" and x.action == "poll.changed"
+            x.payload.items for x in app_state if x.action == "poll.changed.batch"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]
@@ -142,9 +138,7 @@ class MeetingSubscribedTests(TestCase):
         )
         app_state = command
         batched_payload = [
-            x.payload.items
-            for x in app_state
-            if x.action == "s.batch" and x.action == "poll.changed"
+            x.payload.items for x in app_state if x.action == "poll.changed.batch"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]
@@ -170,9 +164,7 @@ class MeetingSubscribedTests(TestCase):
         )
         app_state = command
         batched_payload = [
-            x.payload.items
-            for x in app_state
-            if x.action == "s.batch" and x.action == "poll.changed"
+            x.payload.items for x in app_state if x.action == "poll.changed.batch"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]
@@ -196,10 +188,11 @@ class MeetingSubscribedTests(TestCase):
     def test_app_state_ongoing_poll(self):
         command = build_app_state("meeting", self.meeting.pk, self.user.pk)
         app_state = command
-        message = [x.payload for x in app_state if x.action.endswith(".batch")][0]
-        self.assertEqual(1, len(message["payloads"]))
+        message = [x for x in app_state if x.action.endswith(".batch")][0]
+        self.assertEqual(1, len(message.payload.items))
         self.assertEqual(
-            {"pk": self.poll2.pk, "voted": 1, "total": 2}, message["payloads"][0].dict()
+            {"pk": self.poll2.pk, "voted": 1, "total": 2},
+            message.payload.items[0].model_dump(),
         )
 
     def test_app_state_multiple_ongoing_poll(self):
@@ -209,7 +202,7 @@ class MeetingSubscribedTests(TestCase):
         self.poll.votes.create(user=self.moderator, vote="yes")
         self.poll2.votes.create(user=self.moderator, vote="yes")
         app_state = command
-        message = [x.payload for x in app_state if x.action.endswith(".batch")][0]
+        message = [x for x in app_state if x.action.endswith(".batch")][0]
         dict_payloads = [x.model_dump() for x in message.payload.items]
         self.assertIn({"pk": self.poll.pk, "voted": 2, "total": 2}, dict_payloads)
         self.assertIn({"pk": self.poll2.pk, "voted": 2, "total": 2}, dict_payloads)
@@ -522,9 +515,7 @@ class VoteTransferSignalsTests(TestCase):
         app_state = command
         payloads = []
         for x in app_state:
-            if x.action == "s.batch" and x.payload.action == action_of(
-                VoteTransferChanged
-            ):
+            if x.action == f"{action_of(VoteTransferChanged)}.batch":
                 payloads = x.payload.items
                 break
         self.assertEqual(1, len(payloads))
@@ -551,7 +542,7 @@ class VoteTransferSignalsTests(TestCase):
             [
                 x
                 for x in app_state
-                if x.action == "s.batch"
+                if x.action.endswith(".batch")
                 and x.payload.action == action_of(VoteTransferChanged)
             ],
         )

@@ -190,5 +190,23 @@ def pydantic_to_drf_validation_error(error: PydanticValidationError) -> Validati
     for err in error.errors():
         loc = err["loc"]
         if loc:
-            _nested_set(eoutput, loc, err["msg"])
+            _nested_set(eoutput, loc, _clean_msg(err["msg"]))
     return ValidationError(eoutput)
+
+
+def _clean_msg(msg: str) -> str:
+    """Strip pydantic v2's "Value error, " prefix.
+
+    v2 prefixes the message of any ValueError raised inside a validator. These
+    messages are shown to end users, and the validators already word them as
+    complete sentences, so the prefix is noise.
+
+    >>> _clean_msg("Value error, Groups are needed")
+    'Groups are needed'
+    >>> _clean_msg("Input should be a valid integer")
+    'Input should be a valid integer'
+    """
+    for prefix in ("Value error, ", "Assertion failed, "):
+        if msg.startswith(prefix):
+            return msg[len(prefix) :]
+    return msg

@@ -95,9 +95,7 @@ class SignalButtonTests(TestCase):
         command = build_app_state("agenda_item", self.ai.pk, self.moderator.pk)
         app_state = command
         batched_payload = [
-            x.payload.items
-            for x in app_state
-            if x.action == "s.batch" and x.action == "reaction.changed"
+            x.payload.items for x in app_state if x.action == "reaction.changed.batch"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]

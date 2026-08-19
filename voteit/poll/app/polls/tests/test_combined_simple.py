@@ -64,7 +64,7 @@ class SimpleTests(TestCase):
         self.poll.votes.create(user=uc, vote=f'{{"no": [{prop.pk},{prop2.pk}]}}')
         self.poll.close(force=True)
         self.assertEqual(
-            self.poll.result,
+            self.poll.result.model_dump(),
             {
                 "results": {
                     prop.pk: {"abstain": 0, "yes": 2, "no": 1},

@@ -7,7 +7,10 @@ from pydantic import ValidationError as PydanticValidationError
 from rest_framework import serializers
 
 from voteit.core.rest_api.serializers import BaseModelSerializer
+from voteit.core.rest_api.utils import _clean_msg
+from voteit.core.validators import DuplicateItemsError
 from voteit.core.validators import root_validate_roles_and_model
+from voteit.invites.exceptions import DataColValidationError
 from voteit.invites.models import MeetingInvite
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.invites.utils import send_updated_invites
@@ -108,22 +111,22 @@ class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
 
 def _pydantic_to_user_messages(exc: PydanticValidationError) -> list[str]:
     """
-    Extract readable error strings from a Pydantic v1 ValidationError,
+    Extract readable error strings from a pydantic ValidationError,
     discarding the technical wrapper ("1 validation error for …\nfield\n  …").
     """
     messages = []
     for e in exc.errors():
-        error_type = e.get("type", "")
-        if error_type == "value_error.datacolvalidation":
-            ctx = e.get("ctx", {})
-            name = ctx.get("name", "")
-            rows = ctx.get("rows", [])
-            row_str = ", ".join(str(r) for r in rows)
-            messages.append(f"Invalid {name} value at row(s): {row_str}")
-        elif error_type == "value_error.duplicateitems":
+        # pydantic v2 reports every ValueError as type "value_error" but hands
+        # back the original exception in ctx, so branch on the class rather
+        # than on the v1-style dotted error type.
+        err = e.get("ctx", {}).get("error")
+        if isinstance(err, DataColValidationError):
+            row_str = ", ".join(str(r) for r in err.rows)
+            messages.append(f"Invalid {err.name} value at row(s): {row_str}")
+        elif isinstance(err, DuplicateItemsError):
             messages.append("The file contains duplicate rows")
         else:
-            messages.append(e["msg"])
+            messages.append(_clean_msg(e["msg"]))
     return messages
 
 

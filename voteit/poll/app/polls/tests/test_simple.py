@@ -57,7 +57,7 @@ class SimpleTests(TestCase):
         self.poll.votes.create(user=uc, vote="no")
         self.poll.close(force=True)
         self.assertEqual(
-            self.poll.result,
+            self.poll.result.model_dump(),
             {
                 "yes": 2,
                 "no": 1,

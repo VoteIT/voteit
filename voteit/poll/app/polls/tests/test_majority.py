@@ -55,7 +55,7 @@ class MajorityTests(TestCase):
         self.poll.votes.create(user=self.voter_a, vote=f'{{"choice": {self.prop1.pk}}}')
         self.poll.close(force=True)
         self.assertEqual(
-            self.poll.result,
+            self.poll.result.model_dump(),
             {
                 "results": [
                     {"proposal": self.prop1.pk, "votes": 1},
@@ -76,7 +76,7 @@ class MajorityTests(TestCase):
         self.poll.votes.create(user=self.voter_b, vote=f'{{"choice": {self.prop2.pk}}}')
         self.poll.close(force=True)
         self.assertEqual(
-            self.poll.result,
+            self.poll.result.model_dump(),
             {
                 "results": [
                     {"proposal": self.prop1.pk, "votes": 1},
@@ -99,7 +99,7 @@ class MajorityTests(TestCase):
         self.poll.votes.create(user=self.voter_c, vote=f'{{"choice": {self.prop2.pk}}}')
         self.poll.close(force=True)
         self.assertEqual(
-            self.poll.result,
+            self.poll.result.model_dump(),
             {
                 "results": [
                     {"proposal": self.prop2.pk, "votes": 1},

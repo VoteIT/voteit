@@ -34,7 +34,7 @@ class AgendaSubscribedTests(TestCase):
         batched_payload = [
             x.payload.items
             for x in app_state
-            if x.action == "s.batch" and x.action == "discussion_post.changed"
+            if x.action == "discussion_post.changed.batch"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]

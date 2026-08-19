@@ -99,7 +99,7 @@ class SignalTests(TestCase):
         ]
         self.assertEqual(1, len(batch_msg))
         batch_msg = batch_msg[0]
-        data_one = batch_msg["p"].payloads[0].dict()
+        data_one = batch_msg.payload.items[0].model_dump()
         self.assertIsInstance(data_one.pop("created"), str)
         self.assertEqual(
             {

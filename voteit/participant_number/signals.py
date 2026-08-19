@@ -43,16 +43,17 @@ def meeting_channel_subscribed(context: Meeting, app_state: AppState, **kw):
 
 @receiver_all_subclasses(post_save, sender=ParticipantNumber)
 @disable_on_raw_save
-def pn_updated(instance: ParticipantNumber = None, created=None, **kw):
+def pn_updated(instance: ParticipantNumber = None, **kw):
     if instance.pns.meeting is None:
         return
     channel = MeetingChannel.from_instance(instance.pns.meeting)
-    msg_klass = created and PNChanged or PNChanged
-    msg = msg_klass(
-        meeting=instance.pns.meeting.pk,
-        number=instance.number,
-        user=instance.user.pk,
-        pk=instance.pk,
+    msg = PNChanged(
+        payload={
+            "meeting": instance.pns.meeting.pk,
+            "number": instance.number,
+            "user": instance.user.pk,
+            "pk": instance.pk,
+        }
     )
     channel.sync_publish(msg)
 

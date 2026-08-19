@@ -110,9 +110,9 @@ class MeetingChannelSubscribedTests(TestCase):
         ]
         self.assertEqual(1, len(added_meeting_roles))
         payload = added_meeting_roles[0].payload
-        self.assertEqual(set(payload["roles"]), {ROLE_MODERATOR, ROLE_PARTICIPANT})
-        self.assertEqual(payload["user_pk"], self.user.pk)
-        self.assertEqual(payload["model"], "meeting")
+        self.assertEqual(set(payload.roles), {ROLE_MODERATOR, ROLE_PARTICIPANT})
+        self.assertEqual(payload.user_pk, self.user.pk)
+        self.assertEqual(payload.model, "meeting")
 
     def test_meeting_groups_and_related_in_app_state(self):
         self.meeting.group_roles_active = True
@@ -131,7 +131,7 @@ class MeetingChannelSubscribedTests(TestCase):
         added = [x for x in app_state if x.action == "group_role.changed"]
         self.assertEqual(1, len(added))
         payload = added[0].p
-        self.assertEqual(self.group_role.pk, payload["pk"])
+        self.assertEqual(self.group_role.pk, payload.pk)
         # GroupMembership
         added = [
             x
