@@ -27,10 +27,10 @@ class CSVRows(BaseModel):
         max_items=500,
     )
 
-    @validator("rows", pre=True, each_item=True)
-    def transform_rows(cls, v: list[str] | str):
-        if isinstance(v, str):
-            return v.split("\t")
+    @validator("rows", pre=True)
+    def transform_rows(cls, v):
+        if isinstance(v, (list, tuple)):
+            return [item.split("\t") if isinstance(item, str) else item for item in v]
         return v
 
 

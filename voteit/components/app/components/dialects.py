@@ -3,6 +3,7 @@ from pydantic import conlist
 from pydantic import constr
 from pydantic import validator
 
+from voteit.core.validators import ensure_unique
 from voteit.components.abcs import ComponentAdapter
 from voteit.components.registries import organisation_components
 
@@ -14,15 +15,12 @@ __all__ = (
 
 
 class DialectsFilterSchema(BaseModel):
-    include: conlist(
-        constr(strip_whitespace=True, to_lower=True), unique_items=True
-    ) = []
-    exclude: conlist(
-        constr(strip_whitespace=True, to_lower=True), unique_items=True
-    ) = []
+    include: conlist(constr(strip_whitespace=True, to_lower=True)) = []
+    exclude: conlist(constr(strip_whitespace=True, to_lower=True)) = []
 
     @validator("include", "exclude")
     def validate_dialect_name(cls, v: list[str]):
+        ensure_unique(v)
         from voteit.meeting.dialects import get_named_paths  # Avoid circular
 
         valid_names = {k for k, v in get_named_paths()}

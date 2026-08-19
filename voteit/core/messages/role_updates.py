@@ -20,10 +20,10 @@ class RolesChangeSchema(BaseModel):
     pk: int  # context where the change happened, use together with model
     model: str  # The model shortname
 
-    @validator("roles", pre=True, each_item=True)
-    def roles_to_str(cls, v: str | Role):
-        if isinstance(v, Role):
-            v = str(v)
+    @validator("roles", pre=True)
+    def roles_to_str(cls, v):
+        if isinstance(v, (list, tuple, set)):
+            return [str(item) if isinstance(item, Role) else item for item in v]
         return v
 
 

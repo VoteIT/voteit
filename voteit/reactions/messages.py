@@ -31,9 +31,9 @@ class ReactionSchema(BaseModel):
     object_id: int
     button: int
 
-    _validate_content_type = validator("content_type", allow_reuse=True)(
-        validate_model_shortname
-    )
+    @validator("content_type")
+    def validate_content_type(cls, v):
+        return validate_model_shortname(v)
 
 
 class ReactionCountSchema(ReactionSchema):
@@ -43,7 +43,7 @@ class ReactionCountSchema(ReactionSchema):
 class UserReactionResponseSchema(ReactionSchema):
     pk: int  # The reactions' pk!
     user: int
-    agenda_item: int | None
+    agenda_item: int | None = None
 
 
 @outgoing

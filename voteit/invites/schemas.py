@@ -8,6 +8,7 @@ from pydantic import conlist
 from pydantic import constr
 from pydantic import validator
 
+from voteit.core.validators import ensure_unique
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.messaging.base import AddedOrUpdatedSchema
 
@@ -60,19 +61,22 @@ class RowColInvitesBaseSchema(BaseModel):
             strip_whitespace=True,
             to_lower=True,
         ),
-        unique_items=True,
         max_items=20,
     )
-    # Important note! unique_items doesn't work when constr changes data. Rows must be altered before
     rows: conlist(
         conlist(
             str | None | int,
-            unique_items=True,
             max_items=30,
         ),
-        unique_items=True,
     )
     dryrun: bool = False  # Abort transaction when complete!
+
+    @validator("columns")
+    def validate_columns_unique(cls, v: list[str]):
+        # Uniqueness is enforced here rather than via conlist(unique_items=True)
+        # so that it runs *after* constr() has stripped and lowercased -- the v1
+        # form compared the raw input and so missed case/whitespace duplicates.
+        return ensure_unique(v)
 
     @validator("columns")
     def validate_columns_requirements(cls, v: list[str]):
@@ -105,6 +109,12 @@ class RowColInvitesBaseSchema(BaseModel):
             reg.preflight(values["columns"], result)
             return result
         raise ValueError("Initial value of rows must be either string or list")
+
+    @validator("rows")
+    def validate_rows_unique(cls, v: list[list]):
+        for row in v:
+            ensure_unique(row)
+        return ensure_unique(v)
 
     @validator("rows")
     def check_row_len(cls, v: list):
@@ -179,10 +189,10 @@ class AnnotationResultSchema(InvitesResultSchema):
     # added, changed and existed should be used equally for registered
     # users and users who haven't used an invitation yet.
     name: str
-    msg: str | None
+    msg: str | None = None
     # Progress
-    curr: int | None
-    total: int | None
+    curr: int | None = None
+    total: int | None = None
     # Any invite that got a new annotation - ie we might want to send InviteChanged message with has_annotations
     newly_annotated_invites: list[int] = Field(default_factory=list)
 

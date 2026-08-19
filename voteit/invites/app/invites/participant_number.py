@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class ParticipantNumberSchema(BaseModel):
-    pn: conint(ge=1, le=999) | None
+    pn: conint(ge=1, le=999) | None = None
 
     @validator("pn", pre=True)
     def cleanup(cls, v):

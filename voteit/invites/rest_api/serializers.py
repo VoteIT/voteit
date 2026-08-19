@@ -120,7 +120,7 @@ def _pydantic_to_user_messages(exc: PydanticValidationError) -> list[str]:
             rows = ctx.get("rows", [])
             row_str = ", ".join(str(r) for r in rows)
             messages.append(f"Invalid {name} value at row(s): {row_str}")
-        elif error_type == "value_error.list.unique_items":
+        elif error_type == "value_error.duplicateitems":
             messages.append("The file contains duplicate rows")
         else:
             messages.append(e["msg"])

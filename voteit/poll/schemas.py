@@ -19,7 +19,7 @@ class PollResult(BaseModel):
     approved: list[int] = []
     denied: list[int] = []
     # Optional, so that it can be populated after method calculation
-    vote_count: int | None
+    vote_count: int | None = None
 
 
 class RankingSchema(BaseModel):
@@ -89,9 +89,9 @@ class ElectoralRegistryPolicySchema(BaseModel):
     allow_poll_er_change: bool
     handles_vote_weight: bool
     handles_active_check: bool
-    group_votes_active: bool | None
+    group_votes_active: bool | None = None
     handles_delegate_to: bool
-    vote_transfer_policy: str | None
+    vote_transfer_policy: str | None = None
 
     @validator("title", "description", pre=True)
     def translate(cls, v):

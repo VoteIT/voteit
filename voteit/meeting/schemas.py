@@ -6,6 +6,7 @@ from pydantic import validator
 
 from voteit.components.utils import get_meeting_component_adapters
 from voteit.core.role import Role
+from voteit.core.validators import ensure_unique
 from voteit.core.validators import root_validate_roles_and_model
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -37,9 +38,11 @@ class GroupRoleSchema(BaseModel):
     role_id: constr(max_length=100, to_lower=True)
     roles: list[str] = ()
 
-    @validator("roles", pre=True, each_item=True)
-    def role_compat(cls, v: str | Role):
-        return _role_compat(v)
+    @validator("roles", pre=True)
+    def role_compat(cls, v):
+        if isinstance(v, (list, tuple)):
+            return [_role_compat(item) for item in v]
+        return v
 
     @validator("roles")
     def validate_roles(cls, v):
@@ -48,7 +51,7 @@ class GroupRoleSchema(BaseModel):
 
 
 class GroupSchema(BaseModel):
-    title: constr(max_length=100) | None
+    title: constr(max_length=100) | None = None
     groupid: constr(max_length=100, to_lower=True, strip_whitespace=True)
 
 
@@ -139,16 +142,17 @@ class SpeakerListSystemSchema(BaseModel):
             raise ValueError(f"{v} is not a valid speaker list method.")
         return v
 
-    @validator("meeting_roles_to_speaker", pre=True, each_item=True)
+    @validator("meeting_roles_to_speaker", pre=True)
     def transform_role(cls, v):
-        if isinstance(v, Role):
-            return str(v)
+        if isinstance(v, (list, tuple)):
+            return [str(item) if isinstance(item, Role) else item for item in v]
         return v
 
-    @validator("meeting_roles_to_speaker", each_item=True)
-    def validate_roles(cls, v: str):
-        if v not in MeetingRoles.valid_roles.values():
-            raise ValueError(f"{v} is not a valid meeting role.")
+    @validator("meeting_roles_to_speaker")
+    def validate_roles(cls, v: list[str]):
+        for item in v:
+            if item not in MeetingRoles.valid_roles.values():
+                raise ValueError(f"{item} is not a valid meeting role.")
         return v
 
     @validator("settings")
@@ -198,8 +202,8 @@ class DialectSchema(BaseModel):
     title: str
     description: str = ""
     name: str
-    roles: conlist(GroupRoleSchema, unique_items=True) = []
-    groups: conlist(GroupSchema, unique_items=True) = []
+    roles: conlist(GroupRoleSchema) = []
+    groups: conlist(GroupSchema) = []
     er_policy_name: str | None = None
     group_votes_active: bool | None = None
     group_roles_active: bool | None = None
@@ -208,25 +212,24 @@ class DialectSchema(BaseModel):
     )
     proposal_id_policy_name: str | None = None
     installable: bool = True  # Offer as selection for all organisations?
-    requires: conlist(
-        constr(to_lower=True, strip_whitespace=True),
-        unique_items=True,
-    ) = []
+    requires: conlist(constr(to_lower=True, strip_whitespace=True)) = []
     view_components: dict[str, str] = {}
     configure_components: list[ComponentSettings] = []
-    block_components: conlist(
-        constr(to_lower=True, strip_whitespace=True),
-        unique_items=True,
-    ) = []
-    block_roles: conlist(
-        constr(to_lower=True, strip_whitespace=True),
-        unique_items=True,
-    ) = []
-    run_scripts: conlist(
-        constr(strip_whitespace=True),
-        unique_items=True,
-    ) = []
+    block_components: conlist(constr(to_lower=True, strip_whitespace=True)) = []
+    block_roles: conlist(constr(to_lower=True, strip_whitespace=True)) = []
+    run_scripts: conlist(constr(strip_whitespace=True)) = []
     rooms: list[RoomSchema] = []
+
+    @validator(
+        "roles",
+        "groups",
+        "requires",
+        "block_components",
+        "block_roles",
+        "run_scripts",
+    )
+    def validate_unique(cls, v):
+        return ensure_unique(v)
 
     @validator("block_roles")
     def validate_roles(cls, v):
@@ -234,6 +237,8 @@ class DialectSchema(BaseModel):
             root_validate_roles_and_model(cls, {"model": "meeting", "roles": v})
         return v
 
-    @validator("block_roles", pre=True, each_item=True)
-    def role_compat(cls, v: str | Role):
-        return _role_compat(v)
+    @validator("block_roles", pre=True)
+    def role_compat(cls, v):
+        if isinstance(v, (list, tuple)):
+            return [_role_compat(item) for item in v]
+        return v

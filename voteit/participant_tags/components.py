@@ -6,6 +6,7 @@ from pydantic import conlist
 from pydantic import validator
 from pydantic.main import BaseModel
 
+from voteit.core.validators import ensure_unique
 from voteit.components.abcs import ComponentAdapter
 from voteit.components.registries import meeting_components
 
@@ -13,22 +14,31 @@ tag_format = re.compile(r"^[a-z0-9_\-]{1,20}$")
 
 
 class TagSettings(BaseModel):
-    tags: conlist(str, min_items=1, unique_items=True)
+    tags: conlist(str, min_items=1)
     many: bool = False
 
-    @validator("tags", each_item=True)
-    def validate_tags(cls, v: str):
+    @validator("tags")
+    def validate_tags(cls, v: list[str]):
         """
         >>> f = TagSettings.validate_tags
-        >>> f('abc')
-        'abc'
-        >>> f('123-_')
-        '123-_'
-        >>> TagSettings.validate_tags('bröla!!!')
+        >>> f(['abc'])
+        ['abc']
+        >>> f(['123-_'])
+        ['123-_']
+        >>> f(['bröla!!!'])
         Traceback (most recent call last):
         ...
         ValueError: bröla!!! is not a valid tag
+        >>> f(['abc', 'ABC'])
+        Traceback (most recent call last):
+        ...
+        DuplicateItemsError: Items must be unique
         """
+        tags = [cls.validate_tag(item) for item in v]
+        return ensure_unique(tags)
+
+    @staticmethod
+    def validate_tag(v: str) -> str:
         v = v.lower()
         if tag_format.match(v):
             return v

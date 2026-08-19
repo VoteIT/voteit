@@ -11,8 +11,8 @@ class RoleOutput(BaseModel):
     name: str
     title: str
     description: str
-    require_names: list[str] | None
-    predicate_info: PredicateOutput | None
+    require_names: list[str] | None = None
+    predicate_info: PredicateOutput | None = None
 
     class Config:
         orm_mode = True
@@ -26,11 +26,11 @@ class RoleOutput(BaseModel):
 
 class PredicateOutput(BaseModel):
     name: str
-    description: str | None
+    description: str | None = None
     fullname: str = ""
     num_args: int
     source: str = ""
-    role_name: str | None
+    role_name: str | None = None
 
     @validator("description")
     def clean_description(cls, v):
@@ -45,7 +45,7 @@ class PredicateOutput(BaseModel):
 class PermissionOutput(BaseModel):
     name: str
     description: str = ""
-    model: str | None
+    model: str | None = None
     context: set[str]
 
     class Config:

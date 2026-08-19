@@ -9,7 +9,7 @@ from voteit.messaging.base import BaseObjectDeleted
 
 class ProposalAddedOrUpdatedSchema(AddedOrUpdatedSchema):
     created: str
-    modified: str | None
+    modified: str | None = None
 
 
 @outgoing

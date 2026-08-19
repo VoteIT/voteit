@@ -121,8 +121,8 @@ class RepeatedIRVSettings(BaseModel):
 
     winners: int  # Validation special
     allow_random: bool = True
-    max: None | PositiveInt
-    min: None | PositiveInt
+    max: None | PositiveInt = None
+    min: None | PositiveInt = None
 
     @validator("min", "max", pre=True)
     def no_zeroes(cls, v: int | None):

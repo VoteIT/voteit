@@ -63,7 +63,7 @@ class STVResultSchema(PollResult):
     quota: int
     runtime: float
     empty_ballot_count: int
-    random_order: None | list[int]
+    random_order: None | list[int] = None
 
 
 @poll_methods

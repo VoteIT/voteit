@@ -28,7 +28,7 @@ class SchulzePollResult(PollResult):
     candidates: list[int]
     winner: int
     strong_pairs: list[tuple[tuple[int, int], int]] = []
-    tied_winners: list[int] | None
+    tied_winners: list[int] | None = None
 
 
 class SchulzeSettingsSchema(BaseModel):
@@ -166,7 +166,7 @@ class RepeatedSchulzeResult(PollResult):
 
 
 class RepeatedSchulzeSettingsSchema(SchulzeSettingsSchema):
-    winners: int | None  # None means all
+    winners: int | None = None  # None means all
 
     @validator("winners", pre=True)
     def transform_winners(cls, v):

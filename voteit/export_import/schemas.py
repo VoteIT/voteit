@@ -57,7 +57,7 @@ class BaseContext(BaseModel, extra=Extra.forbid):
     include_reactions: bool = False
     include_notes: bool = False  # This should be restrictive, not via rest API!
 
-    @validator("include_groups", allow_reuse=True)
+    @validator("include_groups")
     def validate_include_groups(cls, v: bool, values: dict):
         """
         >>> _ = BaseContext()
@@ -76,7 +76,7 @@ class BaseContext(BaseModel, extra=Extra.forbid):
             )
         return v
 
-    @validator("include_reactions", allow_reuse=True)
+    @validator("include_reactions")
     def validate_include_reactions(cls, v: bool, values: dict):
         """
         >>> _ = BaseContext()
@@ -119,11 +119,11 @@ def get_context() -> BaseContext:
 
 class BaseContentData(BaseModel):
     body: str = ""
-    created: datetime | None
-    modified: datetime | None
+    created: datetime | None = None
+    modified: datetime | None = None
     # mentions:list[int] FIXME: how do we handle this?
     tags: list[constr(max_length=100, strip_whitespace=True)] = []
-    pk: str | None
+    pk: str | None = None
 
     class Config:
         orm_mode = True
@@ -141,12 +141,11 @@ class BaseContentData(BaseModel):
 
 
 class GroupMixin(BaseModel):
-    meeting_group: (
-        constr(max_length=100, strip_whitespace=True) | None
-    )  # ID for meeting group
+    # ID for meeting group
+    meeting_group: constr(max_length=100, strip_whitespace=True) | None = None
     as_group: bool = False
 
-    @validator("meeting_group", pre=True, allow_reuse=True)
+    @validator("meeting_group", pre=True)
     def meeting_groupid(cls, v):
         """
         >>> grp=MeetingGroup(groupid='hi-there')
@@ -165,9 +164,9 @@ class GroupMixin(BaseModel):
 
 
 class AuthorMixin(BaseModel):
-    author: str | None
+    author: str | None = None
 
-    @validator("author", pre=True, allow_reuse=True)
+    @validator("author", pre=True)
     def author_user(cls, v):
         """
         >>> user=User(pk=111, email='john@doe.com', username="john")
@@ -189,13 +188,13 @@ class TextDocumentData(BaseModel):
     title: constr(max_length=100, strip_whitespace=True)
     base_tag: constr(max_length=40, strip_whitespace=True, to_lower=True)
     body: str
-    created: datetime | None
-    modified: datetime | None
+    created: datetime | None = None
+    modified: datetime | None = None
 
     class Config:
         orm_mode = True
 
-    @validator("title", "body", pre=True, allow_reuse=True)
+    @validator("title", "body", pre=True)
     def strip_html_from_text_doc(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 
@@ -218,12 +217,11 @@ class TextDocumentData(BaseModel):
 
 class ProposalData(BaseContentData, AuthorMixin, GroupMixin):
     body: str
-    state: constr(strip_whitespace=True, to_lower=True, max_length=50) | None
-    prop_id: (
-        constr(strip_whitespace=True, to_lower=True, max_length=50) | None
-    )  # FIXME: Should we have prop_id here?
+    state: constr(strip_whitespace=True, to_lower=True, max_length=50) | None = None
+    # FIXME: Should we have prop_id here?
+    prop_id: constr(strip_whitespace=True, to_lower=True, max_length=50) | None = None
 
-    @validator("body", pre=True, allow_reuse=True)
+    @validator("body", pre=True)
     def clean_proposal_body(cls, v):
         return strict_clean_html(v) if isinstance(v, str) else v
 
@@ -292,7 +290,7 @@ class DiffProposalData(ProposalData):
     text_document: str = ""  # Really base tag here
     paragraph: int  # Paragraph order num, not pk!
 
-    @validator("paragraph", pre=True, always=True, allow_reuse=True)
+    @validator("paragraph", pre=True, always=True)
     def transform_paragraph(cls, v, values):
         if isinstance(v, TextParagraph):
             values["text_document"] = v.text_document.base_tag
@@ -303,7 +301,7 @@ class DiffProposalData(ProposalData):
 class DiscussionPostData(BaseContentData, AuthorMixin, GroupMixin):
     body: str
 
-    @validator("body", pre=True, allow_reuse=True)
+    @validator("body", pre=True)
     def clean_discussion_body(cls, v):
         return strict_clean_html(v) if isinstance(v, str) else v
 
@@ -347,7 +345,7 @@ class ReactionButtonData(BaseModel):
     description: constr(max_length=100, strip_whitespace=True) = ""
     icon: constr(max_length=30, strip_whitespace=True) = ""
     color: constr(max_length=15, strip_whitespace=True)
-    target: int | None
+    target: int | None = None
     order: int = 0
     change_roles: list[str]
     list_roles: list[str]
@@ -362,7 +360,7 @@ class ReactionButtonData(BaseModel):
     class Config:
         orm_mode = True
 
-    @validator("title", "description", "icon", "color", pre=True, allow_reuse=True)
+    @validator("title", "description", "icon", "color", pre=True)
     def strip_html_from_button_fields(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 
@@ -399,16 +397,16 @@ class NoteData(BaseModel):
     proposal_id: str
     body: str = ""
     intent: str = ""
-    created: datetime | None
+    created: datetime | None = None
 
     class Config:
         orm_mode = True
 
-    @validator("body", pre=True, allow_reuse=True)
+    @validator("body", pre=True)
     def clean_note_body(cls, v):
         return strict_clean_html(v) if isinstance(v, str) else v
 
-    @validator("intent", pre=True, allow_reuse=True)
+    @validator("intent", pre=True)
     def strip_html_from_intent(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 
@@ -433,17 +431,17 @@ class NoteData(BaseModel):
 class MeetingGroupData(BaseContentData):
     title: constr(max_length=100, strip_whitespace=True) = ""
     groupid: constr(max_length=100, strip_whitespace=True)
-    votes: int | None
+    votes: int | None = None
     members: list[str] = []
     post_as: bool = False
     show_on_speaker: bool = True
     delegate_to: str | None = None
 
-    @validator("title", pre=True, allow_reuse=True)
+    @validator("title", pre=True)
     def strip_group_title_html(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 
-    @validator("body", pre=True, allow_reuse=True)
+    @validator("body", pre=True)
     def clean_group_body(cls, v):
         return strict_clean_html(v) if isinstance(v, str) else v
 
@@ -477,7 +475,7 @@ class MeetingGroupData(BaseContentData):
 
 class AgendaItemData(BaseContentData):
     title: constr(max_length=100, strip_whitespace=True)
-    state: constr(strip_whitespace=True, to_lower=True, max_length=50) | None
+    state: constr(strip_whitespace=True, to_lower=True, max_length=50) | None = None
     block_discussion: bool = False
     block_proposals: bool = False
     text_documents: list[TextDocumentData] = []
@@ -487,11 +485,11 @@ class AgendaItemData(BaseContentData):
     class Config:
         orm_mode = True
 
-    @validator("title", pre=True, allow_reuse=True)
+    @validator("title", pre=True)
     def strip_ai_title_html(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 
-    @validator("body", pre=True, allow_reuse=True)
+    @validator("body", pre=True)
     def clean_ai_body(cls, v):
         return strict_clean_html(v) if isinstance(v, str) else v
 
@@ -737,17 +735,17 @@ class ImportStats(BaseModel):
 
 class ImportMeetingMeta(BaseModel):
     version: int
-    created: datetime | None
+    created: datetime | None = None
     title: str = ""
     description: str = ""
 
-    @validator("title", "description", pre=True, allow_reuse=True)
+    @validator("title", "description", pre=True)
     def strip_html_from_meta(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 
 
 class ImportMeetingStructure(MeetingStructure):
-    meta: ImportMeetingMeta | None
+    meta: ImportMeetingMeta | None = None
 
 
 class ExportMeetingMeta(BaseModel):

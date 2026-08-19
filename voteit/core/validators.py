@@ -234,3 +234,49 @@ def valid_userid(value: str) -> str:
     except ValidationError as exc:
         raise ValueError(exc.message)
     return value
+
+
+class DuplicateItemsError(ValueError):
+    """Raised when a sequence that must hold unique items does not.
+
+    Replaces pydantic v1's ``conlist(..., unique_items=True)``, which was
+    removed outright in v2.
+    """
+
+
+def ensure_unique(value):
+    """Reject sequences containing duplicates, passing anything else through.
+
+    Unlike ``conlist(unique_items=True)`` this runs *after* field coercion, so
+    items that are only distinct before coercion -- e.g. under
+    ``constr(to_lower=True, strip_whitespace=True)`` -- are correctly seen as
+    duplicates. That was a documented misbehaviour of the pydantic v1 form.
+
+    Items need not be hashable; ``repr`` is used as the identity key, which is
+    deterministic for the scalars, lists and models this is applied to.
+
+    >>> ensure_unique([1, 2, 3])
+    [1, 2, 3]
+    >>> ensure_unique(["a", "a"])
+    Traceback (most recent call last):
+    ...
+    DuplicateItemsError: Items must be unique
+    >>> ensure_unique([["a"], ["a"]])
+    Traceback (most recent call last):
+    ...
+    DuplicateItemsError: Items must be unique
+
+    Non-sequences are returned untouched:
+
+    >>> ensure_unique(None) is None
+    True
+    """
+    if not isinstance(value, (list, tuple)):
+        return value
+    seen: set[str] = set()
+    for item in value:
+        key = repr(item)
+        if key in seen:
+            raise DuplicateItemsError("Items must be unique")
+        seen.add(key)
+    return value
