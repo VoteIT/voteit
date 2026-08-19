@@ -15,10 +15,10 @@ migrations:
 migrate:
 	python manage.py migrate
 rqworker:
-	python manage.py devrqworker default ts conn long --with-scheduler
+	python manage.py devrqworker default long --with-scheduler
 up:
 	docker compose up -d
-	python manage.py rqworker --with-scheduler default ts conn &
+	python manage.py rqworker --with-scheduler default long &
 	python -W once manage.py runserver
 down:
 	docker compose down

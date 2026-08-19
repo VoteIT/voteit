@@ -51,9 +51,7 @@ INSTALLED_APPS = [
     "rest_framework_api_key",
     "django_filters",
     "channels",
-    "envelope.app.online_channel",
-    "envelope.app.user_channel",
-    "envelope",
+    "chanx.channels",
     "corsheaders",
     "auditlog",
     "django_rq",
@@ -117,7 +115,7 @@ AUTHENTICATION_BACKENDS = [
     "voteit.core.backends.PrefetchedModelBackend",
 ]
 
-# Channels / Envelope / RQ
+# Channels / chanx / RQ
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -127,9 +125,26 @@ CHANNEL_LAYERS = {
         },
     },
 }
-# Must exist within RQ config
-ENVELOPE_CONNECTIONS_QUEUE = "conn"
-ENVELOPE_TIMESTAMP_QUEUE = "ts"
+CHANX = {
+    "MESSAGE_ACTION_KEY": "action",
+    # Suppress the complete/group_complete acks; the frontend does not use
+    # them. Tests turn this on via voteit.messaging.testing.ws_test_settings.
+    "SEND_COMPLETION": False,
+    "SEND_MESSAGE_IMMEDIATELY": True,
+    # We authenticate off scope["user"], not DRF, so there is no auth message.
+    "SEND_AUTHENTICATION_MESSAGE": False,
+    # VoteIT speaks snake_case on the wire.
+    "CAMELIZE": False,
+    "LOG_WEBSOCKET_MESSAGE": True,
+    "LOG_IGNORED_ACTIONS": ["s.ping", "s.pong"],
+    "ASYNCAPI_TITLE": "VoteIT WebSocket API",
+}
+
+# Seconds between Connection.last_action writes for a busy socket.
+VOTEIT_CONNECTION_UPDATE_INTERVAL = 60
+# Collapse this many or more same-action messages to one target into a
+# single <action>.batch message when a transaction commits.
+VOTEIT_BATCH_THRESHOLD = 3
 
 RQ_QUEUES = {
     "default": {
@@ -143,16 +158,6 @@ RQ_QUEUES = {
         "DB": 1,
         "DEFAULT_TIMEOUT": 600,
         "DEFAULT_RESULT_TTL": 3600 * 24 * 7,
-    },
-    ENVELOPE_CONNECTIONS_QUEUE: {
-        "HOST": "redis",
-        "PORT": 6379,
-        "DB": 1,
-    },
-    ENVELOPE_TIMESTAMP_QUEUE: {
-        "HOST": "redis",
-        "PORT": 6379,
-        "DB": 1,
     },
 }
 

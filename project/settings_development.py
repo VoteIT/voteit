@@ -11,7 +11,7 @@ DATABASES["default"]["HOST"] = "localhost"
 MEETING_DIALECTS_DIR = os.path.join(BASE_DIR, "src", "dialect_configs", "dialects")
 
 # Make sure all use same connection to enable us to use one worker when developing
-for qname in {"default", "long", ENVELOPE_TIMESTAMP_QUEUE, ENVELOPE_CONNECTIONS_QUEUE}:
+for qname in {"default", "long"}:
     RQ_QUEUES[qname] = {"HOST": "localhost", "DB": 1, "PORT": 6379}
 
 
@@ -31,7 +31,7 @@ VERBOSE_PERMISSION_LOG = True
 PERMISSON_LOG_FAIL_ONLY = True
 ALLOWED_HOSTS = ["*"]
 LOGGING["loggers"]["voteit"]["level"] = "DEBUG"
-LOGGING["loggers"]["envelope"]["level"] = "DEBUG"
+LOGGING["loggers"]["chanx"]["level"] = "DEBUG"
 LOGGING["handlers"]["console"]["formatter"] = "rq_console"
 
 REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"].append(

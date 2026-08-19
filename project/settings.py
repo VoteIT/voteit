@@ -101,10 +101,6 @@ LOGIN_ERROR_URL = "/error"
 REDIS_RQ_HOST = os.getenv("REDIS_RQ_HOST", "redis_rq")
 RQ_QUEUES["default"]["HOST"] = REDIS_RQ_HOST
 RQ_QUEUES["long"]["HOST"] = REDIS_RQ_HOST
-RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["DB"] = 2
-RQ_QUEUES[ENVELOPE_CONNECTIONS_QUEUE]["HOST"] = REDIS_RQ_HOST
-RQ_QUEUES[ENVELOPE_TIMESTAMP_QUEUE]["DB"] = 3
-RQ_QUEUES[ENVELOPE_TIMESTAMP_QUEUE]["HOST"] = REDIS_RQ_HOST
 
 # Channels
 REDIS_CHANNEL_HOST = os.getenv("REDIS_CHANNEL_HOST", "redis")
@@ -202,8 +198,8 @@ LOGGING = {
             "propagate": False,
         },
         "voteit": {"handlers": ["console"], "level": "WARNING", "propagate": False},
-        "envelope": {"handlers": ["console"], "level": "WARNING", "propagate": False},
-        "envelope.consumers.websocket.event": {
+        "chanx": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "voteit.messaging": {
             "handlers": ["json"],
             "level": "DEBUG",
             "propagate": False,
