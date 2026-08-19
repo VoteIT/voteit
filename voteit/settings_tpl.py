@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "social_django",
     "controlcenter",
     "voteit.core",
+    "voteit.messaging",
     "voteit.meeting",
     "voteit.export_import",
     "voteit.active",
