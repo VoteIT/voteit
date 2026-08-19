@@ -38,6 +38,7 @@ evil_full_example = (
     % evil_text_snippet
 )
 
+
 class CleaningUtilsTests(TestCase):
     pass
 

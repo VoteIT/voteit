@@ -176,13 +176,13 @@ class AnyProposalChangedTests(TestCase):
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_added_participant(self, mock_publish):
-        from voteit.proposal.messages import ProposalAdded
+        from voteit.proposal.messages import ProposalChanged
 
         self.assertFalse(mock_publish.called)
         prop = self.ai.proposals.create()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, ProposalAdded)
+        self.assertIsInstance(msg, ProposalChanged)
         self.assertEqual(prop.pk, msg.data.pk)
 
     @patch.object(ParticipantsChannel, "sync_publish")
@@ -196,25 +196,25 @@ class AnyProposalChangedTests(TestCase):
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_diff_proposal_added(self, mock_publish):
-        from voteit.proposal.messages import ProposalAdded
+        from voteit.proposal.messages import ProposalChanged
 
         self.assertFalse(mock_publish.called)
         diff_prop = self._mk_diff_prop()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, ProposalAdded)
+        self.assertIsInstance(msg, ProposalChanged)
         self.assertEqual(diff_prop.pk, msg.data.pk)
         self.assertEqual(msg.data.paragraph, diff_prop.paragraph.pk)
 
     @patch.object(ModeratorsChannel, "sync_publish")
     def test_added_moderator(self, mock_publish):
-        from voteit.proposal.messages import ProposalAdded
+        from voteit.proposal.messages import ProposalChanged
 
         self.assertFalse(mock_publish.called)
         prop = self.ai.proposals.create()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, ProposalAdded)
+        self.assertIsInstance(msg, ProposalChanged)
         self.assertEqual(prop.pk, msg.data.pk)
         self.ai.state = "private"
         self.ai.save()
@@ -222,7 +222,7 @@ class AnyProposalChangedTests(TestCase):
         self.ai.proposals.create()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, ProposalAdded)
+        self.assertIsInstance(msg, ProposalChanged)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed_participant(self, mock_publish):
@@ -347,14 +347,16 @@ class PrivateAIPublishedTests(TestCase):
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_ai_made_public(self, mock_publish):
         from voteit.agenda.messages import AgendaChanged
-        from voteit.proposal.messages import ProposalAdded
+        from voteit.proposal.messages import ProposalChanged
 
         self.ai.make_upcoming(user=self.moderator)
         self.ai.save()
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
         self.assertEqual(1, len([x for x in messages if isinstance(x, AgendaChanged)]))
-        self.assertEqual(1, len([x for x in messages if isinstance(x, ProposalAdded)]))
+        self.assertEqual(
+            1, len([x for x in messages if isinstance(x, ProposalChanged)])
+        )
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -371,7 +373,7 @@ class AgendaItemChannelTests(TestCase):
 
     @patch.object(AgendaItemChannel, "sync_publish")
     def test_create(self, mock_publish):
-        from voteit.proposal.messages import TextDocumentAdded
+        from voteit.proposal.messages import TextDocumentChanged
 
         text_doc = self.ai.text_documents.create(
             body="Hello again\n\nWorld", base_tag="world"
@@ -379,7 +381,7 @@ class AgendaItemChannelTests(TestCase):
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
         self.assertEqual(
-            1, len([x for x in messages if isinstance(x, TextDocumentAdded)])
+            1, len([x for x in messages if isinstance(x, TextDocumentChanged)])
         )
         msg = messages[0]
         self.assertEqual(text_doc.pk, msg.data.pk)

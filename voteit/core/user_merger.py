@@ -187,9 +187,7 @@ class UserMerger:
                 else:
                     if not self.dry_run:
                         model.objects.filter(pk=obj.pk).update(**{fname: self.target})
-                    self.log.moved.append(
-                        f"{model.__name__}.{fname} pk={obj.pk} moved"
-                    )
+                    self.log.moved.append(f"{model.__name__}.{fname} pk={obj.pk} moved")
 
     def _handle_speaker_list_order(self) -> None:
         from voteit.speaker.models import Speaker

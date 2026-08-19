@@ -5,12 +5,11 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
-from envelope.signals import channel_subscribed
+from voteit.messaging.signals import channel_subscribed
 
 from voteit.core.decorators import disable_on_raw_save
 from voteit.meeting.channels import MeetingChannel
 from voteit.room.channels import RoomChannel
-from voteit.room.messages import RoomAdded
 from voteit.room.messages import RoomChanged
 from voteit.room.messages import RoomDeleted
 from voteit.room.messages import RoomHighlighted
@@ -18,7 +17,7 @@ from voteit.room.models import Room
 from voteit.room.rest_api.serializers import RoomSerializer
 
 if TYPE_CHECKING:
-    from envelope.utils import AppState
+    from voteit.messaging.state import AppState
     from voteit.meeting.models import Meeting
 
 #   instance:   The Room
@@ -31,7 +30,7 @@ def meeting_subscribed(context: Meeting, app_state: AppState, **kw):
     Send rooms
     """
     for item in RoomSerializer(context.rooms.all(), many=True).data:
-        app_state.append(RoomAdded(**item))
+        app_state.append(RoomChanged(payload=item))
 
 
 @receiver(channel_subscribed, sender=RoomChannel)
@@ -40,7 +39,9 @@ def room_subscribed(context: Room, app_state: AppState, **kw):
     Send highlighted proposals
     """
     app_state.append(
-        RoomHighlighted(pk=context.pk, highlighted=context.highlighted_proposal_pks)
+        RoomHighlighted(
+            payload={"pk": context.pk, "highlighted": context.highlighted_proposal_pks}
+        )
     )
 
 
@@ -50,16 +51,16 @@ def send_room_updates(*, instance: Room, created: bool, **kwargs):
     meeting_ch = MeetingChannel(instance.meeting_id)
     data = RoomSerializer(instance).data
     if created:
-        msg = RoomAdded(**data)
+        msg = RoomChanged(payload=data)
     else:
-        msg = RoomChanged(**data, token=instance.token)
+        msg = RoomChanged(payload={**data, "token": instance.token})
     meeting_ch.sync_publish(msg)
 
 
 @receiver(pre_delete, sender=Room)
 def send_room_deleted(*, instance: Room, **kwargs):
     meeting_ch = MeetingChannel(instance.meeting_id)
-    msg = RoomDeleted(pk=instance.pk)
+    msg = RoomDeleted(payload={"pk": instance.pk})
     meeting_ch.sync_publish(msg)
 
 
@@ -67,8 +68,10 @@ def send_room_deleted(*, instance: Room, **kwargs):
 def send_highlighted_proposals(*, instance, **kwargs):
     room_ch = RoomChannel(instance.pk)
     msg = RoomHighlighted(
-        pk=instance.pk,
-        highlighted=instance.highlighted_proposal_pks,
-        token=instance.token,
+        payload={
+            "pk": instance.pk,
+            "highlighted": instance.highlighted_proposal_pks,
+            "token": instance.token,
+        }
     )
     room_ch.sync_publish(msg)

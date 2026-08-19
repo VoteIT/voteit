@@ -50,7 +50,7 @@ class ReactionCount(BaseMessage):
 
 
 @outgoing
-class UserReactionAdded(BaseMessage):
+class UserReactionChanged(BaseMessage):
     """
     Normally only sent to the user who added it!
     """

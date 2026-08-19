@@ -104,7 +104,11 @@ class Command(BaseCommand):
 
             if options["dryrun"]:
                 transaction.set_rollback(True)
-                self.stdout.write(self.style.WARNING("-- DRY RUN — transaction rolled back, nothing saved"))
+                self.stdout.write(
+                    self.style.WARNING(
+                        "-- DRY RUN — transaction rolled back, nothing saved"
+                    )
+                )
 
     def _read_bytes(self, filepath: str | None) -> bytes:
         if filepath:

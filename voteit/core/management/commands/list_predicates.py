@@ -1,4 +1,3 @@
-
 import yaml
 from django.core.management import BaseCommand
 

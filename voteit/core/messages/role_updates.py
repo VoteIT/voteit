@@ -31,7 +31,7 @@ class RolesChangeSchema(BaseModel):
 
 
 @outgoing
-class RolesAdded(BaseMessage):
+class RolesChanged(BaseMessage):
     action: Literal["roles.changed"] = "roles.changed"
     payload: RolesChangeSchema
 

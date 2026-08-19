@@ -23,7 +23,7 @@ class PollDeleted(ObjectDeleted):
 
 
 @outgoing
-class ElectoralRegisterAdded(ObjectAddedOrChanged):
+class ElectoralRegisterChanged(ObjectAddedOrChanged):
     action: Literal["er.changed"] = "er.changed"
 
 

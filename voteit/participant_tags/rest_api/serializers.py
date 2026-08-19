@@ -19,7 +19,6 @@ def tag_chars_validator(value: str):
 
 
 class SetTagsSerializer(serializers.Serializer):
-
     tags = serializers.DictField()
 
     def validate_tags(self, value):
@@ -75,12 +74,10 @@ class SetTagsSerializer(serializers.Serializer):
 
 
 class DeleteNamespaceSerializer(serializers.Serializer):
-
     ns = serializers.ListSerializer(child=serializers.CharField())
 
 
 class TagsSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = ParticipantTags
         read_only_fields = ["pk", "meeting", "user"]

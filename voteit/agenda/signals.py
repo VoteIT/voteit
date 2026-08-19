@@ -7,15 +7,12 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
-from envelope.messages.common import Batch
-from envelope.signals import channel_subscribed
+from voteit.messaging.signals import channel_subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
-from voteit.agenda.messages import AgendaAdded
-from voteit.agenda.messages import AgendaBodyAdded
+from voteit.agenda.messages import AgendaChanged
 from voteit.agenda.messages import AgendaBodyChanged
 from voteit.agenda.messages import AgendaBodyDeleted
-from voteit.agenda.messages import AgendaChanged
 from voteit.agenda.messages import AgendaDeleted
 from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.models import AgendaItem
@@ -37,16 +34,13 @@ from voteit.proposal.models import Proposal
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from django.db import models
-    from envelope.channels.models import AppState
+    from voteit.messaging.state import AppState
 
 
 def _attach_agenda_items(qs: models.QuerySet[AgendaItem], app_state: AppState):
     serializer = AgendaItemListSerializer(qs, many=True)
     if serializer.data:
-        batch = Batch(t=AgendaAdded.name, payloads=[])
-        for item in serializer.data:
-            batch.append(AgendaAdded(data=item))
-        app_state.append(batch)
+        app_state.add_batch(AgendaChanged, serializer.data)
 
 
 @receiver(channel_subscribed, sender=ParticipantsChannel)
@@ -82,10 +76,7 @@ def meeting_channel_subscribed(
         context.last_read_set.filter(user=user).select_related("agenda_item"), many=True
     )
     if serializer.data:
-        batch = Batch(t=LastReadChanged.name, payloads=[])
-        for item in serializer.data:
-            batch.append(LastReadChanged(data=item))
-        app_state.append(batch)
+        app_state.add_batch(LastReadChanged, serializer.data)
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)
@@ -93,7 +84,7 @@ def ai_channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
     """
     Send full AI info
     """
-    msg = AgendaBodyAdded(**AgendaItemBodySerializer(context).data)
+    msg = AgendaBodyChanged(payload=AgendaItemBodySerializer(context).data)
     app_state.append(msg)
 
 
@@ -105,9 +96,9 @@ def agenda_change(instance: AgendaItem = None, created=None, **kw):
     data = AgendaItemListSerializer(instance).data
     # Base message that might only get sent to moderators
     if created:
-        msg = AgendaAdded(data=data)
+        msg = AgendaChanged(payload=data)
     else:
-        msg = AgendaChanged(data=data)
+        msg = AgendaChanged(payload=data)
     if not instance.is_private:
         # The agenda item isn't private so publish to everyone
         participants_ch.sync_publish(msg)
@@ -116,9 +107,9 @@ def agenda_change(instance: AgendaItem = None, created=None, **kw):
     ai_ch = AgendaItemChannel.from_instance(instance)
     data = AgendaItemBodySerializer(instance).data
     if created:
-        msg = AgendaBodyAdded(data=data)
+        msg = AgendaBodyChanged(payload=data)
     else:
-        msg = AgendaBodyChanged(data=data)
+        msg = AgendaBodyChanged(payload=data)
     ai_ch.sync_publish(msg)
 
 
@@ -133,7 +124,7 @@ def ai_made_private(instance: AgendaItem, source, target, event, **kw):
         and instance.meeting is not None
     ):
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
-        msg_deleted = AgendaDeleted(pk=instance.pk)
+        msg_deleted = AgendaDeleted(payload={"pk": instance.pk})
         participants_ch.sync_publish(msg_deleted)
 
 
@@ -141,10 +132,10 @@ def ai_made_private(instance: AgendaItem, source, target, event, **kw):
 def agenda_delete(instance: AgendaItem = None, **kw):
     if instance.meeting:
         meeting_ch = MeetingChannel.from_instance(instance.meeting)
-        msg = AgendaDeleted(pk=instance.pk)
+        msg = AgendaDeleted(payload={"pk": instance.pk})
         meeting_ch.sync_publish(msg)
         # We can send this to meeting too, it might not exist though
-        msg = AgendaBodyDeleted(pk=instance.pk)
+        msg = AgendaBodyDeleted(payload={"pk": instance.pk})
         meeting_ch.sync_publish(msg)
 
 

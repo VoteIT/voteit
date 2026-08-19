@@ -9,7 +9,6 @@ from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.invites.channels import MeetingInvitesChannel
-from voteit.invites.messages import MeetingInviteAdded
 from voteit.invites.messages import MeetingInviteChanged
 from voteit.invites.messages import MeetingInviteDeleted
 from voteit.invites.models import MeetingInvite
@@ -98,7 +97,7 @@ class InvitesSubscribedTests(TestCase):
         msg = messages[0]
         batch = None
         for item in msg.data.app_state:
-            if item.t == "s.batch" and item.p["t"] == MeetingInviteAdded.name:
+            if item.t == "s.batch" and item.p["t"] == MeetingInviteChanged.name:
                 batch = item
         payloads = batch.p["payloads"]
         self.assertEqual({self.invite.pk, self.invite2.pk}, {x.pk for x in payloads})
@@ -141,7 +140,7 @@ class MeetingInviteSignalTests(TestCase):
             )
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, MeetingInviteAdded)
+        self.assertIsInstance(msg, MeetingInviteChanged)
         self.assertEqual(invite.pk, msg.data.pk)
         self.assertEqual(False, msg.data.has_annotations)
 

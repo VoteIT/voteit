@@ -7,9 +7,9 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
-from envelope.app.user_channel.channel import UserChannel
-from envelope.messages.common import Batch
-from envelope.signals import channel_subscribed
+from voteit.messaging.channels import UserChannel
+from voteit.messaging.registry import batch_for
+from voteit.messaging.signals import channel_subscribed
 from rest_framework.exceptions import ValidationError
 
 from voteit.agenda.channels import AgendaItemChannel
@@ -20,7 +20,7 @@ from voteit.core.signals import before_sm_transition
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import ensure_atomic
 from voteit.core.decorators import on_transaction_commit
-from voteit.core.messages.role_updates import RolesAdded
+from voteit.core.messages.role_updates import RolesChanged
 from voteit.core.messages.role_updates import RolesRemoved
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
@@ -33,13 +33,10 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.signals import archive_meeting
 from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.room.channels import RoomChannel
-from voteit.speaker.messages import SpeakerAdded
 from voteit.speaker.messages import SpeakerChanged
 from voteit.speaker.messages import SpeakerDeleted
-from voteit.speaker.messages import SpeakerListAdded
 from voteit.speaker.messages import SpeakerListChanged
 from voteit.speaker.messages import SpeakerListDeleted
-from voteit.speaker.messages import SpeakerSystemAdded
 from voteit.speaker.messages import SpeakerSystemChanged
 from voteit.speaker.messages import SpeakerSystemDeleted
 from voteit.speaker.models import Speaker
@@ -53,7 +50,7 @@ from voteit.speaker.statemachines import SpeakerSystemStateMachine
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
-    from envelope.utils import AppState
+    from voteit.messaging.state import AppState
     from voteit.room.models import Room
 
 # instance
@@ -71,7 +68,7 @@ def notify_active_list_changed(instance: SpeakerListSystem, **kwargs):
     """
     if instance.active_list_id:
         serializer = SpeakerListSerializer(instance.active_list)
-        msg = SpeakerListChanged(**serializer.data)
+        msg = SpeakerListChanged(payload=serializer.data)
         room_ch = RoomChannel(instance.room_id)
         room_ch.sync_publish(msg)
         speaker_qs = Speaker.objects.filter(
@@ -79,19 +76,19 @@ def notify_active_list_changed(instance: SpeakerListSystem, **kwargs):
             speaker_list=instance.active_list,
         ).values("user_id", "started", "pk", "seconds")
         if speaker_qs:
-            batch = Batch(t=SpeakerAdded.name, payloads=[])
+            payloads = []
             for item in speaker_qs:
-                batch.append(
-                    SpeakerAdded(
-                        room=instance.room_id,
-                        user=item["user_id"],
-                        speaker_list=instance.active_list_id,
-                        started=item["started"],
-                        pk=item["pk"],
-                        seconds=item["seconds"],
-                    )
+                payloads.append(
+                    {
+                        "room": instance.room_id,
+                        "user": item["user_id"],
+                        "speaker_list": instance.active_list_id,
+                        "started": item["started"],
+                        "pk": item["pk"],
+                        "seconds": item["seconds"],
+                    }
                 )
-            room_ch.sync_publish(batch)
+            room_ch.sync_publish(batch_for(SpeakerChanged)(payload={"items": payloads}))
 
 
 # System signals
@@ -106,7 +103,7 @@ def notify_added_or_changed_speaker_system(
     if instance.meeting_id:
         meeting_ch = MeetingChannel(instance.meeting_id)
         if created:
-            msg_class = SpeakerSystemAdded
+            msg_class = SpeakerSystemChanged
         else:
             msg_class = SpeakerSystemChanged
         data = SpeakerListSystemSerializer(instance).data
@@ -130,7 +127,7 @@ def send_speaker_list_with_current_when_changed(
     if speaker_list.is_active_list:
         room_id = speaker_list.room_id
         data = SpeakerListSerializer(speaker_list).data
-        msg = SpeakerListChanged(**data)
+        msg = SpeakerListChanged(payload=data)
         for ch in (
             AgendaItemChannel(speaker_list.agenda_item_id),
             RoomChannel(room_id),
@@ -145,7 +142,7 @@ def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
     Notify meeting that the speaker system is no more. We had a good run dear friends, you will be missed :(
     """
     if instance.meeting_id:
-        msg = SpeakerSystemDeleted(pk=instance.pk)
+        msg = SpeakerSystemDeleted(payload={"pk": instance.pk})
         ch = MeetingChannel(instance.meeting_id)
         ch.sync_publish(msg)
     # Notify in case method needs any other cleanup
@@ -162,7 +159,7 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
     Send to Agenda or meeting channel depending on if it's the active list.
     """
     if created:
-        msg_class = SpeakerListAdded
+        msg_class = SpeakerListChanged
     else:
         msg_class = SpeakerListChanged
     data = SpeakerListSerializer(instance).data
@@ -180,7 +177,7 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
 @disable_on_raw_save
 def notify_deleted_speaker_list(instance: SpeakerList, **kw):
     if instance.agenda_item_id:
-        msg = SpeakerListDeleted(pk=instance.pk)
+        msg = SpeakerListDeleted(payload={"pk": instance.pk})
         ai_channel = AgendaItemChannel(instance.agenda_item_id)
         ai_channel.sync_publish(msg)
     # We don't need to care about deleted to any other channel, since system will indicate that no list is active.
@@ -195,9 +192,9 @@ def push_speaker_added_or_changed(instance: Speaker, created=False, **kwargs):
     if instance.speaker_list.is_active_list:
         data = SpeakerSerializer(instance).data
         if created:
-            msg = SpeakerAdded(**data)
+            msg = SpeakerChanged(payload=data)
         else:
-            msg = SpeakerChanged(**data)
+            msg = SpeakerChanged(payload=data)
         room_ch = RoomChannel(instance.speaker_list.room_id)
         room_ch.sync_publish(msg, on_commit=False)  # Already post transaction
 
@@ -206,7 +203,7 @@ def push_speaker_added_or_changed(instance: Speaker, created=False, **kwargs):
 @disable_on_raw_save
 def push_speaker_deleted(instance: Speaker, **kwargs):
     if instance.speaker_list.is_active_list:
-        msg = SpeakerDeleted(pk=instance.pk)
+        msg = SpeakerDeleted(payload={"pk": instance.pk})
         room_ch = RoomChannel(instance.speaker_list.room_id)
         room_ch.sync_publish(msg)
 
@@ -279,16 +276,18 @@ def meeting_channel_subscribed(
     systems_qs = context.speaker_systems.all()
     sys_serializer = SpeakerListSystemSerializer(systems_qs, many=True)
     for item in sys_serializer.data:
-        app_state.append(SpeakerSystemAdded(**item))
+        app_state.append(SpeakerSystemChanged(payload=item))
     model_shortname = get_model_shortname(SpeakerListSystem)
     for rdata in SpeakerSystemRoles.objects.filter(
         user=user, context__in=systems_qs
     ).values("assigned", "context_id"):
-        msg = RolesAdded(
-            roles=rdata["assigned"],
-            pk=rdata["context_id"],
-            model=model_shortname,
-            user_pk=user.pk,
+        msg = RolesChanged(
+            payload={
+                "roles": rdata["assigned"],
+                "pk": rdata["context_id"],
+                "model": model_shortname,
+                "user_pk": user.pk,
+            }
         )
         app_state.append(msg)
 
@@ -306,9 +305,9 @@ def send_active_speaker_list_speakers(context: Room, app_state: AppState, **kwar
         ).select_related("speaker_list")
         speaker_serializer = SpeakerSerializer(qs, many=True)
         for item in speaker_serializer.data:
-            app_state.append(SpeakerAdded(**item))
+            app_state.append(SpeakerChanged(payload=item))
         list_serializer = SpeakerListSerializer(active_list)
-        app_state.append(SpeakerListAdded(**list_serializer.data))
+        app_state.append(SpeakerListChanged(payload=list_serializer.data))
 
 
 @receiver(channel_subscribed, sender=AgendaItemChannel)
@@ -324,7 +323,7 @@ def ai_channel_subscribed(
     )
     serializer = SpeakerListSerializer(lists_qs, many=True)
     for item in serializer.data:
-        app_state.append(SpeakerListAdded(**item))
+        app_state.append(SpeakerListChanged(payload=item))
 
 
 # Archiving
@@ -373,11 +372,13 @@ def _role_msg_publish(instance: SpeakerSystemRoles, msg):
 def push_roles_added(instance: SpeakerSystemRoles, roles: list[Role], **kwargs):
     _role_msg_publish(
         instance,
-        RolesAdded(
-            roles=roles,
-            pk=instance.context.pk,
-            model=get_model_shortname(instance.context),
-            user_pk=instance.user.pk,
+        RolesChanged(
+            payload={
+                "roles": roles,
+                "pk": instance.context.pk,
+                "model": get_model_shortname(instance.context),
+                "user_pk": instance.user.pk,
+            }
         ),
     )
 
@@ -388,9 +389,11 @@ def push_roles_removed(instance: SpeakerSystemRoles, roles: list[Role], **kwargs
     _role_msg_publish(
         instance,
         RolesRemoved(
-            roles=roles,
-            pk=instance.context.pk,
-            model=get_model_shortname(instance.context),
-            user_pk=instance.user.pk,
+            payload={
+                "roles": roles,
+                "pk": instance.context.pk,
+                "model": get_model_shortname(instance.context),
+                "user_pk": instance.user.pk,
+            }
         ),
     )

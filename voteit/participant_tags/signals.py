@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-from envelope.channels.models import AppState
-from envelope.signals import channel_subscribed
+from voteit.messaging.state import AppState
+from voteit.messaging.signals import channel_subscribed
 
 from voteit.meeting.channels import MeetingChannel
 from voteit.participant_tags.components import GenderTags
@@ -27,9 +27,11 @@ def send_tags_updated(instance: ParticipantTags, created=False, **kwargs):
         return
     ch = MeetingChannel(instance.meeting_id)
     msg = ParticipantTagsChanged(
-        user=instance.user_id,
-        meeting=instance.meeting_id,
-        tags=instance.tags,
+        payload={
+            "user": instance.user_id,
+            "meeting": instance.meeting_id,
+            "tags": instance.tags,
+        }
     )
     ch.sync_publish(msg)
 
@@ -38,9 +40,7 @@ def send_tags_updated(instance: ParticipantTags, created=False, **kwargs):
 def send_tags_removed(instance: ParticipantTags, **kwargs):
     ch = MeetingChannel(instance.meeting_id)
     msg = ParticipantTagsChanged(
-        user=instance.user_id,
-        meeting=instance.meeting_id,
-        tags={},
+        payload={"user": instance.user_id, "meeting": instance.meeting_id, "tags": {}}
     )
     ch.sync_publish(msg)
 
@@ -61,5 +61,5 @@ def send_all_tags(context: Meeting, app_state: AppState, **kw):
                     tag_vals = [tag_vals]
                 for v in tag_vals:
                     tags[f"{ns}:{v}"].append(row["user_id"])
-        msg = AllParticipantTags(meeting=context.pk, tags=tags)
+        msg = AllParticipantTags(payload={"meeting": context.pk, "tags": tags})
         app_state.append(msg)

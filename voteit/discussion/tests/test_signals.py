@@ -59,13 +59,13 @@ class DiscussionPostChangedTests(TestCase):
 
     @patch.object(AgendaItemChannel, "sync_publish")
     def test_added(self, mock_publish):
-        from voteit.discussion.messages import DiscussionPostAdded
+        from voteit.discussion.messages import DiscussionPostChanged
 
         self.assertFalse(mock_publish.called)
         disc = self.ai.discussions.create()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, DiscussionPostAdded)
+        self.assertIsInstance(msg, DiscussionPostChanged)
         self.assertEqual(disc.pk, msg.data.pk)
 
     @patch.object(AgendaItemChannel, "sync_publish")

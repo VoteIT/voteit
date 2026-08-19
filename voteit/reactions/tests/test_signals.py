@@ -44,12 +44,12 @@ class SignalButtonTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_button_added(self, mock_publish):
-        from voteit.reactions.messages import ButtonAdded
+        from voteit.reactions.messages import ButtonChanged
 
         button = self.meeting.reaction_buttons.create(title="Btn")
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, ButtonAdded)
+        self.assertIsInstance(msg, ButtonChanged)
         self.assertEqual(button.pk, msg.data.pk)
 
     @patch.object(MeetingChannel, "sync_publish")
@@ -190,12 +190,12 @@ class SignalReactionTests(TestCase):
 
     @patch.object(UserChannel, "sync_publish")
     def test_reaction_added_user(self, mock_publish):
-        from voteit.reactions.messages import UserReactionAdded
+        from voteit.reactions.messages import UserReactionChanged
 
         self.assertFalse(mock_publish.called)
         reaction = self._mk_reaction()
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, UserReactionAdded)
+        self.assertIsInstance(msg, UserReactionChanged)
         self.assertEqual(reaction.pk, msg.data.pk)
         self.assertEqual(self.button.pk, msg.data.button)
         self.assertEqual(self.prop.pk, msg.data.object_id)

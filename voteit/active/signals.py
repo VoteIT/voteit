@@ -6,7 +6,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-from envelope.signals import channel_subscribed
+from voteit.messaging.signals import channel_subscribed
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.active.messages import ActiveUserChanged
@@ -21,14 +21,14 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 
 if TYPE_CHECKING:
-    from envelope.channels.models import AppState
+    from voteit.messaging.state import AppState
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
 def send_active_users_appstruct(context: Meeting, app_state: AppState, **kwargs):
     if active_enabled_for_meeting(context.meeting):
         users = list(context.active_users.values_list("user_id", flat=True))
-        msg = ActiveUsers(users=users, meeting=context.pk)
+        msg = ActiveUsers(payload={"users": users, "meeting": context.pk})
         app_state.append(msg)
 
 
@@ -36,7 +36,7 @@ def send_active_users_appstruct(context: Meeting, app_state: AppState, **kwargs)
 def send_active_state_when_enabled(instance: MeetingComponent, **kwargs):
     if instance.component_name == ActiveUsersComponent.name and instance.enabled:
         users = list(instance.meeting.active_users.values_list("user_id", flat=True))
-        msg = ActiveUsers(users=users, meeting=instance.meeting.pk)
+        msg = ActiveUsers(payload={"users": users, "meeting": instance.meeting.pk})
         ch = MeetingChannel.from_instance(instance.meeting)
         ch.sync_publish(msg)
 
@@ -45,7 +45,11 @@ def _send_active_user(*, instance: ActiveUser, active: bool):
     with suppress(ObjectDoesNotExist):
         ch = MeetingChannel.from_instance(instance.meeting)
         msg = ActiveUserChanged(
-            user=instance.user_id, active=active, meeting=instance.meeting.pk
+            payload={
+                "user": instance.user_id,
+                "active": active,
+                "meeting": instance.meeting.pk,
+            }
         )
         ch.sync_publish(msg)
 

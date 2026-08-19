@@ -11,7 +11,6 @@ from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.models import Meeting
 from voteit.notes import NoteIntent
 from voteit.notes.components import NotesComponent
-from voteit.notes.messages import NoteAdded
 from voteit.notes.messages import NoteChanged
 from voteit.notes.messages import NoteDeleted
 
@@ -44,7 +43,7 @@ class SignalTests(TestCase):
         )
 
     def test_msg_on_add(self):
-        with ChannelMessageCatcher(UserChannel, NoteAdded) as messages:
+        with ChannelMessageCatcher(UserChannel, NoteChanged) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 self.participant.notes.create(
                     proposal=self.prop2,
@@ -104,7 +103,9 @@ class SignalTests(TestCase):
         ch = AgendaItemChannel(self.ai.pk)
         app_state = msg.get_app_state(ch)
         batch_msg = [
-            x for x in app_state if x["t"] == Batch.name and x["p"].t == NoteAdded.name
+            x
+            for x in app_state
+            if x["t"] == Batch.name and x["p"].t == NoteChanged.name
         ]
         self.assertEqual(1, len(batch_msg))
         batch_msg = batch_msg[0]
@@ -129,7 +130,9 @@ class SignalTests(TestCase):
         ch = AgendaItemChannel(self.ai.pk)
         app_state = msg.get_app_state(ch)
         batch_msg = [
-            x for x in app_state if x["t"] == Batch.name and x["p"].t == NoteAdded.name
+            x
+            for x in app_state
+            if x["t"] == Batch.name and x["p"].t == NoteChanged.name
         ]
         self.assertEqual(0, len(batch_msg))
 

@@ -13,9 +13,8 @@ from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
 from voteit.core.signals import after_sm_transition
-from envelope.app.user_channel.channel import UserChannel
-from envelope.messages.common import Batch
-from envelope.signals import channel_subscribed
+from voteit.messaging.channels import UserChannel
+from voteit.messaging.signals import channel_subscribed
 from sql_util.aggregates import SubqueryCount
 
 from voteit.agenda.models import AgendaItem
@@ -28,14 +27,12 @@ from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.poll.jobs import schedule_poll_status_publish
-from voteit.poll.messages import ElectoralRegisterAdded
+from voteit.poll.messages import ElectoralRegisterChanged
 from voteit.poll.messages import ElectoralRegisterDeleted
 from voteit.poll.messages import GenericVoteResponse
-from voteit.poll.messages import PollAdded
 from voteit.poll.messages import PollChanged
 from voteit.poll.messages import PollDeleted
 from voteit.poll.messages import PollStatus
-from voteit.poll.messages import VoteTransferAdded
 from voteit.poll.messages import VoteTransferChanged
 from voteit.poll.messages import VoteTransferDeleted
 from voteit.poll.models import ElectoralRegister
@@ -48,7 +45,7 @@ from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.rest_api.serializers import VoteTransferSerializer
 
 if TYPE_CHECKING:
-    from envelope.utils import AppState
+    from voteit.messaging.state import AppState
     from voteit.proposal.models import Proposal
 
 logger = getLogger(__name__)
@@ -65,7 +62,7 @@ def send_ongoing_meeting_poll_stats(context: Meeting, app_state: AppState, **kw)
     """
     Populate app_state with current poll status
     """
-    batch = Batch(t=PollStatus.name, payloads=[])
+    payloads = []
     for poll in (
         context.polls.filter(state="ongoing")
         .annotate(voted=SubqueryCount("votes"))
@@ -74,14 +71,8 @@ def send_ongoing_meeting_poll_stats(context: Meeting, app_state: AppState, **kw)
         total = (
             len(poll.electoral_register.voter_data) if poll.electoral_register else 0
         )
-        batch.append(
-            PollStatus(
-                pk=poll.pk,
-                voted=poll.voted,
-                total=total,
-            )
-        )
-    app_state.append(batch)
+        payloads.append({"pk": poll.pk, "voted": poll.voted, "total": total})
+    app_state.add_batch(PollStatus, payloads)
 
 
 @receiver(channel_subscribed, sender=ParticipantsChannel)
@@ -98,10 +89,7 @@ def participants_subscribed(
     )
     serializer = PollDetailSerializer(qs, many=True)
     if serializer.data:
-        batch = Batch(t=PollAdded.name, payloads=[])
-        for item in serializer.data:
-            batch.append(PollAdded(data=item))
-        app_state.append(batch)
+        app_state.add_batch(PollChanged, serializer.data)
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
@@ -114,20 +102,17 @@ def meeting_subscribed(context: Meeting, app_state: AppState, user: AbstractUser
     ).prefetch_related("poll")
     vote_serializer = VoteSerializer(vote_qs, many=True)
     for item in vote_serializer.data:
-        app_state.append(GenericVoteResponse(**item))
+        app_state.append(GenericVoteResponse(payload=item))
     if context.latest_er:
         app_state.append(
-            ElectoralRegisterAdded(
-                **ElectoralRegisterSerializer(context.latest_er).data
+            ElectoralRegisterChanged(
+                payload=ElectoralRegisterSerializer(context.latest_er).data
             )
         )
     if context.vote_transfer_policy is not None:
         vt_serializer = VoteTransferSerializer(context.vote_transfers.all(), many=True)
         if vt_serializer.data:
-            batch = Batch(t=VoteTransferAdded.name, payloads=[])
-            for item in vt_serializer.data:
-                batch.append(VoteTransferAdded(data=item))
-            app_state.append(batch)
+            app_state.add_batch(PollChanged, vt_serializer.data)
 
 
 @receiver(channel_subscribed, sender=ModeratorsChannel)
@@ -143,10 +128,7 @@ def moderators_subscribed(
         context={"show_withheld": True},
     )
     if serializer.data:
-        batch = Batch(t=PollAdded.name, payloads=[])
-        for item in serializer.data:
-            batch.append(PollAdded(data=item))
-        app_state.append(batch)
+        app_state.add_batch(VoteTransferChanged, serializer.data)
 
 
 @receiver(post_save, sender=Poll)
@@ -170,15 +152,15 @@ def poll_change(*, instance: Poll, created: bool, **kw):
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
         if created:
-            mod_msg = PollAdded(data=mod_data)
-            part_msg = PollAdded(data=part_data)
+            mod_msg = PollChanged(payload=mod_data)
+            part_msg = PollChanged(payload=part_data)
         else:
-            mod_msg = PollChanged(data=mod_data)
-            part_msg = PollChanged(data=part_data)
+            mod_msg = PollChanged(payload=mod_data)
+            part_msg = PollChanged(payload=part_data)
         if instance.is_private:
             # Only care about transmitting to participants if it existed previously
             if not created:
-                participants_msg = PollDeleted(pk=instance.pk)
+                participants_msg = PollDeleted(payload={"pk": instance.pk})
                 participants_ch.sync_publish(participants_msg, on_commit=False)
         elif instance.agenda_item is None or not instance.agenda_item.is_private:
             # Publish if ai isn't private
@@ -191,7 +173,7 @@ def poll_delete(*, instance: Poll, **kw):
     """Poll deleted is only sent to moderators if the poll's private"""
     if instance.meeting is not None:
         moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
-        msg = PollDeleted(pk=instance.pk)
+        msg = PollDeleted(payload={"pk": instance.pk})
         moderators_ch.sync_publish(msg)
         # Publish to participants if poll isn't private. If agenda item exists, make sure it's not private
         if not instance.is_private:
@@ -213,7 +195,7 @@ def private_ai_published(instance: AgendaItem, source, target, event, **kw):
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         for poll in instance.polls.exclude(state="private"):
             data = PollDetailSerializer(poll).data
-            msg = PollAdded(data=data)
+            msg = PollChanged(payload=data)
             participants_ch.sync_publish(msg)
 
 
@@ -224,7 +206,7 @@ def push_new_er(instance: ElectoralRegister, **kwargs):
     """
     meeting_ch = MeetingChannel(instance.meeting_id)
     data = ElectoralRegisterSerializer(instance).data
-    msg = ElectoralRegisterAdded(data=data)
+    msg = ElectoralRegisterChanged(payload=data)
     meeting_ch.sync_publish(msg)
 
 
@@ -237,7 +219,7 @@ def er_deleted(*, instance: ElectoralRegister, **kw):
     if instance.meeting_id is not None:
         # We can't really do anything if it is!
         meeting_ch = MeetingChannel(instance.meeting_id)
-        msg = ElectoralRegisterDeleted(pk=instance.pk)
+        msg = ElectoralRegisterDeleted(payload={"pk": instance.pk})
         meeting_ch.sync_publish(msg)
 
 
@@ -287,7 +269,7 @@ def vote_added(instance: Vote, *, created: bool, **kw):
     # We need to send the vote to the user too, so they have access to their own data in case they're using several tabs
     user_ch = UserChannel.from_instance(instance.user)
     serializer = VoteSerializer(instance)
-    msg = GenericVoteResponse(**serializer.data)
+    msg = GenericVoteResponse(payload=serializer.data)
     user_ch.sync_publish(msg)
 
 
@@ -306,9 +288,9 @@ def remove_vote_transfers(instance: MeetingRoles, **kwargs):
 def send_vote_transfer(instance: VoteTransfer, *, created, **kwargs):
     serializer = VoteTransferSerializer(instance)
     if created:
-        msg = VoteTransferAdded(**serializer.data)
+        msg = VoteTransferChanged(payload=serializer.data)
     else:
-        msg = VoteTransferChanged(**serializer.data)
+        msg = VoteTransferChanged(payload=serializer.data)
     meeting_ch = MeetingChannel(instance.meeting_id)
     meeting_ch.sync_publish(msg)
 
@@ -316,5 +298,5 @@ def send_vote_transfer(instance: VoteTransfer, *, created, **kwargs):
 @receiver(pre_delete, sender=VoteTransfer)
 def send_vote_transfer_deleted(instance: VoteTransfer, **kwargs):
     meeting_ch = MeetingChannel(instance.meeting_id)
-    msg = VoteTransferDeleted(pk=instance.pk)
+    msg = VoteTransferDeleted(payload={"pk": instance.pk})
     meeting_ch.sync_publish(msg)

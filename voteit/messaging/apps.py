@@ -14,7 +14,11 @@ class MessagingConfig(AppConfig):
 
     def ready(self):
         from django.contrib.auth import get_user_model
+        from django.utils.module_loading import autodiscover_modules
 
         from voteit.messaging.channels import UserChannel
 
         UserChannel.model = get_user_model()
+        # The consumer reads the outgoing registry when its class is created,
+        # so every app's messages.py and channels.py must have been imported.
+        autodiscover_modules("messages", "channels")

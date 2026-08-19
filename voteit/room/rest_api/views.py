@@ -94,13 +94,9 @@ class RoomsViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
         room = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        msg = RoomMarked(
-            mm={"user_pk": request.user.pk},
-            room=room.pk,
-            **serializer.validated_data,
-        )
+        msg = RoomMarked(payload={"room": room.pk, **serializer.validated_data})
         RoomChannel.from_instance(room).sync_publish(msg, on_commit=False)
-        return Response(msg.data.dict())
+        return Response(msg.payload.model_dump())
 
     @action(methods=["get"], detail=True)
     def status(self, request, *args, **kwargs):

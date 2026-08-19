@@ -44,9 +44,11 @@ def publish_poll_status(poll_pk: int) -> None:
         )
         return
     msg = PollStatus(
-        pk=poll.pk,
-        voted=poll.votes.count(),
-        total=len(poll.electoral_register.voter_data),
+        payload={
+            "pk": poll.pk,
+            "voted": poll.votes.count(),
+            "total": len(poll.electoral_register.voter_data),
+        }
     )
     MeetingChannel(poll.meeting_id).sync_publish(msg)
 

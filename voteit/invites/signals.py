@@ -5,12 +5,10 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
-from envelope.messages.common import Batch
-from envelope.signals import channel_subscribed
+from voteit.messaging.signals import channel_subscribed
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.invites.channels import MeetingInvitesChannel
-from voteit.invites.messages import MeetingInviteAdded
 from voteit.invites.messages import MeetingInviteChanged
 from voteit.invites.messages import MeetingInviteDeleted
 from voteit.invites.models import MeetingInvite
@@ -24,7 +22,7 @@ from voteit.meeting.signals import meeting_joined
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
     from voteit.meeting.models import Meeting
-    from envelope.utils import AppState
+    from voteit.messaging.state import AppState
 
 
 @receiver(archive_meeting)
@@ -53,10 +51,10 @@ def invites_channel_subscribed(
     invites_qs = reg.prep_invites_qs_for_subscribe(context.invites.all())
     serializer = MeetingInviteSerializer(invites_qs, many=True)
     if serializer.data:
-        batch = Batch(t=MeetingInviteAdded.name, payloads=[])
+        payloads = []
         for item in serializer.data:
-            batch.append(MeetingInviteAdded(**item))
-        app_state.append(batch)
+            payloads.append({**item})
+        app_state.add_batch(MeetingInviteChanged, payloads)
 
 
 @receiver(post_save, sender=MeetingInvite)
@@ -66,16 +64,16 @@ def meeting_invite_changed(instance: MeetingInvite = None, created=None, **kw):
     ch = MeetingInvitesChannel(instance.meeting_id)
     data = MeetingInviteSerializer(instance).data
     if created:
-        msg = MeetingInviteAdded(data=data)
+        msg = MeetingInviteChanged(payload=data)
     else:
-        msg = MeetingInviteChanged(data=data)
+        msg = MeetingInviteChanged(payload=data)
     ch.sync_publish(msg, on_commit=False)  # No need
 
 
 @receiver(pre_delete, sender=MeetingInvite)
 def agenda_delete(instance: MeetingInvite = None, **kw):
     ch = MeetingInvitesChannel(instance.meeting_id)
-    msg = MeetingInviteDeleted(pk=instance.pk)
+    msg = MeetingInviteDeleted(payload={"pk": instance.pk})
     ch.sync_publish(msg)
 
 

@@ -270,7 +270,9 @@ class ReactionButtonActionsTests(APITestCase):
         url = reverse("reaction-buttons-set", kwargs={"pk": self.button.pk})
         self.client.force_login(self.participant)
         response = self.client.post(
-            url, {"content_type": "meeting", "object_id": self.meeting.pk}, format="json"
+            url,
+            {"content_type": "meeting", "object_id": self.meeting.pk},
+            format="json",
         )
         self.assertEqual(response.status_code, 400, response.json())
         self.assertIn("content_type", response.json())
@@ -437,7 +439,9 @@ class ReactionButtonActionsTests(APITestCase):
         url = reverse("reaction-buttons-set", kwargs={"pk": self.button.pk})
         self.client.force_login(self.participant)
         response = self.client.post(
-            url, {"content_type": "proposal", "object_id": other_proposal.pk}, format="json"
+            url,
+            {"content_type": "proposal", "object_id": other_proposal.pk},
+            format="json",
         )
         self.assertEqual(response.status_code, 404)
 

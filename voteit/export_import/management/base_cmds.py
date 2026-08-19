@@ -2,7 +2,6 @@ from django.core.management import BaseCommand
 
 
 class BaseExpImpCommand(BaseCommand):
-
     def add_arguments(self, parser):
         parser.add_argument("-m", help="Meeting pk", required=True)
         parser.add_argument(

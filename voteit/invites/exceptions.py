@@ -1,5 +1,3 @@
-
-
 class DataColValidationError(ValueError):
     name: str
     index: int  # Start at 1

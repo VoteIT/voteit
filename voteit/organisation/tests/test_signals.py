@@ -75,13 +75,13 @@ class RoleChangesPublishedTests(TestCase):
 
     @patch.object(OrganisationChannel, "sync_publish")
     def test_added(self, mock_publish):
-        from voteit.core.messages.role_updates import RolesAdded
+        from voteit.core.messages.role_updates import RolesChanged
 
         self.assertFalse(mock_publish.called)
         self.org.add_roles(self.user, "meeting_creator")
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, RolesAdded)
+        self.assertIsInstance(msg, RolesChanged)
         self.assertEqual(self.org.pk, msg.data.pk)
         self.assertEqual(msg.data.model, "organisation")
         self.assertEqual({"meeting_creator"}, set(msg.data.roles))

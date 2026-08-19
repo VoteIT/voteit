@@ -6,8 +6,7 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-from envelope.messages.common import Batch
-from envelope.signals import channel_subscribed
+from voteit.messaging.signals import channel_subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
@@ -19,10 +18,8 @@ from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.proposal.diff import Changes
-from voteit.proposal.messages import ProposalAdded
 from voteit.proposal.messages import ProposalChanged
 from voteit.proposal.messages import ProposalDeleted
-from voteit.proposal.messages import TextDocumentAdded
 from voteit.proposal.messages import TextDocumentChanged
 from voteit.proposal.messages import TextDocumentDeleted
 from voteit.proposal.models import DiffProposal
@@ -34,7 +31,7 @@ from voteit.proposal.rest_api.serializers import ProposalDetailSerializer
 from voteit.proposal.rest_api.serializers import TextDocumentSerializer
 
 if TYPE_CHECKING:
-    from envelope.channels.models import AppState
+    from voteit.messaging.state import AppState
 
     from voteit.meeting.models import Meeting
 
@@ -66,7 +63,7 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
     )
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemStateMachine.private.value)
-    batch = Batch(t=ProposalAdded.name, payloads=[])
+    payloads = []
     shortname = get_model_shortname(Proposal)
     items = list(qs.values(*proposal_fields))
     mentions_map = _fetch_mentions_map([item["pk"] for item in items])
@@ -74,7 +71,7 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
         item["m"] = meeting.pk
         item["shortname"] = shortname
         item["mentions"] = mentions_map.get(item["pk"], [])
-        batch.append(ProposalAdded(data=item))
+        payloads.append(item)
 
     diff_fields = (set(DiffProposalDetailSerializer.Meta.fields) - exclude_fields) | {
         "para_body"
@@ -95,9 +92,9 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
         item["shortname"] = shortname
         item["m"] = meeting.pk
         item["mentions"] = diff_mentions_map.get(item["pk"], [])
-        batch.append(ProposalAdded(data=item))
+        payloads.append(item)
 
-    app_state.append(batch)
+    app_state.add_batch(ProposalChanged, payloads)
 
 
 @receiver(channel_subscribed, sender=ParticipantsChannel)
@@ -129,9 +126,9 @@ def proposal_updated(instance: Proposal = None, created=None, **kw):
     # Inject meeting attr
     data["m"] = meeting_pk
     if created:
-        msg = ProposalAdded(data=data)
+        msg = ProposalChanged(payload=data)
     else:
-        msg = ProposalChanged(data=data)
+        msg = ProposalChanged(payload=data)
     moderators_ch.sync_publish(msg)
     if instance.agenda_item_id and not instance.agenda_item.is_private:
         participants_ch = ParticipantsChannel(meeting_pk)
@@ -146,7 +143,7 @@ def proposal_delete(instance: Proposal = None, **kw):
     if not meeting_pk:
         return
     moderators_ch = ModeratorsChannel(meeting_pk)
-    msg = ProposalDeleted(pk=instance.pk)
+    msg = ProposalDeleted(payload={"pk": instance.pk})
     moderators_ch.sync_publish(msg)
     if not instance.agenda_item.is_private:
         participants_ch = ParticipantsChannel(meeting_pk)
@@ -175,7 +172,7 @@ def private_ai_published(instance: AgendaItem, source, target, event, **kw):
         for proposal in proposals:
             data = GenericProposalSerializer(proposal).data
             data["m"] = meeting_pk
-            msg = ProposalAdded(data=data)
+            msg = ProposalChanged(payload=data)
             participants_ch.sync_publish(msg)
 
 
@@ -188,7 +185,7 @@ def agenda_item_channel_subscribed(context: AgendaItem, app_state: AppState, **k
         TextDocument.objects.filter(agenda_item=context), many=True
     )
     for item in serializer.data:
-        app_state.append(TextDocumentAdded(**item))
+        app_state.append(TextDocumentChanged(payload=item))
 
 
 @receiver(post_save, sender=TextDocument)
@@ -207,9 +204,9 @@ def text_document_updated(instance: TextDocument = None, created=None, **kw):
     ch = AgendaItemChannel.from_instance(instance.agenda_item)
     data = TextDocumentSerializer(instance).data
     if created:
-        msg = TextDocumentAdded(data=data)
+        msg = TextDocumentChanged(payload=data)
     else:
-        msg = TextDocumentChanged(data=data)
+        msg = TextDocumentChanged(payload=data)
     ch.sync_publish(msg)
 
 
@@ -218,5 +215,5 @@ def text_paragraph_delete(instance: TextDocument = None, **kw):
     if instance.agenda_item is None:
         return
     ch = AgendaItemChannel.from_instance(instance.agenda_item)
-    msg = TextDocumentDeleted(pk=instance.pk)
+    msg = TextDocumentDeleted(payload={"pk": instance.pk})
     ch.sync_publish(msg)

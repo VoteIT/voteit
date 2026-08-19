@@ -57,7 +57,7 @@ if find_spec("voteit_tools"):
 
 ROOT_URLCONF = "project.urls"
 WSGI_APPLICATION = "project.wsgi.application"
-ASGI_APPLICATION = "project.routing.application"
+ASGI_APPLICATION = "project.asgi.application"
 
 
 # Auth & "social" auth

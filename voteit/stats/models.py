@@ -16,7 +16,7 @@ class HistoryLog(models.Model):
     """
 
     # Unique together
-    date:date = models.DateField()
+    date: date = models.DateField()
     org: Organisation = models.ForeignKey(
         "organisation.Organisation", on_delete=models.PROTECT
     )

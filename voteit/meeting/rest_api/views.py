@@ -11,9 +11,9 @@ from django.db.models import RestrictedError
 from django.http import Http404
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
-from envelope import INTERNAL
-from envelope.app.user_channel.channel import UserChannel
-from envelope.channels.messages import RecheckChannelSubscriptions
+from voteit.messaging.channels import user_group
+from voteit.messaging.consumer import VoteitConsumer
+from voteit.messaging.messages import RecheckSubscriptions
 from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
@@ -231,8 +231,11 @@ class MeetingRolesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 context=meeting,
                 roles=changed,
             )
-            msg = RecheckChannelSubscriptions(consumer_name="", subscriptions=[])
-            UserChannel.from_instance(user, envelope_name=INTERNAL).sync_publish(msg)
+            # Ask every socket this user has open to re-evaluate what it is
+            # still allowed to be subscribed to.
+            VoteitConsumer.broadcast_event_sync(
+                RecheckSubscriptions(), user_group(user.pk)
+            )
         try:
             roles_obj = MeetingRoles.objects.get(context=meeting, user=user)
         except MeetingRoles.DoesNotExist:

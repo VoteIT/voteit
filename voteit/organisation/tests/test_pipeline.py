@@ -38,7 +38,9 @@ class EnsureUseridTests(TestCase):
 
     def test_deduplicates_userid(self):
         self._make_user(username="taken", userid="anna-karlsson")
-        user = self._make_user(username="anna2", first_name="Anna", last_name="Karlsson")
+        user = self._make_user(
+            username="anna2", first_name="Anna", last_name="Karlsson"
+        )
         ensure_userid(backend=None, user=user)
         user.refresh_from_db()
         self.assertIsNotNone(user.userid)
@@ -68,7 +70,9 @@ class SocialUserInactiveTests(TestCase):
         cls.org = Organisation.objects.create()
 
     def _make_user(self, username, identity_id, is_active=True):
-        return self.org.users.create(username=username, identity_id=identity_id, is_active=is_active)
+        return self.org.users.create(
+            username=username, identity_id=identity_id, is_active=is_active
+        )
 
     def _make_backend(self, social=None):
         """Minimal mock backend: name, organisation, and the social auth storage lookup."""
@@ -145,7 +149,9 @@ class SocialAuthTransferTests(TestCase):
         cls.org = Organisation.objects.create()
 
     def _make_user(self, username, identity_id=None, is_active=True):
-        return self.org.users.create(username=username, identity_id=identity_id, is_active=is_active)
+        return self.org.users.create(
+            username=username, identity_id=identity_id, is_active=is_active
+        )
 
     def _make_social_auth(self, user, uid, provider="idproxy"):
         return UserSocialAuth.objects.create(user=user, uid=uid, provider=provider)
@@ -182,7 +188,9 @@ class SocialAuthTransferTests(TestCase):
         is found, any other social auths on the inactive user are also moved to
         the active user.
         """
-        inactive = self._make_user("inactive-extra", identity_id="uid-C", is_active=False)
+        inactive = self._make_user(
+            "inactive-extra", identity_id="uid-C", is_active=False
+        )
         active = self._make_user("active-extra", identity_id="uid-C")
         extra_social = self._make_social_auth(inactive, uid="uid-old")
 

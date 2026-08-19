@@ -34,7 +34,7 @@ def run_worker(worker_pid_file, worker_args):
         kill_worker_cmd = f"kill {worker_pid}"
         subprocess.run(shlex.split(kill_worker_cmd), stderr=subprocess.PIPE)
 
-    start_worker_cmd = f'{get_managepy_path()} rqworker --pid={worker_pid_file} {" ".join(worker_args)}'
+    start_worker_cmd = f"{get_managepy_path()} rqworker --pid={worker_pid_file} {' '.join(worker_args)}"
     print(f"Starting RQ worker: {start_worker_cmd}")
     subprocess.run(shlex.split(start_worker_cmd))
 

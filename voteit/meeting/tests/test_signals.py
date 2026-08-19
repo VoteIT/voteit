@@ -172,13 +172,13 @@ class MeetingGroupChangedTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added(self, mock_publish):
-        from voteit.meeting.messages import MeetingGroupAdded
+        from voteit.meeting.messages import MeetingGroupChanged
 
         with self.captureOnCommitCallbacks(execute=True):
             group = self.meeting.groups.create()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, MeetingGroupAdded)
+        self.assertIsInstance(msg, MeetingGroupChanged)
         self.assertEqual(group.pk, msg.data.pk)
 
     @patch.object(MeetingChannel, "sync_publish")
@@ -206,27 +206,27 @@ class MeetingGroupChangedTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_member_added_compat(self, mock_publish):
-        from voteit.meeting.messages import GroupMembershipAdded
+        from voteit.meeting.messages import GroupMembershipChanged
 
         self.group.members.add(self.user)
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
         self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertIsInstance(msg, GroupMembershipAdded)
+        self.assertIsInstance(msg, GroupMembershipChanged)
         self.assertEqual(self.group.pk, msg.data.meeting_group)
         self.assertEqual(self.meeting.pk, msg.data.m)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_member_added_compat_reverse(self, mock_publish):
-        from voteit.meeting.messages import GroupMembershipAdded
+        from voteit.meeting.messages import GroupMembershipChanged
 
         self.user.meeting_groups.add(self.group)
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
         self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertIsInstance(msg, GroupMembershipAdded)
+        self.assertIsInstance(msg, GroupMembershipChanged)
         self.assertEqual(self.group.pk, msg.data.meeting_group)
         self.assertEqual(self.meeting.pk, msg.data.m)
 
@@ -281,13 +281,13 @@ class RoleChangesPublishedTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added(self, mock_publish):
-        from voteit.core.messages.role_updates import RolesAdded
+        from voteit.core.messages.role_updates import RolesChanged
 
         self.assertFalse(mock_publish.called)
         self.meeting.add_roles(self.user, ROLE_MODERATOR)
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, RolesAdded)
+        self.assertIsInstance(msg, RolesChanged)
         self.assertEqual(self.meeting.pk, msg.data.pk)
         self.assertEqual({ROLE_MODERATOR}, set(msg.data.roles))
 

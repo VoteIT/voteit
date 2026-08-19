@@ -14,7 +14,7 @@ from envelope.testing import testing_channel_layers_setting
 from envelope.utils import get_or_create_txn_sender
 
 from voteit.agenda.channels import AgendaItemChannel
-from voteit.agenda.messages import AgendaBodyAdded
+from voteit.agenda.messages import AgendaBodyChanged
 from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.models import AgendaItem
 from voteit.core.testing import FakeCommit
@@ -101,7 +101,7 @@ class SubscribedTests(TestCase):
         ch = AgendaItemChannel(self.ai.pk)
         self.assertTrue(ch.allow_subscribe(self.user))
         app_state = command.get_app_state(ch)
-        messages = [x for x in app_state if x["t"] == AgendaBodyAdded.name]
+        messages = [x for x in app_state if x["t"] == AgendaBodyChanged.name]
         self.assertEqual(1, len(messages))
         msg = messages[0]
         self.assertEqual({"pk": self.ai.pk, "body": "Hello world"}, msg["p"].dict())
@@ -127,13 +127,13 @@ class AgendaChangedTests(TestCase):
 
     @patch.object(ModeratorsChannel, "sync_publish")
     def test_added_moderators(self, mock_publish):
-        from voteit.agenda.messages import AgendaAdded
+        from voteit.agenda.messages import AgendaChanged
 
         self.assertFalse(mock_publish.called)
         ai = self.meeting.agenda_items.create()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, AgendaAdded)
+        self.assertIsInstance(msg, AgendaChanged)
         self.assertEqual(ai.pk, msg.data.pk)
 
     @patch.object(ParticipantsChannel, "sync_publish")

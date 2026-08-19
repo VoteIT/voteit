@@ -32,7 +32,9 @@ def _transfer_social_auths(from_user, to_user, provider):
     No conflict check needed: UserSocialAuth has a global unique constraint on
     (provider, uid), so the same uid can never exist on two users simultaneously.
     """
-    UserSocialAuth.objects.filter(user=from_user, provider=provider).update(user=to_user)
+    UserSocialAuth.objects.filter(user=from_user, provider=provider).update(
+        user=to_user
+    )
 
 
 def social_user(backend, uid, user=None, *args, **kwargs):

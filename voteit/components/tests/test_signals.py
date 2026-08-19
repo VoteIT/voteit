@@ -155,7 +155,7 @@ class MeetingComponentChangedTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added_enabled(self, mock_publish):
-        from voteit.components.messages import MeetingComponentAdded
+        from voteit.components.messages import MeetingComponentChanged
 
         with FakeCommit():
             component = self.meeting.components.create(
@@ -163,7 +163,7 @@ class MeetingComponentChangedTests(TestCase):
             )
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, MeetingComponentAdded)
+        self.assertIsInstance(msg, MeetingComponentChanged)
         self.assertEqual(component.pk, msg.data.pk)
 
     @patch.object(MeetingChannel, "sync_publish")

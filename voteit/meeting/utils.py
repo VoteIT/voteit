@@ -26,6 +26,6 @@ def sort_agenda_items(
 
 
 def notify_dialect_changed(meeting: Meeting) -> None:
-    msg = MeetingDialectChanged(pk=meeting.pk)
+    msg = MeetingDialectChanged(payload={"pk": meeting.pk})
     ch = MeetingChannel(meeting.pk)
     ch.sync_publish(msg)

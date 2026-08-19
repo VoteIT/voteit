@@ -22,7 +22,6 @@ from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.poll.app.er_policies.auto_always import AutoAlways
-from voteit.poll.messages import VoteTransferAdded
 from voteit.poll.messages import VoteTransferChanged
 from voteit.poll.messages import VoteTransferDeleted
 from voteit.poll.models import ElectoralRegister
@@ -300,7 +299,7 @@ class PollChangedTests(TestCase):
 
     @patch.object(ModeratorsChannel, "sync_publish")
     def test_added_moderators(self, mock_publish):
-        from voteit.poll.messages import PollAdded
+        from voteit.poll.messages import PollChanged
 
         self.assertFalse(mock_publish.called)
         with self.captureOnCommitCallbacks(execute=True):
@@ -310,7 +309,7 @@ class PollChangedTests(TestCase):
             poll.proposals.add(self.prop)
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, PollAdded)
+        self.assertIsInstance(msg, PollChanged)
         self.assertEqual(poll.pk, msg.data.pk)
         self.assertEqual([self.prop.pk], msg.data.proposals)
 
@@ -397,7 +396,7 @@ class PrivateAIPublishedTests(TestCase):
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_ai_made_public_visible_poll(self, mock_publish):
         from voteit.agenda.messages import AgendaChanged
-        from voteit.poll.messages import PollAdded
+        from voteit.poll.messages import PollChanged
 
         self.poll.upcoming(force=True)
         self.poll.save()
@@ -407,7 +406,7 @@ class PrivateAIPublishedTests(TestCase):
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
         self.assertEqual(1, len([x for x in messages if isinstance(x, AgendaChanged)]))
-        self.assertEqual(1, len([x for x in messages if isinstance(x, PollAdded)]))
+        self.assertEqual(1, len([x for x in messages if isinstance(x, PollChanged)]))
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
@@ -420,14 +419,14 @@ class NewERSentToMeetingTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added(self, mock_publish):
-        from voteit.poll.messages import ElectoralRegisterAdded
+        from voteit.poll.messages import ElectoralRegisterChanged
 
         er = self.meeting.er_policy.create_er(weight_dict={self.user.pk: 5})
         self.assertTrue(mock_publish.called)
         messages = [
             x.args[0]
             for x in mock_publish.mock_calls
-            if isinstance(x.args[0], ElectoralRegisterAdded)
+            if isinstance(x.args[0], ElectoralRegisterChanged)
         ]
         self.assertEqual(1, len(messages))
         msg = messages[0]
@@ -541,7 +540,7 @@ class VoteTransferSignalsTests(TestCase):
             )
         self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertIsInstance(msg, VoteTransferAdded)
+        self.assertIsInstance(msg, VoteTransferChanged)
         self.assertEqual(
             {
                 "meeting": self.meeting.pk,
@@ -591,7 +590,7 @@ class VoteTransferSignalsTests(TestCase):
         msg = messages[0]
         payloads = []
         for x in msg.data.app_state:
-            if x.t == "s.batch" and x.p["t"] == VoteTransferAdded.name:
+            if x.t == "s.batch" and x.p["t"] == VoteTransferChanged.name:
                 payloads = x.p["payloads"]
                 break
         self.assertEqual(1, len(payloads))
@@ -623,6 +622,6 @@ class VoteTransferSignalsTests(TestCase):
             [
                 x
                 for x in msg.data.app_state
-                if x.t == "s.batch" and x.p["t"] == VoteTransferAdded.name
+                if x.t == "s.batch" and x.p["t"] == VoteTransferChanged.name
             ],
         )

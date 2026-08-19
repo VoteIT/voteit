@@ -60,7 +60,7 @@ class Command(BaseExpImpCommand):
             verify=not options["skip_verify"],
         )
         with transaction.atomic(durable=True):
-            self.stdout.write(f'Reading and importing {options["filename"]} ...')
+            self.stdout.write(f"Reading and importing {options['filename']} ...")
             importer.from_file(options["filename"])
             importer.run()
             self.stdout.write(

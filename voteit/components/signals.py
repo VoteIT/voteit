@@ -6,9 +6,8 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from voteit.core.signals import after_sm_transition
-from envelope.signals import channel_subscribed
+from voteit.messaging.signals import channel_subscribed
 
-from voteit.components.messages import MeetingComponentAdded
 from voteit.components.messages import MeetingComponentChanged
 from voteit.components.messages import MeetingComponentDeleted
 from voteit.components.rest_api.serializers import MeetingComponentSerializer
@@ -22,7 +21,7 @@ from voteit.meeting.statemachines import MeetingStateMachine
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
-    from envelope.utils import AppState
+    from voteit.messaging.state import AppState
 
 
 @receiver(channel_subscribed, sender=MeetingChannel)
@@ -36,7 +35,9 @@ def meeting_channel_subscribed(
     for component in context.components.all():
         if component.is_valid:
             app_state.append(
-                MeetingComponentAdded(**MeetingComponentSerializer(component).data)
+                MeetingComponentChanged(
+                    payload=MeetingComponentSerializer(component).data
+                )
             )
 
 
@@ -55,20 +56,20 @@ def meeting_component_updated(instance: MeetingComponent = None, created=None, *
     is_valid = data["is_valid"]
     if created:
         if is_valid:
-            meeting_ch.sync_publish(MeetingComponentAdded(**data))
+            meeting_ch.sync_publish(MeetingComponentChanged(payload=data))
     else:
         # Update
         meeting_ch.sync_publish(
-            MeetingComponentChanged(**data)
+            MeetingComponentChanged(payload=data)
             if is_valid
-            else MeetingComponentDeleted(**data)
+            else MeetingComponentDeleted(payload=data)
         )
 
 
 @receiver(pre_delete, sender=MeetingComponent)
 def meeting_component_delete(instance=None, **kw):
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
-    msg = MeetingComponentDeleted(pk=instance.pk)
+    msg = MeetingComponentDeleted(payload={"pk": instance.pk})
     # Sent after transaction commit!
     meeting_ch.sync_publish(msg)
 

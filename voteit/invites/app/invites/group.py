@@ -191,19 +191,23 @@ class InviteGroup(AnnotationDataAdapter):
                                 result.existed += 1
                             else:
                                 result.changed += 1
-                                to_upsert.append(MeetingGroupAnnotation(
-                                    meeting_invite_id=invite.pk,
-                                    meeting_group_id=mg_id,
-                                    group_role_id=role_pk,
-                                ))
+                                to_upsert.append(
+                                    MeetingGroupAnnotation(
+                                        meeting_invite_id=invite.pk,
+                                        meeting_group_id=mg_id,
+                                        group_role_id=role_pk,
+                                    )
+                                )
                         else:
                             result.added += 1
                             newly_annotated.add(invite.pk)
-                            to_upsert.append(MeetingGroupAnnotation(
-                                meeting_invite_id=invite.pk,
-                                meeting_group_id=mg_id,
-                                group_role_id=role_pk,
-                            ))
+                            to_upsert.append(
+                                MeetingGroupAnnotation(
+                                    meeting_invite_id=invite.pk,
+                                    meeting_group_id=mg_id,
+                                    group_role_id=role_pk,
+                                )
+                            )
             if to_upsert:
                 MeetingGroupAnnotation.objects.bulk_create(
                     to_upsert,
@@ -225,9 +229,11 @@ class InviteGroup(AnnotationDataAdapter):
         in anything else than a bool value.
         """
         return invites_qs.annotate(
-            **{cls.invite_qs_annotation_name: Exists(
-                MeetingGroupAnnotation.objects.filter(meeting_invite=OuterRef("pk"))
-            )}
+            **{
+                cls.invite_qs_annotation_name: Exists(
+                    MeetingGroupAnnotation.objects.filter(meeting_invite=OuterRef("pk"))
+                )
+            }
         )
 
     def get_annotations(self) -> Generator[dict]:

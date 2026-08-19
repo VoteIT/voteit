@@ -15,10 +15,14 @@ from voteit.token_api.validators import validate_api_key_scopes
 
 class MeetingAPIKeyManager(BaseAPIKeyManager):
     def get_usable_keys(self):
-        return super().get_usable_keys().select_related(
-            "user",
-            "meeting",
-            "meeting__organisation",
+        return (
+            super()
+            .get_usable_keys()
+            .select_related(
+                "user",
+                "meeting",
+                "meeting__organisation",
+            )
         )
 
 

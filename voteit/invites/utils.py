@@ -38,7 +38,7 @@ def send_updated_invites(
     ch = MeetingInvitesChannel.from_instance(meeting)
     serializer = MeetingInviteSerializer(queryset, many=True)
     for data in serializer.data:
-        msg = MeetingInviteChanged(data=data)
+        msg = MeetingInviteChanged(payload=data)
         ch.sync_publish(msg)
 
 

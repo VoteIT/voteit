@@ -55,13 +55,13 @@ class SignalsTests(TestCase):
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_added_pn(self, mock_publish):
-        from voteit.participant_number.messages import PNAdded
+        from voteit.participant_number.messages import PNChanged
 
         self.assertFalse(mock_publish.called)
         pn = self.pn_sys.numbers.create(user=self.user_c)
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
-        self.assertIsInstance(msg, PNAdded)
+        self.assertIsInstance(msg, PNChanged)
         self.assertEqual(pn.pk, msg.data.pk)
         self.assertEqual(pn.number, msg.data.number)
         self.assertEqual(3, pn.number)

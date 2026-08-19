@@ -11,19 +11,16 @@ from envelope.testing import MessageCatcher
 from envelope.testing import testing_channel_layers_setting
 
 from voteit.agenda.channels import AgendaItemChannel
-from voteit.core.messages.role_updates import RolesAdded
+from voteit.core.messages.role_updates import RolesChanged
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.room.channels import RoomChannel
-from voteit.speaker.messages import SpeakerAdded
 from voteit.speaker.messages import SpeakerChanged
 from voteit.speaker.messages import SpeakerDeleted
-from voteit.speaker.messages import SpeakerListAdded
 from voteit.speaker.messages import SpeakerListChanged
 from voteit.speaker.messages import SpeakerListDeleted
-from voteit.speaker.messages import SpeakerSystemAdded
 from voteit.speaker.messages import SpeakerSystemChanged
 from voteit.speaker.messages import SpeakerSystemDeleted
 from voteit.speaker.models import SpeakerList
@@ -135,7 +132,7 @@ class AppStateTests(TestCase):
         msg = messages[0]
         self.assertIsInstance(msg, Subscribed)
         self.assertEqual(self.speaker_list.speaker_items.count(), 5)
-        self.assertEqual(sum(x.t == SpeakerAdded.name for x in msg.data.app_state), 0)
+        self.assertEqual(sum(x.t == SpeakerChanged.name for x in msg.data.app_state), 0)
         self.system.active_list = self.speaker_list
         self.system.save()
         with MessageCatcher(Subscribed) as messages:
@@ -143,7 +140,7 @@ class AppStateTests(TestCase):
         self.assertEqual(1, len(messages))
         msg = messages[0]
         self.assertIsInstance(msg, Subscribed)
-        self.assertEqual(sum(x.t == SpeakerAdded.name for x in msg.data.app_state), 5)
+        self.assertEqual(sum(x.t == SpeakerChanged.name for x in msg.data.app_state), 5)
 
     def test_dont_kill_signal_when_room_changes(self):
         self.system.delete()
@@ -168,7 +165,7 @@ class AppStateTests(TestCase):
         self.assertEqual(1, len(messages))
         msg = messages[0]
         system_payload = [
-            x.p for x in msg.data.app_state if x.t == SpeakerSystemAdded.name
+            x.p for x in msg.data.app_state if x.t == SpeakerSystemChanged.name
         ]
         self.assertEqual(1, len(system_payload))
         self.assertEqual(
@@ -189,7 +186,7 @@ class AppStateTests(TestCase):
         speaker_roles_payload = [
             x.p
             for x in msg.data.app_state
-            if x.t == RolesAdded.name and ROLE_SPEAKER in x.p["roles"]
+            if x.t == RolesChanged.name and ROLE_SPEAKER in x.p["roles"]
         ]
         self.assertEqual(1, len(speaker_roles_payload))
         self.assertEqual(
@@ -214,10 +211,10 @@ class AppStateTests(TestCase):
         msg = messages[0]
         self.assertIsInstance(msg, Subscribed)
         self.assertEqual(
-            sum(x.t == SpeakerListAdded.name for x in msg.data.app_state), 1
+            sum(x.t == SpeakerListChanged.name for x in msg.data.app_state), 1
         )
         speaker_lists_added = [
-            x.p for x in msg.data.app_state if x.t == SpeakerListAdded.name
+            x.p for x in msg.data.app_state if x.t == SpeakerListChanged.name
         ]
         self.assertEqual(1, len(speaker_lists_added))
         self.assertEqual(
@@ -282,7 +279,7 @@ class SendStateChangesTestsTests(TestCase):
         )
         self.assertDictEqual(
             {
-                "t": SpeakerAdded.name,
+                "t": SpeakerChanged.name,
                 "payloads": [
                     {
                         "user": self.participant.pk,
@@ -328,7 +325,7 @@ class SendStateChangesTestsTests(TestCase):
 
     def test_meeting_channel_receives_system_added(self):
         new_room = self.meeting.rooms.create()
-        with ChannelMessageCatcher(MeetingChannel, SpeakerSystemAdded) as messages:
+        with ChannelMessageCatcher(MeetingChannel, SpeakerSystemChanged) as messages:
             new_system = self.meeting.speaker_systems.create(
                 method_name="simple", room=new_room, safe_positions=2
             )
@@ -382,7 +379,7 @@ class SendStateChangesTestsTests(TestCase):
         )
 
     def test_ai_channel_receives_list_added(self):
-        with ChannelMessageCatcher(AgendaItemChannel, SpeakerListAdded) as messages:
+        with ChannelMessageCatcher(AgendaItemChannel, SpeakerListChanged) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 new_list = self.ai.speaker_lists.create(speaker_system=self.system)
         self.assertEqual(1, len(messages))
@@ -435,7 +432,7 @@ class SendStateChangesTestsTests(TestCase):
         )
 
     def test_room_channel_ignores_list_added(self):
-        with ChannelMessageCatcher(RoomChannel, SpeakerListAdded) as messages:
+        with ChannelMessageCatcher(RoomChannel, SpeakerListChanged) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 self.ai.speaker_lists.create(speaker_system=self.system)
         self.assertEqual(0, len(messages))
@@ -469,14 +466,14 @@ class SendStateChangesTestsTests(TestCase):
         )
 
     def test_room_channel_receives_speaker_added_if_active(self):
-        with ChannelMessageCatcher(RoomChannel, SpeakerAdded) as messages:
+        with ChannelMessageCatcher(RoomChannel, SpeakerChanged) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 speaker = self.speaker_list.speaker_items.create(user=self.moderator)
         self.assertEqual(0, len(messages))
         self.system.active_list = self.speaker_list
         self.system.save()
         speaker.delete()
-        with ChannelMessageCatcher(RoomChannel, SpeakerAdded) as messages:
+        with ChannelMessageCatcher(RoomChannel, SpeakerChanged) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 speaker = self.speaker_list.speaker_items.create(user=self.moderator)
         self.assertEqual(1, len(messages))

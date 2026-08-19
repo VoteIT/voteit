@@ -48,7 +48,9 @@ class Command(BaseCommand):
         self.stdout.write(f"Source: {source} (pk={source.pk})")
         self.stdout.write(f"Target: {target} (pk={target.pk})")
         if dry_run:
-            self.stdout.write(self.style.WARNING("=== DRY RUN — no changes will be made ==="))
+            self.stdout.write(
+                self.style.WARNING("=== DRY RUN — no changes will be made ===")
+            )
 
         merger = UserMerger(source=source, target=target, dry_run=dry_run)
         try:

@@ -44,14 +44,18 @@ class DiscussionPostViewSet(VerboseAutoPermissionViewSetMixin, ModelViewSet):
         if self.action == "list":
             return DiscussionPost.objects.none()
         user = self.request.user
-        return DiscussionPost.objects.filter(
-            models.Q(
-                agenda_item__meeting__roles__user=user,
-                agenda_item__meeting__roles__assigned__contains=ROLE_MODERATOR,
+        return (
+            DiscussionPost.objects.filter(
+                models.Q(
+                    agenda_item__meeting__roles__user=user,
+                    agenda_item__meeting__roles__assigned__contains=ROLE_MODERATOR,
+                )
+                | models.Q(agenda_item__meeting__roles__user=user)
+                & ~models.Q(agenda_item__state="private")
             )
-            | models.Q(agenda_item__meeting__roles__user=user)
-            & ~models.Q(agenda_item__state="private")
-        ).select_related("agenda_item__meeting").distinct()
+            .select_related("agenda_item__meeting")
+            .distinct()
+        )
 
 
 @router.register("export-discussion-posts", basename="export-discussion-posts")

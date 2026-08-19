@@ -10,28 +10,24 @@ from django.db.models.signals import pre_delete
 from django.db.models.signals import pre_save
 from django.dispatch import Signal
 from django.dispatch import receiver
-from envelope.app.user_channel.channel import UserChannel
-from envelope.messages.common import Batch
-from envelope.signals import channel_subscribed
+from voteit.messaging.channels import UserChannel
+from voteit.messaging.signals import channel_subscribed
 
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
-from voteit.core.messages.role_updates import RolesAdded
+from voteit.core.messages.role_updates import RolesChanged
 from voteit.core.messages.role_updates import RolesRemoved
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
 from voteit.meeting.channels import MeetingChannel
-from voteit.meeting.messages import GroupMembershipAdded
 from voteit.meeting.messages import GroupMembershipChanged
 from voteit.meeting.messages import GroupMembershipDeleted
-from voteit.meeting.messages import GroupRoleAdded
 from voteit.meeting.messages import GroupRoleChanged
 from voteit.meeting.messages import GroupRoleDeleted
 from voteit.meeting.messages import MeetingChanged
 from voteit.meeting.messages import MeetingDeleted
-from voteit.meeting.messages import MeetingGroupAdded
 from voteit.meeting.messages import MeetingGroupChanged
 from voteit.meeting.messages import MeetingGroupDeleted
 from voteit.meeting.models import GroupMembership
@@ -46,7 +42,7 @@ from voteit.meeting.rest_api.serializers import MeetingGroupSerializer
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
-    from envelope.utils import AppState
+    from voteit.messaging.state import AppState
     from voteit.core.abcs import MeetingContext
 
 # Signal providing an atomic transaction to do cleanup when a meeting is archived
@@ -88,9 +84,9 @@ _added_serializer_class = {
     GroupMembership: GroupMembershipSerializer,
 }
 _added_msg_class = {
-    MeetingGroup: MeetingGroupAdded,
-    GroupRole: GroupRoleAdded,
-    GroupMembership: GroupMembershipAdded,
+    MeetingGroup: MeetingGroupChanged,
+    GroupRole: GroupRoleChanged,
+    GroupMembership: GroupMembershipChanged,
 }
 _changed_serializer_class = {
     MeetingGroup: MeetingGroupSerializer,
@@ -138,7 +134,7 @@ def meeting_change(instance, created=None, **kw):
     if not created:
         data = MeetingDetailSerializer(instance).data
         ch = MeetingChannel.from_instance(instance)
-        msg = MeetingChanged(data=data)
+        msg = MeetingChanged(payload=data)
         ch.sync_publish(msg)
 
 
@@ -163,34 +159,33 @@ def meeting_channel_subscribed(
     """
     roles = context.get_roles(user)
     if roles:
-        msg = RolesAdded(
-            roles=roles,
-            pk=context.pk,
-            model=get_model_shortname(context),
-            user_pk=user.pk,
+        msg = RolesChanged(
+            payload={
+                "roles": roles,
+                "pk": context.pk,
+                "model": get_model_shortname(context),
+                "user_pk": user.pk,
+            }
         )
         app_state.append(msg)
     # Append all groups - members have moved to GroupMembership!
     meeting_groups_qs = context.groups.all().prefetch_related("delegate_to")
     mg_serializer = MeetingGroupSerializer(meeting_groups_qs, many=True)
     if mg_serializer.data:
-        batch = Batch(t=MeetingGroupAdded.name, payloads=[])
-        for item in mg_serializer.data:
-            batch.append(MeetingGroupAdded(data=item))
-        app_state.append(batch)
+        app_state.add_batch(MeetingGroupChanged, mg_serializer.data)
     # GroupMemberships
     gm_qs = GroupMembership.objects.filter(meeting_group__meeting=context)
     gm_data = GroupMembershipSerializer(gm_qs, many=True).data
     if gm_data:
-        batch = Batch(t=GroupMembershipAdded.name, payloads=[])
+        payloads = []
         for item in gm_data:
             # Inject meeting pk
-            batch.append(GroupMembershipAdded(data={"m": context.pk, **item}))
-        app_state.append(batch)
+            payloads.append({"m": context.pk, **item})
+        app_state.add_batch(GroupMembershipChanged, payloads)
     # And GroupRoles
     if context.group_roles_active:
         for item in GroupRoleSerializer(context.group_roles.all(), many=True).data:
-            app_state.append(GroupRoleAdded(**item))
+            app_state.append(GroupRoleChanged(payload=item))
 
 
 @receiver(post_save, sender=MeetingGroup)
@@ -249,11 +244,13 @@ def _role_msg_publish(instance: MeetingRoles, msg):
 def push_roles_added(instance: MeetingRoles, roles: list[Role], **kwargs):
     _role_msg_publish(
         instance,
-        RolesAdded(
-            roles=roles,
-            pk=instance.context.pk,
-            model=get_model_shortname(instance.context),
-            user_pk=instance.user.pk,
+        RolesChanged(
+            payload={
+                "roles": roles,
+                "pk": instance.context.pk,
+                "model": get_model_shortname(instance.context),
+                "user_pk": instance.user.pk,
+            }
         ),
     )
 
@@ -263,10 +260,12 @@ def push_roles_removed(instance: MeetingRoles, roles: list[Role], **kwargs):
     _role_msg_publish(
         instance,
         RolesRemoved(
-            roles=roles,
-            pk=instance.context.pk,
-            model=get_model_shortname(instance.context),
-            user_pk=instance.user.pk,
+            payload={
+                "roles": roles,
+                "pk": instance.context.pk,
+                "model": get_model_shortname(instance.context),
+                "user_pk": instance.user.pk,
+            }
         ),
     )
 
