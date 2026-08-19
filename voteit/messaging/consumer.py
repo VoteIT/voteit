@@ -68,7 +68,8 @@ class AuthenticatedUserAuthenticator(BaseAuthenticator):
 class SubscriptionMixin(ChanxWebsocketConsumerMixin):
     """channel.subscribe / leave / list_subscriptions / recheck."""
 
-    subscriptions: set[ChannelRef]
+    # Not `subscriptions`: chanx uses that name for its own topic registry.
+    channel_subs: set[ChannelRef]
 
     @ws_handler(summary="Subscribe to a context channel")
     async def subscribe(
@@ -92,7 +93,7 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
 
     @event_handler
     async def on_subscribed(self, event: ChannelSubscribed) -> ChannelSubscribed:
-        self.subscriptions.add(
+        self.channel_subs.add(
             ChannelRef(pk=event.payload.pk, channel_type=event.payload.channel_type)
         )
         return event
@@ -111,7 +112,7 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
 
     @event_handler
     async def on_left(self, event: ChannelLeft) -> ChannelLeft:
-        self.subscriptions.discard(
+        self.channel_subs.discard(
             ChannelRef(pk=event.payload.pk, channel_type=event.payload.channel_type)
         )
         return event
@@ -126,7 +127,7 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
             else f"{ref.channel_type}_{ref.pk}"
         )
         await self.channel_layer.group_discard(group, self.channel_name)
-        self.subscriptions.discard(ref)
+        self.channel_subs.discard(ref)
         return ChannelLeft(payload={**ref.model_dump(), "channel_name": group})
 
     @ws_handler(summary="List current subscriptions")
@@ -136,7 +137,7 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
         return ChannelSubscriptions(
             payload={
                 "subscriptions": sorted(
-                    self.subscriptions, key=lambda r: (r.channel_type, r.pk)
+                    self.channel_subs, key=lambda r: (r.channel_type, r.pk)
                 )
             }
         )
@@ -144,12 +145,12 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
     @event_handler
     async def recheck(self, _event: RecheckSubscriptions) -> None:
         """Re-evaluate subscriptions, e.g. after the user's roles changed."""
-        if not self.subscriptions:
+        if not self.channel_subs:
             return None
         await sync_to_async(enqueue_recheck, thread_sensitive=False)(
             user_pk=self.user.pk,
             consumer_channel=self.channel_name,
-            subscriptions=[ref.model_dump() for ref in self.subscriptions],
+            subscriptions=[ref.model_dump() for ref in self.channel_subs],
         )
         return None
 
@@ -218,7 +219,7 @@ class VoteitConsumer(
 
     async def post_authentication(self) -> None:
         self.user = self.scope["user"]
-        self.subscriptions = set()
+        self.channel_subs = set()
         await self.channel_layer.group_add(user_group(self.user.pk), self.channel_name)
         await self.channel_layer.group_add(ONLINE_GROUP, self.channel_name)
         self.last_connection_update = now()
