@@ -1,52 +1,38 @@
 from __future__ import annotations
 
+from typing import Literal
 
-from voteit.messaging.base import BaseObjectAdded
-from voteit.messaging.base import BaseObjectChanged
-from voteit.messaging.base import BaseObjectDeleted
+
+from voteit.messaging.base import ObjectAddedOrChanged
+from voteit.messaging.base import ObjectDeleted
 from voteit.messaging.decorators import outgoing
 
 
 @outgoing
-class SpeakerListAdded(BaseObjectAdded):
-    name = "speaker_list.added"
+class SpeakerListChanged(ObjectAddedOrChanged):
+    action: Literal["speaker_list.changed"] = "speaker_list.changed"
 
 
 @outgoing
-class SpeakerListChanged(BaseObjectChanged):
-    name = "speaker_list.changed"
+class SpeakerListDeleted(ObjectDeleted):
+    action: Literal["speaker_list.deleted"] = "speaker_list.deleted"
 
 
 @outgoing
-class SpeakerListDeleted(BaseObjectDeleted):
-    name = "speaker_list.deleted"
+class SpeakerSystemChanged(ObjectAddedOrChanged):
+    action: Literal["speaker_system.changed"] = "speaker_system.changed"
 
 
 @outgoing
-class SpeakerSystemAdded(BaseObjectAdded):
-    name = "speaker_system.added"
+class SpeakerSystemDeleted(ObjectDeleted):
+    action: Literal["speaker_system.deleted"] = "speaker_system.deleted"
 
 
 @outgoing
-class SpeakerSystemChanged(BaseObjectChanged):
-    name = "speaker_system.changed"
+class SpeakerChanged(ObjectAddedOrChanged):
+    action: Literal["speaker.changed"] = "speaker.changed"
 
 
 @outgoing
-class SpeakerSystemDeleted(BaseObjectDeleted):
-    name = "speaker_system.deleted"
-
-
-@outgoing
-class SpeakerChanged(BaseObjectChanged):
-    name = "speaker.changed"
-
-
-@outgoing
-class SpeakerAdded(BaseObjectAdded):
-    name = "speaker.added"
-
-
-@outgoing
-class SpeakerDeleted(BaseObjectDeleted):
-    name = "speaker.deleted"
+class SpeakerDeleted(ObjectDeleted):
+    action: Literal["speaker.deleted"] = "speaker.deleted"

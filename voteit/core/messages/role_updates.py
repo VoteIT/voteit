@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from pydantic import validator
+from typing import Literal
+from chanx.messages.base import BaseMessage
+
+from pydantic import field_validator
 from pydantic.main import BaseModel
 
-from envelope.core.message import Message
 from voteit.core.role import Role
 from voteit.messaging.decorators import outgoing
 
@@ -20,7 +22,8 @@ class RolesChangeSchema(BaseModel):
     pk: int  # context where the change happened, use together with model
     model: str  # The model shortname
 
-    @validator("roles", pre=True)
+    @field_validator("roles", mode="before")
+    @classmethod
     def roles_to_str(cls, v):
         if isinstance(v, (list, tuple, set)):
             return [str(item) if isinstance(item, Role) else item for item in v]
@@ -28,14 +31,12 @@ class RolesChangeSchema(BaseModel):
 
 
 @outgoing
-class RolesAdded(Message):
-    name = "roles.added"
-    schema = RolesChangeSchema
-    data: RolesChangeSchema
+class RolesAdded(BaseMessage):
+    action: Literal["roles.changed"] = "roles.changed"
+    payload: RolesChangeSchema
 
 
 @outgoing
-class RolesRemoved(Message):
-    name = "roles.removed"
-    schema = RolesChangeSchema
-    data: RolesChangeSchema
+class RolesRemoved(BaseMessage):
+    action: Literal["roles.removed"] = "roles.removed"
+    payload: RolesChangeSchema

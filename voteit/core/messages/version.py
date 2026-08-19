@@ -1,6 +1,7 @@
+from typing import Literal
+from chanx.messages.base import BaseMessage
 from pydantic import BaseModel
 
-from envelope.core.message import Message
 from voteit.messaging.decorators import outgoing
 
 
@@ -10,7 +11,6 @@ class VersionSchema(BaseModel):
 
 
 @outgoing
-class VersionMessage(Message):
-    name = "s.versions"
-    schema = VersionSchema
-    data: VersionSchema
+class VersionMessage(BaseMessage):
+    action: Literal["s.versions"] = "s.versions"
+    payload: VersionSchema

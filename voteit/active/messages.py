@@ -1,6 +1,7 @@
+from typing import Literal
+from chanx.messages.base import BaseMessage
 from pydantic import BaseModel
 
-from envelope.core.message import Message
 
 from voteit.messaging.decorators import outgoing
 
@@ -12,10 +13,9 @@ class ActiveUserChangedSchema(BaseModel):
 
 
 @outgoing
-class ActiveUserChanged(Message):
-    name = "active_user.changed"
-    schema = ActiveUserChangedSchema
-    data: ActiveUserChangedSchema
+class ActiveUserChanged(BaseMessage):
+    action: Literal["active_user.changed"] = "active_user.changed"
+    payload: ActiveUserChangedSchema
 
 
 class ActiveUsersSchema(BaseModel):
@@ -24,7 +24,6 @@ class ActiveUsersSchema(BaseModel):
 
 
 @outgoing
-class ActiveUsers(Message):
-    name = "active_user.all"
-    schema = ActiveUsersSchema
-    data: ActiveUsersSchema
+class ActiveUsers(BaseMessage):
+    action: Literal["active_user.all"] = "active_user.all"
+    payload: ActiveUsersSchema

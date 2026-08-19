@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from voteit.messaging.base import AddedOrUpdatedSchema
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.base import BaseObjectAdded
-from voteit.messaging.base import BaseObjectChanged
-from voteit.messaging.base import BaseObjectDeleted
+from voteit.messaging.base import ObjectAddedOrChanged
+from voteit.messaging.base import ObjectDeleted
 
 
 class ProposalAddedOrUpdatedSchema(AddedOrUpdatedSchema):
@@ -13,34 +14,20 @@ class ProposalAddedOrUpdatedSchema(AddedOrUpdatedSchema):
 
 
 @outgoing
-class ProposalAdded(BaseObjectAdded):
-    name = "proposal.added"
-    schema = ProposalAddedOrUpdatedSchema
-    data: ProposalAddedOrUpdatedSchema
+class ProposalChanged(ObjectAddedOrChanged):
+    action: Literal["proposal.changed"] = "proposal.changed"
 
 
 @outgoing
-class ProposalChanged(BaseObjectChanged):
-    name = "proposal.changed"
-    schema = ProposalAddedOrUpdatedSchema
-    data: ProposalAddedOrUpdatedSchema
+class ProposalDeleted(ObjectDeleted):
+    action: Literal["proposal.deleted"] = "proposal.deleted"
 
 
 @outgoing
-class ProposalDeleted(BaseObjectDeleted):
-    name = "proposal.deleted"
+class TextDocumentChanged(ObjectAddedOrChanged):
+    action: Literal["text_document.changed"] = "text_document.changed"
 
 
 @outgoing
-class TextDocumentAdded(BaseObjectAdded):
-    name = "text_document.added"
-
-
-@outgoing
-class TextDocumentChanged(BaseObjectChanged):
-    name = "text_document.changed"
-
-
-@outgoing
-class TextDocumentDeleted(BaseObjectDeleted):
-    name = "text_document.deleted"
+class TextDocumentDeleted(ObjectDeleted):
+    action: Literal["text_document.deleted"] = "text_document.deleted"

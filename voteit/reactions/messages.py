@@ -1,29 +1,25 @@
 from __future__ import annotations
 
-from pydantic import validator
+from typing import Literal
+from chanx.messages.base import BaseMessage
+
+from pydantic import field_validator
 from pydantic.main import BaseModel
 
-from envelope.core.message import Message
 from voteit.core.validators import validate_model_shortname
-from voteit.messaging.base import BaseObjectAdded
-from voteit.messaging.base import BaseObjectChanged
-from voteit.messaging.base import BaseObjectDeleted
+from voteit.messaging.base import ObjectAddedOrChanged
+from voteit.messaging.base import ObjectDeleted
 from voteit.messaging.decorators import outgoing
 
 
 @outgoing
-class ButtonAdded(BaseObjectAdded):
-    name = "reaction_button.added"
+class ButtonChanged(ObjectAddedOrChanged):
+    action: Literal["reaction_button.changed"] = "reaction_button.changed"
 
 
 @outgoing
-class ButtonChanged(BaseObjectChanged):
-    name = "reaction_button.changed"
-
-
-@outgoing
-class ButtonDeleted(BaseObjectDeleted):
-    name = "reaction_button.deleted"
+class ButtonDeleted(ObjectDeleted):
+    action: Literal["reaction_button.deleted"] = "reaction_button.deleted"
 
 
 class ReactionSchema(BaseModel):
@@ -31,7 +27,8 @@ class ReactionSchema(BaseModel):
     object_id: int
     button: int
 
-    @validator("content_type")
+    @field_validator("content_type")
+    @classmethod
     def validate_content_type(cls, v):
         return validate_model_shortname(v)
 
@@ -47,23 +44,21 @@ class UserReactionResponseSchema(ReactionSchema):
 
 
 @outgoing
-class ReactionCount(Message):
-    name = "reaction.count"
-    schema = ReactionCountSchema
-    data: ReactionCountSchema
+class ReactionCount(BaseMessage):
+    action: Literal["reaction.count"] = "reaction.count"
+    payload: ReactionCountSchema
 
 
 @outgoing
-class UserReactionAdded(Message):
+class UserReactionAdded(BaseMessage):
     """
     Normally only sent to the user who added it!
     """
 
-    name = "reaction.added"
-    schema = UserReactionResponseSchema
-    data: UserReactionResponseSchema
+    action: Literal["reaction.changed"] = "reaction.changed"
+    payload: UserReactionResponseSchema
 
 
 @outgoing
-class UserReactionDeleted(BaseObjectDeleted):
-    name = "reaction.deleted"
+class UserReactionDeleted(ObjectDeleted):
+    action: Literal["reaction.deleted"] = "reaction.deleted"

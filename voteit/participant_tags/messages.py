@@ -1,4 +1,5 @@
-from envelope.core import Message
+from typing import Literal
+from chanx.messages.base import BaseMessage
 from pydantic.main import BaseModel
 
 from voteit.messaging.decorators import outgoing
@@ -11,14 +12,13 @@ class ParticipantTagsSchema(BaseModel):
 
 
 @outgoing
-class ParticipantTagsChanged(Message):
+class ParticipantTagsChanged(BaseMessage):
     """
     There's no deleted or added message for this tag. Deleted is simply empty tags.
     """
 
-    name = "ptags.changed"
-    schema = ParticipantTagsSchema
-    data: ParticipantTagsSchema
+    action: Literal["ptags.changed"] = "ptags.changed"
+    payload: ParticipantTagsSchema
 
 
 class AllParticipantTagsSchema(BaseModel):
@@ -27,7 +27,6 @@ class AllParticipantTagsSchema(BaseModel):
 
 
 @outgoing
-class AllParticipantTags(Message):
-    name = "ptags.all"
-    schema = AllParticipantTagsSchema
-    data: AllParticipantTagsSchema
+class AllParticipantTags(BaseMessage):
+    action: Literal["ptags.all"] = "ptags.all"
+    payload: AllParticipantTagsSchema

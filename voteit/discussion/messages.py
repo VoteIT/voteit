@@ -1,19 +1,14 @@
+from typing import Literal
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.base import BaseObjectAdded
-from voteit.messaging.base import BaseObjectChanged
-from voteit.messaging.base import BaseObjectDeleted
+from voteit.messaging.base import ObjectAddedOrChanged
+from voteit.messaging.base import ObjectDeleted
 
 
 @outgoing
-class DiscussionPostAdded(BaseObjectAdded):
-    name = "discussion_post.added"
+class DiscussionPostChanged(ObjectAddedOrChanged):
+    action: Literal["discussion_post.changed"] = "discussion_post.changed"
 
 
 @outgoing
-class DiscussionPostChanged(BaseObjectChanged):
-    name = "discussion_post.changed"
-
-
-@outgoing
-class DiscussionPostDeleted(BaseObjectDeleted):
-    name = "discussion_post.deleted"
+class DiscussionPostDeleted(ObjectDeleted):
+    action: Literal["discussion_post.deleted"] = "discussion_post.deleted"

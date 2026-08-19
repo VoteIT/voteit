@@ -1,46 +1,37 @@
 from __future__ import annotations
 
+from typing import Literal
+from chanx.messages.base import BaseMessage
+
 from datetime import datetime
 
 from django.utils import timezone
-from envelope.core.message import Message
 from pydantic import BaseModel
-from pydantic import validator
+from pydantic import field_validator
 
-from voteit.messaging.base import BaseObjectAdded
-from voteit.messaging.base import BaseObjectChanged
-from voteit.messaging.base import BaseObjectDeleted
+from voteit.messaging.base import ObjectAddedOrChanged
+from voteit.messaging.base import ObjectDeleted
 from voteit.messaging.decorators import outgoing
 
 
 @outgoing
-class AgendaAdded(BaseObjectAdded):
-    name = "agenda_item.added"
+class AgendaChanged(ObjectAddedOrChanged):
+    action: Literal["agenda_item.changed"] = "agenda_item.changed"
 
 
 @outgoing
-class AgendaChanged(BaseObjectChanged):
-    name = "agenda_item.changed"
+class AgendaDeleted(ObjectDeleted):
+    action: Literal["agenda_item.deleted"] = "agenda_item.deleted"
 
 
 @outgoing
-class AgendaDeleted(BaseObjectDeleted):
-    name = "agenda_item.deleted"
+class AgendaBodyChanged(ObjectAddedOrChanged):
+    action: Literal["agenda_body.changed"] = "agenda_body.changed"
 
 
 @outgoing
-class AgendaBodyAdded(BaseObjectAdded):
-    name = "agenda_body.added"
-
-
-@outgoing
-class AgendaBodyChanged(BaseObjectChanged):
-    name = "agenda_body.changed"
-
-
-@outgoing
-class AgendaBodyDeleted(BaseObjectDeleted):
-    name = "agenda_body.deleted"
+class AgendaBodyDeleted(ObjectDeleted):
+    action: Literal["agenda_body.deleted"] = "agenda_body.deleted"
 
 
 class LastReadChangedSchema(BaseModel):
@@ -54,7 +45,8 @@ class LastReadChangedSchema(BaseModel):
     timestamp: str
     agenda_item: int
 
-    @validator("timestamp", pre=True)
+    @field_validator("timestamp", mode="before")
+    @classmethod
     def convert_dt(cls, v):
         if isinstance(v, datetime):
             tz = timezone.get_current_timezone()
@@ -64,7 +56,6 @@ class LastReadChangedSchema(BaseModel):
 
 
 @outgoing
-class LastReadChanged(Message):
-    name = "last_read.changed"
-    schema = LastReadChangedSchema
-    data: LastReadChangedSchema
+class LastReadChanged(BaseMessage):
+    action: Literal["last_read.changed"] = "last_read.changed"
+    payload: LastReadChangedSchema

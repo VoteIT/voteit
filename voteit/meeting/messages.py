@@ -1,64 +1,49 @@
-from voteit.messaging.base import BaseObjectAdded
-from voteit.messaging.base import BaseObjectChanged
-from voteit.messaging.base import BaseObjectDeleted
+from typing import Literal
+from voteit.messaging.base import ObjectAddedOrChanged
+from voteit.messaging.base import ObjectDeleted
 from voteit.messaging.decorators import outgoing
 
 
 @outgoing
-class MeetingChanged(BaseObjectChanged):
-    name = "meeting.changed"
+class MeetingChanged(ObjectAddedOrChanged):
+    action: Literal["meeting.changed"] = "meeting.changed"
 
 
 @outgoing
-class MeetingDeleted(BaseObjectDeleted):
-    name = "meeting.deleted"
+class MeetingDeleted(ObjectDeleted):
+    action: Literal["meeting.deleted"] = "meeting.deleted"
 
 
 @outgoing
-class MeetingDialectChanged(BaseObjectChanged):
-    name = "meeting.dialect_changed"
+class MeetingDialectChanged(ObjectAddedOrChanged):
+    action: Literal["meeting.dialect_changed"] = "meeting.dialect_changed"
 
 
 @outgoing
-class MeetingGroupAdded(BaseObjectAdded):
-    name = "meeting_group.added"
+class MeetingGroupChanged(ObjectAddedOrChanged):
+    action: Literal["meeting_group.changed"] = "meeting_group.changed"
 
 
 @outgoing
-class MeetingGroupChanged(BaseObjectChanged):
-    name = "meeting_group.changed"
+class MeetingGroupDeleted(ObjectDeleted):
+    action: Literal["meeting_group.deleted"] = "meeting_group.deleted"
 
 
 @outgoing
-class MeetingGroupDeleted(BaseObjectDeleted):
-    name = "meeting_group.deleted"
+class GroupRoleChanged(ObjectAddedOrChanged):
+    action: Literal["group_role.changed"] = "group_role.changed"
 
 
 @outgoing
-class GroupRoleAdded(BaseObjectAdded):
-    name = "group_role.added"
+class GroupRoleDeleted(ObjectDeleted):
+    action: Literal["group_role.deleted"] = "group_role.deleted"
 
 
 @outgoing
-class GroupRoleChanged(BaseObjectChanged):
-    name = "group_role.changed"
+class GroupMembershipChanged(ObjectAddedOrChanged):
+    action: Literal["group_membership.changed"] = "group_membership.changed"
 
 
 @outgoing
-class GroupRoleDeleted(BaseObjectDeleted):
-    name = "group_role.deleted"
-
-
-@outgoing
-class GroupMembershipAdded(BaseObjectAdded):
-    name = "group_membership.added"
-
-
-@outgoing
-class GroupMembershipChanged(BaseObjectChanged):
-    name = "group_membership.changed"
-
-
-@outgoing
-class GroupMembershipDeleted(BaseObjectDeleted):
-    name = "group_membership.deleted"
+class GroupMembershipDeleted(ObjectDeleted):
+    action: Literal["group_membership.deleted"] = "group_membership.deleted"

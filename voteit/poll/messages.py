@@ -1,54 +1,45 @@
 from __future__ import annotations
 
+from typing import Literal
+from chanx.messages.base import BaseMessage
+
 from pydantic.main import BaseModel
 
-from envelope.core.message import Message
 
-from voteit.messaging.base import BaseObjectAdded
-from voteit.messaging.base import BaseObjectChanged
-from voteit.messaging.base import BaseObjectDeleted
+from voteit.messaging.base import ObjectAddedOrChanged
+from voteit.messaging.base import ObjectDeleted
 from voteit.messaging.decorators import outgoing
 from voteit.poll.schemas import AddedVoteSchema
 
 
 @outgoing
-class PollAdded(BaseObjectAdded):
-    name = "poll.added"
+class PollChanged(ObjectAddedOrChanged):
+    action: Literal["poll.changed"] = "poll.changed"
 
 
 @outgoing
-class PollChanged(BaseObjectChanged):
-    name = "poll.changed"
+class PollDeleted(ObjectDeleted):
+    action: Literal["poll.deleted"] = "poll.deleted"
 
 
 @outgoing
-class PollDeleted(BaseObjectDeleted):
-    name = "poll.deleted"
+class ElectoralRegisterAdded(ObjectAddedOrChanged):
+    action: Literal["er.changed"] = "er.changed"
 
 
 @outgoing
-class ElectoralRegisterAdded(BaseObjectAdded):
-    name = "er.added"
+class ElectoralRegisterDeleted(ObjectDeleted):
+    action: Literal["er.deleted"] = "er.deleted"
 
 
 @outgoing
-class ElectoralRegisterDeleted(BaseObjectDeleted):
-    name = "er.deleted"
+class VoteTransferChanged(ObjectAddedOrChanged):
+    action: Literal["vt.changed"] = "vt.changed"
 
 
 @outgoing
-class VoteTransferAdded(BaseObjectAdded):
-    name = "vt.added"
-
-
-@outgoing
-class VoteTransferChanged(BaseObjectChanged):
-    name = "vt.changed"
-
-
-@outgoing
-class VoteTransferDeleted(BaseObjectDeleted):
-    name = "vt.deleted"
+class VoteTransferDeleted(ObjectDeleted):
+    action: Literal["vt.deleted"] = "vt.deleted"
 
 
 class PollStatusSchema(BaseModel):
@@ -58,14 +49,12 @@ class PollStatusSchema(BaseModel):
 
 
 @outgoing
-class PollStatus(Message):
-    name = "poll.status"
-    schema = PollStatusSchema
-    data: PollStatusSchema
+class PollStatus(BaseMessage):
+    action: Literal["poll.status"] = "poll.status"
+    payload: PollStatusSchema
 
 
 @outgoing
-class GenericVoteResponse(Message):
-    name = "vote.added"
-    schema = AddedVoteSchema
-    data: AddedVoteSchema
+class GenericVoteResponse(BaseMessage):
+    action: Literal["vote.changed"] = "vote.changed"
+    payload: AddedVoteSchema

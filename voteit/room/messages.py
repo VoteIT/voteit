@@ -1,22 +1,17 @@
+from typing import Literal
+from chanx.messages.base import BaseMessage
 from pydantic import BaseModel
-from pydantic import validator
+from pydantic import model_validator
 
-from envelope.core import Message
 
-from voteit.messaging.base import BaseObjectAdded
-from voteit.messaging.base import BaseObjectChanged
-from voteit.messaging.base import BaseObjectDeleted
+from voteit.messaging.base import ObjectAddedOrChanged
+from voteit.messaging.base import ObjectDeleted
 from voteit.messaging.decorators import outgoing
 
 
 @outgoing
-class RoomAdded(BaseObjectAdded):
-    name = "room.added"
-
-
-@outgoing
-class RoomChanged(BaseObjectChanged):
-    name = "room.changed"
+class RoomChanged(ObjectAddedOrChanged):
+    action: Literal["room.changed"] = "room.changed"
 
 
 class RoomHighlightedSchema(BaseModel):
@@ -26,35 +21,34 @@ class RoomHighlightedSchema(BaseModel):
 
 
 @outgoing
-class RoomHighlighted(Message):
-    name = "room.highlighted"
-    schema = RoomHighlightedSchema
-    data: RoomHighlightedSchema
+class RoomHighlighted(BaseMessage):
+    action: Literal["room.highlighted"] = "room.highlighted"
+    payload: RoomHighlightedSchema
 
 
 @outgoing
-class RoomDeleted(BaseObjectDeleted):
-    name = "room.deleted"
+class RoomDeleted(ObjectDeleted):
+    action: Literal["room.deleted"] = "room.deleted"
 
 
 class RoomMarkTextSchema(BaseModel):
     """
     >>> S = RoomMarkTextSchema
-    >>> S(room=1).dict(exclude_unset=True)
+    >>> S(room=1).model_dump(exclude_unset=True)
     {'room': 1}
 
-    >>> S(proposal=1, start=1, end=2, room=1).dict(exclude_unset=True)
+    >>> S(proposal=1, start=1, end=2, room=1).model_dump(exclude_unset=True)
     {'room': 1, 'start': 1, 'end': 2, 'proposal': 1}
 
-    >>> S(proposal=1, room=1).dict(exclude_unset=True)
+    >>> S(proposal=1, room=1).model_dump(exclude_unset=True)
     {'room': 1, 'proposal': 1}
 
-    >>> S(start=1, end=2, room=1).dict(exclude_unset=True)
+    >>> S(start=1, end=2, room=1).model_dump(exclude_unset=True)
     Traceback (most recent call last):
     ...
     pydantic.error_wrappers.ValidationError:
 
-    >>> S(start=1, proposal=1, room=1).dict(exclude_unset=True)
+    >>> S(start=1, proposal=1, room=1).model_dump(exclude_unset=True)
     Traceback (most recent call last):
     ...
     pydantic.error_wrappers.ValidationError:
@@ -65,25 +59,23 @@ class RoomMarkTextSchema(BaseModel):
     end: int | None = None
     proposal: int | None = None
 
-    @validator("end", always=True)
-    def validate_start_end(cls, v: int | None, values: dict):
-        start = values.get("start")
-        if type(v) is not type(start):
+    # One model validator rather than two field validators with always=True:
+    # v2 field validators never run when a field falls back to its default, so
+    # the "start without end" and "start without proposal" cases would stop
+    # raising entirely.
+    @model_validator(mode="after")
+    def validate_marking(self):
+        if type(self.end) is not type(self.start):
             raise ValueError("Both start and end must be a number or None")
-        if isinstance(start, int) and not start < v:
-            raise ValueError("end must be higher than start")
-        return v
-
-    @validator("proposal", always=True)
-    def validate_proposal(cls, v: int | None, values: dict):
-        start = values.get("start")
-        if isinstance(start, int) and not isinstance(v, int):
-            raise ValueError("proposal must be specified if start and end is set")
-        return v
+        if isinstance(self.start, int):
+            if not self.start < self.end:
+                raise ValueError("end must be higher than start")
+            if not isinstance(self.proposal, int):
+                raise ValueError("proposal must be specified if start and end is set")
+        return self
 
 
 @outgoing
-class RoomMarked(Message):
-    name = "room.marked"
-    schema = RoomMarkTextSchema
-    data: RoomMarkTextSchema
+class RoomMarked(BaseMessage):
+    action: Literal["room.marked"] = "room.marked"
+    payload: RoomMarkTextSchema

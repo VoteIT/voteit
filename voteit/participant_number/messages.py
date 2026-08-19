@@ -1,9 +1,12 @@
+from abc import ABC
+from typing import Literal
+
+from chanx.messages.base import BaseMessage
 from pydantic import BaseModel
 
-from envelope.core.message import Message
 
 from voteit.messaging.decorators import outgoing
-from voteit.messaging.base import BaseObjectDeleted
+from voteit.messaging.base import ObjectDeleted
 
 
 class PNSchema(BaseModel):
@@ -13,21 +16,15 @@ class PNSchema(BaseModel):
     pk: int
 
 
-class PNMessage(Message):
-    schema = PNSchema
-    data: PNSchema
-
-
-@outgoing
-class PNAdded(PNMessage):
-    name = "pn.added"
+class PNMessage(BaseMessage, ABC):
+    payload: PNSchema
 
 
 @outgoing
 class PNChanged(PNMessage):
-    name = "pn.changed"
+    action: Literal["pn.changed"] = "pn.changed"
 
 
 @outgoing
-class PNDeleted(BaseObjectDeleted):
-    name = "pn.deleted"
+class PNDeleted(ObjectDeleted):
+    action: Literal["pn.deleted"] = "pn.deleted"

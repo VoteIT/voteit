@@ -1,53 +1,67 @@
 from __future__ import annotations
 
+from abc import ABC
 from datetime import datetime
 
+from chanx.messages.base import BaseMessage
 from django.utils import timezone
-from pydantic import validator
-from pydantic.main import BaseModel
-
-from envelope.core.message import Message
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import model_validator
 
 
 class AddedOrUpdatedSchema(BaseModel):
+    """Payload for object add/change messages.
+
+    Deliberately permissive: publishers hand it whatever their DRF serializer
+    or ``.values()`` query produced, and the frontend upserts on ``pk``.
+    """
+
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
     pk: int
 
-    class Config:
-        extra = "allow"
-        arbitrary_types_allowed = True
+    @model_validator(mode="before")
+    @classmethod
+    def isoformat_datetimes(cls, data):
+        """Render every datetime in the local timezone, declared or extra.
 
-    @validator(
-        "created",
-        "modified",
-        "timestamp",
-        pre=True,
-        check_fields=False,
-    )
-    def convert_dt(cls, v):
+        Under pydantic v1 this was a field validator naming created/modified/
+        timestamp with check_fields=False, so it only covered those three and
+        only when a subclass declared them; extras were left to pydantic's own
+        encoder. v2 serialises extra datetimes as UTC with a Z suffix, which
+        would silently change the wire format for the publishers that pass
+        .values() output rather than serializer output. Normalising every
+        datetime here keeps one format and drops the check_fields footgun.
+
+        >>> from datetime import datetime, timezone as dt_timezone
+        >>> dt = datetime(2020, 1, 1, tzinfo=dt_timezone.utc)
+        >>> AddedOrUpdatedSchema(pk=1, seen=dt).model_dump()["seen"]
+        '2020-01-01T01:00:00+01:00'
         """
-        Note! This validator isn't run unless the field is defined on the model!
-        """
-        if isinstance(v, datetime):
-            tz = timezone.get_current_timezone()
-            v = v.astimezone(tz)
-            return v.isoformat()
-        return v
+        if not isinstance(data, dict):
+            return data
+        tz = timezone.get_current_timezone()
+        return {
+            key: value.astimezone(tz).isoformat()
+            if isinstance(value, datetime)
+            else value
+            for key, value in data.items()
+        }
 
 
 class DeletedSchema(BaseModel):
     pk: int
 
 
-class BaseObjectAdded(Message):
-    schema = AddedOrUpdatedSchema
-    data: AddedOrUpdatedSchema
+class ObjectAddedOrChanged(BaseMessage, ABC):
+    """An object was created or updated. The client upserts on pk.
+
+    There is no separate "added" message -- see the CHANGELOG.
+    """
+
+    payload: AddedOrUpdatedSchema
 
 
-class BaseObjectChanged(Message):
-    schema = AddedOrUpdatedSchema
-    data: AddedOrUpdatedSchema
-
-
-class BaseObjectDeleted(Message):
-    schema = DeletedSchema
-    data: DeletedSchema
+class ObjectDeleted(BaseMessage, ABC):
+    payload: DeletedSchema
