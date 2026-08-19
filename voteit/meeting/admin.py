@@ -82,7 +82,7 @@ class CloneMeetingForm(ImportMeetingForm):
         importer = direct_clone(
             target=target, source=self.instance, dry_run=not commit, **self.cleaned_data
         )
-        self.stats = importer.stats().dict(skip_defaults=True)
+        self.stats = importer.stats().model_dump(exclude_unset=True)
         self.commit = commit
         if commit:
             return target

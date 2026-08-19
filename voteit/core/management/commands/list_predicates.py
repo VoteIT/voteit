@@ -34,7 +34,9 @@ class Command(BaseCommand):
             out = predicate.output()
             print(
                 yaml.dump(
-                    out.dict(skip_defaults=True, exclude_none=True, exclude={"source"})
+                    out.model_dump(
+                        exclude_unset=True, exclude_none=True, exclude={"source"}
+                    )
                 )
             )
             print(out.source)

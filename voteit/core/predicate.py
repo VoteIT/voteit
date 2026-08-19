@@ -67,7 +67,7 @@ class Predicate(RulesPredicate):
     ValueError: musician is already assigned to the predicate is_musician
 
     Calling output will get the contents of the predicate:
-    >>> is_musician.output().dict(skip_defaults=True, exclude_none=True, exclude={"source",})
+    >>> is_musician.output().model_dump(exclude_unset=True, exclude_none=True, exclude={"source"})
     {'name': 'is_musician', 'fullname': 'voteit.core.predicate.is_musician', 'num_args': 1, 'role_name': 'musician'}
     """
 

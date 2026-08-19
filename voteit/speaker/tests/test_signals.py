@@ -145,7 +145,9 @@ class AppStateTests(TestCase):
         )
         app_state = command
         system_payload = [
-            x.payload for x in app_state if x.action == action_of(SpeakerSystemChanged)
+            x.payload.model_dump()
+            for x in app_state
+            if x.action == action_of(SpeakerSystemChanged)
         ]
         self.assertEqual(1, len(system_payload))
         self.assertEqual(
@@ -186,7 +188,9 @@ class AppStateTests(TestCase):
             sum(x.action == action_of(SpeakerListChanged) for x in app_state), 1
         )
         speaker_lists_added = [
-            x.payload for x in app_state if x.action == action_of(SpeakerListChanged)
+            x.payload.model_dump()
+            for x in app_state
+            if x.action == action_of(SpeakerListChanged)
         ]
         self.assertEqual(1, len(speaker_lists_added))
         self.assertEqual(

@@ -152,7 +152,7 @@ def pydantic_to_drf_validation_error(error: PydanticValidationError) -> Validati
     >>> isinstance(new_exc, ValidationError)
     True
     >>> new_exc
-    ValidationError({'num': 'value is not a valid integer'})
+    ValidationError({'num': 'Input should be a valid integer, unable to parse string as an integer'})
 
     Nested model errors are placed under their full field path, so they
     never overwrite sibling fields at a shallower level:
@@ -164,12 +164,12 @@ def pydantic_to_drf_validation_error(error: PydanticValidationError) -> Validati
     ...     count: int
     ...     inner: Inner
     ...
-    >>> Outer.model_rebuild()
+    >>> _ = Outer.model_rebuild()
     >>> try:
     ...     Outer(count='bad', inner={'value': 'also-bad'})
     ... except pydantic.ValidationError as exc:
     ...     new_exc = pydantic_to_drf_validation_error(exc)
-    >>> new_exc.detail == {'count': 'value is not a valid integer', 'inner': {'value': 'value is not a valid integer'}}
+    >>> new_exc.detail == {'count': 'Input should be a valid integer, unable to parse string as an integer', 'inner': {'value': 'Input should be a valid integer, unable to parse string as an integer'}}
     True
 
     List errors preserve per-element positions as a list, padded with empty
@@ -178,12 +178,12 @@ def pydantic_to_drf_validation_error(error: PydanticValidationError) -> Validati
     >>> class OuterList(pydantic.BaseModel):
     ...     inner: list[Inner]
     ...
-    >>> OuterList.model_rebuild()
+    >>> _ = OuterList.model_rebuild()
     >>> try:
     ...     OuterList(inner=[{'value': 1}, {'value': 'also-bad'}, {'value': 'very-bad'}])
     ... except pydantic.ValidationError as exc:
     ...     list_exc = pydantic_to_drf_validation_error(exc)
-    >>> list_exc.detail == {'inner': [{}, {'value': 'value is not a valid integer'}, {'value': 'value is not a valid integer'}]}
+    >>> list_exc.detail == {'inner': [{}, {'value': 'Input should be a valid integer, unable to parse string as an integer'}, {'value': 'Input should be a valid integer, unable to parse string as an integer'}]}
     True
     """
     eoutput = {}

@@ -53,7 +53,9 @@ class SignalAndSubscribeTests(TestCase):
         )
         app_state = command
         tags_payload = [
-            x.payload for x in app_state if x.action == action_of(AllParticipantTags)
+            x.payload.model_dump()
+            for x in app_state
+            if x.action == action_of(AllParticipantTags)
         ][0]
         self.assertEqual(
             {

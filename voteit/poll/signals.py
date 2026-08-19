@@ -112,7 +112,7 @@ def meeting_subscribed(context: Meeting, app_state: AppState, user: AbstractUser
     if context.vote_transfer_policy is not None:
         vt_serializer = VoteTransferSerializer(context.vote_transfers.all(), many=True)
         if vt_serializer.data:
-            app_state.add_batch(PollChanged, vt_serializer.data)
+            app_state.add_batch(VoteTransferChanged, vt_serializer.data)
 
 
 @receiver(channel_subscribed, sender=ModeratorsChannel)
@@ -128,7 +128,7 @@ def moderators_subscribed(
         context={"show_withheld": True},
     )
     if serializer.data:
-        app_state.add_batch(VoteTransferChanged, serializer.data)
+        app_state.add_batch(PollChanged, serializer.data)
 
 
 @receiver(post_save, sender=Poll)
