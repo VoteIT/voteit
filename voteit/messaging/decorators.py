@@ -6,25 +6,23 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from envelope import WS_OUTGOING
-from envelope.utils import get_context_channel_registry
-from envelope.utils import get_global_message_registry
+from voteit.messaging.registry import register_channel
+from voteit.messaging.registry import register_outgoing
 
 if TYPE_CHECKING:
-    from envelope.channels.models import ContextChannel
-    from envelope.core.message import Message
+    from chanx.messages.base import BaseMessage
+
+    from voteit.messaging.channels import ContextChannel
 
 
-def channel(channel: type[ContextChannel]):
-    reg = get_context_channel_registry()
-    reg[channel.name] = channel
-    return channel
+def channel(channel: type[ContextChannel]) -> type[ContextChannel]:
+    return register_channel(channel)
 
 
-def outgoing(message: type[Message]):
-    # setdefault rather than get_message_registry(): django.contrib.admin autodiscovery
-    # imports app messages.py modules before envelope's AppConfig.ready() has run
-    # register_envelopes(), so the namespace may not exist yet.
-    reg = get_global_message_registry().setdefault(WS_OUTGOING, {})
-    reg[message.name] = message
-    return message
+def outgoing(message: type[BaseMessage]) -> type[BaseMessage]:
+    """Register a message the server pushes to clients.
+
+    Also generates its ``<action>.batch`` sibling -- see
+    voteit.messaging.batch.
+    """
+    return register_outgoing(message)

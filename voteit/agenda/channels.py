@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from logging import getLogger
 
-from envelope.channels.models import ContextChannel
+from voteit.messaging.channels import ContextChannel
 
 from voteit.agenda.models import AgendaItem
 from voteit.core import PERM

@@ -11,3 +11,10 @@ class MessagingConfig(AppConfig):
     label = "voteit_messaging"
     verbose_name = "Messaging"
     default_auto_field = "django.db.models.BigAutoField"
+
+    def ready(self):
+        from django.contrib.auth import get_user_model
+
+        from voteit.messaging.channels import UserChannel
+
+        UserChannel.model = get_user_model()

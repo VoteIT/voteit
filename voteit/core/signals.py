@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from os import getenv
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
@@ -9,15 +8,10 @@ from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
-from async_signals import receiver as areceiver
-from envelope.async_signals import consumer_connected
-from envelope.app.online_channel.channel import OnlineChannel
-
 from voteit.core import models_to_register
 
 if TYPE_CHECKING:
     from django.db.models import Model
-    from envelope.consumers.websocket import WebsocketConsumer
 
 
 # The following signals will provide arguments "sender", "instance" and "roles"
@@ -42,25 +36,14 @@ def deferred_register_model(sender: Model, **kw):
     models_to_register.add(sender)
 
 
-@areceiver(consumer_connected)
-async def send_versions(*, consumer: WebsocketConsumer, **kwargs):
-    if consumer.channel_name:
-        from voteit.core.messages.version import VersionMessage
-
-        msg = VersionMessage(
-            backend=getenv("BACKEND_VERSION", ""),
-            frontend=getenv("FRONTEND_VERSION", ""),
-        )
-        await consumer.send_ws_message(msg)
-
-
 def post_init_registrations():
     User = get_user_model()
     from voteit.core.messages.user import InvalidateUserCache
+    from voteit.messaging.channels import OnlineChannel
 
     @receiver(pre_delete, sender=User)
     @receiver(post_save, sender=User)
     def invalidate_user_cache(*, instance: User, created=False, **kwargs):
         if not created:
-            msg = InvalidateUserCache(pk=instance.pk)
+            msg = InvalidateUserCache(payload={"pk": instance.pk})
             OnlineChannel().sync_publish(msg)
