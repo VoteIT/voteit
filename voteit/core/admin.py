@@ -18,6 +18,7 @@ from django.utils.timezone import now
 from auditlog.admin import LogEntryAdmin
 from auditlog.models import LogEntry
 from voteit.core.models import User
+from voteit.messaging.models import Connection
 from voteit.core.user_merger import UserMerger
 from voteit.discussion.models import DiscussionPost
 from voteit.meeting.models import Meeting
@@ -51,6 +52,7 @@ class OnlineFilter(admin.SimpleListFilter):
     ONLINE = "o"
     DISCONNECTED = "d"
     WITHIN_LAST_MONTH = "l"
+    ONLINE_WINDOW = timedelta(minutes=15)
 
     def lookups(self, request, model_admin):
         """
@@ -72,22 +74,24 @@ class OnlineFilter(admin.SimpleListFilter):
         provided in the query string and retrievable via
         `self.value()`.
         """
-        # decide how to filter the queryset.
+        # Connection has no FK to user any more, so these go through a subquery
+        # rather than a reverse relation -- which also drops the .distinct()
+        # that the join previously made necessary.
         if self.value():
             if self.value() == self.ONLINE:
                 return queryset.filter(
-                    connections__online=True,
-                    connections__last_action__gt=now() - timedelta(minutes=15),
-                ).distinct()
+                    pk__in=Connection.objects.online(self.ONLINE_WINDOW).user_ids()
+                )
             elif self.value() == self.DISCONNECTED:
                 return queryset.exclude(
-                    connections__online=True,
-                    connections__last_action__gt=now() - timedelta(minutes=15),
-                ).distinct()
+                    pk__in=Connection.objects.online(self.ONLINE_WINDOW).user_ids()
+                )
             elif self.value() == self.WITHIN_LAST_MONTH:
                 return queryset.filter(
-                    connections__last_action__gt=now() - timedelta(days=30)
-                ).distinct()
+                    pk__in=Connection.objects.active_since(
+                        now() - timedelta(days=30)
+                    ).user_ids()
+                )
 
 
 class LinkedFilter(admin.SimpleListFilter):

@@ -9,8 +9,7 @@ from django.db.models import Subquery
 from django.db.models.functions import Coalesce
 from django.template.response import TemplateResponse
 from django.urls import path
-from django.utils.timezone import now
-from envelope.models import Connection
+from voteit.messaging.models import Connection
 
 from voteit.meeting.models import Meeting
 from voteit.organisation.models import OAuth2Provider
@@ -112,19 +111,17 @@ class OrganisationAdmin(admin.ModelAdmin):
         ] + super().get_urls()
 
     def online_view(self, request):
-        recent_threshold = now() - timedelta(minutes=10)
+        # Connection no longer has an FK to user, so group through User rather
+        # than following user__organisation off the connection itself.
+        online_user_ids = Connection.objects.online(timedelta(minutes=10)).user_ids()
         counts = list(
-            Connection.objects.filter(
-                online=True,
-                last_action__gt=recent_threshold,
-                user__organisation__isnull=False,
-            )
-            .values("user__organisation")
-            .annotate(cnt=models.Count("user_id", distinct=True))
+            User.objects.filter(pk__in=online_user_ids, organisation__isnull=False)
+            .values("organisation")
+            .annotate(cnt=models.Count("pk", distinct=True))
             .order_by("-cnt")
         )
-        org_ids = [row["user__organisation"] for row in counts]
-        count_map = {row["user__organisation"]: row["cnt"] for row in counts}
+        org_ids = [row["organisation"] for row in counts]
+        count_map = {row["organisation"]: row["cnt"] for row in counts}
         orgs_by_id = Organisation.objects.in_bulk(org_ids)
         organisations = []
         for org_id in org_ids:

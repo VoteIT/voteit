@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
-from envelope.models import Connection
+from voteit.messaging.models import Connection
 
 from ...meeting.models import Meeting
 from ..models import HistoryLog
@@ -34,7 +34,9 @@ class PopulateJobTests(TestCase):
 
     def test_unique(self):
         Connection.objects.create(
-            user=self.moderator, online_at=timezone.now(), last_action=timezone.now()
+            user_id=self.moderator.pk,
+            connected_at=timezone.now(),
+            last_action=timezone.now(),
         )
         self._do_job()
         self.assertEqual(HistoryLog.objects.all().count(), 1)
@@ -43,12 +45,14 @@ class PopulateJobTests(TestCase):
             HistoryLog.objects.create(date=timezone.now())
 
     def test_connections(self):
-        Connection.objects.create(user=self.moderator, last_action=timezone.now())
-        Connection.objects.create(user=self.participant, last_action=timezone.now())
+        Connection.objects.create(user_id=self.moderator.pk, last_action=timezone.now())
         Connection.objects.create(
-            channel_name="other", user=self.moderator, last_action=timezone.now()
+            user_id=self.participant.pk, last_action=timezone.now()
         )
-        Connection.objects.create(user=self.outsider, last_action=timezone.now())
+        Connection.objects.create(
+            channel_name="other", user_id=self.moderator.pk, last_action=timezone.now()
+        )
+        Connection.objects.create(user_id=self.outsider.pk, last_action=timezone.now())
         entry = self._do_job()
 
         self.assertEqual(entry.connection_count, 3)
@@ -77,13 +81,13 @@ class PopulateJobTests(TestCase):
         with set_actor(self.moderator):
             sl = self._mk_speaker_list()
             sl.speaker_items.create(
-                seconds=10, started=timezone.now(), user=self.moderator
+                seconds=10, started=timezone.now(), user_id=self.moderator.pk
             )
             sl.speaker_items.create(
-                seconds=20, started=timezone.now(), user=self.participant
+                seconds=20, started=timezone.now(), user_id=self.participant.pk
             )
             sl.speaker_items.create(
-                seconds=30, started=timezone.now(), user=self.outsider
+                seconds=30, started=timezone.now(), user_id=self.outsider.pk
             )  # filtered on user org...
         entry = self._do_job()
         self.assertEqual(entry.spoken_duration.seconds, 30)
@@ -103,8 +107,9 @@ class PopulateJobTests(TestCase):
     def test_online_duration(self):
         for user in (self.moderator, self.participant, self.outsider):
             with set_actor(user):
-                user.connections.create(
-                    online_at=timezone.now() - timedelta(minutes=30),
+                Connection.objects.create(
+                    user_id=user.pk,
+                    connected_at=timezone.now() - timedelta(minutes=30),
                     last_action=timezone.now(),
                 )
         entry = self._do_job()
@@ -196,7 +201,7 @@ class PopulateJobTests(TestCase):
         for user in (self.moderator, self.participant, self.outsider):
             for n in range(2):
                 Connection.objects.create(
-                    user=user, online_at=timezone.now(), channel_name=str(n)
+                    user_id=user.pk, connected_at=timezone.now(), channel_name=str(n)
                 )
         entry = self._do_job()
         self.assertEqual(entry.user_online_count, 2)
@@ -212,8 +217,8 @@ class PopulateJobTests(TestCase):
 
         # 2 days ago someone was online
         Connection.objects.create(
-            user=self.moderator,
-            online_at=timezone.now() - timedelta(days=2),
+            user_id=self.moderator.pk,
+            connected_at=timezone.now() - timedelta(days=2),
         )
         for i, has_log in ((0, True), (1, False), (2, True)):
             if has_log:

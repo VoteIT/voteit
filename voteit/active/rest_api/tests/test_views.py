@@ -11,6 +11,7 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
 from voteit.active.components import ActiveUsersComponent
+from voteit.messaging.models import Connection
 from voteit.active.messages import ActiveUserChanged
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
@@ -115,8 +116,10 @@ class PurgeActionTests(ActiveUserViewSetBase):
     def _setup_active_and_connections(self):
         self.meeting.active_users.create(user=self.moderator)
         active_participant = self.meeting.active_users.create(user=self.participant)
-        self.moderator.connections.create(last_action=now())
-        self.participant.connections.create(last_action=now() - timedelta(days=1))
+        Connection.objects.create(user_id=self.moderator.pk, last_action=now())
+        Connection.objects.create(
+            user_id=self.participant.pk, last_action=now() - timedelta(days=1)
+        )
         return active_participant
 
     def test_purge_removes_inactive_and_returns_count(self):
@@ -143,8 +146,8 @@ class PurgeActionTests(ActiveUserViewSetBase):
     def test_purge_with_hours_zero_uses_5_min_cutoff(self):
         self.meeting.active_users.create(user=self.moderator)
         self.meeting.active_users.create(user=self.participant)
-        self.moderator.connections.create(last_action=now())
-        self.participant.connections.create(last_action=now())
+        Connection.objects.create(user_id=self.moderator.pk, last_action=now())
+        Connection.objects.create(user_id=self.participant.pk, last_action=now())
         url = reverse("active-users-purge", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.moderator)
         response = self.client.post(url, {"hours": 0})

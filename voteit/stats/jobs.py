@@ -9,7 +9,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models.functions import Concat
 from django.utils import timezone
-from envelope.models import Connection
+from voteit.messaging.models import Connection
 
 from voteit.core.decorators import schedule_job
 from voteit.stats.models import HistoryLog
@@ -71,10 +71,13 @@ def populate_history_log(
         **mk_daterange_filter("timestamp", date),
     )
 
-    connection_exists = Connection.objects.filter(
-        user__organisation_id=models.OuterRef("pk"),
-        **mk_daterange_filter("online_at", date),
+    user_connected = Connection.objects.filter(
+        user_id=models.OuterRef("pk"),
+        **mk_daterange_filter("connected_at", date),
     )
+    connection_exists = User.objects.filter(
+        organisation_id=models.OuterRef("pk")
+    ).filter(models.Exists(user_connected))
 
     # HistoryLog already exists
     history_exists = HistoryLog.objects.filter(
@@ -131,7 +134,8 @@ def populate_history_log(
             ),
             # Total connections made (WebSocket)
             connection_count=Connection.objects.filter(
-                user__organisation=org, **mk_daterange_filter("last_action", date)
+                user_id__in=org.users.values("pk"),
+                **mk_daterange_filter("last_action", date),
             ).count(),
             # Count of different kinds of content types
             content_types={
@@ -146,11 +150,12 @@ def populate_history_log(
             ).count(),
             # Estimated online time for all users
             online_duration=Connection.objects.filter(
-                user__organisation=org, **mk_daterange_filter("last_action", date)
+                user_id__in=org.users.values("pk"),
+                **mk_daterange_filter("last_action", date),
             )
             .annotate(
                 duration=models.ExpressionWrapper(
-                    models.F("last_action") - models.F("online_at"),
+                    models.F("last_action") - models.F("connected_at"),
                     output_field=models.DurationField(),
                 )
             )
@@ -178,8 +183,8 @@ def populate_history_log(
             user_online_count=org.users.annotate(
                 conn=models.Exists(
                     Connection.objects.filter(
-                        user=models.OuterRef("id"),
-                        **mk_daterange_filter("online_at", date),
+                        user_id=models.OuterRef("id"),
+                        **mk_daterange_filter("connected_at", date),
                     )
                 )
             )

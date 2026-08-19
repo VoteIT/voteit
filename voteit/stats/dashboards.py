@@ -14,7 +14,7 @@ from django.db.models.fields.json import KeyTransform
 from django.db.models.functions import Cast
 from django.utils import timezone
 from django.utils.functional import cached_property
-from envelope.models import Connection
+from voteit.messaging.models import Connection
 from sql_util.aggregates import SubquerySum
 
 from ..organisation.models import Organisation
@@ -274,8 +274,7 @@ class OnlineUserChart(widgets.BarChart):
     def top_orgs(self):
         return (
             Organisation.objects.filter(
-                users__connections__online=True,
-                users__connections__last_action__gt=timezone.now() - self.action_time,
+                users__pk__in=Connection.objects.online(self.action_time).user_ids()
             )
             .annotate(conns=Count("users", distinct=True))
             .order_by("-conns")
@@ -287,11 +286,9 @@ class OnlineUserChart(widgets.BarChart):
     def series(self):
         return [
             [
-                Connection.objects.filter(
-                    online=True,
-                    last_action__gt=timezone.now() - self.action_time,
-                )
-                .distinct("user")
+                Connection.objects.online(self.action_time)
+                .values("user_id")
+                .distinct()
                 .count(),
                 *(o.conns for o in self.top_orgs),
             ]

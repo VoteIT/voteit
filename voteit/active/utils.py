@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from django.utils.timezone import now
 
-from envelope.models import Connection
+from voteit.messaging.models import Connection
 from voteit.active.components import ActiveUsersComponent
 from voteit.meeting.models import Meeting
 
