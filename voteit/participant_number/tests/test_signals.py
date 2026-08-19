@@ -6,9 +6,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.testing import MessageCatcher
+from voteit.messaging.testing import build_app_state
+
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -41,16 +40,9 @@ class SignalsTests(TestCase):
         self.one.refresh_from_db()
 
     def test_app_state_sent(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user_a.pk},
-            pk=self.meeting.pk,
-            channel_type=MeetingChannel.name,
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "pn.added"}
+        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user_a.pk)
+        app_state = command
+        pks = {x.payload["pk"] for x in app_state if x.action == "pn.changed"}
         self.assertEqual({self.one.pk, self.two.pk}, pks)
 
     @patch.object(MeetingChannel, "sync_publish")
@@ -62,8 +54,8 @@ class SignalsTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, PNChanged)
-        self.assertEqual(pn.pk, msg.data.pk)
-        self.assertEqual(pn.number, msg.data.number)
+        self.assertEqual(pn.pk, msg.payload.pk)
+        self.assertEqual(pn.number, msg.payload.number)
         self.assertEqual(3, pn.number)
 
     @patch.object(MeetingChannel, "sync_publish")
@@ -76,7 +68,7 @@ class SignalsTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, PNChanged)
-        self.assertEqual(self.one.number, msg.data.number)
+        self.assertEqual(self.one.number, msg.payload.number)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_pn_deleted(self, mock_publish):
@@ -88,4 +80,4 @@ class SignalsTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, PNDeleted)
-        self.assertEqual(pn_pk, msg.data.pk)
+        self.assertEqual(pn_pk, msg.payload.pk)

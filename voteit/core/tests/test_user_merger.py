@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.test import TestCase
 from django.test import override_settings
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.core.user_merger import UserMerger
 from voteit.meeting.models import Meeting

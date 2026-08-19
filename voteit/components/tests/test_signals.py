@@ -3,10 +3,9 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.testing import MessageCatcher
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import action_of
+from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.core.testing import FakeCommit
@@ -28,7 +27,7 @@ class MeetingChannelSubscribedTests(TestCase):
         cls.user: User = cls.meeting.participants.create(username="user")
         cls.meeting.add_roles(cls.user, ROLE_MODERATOR)
         cls.flash = cls.meeting.components.create(
-            component_name=FlashMessage.name,
+            component_name=action_of(FlashMessage),
             settings={"msg": "Hello!"},
             enabled=True,
         )
@@ -37,21 +36,12 @@ class MeetingChannelSubscribedTests(TestCase):
         )
 
     def _mk_subscribe(self):
-        return Subscribe(
-            mm={"user_pk": self.user.pk, "consumer_name": "abc"},
-            channel_type="meeting",
-            pk=self.meeting.pk,
-        )
+        return build_app_state("meeting", self.meeting.pk, self.user.pk)
 
     def test_meeting_components_in_app_state(self):
-        msg = self._mk_subscribe()
-        with MessageCatcher(Subscribed) as messages:
-            msg.run_job()
-        self.assertEqual(1, len(messages))
-        response = messages[0]
-        self.assertIsInstance(response, Subscribed)
+        app_state = self._mk_subscribe()
         payloads = [
-            x.p for x in response.data.app_state if x.t == "meeting_component.added"
+            x.payload for x in app_state if x.action == "meeting_component.changed"
         ]
         self.assertEqual(2, len(payloads))
         self.assertEqual(
@@ -59,7 +49,7 @@ class MeetingChannelSubscribedTests(TestCase):
                 "pk": self.flash.pk,
                 "settings": {"msg": "Hello!", "type": "info"},
                 "meeting": self.meeting.pk,
-                "component_name": FlashMessage.name,
+                "component_name": action_of(FlashMessage),
                 "enabled": True,
                 "is_valid": True,
             },
@@ -82,14 +72,9 @@ class MeetingChannelSubscribedTests(TestCase):
         self.prop_print.save()
         self.flash.settings_data = {}
         self.flash.save()
-        msg = self._mk_subscribe()
-        with MessageCatcher(Subscribed) as messages:
-            msg.run_job()
-        self.assertEqual(1, len(messages))
-        response = messages[0]
-        self.assertIsInstance(response, Subscribed)
+        app_state = self._mk_subscribe()
         payloads = [
-            x.p for x in response.data.app_state if x.t == "meeting_component.added"
+            x.payload for x in app_state if x.action == "meeting_component.changed"
         ]
         # Only prop_print here, flash should have invalid settings
         self.assertEqual(1, len(payloads))
@@ -98,14 +83,9 @@ class MeetingChannelSubscribedTests(TestCase):
     def test_meeting_components_disabled(self):
         self.flash.disable()
         self.flash.save()
-        msg = self._mk_subscribe()
-        with MessageCatcher(Subscribed) as messages:
-            msg.run_job()
-        self.assertEqual(1, len(messages))
-        response = messages[0]
-        self.assertIsInstance(response, Subscribed)
+        app_state = self._mk_subscribe()
         payloads = [
-            x.p for x in response.data.app_state if x.t == "meeting_component.added"
+            x.payload for x in app_state if x.action == "meeting_component.changed"
         ]
         # All sent, but one is disabled
         self.assertEqual(2, len(payloads))
@@ -119,7 +99,7 @@ class MeetingChannelSubscribedTests(TestCase):
                     "type": "info",
                 },
                 "meeting": self.meeting.pk,
-                "component_name": FlashMessage.name,
+                "component_name": action_of(FlashMessage),
                 "enabled": False,
                 "is_valid": True,
             },
@@ -143,7 +123,7 @@ class MeetingComponentChangedTests(TestCase):
     def setUpTestData(cls):
         cls.meeting = Meeting.objects.create()
         cls.component: MeetingComponent = cls.meeting.components.create(
-            component_name=FlashMessage.name, settings={"msg": "Hello"}
+            component_name=action_of(FlashMessage), settings={"msg": "Hello"}
         )
 
     @patch.object(MeetingChannel, "sync_publish")
@@ -164,7 +144,7 @@ class MeetingComponentChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingComponentChanged)
-        self.assertEqual(component.pk, msg.data.pk)
+        self.assertEqual(component.pk, msg.payload.pk)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_changed_enabled(self, mock_publish):
@@ -177,7 +157,7 @@ class MeetingComponentChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingComponentChanged)
-        self.assertEqual(self.component.pk, msg.data.pk)
+        self.assertEqual(self.component.pk, msg.payload.pk)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_changed_disabled(self, mock_publish):
@@ -190,7 +170,7 @@ class MeetingComponentChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingComponentChanged)
-        self.assertEqual(self.component.pk, msg.data.pk)
+        self.assertEqual(self.component.pk, msg.payload.pk)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_deleted(self, mock_publish):
@@ -201,7 +181,7 @@ class MeetingComponentChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingComponentDeleted)
-        self.assertEqual(component_pk, msg.data.pk)
+        self.assertEqual(component_pk, msg.payload.pk)
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
@@ -212,7 +192,7 @@ class MeetingComponentsDisabledWhenMeetingClosesTests(TestCase):
         cls.moderator = User.objects.create(username="test_moderator_cmp")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
         cls.msg: MeetingComponent = cls.meeting.components.create(
-            component_name=FlashMessage.name,
+            component_name=action_of(FlashMessage),
             settings={"msg": "Hello"},
             enabled=True,
         )

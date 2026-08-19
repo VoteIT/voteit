@@ -6,10 +6,9 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.channels.models import AppState
-from envelope.testing import MessageCatcher
+from voteit.messaging.testing import build_app_state
+
+from voteit.messaging.state import AppState
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.models import AgendaItem
@@ -48,95 +47,55 @@ class MeetingSubscribedTests(TestCase):
         self.ai.refresh_from_db()
 
     def test_app_state_sent_moderators(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type="moderators",
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        response = messages[0]
-        self.assertIsInstance(response, Subscribed)
+        command = build_app_state("moderators", self.meeting.pk, self.user.pk)
+        app_state = command
         pks = set()
-        for msg in response.data.app_state:
-            if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
-                pks = {x.pk for x in msg.p["payloads"]}
+        for msg in app_state:
+            if msg.action == "proposal.changed.batch":
+                pks = {x.pk for x in msg.payload.items}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_app_state_sent_private_moderators(self):
         self.ai.state = "private"
         self.ai.save()
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type="moderators",
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        response = messages[0]
-        self.assertIsInstance(response, Subscribed)
+        command = build_app_state("moderators", self.meeting.pk, self.user.pk)
+        app_state = command
         pks = set()
-        for msg in response.data.app_state:
-            if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
-                pks = {x.pk for x in msg.p["payloads"]}
+        for msg in app_state:
+            if msg.action == "proposal.changed.batch":
+                pks = {x.pk for x in msg.payload.items}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_date_of_proposals_on_subscribe(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type="moderators",
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        response = messages[0]
-        self.assertIsInstance(response, Subscribed)
-        for msg in response.data.app_state:
-            if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
+        command = build_app_state("moderators", self.meeting.pk, self.user.pk)
+        app_state = command
+        for msg in app_state:
+            if msg.action == "proposal.changed.batch":
                 break
-        first = msg.p["payloads"][0]
+        first = msg.payload.items[0]
         self.assertIsInstance(first.created, str)
         self.assertEqual(
             ProposalDetailSerializer(self.prop1).data["created"], first.created
         )
 
     def test_app_state_sent_participants(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type="participants",
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        response = messages[0]
-        self.assertIsInstance(response, Subscribed)
+        command = build_app_state("participants", self.meeting.pk, self.user.pk)
+        app_state = command
         pks = set()
-        for msg in response.data.app_state:
-            if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
-                pks = {x.pk for x in msg.p["payloads"]}
+        for msg in app_state:
+            if msg.action == "proposal.changed.batch":
+                pks = {x.pk for x in msg.payload.items}
         self.assertEqual({self.prop1.pk, self.prop2.pk}, pks)
 
     def test_app_state_sent_private_participants(self):
         self.ai.state = "private"
         self.ai.save()
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type="participants",
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        response = messages[0]
-        self.assertIsInstance(response, Subscribed)
+        command = build_app_state("participants", self.meeting.pk, self.user.pk)
+        app_state = command
         pks = set()
-        for msg in response.data.app_state:
-            if msg.t == "s.batch" and msg.p["t"] == "proposal.added":
-                pks = {x.pk for x in msg.p["payloads"]}
+        for msg in app_state:
+            if msg.action == "proposal.changed.batch":
+                pks = {x.pk for x in msg.payload.items}
         self.assertEqual(set(), pks)
 
     def test_attach_proposals_query_count(self):
@@ -183,7 +142,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalChanged)
-        self.assertEqual(prop.pk, msg.data.pk)
+        self.assertEqual(prop.pk, msg.payload.pk)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_added_in_private_ai_participant(self, mock_publish):
@@ -203,8 +162,8 @@ class AnyProposalChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalChanged)
-        self.assertEqual(diff_prop.pk, msg.data.pk)
-        self.assertEqual(msg.data.paragraph, diff_prop.paragraph.pk)
+        self.assertEqual(diff_prop.pk, msg.payload.pk)
+        self.assertEqual(msg.payload.paragraph, diff_prop.paragraph.pk)
 
     @patch.object(ModeratorsChannel, "sync_publish")
     def test_added_moderator(self, mock_publish):
@@ -215,7 +174,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalChanged)
-        self.assertEqual(prop.pk, msg.data.pk)
+        self.assertEqual(prop.pk, msg.payload.pk)
         self.ai.state = "private"
         self.ai.save()
         mock_publish.reset_mock()
@@ -234,7 +193,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalChanged)
-        self.assertEqual(self.prop.pk, msg.data.pk)
+        self.assertEqual(self.prop.pk, msg.payload.pk)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_diff_changed_participant(self, mock_publish):
@@ -246,8 +205,8 @@ class AnyProposalChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalChanged)
-        self.assertEqual(self.diff_prop.pk, msg.data.pk)
-        self.assertEqual(self.diff_prop.paragraph.pk, msg.data.paragraph)
+        self.assertEqual(self.diff_prop.pk, msg.payload.pk)
+        self.assertEqual(self.diff_prop.paragraph.pk, msg.payload.paragraph)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed_private_ai_participant(self, mock_publish):
@@ -269,7 +228,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalChanged)
-        self.assertEqual(self.prop.pk, msg.data.pk)
+        self.assertEqual(self.prop.pk, msg.payload.pk)
         self.ai.state = "private"
         self.ai.save()
         mock_publish.reset_mock()
@@ -287,7 +246,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalDeleted)
-        self.assertEqual(prop_pk, msg.data.pk)
+        self.assertEqual(prop_pk, msg.payload.pk)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted_diff_participants(self, mock_publish):
@@ -299,7 +258,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalDeleted)
-        self.assertEqual(diff_prop_pk, msg.data.pk)
+        self.assertEqual(diff_prop_pk, msg.payload.pk)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted_participants_private_ai(self, mock_publish):
@@ -320,7 +279,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalDeleted)
-        self.assertEqual(prop_pk, msg.data.pk)
+        self.assertEqual(prop_pk, msg.payload.pk)
         self.ai.state = "private"
         self.ai.save()
         prop = self.ai.proposals.create()
@@ -330,7 +289,7 @@ class AnyProposalChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalDeleted)
-        self.assertEqual(prop_pk, msg.data.pk)
+        self.assertEqual(prop_pk, msg.payload.pk)
 
 
 @override_settings(CHANNEL_LAYERS=_channel_layers_setting)
@@ -380,13 +339,13 @@ class AgendaItemChannelTests(TestCase):
         )
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
+        msg = messages[0]
         self.assertEqual(
             1, len([x for x in messages if isinstance(x, TextDocumentChanged)])
         )
-        msg = messages[0]
-        self.assertEqual(text_doc.pk, msg.data.pk)
+        self.assertEqual(text_doc.pk, msg.payload.pk)
         self.assertEqual(
-            ["Hello again", "World"], [x["body"] for x in msg.data.paragraphs]
+            ["Hello again", "World"], [x["body"] for x in msg.payload.paragraphs]
         )
 
     @patch.object(AgendaItemChannel, "sync_publish")
@@ -397,11 +356,11 @@ class AgendaItemChannelTests(TestCase):
         self.text_document.delete()
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
+        msg = messages[0]
         self.assertEqual(
             1, len([x for x in messages if isinstance(x, TextDocumentDeleted)])
         )
-        msg = messages[0]
-        self.assertEqual(deleted_pk, msg.data.pk)
+        self.assertEqual(deleted_pk, msg.payload.pk)
 
     @patch.object(AgendaItemChannel, "sync_publish")
     def test_update(self, mock_publish):
@@ -411,25 +370,17 @@ class AgendaItemChannelTests(TestCase):
         self.text_document.save()
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
+        msg = messages[0]
         self.assertEqual(
             1, len([x for x in messages if isinstance(x, TextDocumentChanged)])
         )
-        msg = messages[0]
-        self.assertEqual(self.text_document.pk, msg.data.pk)
-        self.assertEqual("Blaha", msg.data.body)
+        self.assertEqual(self.text_document.pk, msg.payload.pk)
+        self.assertEqual("Blaha", msg.payload.body)
 
     def test_subscribe_fetches_text_doc(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.ai.pk,
-            channel_type="agenda_item",
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        response = messages[0]
-        self.assertIsInstance(response, Subscribed)
+        command = build_app_state("agenda_item", self.ai.pk, self.user.pk)
+        app_state = command
         pks = {
-            x.p["pk"] for x in response.data.app_state if x.t == "text_document.added"
+            x.payload["pk"] for x in app_state if x.action == "text_document.changed"
         }
         self.assertEqual({self.text_document.pk}, pks)

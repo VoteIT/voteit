@@ -378,7 +378,7 @@ class MeetingViewSetTests(APITestCase):
             for c in mock_publish.mock_calls
             if isinstance(c.args[0], MeetingDialectChanged)
         )
-        self.assertEqual(self.meeting.pk, msg.data.pk)
+        self.assertEqual(self.meeting.pk, msg.payload.pk)
 
     def test_install_dialect_already_installed(self):
         Meeting.objects.filter(pk=self.meeting.pk).update(
@@ -434,7 +434,7 @@ class MeetingViewSetTests(APITestCase):
             for c in mock_publish.mock_calls
             if isinstance(c.args[0], MeetingDialectChanged)
         )
-        self.assertEqual(self.meeting.pk, msg.data.pk)
+        self.assertEqual(self.meeting.pk, msg.payload.pk)
 
     def test_remove_dialect_none_installed(self):
         url = reverse("meeting-remove-dialect", kwargs={"pk": self.meeting.pk})
@@ -1502,5 +1502,5 @@ class MeetingStateMachineSchemaTests(APITestCase):
     def test_detail(self):
         response = self.client.get("/api/state-machines/MeetingStateMachine/")
         self.assertEqual(200, response.status_code)
-        self.assertIn("states", response.data)
-        self.assertIn("events", response.data)
+        self.assertIn("states", response.payload)
+        self.assertIn("events", response.payload)

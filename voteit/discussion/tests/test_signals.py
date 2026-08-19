@@ -4,9 +4,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.testing import MessageCatcher
+from voteit.messaging.testing import build_app_state
+
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -30,19 +29,12 @@ class AgendaSubscribedTests(TestCase):
         self.meeting.add_roles(self.user, ROLE_PARTICIPANT)
 
     def test_app_state_sent(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.ai.pk,
-            channel_type="agenda_item",
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
+        command = build_app_state("agenda_item", self.ai.pk, self.user.pk)
+        app_state = command
         batched_payload = [
-            x.p["payloads"]
-            for x in msg.data.app_state
-            if x.t == "s.batch" and x.p.get("t") == "discussion_post.added"
+            x.payload.items
+            for x in app_state
+            if x.action == "s.batch" and x.action == "discussion_post.changed"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]
@@ -66,7 +58,7 @@ class DiscussionPostChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, DiscussionPostChanged)
-        self.assertEqual(disc.pk, msg.data.pk)
+        self.assertEqual(disc.pk, msg.payload.pk)
 
     @patch.object(AgendaItemChannel, "sync_publish")
     def test_changed(self, mock_publish):
@@ -78,7 +70,7 @@ class DiscussionPostChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, DiscussionPostChanged)
-        self.assertEqual(self.disc.pk, msg.data.pk)
+        self.assertEqual(self.disc.pk, msg.payload.pk)
 
     @patch.object(AgendaItemChannel, "sync_publish")
     def test_deleted(self, mock_publish):
@@ -90,4 +82,4 @@ class DiscussionPostChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, DiscussionPostDeleted)
-        self.assertEqual(disc_pk, msg.data.pk)
+        self.assertEqual(disc_pk, msg.payload.pk)

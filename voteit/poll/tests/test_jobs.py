@@ -44,8 +44,8 @@ class PublishPollStatusTests(TestCase):
         mock_publish.assert_called_once()
         msg = mock_publish.call_args.args[0]
         self.assertIsInstance(msg, PollStatus)
-        self.assertEqual(1, msg.data.voted)
-        self.assertEqual(1, msg.data.total)
+        self.assertEqual(1, msg.payload.voted)
+        self.assertEqual(1, msg.payload.total)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_missing_poll_is_noop(self, mock_publish):

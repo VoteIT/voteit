@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
 from django.test import override_settings
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.agenda.models import AgendaItem
 from voteit.meeting.models import Meeting

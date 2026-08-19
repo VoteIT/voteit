@@ -6,7 +6,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.utils.timezone import now
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
@@ -184,9 +184,9 @@ class ActiveActionMessageTests(ActiveUserViewSetBase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.call_args.args[0]
         self.assertIsInstance(msg, ActiveUserChanged)
-        self.assertEqual(msg.data.user, self.participant.pk)
-        self.assertEqual(msg.data.meeting, self.meeting.pk)
-        self.assertTrue(msg.data.active)
+        self.assertEqual(msg.payload.user, self.participant.pk)
+        self.assertEqual(msg.payload.meeting, self.meeting.pk)
+        self.assertTrue(msg.payload.active)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_set_inactive_publishes_active_user_changed(self, mock_publish):
@@ -198,6 +198,6 @@ class ActiveActionMessageTests(ActiveUserViewSetBase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.call_args.args[0]
         self.assertIsInstance(msg, ActiveUserChanged)
-        self.assertEqual(msg.data.user, self.participant.pk)
-        self.assertEqual(msg.data.meeting, self.meeting.pk)
-        self.assertFalse(msg.data.active)
+        self.assertEqual(msg.payload.user, self.participant.pk)
+        self.assertEqual(msg.payload.meeting, self.meeting.pk)
+        self.assertFalse(msg.payload.active)

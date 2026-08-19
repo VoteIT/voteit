@@ -78,22 +78,14 @@ _del_msg_class = {
     GroupRole: GroupRoleDeleted,
     GroupMembership: GroupMembershipDeleted,
 }
-_added_serializer_class = {
+# There is no longer an "added" message distinct from "changed", and the
+# serializers were already the same for both, so one mapping covers each.
+_serializer_class = {
     MeetingGroup: MeetingGroupSerializer,
     GroupRole: GroupRoleSerializer,
     GroupMembership: GroupMembershipSerializer,
 }
-_added_msg_class = {
-    MeetingGroup: MeetingGroupChanged,
-    GroupRole: GroupRoleChanged,
-    GroupMembership: GroupMembershipChanged,
-}
-_changed_serializer_class = {
-    MeetingGroup: MeetingGroupSerializer,
-    GroupRole: GroupRoleSerializer,
-    GroupMembership: GroupMembershipSerializer,
-}
-_changed_msg_class = {
+_msg_class = {
     MeetingGroup: MeetingGroupChanged,
     GroupRole: GroupRoleChanged,
     GroupMembership: GroupMembershipChanged,
@@ -146,7 +138,7 @@ def publish_deleted_to_meeting_ch(instance: MeetingContext, *, sender, **kwargs)
     if instance.meeting and instance.pk is not None:
         meeting_ch = MeetingChannel.from_instance(instance.meeting)
         msg_class = _del_msg_class.get(sender)
-        msg = msg_class(pk=instance.pk)
+        msg = msg_class(payload={"pk": instance.pk})
         meeting_ch.sync_publish(msg, on_commit=True)
 
 
@@ -192,23 +184,12 @@ def meeting_channel_subscribed(
 @receiver(post_save, sender=GroupMembership)
 @receiver(post_save, sender=GroupRole)
 @disable_on_raw_save
-def context_changed_publish_to_meeting(instance, *, sender, created, **kwargs):
+def context_changed_publish_to_meeting(instance, *, sender, **kwargs):
     meeting_ch = MeetingChannel.from_instance(instance.meeting)
-    is_gm = sender is GroupMembership
-    if created:
-        serializer = _added_serializer_class[sender]
-        data = serializer(instance).data
-        if is_gm:
-            data["m"] = instance.meeting.pk
-        added_msg = _added_msg_class[sender]
-        msg = added_msg(**data)
-    else:
-        serializer = _changed_serializer_class[sender]
-        data = serializer(instance).data
-        if is_gm:
-            data["m"] = instance.meeting.pk
-        changed_msg = _changed_msg_class[sender]
-        msg = changed_msg(**data)
+    data = _serializer_class[sender](instance).data
+    if sender is GroupMembership:
+        data["m"] = instance.meeting.pk
+    msg = _msg_class[sender](payload=data)
     meeting_ch.sync_publish(msg, on_commit=True)
 
 

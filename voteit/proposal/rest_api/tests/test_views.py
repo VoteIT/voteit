@@ -257,8 +257,8 @@ class ProposalsAPITests(APITestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ProposalChanged)
-        self.assertEqual(diff_prop.pk, msg.data.pk)
-        self.assertEqual(self.para.pk, msg.data.paragraph)
+        self.assertEqual(diff_prop.pk, msg.payload.pk)
+        self.assertEqual(self.para.pk, msg.payload.paragraph)
 
     def test_patch_author_normal_user(self):
         prop = self.ai.proposals.create(body="hello", author=self.proposer)
@@ -542,5 +542,5 @@ class ProposalStateMachineSchemaTests(APITestCase):
     def test_detail(self):
         response = self.client.get("/api/state-machines/ProposalStateMachine/")
         self.assertEqual(200, response.status_code)
-        self.assertIn("states", response.data)
-        self.assertIn("events", response.data)
+        self.assertIn("states", response.payload)
+        self.assertIn("events", response.payload)

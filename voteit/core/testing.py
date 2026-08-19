@@ -8,7 +8,7 @@ from typing import Generator
 from typing import TYPE_CHECKING
 
 from django.db import transaction
-from envelope.testing import testing_channel_layers_setting  # noqa
+from voteit.messaging.testing import testing_channel_layers_setting  # noqa
 from django.contrib.auth import get_user_model
 from django.db.transaction import get_connection
 

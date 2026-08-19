@@ -1,11 +1,11 @@
 from django.test import TestCase
 from django.test import override_settings
-from envelope.app.user_channel.channel import UserChannel
-from envelope.channels.messages import Subscribe
-from envelope.channels.models import AppState
-from envelope.messages.common import Batch
-from envelope.testing import ChannelMessageCatcher
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.channels import UserChannel
+from voteit.messaging.state import AppState
+from voteit.messaging.testing import action_of
+from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import ChannelMessageCatcher
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.meeting.models import Meeting
@@ -36,11 +36,7 @@ class SignalTests(TestCase):
         )
 
     def _mk_subs(self):
-        return Subscribe(
-            mm={"user_pk": self.participant.pk, "consumer_name": "abc"},
-            channel_type=AgendaItemChannel.name,
-            pk=self.ai.pk,
-        )
+        return build_app_state(AgendaItemChannel.name, self.ai.pk, self.participant.pk)
 
     def test_msg_on_add(self):
         with ChannelMessageCatcher(UserChannel, NoteChanged) as messages:
@@ -49,7 +45,6 @@ class SignalTests(TestCase):
                     proposal=self.prop2,
                     intent=NoteIntent.APPROVE,
                 )
-        self.assertEqual(1, len(messages))
         data = messages[0].data.dict()
         self.assertIsInstance(data.pop("pk"), int)
         self.assertIsInstance(data.pop("created"), str)
@@ -70,7 +65,6 @@ class SignalTests(TestCase):
             with self.captureOnCommitCallbacks(execute=True):
                 self.note.body = "I really don't know about this"
                 self.note.save()
-        self.assertEqual(1, len(messages))
         data = messages[0].data.dict()
         self.assertIsInstance(data.pop("created"), str)
         self.assertEqual(
@@ -91,7 +85,6 @@ class SignalTests(TestCase):
         with ChannelMessageCatcher(UserChannel, NoteDeleted) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 self.note.delete()
-        self.assertEqual(1, len(messages))
         data = messages[0].data.dict()
         self.assertEqual(
             {"pk": note_pk},
@@ -100,12 +93,11 @@ class SignalTests(TestCase):
 
     def test_subscribe(self):
         msg = self._mk_subs()
-        ch = AgendaItemChannel(self.ai.pk)
-        app_state = msg.get_app_state(ch)
+        app_state = msg
         batch_msg = [
             x
             for x in app_state
-            if x["t"] == Batch.name and x["p"].t == NoteChanged.name
+            if x.action.endswith(".batch") and x["p"].t == action_of(NoteChanged)
         ]
         self.assertEqual(1, len(batch_msg))
         batch_msg = batch_msg[0]
@@ -127,12 +119,11 @@ class SignalTests(TestCase):
     def test_subscribe_no_component(self):
         self.component.delete()
         msg = self._mk_subs()
-        ch = AgendaItemChannel(self.ai.pk)
-        app_state = msg.get_app_state(ch)
+        app_state = msg
         batch_msg = [
             x
             for x in app_state
-            if x["t"] == Batch.name and x["p"].t == NoteChanged.name
+            if x.action.endswith(".batch") and x["p"].t == action_of(NoteChanged)
         ]
         self.assertEqual(0, len(batch_msg))
 

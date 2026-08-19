@@ -3,8 +3,9 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.channels.messages import Subscribe
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import action_of
+from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.active.components import ActiveUsersComponent
 from voteit.active.messages import ActiveUserChanged
@@ -31,10 +32,8 @@ class SignalsTests(TestCase):
         cls.active = cls.meeting.active_users.create(user=cls.active_user)
 
     def _mk_msg(self):
-        return Subscribe(
-            mm={"user_pk": self.participant.pk, "consumer_name": "abc"},
-            channel_type=MeetingChannel.name,
-            pk=self.meeting.pk,
+        return build_app_state(
+            MeetingChannel.name, self.meeting.pk, self.participant.pk
         )
 
     @patch.object(MeetingChannel, "sync_publish")
@@ -43,23 +42,22 @@ class SignalsTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ActiveUserChanged)
-        self.assertEqual(msg.data.user, self.participant.pk)
-        self.assertEqual(msg.data.meeting, self.meeting.pk)
-        self.assertTrue(msg.data.active)
+        self.assertEqual(msg.payload.user, self.participant.pk)
+        self.assertEqual(msg.payload.meeting, self.meeting.pk)
+        self.assertTrue(msg.payload.active)
         mock_publish.reset_mock()
         obj.delete()
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ActiveUserChanged)
-        self.assertEqual(msg.data.user, self.participant.pk)
-        self.assertEqual(msg.data.meeting, self.meeting.pk)
-        self.assertFalse(msg.data.active)
+        self.assertEqual(msg.payload.user, self.participant.pk)
+        self.assertEqual(msg.payload.meeting, self.meeting.pk)
+        self.assertFalse(msg.payload.active)
 
     def test_meeting_channel_subscribed(self):
         msg = self._mk_msg()
-        ch = MeetingChannel.from_instance(self.meeting)
-        app_state = msg.get_app_state(ch)
-        active_msgs = [x for x in app_state if x["t"] == ActiveUsers.name]
+        app_state = msg
+        active_msgs = [x for x in app_state if x.action == action_of(ActiveUsers)]
         self.assertEqual(1, len(active_msgs))
         msg_dict = active_msgs[0]
         self.assertEqual([self.active.user_id], msg_dict["p"].users)
@@ -67,9 +65,10 @@ class SignalsTests(TestCase):
     def test_meeting_channel_subscribed_not_sent_when_disabled(self):
         self.component.delete()
         msg = self._mk_msg()
-        ch = MeetingChannel.from_instance(self.meeting)
-        app_state = msg.get_app_state(ch)
-        self.assertEqual([], [x for x in app_state if x["t"] == ActiveUsers.name])
+        app_state = msg
+        self.assertEqual(
+            [], [x for x in app_state if x.action == action_of(ActiveUsers)]
+        )
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_enable_disable_component(self, mock_publish):
@@ -87,8 +86,8 @@ class SignalsTests(TestCase):
         self.assertEqual(1, len(messages))  # Created
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ActiveUsers)
-        self.assertEqual(msg.data.users, [self.active_user.pk])
-        self.assertEqual(msg.data.meeting, self.meeting.pk)
+        self.assertEqual(msg.payload.users, [self.active_user.pk])
+        self.assertEqual(msg.payload.meeting, self.meeting.pk)
 
     def test_removing_user_from_meeting_removes_active(self):
         self.meeting.remove_roles(self.active_user, ROLE_PARTICIPANT)

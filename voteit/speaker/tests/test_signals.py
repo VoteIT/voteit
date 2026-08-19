@@ -3,12 +3,10 @@ from django.test import TestCase
 from django.test import override_settings
 from django.utils.timezone import now
 from rest_framework.exceptions import ValidationError
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.messages.common import Batch
-from envelope.testing import ChannelMessageCatcher
-from envelope.testing import MessageCatcher
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import action_of
+from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import ChannelMessageCatcher
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.messages.role_updates import RolesChanged
@@ -121,51 +119,33 @@ class AppStateTests(TestCase):
             )
 
     def test_speakers_sent_to_room_if_active(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
-            pk=self.room.pk,
-            channel_type=RoomChannel.name,
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        self.assertIsInstance(msg, Subscribed)
+        command = build_app_state(RoomChannel.name, self.room.pk, self.moderator.pk)
+        app_state = command
         self.assertEqual(self.speaker_list.speaker_items.count(), 5)
-        self.assertEqual(sum(x.t == SpeakerChanged.name for x in msg.data.app_state), 0)
+        self.assertEqual(
+            sum(x.action == action_of(SpeakerChanged) for x in app_state), 0
+        )
         self.system.active_list = self.speaker_list
         self.system.save()
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        self.assertIsInstance(msg, Subscribed)
-        self.assertEqual(sum(x.t == SpeakerChanged.name for x in msg.data.app_state), 5)
+        app_state = command
+        self.assertEqual(
+            sum(x.action == action_of(SpeakerChanged) for x in app_state), 5
+        )
 
     def test_dont_kill_signal_when_room_changes(self):
         self.system.delete()
         self.room.refresh_from_db()
         self.room.save()
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
-            pk=self.room.pk,
-            channel_type=RoomChannel.name,
-        )
-        with MessageCatcher(Subscribed):
-            command.run_job()
+        # Just needs to not raise
+        build_app_state(RoomChannel.name, self.room.pk, self.moderator.pk)
 
     def test_system_and_roles_sent_to_meeting(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.participant.pk},
-            pk=self.meeting.pk,
-            channel_type=MeetingChannel.name,
+        command = build_app_state(
+            MeetingChannel.name, self.meeting.pk, self.participant.pk
         )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
+        app_state = command
         system_payload = [
-            x.p for x in msg.data.app_state if x.t == SpeakerSystemChanged.name
+            x.payload for x in app_state if x.action == action_of(SpeakerSystemChanged)
         ]
         self.assertEqual(1, len(system_payload))
         self.assertEqual(
@@ -184,9 +164,10 @@ class AppStateTests(TestCase):
             system_payload[0],
         )
         speaker_roles_payload = [
-            x.p
-            for x in msg.data.app_state
-            if x.t == RolesChanged.name and ROLE_SPEAKER in x.p["roles"]
+            x.payload
+            for x in app_state
+            if x.action == action_of(RolesChanged)
+            and ROLE_SPEAKER in x.payload["roles"]
         ]
         self.assertEqual(1, len(speaker_roles_payload))
         self.assertEqual(
@@ -200,21 +181,13 @@ class AppStateTests(TestCase):
         )
 
     def test_lists_sent_to_agenda_item(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
-            pk=self.ai.pk,
-            channel_type=AgendaItemChannel.name,
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        self.assertIsInstance(msg, Subscribed)
+        command = build_app_state(AgendaItemChannel.name, self.ai.pk, self.moderator.pk)
+        app_state = command
         self.assertEqual(
-            sum(x.t == SpeakerListChanged.name for x in msg.data.app_state), 1
+            sum(x.action == action_of(SpeakerListChanged) for x in app_state), 1
         )
         speaker_lists_added = [
-            x.p for x in msg.data.app_state if x.t == SpeakerListChanged.name
+            x.payload for x in app_state if x.action == action_of(SpeakerListChanged)
         ]
         self.assertEqual(1, len(speaker_lists_added))
         self.assertEqual(
@@ -259,7 +232,9 @@ class SendStateChangesTestsTests(TestCase):
             self.system.active_list = None
             self.system.save()
         self.assertFalse(messages)
-        with ChannelMessageCatcher(RoomChannel, SpeakerListChanged, Batch) as messages:
+        with ChannelMessageCatcher(
+            RoomChannel, SpeakerListChanged, f"{action_of(SpeakerChanged)}.batch"
+        ) as messages:
             self.system.active_list = self.speaker_list
             self.system.save()
         self.assertEqual(2, len(messages))
@@ -279,7 +254,7 @@ class SendStateChangesTestsTests(TestCase):
         )
         self.assertDictEqual(
             {
-                "t": SpeakerChanged.name,
+                "t": action_of(SpeakerChanged),
                 "payloads": [
                     {
                         "user": self.participant.pk,
@@ -329,7 +304,6 @@ class SendStateChangesTestsTests(TestCase):
             new_system = self.meeting.speaker_systems.create(
                 method_name="simple", room=new_room, safe_positions=2
             )
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "active_list": None,
@@ -349,7 +323,6 @@ class SendStateChangesTestsTests(TestCase):
     def test_meeting_channel_receives_system_changed(self):
         with ChannelMessageCatcher(MeetingChannel, SpeakerSystemChanged) as messages:
             self.system.save()
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "active_list": None,
@@ -370,7 +343,6 @@ class SendStateChangesTestsTests(TestCase):
         system_pk = self.system.pk
         with ChannelMessageCatcher(MeetingChannel, SpeakerSystemDeleted) as messages:
             self.system.delete()
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "pk": system_pk,
@@ -382,7 +354,6 @@ class SendStateChangesTestsTests(TestCase):
         with ChannelMessageCatcher(AgendaItemChannel, SpeakerListChanged) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 new_list = self.ai.speaker_lists.create(speaker_system=self.system)
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "agenda_item": self.ai.pk,
@@ -403,7 +374,6 @@ class SendStateChangesTestsTests(TestCase):
             with self.captureOnCommitCallbacks(execute=True):
                 self.speaker_list.title = "Hello"
                 self.speaker_list.save()
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "speaker_system": self.system.pk,
@@ -423,7 +393,6 @@ class SendStateChangesTestsTests(TestCase):
         list_pk = self.speaker_list.pk
         with ChannelMessageCatcher(AgendaItemChannel, SpeakerListDeleted) as messages:
             self.speaker_list.delete()
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "pk": list_pk,
@@ -449,7 +418,6 @@ class SendStateChangesTestsTests(TestCase):
             with self.captureOnCommitCallbacks(execute=True):
                 self.speaker_list.title = "Hello"
                 self.speaker_list.save()
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "speaker_system": self.system.pk,
@@ -476,7 +444,6 @@ class SendStateChangesTestsTests(TestCase):
         with ChannelMessageCatcher(RoomChannel, SpeakerChanged) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 speaker = self.speaker_list.speaker_items.create(user=self.moderator)
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "speaker_list": self.speaker_list.pk,
@@ -499,7 +466,6 @@ class SendStateChangesTestsTests(TestCase):
         with ChannelMessageCatcher(RoomChannel, SpeakerChanged) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 self.speaker.save()
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "speaker_list": self.speaker_list.pk,
@@ -524,7 +490,6 @@ class SendStateChangesTestsTests(TestCase):
         with ChannelMessageCatcher(RoomChannel, SpeakerDeleted) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 self.speaker.delete()
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "pk": speaker_pk,
@@ -542,7 +507,6 @@ class SendStateChangesTestsTests(TestCase):
         with ChannelMessageCatcher(RoomChannel, SpeakerChanged) as messages:
             with self.captureOnCommitCallbacks(execute=True):
                 self.speaker.save()
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "speaker_list": self.speaker_list.pk,

@@ -3,6 +3,8 @@ from django.test import TestCase
 from django.test import override_settings
 from pydantic import ValidationError
 
+from voteit.messaging.testing import action_of
+
 from voteit.components.app.components.dialects import DialectsFilter
 from voteit.components.app.components.irv import RepeatedIRV
 from voteit.components.app.components.message import FlashMessage
@@ -44,7 +46,7 @@ dialect_with_component.update(
     {
         "block_components": [RepeatedIRV.name],
         "configure_components": [
-            {"name": FlashMessage.name, "settings": {"msg": "Hello!"}}
+            {"name": action_of(FlashMessage), "settings": {"msg": "Hello!"}}
         ],
     }
 )
@@ -54,11 +56,11 @@ dialect_with_tags_component = {
     **dialect_named_test,
     "configure_components": [
         {
-            "name": GenderTags.name,
+            "name": action_of(GenderTags),
             "settings": {"tags": ["f", "m", "nb"]},
         },
         {
-            "name": PronounTags.name,
+            "name": action_of(PronounTags),
             "settings": {"tags": ["he", "she", "ze"], "many": True},
         },
     ],
@@ -93,7 +95,7 @@ dialect_with_gender_speaker_list = {
     **dialect_named_test,
     "configure_components": [
         {
-            "name": GenderTags.name,
+            "name": action_of(GenderTags),
             "settings": {"tags": ["f", "m", "nb"]},
         }
     ],
@@ -222,7 +224,7 @@ class DialectHandlerTests(TestCase):
         handler = self._cut.load_from_dict(dialect_with_component)
         handler.install(self.meeting)
         component = self.meeting.components.filter(
-            component_name=FlashMessage.name
+            component_name=action_of(FlashMessage)
         ).first()
         self.assertEqual({"msg": "Hello!"}, component.settings_data)
         self.assertTrue(component.enabled)
@@ -233,12 +235,12 @@ class DialectHandlerTests(TestCase):
         handler = self._cut.load_from_dict(dialect_with_tags_component)
         handler.install(self.meeting)
         gender_component = self.meeting.components.filter(
-            component_name=GenderTags.name
+            component_name=action_of(GenderTags)
         ).first()
         self.assertEqual({"tags": ["f", "m", "nb"]}, gender_component.settings_data)
         self.assertTrue(gender_component.enabled)
         pronoun_component = self.meeting.components.filter(
-            component_name=PronounTags.name
+            component_name=action_of(PronounTags)
         ).first()
         self.assertEqual(
             {"tags": ["he", "she", "ze"], "many": True}, pronoun_component.settings_data

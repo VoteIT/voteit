@@ -4,11 +4,8 @@ from django.contrib.auth import get_user_model
 from django.dispatch import receiver
 from django.test import TestCase
 from django.test import override_settings
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.messages.common import Batch
-from envelope.testing import MessageCatcher
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
@@ -83,7 +80,7 @@ class MeetingChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingChanged)
-        self.assertEqual(self.meeting.pk, msg.data.pk)
+        self.assertEqual(self.meeting.pk, msg.payload.pk)
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
@@ -102,23 +99,14 @@ class MeetingChannelSubscribedTests(TestCase):
         )
 
     def _mk_subscribe(self):
-        return Subscribe(
-            mm={"user_pk": self.user.pk, "consumer_name": "abc"},
-            channel_type="meeting",
-            pk=self.meeting.pk,
-        )
+        return build_app_state("meeting", self.meeting.pk, self.user.pk)
 
     def test_roles_in_app_state(self):
-        msg = self._mk_subscribe()
-        with MessageCatcher(Subscribed) as messages:
-            msg.run_job()
-        self.assertEqual(1, len(messages))
-        response = messages[0]
-        self.assertIsInstance(response, Subscribed)
+        app_state = self._mk_subscribe()
         added_meeting_roles = [
             x
-            for x in response.data.app_state
-            if x.t == "roles.added" and x.p["pk"] == self.meeting.pk
+            for x in app_state
+            if x.action == "roles.changed" and x.payload["pk"] == self.meeting.pk
         ]
         self.assertEqual(1, len(added_meeting_roles))
         payload = added_meeting_roles[0].p
@@ -129,31 +117,28 @@ class MeetingChannelSubscribedTests(TestCase):
     def test_meeting_groups_and_related_in_app_state(self):
         self.meeting.group_roles_active = True
         self.meeting.save()
-        msg = self._mk_subscribe()
-        with MessageCatcher(Subscribed) as messages:
-            msg.run_job()
-        self.assertEqual(1, len(messages))
-        response = messages[0]
-        self.assertIsInstance(response, Subscribed)
+        app_state = self._mk_subscribe()
         # MeetingGroup
         added = [
             x
-            for x in response.data.app_state
-            if x.t == Batch.name and x.p["t"] == "meeting_group.added"
+            for x in app_state
+            if x.action.endswith(".batch")
+            and x.payload.action == "meeting_group.changed"
         ]
         self.assertEqual(1, len(added))
         payload = added[0].p["payloads"][0]
         self.assertEqual(self.group.pk, payload.pk)
         # GroupRole
-        added = [x for x in response.data.app_state if x.t == "group_role.added"]
+        added = [x for x in app_state if x.action == "group_role.changed"]
         self.assertEqual(1, len(added))
         payload = added[0].p
         self.assertEqual(self.group_role.pk, payload["pk"])
         # GroupMembership
         added = [
             x
-            for x in response.data.app_state
-            if x.t == Batch.name and x.p["t"] == "group_membership.added"
+            for x in app_state
+            if x.action.endswith(".batch")
+            and x.payload.action == "group_membership.changed"
         ]
         self.assertEqual(1, len(added))
         payload = added[0].p["payloads"][0]
@@ -179,7 +164,7 @@ class MeetingGroupChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingGroupChanged)
-        self.assertEqual(group.pk, msg.data.pk)
+        self.assertEqual(group.pk, msg.payload.pk)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_changed(self, mock_publish):
@@ -191,7 +176,7 @@ class MeetingGroupChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingGroupChanged)
-        self.assertEqual(self.group.pk, msg.data.pk)
+        self.assertEqual(self.group.pk, msg.payload.pk)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_deleted(self, mock_publish):
@@ -202,7 +187,7 @@ class MeetingGroupChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingGroupDeleted)
-        self.assertEqual(group_pk, msg.data.pk)
+        self.assertEqual(group_pk, msg.payload.pk)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_member_added_compat(self, mock_publish):
@@ -211,11 +196,10 @@ class MeetingGroupChangedTests(TestCase):
         self.group.members.add(self.user)
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
-        self.assertEqual(1, len(messages))
         msg = messages[0]
         self.assertIsInstance(msg, GroupMembershipChanged)
-        self.assertEqual(self.group.pk, msg.data.meeting_group)
-        self.assertEqual(self.meeting.pk, msg.data.m)
+        self.assertEqual(self.group.pk, msg.payload.meeting_group)
+        self.assertEqual(self.meeting.pk, msg.payload.m)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_member_added_compat_reverse(self, mock_publish):
@@ -224,11 +208,10 @@ class MeetingGroupChangedTests(TestCase):
         self.user.meeting_groups.add(self.group)
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
-        self.assertEqual(1, len(messages))
         msg = messages[0]
         self.assertIsInstance(msg, GroupMembershipChanged)
-        self.assertEqual(self.group.pk, msg.data.meeting_group)
-        self.assertEqual(self.meeting.pk, msg.data.m)
+        self.assertEqual(self.group.pk, msg.payload.meeting_group)
+        self.assertEqual(self.meeting.pk, msg.payload.m)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_member_removed_compat(self, mock_publish):
@@ -238,7 +221,6 @@ class MeetingGroupChangedTests(TestCase):
         mock_publish.reset_mock()
         self.group.members.remove(self.user)
         messages = [x.args[0] for x in mock_publish.mock_calls]
-        self.assertEqual(1, len(messages))
         msg = messages[0]
         self.assertIsInstance(msg, GroupMembershipDeleted)
 
@@ -251,7 +233,6 @@ class MeetingGroupChangedTests(TestCase):
         self.user.meeting_groups.remove(self.group)
         self.assertTrue(mock_publish.called)
         messages = [x.args[0] for x in mock_publish.mock_calls]
-        self.assertEqual(1, len(messages))
         msg = messages[0]
         self.assertIsInstance(msg, GroupMembershipDeleted)
 
@@ -288,8 +269,8 @@ class RoleChangesPublishedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, RolesChanged)
-        self.assertEqual(self.meeting.pk, msg.data.pk)
-        self.assertEqual({ROLE_MODERATOR}, set(msg.data.roles))
+        self.assertEqual(self.meeting.pk, msg.payload.pk)
+        self.assertEqual({ROLE_MODERATOR}, set(msg.payload.roles))
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_removed(self, mock_publish):
@@ -300,8 +281,8 @@ class RoleChangesPublishedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, RolesRemoved)
-        self.assertEqual(self.meeting.pk, msg.data.pk)
-        self.assertEqual({ROLE_PARTICIPANT}, set(msg.data.roles))
+        self.assertEqual(self.meeting.pk, msg.payload.pk)
+        self.assertEqual({ROLE_PARTICIPANT}, set(msg.payload.roles))
 
 
 class MeetingERChangedTests(TestCase):

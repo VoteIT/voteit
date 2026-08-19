@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import testing_channel_layers_setting
 from social_django.models import UserSocialAuth
 
 from voteit.organisation.jobs import cleanup_extra_data_for_older_users

@@ -6,12 +6,12 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.messages.common import Batch
-from envelope.testing import MessageCatcher
-from envelope.testing import testing_channel_layers_setting
-from envelope.utils import get_or_create_txn_sender
+from voteit.agenda.messages import AgendaChanged
+
+from voteit.messaging.testing import MessageCatcher
+from voteit.messaging.testing import action_of
+from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.messages import AgendaBodyChanged
@@ -41,50 +41,34 @@ class SubscribedTests(TestCase):
         cls.ai_private.mark_read(cls.user)
 
     def test_app_state_sent_participants(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type=ParticipantsChannel.name,
+        command = build_app_state(
+            ParticipantsChannel.name, self.meeting.pk, self.user.pk
         )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
+        app_state = command
         pks = set()
-        for msg in msg.data.app_state:
-            if msg.t == "s.batch" and msg.p["t"] == "agenda_item.added":
-                pks = {x.pk for x in msg.p["payloads"]}
+        for msg in app_state:
+            if msg.action == "agenda_item.changed.batch":
+                pks = {x.pk for x in msg.payload.items}
         self.assertEqual({self.ai.pk}, pks)
 
     def test_app_state_sent_moderators(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type=ModeratorsChannel.name,
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
+        command = build_app_state(ModeratorsChannel.name, self.meeting.pk, self.user.pk)
+        app_state = command
         pks = set()
-        for msg in msg.data.app_state:
-            if msg.t == "s.batch" and msg.p["t"] == "agenda_item.added":
-                pks = {x.pk for x in msg.p["payloads"]}
+        for msg in app_state:
+            if msg.action == "agenda_item.changed.batch":
+                pks = {x.pk for x in msg.payload.items}
         self.assertEqual({self.ai.pk, self.ai_private.pk}, pks)
 
     def test_app_state_last_read_sent(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type=MeetingChannel.name,
-        )
+        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
         ch = MeetingChannel(self.meeting.pk)
         self.assertTrue(ch.allow_subscribe(self.user))
-        app_state = command.get_app_state(ch)
+        app_state = command
         batch_msgs = [
             x
             for x in app_state
-            if x["t"] == Batch.name and x["p"].t == LastReadChanged.name
+            if x.action.endswith(".batch") and x["p"].t == action_of(LastReadChanged)
         ]
         self.assertEqual(1, len(batch_msgs))
         batch = batch_msgs[0]
@@ -93,18 +77,15 @@ class SubscribedTests(TestCase):
         )
 
     def test_app_state_sends_body(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.ai.pk,
-            channel_type=AgendaItemChannel.name,
-        )
+        command = build_app_state(AgendaItemChannel.name, self.ai.pk, self.user.pk)
         ch = AgendaItemChannel(self.ai.pk)
         self.assertTrue(ch.allow_subscribe(self.user))
-        app_state = command.get_app_state(ch)
-        messages = [x for x in app_state if x["t"] == AgendaBodyChanged.name]
-        self.assertEqual(1, len(messages))
+        app_state = command
+        messages = [x for x in app_state if x.action == action_of(AgendaBodyChanged)]
         msg = messages[0]
-        self.assertEqual({"pk": self.ai.pk, "body": "Hello world"}, msg["p"].dict())
+        self.assertEqual(
+            {"pk": self.ai.pk, "body": "Hello world"}, msg.payload.model_dump()
+        )
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
@@ -134,7 +115,7 @@ class AgendaChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, AgendaChanged)
-        self.assertEqual(ai.pk, msg.data.pk)
+        self.assertEqual(ai.pk, msg.payload.pk)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed_participants(self, mock_publish):
@@ -150,7 +131,7 @@ class AgendaChangedTests(TestCase):
         # But now it's published
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, AgendaChanged)
-        self.assertEqual(self.ai.pk, msg.data.pk)
+        self.assertEqual(self.ai.pk, msg.payload.pk)
 
     def test_changed_causes_batch_messages(self):
         ais = []
@@ -158,21 +139,20 @@ class AgendaChangedTests(TestCase):
             for i in range(5):
                 ais.append(self.meeting.agenda_items.create(title=str(i)))
 
-        # And the actual batch test
-        with self.captureOnCommitCallbacks(execute=True):
-            for ai in ais:
-                ai.title += " updated"
-                ai.save()
-            txn = get_or_create_txn_sender()
-            txn.batch_messages()
-            group_keys = [x.group_key for x in txn.data]
-        counter = Counter()
-        for x in group_keys:
-            counter[x] += 1
-        self.assertEqual(
-            1,
-            counter[f"s.batchmoderators_{self.meeting.pk}ws_outgoing1"],
+        # Five changes to the same channel in one transaction collapse into a
+        # single agenda_item.changed.batch on commit.
+        with MessageCatcher() as messages:
+            with self.captureOnCommitCallbacks(execute=True):
+                for ai in ais:
+                    ai.title += " updated"
+                    ai.save()
+        counter = Counter(m.action for m in messages)
+        self.assertEqual(1, counter[f"{action_of(AgendaChanged)}.batch"])
+        self.assertEqual(0, counter[action_of(AgendaChanged)])
+        batch = next(
+            m for m in messages if m.action == f"{action_of(AgendaChanged)}.batch"
         )
+        self.assertEqual(5, len(batch.payload.items))
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_deleted_moderators(self, mock_publish):
@@ -186,11 +166,11 @@ class AgendaChangedTests(TestCase):
         # Agenda
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, AgendaDeleted)
-        self.assertEqual(ai_pk, msg.data.pk)
+        self.assertEqual(ai_pk, msg.payload.pk)
         # Body
         msg = mock_publish.mock_calls[1].args[0]
         self.assertIsInstance(msg, AgendaBodyDeleted)
-        self.assertEqual(ai_pk, msg.data.pk)
+        self.assertEqual(ai_pk, msg.payload.pk)
 
 
 class ArchiveAgendaTests(TestCase):

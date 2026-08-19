@@ -107,7 +107,7 @@ def notify_added_or_changed_speaker_system(
         else:
             msg_class = SpeakerSystemChanged
         data = SpeakerListSystemSerializer(instance).data
-        msg = msg_class(**data)
+        msg = msg_class(payload=data)
         meeting_ch.sync_publish(msg)
 
 
@@ -163,7 +163,7 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
     else:
         msg_class = SpeakerListChanged
     data = SpeakerListSerializer(instance).data
-    msg = msg_class(**data)
+    msg = msg_class(payload=data)
     if instance.agenda_item_id:
         ai_channel = AgendaItemChannel(instance.agenda_item_id)
         ai_channel.sync_publish(msg)

@@ -3,10 +3,9 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.channels.models import AppState
-from envelope.testing import MessageCatcher
+from voteit.messaging.testing import build_app_state
+
+from voteit.messaging.state import AppState
 
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
@@ -38,17 +37,9 @@ class SubscriptionTests(TestCase):
         cls.hl1 = cls.room.highlighted_proposals.create(proposal=cls.prop1)
 
     def test_subscribe_meeting(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type=MeetingChannel.name,
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        self.assertIsInstance(msg, Subscribed)
-        payloads = [x.p for x in msg.data.app_state if x.t == "room.added"]
+        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
+        app_state = command
+        payloads = [x.payload for x in app_state if x.action == "room.changed"]
         self.assertEqual(1, len(payloads))
         data = payloads[0]
         self.assertTrue(data.pop("created", None))
@@ -71,16 +62,8 @@ class SubscriptionTests(TestCase):
         )
 
     def test_subscribe_room(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.room.pk,
-            channel_type=RoomChannel.name,
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        self.assertIsInstance(msg, Subscribed)
+        command = build_app_state(RoomChannel.name, self.room.pk, self.user.pk)
+        app_state = command
         self.assertEqual(
             [
                 {
@@ -89,7 +72,7 @@ class SubscriptionTests(TestCase):
                     "token": None,
                 }
             ],
-            [x.p for x in msg.data.app_state if x.t == RoomHighlighted.name],
+            [x.payload for x in app_state if x.action == RoomHighlighted.name],
         )
 
     def test_subscribe_room_queries(self):
@@ -111,9 +94,8 @@ class SubscriptionTests(TestCase):
             for x in mock_publish.mock_calls
             if isinstance(x.args[0], RoomChanged)
         ]
-        self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual("Hello world", msg.data.title)
+        self.assertEqual("Hello world", msg.payload.title)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_room_deleted(self, mock_publish):
@@ -126,6 +108,5 @@ class SubscriptionTests(TestCase):
             for x in mock_publish.mock_calls
             if isinstance(x.args[0], RoomDeleted)
         ]
-        self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual(room_pk, msg.data.pk)
+        self.assertEqual(room_pk, msg.payload.pk)

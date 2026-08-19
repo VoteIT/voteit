@@ -4,9 +4,9 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.test import override_settings
 from django.utils import timezone
-from envelope.app.user_channel.channel import UserChannel
-from envelope.testing import ChannelMessageCatcher
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.channels import UserChannel
+from voteit.messaging.testing import ChannelMessageCatcher
+from voteit.messaging.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
@@ -888,8 +888,8 @@ class PollStateMachineSchemaTests(APITestCase):
     def test_detail(self):
         response = self.client.get("/api/state-machines/PollStateMachine/")
         self.assertEqual(200, response.status_code)
-        self.assertIn("states", response.data)
-        self.assertIn("events", response.data)
+        self.assertIn("states", response.payload)
+        self.assertIn("events", response.payload)
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)

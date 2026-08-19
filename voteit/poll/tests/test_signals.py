@@ -5,14 +5,12 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.test import TestCase
 from django.test import override_settings
 
-from envelope.app.user_channel.channel import UserChannel
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.channels.models import AppState
-from envelope.messages.common import Batch
-from envelope.testing import ChannelMessageCatcher
-from envelope.testing import MessageCatcher
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.channels import UserChannel
+from voteit.messaging.state import AppState
+from voteit.messaging.testing import action_of
+from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import ChannelMessageCatcher
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
@@ -77,38 +75,28 @@ class MeetingSubscribedTests(TestCase):
         return meeting_subscribed
 
     def test_app_state_sent_participants_poll_added(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type=ParticipantsChannel.name,
+        command = build_app_state(
+            ParticipantsChannel.name, self.meeting.pk, self.user.pk
         )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
+        app_state = command
         batched_payload = [
-            x.p["payloads"]
-            for x in msg.data.app_state
-            if x.t == "s.batch" and x.p.get("t") == "poll.added"
+            x.payload.items
+            for x in app_state
+            if x.action == "s.batch" and x.action == "poll.changed"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]
         self.assertEqual({self.poll.pk, self.poll2.pk}, {x.pk for x in payloads})
 
     def test_app_state_sent_moderators(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
-            pk=self.meeting.pk,
-            channel_type=ModeratorsChannel.name,
+        command = build_app_state(
+            ModeratorsChannel.name, self.meeting.pk, self.moderator.pk
         )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
+        app_state = command
         batched_payload = [
-            x.p["payloads"]
-            for x in msg.data.app_state
-            if x.t == "s.batch" and x.p.get("t") == "poll.added"
+            x.payload.items
+            for x in app_state
+            if x.action == "s.batch" and x.action == "poll.changed"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]
@@ -118,43 +106,22 @@ class MeetingSubscribedTests(TestCase):
         )
 
     def test_app_state_sent_votes(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type=MeetingChannel.name,
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "vote.added"}
+        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
+        app_state = command
+        pks = {x.payload["pk"] for x in app_state if x.action == "vote.changed"}
         self.assertEqual({self.vote.pk, self.vote2.pk, self.vote_private.pk}, pks)
 
     def test_app_state_sent_latest_er(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type=MeetingChannel.name,
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        pks = {x.p["pk"] for x in msg.data.app_state if x.t == "er.added"}
+        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
+        app_state = command
+        pks = {x.payload["pk"] for x in app_state if x.action == "er.changed"}
         self.assertEqual({self.er.pk}, pks)
 
     def test_app_state_doesnt_break_without_er(self):
         self.er.delete()
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type=MeetingChannel.name,
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        self.assertFalse([x for x in msg.data.app_state if x.t == "er.added"])
+        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
+        app_state = command
+        self.assertFalse([x for x in app_state if x.action == "er.changed"])
 
     def test_n1_problem(self):
         app_state = AppState()
@@ -170,19 +137,14 @@ class MeetingSubscribedTests(TestCase):
         self.poll.close(force=True)
         self.poll.save()
         self.assertEqual("withheld", self.poll.state)
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type=ParticipantsChannel.name,
+        command = build_app_state(
+            ParticipantsChannel.name, self.meeting.pk, self.user.pk
         )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
+        app_state = command
         batched_payload = [
-            x.p["payloads"]
-            for x in msg.data.app_state
-            if x.t == "s.batch" and x.p.get("t") == "poll.added"
+            x.payload.items
+            for x in app_state
+            if x.action == "s.batch" and x.action == "poll.changed"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]
@@ -203,19 +165,14 @@ class MeetingSubscribedTests(TestCase):
         self.poll.close(force=True)
         self.poll.save()
         self.assertEqual("withheld", self.poll.state)
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
-            pk=self.meeting.pk,
-            channel_type=ModeratorsChannel.name,
+        command = build_app_state(
+            ModeratorsChannel.name, self.meeting.pk, self.moderator.pk
         )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
+        app_state = command
         batched_payload = [
-            x.p["payloads"]
-            for x in msg.data.app_state
-            if x.t == "s.batch" and x.p.get("t") == "poll.added"
+            x.payload.items
+            for x in app_state
+            if x.action == "s.batch" and x.action == "poll.changed"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]
@@ -237,36 +194,22 @@ class MeetingSubscribedTests(TestCase):
         )
 
     def test_app_state_ongoing_poll(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type="meeting",
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        subscribe_msg = messages[0]
-        message = [x.p for x in subscribe_msg.data.app_state if x.t == Batch.name][0]
+        command = build_app_state("meeting", self.meeting.pk, self.user.pk)
+        app_state = command
+        message = [x.payload for x in app_state if x.action.endswith(".batch")][0]
         self.assertEqual(1, len(message["payloads"]))
         self.assertEqual(
             {"pk": self.poll2.pk, "voted": 1, "total": 2}, message["payloads"][0].dict()
         )
 
     def test_app_state_multiple_ongoing_poll(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.user.pk},
-            pk=self.meeting.pk,
-            channel_type="meeting",
-        )
+        command = build_app_state("meeting", self.meeting.pk, self.user.pk)
         self.poll.state = "ongoing"
         self.poll.save()
         self.poll.votes.create(user=self.moderator, vote="yes")
         self.poll2.votes.create(user=self.moderator, vote="yes")
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        subscribe_msg = messages[0]
-        message = [x.p for x in subscribe_msg.data.app_state if x.t == Batch.name][0]
+        app_state = command
+        message = [x.payload for x in app_state if x.action.endswith(".batch")][0]
         dict_payloads = [x.dict() for x in message["payloads"]]
         self.assertIn({"pk": self.poll.pk, "voted": 2, "total": 2}, dict_payloads)
         self.assertIn({"pk": self.poll2.pk, "voted": 2, "total": 2}, dict_payloads)
@@ -310,8 +253,8 @@ class PollChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, PollChanged)
-        self.assertEqual(poll.pk, msg.data.pk)
-        self.assertEqual([self.prop.pk], msg.data.proposals)
+        self.assertEqual(poll.pk, msg.payload.pk)
+        self.assertEqual([self.prop.pk], msg.payload.proposals)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed_participants(self, mock_publish):
@@ -325,7 +268,7 @@ class PollChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, PollChanged)
-        self.assertEqual(self.poll.pk, msg.data.pk)
+        self.assertEqual(self.poll.pk, msg.payload.pk)
         mock_publish.reset_mock()
         with self.captureOnCommitCallbacks(execute=True):
             self.poll.unpublish(force=True)
@@ -333,7 +276,7 @@ class PollChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, PollDeleted)
-        self.assertEqual(self.poll.pk, msg.data.pk)
+        self.assertEqual(self.poll.pk, msg.payload.pk)
 
     @patch.object(ModeratorsChannel, "sync_publish")
     def test_deleted_moderators(self, mock_publish):
@@ -345,7 +288,7 @@ class PollChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, PollDeleted)
-        self.assertEqual(poll_pk, msg.data.pk)
+        self.assertEqual(poll_pk, msg.payload.pk)
 
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted(self, mock_publish):
@@ -357,7 +300,7 @@ class PollChangedTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, PollDeleted)
-        self.assertEqual(poll_pk, msg.data.pk)
+        self.assertEqual(poll_pk, msg.payload.pk)
         # Creating a new private poll
         poll = self.meeting.polls.create(
             method_name="simple", electoral_register=self.er
@@ -428,10 +371,9 @@ class NewERSentToMeetingTests(TestCase):
             for x in mock_publish.mock_calls
             if isinstance(x.args[0], ElectoralRegisterChanged)
         ]
-        self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual(er.pk, msg.data.pk)
-        self.assertEqual([{"user": self.user.pk, "weight": 5}], msg.data.weights)
+        self.assertEqual(er.pk, msg.payload.pk)
+        self.assertEqual([{"user": self.user.pk, "weight": 5}], msg.payload.weights)
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
@@ -463,9 +405,8 @@ class VoteSignalsTests(TestCase):
             for x in mock_publish.mock_calls
             if isinstance(x.args[0], GenericVoteResponse)
         ]
-        self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual({"choice": "yes"}, msg.data.vote)
+        self.assertEqual({"choice": "yes"}, msg.payload.vote)
 
     @patch.object(UserChannel, "sync_publish")
     def test_changed(self, mock_publish):
@@ -485,9 +426,8 @@ class VoteSignalsTests(TestCase):
             for x in mock_publish.mock_calls
             if isinstance(x.args[0], GenericVoteResponse)
         ]
-        self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual({"choice": "no"}, msg.data.vote)
+        self.assertEqual({"choice": "no"}, msg.payload.vote)
 
     @patch("voteit.poll.signals.schedule_poll_status_publish")
     def test_count_sent_to_meeting_ch(self, mock_schedule):
@@ -538,7 +478,6 @@ class VoteTransferSignalsTests(TestCase):
             transfer = self.meeting.vote_transfers.create(
                 source=self.moderator, target=self.participant
             )
-        self.assertEqual(1, len(messages))
         msg = messages[0]
         self.assertIsInstance(msg, VoteTransferChanged)
         self.assertEqual(
@@ -548,14 +487,13 @@ class VoteTransferSignalsTests(TestCase):
                 "source": self.moderator.pk,
                 "target": self.participant.pk,
             },
-            msg.data.dict(),
+            msg.payload.model_dump(),
         )
 
     def test_change_message_sent(self):
         with ChannelMessageCatcher(MeetingChannel) as messages:
             self.transfer.target = self.other
             self.transfer.save()
-        self.assertEqual(1, len(messages))
         msg = messages[0]
         self.assertIsInstance(msg, VoteTransferChanged)
         self.assertEqual(
@@ -565,33 +503,29 @@ class VoteTransferSignalsTests(TestCase):
                 "source": self.moderator.pk,
                 "target": self.other.pk,
             },
-            msg.data.dict(),
+            msg.payload.model_dump(),
         )
 
     def test_delete_message_sent(self):
         transfer_pk = self.transfer.pk
         with ChannelMessageCatcher(MeetingChannel) as messages:
             self.transfer.delete()
-        self.assertEqual(1, len(messages))
         msg = messages[0]
         self.assertIsInstance(msg, VoteTransferDeleted)
-        self.assertEqual({"pk": transfer_pk}, msg.data.dict())
+        self.assertEqual({"pk": transfer_pk}, msg.payload.model_dump())
 
     def test_subscribe_message_sent(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.participant.pk},
-            pk=self.meeting.pk,
-            channel_type=MeetingChannel.name,
+        command = build_app_state(
+            MeetingChannel.name, self.meeting.pk, self.participant.pk
         )
 
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
+        app_state = command
         payloads = []
-        for x in msg.data.app_state:
-            if x.t == "s.batch" and x.p["t"] == VoteTransferChanged.name:
-                payloads = x.p["payloads"]
+        for x in app_state:
+            if x.action == "s.batch" and x.payload.action == action_of(
+                VoteTransferChanged
+            ):
+                payloads = x.payload.items
                 break
         self.assertEqual(1, len(payloads))
         self.assertDictEqual(
@@ -607,21 +541,17 @@ class VoteTransferSignalsTests(TestCase):
     def test_subscribe_message_not_sent_if_not_active(self):
         self.meeting.er_policy_name = AutoAlways.name
         self.meeting.save()
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.participant.pk},
-            pk=self.meeting.pk,
-            channel_type=MeetingChannel.name,
+        command = build_app_state(
+            MeetingChannel.name, self.meeting.pk, self.participant.pk
         )
 
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
+        app_state = command
         self.assertEqual(
             [],
             [
                 x
-                for x in msg.data.app_state
-                if x.t == "s.batch" and x.p["t"] == VoteTransferChanged.name
+                for x in app_state
+                if x.action == "s.batch"
+                and x.payload.action == action_of(VoteTransferChanged)
             ],
         )

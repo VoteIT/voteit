@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import override_settings
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
@@ -246,8 +246,8 @@ class RoomsViewTestCase(APITestCase):
         ]
         self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual(self.room.pk, msg.data.pk)
-        self.assertEqual("abc", msg.data.token)
+        self.assertEqual(self.room.pk, msg.payload.pk)
+        self.assertEqual("abc", msg.payload.token)
 
     @patch.object(RoomChannel, "sync_publish")
     def test_highlight_with_token(self, mock_publish):
@@ -264,9 +264,9 @@ class RoomsViewTestCase(APITestCase):
         ]
         self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual(self.room.pk, msg.data.pk)
-        self.assertEqual("abc", msg.data.token)
-        self.assertEqual([self.prop1.pk, self.prop2.pk], msg.data.highlighted)
+        self.assertEqual(self.room.pk, msg.payload.pk)
+        self.assertEqual("abc", msg.payload.token)
+        self.assertEqual([self.prop1.pk, self.prop2.pk], msg.payload.highlighted)
 
     @patch.object(RoomChannel, "sync_publish")
     def test_mark_text(self, mock_publish):
@@ -292,10 +292,10 @@ class RoomsViewTestCase(APITestCase):
         ]
         self.assertEqual(1, len(messages))
         msg = messages[0]
-        self.assertEqual(self.room.pk, msg.data.room)
-        self.assertEqual(1, msg.data.start)
-        self.assertEqual(2, msg.data.end)
-        self.assertEqual(self.prop1.pk, msg.data.proposal)
+        self.assertEqual(self.room.pk, msg.payload.room)
+        self.assertEqual(1, msg.payload.start)
+        self.assertEqual(2, msg.payload.end)
+        self.assertEqual(self.prop1.pk, msg.payload.proposal)
         self.assertEqual(self.moderator.pk, msg.mm.user_pk)
 
     def test_mark_text_without_selection(self):

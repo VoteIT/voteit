@@ -3,7 +3,7 @@ from django.db import IntegrityError
 from django.test import TestCase
 from django.test import override_settings
 
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.meeting.models import Meeting
 

@@ -1,6 +1,8 @@
 from django.db import IntegrityError
 from django.test import TestCase
 
+from voteit.messaging.testing import action_of
+
 from voteit.meeting.models import Meeting
 from voteit.participant_tags.components import GenderTags
 
@@ -14,7 +16,7 @@ class ParticipantTagTests(TestCase):
         cls.participant = cls.meeting.participants.get(username="participant")
         cls.moderator = cls.meeting.participants.get(username="moderator")
         cls.component = cls.meeting.components.create(
-            component_name=GenderTags.name,
+            component_name=action_of(GenderTags),
             enabled=True,
             settings_data={"tags": ["f", "m", "nb"]},
         )

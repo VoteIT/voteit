@@ -5,10 +5,10 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.app.online_channel.channel import OnlineChannel
+from voteit.messaging.channels import OnlineChannel
 from envelope.async_signals import consumer_connected
 from envelope.testing import mk_consumer
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.core.messages.user import InvalidateUserCache
 
@@ -54,7 +54,7 @@ class UserChangedSignalTests(TestCase):
         self.assertEqual(1, len(mock_method.mock_calls))
         msg = mock_method.mock_calls[0].args[0]
         self.assertIsInstance(msg, InvalidateUserCache)
-        self.assertEqual(user_pk, msg.data.pk)
+        self.assertEqual(user_pk, msg.payload.pk)
 
     @patch.object(OnlineChannel, "sync_publish")
     def test_changed(self, mock_method):
@@ -64,4 +64,4 @@ class UserChangedSignalTests(TestCase):
         self.assertEqual(1, len(mock_method.mock_calls))
         msg = mock_method.mock_calls[0].args[0]
         self.assertIsInstance(msg, InvalidateUserCache)
-        self.assertEqual(self.user.pk, msg.data.pk)
+        self.assertEqual(self.user.pk, msg.payload.pk)

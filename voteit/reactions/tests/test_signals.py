@@ -5,11 +5,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ObjectDoesNotExist
 from django.test import TestCase
 from django.test import override_settings
-from envelope.app.user_channel.channel import UserChannel
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.channels.models import AppState
-from envelope.testing import MessageCatcher
+from voteit.messaging.testing import build_app_state
+
+from voteit.messaging.channels import UserChannel
+from voteit.messaging.state import AppState
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.discussion.models import DiscussionPost
@@ -50,7 +49,7 @@ class SignalButtonTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ButtonChanged)
-        self.assertEqual(button.pk, msg.data.pk)
+        self.assertEqual(button.pk, msg.payload.pk)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_button_changed(self, mock_publish):
@@ -61,7 +60,7 @@ class SignalButtonTests(TestCase):
         self.button.save()
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ButtonChanged)
-        self.assertEqual(self.button.pk, msg.data.pk)
+        self.assertEqual(self.button.pk, msg.payload.pk)
         self.assertEqual(self.button.title, "I'm new")
 
     @patch.object(MeetingChannel, "sync_publish")
@@ -73,22 +72,14 @@ class SignalButtonTests(TestCase):
         self.button.delete()
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ButtonDeleted)
-        self.assertEqual(button_pk, msg.data.pk)
+        self.assertEqual(button_pk, msg.payload.pk)
 
     def test_meeting_channel_subscribed(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
-            pk=self.meeting.pk,
-            channel_type="meeting",
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        self.assertIsInstance(msg, Subscribed)
-        unpacked = {x.t: x.p for x in msg.data.app_state}
-        self.assertIn("reaction_button.added", unpacked)
-        self.assertEqual(self.button.pk, unpacked["reaction_button.added"]["pk"])
+        command = build_app_state("meeting", self.meeting.pk, self.moderator.pk)
+        app_state = command
+        unpacked = {x.action: x.payload for x in app_state}
+        self.assertIn("reaction_button.changed", unpacked)
+        self.assertEqual(self.button.pk, unpacked["reaction_button.changed"]["pk"])
 
     def test_ai_channel_subscribed(self):
         other = User.objects.create(username="other")
@@ -101,28 +92,20 @@ class SignalButtonTests(TestCase):
         self.disc.reaction_set.create(
             user=self.moderator, button=self.button, agenda_item=self.ai
         )
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
-            pk=self.ai.pk,
-            channel_type="agenda_item",
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        self.assertIsInstance(msg, Subscribed)
+        command = build_app_state("agenda_item", self.ai.pk, self.moderator.pk)
+        app_state = command
         batched_payload = [
-            x.p["payloads"]
-            for x in msg.data.app_state
-            if x.t == "s.batch" and x.p.get("t") == "reaction.added"
+            x.payload.items
+            for x in app_state
+            if x.action == "s.batch" and x.action == "reaction.changed"
         ]
         self.assertEqual(1, len(batched_payload))
         payloads = batched_payload[0]
         self.assertEqual(2, len(payloads))
         self.assertEqual(self.button.pk, payloads[0].button)
-        counts = [m for m in msg.data.app_state if m.t == "reaction.count"]
+        counts = [m for m in app_state if m.action == "reaction.count"]
         self.assertEqual(len(counts), 2)
-        self.assertEqual(sum(c.p["count"] for c in counts), 3)
+        self.assertEqual(sum(c.payload["count"] for c in counts), 3)
 
     def test_ai_channel_subscribed_n1_problem(self):
         from voteit.reactions.signals import ai_channel_subscribed
@@ -169,10 +152,10 @@ class SignalReactionTests(TestCase):
         self._mk_reaction()
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, ReactionCount)
-        self.assertEqual(1, msg.data.count)
-        self.assertEqual(self.button.pk, msg.data.button)
-        self.assertEqual(self.prop.pk, msg.data.object_id)
-        self.assertEqual("proposal", msg.data.content_type)
+        self.assertEqual(1, msg.payload.count)
+        self.assertEqual(self.button.pk, msg.payload.button)
+        self.assertEqual(self.prop.pk, msg.payload.object_id)
+        self.assertEqual("proposal", msg.payload.content_type)
 
     @patch.object(AgendaItemChannel, "sync_publish")
     def test_reaction_deleted_ai(self, mock_publish):
@@ -183,10 +166,10 @@ class SignalReactionTests(TestCase):
         reaction.delete()
         msg = mock_publish.mock_calls[-1].args[0]
         self.assertIsInstance(msg, ReactionCount)
-        self.assertEqual(0, msg.data.count)
-        self.assertEqual(self.button.pk, msg.data.button)
-        self.assertEqual(self.prop.pk, msg.data.object_id)
-        self.assertEqual("proposal", msg.data.content_type)
+        self.assertEqual(0, msg.payload.count)
+        self.assertEqual(self.button.pk, msg.payload.button)
+        self.assertEqual(self.prop.pk, msg.payload.object_id)
+        self.assertEqual("proposal", msg.payload.content_type)
 
     @patch.object(UserChannel, "sync_publish")
     def test_reaction_added_user(self, mock_publish):
@@ -196,10 +179,10 @@ class SignalReactionTests(TestCase):
         reaction = self._mk_reaction()
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, UserReactionChanged)
-        self.assertEqual(reaction.pk, msg.data.pk)
-        self.assertEqual(self.button.pk, msg.data.button)
-        self.assertEqual(self.prop.pk, msg.data.object_id)
-        self.assertEqual("proposal", msg.data.content_type)
+        self.assertEqual(reaction.pk, msg.payload.pk)
+        self.assertEqual(self.button.pk, msg.payload.button)
+        self.assertEqual(self.prop.pk, msg.payload.object_id)
+        self.assertEqual("proposal", msg.payload.content_type)
 
     @patch.object(UserChannel, "sync_publish")
     def test_reaction_deleted_user(self, mock_publish):
@@ -211,7 +194,7 @@ class SignalReactionTests(TestCase):
         reaction.delete()
         msg = mock_publish.mock_calls[-1].args[0]
         self.assertIsInstance(msg, UserReactionDeleted)
-        self.assertEqual(reaction_pk, msg.data.pk)
+        self.assertEqual(reaction_pk, msg.payload.pk)
 
     def test_deleting_context_kills_reaction(self):
         # Due to historic reasons, reactions are linked to base object

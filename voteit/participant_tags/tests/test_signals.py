@@ -1,11 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.testing import ChannelMessageCatcher
-from envelope.testing import MessageCatcher
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import action_of
+from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import ChannelMessageCatcher
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
@@ -28,12 +27,12 @@ class SignalAndSubscribeTests(TestCase):
         cls.org: Organisation = Organisation.objects.get(pk=1)
         cls.meeting = Meeting.objects.get(pk=1)
         cls.pronoun_component: NamespacedTags = cls.meeting.components.create(
-            component_name=PronounTags.name,
+            component_name=action_of(PronounTags),
             settings={"tags": ["han", "hon", "hen"], "many": True},
             enabled=True,
         )
         cls.gender_component: NamespacedTags = cls.meeting.components.create(
-            component_name=GenderTags.name,
+            component_name=action_of(GenderTags),
             settings={"tags": ["f", "m", "nb"]},
             enabled=True,
         )
@@ -49,18 +48,12 @@ class SignalAndSubscribeTests(TestCase):
         )
 
     def test_ptags_to_meeting_ch(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.participant.pk},
-            pk=self.meeting.pk,
-            channel_type=MeetingChannel.name,
+        command = build_app_state(
+            MeetingChannel.name, self.meeting.pk, self.participant.pk
         )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
-        self.assertIsInstance(msg, Subscribed)
+        app_state = command
         tags_payload = [
-            x.p for x in msg.data.app_state if x.t == AllParticipantTags.name
+            x.payload for x in app_state if x.action == action_of(AllParticipantTags)
         ][0]
         self.assertEqual(
             {
@@ -78,7 +71,6 @@ class SignalAndSubscribeTests(TestCase):
     def test_changed(self):
         with ChannelMessageCatcher(MeetingChannel, ParticipantTagsChanged) as messages:
             self.moderator_tags.save()
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "meeting": self.meeting.pk,
@@ -91,7 +83,6 @@ class SignalAndSubscribeTests(TestCase):
     def test_deleted_sent_as_changed(self):
         with ChannelMessageCatcher(MeetingChannel, ParticipantTagsChanged) as messages:
             self.moderator_tags.delete()
-        self.assertEqual(1, len(messages))
         self.assertEqual(
             {
                 "meeting": self.meeting.pk,

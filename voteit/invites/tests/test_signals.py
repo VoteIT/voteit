@@ -3,10 +3,9 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
-from envelope.channels.messages import Subscribe
-from envelope.channels.messages import Subscribed
-from envelope.testing import MessageCatcher
-from envelope.testing import testing_channel_layers_setting
+from voteit.messaging.testing import action_of
+from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteChanged
@@ -86,20 +85,15 @@ class InvitesSubscribedTests(TestCase):
         cls.invite.group_annotations.create(meeting_group=cls.group)
 
     def test_app_state_sent(self):
-        command = Subscribe(
-            mm={"consumer_name": "abc", "user_pk": self.moderator.pk},
-            pk=self.meeting.pk,
-            channel_type="invites",
-        )
-        with MessageCatcher(Subscribed) as messages:
-            command.run_job()
-        self.assertEqual(1, len(messages))
-        msg = messages[0]
+        command = build_app_state("invites", self.meeting.pk, self.moderator.pk)
+        app_state = command
         batch = None
-        for item in msg.data.app_state:
-            if item.t == "s.batch" and item.p["t"] == MeetingInviteChanged.name:
+        for item in app_state:
+            if item.action == "s.batch" and item.payload.action == action_of(
+                MeetingInviteChanged
+            ):
                 batch = item
-        payloads = batch.p["payloads"]
+        payloads = batch.payload.items
         self.assertEqual({self.invite.pk, self.invite2.pk}, {x.pk for x in payloads})
         self.assertEqual({True, False}, {x.has_annotations for x in payloads})
         data = {}
@@ -141,8 +135,8 @@ class MeetingInviteSignalTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingInviteChanged)
-        self.assertEqual(invite.pk, msg.data.pk)
-        self.assertEqual(False, msg.data.has_annotations)
+        self.assertEqual(invite.pk, msg.payload.pk)
+        self.assertEqual(False, msg.payload.has_annotations)
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_changed(self, mock_publish):
@@ -153,9 +147,9 @@ class MeetingInviteSignalTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingInviteChanged)
-        self.assertEqual(self.invite.pk, msg.data.pk)
-        self.assertEqual(self.invite.roles, msg.data.roles)
-        self.assertEqual(True, msg.data.has_annotations)
+        self.assertEqual(self.invite.pk, msg.payload.pk)
+        self.assertEqual(self.invite.roles, msg.payload.roles)
+        self.assertEqual(True, msg.payload.has_annotations)
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_deleted_diff_participants(self, mock_publish):
@@ -165,7 +159,7 @@ class MeetingInviteSignalTests(TestCase):
         self.assertTrue(mock_publish.called)
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingInviteDeleted)
-        self.assertEqual(invite_pk, msg.data.pk)
+        self.assertEqual(invite_pk, msg.payload.pk)
 
     @patch.object(MeetingInvitesChannel, "sync_publish")
     def test_accepted_removes_annotation(self, mock_publish):
@@ -175,4 +169,4 @@ class MeetingInviteSignalTests(TestCase):
             self.invite.save()
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, MeetingInviteChanged)
-        self.assertEqual(False, msg.data.has_annotations)
+        self.assertEqual(False, msg.payload.has_annotations)
