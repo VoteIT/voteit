@@ -619,6 +619,6 @@ class InviteDataTypesViewSet(ViewSet):
         for v in reg.values():
             if v.is_user_data and v.name not in scopes:
                 continue
-            data = InviteDataTypesSchema.from_orm(v)
+            data = InviteDataTypesSchema.model_validate(v)
             results.append(data.dict())
         return Response(data=results)

@@ -12,13 +12,12 @@ from voteit.speaker.models import SpeakerListSystem
 from voteit.speaker.registries import list_method
 from voteit.speaker.signals import list_method_added
 from voteit.speaker.signals import list_method_removed
+from pydantic import ConfigDict
 
 
 class GenderAndPrioritySchema(PrioritySettingsSchema):
     priority_genders: list[str] = ["f", "nb"]
-
-    class Config:
-        allow_mutation = False
+    model_config = ConfigDict(frozen=True)
 
 
 @list_method

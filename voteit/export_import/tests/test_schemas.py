@@ -29,7 +29,7 @@ class ExportImportMeetingTests(TestCase):
         return MeetingStructure
 
     def test_export_json_roundtrip(self):
-        data = self._cut.from_orm(self.meeting)
+        data = self._cut.model_validate(self.meeting)
         json_data = data.json()
         json.loads(json_data)
 
@@ -43,7 +43,7 @@ class ExportImportMeetingTests(TestCase):
         import_dict = read_fixture("combined_meeting_fixture.yaml")
         with schema_context(include_reactions=True):
             import_data = self._cut(**import_dict, include_reactions=True)
-            export_data = self._cut.from_orm(self.meeting)
+            export_data = self._cut.model_validate(self.meeting)
         self.assertEqual(import_data, export_data)
         import_agenda_data = import_data.agenda_items[0].dict()
         export_agenda_data = export_data.agenda_items[0].dict()
@@ -60,7 +60,7 @@ class SchemasMatchCommonSerializersTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
-        cls.export_data: MeetingStructure = MeetingStructure.from_orm(cls.meeting)
+        cls.export_data: MeetingStructure = MeetingStructure.model_validate(cls.meeting)
         cls.proposals = tuple(
             cls.meeting.agenda_items.first().proposals.all().select_subclasses()
         )

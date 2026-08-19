@@ -2,22 +2,24 @@ import re
 from abc import ABC
 from abc import abstractmethod
 
-from pydantic import conlist
-from pydantic import validator
+from pydantic import field_validator, Field
 from pydantic.main import BaseModel
 
 from voteit.core.validators import ensure_unique
 from voteit.components.abcs import ComponentAdapter
 from voteit.components.registries import meeting_components
+from typing import List
+from typing_extensions import Annotated
 
 tag_format = re.compile(r"^[a-z0-9_\-]{1,20}$")
 
 
 class TagSettings(BaseModel):
-    tags: conlist(str, min_items=1)
+    tags: Annotated[List[str], Field(min_length=1)]
     many: bool = False
 
-    @validator("tags")
+    @field_validator("tags")
+    @classmethod
     def validate_tags(cls, v: list[str]):
         """
         >>> f = TagSettings.validate_tags

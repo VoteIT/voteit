@@ -188,7 +188,7 @@ class ElectoralRegisterPoliciesViewSet(ViewSet):
         reg = get_electoral_policy_registry()
         results = []
         for er_policy in reg.values():
-            data = ElectoralRegistryPolicySchema.from_orm(er_policy)
+            data = ElectoralRegistryPolicySchema.model_validate(er_policy)
             results.append(data.dict())
         return Response(data=results)
 

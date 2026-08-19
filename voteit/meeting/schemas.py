@@ -1,8 +1,5 @@
-from pydantic import BaseModel
-from pydantic import conint
-from pydantic import conlist
-from pydantic import constr
-from pydantic import validator
+from pydantic import field_validator, Field, StringConstraints, BaseModel
+from pydantic import model_validator
 
 from voteit.components.utils import get_meeting_component_adapters
 from voteit.core.role import Role
@@ -15,6 +12,8 @@ from voteit.meeting.roles import ROLE_DISCUSSER
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.speaker.registries import list_method
+from typing import List
+from typing_extensions import Annotated
 
 _DIALECT_ROLE_COMPAT = {
     "participant": str(ROLE_PARTICIPANT),
@@ -34,25 +33,29 @@ def _role_compat(v: str | Role) -> str:
 
 
 class GroupRoleSchema(BaseModel):
-    title: constr(max_length=100)
-    role_id: constr(max_length=100, to_lower=True)
+    title: Annotated[str, StringConstraints(max_length=100)]
+    role_id: Annotated[str, StringConstraints(max_length=100, to_lower=True)]
     roles: list[str] = ()
 
-    @validator("roles", pre=True)
+    @field_validator("roles", mode="before")
+    @classmethod
     def role_compat(cls, v):
         if isinstance(v, (list, tuple)):
             return [_role_compat(item) for item in v]
         return v
 
-    @validator("roles")
+    @field_validator("roles")
+    @classmethod
     def validate_roles(cls, v):
         root_validate_roles_and_model(cls, {"model": "meeting", "roles": v})
         return v
 
 
 class GroupSchema(BaseModel):
-    title: constr(max_length=100) | None = None
-    groupid: constr(max_length=100, to_lower=True, strip_whitespace=True)
+    title: Annotated[str, StringConstraints(max_length=100)] | None = None
+    groupid: Annotated[
+        str, StringConstraints(max_length=100, to_lower=True, strip_whitespace=True)
+    ]
 
 
 class ComponentSettings(BaseModel):
@@ -77,26 +80,29 @@ class ComponentSettings(BaseModel):
     pydantic.error_wrappers.ValidationError: 1 validation error for ComponentSettings
     """
 
-    name: constr(strip_whitespace=True, to_lower=True)
+    name: Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True)]
     settings: dict | None = None
 
-    @validator("name")
+    @field_validator("name")
+    @classmethod
     def validate_name(cls, v: str):
         if v not in get_meeting_component_adapters():
             raise ValueError(f"{v} is not a meeting component name")
         return v
 
-    @validator("settings", always=True)
-    def validate_settings(cls, v, values):
+    # Cross-field, and the v1 form had always=True so it must still run when
+    # settings is left at its default -- which a v2 field validator would not.
+    @model_validator(mode="after")
+    def validate_settings(self):
         try:
-            adapter = get_meeting_component_adapters()[values["name"]]
+            adapter = get_meeting_component_adapters()[self.name]
         except KeyError:
-            return  # Will be caught by other validator
+            return self  # Will be caught by the name validator
         if adapter.schema is not None:
-            if not isinstance(v, dict):
+            if not isinstance(self.settings, dict):
                 raise ValueError("missing or isn't a dict")
-            adapter.schema(**v)
-        return v
+            adapter.schema(**self.settings)
+        return self
 
 
 class SpeakerListSystemSchema(BaseModel):
@@ -132,44 +138,50 @@ class SpeakerListSystemSchema(BaseModel):
 
     method_name: str
     settings: dict | None = None
-    safe_positions: conint(ge=1, le=3) | None = None
+    safe_positions: Annotated[int, Field(ge=1, le=3)] | None = None
     show_time: bool = False  # Will be removed?
     meeting_roles_to_speaker: list[str] = []
 
-    @validator("method_name")
+    @field_validator("method_name")
+    @classmethod
     def validate_method_name(cls, v: str):
         if v not in list_method:
             raise ValueError(f"{v} is not a valid speaker list method.")
         return v
 
-    @validator("meeting_roles_to_speaker", pre=True)
+    @field_validator("meeting_roles_to_speaker", mode="before")
+    @classmethod
     def transform_role(cls, v):
         if isinstance(v, (list, tuple)):
             return [str(item) if isinstance(item, Role) else item for item in v]
         return v
 
-    @validator("meeting_roles_to_speaker")
+    @field_validator("meeting_roles_to_speaker")
+    @classmethod
     def validate_roles(cls, v: list[str]):
         for item in v:
             if item not in MeetingRoles.valid_roles.values():
                 raise ValueError(f"{item} is not a valid meeting role.")
         return v
 
-    @validator("settings")
-    def check_settings(cls, v: dict | None, values: dict):
-        method = list_method[values["method_name"]]
+    # Cross-field. No always=True on the v1 form, so it only ran when settings
+    # was actually supplied; model_fields_set preserves that.
+    @model_validator(mode="after")
+    def check_settings(self):
+        if "settings" not in self.model_fields_set:
+            return self
+        method = list_method[self.method_name]
         if method.settings_schema:
-            if v is None:
-                v = {}
-            method.settings_schema(**v)
-        else:
-            if v:
-                raise ValueError(f"{method.name} has no settings")
-        return v
+            if self.settings is None:
+                self.settings = {}
+            method.settings_schema(**self.settings)
+        elif self.settings:
+            raise ValueError(f"{method.name} has no settings")
+        return self
 
 
 class RoomSchema(BaseModel):
-    title: constr(strip_whitespace=True, max_length=100) = ""
+    title: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] = ""
     open: bool = False
     send_sls: bool = False
     send_proposals: bool = False
@@ -202,8 +214,8 @@ class DialectSchema(BaseModel):
     title: str
     description: str = ""
     name: str
-    roles: conlist(GroupRoleSchema) = []
-    groups: conlist(GroupSchema) = []
+    roles: Annotated[List[GroupRoleSchema], Field()] = []
+    groups: Annotated[List[GroupSchema], Field()] = []
     er_policy_name: str | None = None
     group_votes_active: bool | None = None
     group_roles_active: bool | None = None
@@ -212,32 +224,41 @@ class DialectSchema(BaseModel):
     )
     proposal_id_policy_name: str | None = None
     installable: bool = True  # Offer as selection for all organisations?
-    requires: conlist(constr(to_lower=True, strip_whitespace=True)) = []
+    requires: Annotated[
+        List[Annotated[str, StringConstraints(to_lower=True, strip_whitespace=True)]],
+        Field(),
+    ] = []
     view_components: dict[str, str] = {}
     configure_components: list[ComponentSettings] = []
-    block_components: conlist(constr(to_lower=True, strip_whitespace=True)) = []
-    block_roles: conlist(constr(to_lower=True, strip_whitespace=True)) = []
-    run_scripts: conlist(constr(strip_whitespace=True)) = []
+    block_components: Annotated[
+        List[Annotated[str, StringConstraints(to_lower=True, strip_whitespace=True)]],
+        Field(),
+    ] = []
+    block_roles: Annotated[
+        List[Annotated[str, StringConstraints(to_lower=True, strip_whitespace=True)]],
+        Field(),
+    ] = []
+    run_scripts: Annotated[
+        List[Annotated[str, StringConstraints(strip_whitespace=True)]], Field()
+    ] = []
     rooms: list[RoomSchema] = []
 
-    @validator(
-        "roles",
-        "groups",
-        "requires",
-        "block_components",
-        "block_roles",
-        "run_scripts",
+    @field_validator(
+        "roles", "groups", "requires", "block_components", "block_roles", "run_scripts"
     )
+    @classmethod
     def validate_unique(cls, v):
         return ensure_unique(v)
 
-    @validator("block_roles")
+    @field_validator("block_roles")
+    @classmethod
     def validate_roles(cls, v):
         if v:
             root_validate_roles_and_model(cls, {"model": "meeting", "roles": v})
         return v
 
-    @validator("block_roles", pre=True)
+    @field_validator("block_roles", mode="before")
+    @classmethod
     def role_compat(cls, v):
         if isinstance(v, (list, tuple)):
             return [_role_compat(item) for item in v]

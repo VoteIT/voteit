@@ -1,7 +1,7 @@
 from collections import Counter
 
 from django.utils.translation import gettext as _
-from pydantic import validator
+from pydantic import field_validator, ConfigDict
 from pydantic.main import BaseModel
 from stvpoll.abcs import STVPollBase
 from stvpoll.scottish_stv import ScottishSTV as _ScottishSTV
@@ -20,15 +20,15 @@ class ScottishSTVSettings(BaseModel):
     winners: int
     allow_random: bool = True
 
-    @validator("winners")
+    @field_validator("winners")
+    @classmethod
     def validate_winners(cls, v):
         """This doesn't check attached polls though!"""
         if v < ScottishSTV.min_winners:
             raise ValueError(f"Must have more winners than {ScottishSTV.min_winners}")
         return v
 
-    class Config:
-        allow_mutation = False
+    model_config = ConfigDict(frozen=True)
 
 
 class STVResultRoundSchema(BaseModel):
@@ -37,7 +37,8 @@ class STVResultRoundSchema(BaseModel):
     selected: list[int]
     vote_count: list[tuple[int, float]]
 
-    @validator("vote_count", pre=True)
+    @field_validator("vote_count", mode="before")
+    @classmethod
     def convert_vote_count(cls, v):
         """Vote count from STVPoll method looks like this:
         >>> vote_count = {1: 0.0, 2: 2.0}

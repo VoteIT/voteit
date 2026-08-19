@@ -83,7 +83,7 @@ class VerboseComponentSerializer(serializers.Serializer):
 
     def get_schema(self, instance: MeetingComponent):
         if instance.adapter and instance.adapter.schema is not None:
-            return instance.adapter.schema.schema()
+            return instance.adapter.schema.model_json_schema()
 
 
 class VerboseMeetingComponentSerializer(

@@ -1,7 +1,6 @@
 from contextlib import suppress
 
-from pydantic import BaseModel
-from pydantic import validator
+from pydantic import field_validator, BaseModel
 from django.utils.translation import gettext_lazy as _
 
 from voteit.invites.abcs import InviteUserDataAdapter
@@ -36,7 +35,8 @@ with suppress(ImportError):
 
         swedish_ssn: str
 
-        @validator("swedish_ssn")
+        @field_validator("swedish_ssn")
+        @classmethod
         def validate_ssn(cls, v: str) -> str:
             with suppress(PersonnummerException):
                 return Personnummer(v.strip()).format(long_format=True)

@@ -2,12 +2,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.utils.translation import gettext_lazy as _
-from pydantic import BaseModel
-from pydantic import constr
+from pydantic import StringConstraints, BaseModel
 
 from voteit.invites.abcs import AnnotationDataAdapter
 from voteit.invites.app.invites.group import InviteGroup
 from voteit.invites.registries import invite_adapter_registry
+from typing_extensions import Annotated
 
 if TYPE_CHECKING:
     from voteit.invites.models import MeetingInvite
@@ -15,7 +15,9 @@ if TYPE_CHECKING:
 
 
 class GroupRoleSchema(BaseModel):
-    grouprole: constr(to_lower=True, strip_whitespace=True, max_length=100)
+    grouprole: Annotated[
+        str, StringConstraints(to_lower=True, strip_whitespace=True, max_length=100)
+    ]
 
 
 @invite_adapter_registry

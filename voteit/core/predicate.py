@@ -104,7 +104,7 @@ class Predicate(RulesPredicate):
         return check_result
 
     def output(self) -> PredicateOutput:
-        return PredicateOutput.from_orm(self)
+        return PredicateOutput.model_validate(self)
 
 
 class PredicateRegistry(Registry):

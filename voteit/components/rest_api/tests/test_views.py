@@ -173,7 +173,9 @@ class MeetingComponentViewSetTests(APITestCase):
         response = self.client.get(url, data={"transition": "enable"})
         self.assertEqual(200, response.status_code)
         data = response.json()
-        self.assertEqual(self.message_component.adapter.schema.schema(), data["schema"])
+        self.assertEqual(
+            self.message_component.adapter.schema.model_json_schema(), data["schema"]
+        )
 
 
 class OrganisationSendsComponentsViewSetTests(APITestCase):

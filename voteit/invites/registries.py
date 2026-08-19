@@ -51,13 +51,11 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
         with existing <class 'voteit.invites.registries.Hello'>. Schema attributes {'world'} are the same
         """
         if issubclass(factory, InviteUserDataAdapter):
-            candidate_keys = set(factory.schema.schema()["properties"].keys())
+            candidate_keys = set(factory.schema.model_fields)
             for v in self.values():
                 if not issubclass(v, InviteUserDataAdapter):
                     continue
-                clash = candidate_keys.intersection(
-                    v.schema.schema()["properties"].keys()
-                )
+                clash = candidate_keys.intersection(v.schema.model_fields)
                 if clash:
                     raise ValueError(
                         f"If you register {factory} it will clash with existing {v}, schema attributes {clash} are the same"

@@ -164,7 +164,7 @@ def pydantic_to_drf_validation_error(error: PydanticValidationError) -> Validati
     ...     count: int
     ...     inner: Inner
     ...
-    >>> Outer.update_forward_refs(Inner=Inner)
+    >>> Outer.model_rebuild()
     >>> try:
     ...     Outer(count='bad', inner={'value': 'also-bad'})
     ... except pydantic.ValidationError as exc:
@@ -178,7 +178,7 @@ def pydantic_to_drf_validation_error(error: PydanticValidationError) -> Validati
     >>> class OuterList(pydantic.BaseModel):
     ...     inner: list[Inner]
     ...
-    >>> OuterList.update_forward_refs(Inner=Inner)
+    >>> OuterList.model_rebuild()
     >>> try:
     ...     OuterList(inner=[{'value': 1}, {'value': 'also-bad'}, {'value': 'very-bad'}])
     ... except pydantic.ValidationError as exc:

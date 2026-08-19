@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections import Counter
 
 from django.utils.translation import gettext as _
-from pydantic import BaseModel
-from pydantic import validator
+from pydantic import field_validator, BaseModel
 
 from rest_framework.exceptions import ValidationError
 
 from voteit.poll.abcs import PollMethod
+from voteit.poll.abcs import vote_json
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import PollResult
@@ -19,7 +19,8 @@ __all__ = ("Majority",)
 class MajorityVoteSchema(BaseModel):
     choice: int
 
-    @validator("choice")
+    @field_validator("choice")
+    @classmethod
     def validate_choice(cls, v: int):
         """
         >>> MajorityVoteSchema.validate_choice(1)
@@ -57,10 +58,10 @@ class Majority(PollMethod):
     result_schema = MajorityPollResult
 
     def vote_to_str(self, data: MajorityVoteSchema) -> str:
-        return data.json()
+        return vote_json(data)
 
     def vote_to_obj(self, text: str) -> MajorityVoteSchema:
-        return self.vote_schema.parse_raw(text)
+        return self.vote_schema.model_validate_json(text)
 
     def calculate_result(self, counter: Counter) -> MajorityPollResult:
         """

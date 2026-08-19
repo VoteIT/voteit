@@ -92,7 +92,7 @@ class Role(str):
         self.requires = set()
 
     def output(self) -> RoleOutput:
-        return RoleOutput.from_orm(self)
+        return RoleOutput.model_validate(self)
 
     def __repr__(self):
         return f"{self.title} ({self.name})"

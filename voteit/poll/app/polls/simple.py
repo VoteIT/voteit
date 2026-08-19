@@ -3,8 +3,7 @@ from __future__ import annotations
 from typing import Counter
 
 from django.utils.translation import gettext_lazy as _
-from pydantic import BaseModel
-from pydantic import validator
+from pydantic import field_validator, BaseModel
 
 from voteit.poll.abcs import PollMethod
 from voteit.poll.exceptions import InvalidProposalCount
@@ -22,7 +21,8 @@ VOTE_CHOICES = ((YES, _("Yes")), (NO, _("No")))
 class SimpleVoteSchema(BaseModel):
     choice: str
 
-    @validator("choice")
+    @field_validator("choice")
+    @classmethod
     def choice_validator(cls, v):
         if v not in [YES, NO]:
             raise ValueError("Not a valid choice")

@@ -4,9 +4,7 @@ import json
 from collections import Counter
 
 from django.utils.translation import gettext as _
-from pydantic import BaseModel
-from pydantic import root_validator
-from pydantic import validator
+from pydantic import field_validator, model_validator, BaseModel
 
 from rest_framework.exceptions import ValidationError
 
@@ -19,7 +17,8 @@ from voteit.poll.schemas import PollResult
 class DuttVoteSchema(BaseModel):
     choices: list[int]
 
-    @validator("choices")
+    @field_validator("choices")
+    @classmethod
     def validate_choices(cls, v: list[int]):
         """
         >>> DuttVoteSchema.validate_choices([1])
@@ -40,8 +39,10 @@ class DuttSettingsSchema(BaseModel):
     max: int = 0
     min: int = 0
 
-    @root_validator(skip_on_failure=True)
-    def validate_max_min(cls, values):
+    # mode="after" is the natural v2 form of root_validator(skip_on_failure);
+    # it only runs once the fields themselves have validated.
+    @model_validator(mode="after")
+    def validate_max_min(self):
         """
         >>> DuttSettingsSchema(max=2)
         DuttSettingsSchema(max=2, min=0)
@@ -54,9 +55,9 @@ class DuttSettingsSchema(BaseModel):
         ...
         pydantic.error_wrappers.ValidationError: 1 validation error for DuttSettingsSchema
         """
-        if values["max"] and values["max"] < values["min"]:
+        if self.max and self.max < self.min:
             raise ValueError("min value can't be higher than max")
-        return values
+        return self
 
 
 class DuttScore(BaseModel):

@@ -1,9 +1,9 @@
 from typing import Counter
 
 from django.utils.translation import gettext_lazy as _
-from pydantic import BaseModel
+from pydantic import field_validator, ConfigDict, BaseModel
+from pydantic import ValidationInfo
 from pydantic import PositiveInt
-from pydantic import validator
 from rest_framework.exceptions import ValidationError
 from stvpoll.abcs import STVPollBase
 from stvpoll.irv import IRV as IRVBase
@@ -22,9 +22,7 @@ __all__ = ("IRV",)
 
 class IRVSettings(BaseModel):
     allow_random: bool = True
-
-    class Config:
-        allow_mutation = False
+    model_config = ConfigDict(frozen=True)
 
 
 @poll_methods
@@ -124,13 +122,15 @@ class RepeatedIRVSettings(BaseModel):
     max: None | PositiveInt = None
     min: None | PositiveInt = None
 
-    @validator("min", "max", pre=True)
+    @field_validator("min", "max", mode="before")
+    @classmethod
     def no_zeroes(cls, v: int | None):
         if v == 0:
             return None
         return v
 
-    @validator("winners")
+    @field_validator("winners")
+    @classmethod
     def validate_winners(cls, v):
         """
         This doesn't check attached polls though!
@@ -139,16 +139,16 @@ class RepeatedIRVSettings(BaseModel):
             raise ValueError(f"Must have at least {RepeatedIRV.min_winners} winners")
         return v
 
-    @validator("min")
-    def min_validator(cls, v: int | None, values):
+    @field_validator("min")
+    @classmethod
+    def min_validator(cls, v: int | None, info: ValidationInfo):
         if v:
-            if maxval := values.get("max"):
+            if maxval := info.data.get("max"):
                 if v > maxval:
                     raise ValueError("Min value bigger than max")
         return v
 
-    class Config:
-        allow_mutation = False
+    model_config = ConfigDict(frozen=True)
 
 
 @poll_methods

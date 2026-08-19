@@ -3,8 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from django.utils.functional import Promise
-from pydantic import BaseModel
-from pydantic import validator
+from pydantic import field_validator, ConfigDict, BaseModel
 
 
 class RoleOutput(BaseModel):
@@ -13,11 +12,10 @@ class RoleOutput(BaseModel):
     description: str
     require_names: list[str] | None = None
     predicate_info: PredicateOutput | None = None
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        orm_mode = True
-
-    @validator("title", "description", pre=True)
+    @field_validator("title", "description", mode="before")
+    @classmethod
     def convert_lazy(cls, v: Any):
         if isinstance(v, Promise):
             return str(v)
@@ -32,14 +30,14 @@ class PredicateOutput(BaseModel):
     source: str = ""
     role_name: str | None = None
 
-    @validator("description")
+    @field_validator("description")
+    @classmethod
     def clean_description(cls, v):
         if isinstance(v, str):
             return v.strip()
         return v
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PermissionOutput(BaseModel):
@@ -47,9 +45,7 @@ class PermissionOutput(BaseModel):
     description: str = ""
     model: str | None = None
     context: set[str]
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-RoleOutput.update_forward_refs()
+RoleOutput.model_rebuild()

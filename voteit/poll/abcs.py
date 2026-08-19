@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from abc import ABC
 from abc import abstractmethod
 from collections.abc import Iterable
@@ -20,6 +21,18 @@ if TYPE_CHECKING:
     from voteit.poll.models import VoteTransfer
 
 logger = getLogger(__name__)
+
+
+def vote_json(data: BaseModel) -> str:
+    """Serialise a vote exactly as pydantic v1's ``.json()`` did.
+
+    Vote strings are used verbatim as Counter keys in
+    ``Poll.finalize_vote_data`` and feed ``ballot_checksum``, so a formatting
+    change would split identical ballots across two keys -- and change the
+    checksum -- for any poll open across the upgrade. v2's
+    ``model_dump_json()`` emits compact separators where v1 used ", " and ": ".
+    """
+    return json.dumps(data.model_dump(mode="json"))
 
 
 class PollMethod(ABC):

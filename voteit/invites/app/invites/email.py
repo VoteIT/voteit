@@ -2,8 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.utils.translation import gettext_lazy as _
-from pydantic import EmailStr
-from pydantic import validator
+from pydantic import field_validator, EmailStr
 from pydantic.main import BaseModel
 
 from voteit.invites.abcs import InviteUserDataAdapter
@@ -17,7 +16,8 @@ if TYPE_CHECKING:
 class EmailSchema(BaseModel):
     email: EmailStr
 
-    @validator("email")
+    @field_validator("email")
+    @classmethod
     def transform_email(cls, v: str):
         return v.lower().strip()
 

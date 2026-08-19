@@ -2,10 +2,7 @@ from __future__ import annotations
 import os.path
 
 from django.conf import settings
-from pydantic import BaseModel
-from pydantic import conlist
-from pydantic import constr
-from pydantic import validator
+from pydantic import field_validator, Field, StringConstraints, BaseModel
 
 from voteit.app.skr import FILE_KOMMUNER
 from voteit.app.skr import FILE_REGIONER
@@ -14,20 +11,29 @@ from voteit.app.skr import REGION_TAG
 from voteit.meeting.dialects import DialectScript
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
+from typing import List
+from typing_extensions import Annotated
 
 
 class CSVRows(BaseModel):
-    rows: conlist(
-        conlist(
-            constr(strip_whitespace=True),
-            min_items=2,
-            max_items=2,
+    rows: Annotated[
+        List[
+            Annotated[
+                List[Annotated[str, StringConstraints(strip_whitespace=True)]],
+                Field(
+                    min_length=2,
+                    max_length=2,
+                ),
+            ]
+        ],
+        Field(
+            min_length=1,
+            max_length=500,
         ),
-        min_items=1,
-        max_items=500,
-    )
+    ]
 
-    @validator("rows", pre=True)
+    @field_validator("rows", mode="before")
+    @classmethod
     def transform_rows(cls, v):
         if isinstance(v, (list, tuple)):
             return [item.split("\t") if isinstance(item, str) else item for item in v]

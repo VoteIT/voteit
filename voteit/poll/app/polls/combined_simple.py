@@ -3,10 +3,10 @@ from __future__ import annotations
 from collections import Counter
 
 from django.utils.translation import gettext_lazy as _
-from pydantic import BaseModel
-from pydantic import validator
+from pydantic import field_validator, BaseModel
 
 from voteit.poll.abcs import PollMethod
+from voteit.poll.abcs import vote_json
 from voteit.poll.exceptions import InvalidProposalCount
 from voteit.poll.registries import poll_methods
 from voteit.poll.schemas import PollResult
@@ -25,7 +25,8 @@ class CombinedSimpleVoteSchema(BaseModel):
     no: list[int] = []
     abstain: list[int] = []
 
-    @validator("yes", "no", "abstain")
+    @field_validator("yes", "no", "abstain")
+    @classmethod
     def order_choices(cls, lst: list[int]):
         return sorted(lst)
 
@@ -53,10 +54,10 @@ class CombinedSimple(PollMethod):
     result_schema = CombinedSimplePollResult
 
     def vote_to_str(self, data: CombinedSimpleVoteSchema) -> str:
-        return data.json()
+        return vote_json(data)
 
     def vote_to_obj(self, text: str) -> CombinedSimpleVoteSchema:
-        return self.vote_schema.parse_raw(text)
+        return self.vote_schema.model_validate_json(text)
 
     @staticmethod
     def _count_votes(

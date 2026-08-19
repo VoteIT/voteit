@@ -1,12 +1,12 @@
 from typing import Any
 
 from django.contrib.auth.models import AbstractUser
-from pydantic import validator
+from pydantic import field_validator, ConfigDict
 from pydantic.main import BaseModel
 
 
 class _GenericVoteSchema(BaseModel):
-    vote: Any  # Override this
+    vote: Any = None  # Override this
     abstain: bool = False
 
 
@@ -30,7 +30,8 @@ class VoterWeightSchema(BaseModel):
     user: int
     weight: int
 
-    @validator("user", pre=True)
+    @field_validator("user", mode="before")
+    @classmethod
     def transform_user(cls, value):
         if isinstance(value, int):
             return value
@@ -38,7 +39,8 @@ class VoterWeightSchema(BaseModel):
             return value.pk
         raise ValueError("Wrong user type")
 
-    @validator("weight")
+    @field_validator("weight")
+    @classmethod
     def validate_weight(cls, v):
         """
         Always a positive int
@@ -60,7 +62,8 @@ class VoterWeightSchema(BaseModel):
 class VotersWeightsSchema(BaseModel):
     weights: list[VoterWeightSchema] = ()
 
-    @validator("weights")
+    @field_validator("weights")
+    @classmethod
     def validate_weights(cls, v):
         """
         >>> VotersWeightsSchema( weights=[{'user': 1, 'weight': 1}])
@@ -93,11 +96,11 @@ class ElectoralRegistryPolicySchema(BaseModel):
     handles_delegate_to: bool
     vote_transfer_policy: str | None = None
 
-    @validator("title", "description", pre=True)
+    @field_validator("title", "description", mode="before")
+    @classmethod
     def translate(cls, v):
         if not isinstance(v, str):
             return str(v)
         return v
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

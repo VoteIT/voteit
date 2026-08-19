@@ -1,5 +1,5 @@
 from django.db import models
-from pydantic import validator
+from pydantic import field_validator, ConfigDict
 from pydantic.main import BaseModel
 
 from voteit.speaker.abcs import ListMethod
@@ -10,13 +10,10 @@ from voteit.speaker.registries import list_method
 
 class PrioritySettingsSchema(BaseModel):
     max_times: int = 0
-    # "Number of times to prioritise a speaker. "
-    # "0 means always prioritise speakers who've spoken less than someone else."
+    model_config = ConfigDict(frozen=True)
 
-    class Config:
-        allow_mutation = False
-
-    @validator("max_times", pre=True)
+    @field_validator("max_times", mode="before")
+    @classmethod
     def set_to_zero_when_falsy(cls, v):
         """
         This is kind of a bugfix for frontend, but no harm

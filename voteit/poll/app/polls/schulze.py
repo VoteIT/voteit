@@ -5,8 +5,7 @@ from typing import Counter
 
 from django.utils.translation import gettext as _
 from py3votecore.schulze_method import SchulzeMethod
-from pydantic import BaseModel
-from pydantic import validator
+from pydantic import field_validator, ConfigDict, BaseModel
 
 from rest_framework.exceptions import ValidationError
 
@@ -35,7 +34,8 @@ class SchulzeSettingsSchema(BaseModel):
     stars: int = 5
     deny_proposal: bool = False
 
-    @validator("stars")
+    @field_validator("stars")
+    @classmethod
     def validate_stars(cls, v):
         if v > 20:
             raise ValueError("Must be 20 or less")
@@ -168,7 +168,8 @@ class RepeatedSchulzeResult(PollResult):
 class RepeatedSchulzeSettingsSchema(SchulzeSettingsSchema):
     winners: int | None = None  # None means all
 
-    @validator("winners", pre=True)
+    @field_validator("winners", mode="before")
+    @classmethod
     def transform_winners(cls, v):
         """
         Serializers will send "" as empty, but we require None here
@@ -177,14 +178,14 @@ class RepeatedSchulzeSettingsSchema(SchulzeSettingsSchema):
             v = None
         return v
 
-    @validator("winners")
+    @field_validator("winners")
+    @classmethod
     def validate_winners(cls, v):
         if v is not None and v < 2:
             raise ValueError("Must be either none or more than 1")
         return v
 
-    class Config:
-        allow_mutation = False
+    model_config = ConfigDict(frozen=True)
 
 
 @poll_methods

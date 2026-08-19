@@ -11,6 +11,11 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.utils.module_loading import import_string
+from types import UnionType
+from typing import Union
+from typing import get_args
+from typing import get_origin
+
 from pydantic import BaseModel
 from typing import Generator
 from yaml import safe_load
@@ -323,11 +328,26 @@ def check_dialect_files() -> list[tuple[str, str]]:
     return names_titles
 
 
+def _strip_optional(annotation):
+    """X | None -> X, leaving anything else alone."""
+    if get_origin(annotation) is UnionType or get_origin(annotation) is Union:
+        args = [a for a in get_args(annotation) if a is not type(None)]
+        if len(args) == 1:
+            return args[0]
+    return annotation
+
+
 def _get_schema_list_items(schema_cls: type[BaseModel]) -> set[str]:
+    """Names of the sequence fields, which dialects merge rather than replace.
+
+    Read off model_fields rather than the generated JSON Schema: v2 emits
+    anyOf with no top-level "type" for an Optional field, so a future
+    `list[X] | None` would silently drop out of the merge set.
+    """
     return {
-        k
-        for k, v in schema_cls.schema()["properties"].items()
-        if v.get("type") == "array"
+        name
+        for name, field in schema_cls.model_fields.items()
+        if get_origin(_strip_optional(field.annotation)) in (list, set, tuple)
     }
 
 

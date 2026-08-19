@@ -10,12 +10,15 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils.text import slugify
 from django.utils.timezone import now
-from pydantic import BaseModel
-from pydantic import Extra
+from pydantic import (
+    field_validator,
+    model_validator,
+    StringConstraints,
+    ConfigDict,
+    BaseModel,
+)
+from pydantic import ValidationInfo
 from pydantic import Field
-from pydantic import constr
-from pydantic import root_validator
-from pydantic import validator
 
 from voteit.core.utils import strict_clean_html
 from voteit.core.utils import strip_html
@@ -31,6 +34,7 @@ from voteit.proposal.models import TextParagraph
 from voteit.proposal.statemachines import ProposalStateMachine
 from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
+from typing_extensions import Annotated
 
 User = get_user_model()
 
@@ -41,7 +45,7 @@ def _m_to_s_default():
     return model_to_schema.copy()
 
 
-class BaseContext(BaseModel, extra=Extra.forbid):
+class BaseContext(BaseModel, extra="forbid"):
     model_to_schema: dict[type[models.Model], type[BaseModel]] = Field(
         default_factory=_m_to_s_default
     )
@@ -57,8 +61,9 @@ class BaseContext(BaseModel, extra=Extra.forbid):
     include_reactions: bool = False
     include_notes: bool = False  # This should be restrictive, not via rest API!
 
-    @validator("include_groups")
-    def validate_include_groups(cls, v: bool, values: dict):
+    @field_validator("include_groups")
+    @classmethod
+    def validate_include_groups(cls, v: bool, info: ValidationInfo):
         """
         >>> _ = BaseContext()
         >>> _ = BaseContext(clear_group_authors=True)
@@ -70,14 +75,15 @@ class BaseContext(BaseModel, extra=Extra.forbid):
         include_groups
           Groups are needed to set group authors - change 'clear_group_authors' or 'include_groups'
         """
-        if not v and not values.get("clear_group_authors", False):
+        if not v and not info.data.get("clear_group_authors", False):
             raise ValueError(
                 "Groups are needed to set group authors - change 'clear_group_authors' or 'include_groups'"
             )
         return v
 
-    @validator("include_reactions")
-    def validate_include_reactions(cls, v: bool, values: dict):
+    @field_validator("include_reactions")
+    @classmethod
+    def validate_include_reactions(cls, v: bool, info: ValidationInfo):
         """
         >>> _ = BaseContext()
         >>> _ = BaseContext(include_reactions=True)
@@ -89,7 +95,7 @@ class BaseContext(BaseModel, extra=Extra.forbid):
         include_reactions
           Buttons are needed to set reactions - change 'include_buttons'
         """
-        if v and not values.get("include_buttons", False):
+        if v and not info.data.get("include_buttons", False):
             raise ValueError(
                 "Buttons are needed to set reactions - change 'include_buttons'"
             )
@@ -122,13 +128,14 @@ class BaseContentData(BaseModel):
     created: datetime | None = None
     modified: datetime | None = None
     # mentions:list[int] FIXME: how do we handle this?
-    tags: list[constr(max_length=100, strip_whitespace=True)] = []
+    tags: list[
+        Annotated[str, StringConstraints(max_length=100, strip_whitespace=True)]
+    ] = []
     pk: str | None = None
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        orm_mode = True
-
-    @validator("pk", pre=True)
+    @field_validator("pk", mode="before")
+    @classmethod
     def convert_pk(cls, v):
         """
         Change to an unusable form to avoid mistakes later on.
@@ -142,10 +149,13 @@ class BaseContentData(BaseModel):
 
 class GroupMixin(BaseModel):
     # ID for meeting group
-    meeting_group: constr(max_length=100, strip_whitespace=True) | None = None
+    meeting_group: (
+        Annotated[str, StringConstraints(max_length=100, strip_whitespace=True)] | None
+    ) = None
     as_group: bool = False
 
-    @validator("meeting_group", pre=True)
+    @field_validator("meeting_group", mode="before")
+    @classmethod
     def meeting_groupid(cls, v):
         """
         >>> grp=MeetingGroup(groupid='hi-there')
@@ -166,7 +176,8 @@ class GroupMixin(BaseModel):
 class AuthorMixin(BaseModel):
     author: str | None = None
 
-    @validator("author", pre=True)
+    @field_validator("author", mode="before")
+    @classmethod
     def author_user(cls, v):
         """
         >>> user=User(pk=111, email='john@doe.com', username="john")
@@ -185,20 +196,22 @@ class AuthorMixin(BaseModel):
 
 
 class TextDocumentData(BaseModel):
-    title: constr(max_length=100, strip_whitespace=True)
-    base_tag: constr(max_length=40, strip_whitespace=True, to_lower=True)
+    title: Annotated[str, StringConstraints(max_length=100, strip_whitespace=True)]
+    base_tag: Annotated[
+        str, StringConstraints(max_length=40, strip_whitespace=True, to_lower=True)
+    ]
     body: str
     created: datetime | None = None
     modified: datetime | None = None
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        orm_mode = True
-
-    @validator("title", "body", pre=True)
+    @field_validator("title", "body", mode="before")
+    @classmethod
     def strip_html_from_text_doc(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 
-    @validator("base_tag")
+    @field_validator("base_tag")
+    @classmethod
     def check_base_tag(cls, v):
         """
         >>> TextDocumentData.check_base_tag('hello-world')
@@ -217,15 +230,27 @@ class TextDocumentData(BaseModel):
 
 class ProposalData(BaseContentData, AuthorMixin, GroupMixin):
     body: str
-    state: constr(strip_whitespace=True, to_lower=True, max_length=50) | None = None
+    state: (
+        Annotated[
+            str, StringConstraints(strip_whitespace=True, to_lower=True, max_length=50)
+        ]
+        | None
+    ) = None
     # FIXME: Should we have prop_id here?
-    prop_id: constr(strip_whitespace=True, to_lower=True, max_length=50) | None = None
+    prop_id: (
+        Annotated[
+            str, StringConstraints(strip_whitespace=True, to_lower=True, max_length=50)
+        ]
+        | None
+    ) = None
 
-    @validator("body", pre=True)
+    @field_validator("body", mode="before")
+    @classmethod
     def clean_proposal_body(cls, v):
         return strict_clean_html(v) if isinstance(v, str) else v
 
-    @validator("state")
+    @field_validator("state")
+    @classmethod
     def check_state(cls, v):
         """
         >>> ProposalData.check_state("published")
@@ -246,24 +271,26 @@ class ProposalData(BaseContentData, AuthorMixin, GroupMixin):
             raise ValueError(f"{v} is not a valid proposal state")
         return v
 
-    @root_validator(pre=True)  # Before validate_prop_id
+    @model_validator(mode="before")  # Before validate_prop_id
+    @classmethod
     def maybe_clear_prop_id_from_tags(cls, values):
         """
-        >>> ProposalData(prop_id='hello', tags=['hello','world'], body="").dict(include={'tags'})
+        >>> ProposalData(prop_id='hello', tags=['hello','world'], body="").model_dump(include={'tags'})
         {'tags': ['hello', 'world']}
         >>> with schema_context(clear_proposal_id=True):
-        ...     ProposalData(prop_id='hello', tags=['hello','world'], body="").dict(include={'tags'})
+        ...     ProposalData(prop_id='hello', tags=['hello','world'], body="").model_dump(include={'tags'})
         {'tags': ['world']}
         """
         ctx = get_context()
-        if ctx.clear_proposal_id:
+        if ctx.clear_proposal_id and isinstance(values, dict):
             if tags := values.get("tags"):
                 if prop_id := values.get("prop_id"):
                     if prop_id in tags:
                         tags.remove(prop_id)
         return values
 
-    @validator("prop_id")
+    @field_validator("prop_id")
+    @classmethod
     def validate_prop_id(cls, v: str | None):
         """
         >>> ProposalData.validate_prop_id('hello-world')
@@ -290,18 +317,26 @@ class DiffProposalData(ProposalData):
     text_document: str = ""  # Really base tag here
     paragraph: int  # Paragraph order num, not pk!
 
-    @validator("paragraph", pre=True, always=True)
-    def transform_paragraph(cls, v, values):
-        if isinstance(v, TextParagraph):
-            values["text_document"] = v.text_document.base_tag
-            return v.paragraph_id
-        return v
+    # Sets text_document as a side effect of reading paragraph, which a field
+    # validator cannot do in v2 -- info.data is a snapshot, not the model.
+    @model_validator(mode="before")
+    @classmethod
+    def transform_paragraph(cls, data):
+        if not isinstance(data, dict):
+            return data
+        paragraph = data.get("paragraph")
+        if isinstance(paragraph, TextParagraph):
+            data = dict(data)
+            data["text_document"] = paragraph.text_document.base_tag
+            data["paragraph"] = paragraph.paragraph_id
+        return data
 
 
 class DiscussionPostData(BaseContentData, AuthorMixin, GroupMixin):
     body: str
 
-    @validator("body", pre=True)
+    @field_validator("body", mode="before")
+    @classmethod
     def clean_discussion_body(cls, v):
         return strict_clean_html(v) if isinstance(v, str) else v
 
@@ -311,11 +346,10 @@ class ReactionData(BaseModel):
     agenda_item_id: str
     content_type: list[str]
     object_id: str
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        orm_mode = True
-
-    @validator("content_type", pre=True)
+    @field_validator("content_type", mode="before")
+    @classmethod
     def ct_to_natural_key(cls, v):
         if not isinstance(v, list):
             # Consistent behaviour + json friendly
@@ -328,7 +362,8 @@ class ReactionData(BaseModel):
             raise ValueError("Not a list with 2 items")
         return v
 
-    @validator("object_id", "agenda_item_id", pre=True)
+    @field_validator("object_id", "agenda_item_id", mode="before")
+    @classmethod
     def convert_ids(cls, v):
         """
         Change to an unusable form to avoid mistakes later on.
@@ -341,10 +376,12 @@ class ReactionData(BaseModel):
 
 
 class ReactionButtonData(BaseModel):
-    title: constr(max_length=80, strip_whitespace=True) = ""
-    description: constr(max_length=100, strip_whitespace=True) = ""
-    icon: constr(max_length=30, strip_whitespace=True) = ""
-    color: constr(max_length=15, strip_whitespace=True)
+    title: Annotated[str, StringConstraints(max_length=80, strip_whitespace=True)] = ""
+    description: Annotated[
+        str, StringConstraints(max_length=100, strip_whitespace=True)
+    ] = ""
+    icon: Annotated[str, StringConstraints(max_length=30, strip_whitespace=True)] = ""
+    color: Annotated[str, StringConstraints(max_length=15, strip_whitespace=True)]
     target: int | None = None
     order: int = 0
     change_roles: list[str]
@@ -356,15 +393,15 @@ class ReactionButtonData(BaseModel):
     vote_template: bool = False
     flag_mode: bool = False
     reactions: list[ReactionData] = []
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        orm_mode = True
-
-    @validator("title", "description", "icon", "color", pre=True)
+    @field_validator("title", "description", "icon", "color", mode="before")
+    @classmethod
     def strip_html_from_button_fields(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 
-    @validator("reactions", pre=True)
+    @field_validator("reactions", mode="before")
+    @classmethod
     def resolve_reactions(cls, v):
         ctx = get_context()
         if ctx.include_reactions:
@@ -398,19 +435,20 @@ class NoteData(BaseModel):
     body: str = ""
     intent: str = ""
     created: datetime | None = None
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        orm_mode = True
-
-    @validator("body", pre=True)
+    @field_validator("body", mode="before")
+    @classmethod
     def clean_note_body(cls, v):
         return strict_clean_html(v) if isinstance(v, str) else v
 
-    @validator("intent", pre=True)
+    @field_validator("intent", mode="before")
+    @classmethod
     def strip_html_from_intent(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 
-    @validator("proposal_id", pre=True)
+    @field_validator("proposal_id", mode="before")
+    @classmethod
     def convert_ids(cls, v):
         """
         Change to an unusable form to avoid mistakes later on.
@@ -421,7 +459,8 @@ class NoteData(BaseModel):
             v = "_" + v
         return v
 
-    @validator("user", pre=True)
+    @field_validator("user", mode="before")
+    @classmethod
     def to_username(cls, v):
         if isinstance(v, User):
             return v.username
@@ -429,35 +468,40 @@ class NoteData(BaseModel):
 
 
 class MeetingGroupData(BaseContentData):
-    title: constr(max_length=100, strip_whitespace=True) = ""
-    groupid: constr(max_length=100, strip_whitespace=True)
+    title: Annotated[str, StringConstraints(max_length=100, strip_whitespace=True)] = ""
+    groupid: Annotated[str, StringConstraints(max_length=100, strip_whitespace=True)]
     votes: int | None = None
     members: list[str] = []
     post_as: bool = False
     show_on_speaker: bool = True
     delegate_to: str | None = None
 
-    @validator("title", pre=True)
+    @field_validator("title", mode="before")
+    @classmethod
     def strip_group_title_html(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 
-    @validator("body", pre=True)
+    @field_validator("body", mode="before")
+    @classmethod
     def clean_group_body(cls, v):
         return strict_clean_html(v) if isinstance(v, str) else v
 
-    @validator("title")
-    def use_groupid_as_title_if_empty(cls, v, values: dict):
+    @field_validator("title")
+    @classmethod
+    def use_groupid_as_title_if_empty(cls, v, info: ValidationInfo):
         if not v:
-            v = values["groupid"]
+            v = info.data["groupid"]
         return v
 
-    @validator("members", pre=True)
+    @field_validator("members", mode="before")
+    @classmethod
     def fetch_members(cls, v):
         if isinstance(v, (models.QuerySet, models.Manager)):
             return list(v.values_list("username", flat=True))
         return v
 
-    @validator("delegate_to", pre=True)
+    @field_validator("delegate_to", mode="before")
+    @classmethod
     def resolve_delegate_to(cls, v):
         """
         >>> grp=MeetingGroup(groupid='hi-there')
@@ -474,44 +518,53 @@ class MeetingGroupData(BaseContentData):
 
 
 class AgendaItemData(BaseContentData):
-    title: constr(max_length=100, strip_whitespace=True)
-    state: constr(strip_whitespace=True, to_lower=True, max_length=50) | None = None
+    title: Annotated[str, StringConstraints(max_length=100, strip_whitespace=True)]
+    state: (
+        Annotated[
+            str, StringConstraints(strip_whitespace=True, to_lower=True, max_length=50)
+        ]
+        | None
+    ) = None
     block_discussion: bool = False
     block_proposals: bool = False
     text_documents: list[TextDocumentData] = []
     proposals: list[ProposalData | DiffProposalData] = []
     discussions: list[DiscussionPostData] = []
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        orm_mode = True
-
-    @validator("title", pre=True)
+    @field_validator("title", mode="before")
+    @classmethod
     def strip_ai_title_html(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 
-    @validator("body", pre=True)
+    @field_validator("body", mode="before")
+    @classmethod
     def clean_ai_body(cls, v):
         return strict_clean_html(v) if isinstance(v, str) else v
 
-    @validator("text_documents", pre=True)
+    @field_validator("text_documents", mode="before")
+    @classmethod
     def fetch_related_text(cls, v):
         return resolve_potential_manager(v)
 
-    @validator("proposals", pre=True)
+    @field_validator("proposals", mode="before")
+    @classmethod
     def fetch_related_proposals(cls, v):
         ctx = get_context()
         if not ctx.include_proposals:
             return []
         return resolve_potential_manager(v, select={"meeting_group", "author"})
 
-    @validator("discussions", pre=True)
+    @field_validator("discussions", mode="before")
+    @classmethod
     def fetch_related_qs(cls, v):
         ctx = get_context()
         if not ctx.include_discussions:
             return []
         return resolve_potential_manager(v, select={"meeting_group", "author"})
 
-    @validator("proposals", pre=True)
+    @field_validator("proposals", mode="before")
+    @classmethod
     def select_proposal_type(cls, v: list[dict | ProposalData | DiffProposalData]):
         """
         Duck-type dict data as a proposal
@@ -535,7 +588,8 @@ class AgendaItemData(BaseContentData):
             checked.append(item)
         return checked
 
-    @validator("state")
+    @field_validator("state")
+    @classmethod
     def check_state(cls, v):
         """
         >>> AgendaItemData.check_state("upcoming")
@@ -556,8 +610,11 @@ class AgendaItemData(BaseContentData):
             raise ValueError(f"{v} is not a valid Agenda item state")
         return v
 
-    @validator("proposals")
-    def unique_prop_ids(cls, v: list[ProposalData | DiffProposalData], values: dict):
+    @field_validator("proposals")
+    @classmethod
+    def unique_prop_ids(
+        cls, v: list[ProposalData | DiffProposalData], info: ValidationInfo
+    ):
         """
         >>> p = ProposalData
         >>> proposals=[p(prop_id="hi", body="Hi"), p(body="Hi")]
@@ -575,13 +632,14 @@ class AgendaItemData(BaseContentData):
             if prop.prop_id:
                 if prop.prop_id in found:
                     raise ValueError(
-                        f"Agenda item {values['title']} contains proposals with duplicate proposal id: #{prop.prop_id}"
+                        f"Agenda item {info.data['title']} contains proposals with duplicate proposal id: #{prop.prop_id}"
                     )
                 found.add(prop.prop_id)
         return v
 
-    @validator("text_documents")
-    def unique_base_tag(cls, v: list[TextDocumentData], values: dict):
+    @field_validator("text_documents")
+    @classmethod
+    def unique_base_tag(cls, v: list[TextDocumentData], info: ValidationInfo):
         """
         >>> t = TextDocumentData
         >>> text_documents=[t(base_tag="hi", title="Hi", body="Hi"), t(base_tag="hello", title="Hi", body="Hi")]
@@ -598,7 +656,7 @@ class AgendaItemData(BaseContentData):
         for tdd in v:
             if tdd.base_tag in found:
                 raise ValueError(
-                    f"Agenda item {values['title']} contains TextDocuments with duplicate base_tag: #{tdd.base_tag}"
+                    f"Agenda item {info.data['title']} contains TextDocuments with duplicate base_tag: #{tdd.base_tag}"
                 )
             found.add(tdd.base_tag)
         return v
@@ -609,11 +667,10 @@ class MeetingStructure(BaseModel):
     agenda_items: list[AgendaItemData] = []
     reaction_buttons: list[ReactionButtonData] = []
     notes: list[NoteData] = []
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        orm_mode = True
-
-    @validator("agenda_items", pre=True)
+    @field_validator("agenda_items", mode="before")
+    @classmethod
     def fetch_agenda_items(cls, v):
         return resolve_potential_manager(
             v,
@@ -624,28 +681,32 @@ class MeetingStructure(BaseModel):
             ),
         )
 
-    @validator("groups", pre=True)
+    @field_validator("groups", mode="before")
+    @classmethod
     def fetch_groups(cls, v):
         ctx = get_context()
         if not ctx.include_groups:
             return []
         return resolve_potential_manager(v)
 
-    @validator("reaction_buttons", pre=True)
+    @field_validator("reaction_buttons", mode="before")
+    @classmethod
     def fetch_reaction_buttons(cls, v):
         ctx = get_context()
         if not ctx.include_buttons:
             return []
         return resolve_potential_manager(v)
 
-    @validator("notes", pre=True)
+    @field_validator("notes", mode="before")
+    @classmethod
     def fetch_notes(cls, v):
         ctx = get_context()
         if not ctx.include_notes:
             return []
         return resolve_potential_manager(v)
 
-    @validator("groups")
+    @field_validator("groups")
+    @classmethod
     def check_unique_groupids(cls, v: list[MeetingGroupData]):
         """
         >>> f = MeetingStructure.check_unique_groupids
@@ -666,8 +727,9 @@ class MeetingStructure(BaseModel):
             raise ValueError("Duplicate groupid(s): '%s'" % "', '".join(duplicate))
         return v
 
-    @validator("agenda_items")
-    def check_groupids(cls, v: list[AgendaItemData], values):
+    @field_validator("agenda_items")
+    @classmethod
+    def check_groupids(cls, v: list[AgendaItemData], info: ValidationInfo):
         """
         >>> groups = [MeetingGroupData(groupid='hi')]
         >>> proposals = [ProposalData(meeting_group=None, body="Hi"), ProposalData(meeting_group='hi', body="Hi")]
@@ -681,7 +743,7 @@ class MeetingStructure(BaseModel):
         ...
         pydantic.error_wrappers.ValidationError: 1 validation error for MeetingStructure
         """
-        groupids = {mgd.groupid for mgd in values.get("groups", [])}
+        groupids = {mgd.groupid for mgd in info.data.get("groups", [])}
         for aid in v:
             for obj in chain(aid.proposals, aid.discussions):
                 if obj.meeting_group and obj.meeting_group not in groupids:
@@ -701,7 +763,8 @@ def resolve_potential_manager(v: models.Manager | Any, prefetch=(), select=()):
             v = v.select_related(*select)
         ctx = get_context()
         return [
-            ctx.model_to_schema[o.__class__].from_orm(o) for o in v.all().order_by("id")
+            ctx.model_to_schema[o.__class__].model_validate(o)
+            for o in v.all().order_by("id")
         ]
     return v
 
@@ -739,7 +802,8 @@ class ImportMeetingMeta(BaseModel):
     title: str = ""
     description: str = ""
 
-    @validator("title", "description", pre=True)
+    @field_validator("title", "description", mode="before")
+    @classmethod
     def strip_html_from_meta(cls, v):
         return strip_html(v) if isinstance(v, str) else v
 

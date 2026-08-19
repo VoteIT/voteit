@@ -39,7 +39,7 @@ class ImportFileSerializer(serializers.Serializer):
 
     Compare context arg with serializer args
     >>> from voteit.export_import.schemas import BaseContext
-    >>> schema_fields = set(BaseContext.schema()['properties'])
+    >>> schema_fields = set(BaseContext.model_json_schema()['properties'])
     >>> _ = [schema_fields.remove(x) for x in {'model_to_schema', 'include_notes'}]
     >>> serializer = ImportFileSerializer()
     >>> ser_fields = set(serializer.fields)

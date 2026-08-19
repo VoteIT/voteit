@@ -7,7 +7,7 @@ from typing import Generator
 from django.db.models import Exists
 from django.db.models import OuterRef
 from django.utils.translation import gettext_lazy as _
-from pydantic import constr
+from pydantic import StringConstraints
 from pydantic.main import BaseModel
 
 from voteit.invites.abcs import AnnotationDataAdapter
@@ -15,6 +15,7 @@ from voteit.invites.models import MeetingGroupAnnotation
 from voteit.invites.registries import invite_adapter_registry
 from voteit.invites.schemas import AnnotationResultSchema
 from voteit.meeting.models import GroupMembership
+from typing_extensions import Annotated
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -24,7 +25,9 @@ if TYPE_CHECKING:
 
 
 class GroupSchema(BaseModel):
-    group: constr(to_lower=True, strip_whitespace=True, max_length=100)
+    group: Annotated[
+        str, StringConstraints(to_lower=True, strip_whitespace=True, max_length=100)
+    ]
 
 
 @invite_adapter_registry

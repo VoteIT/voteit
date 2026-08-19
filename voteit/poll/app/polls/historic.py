@@ -1,32 +1,26 @@
 import json
 from abc import ABC
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 from voteit.poll.abcs import PollMethod
+from voteit.poll.abcs import vote_json
 from voteit.poll.app.polls.schulze import Schulze
 from voteit.poll.app.polls.schulze import SchulzeVoteSchema
 from voteit.poll.registries import poll_methods
 
 
 class HistoricSettingsData(BaseModel):
-    class Config:
-        extra = "allow"
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
 
 class HistoricVoteData(BaseModel):
-    class Config:
-        extra = "allow"
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
 
 class HistoricResultData(BaseModel):
     approved: list = []
     denied: list = []
-
-    class Config:
-        extra = "allow"
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
 
 class HistoricPollMethod(PollMethod, ABC):
@@ -56,7 +50,7 @@ class HistoricWithVoteData(HistoricPollMethod, ABC):
         >>> '"ever": "we"' in text
         True
         """
-        return data.json()
+        return vote_json(data)
 
     def vote_to_obj(self, text: str) -> BaseModel:
         """

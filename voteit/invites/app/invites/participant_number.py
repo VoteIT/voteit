@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic import conint
-from pydantic import validator
+from pydantic import field_validator, Field
 from pydantic.main import BaseModel
+from typing_extensions import Annotated
 
 
 if TYPE_CHECKING:
@@ -12,9 +12,10 @@ if TYPE_CHECKING:
 
 
 class ParticipantNumberSchema(BaseModel):
-    pn: conint(ge=1, le=999) | None = None
+    pn: Annotated[int, Field(ge=1, le=999)] | None = None
 
-    @validator("pn", pre=True)
+    @field_validator("pn", mode="before")
+    @classmethod
     def cleanup(cls, v):
         if isinstance(v, str):
             return v.strip() or None

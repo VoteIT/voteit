@@ -1,16 +1,15 @@
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import TYPE_CHECKING
+from typing import List, TYPE_CHECKING
 
-from pydantic import BaseModel
+from pydantic import field_validator, StringConstraints, ConfigDict, BaseModel
+from pydantic import ValidationInfo
 from pydantic import Field
-from pydantic import conlist
-from pydantic import constr
-from pydantic import validator
 
 from voteit.core.validators import ensure_unique
 from voteit.invites.utils import get_invite_adapter_registry
 from voteit.messaging.base import AddedOrUpdatedSchema
+from typing_extensions import Annotated
 
 if TYPE_CHECKING:
     pass
@@ -56,36 +55,51 @@ class RowColInvitesBaseSchema(BaseModel):
         rows
     """
 
-    columns: conlist(
-        constr(
-            strip_whitespace=True,
-            to_lower=True,
+    columns: Annotated[
+        List[
+            Annotated[
+                str,
+                StringConstraints(
+                    strip_whitespace=True,
+                    to_lower=True,
+                ),
+            ]
+        ],
+        Field(
+            max_length=20,
         ),
-        max_items=20,
-    )
-    rows: conlist(
-        conlist(
-            str | None | int,
-            max_items=30,
-        ),
-    )
+    ]
+    rows: Annotated[
+        List[
+            Annotated[
+                List[str | None | int],
+                Field(
+                    max_length=30,
+                ),
+            ]
+        ],
+        Field(),
+    ]
     dryrun: bool = False  # Abort transaction when complete!
 
-    @validator("columns")
+    @field_validator("columns")
+    @classmethod
     def validate_columns_unique(cls, v: list[str]):
         # Uniqueness is enforced here rather than via conlist(unique_items=True)
         # so that it runs *after* constr() has stripped and lowercased -- the v1
         # form compared the raw input and so missed case/whitespace duplicates.
         return ensure_unique(v)
 
-    @validator("columns")
+    @field_validator("columns")
+    @classmethod
     def validate_columns_requirements(cls, v: list[str]):
         reg = get_invite_adapter_registry()
         reg.check_column_req(v)
         return v
 
-    @validator("rows", pre=True)
-    def convert_rows(cls, v, values: dict):
+    @field_validator("rows", mode="before")
+    @classmethod
+    def convert_rows(cls, v, info: ValidationInfo):
         if isinstance(v, str):
             v = v.splitlines()
         if isinstance(v, list):
@@ -101,22 +115,24 @@ class RowColInvitesBaseSchema(BaseModel):
                         result.append(row)
                 else:
                     raise ValueError(f"Got bogus value on row {i}: {row}")
-            if "columns" not in values:
+            if "columns" not in info.data:
                 raise ValueError(
                     "Couldn't validate rows because of invalid column names"
                 )
             reg = get_invite_adapter_registry()
-            reg.preflight(values["columns"], result)
+            reg.preflight(info.data["columns"], result)
             return result
         raise ValueError("Initial value of rows must be either string or list")
 
-    @validator("rows")
+    @field_validator("rows")
+    @classmethod
     def validate_rows_unique(cls, v: list[list]):
         for row in v:
             ensure_unique(row)
         return ensure_unique(v)
 
-    @validator("rows")
+    @field_validator("rows")
+    @classmethod
     def check_row_len(cls, v: list):
         """
         >>> v = list(range(5))
@@ -145,11 +161,12 @@ class RowColInvitesBaseSchema(BaseModel):
             )
         return v
 
-    @validator("rows")
+    @field_validator("rows")
+    @classmethod
     def check_important_data_outside_read_columns(
-        cls, v: list[list[str]], values: dict
+        cls, v: list[list[str]], info: ValidationInfo
     ):
-        col_len = len(values["columns"])
+        col_len = len(info.data["columns"])
         bad_rows = []
         first_offender = None
         for i, row in enumerate(v):
@@ -172,10 +189,11 @@ class RowColInvitesBaseSchema(BaseModel):
             raise ValueError(msg)
         return v
 
-    @validator("rows")
-    def check_user_data_intersections(cls, v: list[list[str]], values: dict):
+    @field_validator("rows")
+    @classmethod
+    def check_user_data_intersections(cls, v: list[list[str]], info: ValidationInfo):
         reg = get_invite_adapter_registry()
-        reg.check_intersections(values["columns"], v)
+        reg.check_intersections(info.data["columns"], v)
         return v
 
 
@@ -205,24 +223,22 @@ class InviteDataTypesSchema(BaseModel):
     is_clearable: bool
     is_runnable: bool
 
-    @validator("title", pre=True)
+    @field_validator("title", mode="before")
+    @classmethod
     def translate(cls, v):
         if not isinstance(v, str):
             return str(v)
         return v
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InviteAddedOrUpdatedSchema(AddedOrUpdatedSchema):
     user_data: dict
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
-    class Config:
-        extra = "allow"
-        arbitrary_types_allowed = True
-
-    @validator("user_data")
+    @field_validator("user_data")
+    @classmethod
     def mask_sensitive(cls, v: dict):
         """
         >>> InviteAddedOrUpdatedSchema(pk=1, user_data={'email': 'jane@voteit.se', 'swedish_ssn': '191212121212'})
