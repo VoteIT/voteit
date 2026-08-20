@@ -38,6 +38,30 @@ def ws_test_settings(cls_or_func):
     )(cls_or_func)
 
 
+def widen_receive_timeout(communicator, margin: float = 5) -> None:
+    """Keep a drain's inner receive from expiring before the drain itself.
+
+    ``receive_all_messages()`` wraps its own timeout around
+    ``receive_json_from()`` using the *same* value, so both deadlines land in
+    the same event-loop iteration. If the loop wakes up late -- a busy test
+    suite is enough -- the inner one fires too, and asgiref reacts to that by
+    cancelling the whole ASGI application task
+    (``ApplicationCommunicator.receive_output``). The socket is dead from then
+    on, and the next send raises ``CancelledError`` rather than anything that
+    points at the cause.
+
+    Pushing the inner deadline past the outer one means the drain's own
+    timeout is always the one that fires.
+    """
+    # FIXME: This can be removed when ChanX updates.
+    original = communicator.receive_json_from
+
+    async def receive_json_from(timeout: float = 1):
+        return await original(timeout + margin)
+
+    communicator.receive_json_from = receive_json_from
+
+
 class BaseMessageCatcher:
     """Collects messages, optionally filtered by type or action name."""
 

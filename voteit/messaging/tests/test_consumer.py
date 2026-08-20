@@ -8,6 +8,8 @@ WebsocketTestCase is a TransactionTestCase: no setUpTestData, tables are
 truncated between tests, and objects must be re-fetched in setUp.
 """
 
+import asyncio
+import time
 from unittest.mock import patch
 
 from asgiref.sync import sync_to_async
@@ -31,6 +33,7 @@ from voteit.messaging.messages import ChannelSubscribe
 from voteit.messaging.messages import Ping
 from voteit.messaging.messages import Pong
 from voteit.messaging.models import Connection
+from voteit.messaging.testing import widen_receive_timeout
 from voteit.messaging.testing import ws_test_settings
 from voteit.organisation.models import Organisation
 
@@ -60,8 +63,17 @@ class ConsumerTestCase(WebsocketTestCase):
         self.meeting.add_roles(self.moderator, ROLE_MODERATOR, ROLE_PARTICIPANT)
         self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
 
+    def create_communicator(self, **kwargs):
+        communicator = super().create_communicator(**kwargs)
+        widen_receive_timeout(communicator)
+        return communicator
+
     async def _connect(self, user=None):
-        """Connect, authenticated as user unless anonymous is wanted."""
+        """Connect, authenticated as user unless anonymous is wanted.
+
+        An authenticated socket starts with s.versions, which is read here so
+        every test starts from a quiet socket.
+        """
         headers = []
         if user is not None:
             await self.async_client.aforce_login(user)
@@ -74,7 +86,19 @@ class ConsumerTestCase(WebsocketTestCase):
         communicator = self.create_communicator(headers=headers)
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
+        if user is not None:
+            self.versions = await self._receive_one(communicator)
         return communicator
+
+    async def _receive_one(self, communicator, timeout=1):
+        """Receive exactly one message.
+
+        Not receive_all_messages(): nothing acks the connect, so a drain here
+        could only end by running out its timeout -- a second per test, and
+        the case that used to leave the socket cancelled.
+        """
+        raw = await communicator.receive_json_from(timeout)
+        return communicator.consumer.outgoing_message_adapter.validate_python(raw)
 
     def _work(self):
         """Drain the subscribe queue with an in-process worker."""
@@ -94,13 +118,11 @@ class ConnectionTests(ConsumerTestCase):
 
     async def test_authenticated_gets_versions(self):
         communicator = await self._connect(self.moderator)
-        messages = await communicator.receive_all_messages(timeout=1)
-        self.assertIn("s.versions", [m.action for m in messages])
+        self.assertEqual("s.versions", self.versions.action)
         await communicator.disconnect()
 
     async def test_connection_row_created(self):
         communicator = await self._connect(self.moderator)
-        await communicator.receive_all_messages(timeout=1)
         exists = await Connection.objects.filter(
             user_id=self.moderator.pk, code__isnull=True
         ).aexists()
@@ -109,14 +131,31 @@ class ConnectionTests(ConsumerTestCase):
 
     async def test_disconnect_records_close_code(self):
         communicator = await self._connect(self.moderator)
-        await communicator.receive_all_messages(timeout=1)
         await communicator.disconnect()
         conn = await Connection.objects.filter(user_id=self.moderator.pk).afirst()
         self.assertIsNotNone(conn.code)
 
     async def test_ping_pong(self):
         communicator = await self._connect(self.moderator)
+        await communicator.send_message(Ping())
+        messages = await communicator.receive_all_messages(timeout=1)
+        self.assertIn(Pong(), messages)
+        await communicator.disconnect()
+
+    async def test_socket_survives_a_late_event_loop_wakeup(self):
+        """A drain that times out must not take the socket down with it.
+
+        Blocking the loop so that it wakes up past the drain's deadline used
+        to make asgiref cancel the application task, and the next send then
+        raised CancelledError instead of anything informative. See
+        voteit.messaging.testing.widen_receive_timeout.
+        """
+        communicator = await self._connect(self.moderator)
+        loop = asyncio.get_running_loop()
+        loop.call_later(0.95, lambda: time.sleep(0.3))
         await communicator.receive_all_messages(timeout=1)
+        self.assertFalse(communicator.future.cancelled())
+
         await communicator.send_message(Ping())
         messages = await communicator.receive_all_messages(timeout=1)
         self.assertIn(Pong(), messages)
@@ -139,7 +178,6 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_stream_order(self):
         communicator = await self._connect(self.moderator)
-        await communicator.receive_all_messages(timeout=1)
         messages = await self._subscribe(communicator, "meeting", self.meeting.pk)
         actions = [m.action for m in messages]
         self.assertEqual("channel.subscribed", actions[0])
@@ -148,7 +186,6 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_subscribed_payload(self):
         communicator = await self._connect(self.moderator)
-        await communicator.receive_all_messages(timeout=1)
         messages = await self._subscribe(communicator, "meeting", self.meeting.pk)
         subscribed = next(m for m in messages if m.action == "channel.subscribed")
         self.assertEqual(self.meeting.pk, subscribed.payload.pk)
@@ -158,7 +195,6 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_permission_denied(self):
         communicator = await self._connect(self.participant)
-        await communicator.receive_all_messages(timeout=1)
         await communicator.send_message(
             ChannelSubscribe(
                 payload={"channel_type": "moderators", "pk": self.meeting.pk}
@@ -176,7 +212,6 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_unknown_channel_type_never_reaches_the_queue(self):
         communicator = await self._connect(self.moderator)
-        await communicator.receive_all_messages(timeout=1)
         await communicator.send_message(
             ChannelSubscribe(payload={"channel_type": "nope", "pk": 1})
         )
@@ -188,7 +223,6 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_group_fanout(self):
         communicator = await self._connect(self.moderator)
-        await communicator.receive_all_messages(timeout=1)
         await self._subscribe(communicator, "meeting", self.meeting.pk)
         await sync_to_async(MeetingChannel(self.meeting.pk).sync_publish)(
             AgendaChanged(payload={"pk": 1, "title": "Hello"}), on_commit=False
@@ -204,7 +238,6 @@ class SubscribeTests(ConsumerTestCase):
     async def test_batch_collapse_end_to_end(self):
         """Several changes in one transaction arrive as one batch."""
         communicator = await self._connect(self.moderator)
-        await communicator.receive_all_messages(timeout=1)
         await self._subscribe(communicator, "meeting", self.meeting.pk)
 
         def publish_four():
@@ -225,7 +258,6 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_below_threshold_stays_individual(self):
         communicator = await self._connect(self.moderator)
-        await communicator.receive_all_messages(timeout=1)
         await self._subscribe(communicator, "meeting", self.meeting.pk)
 
         def publish_two():
@@ -244,7 +276,6 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_leave_stops_delivery(self):
         communicator = await self._connect(self.moderator)
-        await communicator.receive_all_messages(timeout=1)
         await self._subscribe(communicator, "meeting", self.meeting.pk)
         await communicator.send_message(
             ChannelLeave(payload={"channel_type": "meeting", "pk": self.meeting.pk})
@@ -263,7 +294,6 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_list_subscriptions(self):
         communicator = await self._connect(self.moderator)
-        await communicator.receive_all_messages(timeout=1)
         await self._subscribe(communicator, "meeting", self.meeting.pk)
         await self._subscribe(communicator, "moderators", self.meeting.pk)
         await communicator.send_message(ChannelListSubscriptions())
