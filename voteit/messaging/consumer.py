@@ -44,6 +44,7 @@ from voteit.messaging.messages import ClosingConnection
 from voteit.messaging.messages import Ping
 from voteit.messaging.messages import Pong
 from voteit.messaging.messages import RecheckSubscriptions
+from voteit.messaging.models import ABNORMAL_CLOSURE
 from voteit.messaging.models import Connection
 from voteit.messaging.registry import all_outgoing_messages
 from voteit.messaging.registry import context_channel_registry
@@ -188,7 +189,10 @@ class ConnectionMixin(ChanxWebsocketConsumerMixin):
         await self.update_connection()
 
     async def websocket_disconnect(self, message: dict):
-        await self.update_connection(code=message.get("code"))
+        # Fall back to 1006 rather than None: a disconnect message without a
+        # code would otherwise write the row back as still open, leaving a
+        # dangling connection behind a socket we know has gone.
+        await self.update_connection(code=message.get("code") or ABNORMAL_CLOSURE)
         await super().websocket_disconnect(message)
 
     async def update_connection(self, code: int | None = None) -> None:

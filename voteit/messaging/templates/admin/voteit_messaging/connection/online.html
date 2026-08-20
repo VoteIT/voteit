@@ -1,0 +1,99 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Online now</h1>
+
+<p>
+    Window:
+    {% for choice in window_choices %}
+        {% if choice == minutes %}
+            <strong>{{ choice }} min</strong>
+        {% else %}
+            <a href="?window={{ choice }}">{{ choice }} min</a>
+        {% endif %}
+        {% if not forloop.last %}&middot;{% endif %}
+    {% endfor %}
+    <br>
+    <small>
+        A connection counts as online when it is still open and did something
+        within the window. Open connections that have been silent for longer are
+        counted as stale instead &mdash; sockets that died without closing.
+    </small>
+</p>
+
+<table>
+    <tbody>
+        <tr><th>Users online</th><td>{{ user_count }}</td></tr>
+        <tr><th>Open sockets</th><td>{{ socket_count }}</td></tr>
+        <tr><th>Sockets per user</th><td>{{ sockets_per_user }}</td></tr>
+        <tr>
+            <th>Stale connections</th>
+            <td><a href="{{ stale_url }}">{{ stale_count }}</a></td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Per organisation</h2>
+{% if organisations %}
+<table>
+    <thead>
+        <tr><th>Organisation</th><th>Users online</th></tr>
+    </thead>
+    <tbody>
+        {% for row in organisations %}
+        <tr>
+            <td><a href="{{ row.url }}">{{ row.organisation.title }}</a></td>
+            <td>{{ row.users }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No organisations have online users right now.</p>
+{% endif %}
+
+<h2>Connected for</h2>
+<table>
+    <thead>
+        <tr><th>Duration</th><th>Sockets</th></tr>
+    </thead>
+    <tbody>
+        {% for bucket in buckets %}
+        <tr><td>{{ bucket.label }}</td><td>{{ bucket.count }}</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Longest current sessions</h2>
+{% if longest %}
+<table>
+    <thead>
+        <tr>
+            <th>User</th>
+            <th>Organisation</th>
+            <th>Connected at</th>
+            <th>Duration</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in longest %}
+        <tr>
+            <td>{{ row.user }}</td>
+            <td>{{ row.organisation }}</td>
+            <td>{{ row.connected_at }}</td>
+            <td>{{ row.duration }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p><small>
+    Duration is <code>last_action - connected_at</code>. Writes to
+    <code>last_action</code> are throttled to one per
+    <code>VOTEIT_CONNECTION_UPDATE_INTERVAL</code> seconds, so a duration lags
+    real time by up to that much.
+</small></p>
+{% else %}
+<p>Nobody is online right now.</p>
+{% endif %}
+
+<p><a href="{{ changelist_url }}">&larr; All connections</a></p>
+{% endblock %}

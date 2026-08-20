@@ -4,16 +4,23 @@ from auditlog.models import LogEntry
 from controlcenter import Dashboard
 from controlcenter import widgets
 from django.contrib.auth import get_user_model
+from django.db.models import Case
+from django.db.models import CharField
 from django.db.models import Count
 from django.db.models import IntegerField
 from django.db.models import OuterRef
 from django.db.models import Q
 from django.db.models import Subquery
 from django.db.models import Sum
+from django.db.models import Value
+from django.db.models import When
 from django.db.models.fields.json import KeyTransform
 from django.db.models.functions import Cast
 from django.utils import timezone
 from django.utils.functional import cached_property
+from voteit.messaging.models import GOING_AWAY
+from voteit.messaging.models import NORMAL_CLOSURE
+from voteit.messaging.models import ABNORMAL_CLOSURE
 from voteit.messaging.models import Connection
 from sql_util.aggregates import SubquerySum
 
@@ -295,6 +302,174 @@ class OnlineUserChart(widgets.BarChart):
         ]
 
 
+class HourlyChart(widgets.LineChart):
+    """Counts per hour over the last 24, bucketed on an hour lookup.
+
+    Same shape as ActionsLast24 -- the codebase uses ``__hour`` rather than
+    TruncHour throughout.
+    """
+
+    field = "timestamp"
+
+    class Chartist:
+        options = {
+            "onlyInteger": True,
+        }
+
+    @property
+    def start_this_hour(self):
+        return timezone.now().replace(minute=0, second=0, microsecond=0)
+
+    @property
+    def start_time(self):
+        return self.start_this_hour - timedelta(hours=24)
+
+    @staticmethod
+    def iter_hours():
+        this_hour = timezone.now().hour
+        for n in range(24):
+            yield (this_hour - n) % 24
+
+    def labels(self):
+        return [f"{h:02d}" for h in self.iter_hours()]
+
+    def series(self):
+        lookup = {
+            entry[f"{self.field}__hour"]: entry["sum"] for entry in self.get_queryset()
+        }
+        return [[lookup.get(hour, 0) for hour in self.iter_hours()]]
+
+
+class ConnectionsStartedLast24(HourlyChart):
+    title = "Websocket connections opened last 24 hours"
+    field = "connected_at"
+
+    def get_queryset(self):
+        return (
+            Connection.objects.filter(
+                connected_at__gte=self.start_time, connected_at__lt=self.start_this_hour
+            )
+            .order_by()
+            .values("connected_at__hour")
+            .annotate(sum=Count("pk"))
+        )
+
+
+class ClosedLast24Mixin:
+    """Connections that reported a close code during the last 24 hours."""
+
+    @property
+    def start_time(self):
+        return timezone.now() - timedelta(hours=24)
+
+    def closed_qs(self):
+        return Connection.objects.filter(
+            code__isnull=False, last_action__gte=self.start_time
+        )
+
+
+class SessionLengthChart(ClosedLast24Mixin, widgets.BarChart):
+    """How long finished sessions lasted.
+
+    Only as accurate as last_action, which is throttled to one write per
+    VOTEIT_CONNECTION_UPDATE_INTERVAL -- so treat the shortest bucket as
+    "a minute or less" rather than a precise figure.
+    """
+
+    title = "Session length, closed last 24h"
+
+    # Ordered shortest first; the last entry is the catch-all.
+    buckets = (
+        ("< 1 min", timedelta(minutes=1)),
+        ("1-5 min", timedelta(minutes=5)),
+        ("5-15 min", timedelta(minutes=15)),
+        ("15-60 min", timedelta(hours=1)),
+        ("1-4 h", timedelta(hours=4)),
+        ("> 4 h", None),
+    )
+
+    class Chartist:
+        options = {
+            "onlyInteger": True,
+        }
+
+    def bucket_case(self):
+        return Case(
+            *(
+                When(duration__lt=upper, then=Value(label))
+                for label, upper in self.buckets
+                if upper is not None
+            ),
+            default=Value(self.buckets[-1][0]),
+            output_field=CharField(),
+        )
+
+    def get_queryset(self):
+        return (
+            self.closed_qs()
+            .with_duration()
+            .annotate(bucket=self.bucket_case())
+            # order_by() clears Meta.ordering, which would otherwise join
+            # last_action into the GROUP BY and give one row per connection.
+            .order_by()
+            .values_list("bucket")
+            .annotate(sum=Count("pk"))
+        )
+
+    def labels(self):
+        return [label for label, _ in self.buckets]
+
+    def series(self):
+        lookup = dict(self.get_queryset())
+        return [[lookup.get(label, 0) for label, _ in self.buckets]]
+
+
+class CloseCodeChart(ClosedLast24Mixin, widgets.BarChart):
+    """Which close codes sockets reported, plus how many never reported one.
+
+    A large "still open" bar next to a small live-user count means dangling
+    rows are accumulating -- see close_stale_connections.
+    """
+
+    title = "Close codes last 24h"
+
+    code_labels = {
+        NORMAL_CLOSURE: f"{NORMAL_CLOSURE} normal",
+        GOING_AWAY: f"{GOING_AWAY} going away",
+        ABNORMAL_CLOSURE: f"{ABNORMAL_CLOSURE} abnormal",
+    }
+
+    class Chartist:
+        options = {
+            "onlyInteger": True,
+        }
+
+    @cached_property
+    def rows(self):
+        counts = list(
+            self.closed_qs()
+            .order_by()
+            .values_list("code")
+            .annotate(sum=Count("pk"))
+            .order_by("-sum")
+        )
+        still_open = (
+            Connection.objects.open().filter(connected_at__gte=self.start_time).count()
+        )
+        if still_open:
+            counts.append((None, still_open))
+        return counts
+
+    def labels(self):
+        return [
+            self.code_labels.get(code, "still open" if code is None else str(code))
+            for code, _ in self.rows
+        ]
+
+    def series(self):
+        return [[count for _, count in self.rows]]
+
+
 class LatestStats(Dashboard):
     title = "Recent"
     widgets = (
@@ -311,4 +486,14 @@ class NowStats(Dashboard):
     widgets = (
         OnlineUserChart,
         ActionsLast24,
+    )
+
+
+class SocketStats(Dashboard):
+    title = "Sockets"
+    widgets = (
+        OnlineUserChart,
+        ConnectionsStartedLast24,
+        SessionLengthChart,
+        CloseCodeChart,
     )

@@ -22,3 +22,6 @@ class MessagingConfig(AppConfig):
         # The consumer reads the outgoing registry when its class is created,
         # so every app's messages.py and channels.py must have been imported.
         autodiscover_modules("messages", "channels")
+        # Last: importing jobs runs @schedule_job, and jobs.py pulls in the
+        # message and channel registries it just populated.
+        from voteit.messaging import jobs  # noqa: F401

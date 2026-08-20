@@ -60,8 +60,31 @@ the whole codebase to v1.
   the old code.
 - `Connection` gains indexes; the equivalent lookup went from a 38ms sequential
   scan to 0.1ms on a table of ~860k rows.
+- **Websocket connections are visible in the admin.** `voteit.messaging` gets a
+  read-only `Connection` changelist (filter by online / stale / closed and by
+  organisation, sort by session duration, search by user), a live
+  `.../connection/online/` page (users online, sockets per user, per-org
+  breakdown, connected-for histogram, longest current sessions) and a new
+  `Sockets` dashboard tab under `/admin/dashboard/` with connections-per-hour,
+  session-length and close-code charts. Until now the only way to see who was
+  online was the online/offline filter on the user list.
+- **Stale connections are cleaned up.** `close_stale_connections` runs every 30
+  minutes and stamps close code 1006 on open rows that have been silent longer
+  than `VOTEIT_CONNECTION_STALE_JOB_AFTER` (1h). Nothing reaped this table
+  before, so rows from crashed workers stayed "open" forever and bloated the
+  partial index behind every presence query. No visible count changes — those
+  rows were already outside the `online()` window — and a socket that turns out
+  to be alive resets its own code on the next message. Setting
+  `VOTEIT_CONNECTION_RETENTION_DAYS` (default `None`, off) additionally deletes
+  long-closed rows; `voteit.stats.HistoryLog` already holds the daily
+  aggregates they feed.
 - First end-to-end websocket tests: previously everything was tested at the
   signal level and nothing exercised the consumer itself.
+
+### Fixes
+
+- A websocket disconnect whose ASGI message carried no close code used to write
+  the `Connection` row back as still open. It now records 1006.
 
 
 ## v0.47 (2026-08-17)

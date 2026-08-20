@@ -86,6 +86,7 @@ INSTALLED_APPS = [
 CONTROLCENTER_DASHBOARDS = (
     ("now", "voteit.stats.dashboards.NowStats"),
     ("latest", "voteit.stats.dashboards.LatestStats"),
+    ("sockets", "voteit.stats.dashboards.SocketStats"),
 )
 CONTROLCENTER_CHARTIST_COLORS = "material"  # Easier to tell apart
 
@@ -142,6 +143,14 @@ CHANX = {
 
 # Seconds between Connection.last_action writes for a busy socket.
 VOTEIT_CONNECTION_UPDATE_INTERVAL = 60
+# Seconds an open connection may stay silent before it counts as vanished.
+# Drives the admin's Online/Stale filters and the "Online now" page.
+VOTEIT_CONNECTION_STALE_AFTER = 15 * 60
+# The reaper is deliberately more forgiving than the display window above, so a
+# quiet-but-live socket is never marked closed on a hiccup.
+VOTEIT_CONNECTION_STALE_JOB_AFTER = 60 * 60
+# Delete closed connections older than this many days. None disables the purge.
+VOTEIT_CONNECTION_RETENTION_DAYS = None
 # Collapse this many or more same-action messages to one target into a
 # single <action>.batch message when a transaction commits.
 VOTEIT_BATCH_THRESHOLD = 3

@@ -7,6 +7,15 @@ from django.db import models
 from django.db.models import Q
 from django.utils.timezone import now
 
+# The RFC 6455 close codes we care about. 1006 is never sent in a close frame --
+# it means "closed abnormally, no close frame received", which is exactly what a
+# socket that vanished looks like, so it is what we record for one.
+NORMAL_CLOSURE = 1000
+GOING_AWAY = 1001
+ABNORMAL_CLOSURE = 1006
+
+NORMAL_CLOSE_CODES = (NORMAL_CLOSURE, GOING_AWAY)
+
 
 class ConnectionQuerySet(models.QuerySet):
     def open(self):
@@ -24,6 +33,27 @@ class ConnectionQuerySet(models.QuerySet):
         active recently.
         """
         return self.open().active_since(now() - within)
+
+    def stale(self, within: timedelta):
+        """Open connections that have been silent for longer than the window.
+
+        The complement of :meth:`online` over the open rows, and served by the
+        same partial index. These are almost always sockets that died with the
+        process rather than closing, so nothing ever wrote a close code.
+        """
+        return self.open().filter(last_action__lte=now() - within)
+
+    def with_duration(self):
+        """Annotate ``duration`` so it can be shown and sorted on.
+
+        As rough as ``last_action`` itself -- see the class docstring.
+        """
+        return self.annotate(
+            duration=models.ExpressionWrapper(
+                models.F("last_action") - models.F("connected_at"),
+                output_field=models.DurationField(),
+            )
+        )
 
     def user_ids(self):
         """For use as a subquery: ``.filter(pk__in=...user_ids())``."""

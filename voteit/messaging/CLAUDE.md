@@ -20,7 +20,8 @@ channel definitions and the `Connection` model. Built on
 | `registry.py` | `@outgoing` / `@channel` targets. `all_outgoing_messages()` feeds the consumer's `passthrough_events`. |
 | `batch.py` | `make_batch()` — generates the `<action>.batch` sibling of an outgoing type. |
 | `utils.py` | `publish()`, `Target`, `TransactionBatcher`, and `_send_now()`, the single point where anything reaches the channel layer. |
-| `jobs.py` | `subscribe_job` / `recheck_job`, run on the `default` RQ queue. |
+| `jobs.py` | `subscribe_job` / `recheck_job`, run on the `default` RQ queue, plus `close_stale_connections` (see below). |
+| `admin.py` | Read-only `Connection` admin, the `/admin/.../connection/online/` page and the stale-row action. |
 | `state.py` | `AppState`, the accumulator receivers append to. |
 | `testing.py` | `MessageCatcher`, `ChannelMessageCatcher`, `build_app_state`, `payloads_of`, `ws_test_settings`. |
 
@@ -53,6 +54,39 @@ channel.state_complete
 Contribute initial state by receiving `channel_subscribed` and calling
 `app_state.add_batch(MessageCls, payloads)`.
 
+## Connections and presence
+
+`Connection` is one row per socket. There is **no FK to the user** -- rows
+outlive the user they describe -- so every user-facing query goes through a
+subquery (`user_id__in=User.objects.filter(...).values("pk")`).
+
+`code` is the close code and is NULL while the socket is open, but Channels
+never reports a consumer that died with its process, so an open row is only
+evidence of presence when it has also been active recently. That is what
+`Connection.objects.online(within)` means; `.stale(within)` is its complement
+over the open rows, and both ride the `conn_open_last_action_idx` partial index.
+
+`last_action` is written at most once per `VOTEIT_CONNECTION_UPDATE_INTERVAL`
+seconds, and only when a message arrives -- `s.ping` is the de-facto heartbeat.
+Every duration derived from it is an estimate.
+
+`close_stale_connections` runs every 30 minutes and stamps `ABNORMAL_CLOSURE`
+(1006) on rows silent for longer than `VOTEIT_CONNECTION_STALE_JOB_AFTER`. It
+changes no visible number -- those rows were already outside every `online()`
+window -- it just keeps the partial index small. A socket that turns out to be
+alive heals itself: its next message sets `code` back to NULL. Setting
+`VOTEIT_CONNECTION_RETENTION_DAYS` additionally purges long-closed rows.
+
+## Admin
+
+- `/admin/voteit_messaging/connection/` -- read-only changelist, filterable by
+  state (online / stale / closed) and organisation, sortable by duration.
+- `/admin/voteit_messaging/connection/online/` -- live presence: users online,
+  sockets per user, per-organisation breakdown, how long people have been
+  connected, longest current sessions, stale count. `?window=` takes 5, 15 or 60.
+- `/admin/dashboard/sockets/` -- `SocketStats` in `voteit/stats/dashboards.py`:
+  connections opened per hour, session-length distribution, close codes.
+
 ## Gotchas
 
 - Handlers run in a **background task**, so ordering between separately-sent
@@ -65,3 +99,5 @@ Contribute initial state by receiving `channel_subscribed` and calling
 - The consumer reads the outgoing registry when its class is created, so every
   `messages.py` must be imported first (`autodiscover_modules`).
 - `/asyncapi/docs/` (DEBUG) renders the full contract.
+- The app label is `voteit_messaging`, not `messaging` (see `apps.py`), so admin
+  URL names and template paths use that.
