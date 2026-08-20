@@ -22,16 +22,21 @@ from rq import SimpleWorker
 
 from voteit.agenda.messages import AgendaChanged
 from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.messaging.channels import user_group
 from voteit.messaging.consumer import VoteitConsumer
 from voteit.messaging.messages import ChannelLeave
 from voteit.messaging.messages import ChannelListSubscriptions
 from voteit.messaging.messages import ChannelRef
 from voteit.messaging.messages import ChannelSubscribe
+from voteit.messaging.messages import CloseConnection
 from voteit.messaging.messages import Ping
 from voteit.messaging.messages import Pong
+from voteit.messaging.messages import RecheckSubscriptions
+from voteit.messaging.models import NORMAL_CLOSURE
 from voteit.messaging.models import Connection
 from voteit.messaging.testing import widen_receive_timeout
 from voteit.messaging.testing import ws_test_settings
@@ -309,3 +314,184 @@ class SubscribeTests(ConsumerTestCase):
             set(listed.payload.subscriptions),
         )
         await communicator.disconnect()
+
+    async def test_missing_context_yields_subscribe_error(self):
+        """A meeting deleted between listing it and subscribing to it.
+
+        The worker must answer, not fail the job -- _work() fails the test if
+        the job ends up in the failed registry.
+        """
+        communicator = await self._connect(self.moderator)
+        await communicator.send_message(
+            ChannelSubscribe(
+                payload={"channel_type": "meeting", "pk": self.meeting.pk + 1000}
+            )
+        )
+        await communicator.receive_all_messages(timeout=1)
+        await sync_to_async(self._work)()
+        messages = await communicator.receive_all_messages(
+            stop_action="channel.subscribe_error", timeout=2
+        )
+        actions = [m.action for m in messages]
+        self.assertIn("channel.subscribe_error", actions)
+        self.assertNotIn("channel.subscribed", actions)
+        await communicator.disconnect()
+
+
+class RecheckTests(ConsumerTestCase):
+    """Losing a role has to take the subscriptions it paid for with it.
+
+    A subscription is only permission-checked once, when it is granted, so
+    channel.recheck is the entire mechanism for revoking one on a socket that
+    is already open. Removing a role in the REST layer broadcasts it.
+    """
+
+    async def _subscribe(self, communicator, channel_type, pk):
+        await communicator.send_message(
+            ChannelSubscribe(payload={"channel_type": channel_type, "pk": pk})
+        )
+        await communicator.receive_all_messages(timeout=1)
+        await sync_to_async(self._work)()
+        return await communicator.receive_all_messages(
+            stop_action="channel.state_complete", timeout=2
+        )
+
+    async def _recheck(self, communicator, user):
+        await sync_to_async(VoteitConsumer.broadcast_event_sync)(
+            RecheckSubscriptions(), user_group(user.pk)
+        )
+        # The handler only enqueues; let it get that far before working.
+        await communicator.receive_all_messages(timeout=1)
+        await sync_to_async(self._work)()
+
+    async def test_revoked_channel_is_left(self):
+        communicator = await self._connect(self.moderator)
+        await self._subscribe(communicator, "moderators", self.meeting.pk)
+
+        await sync_to_async(self.meeting.remove_roles)(self.moderator, ROLE_MODERATOR)
+        await self._recheck(communicator, self.moderator)
+
+        messages = await communicator.receive_all_messages(
+            stop_action="channel.left", timeout=2
+        )
+        left = [m for m in messages if m.action == "channel.left"]
+        self.assertEqual(1, len(left))
+        self.assertEqual("moderators", left[0].payload.channel_type)
+        self.assertEqual(self.meeting.pk, left[0].payload.pk)
+        await communicator.disconnect()
+
+    async def test_revoked_channel_stops_delivering(self):
+        """The channel.left message is only half of it."""
+        communicator = await self._connect(self.moderator)
+        await self._subscribe(communicator, "moderators", self.meeting.pk)
+
+        await sync_to_async(self.meeting.remove_roles)(self.moderator, ROLE_MODERATOR)
+        await self._recheck(communicator, self.moderator)
+        await communicator.receive_all_messages(stop_action="channel.left", timeout=2)
+        await communicator.receive_all_messages(timeout=1)
+
+        await sync_to_async(ModeratorsChannel(self.meeting.pk).sync_publish)(
+            AgendaChanged(payload={"pk": 1, "title": "Secret"}), on_commit=False
+        )
+        self.assertTrue(await communicator.receive_nothing(timeout=0.5))
+        await communicator.disconnect()
+
+    async def test_still_allowed_channel_is_kept(self):
+        """Losing moderator must not cost the plain meeting channel."""
+        communicator = await self._connect(self.moderator)
+        await self._subscribe(communicator, "meeting", self.meeting.pk)
+        await self._subscribe(communicator, "moderators", self.meeting.pk)
+
+        await sync_to_async(self.meeting.remove_roles)(self.moderator, ROLE_MODERATOR)
+        await self._recheck(communicator, self.moderator)
+        await communicator.receive_all_messages(stop_action="channel.left", timeout=2)
+        await communicator.receive_all_messages(timeout=1)
+
+        await sync_to_async(MeetingChannel(self.meeting.pk).sync_publish)(
+            AgendaChanged(payload={"pk": 1, "title": "Public"}), on_commit=False
+        )
+        messages = await communicator.receive_all_messages(
+            stop_action="agenda_item.changed", timeout=2
+        )
+        self.assertIn("agenda_item.changed", [m.action for m in messages])
+        await communicator.disconnect()
+
+    async def test_left_channel_drops_out_of_list_subscriptions(self):
+        """on_left has to keep the consumer's own set in step."""
+        communicator = await self._connect(self.moderator)
+        await self._subscribe(communicator, "meeting", self.meeting.pk)
+        await self._subscribe(communicator, "moderators", self.meeting.pk)
+
+        await sync_to_async(self.meeting.remove_roles)(self.moderator, ROLE_MODERATOR)
+        await self._recheck(communicator, self.moderator)
+        await communicator.receive_all_messages(stop_action="channel.left", timeout=2)
+
+        await communicator.send_message(ChannelListSubscriptions())
+        messages = await communicator.receive_all_messages(
+            stop_action="channel.subscriptions", timeout=2
+        )
+        listed = next(m for m in messages if m.action == "channel.subscriptions")
+        self.assertEqual(
+            [ChannelRef(pk=self.meeting.pk, channel_type="meeting")],
+            listed.payload.subscriptions,
+        )
+        await communicator.disconnect()
+
+    async def test_nothing_subscribed_never_reaches_the_queue(self):
+        communicator = await self._connect(self.moderator)
+        await self._recheck(communicator, self.moderator)
+        self.assertEqual([], self.queue.job_ids)
+        self.assertTrue(await communicator.receive_nothing(timeout=0.5))
+        await communicator.disconnect()
+
+    async def test_recheck_keeps_everything_when_nothing_changed(self):
+        communicator = await self._connect(self.moderator)
+        await self._subscribe(communicator, "moderators", self.meeting.pk)
+
+        await self._recheck(communicator, self.moderator)
+
+        self.assertTrue(await communicator.receive_nothing(timeout=0.5))
+        await communicator.disconnect()
+
+
+class CloseConnectionTests(ConsumerTestCase):
+    """s.close, the server-side "go away" -- e.g. on logout.
+
+    Nothing in the repo sends it yet, so these tests are the only thing
+    holding the handler to its contract.
+    """
+
+    async def test_warns_before_closing(self):
+        communicator = await self._connect(self.moderator)
+        await sync_to_async(VoteitConsumer.broadcast_event_sync)(
+            CloseConnection(payload={"code": 4001}), user_group(self.moderator.pk)
+        )
+        messages = await communicator.receive_all_messages(
+            stop_action="s.closing", timeout=2
+        )
+        closing = next(m for m in messages if m.action == "s.closing")
+        self.assertEqual(4001, closing.payload.code)
+
+    async def test_socket_is_closed_with_the_requested_code(self):
+        """assert_closed() is not used here -- it only matches a bare close
+        frame, and the whole point of s.close is the code it carries."""
+        communicator = await self._connect(self.moderator)
+        await sync_to_async(VoteitConsumer.broadcast_event_sync)(
+            CloseConnection(payload={"code": 4001}), user_group(self.moderator.pk)
+        )
+        await communicator.receive_all_messages(stop_action="s.closing", timeout=2)
+        self.assertEqual(
+            {"type": "websocket.close", "code": 4001},
+            await communicator.receive_output(),
+        )
+
+    async def test_default_code_is_a_normal_closure(self):
+        communicator = await self._connect(self.moderator)
+        await sync_to_async(VoteitConsumer.broadcast_event_sync)(
+            CloseConnection(), user_group(self.moderator.pk)
+        )
+        await communicator.receive_all_messages(stop_action="s.closing", timeout=2)
+        self.assertEqual(
+            {"type": "websocket.close", "code": NORMAL_CLOSURE},
+            await communicator.receive_output(),
+        )

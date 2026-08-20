@@ -160,7 +160,10 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
         )
         return None
 
-    @event_handler
+    # output_type is spelled out because the warning goes out through
+    # send_message rather than as a return value, and chanx builds the
+    # outgoing union -- and /asyncapi/docs/ -- from handler annotations only.
+    @event_handler(output_type=ClosingConnection)
     async def close_connection(self, event: CloseConnection) -> None:
         await self.send_message(ClosingConnection(payload=event.payload))
         await self.close(event.payload.code)
