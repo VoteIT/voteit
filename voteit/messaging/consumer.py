@@ -71,7 +71,12 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
     # Not `subscriptions`: chanx uses that name for its own topic registry.
     channel_subs: set[ChannelRef]
 
-    @ws_handler(summary="Subscribe to a context channel")
+    # output_type is spelled out because chanx's AsyncAPI generator turns the
+    # NoneType arm of a `X | None` return annotation into a dangling
+    # `#/channels/voteit/messages/none_type` reference, which breaks /asyncapi/docs/.
+    @ws_handler(
+        summary="Subscribe to a context channel", output_type=ChannelSubscribeError
+    )
     async def subscribe(
         self, message: ChannelSubscribe
     ) -> ChannelSubscribeError | None:
