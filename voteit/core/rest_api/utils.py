@@ -10,6 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext as _
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
+from rest_framework.settings import api_settings
 from rules.contrib.models import RulesModelMixin
 
 from voteit.core import PERM
@@ -185,12 +186,34 @@ def pydantic_to_drf_validation_error(error: PydanticValidationError) -> Validati
     ...     list_exc = pydantic_to_drf_validation_error(exc)
     >>> list_exc.detail == {'inner': [{}, {'value': 'Input should be a valid integer, unable to parse string as an integer'}, {'value': 'Input should be a valid integer, unable to parse string as an integer'}]}
     True
+
+    Model validators belong to no single field, so they land under DRF's
+    non-field key rather than being dropped:
+
+    >>> class Ordered(pydantic.BaseModel):
+    ...     low: int
+    ...     high: int
+    ...
+    ...     @pydantic.model_validator(mode="after")
+    ...     def check_order(self):
+    ...         if self.low > self.high:
+    ...             raise ValueError("low must not exceed high")
+    ...         return self
+    ...
+    >>> try:
+    ...     Ordered(low=2, high=1)
+    ... except pydantic.ValidationError as exc:
+    ...     root_exc = pydantic_to_drf_validation_error(exc)
+    >>> root_exc.detail == {'non_field_errors': 'low must not exceed high'}
+    True
     """
     eoutput = {}
     for err in error.errors():
-        loc = err["loc"]
-        if loc:
-            _nested_set(eoutput, loc, _clean_msg(err["msg"]))
+        # A model validator raises with an empty loc -- it belongs to no single
+        # field. pydantic v1 spelled that ("__root__",); dropping it here would
+        # answer an invalid request with a bare 400 and no explanation at all.
+        loc = err["loc"] or (api_settings.NON_FIELD_ERRORS_KEY,)
+        _nested_set(eoutput, loc, _clean_msg(err["msg"]))
     return ValidationError(eoutput)
 
 
