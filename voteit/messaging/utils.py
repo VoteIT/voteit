@@ -118,9 +118,19 @@ def send_to_consumer(
 class TransactionBatcher:
     """Collects sends during an atomic block and collapses them on commit.
 
-    Replaces envelope's TransactionSender. Grouping is by (action, target);
-    insertion order is preserved across groups so that, say, the proposals a
-    poll refers to still arrive before the poll does.
+    Replaces envelope's TransactionSender. Grouping is by (action, target), and
+    the groups go out in the order their *first* message was added.
+
+    That is weaker than preserving insertion order, and the difference matters
+    if one message depends on another. Given ``poll, proposal, proposal,
+    proposal, poll`` to the same target, both polls leave in the first group --
+    so the second one now overtakes the proposals it may refer to.
+
+    Grouping by first occurrence rather than collapsing only consecutive runs
+    is deliberate: publishers interleave targets, so five proposals saved in
+    one request arrive as ``(prop, moderators), (prop, participants), ...`` and
+    consecutive-run collapsing would never batch anything at all. Order within
+    a group is always insertion order.
     """
 
     def __init__(self) -> None:

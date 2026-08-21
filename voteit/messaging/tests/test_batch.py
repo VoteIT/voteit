@@ -87,9 +87,7 @@ class TransactionBatcherTests(TestCase):
         self.assertEqual(2, len(out))
         self.assertEqual([self.target, self.other], [t for _, t in out])
 
-    def test_preserves_order_across_groups(self):
-        # Ordering matters: a poll referring to proposals must not overtake the
-        # proposals themselves.
+    def test_groups_go_out_in_order_of_first_occurrence(self):
         from voteit.poll.messages import PollChanged
 
         out = self._collapse(
@@ -99,6 +97,24 @@ class TransactionBatcherTests(TestCase):
         self.assertEqual(
             ["agenda_item.changed.batch", "poll.changed"], [m.action for m, _ in out]
         )
+
+    def test_a_later_message_joins_its_earlier_group(self):
+        # The limit of the ordering guarantee, pinned rather than endorsed: a
+        # second poll added last leaves with the first one, ahead of the
+        # agenda items it was queued behind. See the TransactionBatcher
+        # docstring.
+        from voteit.poll.messages import PollChanged
+
+        out = self._collapse(
+            [(PollChanged(payload={"pk": 8}), self.target)]
+            + [(self._msg(i), self.target) for i in range(3)]
+            + [(PollChanged(payload={"pk": 9}), self.target)]
+        )
+        self.assertEqual(
+            ["poll.changed", "poll.changed", "agenda_item.changed.batch"],
+            [m.action for m, _ in out],
+        )
+        self.assertEqual([8, 9], [m.payload.pk for m, _ in out[:2]])
 
     def test_empty(self):
         self.assertEqual([], self._collapse([]))

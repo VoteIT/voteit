@@ -99,8 +99,7 @@ All messages are outgoing, published to `MeetingChannel` (for room-level CRUD) o
 
 | Message name | Class | Channel | Payload |
 |---|---|---|---|
-| `room.changed` | `RoomChanged` | `MeetingChannel` | Full room serializer data. No `.added`; the client upserts on `pk`. |
-| `room.changed` | `RoomChanged` | `MeetingChannel` | Full room serializer data + optional `token` |
+| `room.changed` | `RoomChanged` | `MeetingChannel` | Full room serializer data + optional `token`. There is no `room.added`; the client upserts on `pk`. |
 | `room.deleted` | `RoomDeleted` | `MeetingChannel` | `pk` only |
 | `room.highlighted` | `RoomHighlighted` | `RoomChannel` | `{pk, highlighted: [int], token}` |
 | `room.marked` | `RoomMarked` | `RoomChannel` | `{room, start, end, proposal}` |

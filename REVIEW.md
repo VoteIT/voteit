@@ -114,8 +114,13 @@ pydantic v2 prefixes every validator `ValueError` with `"Value error, "` and
 reports them all as type `value_error` (the v1 dotted
 `value_error.datacolvalidation` form is gone).
 
-- The prefix is stripped in `pydantic_to_drf_validation_error`, so API messages
-  are unchanged.
+- The prefix is stripped in `pydantic_to_drf_validation_error`, so messages our
+  own validators raise are unchanged. pydantic's built-in messages *did* change
+  (`"value is not a valid integer"` → `"Input should be a valid integer, unable
+  to parse string as an integer"`); nothing can be done about that.
+- A model validator's error has an empty `loc` in v2 where v1 used
+  `("__root__",)`. It is now reported under `non_field_errors`; the first cut
+  dropped it, answering an invalid request with a bare `400 {}`.
 - The invites CSV-upload branches now `isinstance`-check the original exception
   out of `ctx`, which is sturdier than string matching. `voteit.invites` is
   fully green, including the "duplicate rows" message test.

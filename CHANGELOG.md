@@ -22,6 +22,9 @@ the whole codebase to v1.
 - **`s.batch` and `s.batch2` are gone.** Runs of the same message now collapse
   into a generated per-type `<action>.batch`, whose payload is
   `{"items": [<the normal payload>, ...]}` — typed, and described in the schema.
+  A batch may carry **one** item: live updates only collapse at
+  `VOTEIT_BATCH_THRESHOLD` (3) or more, but initial state is always sent
+  batched however few rows there are. Do not treat `.batch` as "several".
 - **`channel.subscribed` no longer carries `app_state`.** Subscribing now
   streams: `channel.subscribed` (channel metadata only), then the initial state
   as a series of messages, then the new **`channel.state_complete`**. Large
@@ -40,16 +43,26 @@ the whole codebase to v1.
   queue names will simply idle. Update any process manager or compose file.
 - **`ASGI_APPLICATION` moves to `project.asgi.application`** (was
   `project.routing.application`).
-- **New `messaging_connection` table** replaces `envelope_connection`. The
-  migration copies existing rows; `envelope_connection` is deliberately left in
-  place so this release can be rolled back, and will be dropped in a later one.
+- **New `voteit_messaging_connection` table** replaces `envelope_connection`.
+  The app label is `voteit_messaging`, not `messaging`: an unrelated
+  `voteit.messaging` app existed in 2021, and long-lived databases still carry
+  its `messaging.0001_initial` row, which would make Django skip our initial
+  migration as already applied. The migration copies existing rows;
+  `envelope_connection` is deliberately left in place so this release can be
+  rolled back, and will be dropped in a later one.
 - The websocket now enforces `AllowedHostsOriginValidator`, which it did not
   before. Verify `ALLOWED_HOSTS` covers the SPA's origin.
 
 ### Changes
 
-- **pydantic v2**. User-facing validation messages are unchanged: v2's
+- **pydantic v2**. Messages raised by our own validators are unchanged: v2's
   `"Value error, "` prefix is stripped before the message reaches the API.
+  pydantic's *built-in* messages did change, though, and there is no way around
+  it — `"value is not a valid integer"` is now `"Input should be a valid
+  integer, unable to parse string as an integer"`. Any client matching on error
+  strings rather than field names will need updating.
+  Errors from a model validator, which belong to no single field, are reported
+  under `non_field_errors` (v1 used `__root__`).
 - Vote serialisation is byte-for-byte identical to v1, deliberately. Serialised
   votes are used verbatim as counter keys and are hashed into
   `ballot_checksum`, so a formatting change would have split identical ballots

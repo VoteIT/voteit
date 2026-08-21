@@ -38,7 +38,14 @@ registers both. There is no `*.added` — the client upserts on `*.changed`.
 
 Publish with `SomeChannel(pk).sync_publish(msg)`. Inside a transaction the send
 is deferred to commit, where `VOTEIT_BATCH_THRESHOLD` (3) or more of the same
-action to the same target collapse into one batch.
+action to the same target collapse into one batch. Groups leave in the order
+their first message was added -- not full insertion order; see the
+`TransactionBatcher` docstring before relying on one message preceding another.
+
+`VOTEIT_WS_FAST_FANOUT` (default on) serialises a message once at the publisher
+and lets each consumer forward the frame unchanged. Turning it off routes
+through chanx's event dispatcher instead, which re-validates per recipient. The
+frame the client sees is the same either way.
 
 ## Subscribe
 
