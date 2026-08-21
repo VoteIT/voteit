@@ -6,7 +6,11 @@ Serves HTTP through Django and websockets through chanx/Channels.
 
 import os
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "project.settings_development")
+# Matches wsgi.py. Falling back to development settings here would mean an ASGI
+# server started without DJANGO_SETTINGS_MODULE runs production traffic with
+# DEBUG on, ALLOWED_HOSTS ["*"] and /asyncapi/docs/ served publicly. Local dev
+# sets this explicitly through .env.
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "project.settings_production")
 
 from channels.auth import AuthMiddlewareStack
 from channels.routing import ProtocolTypeRouter
