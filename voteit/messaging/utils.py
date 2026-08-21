@@ -39,6 +39,26 @@ class Target:
 
 def _send_now(message: BaseMessage, target: Target) -> None:
     """Hand one message to the channel layer. The single chokepoint."""
+    # chanx picks the channel layer off the consumer class rather than per
+    # call, so a non-default layer can only go the passthrough route.
+    if _fast_fanout() or target.layer != DEFAULT_CHANNEL_LAYER:
+        _send_passthrough(message, target)
+    else:
+        _send_typed(message, target)
+
+
+def _fast_fanout() -> bool:
+    return getattr(settings, "VOTEIT_WS_FAST_FANOUT", True)
+
+
+def _send_passthrough(message: BaseMessage, target: Target) -> None:
+    """Serialise once here and let every consumer forward the frame as-is.
+
+    chanx's ``handle_group_message`` does no validation of its own, so a
+    500-participant meeting pays for one ``model_dump`` rather than one
+    validate-plus-dump per recipient. Safe because the publisher already built
+    the message from a typed class.
+    """
     layer = get_channel_layer(target.layer)
     assert layer is not None, "No channel layer configured"
     payload = {
@@ -51,6 +71,26 @@ def _send_now(message: BaseMessage, target: Target) -> None:
         async_to_sync(layer.group_send)(target.name, payload)
     else:
         async_to_sync(layer.send)(target.name, payload)
+
+
+def _send_typed(message: BaseMessage, target: Target) -> None:
+    """Route through chanx's event dispatcher, which re-validates per recipient.
+
+    Measurably more expensive on wide fan-out -- hence
+    ``VOTEIT_WS_FAST_FANOUT`` -- but it is the library's own path, so it is
+    what to fall back to if the passthrough ever drifts from what chanx emits.
+    The wire frame is identical either way; the consumer's passthrough event
+    handler re-sends the message unchanged.
+
+    Only usable for messages registered with ``@outgoing``, since the receiving
+    consumer validates against that union before dispatching.
+    """
+    from voteit.messaging.consumer import VoteitConsumer
+
+    if target.group:
+        VoteitConsumer.broadcast_event_sync(message, target.name)
+    else:
+        VoteitConsumer.send_event_sync(message, target.name)
 
 
 def publish(message: BaseMessage, target: Target, *, on_commit: bool = True) -> None:

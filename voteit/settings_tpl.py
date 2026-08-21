@@ -154,6 +154,11 @@ VOTEIT_CONNECTION_RETENTION_DAYS = None
 # Collapse this many or more same-action messages to one target into a
 # single <action>.batch message when a transaction commits.
 VOTEIT_BATCH_THRESHOLD = 3
+# Serialise an outgoing message once at the publisher and let each consumer
+# forward the frame unchanged, instead of routing it through chanx's event
+# dispatcher, which re-validates it per recipient. Same frame either way; the
+# difference is CPU on wide fan-out. Set to False to use the library's own path.
+VOTEIT_WS_FAST_FANOUT = True
 
 RQ_QUEUES = {
     "default": {

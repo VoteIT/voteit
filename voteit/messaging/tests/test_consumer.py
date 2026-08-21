@@ -15,6 +15,7 @@ from unittest.mock import patch
 from asgiref.sync import sync_to_async
 from chanx.channels.testing import WebsocketTestCase
 from django.db import transaction
+from django.test import override_settings
 from django.contrib.auth import get_user_model
 from fakeredis import FakeRedis
 from rq import Queue
@@ -235,6 +236,24 @@ class SubscribeTests(ConsumerTestCase):
         messages = await communicator.receive_all_messages(
             stop_action="agenda_item.changed", timeout=2
         )
+        changed = [m for m in messages if m.action == "agenda_item.changed"]
+        self.assertEqual(1, len(changed))
+        self.assertEqual("Hello", changed[0].payload.title)
+        await communicator.disconnect()
+
+    async def test_group_fanout_typed_path(self):
+        # VOTEIT_WS_FAST_FANOUT=False routes the same message through chanx's
+        # event dispatcher instead, which re-validates it per recipient. The
+        # frame the client sees must be identical.
+        communicator = await self._connect(self.moderator)
+        await self._subscribe(communicator, "meeting", self.meeting.pk)
+        with override_settings(VOTEIT_WS_FAST_FANOUT=False):
+            await sync_to_async(MeetingChannel(self.meeting.pk).sync_publish)(
+                AgendaChanged(payload={"pk": 1, "title": "Hello"}), on_commit=False
+            )
+            messages = await communicator.receive_all_messages(
+                stop_action="agenda_item.changed", timeout=2
+            )
         changed = [m for m in messages if m.action == "agenda_item.changed"]
         self.assertEqual(1, len(changed))
         self.assertEqual("Hello", changed[0].payload.title)
