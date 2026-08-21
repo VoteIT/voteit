@@ -100,6 +100,21 @@ still run. The exception is a database error, which leaves the durable atomic
 block unusable and is re-raised — there is deliberately no savepoint per
 collector.
 
+**Prefer `.values()` to a ModelSerializer for anything bulk.** Six models carry
+a `python-statemachine` machine (`Meeting`, `AgendaItem`, `Proposal`, `Poll`,
+`SpeakerListSystem`, `MeetingInvite`), and `MachineMixin.__init__` builds a
+whole machine — callback registries and dispatchers — for *every* instance.
+Measured: **120 kB per model instance against 0.4 kB per `.values()` row, 280x**.
+Serializing 100 agenda items through DRF cost 12 MB to produce 20 kB of wire.
+
+`agenda.items` and `proposal.collectors.attach_proposals` both take the
+`.values()` route for this reason. It is only valid while the serializer has no
+method fields or nested serializers, so assert the equivalence rather than
+assume it — see `voteit/agenda/tests/test_collectors.py`. `poll.polls` and
+`invites.invites` still serialize instances; neither converts safely
+(`SerializerMethodField`, `PydanticFieldSerializer`, M2M), so they remain the
+two places where a very large meeting will show up in worker memory.
+
 ## Connections and presence
 
 `Connection` is one row per socket. There is **no FK to the user** -- rows

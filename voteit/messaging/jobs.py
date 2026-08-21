@@ -181,7 +181,8 @@ def subscribe_job(
 
         # Settled before anything is sent, so the client is told up front
         # exactly which sections to expect and never waits on a collector that
-        # opted out.
+        # opted out. A list, not a generator: it is walked twice, once for the
+        # names below and once to run them.
         collectors = [
             collector
             for collector in (cls(channel, user) for cls in collectors_for(channel_cls))

@@ -20,9 +20,25 @@ if TYPE_CHECKING:
     from voteit.messaging.state import AppState
 
 
+# Taken from the serializer rather than repeated, so the two cannot drift. Every
+# one is a plain concrete column, which is what makes the .values() below a
+# faithful substitute -- and if someone adds a method field to the serializer,
+# .values() raises FieldError rather than silently dropping it.
+AGENDA_ITEM_FIELDS = tuple(AgendaItemListSerializer.Meta.fields)
+
+
 @app_state_collectors
 class AgendaItems(AppStateCollector):
-    """The agenda, minus anything private unless this is the moderator channel."""
+    """The agenda, minus anything private unless this is the moderator channel.
+
+    Uses ``.values()`` rather than the serializer, for the same reason
+    ``proposal.collectors.attach_proposals`` does: instantiating the models
+    would bind a ``python-statemachine`` instance to each one via
+    ``MachineMixin.__init__``, which costs around 120 kB per agenda item --
+    roughly 600x the bytes that item contributes to the wire. The serializer
+    declares nine plain columns and no method fields, so the payloads are
+    identical either way; ``test_values_matches_the_serializer`` holds that.
+    """
 
     name = "agenda.items"
     channels = (ParticipantsChannel, ModeratorsChannel)
@@ -32,7 +48,7 @@ class AgendaItems(AppStateCollector):
         qs = self.context.agenda_items.all()
         if not isinstance(self.channel, ModeratorsChannel):
             qs = qs.exclude(state=AgendaItemStateMachine.private.value)
-        state.add_batch(AgendaChanged, AgendaItemListSerializer(qs, many=True).data)
+        state.add_batch(AgendaChanged, qs.values(*AGENDA_ITEM_FIELDS))
 
 
 @app_state_collectors
