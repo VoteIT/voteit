@@ -97,7 +97,7 @@ def notify_active_list_changed(instance: SpeakerListSystem, **kwargs):
 # System signals
 @receiver(post_save, sender=SpeakerListSystem)
 @disable_on_raw_save
-def notify_added_or_changed_speaker_system(instance: SpeakerListSystem, **kw):
+def notify_changed_speaker_system(instance: SpeakerListSystem, **kw):
     """
     Updates to speaker system, pushed to meeting channel.
     """
@@ -150,7 +150,7 @@ def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
 @receiver(post_save, sender=SpeakerList)
 @disable_on_raw_save
 @on_transaction_commit
-def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **kw):
+def notify_changed_speaker_list(instance: SpeakerList, created=None, **kw):
     """
     Send to Agenda or meeting channel depending on if it's the active list.
     """
@@ -179,7 +179,7 @@ def notify_deleted_speaker_list(instance: SpeakerList, **kw):
 @receiver(post_save, sender=Speaker)
 @disable_on_raw_save
 @on_transaction_commit
-def push_speaker_added_or_changed(instance: Speaker, **kwargs):
+def push_speaker_changed(instance: Speaker, **kwargs):
     # Speakers in the queue are sent as order on list - so we don't need to bother about lists that aren't active
     if instance.speaker_list.is_active_list:
         data = SpeakerSerializer(instance).data
