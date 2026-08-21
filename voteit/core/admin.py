@@ -18,6 +18,7 @@ from django.utils.timezone import now
 from auditlog.admin import LogEntryAdmin
 from auditlog.models import LogEntry
 from voteit.core.models import User
+from voteit.messaging.admin import stale_after
 from voteit.messaging.models import Connection
 from voteit.core.user_merger import UserMerger
 from voteit.discussion.models import DiscussionPost
@@ -52,7 +53,6 @@ class OnlineFilter(admin.SimpleListFilter):
     ONLINE = "o"
     DISCONNECTED = "d"
     WITHIN_LAST_MONTH = "l"
-    ONLINE_WINDOW = timedelta(minutes=15)
 
     def lookups(self, request, model_admin):
         """
@@ -78,13 +78,17 @@ class OnlineFilter(admin.SimpleListFilter):
         # rather than a reverse relation -- which also drops the .distinct()
         # that the join previously made necessary.
         if self.value():
+            # Same window as the Connection admin and the "Online now" page --
+            # VOTEIT_CONNECTION_STALE_AFTER -- read at call time so it stays one
+            # number rather than two that happen to agree.
+            window = stale_after()
             if self.value() == self.ONLINE:
                 return queryset.filter(
-                    pk__in=Connection.objects.online(self.ONLINE_WINDOW).user_ids()
+                    pk__in=Connection.objects.online(window).user_ids()
                 )
             elif self.value() == self.DISCONNECTED:
                 return queryset.exclude(
-                    pk__in=Connection.objects.online(self.ONLINE_WINDOW).user_ids()
+                    pk__in=Connection.objects.online(window).user_ids()
                 )
             elif self.value() == self.WITHIN_LAST_MONTH:
                 return queryset.filter(
