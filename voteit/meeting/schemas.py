@@ -63,7 +63,7 @@ class ComponentSettings(BaseModel):
     >>> ComponentSettings(name='404')
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError: 1 validation error for ComponentSettings
+    pydantic.ValidationError: 1 validation error for ComponentSettings
     >>> from voteit.components.app.components.proposal_print import ProposalPrint
     >>> ComponentSettings(name=ProposalPrint.name)
     ComponentSettings(name='proposal_print', settings=None)
@@ -73,11 +73,11 @@ class ComponentSettings(BaseModel):
     >>> ComponentSettings(name=FlashMessage.name)
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError: 1 validation error for ComponentSettings
+    pydantic.ValidationError: 1 validation error for ComponentSettings
     >>> ComponentSettings(name=FlashMessage.name, settings={'just': 'wrong'})
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError: 1 validation error for ComponentSettings
+    pydantic.ValidationError: 1 validation error for ComponentSettings
     """
 
     name: Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True)]
@@ -111,25 +111,25 @@ class SpeakerListSystemSchema(BaseModel):
     >>> _ = SpeakerListSystemSchema(method_name='404')
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError:
+    pydantic.ValidationError:
 
     >>> _ = SpeakerListSystemSchema(method_name='simple',  safe_positions=1)
     >>> _ = SpeakerListSystemSchema(method_name='simple',  safe_positions=5)
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError:
+    pydantic.ValidationError:
 
     >>> _ = SpeakerListSystemSchema(method_name='simple', meeting_roles_to_speaker=[ROLE_DISCUSSER])
     >>> SpeakerListSystemSchema(method_name='simple', meeting_roles_to_speaker=['404'])
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError:
+    pydantic.ValidationError:
 
     >>> _ = SpeakerListSystemSchema(method_name='simple', settings=None)
     >>> _ = SpeakerListSystemSchema(method_name='simple', settings={'hello': 1})
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError:
+    pydantic.ValidationError:
 
     >>> _ = SpeakerListSystemSchema(method_name='priority', settings={'max_times': 1})
     >>> _ = SpeakerListSystemSchema(method_name='priority', settings={})
@@ -203,12 +203,12 @@ class DialectSchema(BaseModel):
     >>> DialectSchema(**bad_roles)
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError:
+    pydantic.ValidationError:
     >>> _ = DialectSchema(block_roles=[], **data)
     >>> DialectSchema(block_roles=['jeff'], **data)
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError:
+    pydantic.ValidationError:
     """
 
     title: str

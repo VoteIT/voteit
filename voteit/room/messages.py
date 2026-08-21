@@ -46,12 +46,12 @@ class RoomMarkTextSchema(BaseModel):
     >>> S(start=1, end=2, room=1).model_dump(exclude_unset=True)
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError:
+    pydantic.ValidationError:
 
     >>> S(start=1, proposal=1, room=1).model_dump(exclude_unset=True)
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError:
+    pydantic.ValidationError:
     """
 
     room: int

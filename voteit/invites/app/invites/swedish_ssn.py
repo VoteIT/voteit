@@ -25,12 +25,12 @@ with suppress(ImportError):
         >>> SwedishSSN(swedish_ssn="20121212121")
         Traceback (most recent call last):
         ...
-        pydantic.error_wrappers.ValidationError:
+        pydantic.ValidationError:
 
         >>> SwedishSSN(swedish_ssn="99999999-9999")
         Traceback (most recent call last):
         ...
-        pydantic.error_wrappers.ValidationError:
+        pydantic.ValidationError:
         """
 
         swedish_ssn: str

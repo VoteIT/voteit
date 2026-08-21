@@ -51,7 +51,7 @@ class RowColInvitesBaseSchema(BaseModel):
     >>> s(columns={'email'}, rows=[['', 'hello@voteit.se']])
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError: 1 validation error for RowColInvitesBaseSchema
+    pydantic.ValidationError: 1 validation error for RowColInvitesBaseSchema
         rows
     """
 

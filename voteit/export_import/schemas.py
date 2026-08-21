@@ -71,7 +71,7 @@ class BaseContext(BaseModel, extra="forbid"):
         >>> _ = BaseContext(include_groups=False)
         Traceback (most recent call last):
         ...
-        pydantic.error_wrappers.ValidationError: 1 validation error for BaseContext
+        pydantic.ValidationError: 1 validation error for BaseContext
         include_groups
           Groups are needed to set group authors - change 'clear_group_authors' or 'include_groups'
         """
@@ -91,7 +91,7 @@ class BaseContext(BaseModel, extra="forbid"):
         >>> _ = BaseContext(include_buttons=False, include_reactions=True)
         Traceback (most recent call last):
         ...
-        pydantic.error_wrappers.ValidationError: 1 validation error for BaseContext
+        pydantic.ValidationError: 1 validation error for BaseContext
         include_reactions
           Buttons are needed to set reactions - change 'include_buttons'
         """
@@ -638,7 +638,7 @@ class AgendaItemData(BaseContentData):
         >>> _ = AgendaItemData(title="Doh", proposals=proposals)
         Traceback (most recent call last):
         ...
-        pydantic.error_wrappers.ValidationError: 1 validation error for AgendaItemData
+        pydantic.ValidationError: 1 validation error for AgendaItemData
         proposals
           Agenda item Doh contains proposals with duplicate proposal id: #same (type=value_error)
         """
@@ -663,7 +663,7 @@ class AgendaItemData(BaseContentData):
         >>> _ = AgendaItemData(title="Doh", text_documents=text_documents)
         Traceback (most recent call last):
         ...
-        pydantic.error_wrappers.ValidationError: 1 validation error for AgendaItemData
+        pydantic.ValidationError: 1 validation error for AgendaItemData
         text_documents
           Agenda item Doh contains TextDocuments with duplicate base_tag: #same (type=value_error)
         """
@@ -756,7 +756,7 @@ class MeetingStructure(BaseModel):
         >>> _ = MeetingStructure(groups=groups, agenda_items=agenda_items)
         Traceback (most recent call last):
         ...
-        pydantic.error_wrappers.ValidationError: 1 validation error for MeetingStructure
+        pydantic.ValidationError: 1 validation error for MeetingStructure
         """
         groupids = {mgd.groupid for mgd in info.data.get("groups", [])}
         for aid in v:

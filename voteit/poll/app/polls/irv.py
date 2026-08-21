@@ -108,12 +108,12 @@ class RepeatedIRVSettings(BaseModel):
     >>> s(winners=2, max=1, min=2).dict(include={'min', 'max'})
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError:
+    pydantic.ValidationError:
 
     >>> s(winners=1)
     Traceback (most recent call last):
     ...
-    pydantic.error_wrappers.ValidationError:
+    pydantic.ValidationError:
 
     """
 

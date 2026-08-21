@@ -71,7 +71,7 @@ class VotersWeightsSchema(BaseModel):
         >>> VotersWeightsSchema(weights=[{'user': 1, 'weight': 1}, {'user': 1, 'weight': 1}])
         Traceback (most recent call last):
         ...
-        pydantic.error_wrappers.ValidationError: 1 validation error for VotersWeightsSchema
+        pydantic.ValidationError: 1 validation error for VotersWeightsSchema
         """
         found = set()
         for vw in v:
