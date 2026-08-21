@@ -163,7 +163,9 @@ VOTEIT_WS_FAST_FANOUT = True
 # packed up to this size before a new frame is started, and an oversized
 # <action>.batch is re-chunked to fit. Comfortably under the 5 MiB
 # --websocket-max-message-size daphne runs with.
-VOTEIT_APP_STATE_BUNDLE_BYTES = 1_000_000
+VOTEIT_APP_STATE_BUNDLE_BYTES = int(
+    os.getenv("VOTEIT_APP_STATE_BUNDLE_BYTES", 1_000_000)
+)
 
 RQ_QUEUES = {
     "default": {

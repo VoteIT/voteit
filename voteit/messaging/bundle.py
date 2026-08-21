@@ -35,7 +35,6 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
-DEFAULT_BUNDLE_BYTES = 1_000_000
 # The ``{"action": ..., "payload": {"pk": ..., "sections": []}}`` wrapper.
 FRAME_OVERHEAD = 256
 # ``{"name": ..., "complete": true, "failed": false, "messages": []},``
@@ -43,7 +42,7 @@ SECTION_OVERHEAD = 64
 
 
 def budget_bytes() -> int:
-    return getattr(settings, "VOTEIT_APP_STATE_BUNDLE_BYTES", DEFAULT_BUNDLE_BYTES)
+    return getattr(settings, "VOTEIT_APP_STATE_BUNDLE_BYTES")
 
 
 def _json_size(obj) -> int:
