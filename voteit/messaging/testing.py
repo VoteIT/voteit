@@ -23,6 +23,18 @@ testing_channel_layers_setting = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
 }
 
+# Every websocket test has to send this.
+#
+# chanx builds its communicator from get_websocket_application(), which is the
+# real ASGI stack -- AllowedHostsOriginValidator included. That validator denies
+# a handshake whose Origin is missing entirely, unless ALLOWED_HOSTS contains
+# "*". settings_development sets ["*"], so a test without an Origin connects
+# locally; project.settings, which CI runs, does not, so the same test gets a
+# close frame and connect() returns False. Django's setup_test_environment()
+# already appends "testserver" to ALLOWED_HOSTS, so this origin is accepted
+# under either settings module.
+WS_TEST_ORIGIN_HEADER = (b"origin", b"http://testserver")
+
 
 def ws_test_settings(cls_or_func):
     """Settings a consumer test needs.

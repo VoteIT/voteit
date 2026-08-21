@@ -39,6 +39,7 @@ from voteit.messaging.messages import Pong
 from voteit.messaging.messages import RecheckSubscriptions
 from voteit.messaging.models import NORMAL_CLOSURE
 from voteit.messaging.models import Connection
+from voteit.messaging.testing import WS_TEST_ORIGIN_HEADER
 from voteit.messaging.testing import widen_receive_timeout
 from voteit.messaging.testing import ws_test_settings
 from voteit.organisation.models import Organisation
@@ -69,6 +70,12 @@ class ConsumerTestCase(WebsocketTestCase):
         self.meeting.add_roles(self.moderator, ROLE_MODERATOR, ROLE_PARTICIPANT)
         self.meeting.add_roles(self.participant, ROLE_PARTICIPANT)
 
+    def get_ws_headers(self):
+        # The communicator runs the production ASGI stack, origin validation
+        # included, so every handshake needs an Origin. See
+        # voteit.messaging.testing.WS_TEST_ORIGIN_HEADER.
+        return [WS_TEST_ORIGIN_HEADER]
+
     def create_communicator(self, **kwargs):
         communicator = super().create_communicator(**kwargs)
         widen_receive_timeout(communicator)
@@ -80,15 +87,15 @@ class ConsumerTestCase(WebsocketTestCase):
         An authenticated socket starts with s.versions, which is read here so
         every test starts from a quiet socket.
         """
-        headers = []
+        headers = list(self.ws_headers)
         if user is not None:
             await self.async_client.aforce_login(user)
-            headers = [
+            headers.append(
                 (
                     b"cookie",
                     self.async_client.cookies.output(header="", sep="; ").encode(),
                 )
-            ]
+            )
         communicator = self.create_communicator(headers=headers)
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
