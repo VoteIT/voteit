@@ -67,8 +67,8 @@ Serializers:
 **`AgendaItemChannel`** — per-item channel; permission `agenda.view_agendaitem`. Sends full body on subscription.
 
 **Outgoing broadcasts via signals (signals.py):**
-- `AgendaAdded` / `AgendaChanged` / `AgendaDeleted` → `ParticipantsChannel` (non-private only) and `ModeratorsChannel` (all)
-- `AgendaBodyAdded` / `AgendaBodyChanged` / `AgendaBodyDeleted` → `AgendaItemChannel`
+- `AgendaChanged` / `AgendaDeleted` → `ParticipantsChannel` (non-private only) and `ModeratorsChannel` (all). There is no `*.added`; the client upserts on `pk`.
+- `AgendaBodyChanged` / `AgendaBodyDeleted` → `AgendaItemChannel`
 - When an item becomes PRIVATE, `AgendaDeleted` is sent to `ParticipantsChannel` to hide it from non-moderators
 
 All signal-based messages are deferred to transaction commit (`@on_commit`). Bulk operations use `@disable_on_raw_save` to suppress signals.

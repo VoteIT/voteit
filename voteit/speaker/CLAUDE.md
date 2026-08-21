@@ -101,7 +101,7 @@ Pluggable ordering algorithms registered in `voteit.speaker.registries.list_meth
 The `ListMethod` interface:
 - `reorder(safe_speakers, incoming_order) -> Iterator[Speaker]` — receives speakers already sorted by current order; returns new order (not including safe speakers)
 - `get_queryset(speaker_list) -> QuerySet` — returns speakers in queue or currently speaking; may annotate with extra attributes (e.g. `spoken_count`, `gender_tag`) needed by `reorder`
-- `settings_schema` — optional Pydantic v1 model class; if present, `SpeakerListSystem.settings` validates against it
+- `settings_schema` — optional Pydantic model class; if present, `SpeakerListSystem.settings` validates against it
 
 `GenderAndPriority` hooks into `list_method_added` / `list_method_removed` signals to enable/disable the `GenderTags` meeting component automatically.
 
@@ -195,16 +195,15 @@ Export completed speaking turns for a system. Accessible to meeting moderators a
 
 All messages in `messages.py` are outgoing only (`@outgoing`).
 
+There is no `*.added` message; the client upserts on `*.changed`.
+
 | Message | Name | When |
 |---------|------|------|
-| `SpeakerSystemAdded` | `speaker_system.added` | System created |
-| `SpeakerSystemChanged` | `speaker_system.changed` | System updated |
+| `SpeakerSystemChanged` | `speaker_system.changed` | System created or updated |
 | `SpeakerSystemDeleted` | `speaker_system.deleted` | System deleted |
-| `SpeakerListAdded` | `speaker_list.added` | List created |
-| `SpeakerListChanged` | `speaker_list.changed` | List updated or active speaker changed |
+| `SpeakerListChanged` | `speaker_list.changed` | List created or updated, or active speaker changed |
 | `SpeakerListDeleted` | `speaker_list.deleted` | List deleted |
-| `SpeakerAdded` | `speaker.added` | Speaker joins active list |
-| `SpeakerChanged` | `speaker.changed` | Speaker updated (started/stopped) on active list |
+| `SpeakerChanged` | `speaker.changed` | Speaker joins, or is updated (started/stopped) on, the active list |
 | `SpeakerDeleted` | `speaker.deleted` | Speaker removed from active list |
 
 `SpeakerSerializer` includes a denormalised `room` field (source: `speaker_list.room`) so clients can route messages without traversing the list.
@@ -212,17 +211,17 @@ All messages in `messages.py` are outgoing only (`@outgoing`).
 ## Signals
 
 Custom signals defined in `signals.py`:
-- `active_list_changed(instance: SpeakerListSystem)` — fired when `active_list_id` changes; handler publishes `SpeakerListChanged` + a `Batch` of `SpeakerAdded` for all existing speakers to the `RoomChannel`
+- `active_list_changed(instance: SpeakerListSystem)` — fired when `active_list_id` changes; handler publishes `SpeakerListChanged` plus a pre-built `speaker.changed.batch` covering every existing speaker, to the `RoomChannel`
 - `list_method_added(sender=method_class, instance: SpeakerListSystem)` — fired on method assignment or system creation
 - `list_method_removed(sender=method_class, instance: SpeakerListSystem)` — fired on method change or system deletion
 
 **Django signal receivers:**
 
-- `post_save(SpeakerListSystem)` → `SpeakerSystemAdded`/`SpeakerSystemChanged` on `MeetingChannel` (synchronous, no commit deferral)
+- `post_save(SpeakerListSystem)` → `SpeakerSystemChanged` on `MeetingChannel` (synchronous, no commit deferral)
 - `pre_delete(SpeakerListSystem)` → `SpeakerSystemDeleted` on `MeetingChannel`; also fires `list_method_removed`
-- `post_save(SpeakerList)` → `SpeakerListAdded`/`SpeakerListChanged` on `AgendaItemChannel`; also on `RoomChannel` if it is the active list (deferred to commit)
+- `post_save(SpeakerList)` → `SpeakerListChanged` on `AgendaItemChannel`; also on `RoomChannel` if it is the active list (deferred to commit)
 - `pre_delete(SpeakerList)` → `SpeakerListDeleted` on `AgendaItemChannel`
-- `post_save(Speaker)` → `SpeakerListChanged` on `AgendaItemChannel` and `RoomChannel` if active (when `started` or `seconds` changed); also `SpeakerAdded`/`SpeakerChanged` on `RoomChannel` if active (deferred to commit)
+- `post_save(Speaker)` → `SpeakerListChanged` on `AgendaItemChannel` and `RoomChannel` if active (when `started` or `seconds` changed); also `SpeakerChanged` on `RoomChannel` if active (deferred to commit)
 - `pre_delete(Speaker)` → `SpeakerDeleted` on `RoomChannel` if active
 
 **Cross-app signal receivers:**
@@ -234,7 +233,7 @@ Custom signals defined in `signals.py`:
 - `channel_subscribed(MeetingChannel)` → pushes all systems and user's system roles to the subscriber
 - `channel_subscribed(RoomChannel)` → pushes active list and its speakers to the subscriber
 - `channel_subscribed(AgendaItemChannel)` → pushes all active-system lists for that item to the subscriber
-- `roles_added(SpeakerSystemRoles)` → ensures user has `ROLE_PARTICIPANT` in the meeting; also pushes `RolesAdded` to `MeetingChannel` and `UserChannel`
+- `roles_added(SpeakerSystemRoles)` → ensures user has `ROLE_PARTICIPANT` in the meeting; also pushes `RolesChanged` to `MeetingChannel` and `UserChannel`
 - `roles_removed(MeetingRoles, ROLE_PARTICIPANT in roles)` → removes all speaker system roles for that user from all systems in the meeting
 
 ## Notable Design Decisions

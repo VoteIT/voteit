@@ -53,17 +53,18 @@ All messages are outgoing-only and sent exclusively to the owning user's `UserCh
 
 | Message name | Class | Payload |
 |---|---|---|
-| `note.added` | `NoteAdded` | Full note data including `pk`, `proposal`, `agenda_item`, `meeting`, `user`, `body`, `intent`, `created` |
-| `note.changed` | `NoteChanged` | Same schema as `note.added` |
+| `note.changed` | `NoteChanged` | Full note data including `pk`, `proposal`, `agenda_item`, `meeting`, `user`, `body`, `intent`, `created` |
 | `note.deleted` | `NoteDeleted` | `pk` only |
 
-`NoteAdded` and `NoteChanged` use `NoteAddedOrUpdatedSchema`, which extends `AddedOrUpdatedSchema` with a `created: str` field. The `created` datetime is serialised to ISO 8601 with the current timezone by the base schema validator.
+There is no `note.added`; the client upserts on `pk`.
+
+`NoteChanged` uses `NoteAddedOrUpdatedSchema`, which extends `AddedOrUpdatedSchema` with a `created: str` field. The `created` datetime is serialised to ISO 8601 with the current timezone by the base schema validator.
 
 ### Signal handlers (`signals.py`)
 
-- `post_save` on `Note` — deferred to transaction commit via `@on_transaction_commit`; publishes `NoteAdded` or `NoteChanged` to `UserChannel(instance.user_id)`.
+- `post_save` on `Note` — deferred to transaction commit via `@on_transaction_commit`; publishes `NoteChanged` to `UserChannel(instance.user_id)`.
 - `pre_delete` on `Note` — not deferred (must fire before the row is gone); publishes `NoteDeleted` to `UserChannel(instance.user_id)`.
-- `channel_subscribed` on `AgendaItemChannel` — fires when a user subscribes to an agenda item channel. If `NotesComponent` is enabled for the meeting, it queries the user's notes for that agenda item and appends them as a single `Batch(t=NoteAdded.name, ...)` to the `app_state`. Uses `.values()` to avoid N+1 (two queries total regardless of note count).
+- `channel_subscribed` on `AgendaItemChannel` — fires when a user subscribes to an agenda item channel. If `NotesComponent` is enabled for the meeting, it queries the user's notes for that agenda item and appends them with `app_state.add_batch(NoteChanged, payloads)`, i.e. as one `note.changed.batch`. Uses `.values()` to avoid N+1 (two queries total regardless of note count).
 
 ## Components (`components.py`)
 

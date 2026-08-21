@@ -13,7 +13,7 @@ The frontend is a separate single-page application that communicates with this b
 - **Voting / Polls** — Pluggable poll methods (STV, approval, simple majority, …). Full electoral register support with configurable voter weight and delegation policies.
 - **Speaker queues** — Ordered speaker lists with presentation-mode support.
 - **Discussions** — Threaded discussion posts tied to agenda items.
-- **Real-time updates** — WebSocket push via Django Channels and the `envelope` protocol.
+- **Real-time updates** — WebSocket push via Django Channels and the `chanx` protocol.
 - **Role-based access** — Per-meeting roles (Moderator, Participant, Voter, …) with object-level permission rules.
 - **Multi-tenancy** — Every resource belongs to an `Organisation`; hostname routing maps tenants automatically.
 - **Token API** — Meeting-scoped API keys for programmatic or integration access.
@@ -32,7 +32,7 @@ The frontend is a separate single-page application that communicates with this b
 | Auth            | Token auth, Session auth, OAuth2 (IDProxy) |
 | Permissions     | `django-rules` (object-level predicates)   |
 | State machines  | `django-fsm`                               |
-| Validation      | Pydantic v1                                |
+| Validation      | Pydantic v2                                |
 | Package manager | `uv`                                       |
 
 ---

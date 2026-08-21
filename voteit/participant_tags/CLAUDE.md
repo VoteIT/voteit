@@ -20,7 +20,7 @@ There is no state machine and no `rules.py` — access control is enforced entir
 Tag namespaces are defined as meeting components that subclass `NamespacedTags(ComponentAdapter, ABC)`.
 
 `NamespacedTags` carries:
-- `schema = TagSettings` — Pydantic v1 model requiring `tags: conlist(str, min_items=1, unique_items=True)` and `many: bool = False`.
+- `schema = TagSettings` — Pydantic model requiring a non-empty list of unique `tags` and `many: bool = False`.
 - `namespace` — abstract class attribute; the short string key used as the JSON dict key in `ParticipantTags.tags`.
 
 Tag values are validated against `tag_format = re.compile(r"^[a-z0-9_\-]{1,20}$")` — lowercase ASCII/digits/hyphens/underscores, 1–20 chars.

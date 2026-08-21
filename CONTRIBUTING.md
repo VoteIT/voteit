@@ -181,7 +181,7 @@ voteit/myapp/
   workflows.py     # FSM state + transitions (if the model has a lifecycle)
   signals.py       # Django signals, WebSocket broadcasts
   channels.py      # ContextChannel subclass for WS push (if needed)
-  messages.py      # Envelope message classes for WS events (if needed)
+  messages.py      # Outgoing chanx message classes for WS events (if needed)
   admin.py         # Django admin registration
   rest_api/
     serializers.py

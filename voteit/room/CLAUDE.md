@@ -99,7 +99,7 @@ All messages are outgoing, published to `MeetingChannel` (for room-level CRUD) o
 
 | Message name | Class | Channel | Payload |
 |---|---|---|---|
-| `room.added` | `RoomAdded` | `MeetingChannel` | Full room serializer data |
+| `room.changed` | `RoomChanged` | `MeetingChannel` | Full room serializer data. No `.added`; the client upserts on `pk`. |
 | `room.changed` | `RoomChanged` | `MeetingChannel` | Full room serializer data + optional `token` |
 | `room.deleted` | `RoomDeleted` | `MeetingChannel` | `pk` only |
 | `room.highlighted` | `RoomHighlighted` | `RoomChannel` | `{pk, highlighted: [int], token}` |
@@ -109,9 +109,9 @@ All messages are outgoing, published to `MeetingChannel` (for room-level CRUD) o
 
 ### Signal handlers (`signals.py`)
 
-- `channel_subscribed` on `MeetingChannel` — serialises all rooms for the meeting and appends them as `RoomAdded` messages to `app_state`.
+- `channel_subscribed` on `MeetingChannel` — serialises all rooms for the meeting and appends them as `RoomChanged` messages to `app_state`.
 - `channel_subscribed` on `RoomChannel` — appends a `RoomHighlighted` message with the current `highlighted_proposal_pks`.
-- `post_save` on `Room` — publishes `RoomAdded` (on create) or `RoomChanged` (on update, with token) to `MeetingChannel`. Decorated with `@disable_on_raw_save`.
+- `post_save` on `Room` — publishes `RoomChanged` to `MeetingChannel` on create and update. Decorated with `@disable_on_raw_save`.
 - `pre_delete` on `Room` — publishes `RoomDeleted` to `MeetingChannel`.
 - `highlighted_proposals_changed` signal — publishes `RoomHighlighted` (with token) to `RoomChannel`.
 
@@ -149,7 +149,7 @@ python manage.py test voteit.room --keepdb --failfast
 Test modules:
 - `tests/test_models.py` — `Room` creation; `HighlightProposal` duplicate constraint and auto-ordering.
 - `tests/test_rules.py` — ADD / CHANGE / DELETE / HANDLE permissions for anonymous, participant, and moderator roles; archived-meeting blocks.
-- `tests/test_signals.py` — WebSocket messages on room create/update/delete; `MeetingChannel` subscription sends `RoomAdded`; `RoomChannel` subscription sends `RoomHighlighted`; N+1 query guard on room subscription.
+- `tests/test_signals.py` — WebSocket messages on room create/update/delete; `MeetingChannel` subscription sends `RoomChanged`; `RoomChannel` subscription sends `RoomHighlighted`; N+1 query guard on room subscription.
 - `tests/test_docs.py` — runs doctests defined in the `voteit.room` package (currently covers `RoomMarkTextSchema` validation).
 - `rest_api/tests/test_views.py` — full CRUD, permission checks, `handle` action (highlighted order, deduplication, cross-meeting rejection, token propagation, auto-open, auto-handler), `handle_speaker` scoping, `status` preflight, delete with SLS cascade.
 - `rest_api/tests/test_serializers.py` — `RoomDetailSerializer` field output; `RoomHandleSerializer` with/without highlights, bad PKs, cross-meeting proposals.

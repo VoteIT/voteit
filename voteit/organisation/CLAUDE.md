@@ -113,13 +113,13 @@ Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`:
 
 `OrganisationChannel` is a `ContextChannel` keyed by `Organisation` pk. Has `permission = None` (no explicit subscribe permission; any authenticated user can subscribe).
 
-On subscribe, `organisation_channel_subscribed` pushes the user's current org roles as a `RolesAdded` message appended to the initial app state. This is how the frontend learns its own role set on connection.
+On subscribe, `organisation_channel_subscribed` pushes the user's current org roles as a `RolesChanged` message appended to the initial app state. This is how the frontend learns its own role set on connection.
 
 ## Signals (`signals.py`)
 
 - `Organisation post_save` (not created) — publishes `OrganisationChanged` to `OrganisationChannel`. Skipped on `raw` saves.
 - `channel_subscribed` on `OrganisationChannel` — pushes the subscribing user's roles in the initial app state.
-- `roles_added` on `OrganisationRoles` — publishes `RolesAdded` to both `OrganisationChannel` and the affected user's personal `UserChannel`. Skipped on `raw` saves.
+- `roles_added` on `OrganisationRoles` — publishes `RolesChanged` to both `OrganisationChannel` and the affected user's personal `UserChannel`. Skipped on `raw` saves.
 - `roles_removed` on `OrganisationRoles` — same dual-publish for `RolesRemoved`. Not guarded by `@disable_on_raw_save` (intentional asymmetry).
 
 ## WebSocket Messages (`messages.py`)
@@ -138,7 +138,7 @@ On subscribe, `organisation_channel_subscribed` pushes the user's current org ro
 
 **`social_user` pipeline step replaces PSA's built-in.** The built-in would return an inactive user when a `UserSocialAuth` points to one, causing PSA's `do_complete` to reject every login attempt in a persistent loop. The custom step detects inactive users and redirects auth to an active duplicate (by `identity_id`) within the same organisation.
 
-**Role push on channel subscribe, not on login.** Org roles are not embedded in the login response. They are pushed as a `RolesAdded` message when the frontend subscribes to `OrganisationChannel`. This keeps the auth flow simple and the WS channel as the single source of truth for role state.
+**Role push on channel subscribe, not on login.** Org roles are not embedded in the login response. They are pushed as a `RolesChanged` message when the frontend subscribes to `OrganisationChannel`. This keeps the auth flow simple and the WS channel as the single source of truth for role state.
 
 **`bump_permissions` grants `org_manager` when identity server returns `is_superuser`.** This is not Django's `is_superuser` flag — it is a claim from the identity server. It grants an org-scoped manager role, not platform superuser access.
 

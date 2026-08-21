@@ -76,7 +76,7 @@ Annotations are applied alongside invite creation via the JSON REST endpoint or 
 ## WebSocket messages (`messages.py`)
 
 Outgoing only:
-- `meeting_invite.added` / `meeting_invite.changed` / `meeting_invite.deleted` — per-invite state changes pushed to `MeetingInvitesChannel`.
+- `meeting_invite.changed` / `meeting_invite.deleted` — per-invite state changes pushed to `MeetingInvitesChannel`. There is no `.added`; the client upserts on `pk`.
 
 `user_data` in outgoing messages is masked via `InviteAddedOrUpdatedSchema.mask_sensitive`.
 

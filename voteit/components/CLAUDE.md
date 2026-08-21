@@ -26,7 +26,7 @@ Abstract model base for `MeetingComponent` and `OrganisationComponent`. Key beha
 - `adapter` — `cached_property` that looks up `component_name` in the registry returned by `get_registry()`. Returns `None` (silently) if the name is not registered.
 - `adapted` — instantiates and returns the adapter: `self.adapter(self)`.
 - `is_valid` — `True` if the adapter exists and either has no schema or the stored `settings_data` validates against it.
-- `settings` property — reads `settings_data` and returns a hydrated Pydantic model, or `None` if invalid. The setter accepts a `dict` or a schema instance; it validates and stores via `schema.dict()`.
+- `settings` property — reads `settings_data` and returns a hydrated Pydantic model, or `None` if invalid. The setter accepts a `dict` or a schema instance; it validates and stores the dumped model.
 - `enable()` — calls `valid_component_name()` and `valid_settings()` and raises `ValueError` if either fails; then sets `enabled = True`. Does not save.
 - `disable()` — sets `enabled = False`. No validation. Does not save.
 
@@ -38,7 +38,7 @@ Abstract class that plugin authors subclass to define a component type. Class-le
 
 - `name` — unique string key used as the registry key and stored in `component_name`.
 - `title` — human-readable label.
-- `schema: type[BaseModel] | None = None` — optional Pydantic v1 model for settings validation. If `None`, the component has no configurable data.
+- `schema: type[BaseModel] | None = None` — optional Pydantic model for settings validation. If `None`, the component has no configurable data. The JSON Schema exposed over REST is pydantic v2 output: draft 2020-12, `$defs` rather than `definitions`, `anyOf` for optional fields.
 - `disable_on_close: bool = False` — if `True`, the component is automatically disabled when its meeting transitions to the `closed` state.
 
 The constructor receives the `Component` instance as `self.component`.
@@ -100,16 +100,16 @@ Registered at `meeting-components/`. Only `MeetingComponent` has a dedicated Vie
 
 All are outgoing-only, published to `MeetingChannel`:
 
-- **`meeting_component.added`** (`MeetingComponentAdded`) — new valid component or channel subscribe initial state.
+- **`meeting_component.changed`** (`MeetingComponentChanged`) — new or updated valid component, and the channel subscribe initial state. There is no `.added`; the client upserts.
 - **`meeting_component.changed`** (`MeetingComponentChanged`) — component updated and still valid.
 - **`meeting_component.deleted`** (`MeetingComponentDeleted`) — component deleted, or updated but now invalid/disabled so the frontend should remove it from its data layer.
 
-`OrganisationComponentAdded/Changed/Deleted` are defined but currently unused (no signal wires them).
+`OrganisationComponentChanged/Deleted` are defined but currently unused (no signal wires them).
 
 ## Signals (`signals.py`)
 
-- `channel_subscribed` on `MeetingChannel` — pushes `MeetingComponentAdded` for every component where `is_valid` is `True`, regardless of `enabled`. The frontend uses this to populate its data layer for all components, including disabled ones.
-- `post_save` on `MeetingComponent` (deferred to transaction commit) — on create: publishes `MeetingComponentAdded` if valid; on update: publishes `MeetingComponentChanged` if valid, otherwise `MeetingComponentDeleted` (telling the frontend to drop the record).
+- `channel_subscribed` on `MeetingChannel` — pushes `MeetingComponentChanged` for every component where `is_valid` is `True`, regardless of `enabled`. The frontend uses this to populate its data layer for all components, including disabled ones.
+- `post_save` on `MeetingComponent` (deferred to transaction commit) — publishes `MeetingComponentChanged` if valid, otherwise `MeetingComponentDeleted` (telling the frontend to drop the record).
 - `pre_delete` on `MeetingComponent` — publishes `MeetingComponentDeleted` immediately (before the row is gone).
 - `after_sm_transition` on `Meeting` — when the meeting enters `closed`, iterates all adapters with `disable_on_close = True`, finds enabled components with those names, calls `component.disable()` and saves.
 

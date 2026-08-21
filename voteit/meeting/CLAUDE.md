@@ -83,8 +83,8 @@ On `channel_subscribed`, the `meeting_channel_subscribed` signal handler pushes 
 1. `MeetingRoles` created → `meeting_joined` (deferred to transaction commit)
 2. `MeetingRoles` deleted → cascade delete `GroupMembership` for that user
 3. `GroupMembership` saved/deleted → `group_role_added` / `group_role_removed` → updates `MeetingRoles`
-4. `MeetingRoles` roles changed → `RolesAdded` / `RolesRemoved` pushed to `meeting` and user channels
-5. `Meeting` / `MeetingGroup` / `GroupMembership` saved → corresponding `Added` / `Changed` message pushed to `meeting` channel
+4. `MeetingRoles` roles changed → `RolesChanged` / `RolesRemoved` pushed to `meeting` and user channels (deltas, not upserts)
+5. `Meeting` / `MeetingGroup` / `GroupMembership` saved → corresponding `Changed` message pushed to `meeting` channel
 6. Any of the above deleted → `Deleted` message pushed (via `pre_delete`, deferred to commit)
 
 All signal handlers that publish messages defer via `on_transaction_commit=True` to avoid pushing before the DB row is visible.

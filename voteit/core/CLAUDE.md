@@ -166,7 +166,7 @@ Helper for ViewSets that need to look up a context object (e.g. a Meeting) from 
 
 `BaseModelSerializer` validates `author` and `meeting_group` with meeting-scoped permission checks. `RichTextSerializerMixin` auto-extracts hashtags from body into `tags` and numeric `@mentions` into `mentions` (filtered to actual meeting participants).
 
-`PydanticFieldSerializer` bridges Pydantic v1 models and DRF JSON fields — call `.dict()` on inbound Pydantic instances, passthrough for plain dicts.
+`PydanticFieldSerializer` bridges Pydantic models and DRF JSON fields — dumps inbound Pydantic instances, passthrough for plain dicts.
 
 ## Central Router (`rest_api/router.py`)
 
@@ -199,14 +199,14 @@ Custom Django signals defined here:
 - `roles_removed` — symmetric
 - `before_sm_transition` / `after_sm_transition` — state machine lifecycle hooks (see State Machine Integration above)
 
-On `consumer_connected` (WebSocket), `send_versions` pushes a `VersionMessage` with `BACKEND_VERSION` and `FRONTEND_VERSION` env vars to the newly connected client.
+`VoteitConsumer.post_authentication` sends a `VersionMessage` with the `BACKEND_VERSION` and `FRONTEND_VERSION` env vars to every newly connected client. (The envelope-era `consumer_connected` signal and its `send_versions` receiver are gone.)
 
 ## WebSocket Messages (`messages/`)
 
 Three outgoing message types defined here:
 
 - `VersionMessage` (`s.versions`) — backend + frontend version strings; sent on every WebSocket connect
-- `RolesAdded` (`roles.added`) / `RolesRemoved` (`roles.removed`) — notifies clients of role changes with `{user_pk, roles, pk, model}`
+- `RolesChanged` (`roles.changed`) / `RolesRemoved` (`roles.removed`) — notifies clients of role changes with `{user_pk, roles, pk, model}`. These are **deltas**, not object upserts: branch on the action pair, not on the name.
 - `InvalidateUserCache` (`user.inv`) — tells the SPA to re-fetch user data after a save or delete
 
 ## Background Jobs (`jobs.py`)

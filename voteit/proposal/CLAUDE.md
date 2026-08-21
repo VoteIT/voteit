@@ -14,7 +14,7 @@ python manage.py test voteit.proposal --keepdb --failfast
 - `statemachines.py` — `ProposalStateMachine`: states PUBLISHED / RETRACTED / VOTING / APPROVED / DENIED / UNHANDLED
 - `rules.py` — django-rules permission predicates for ADD / CHANGE / DELETE / RETRACT
 - `signals.py` — post-save/pre-delete handlers that broadcast to ParticipantsChannel and ModeratorsChannel
-- `messages.py` — `ProposalAdded`, `ProposalChanged`, `ProposalDeleted`, `TextDocumentAdded/Changed/Deleted` WebSocket messages
+- `messages.py` — `ProposalChanged`, `ProposalDeleted`, `TextDocumentChanged/Deleted` WebSocket messages (no `*.added`; the client upserts on `pk`)
 - `diff.py` — `Changes` class: word-level HTML diff between original and amended text
 - `app/proposal_id/userid.py` — `UseridPID`: default proposal-ID policy (e.g. `"john-doe-1"`)
 - `registries.py` — `proposal_id_registry`: Registry instance for ProposalIDPolicy plugins
@@ -39,7 +39,7 @@ python manage.py test voteit.proposal --keepdb --failfast
 Events such as `retract`, `lock_for_vote`, `approve`, `deny` are defined in `ProposalStateMachine` with `validators` that check permissions (not only at the API layer). The `RETRACT` permission string is exposed as `PERM_RETRACT = "retract"` in `__init__.py`. Trigger events via `proposal.sm.send(event_name, user=request.user)` or through the `POST /{id}/event/` REST endpoint.
 
 ### Signal-driven WebSocket broadcasting
-`signals.py` uses post_save / pre_delete signals to publish to envelope channels. `attach_proposals()` bundles proposals into `Batch` messages on channel subscribe (efficient initial load). Private agenda items are only sent to ModeratorsChannel. `@disable_on_raw_save` prevents broadcasts during data migrations.
+`signals.py` uses post_save / pre_delete signals to publish to `voteit.messaging` channels. `attach_proposals()` bundles proposals with `app_state.add_batch(ProposalChanged, ...)` on channel subscribe, arriving as one `proposal.changed.batch` (efficient initial load). Private agenda items are only sent to ModeratorsChannel. `@disable_on_raw_save` prevents broadcasts during data migrations.
 
 ### TextDocument + TextParagraph lifecycle
 `TextDocument.save()` is wrapped in `transaction.atomic()` and calls `create_text_paragraphs()` to split body on double newlines. `TextParagraph.tag` = `"{base_tag}-{paragraph_id}"`. A DiffProposal references a single `TextParagraph` — you cannot edit or delete a `TextDocument` that already has diff proposals (enforced by the `has_no_proposals` predicate on CHANGE/DELETE of TextDocument).

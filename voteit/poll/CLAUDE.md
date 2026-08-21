@@ -110,17 +110,18 @@ raise/convert to DRF `ValidationError` under the `vote` key. `vote` is required 
 
 ## WebSocket / Channels
 
-Handlers in `signals.py` (subscribed to `channels-envelope` events):
+Handlers in `signals.py` (subscribed to `voteit.messaging` signals):
 
 - **On subscription**: push current poll state, votes, ER, vote transfers to the joining user
-- **On poll change**: broadcast `PollAdded`/`PollChanged`/`PollDeleted` to appropriate channels
+- **On poll change**: broadcast `PollChanged`/`PollDeleted` to appropriate channels. There is no `*.added`; the client upserts on `pk`. Likewise `ElectoralRegisterChanged` and `VoteTransferChanged`.
 - **On vote cast**: send `PollStatus` (aggregate counts, only for polls attached to a meeting) to
   meeting channel; send `GenericVoteResponse` to the voter's user channel. This is a `Vote`
   `post_save` signal, so it fires the same way regardless of whether the vote was written via
   the REST endpoint above or directly through the ORM.
 
-Message types are Pydantic models in `messages.py`. There's no longer an incoming vote
-message - votes are cast via the REST endpoint above.
+Message types are chanx `BaseMessage` subclasses in `messages.py`, registered with
+`@outgoing`. There's no longer an incoming vote message - votes are cast via the REST
+endpoint above.
 
 ## Permissions
 

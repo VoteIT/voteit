@@ -27,10 +27,7 @@ def _mk_meeting(org):
     return Meeting.objects.create(organisation=org)
 
 
-@override_settings(
-    CHANNEL_LAYERS=testing_channel_layers_setting,
-    ENVELOPE_CONNECTIONS_QUEUE=None,
-)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class DeactivateUnusedUsersTests(TestCase):
     @classmethod
     def setUpTestData(cls):

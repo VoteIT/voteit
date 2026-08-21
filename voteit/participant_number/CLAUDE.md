@@ -25,16 +25,16 @@ There is no `rules.py` in this app. Permission checks delegate to the related me
 
 ## WebSocket messages (`messages.py`)
 
-All messages are outgoing-only, published to `MeetingChannel`. Pydantic v1 schemas.
+All messages are outgoing-only, published to `MeetingChannel`.
 
-- **`pn.added`** (`PNAdded`) — a new number was assigned; payload: `{meeting, number, user, pk}`.
+- **`pn.changed`** (`PNChanged`) — a number was assigned or updated; payload: `{meeting, number, user, pk}`. There is no `.added`; the client upserts on `pk`.
 - **`pn.changed`** (`PNChanged`) — an existing assignment was updated; same payload.
 - **`pn.deleted`** (`PNDeleted`) — an assignment was removed; payload: `{pk}` only (inherits from `BaseObjectDeleted`).
 
 ## Signals (`signals.py`)
 
-- `channel_subscribed` on `MeetingChannel` — when a user subscribes to the meeting channel, all current participant numbers are appended to `app_state` as `PNAdded` messages. Silently skips if no `PNSystem` exists for the meeting.
-- `post_save` on `ParticipantNumber` — publishes `PNAdded` on creation or `PNChanged` on update via `MeetingChannel.sync_publish`. Skips if `pns.meeting` is `None`. Uses `@disable_on_raw_save` to avoid firing during data loads.
+- `channel_subscribed` on `MeetingChannel` — when a user subscribes to the meeting channel, all current participant numbers are appended to `app_state` as `PNChanged` messages. Silently skips if no `PNSystem` exists for the meeting.
+- `post_save` on `ParticipantNumber` — publishes `PNChanged` on both creation and update via `MeetingChannel.sync_publish`. Skips if `pns.meeting` is `None`. Uses `@disable_on_raw_save` to avoid firing during data loads.
 - `pre_delete` on `ParticipantNumber` — publishes `PNDeleted` synchronously before the row is removed.
 
 ## Management command
@@ -61,5 +61,5 @@ python manage.py test voteit.participant_number --keepdb --failfast
 ```
 
 - `tests/test_models.py` — `get_user` lookup and both uniqueness constraints.
-- `tests/test_signals.py` — app state population on channel subscribe; `PNAdded`, `PNChanged`, `PNDeleted` WebSocket messages; auto-increment numbering verified via signal test.
+- `tests/test_signals.py` — app state population on channel subscribe; `PNChanged`, `PNDeleted` WebSocket messages; auto-increment numbering verified via signal test.
 - `tests/test_docs.py` — runs any doctests found in the package.

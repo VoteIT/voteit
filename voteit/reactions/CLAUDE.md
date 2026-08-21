@@ -14,7 +14,7 @@ python manage.py test voteit.reactions --keepdb --failfast
 - `mixins.py` — `Reactable` abstract mixin; adds `reaction_set` GenericRelation to a model
 - `rules.py` — permission predicates for ADD/CHANGE/DELETE on buttons and SET/REMOVE on reactions
 - `signals.py` — post_save/pre_delete handlers that broadcast WebSocket messages to `MeetingChannel`, `AgendaItemChannel`, and `UserChannel`
-- `messages.py` — outgoing WebSocket message types: `ButtonAdded`, `ButtonChanged`, `ButtonDeleted`, `ReactionCount`, `UserReactionAdded`, `UserReactionDeleted`
+- `messages.py` — outgoing WebSocket message types: `ButtonChanged`, `ButtonDeleted`, `ReactionCount`, `UserReactionChanged`, `UserReactionDeleted`
 - `rest_api/views.py` — `ReactionButtonViewSet` with `set`, `remove`, `list_reactions` custom actions
 - `rest_api/serializers.py` — `ButtonCreateSerializer`, `ButtonDetailSerializer`, `ReactionTargetSerializer`, `ReactionSerializer`
 
@@ -95,20 +95,21 @@ The `content_type` field in request bodies is a model shortname string (e.g. `"p
 
 All messages are outgoing only (server → client).
 
-**On MeetingChannel subscribe:** all `ReactionButton` records for the meeting are pushed as individual `ButtonAdded` messages.
+**On MeetingChannel subscribe:** all `ReactionButton` records for the meeting are pushed as individual `ButtonChanged` messages.
 
-**On AgendaItemChannel subscribe:** aggregated `ReactionCount` messages (one per button+object combination with count > 0) plus a `Batch` of `UserReactionAdded` messages for the subscribing user's own reactions within that agenda item are pushed. This is done in exactly 2 queries regardless of the number of buttons or reactions.
+**On AgendaItemChannel subscribe:** aggregated `ReactionCount` messages (one per button+object combination with count > 0) plus one `reaction.changed.batch` covering the subscribing user's own reactions within that agenda item are pushed. This is done in exactly 2 queries regardless of the number of buttons or reactions.
 
 | Message name | Type | Payload | Channel |
 |---|---|---|---|
-| `reaction_button.added` | `ButtonAdded` | Full button serialization | `MeetingChannel` |
 | `reaction_button.changed` | `ButtonChanged` | Full button serialization | `MeetingChannel` |
 | `reaction_button.deleted` | `ButtonDeleted` | `{pk}` | `MeetingChannel` |
 | `reaction.count` | `ReactionCount` | `{content_type, object_id, button, count}` | `AgendaItemChannel` |
-| `reaction.added` | `UserReactionAdded` | `{pk, content_type, object_id, button, user, agenda_item}` | `UserChannel` (reaction owner) |
+| `reaction.changed` | `UserReactionChanged` | `{pk, content_type, object_id, button, user, agenda_item}` | `UserChannel` (reaction owner) |
 | `reaction.deleted` | `UserReactionDeleted` | `{pk}` | `UserChannel` (reaction owner) |
 
-`UserReactionAdded`/`UserReactionDeleted` go to the individual user's `UserChannel` rather than being responses to the REST action — this ensures all open browser tabs stay in sync.
+`UserReactionChanged`/`UserReactionDeleted` go to the individual user's `UserChannel` rather than being responses to the REST action — this ensures all open browser tabs stay in sync.
+
+Note `reaction.changed` is a **delta**, not an object upsert: it pairs with `reaction.deleted`, so branch on the action pair rather than on the name.
 
 ## Non-obvious design decisions
 

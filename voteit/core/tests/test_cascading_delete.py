@@ -9,10 +9,7 @@ from voteit.meeting.models import Meeting
 User = get_user_model()
 
 
-@override_settings(
-    CHANNEL_LAYERS=testing_channel_layers_setting,
-    ENVELOPE_CONNECTIONS_QUEUE=None,
-)
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class GenerateValidUseridTests(TestCase):
     fixtures = ["meeting_test_fixture", "agenda_test_fixture"]
 

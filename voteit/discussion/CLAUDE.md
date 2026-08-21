@@ -69,13 +69,12 @@ All three messages extend base classes from `voteit.messaging.base`:
 
 | Message name | Trigger |
 |---|---|
-| `discussion_post.added` | `post_save` when `created=True` |
-| `discussion_post.changed` | `post_save` when `created=False` |
+| `discussion_post.changed` | `post_save`, on create and update alike — there is no `.added` |
 | `discussion_post.deleted` | `pre_delete` |
 
 All messages are published synchronously (`ch.sync_publish`) to `AgendaItemChannel` for the post's agenda item.
 
-On `AgendaItemChannel` subscription (`channel_subscribed` signal), existing posts are bundled into a `Batch(t="discussion_post.added")` message and appended to `app_state` for efficient initial load.
+On `AgendaItemChannel` subscription (`channel_subscribed` signal), existing posts are appended to `app_state` with `add_batch(DiscussionPostChanged, ...)`, arriving as one `discussion_post.changed.batch` for efficient initial load.
 
 The `@disable_on_raw_save` decorator on `discussion_post_change` suppresses broadcasts during data migrations (raw saves).
 

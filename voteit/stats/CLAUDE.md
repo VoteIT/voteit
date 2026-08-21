@@ -17,7 +17,7 @@ Key fields:
 | Field | Source |
 |---|---|
 | `action_count` / `action_types` | `auditlog.LogEntry` |
-| `user_online_count` / `online_duration` / `connection_count` | `envelope.Connection` |
+| `user_online_count` / `online_duration` / `connection_count` | `voteit.messaging.Connection` |
 | `login_count` | auditlog updates on `User` |
 | `speaker_count` / `spoken_duration` | `voteit.speaker.Speaker` |
 | `accepted_invitation_count` | `voteit.invites.MeetingInvite` |
@@ -50,8 +50,11 @@ Add new models here when a new content type should appear in daily stats. The re
 
 - **`LatestStats`** — 10-day rolling window: ActiveOrgs, ActiveOrgsOnline, DailyVoteChart, DailyOrgVoteChart, OnlineYesterdayChart.
 - **`NowStats`** — real-time: OnlineUserChart (last 20 min), ActionsLast24 (hourly buckets).
+- **`SocketStats`** — websocket connections: opened per hour, session-length distribution, close codes.
 
-Dashboard widgets query `HistoryLog` and live `envelope.Connection` / `auditlog.LogEntry` directly — they do not go through any service layer. `SubquerySum` (from `sql_util`) is used for efficient per-org aggregations.
+Dashboard widgets query `HistoryLog` and live `voteit.messaging.Connection` / `auditlog.LogEntry` directly — they do not go through any service layer. `SubquerySum` (from `sql_util`) is used for efficient per-org aggregations.
+
+`Connection` has **no FK to User**, so every user- or org-scoped connection query goes through an explicit subquery (`user_id__in=User.objects.filter(...).values("pk")`) rather than a join.
 
 ## Admin
 

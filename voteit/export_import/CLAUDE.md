@@ -16,7 +16,7 @@ Note: `empty_sign.yaml` has a deliberately empty signature — it passes the val
 
 - `exporter.py` — `Exporter`: converts `Meeting` → `ExportMeetingStructure` via Pydantic ORM mode
 - `importer.py` — `Importer`: parses YAML → schema → creates/updates DB objects; call `.run()` (or `importer()`) after `from_file()` / `from_stream()`
-- `schemas.py` — Pydantic v1 schemas for all entities; context-aware validators control filtering; HTML sanitization on every text field
+- `schemas.py` — Pydantic v2 schemas for all entities; context-aware validators control filtering; HTML sanitization on every text field
 - `utils.py` — HMAC-SHA256 signing/verification, `_NoAliasLoader`, `MAX_IMPORT_BYTES`, `MAX_UNSIGNED_IMPORT_BYTES`, `prepare_clone_importer()`, `direct_clone()`
 - `exceptions.py` — `ImportFileError`, `SignatureVerificationFailed`
 - `rest_api/views.py` — `MeetingDataViewSet`: `GET /yaml/`, `POST /import/`, `POST /clone/` — both `POST /import/` and `POST /clone/` accept a `preview` flag (see below)
@@ -32,8 +32,13 @@ All `include_*` / `clear_*` flags are passed through a `ContextVar` (`schema_con
 ### PK masking
 Integer PKs in exports are prefixed with `_` (e.g., `_123`) to mark them as placeholder IDs. On import they must be remapped — never used directly as DB PKs.
 
-### Pydantic v1
-The project pins Pydantic `<2`. Use `.from_orm()`, `@validator`, `class Config: orm_mode = True`. Do not use v2 syntax (`model_validator`, `field_validator`, `model_config`, etc.).
+### Pydantic v2
+Use `.model_validate()`, `@field_validator` / `@model_validator`, and `model_config = ConfigDict(from_attributes=True)`. The v1 spellings (`.from_orm()`, `@validator`, `class Config`) are gone.
+
+Two v2 behaviours bite in this module specifically:
+
+- `mode="before"` validators on the same field run in **reverse** declaration order, where v1 ran `pre=True` ones in declaration order. `AgendaItemData.fetch_related_proposals` does both of its steps in one validator for that reason — do not split it back up.
+- A field validator never runs when the field falls back to its default, so v1's `always=True` has no equivalent. Use `@model_validator(mode="after")`, and `self.model_fields_set` when the check should only apply to values that were actually supplied.
 
 ### Signing: HMAC-SHA256, quality indicator only
 `sign_payload()` uses `hmac.new(key, payload, "sha256")`. Signing is a **quality indicator** — it signals the file came from a VoteIT export, not arbitrary YAML. It is not an access-control boundary. `EXPORT_SECRET_KEY` (>10 chars) must be set in Django settings. If missing or short, `apps.ready()` logs a warning; `ValueError` is raised lazily by `get_export_secret()` when actually needed. Verification uses `secrets.compare_digest()` to prevent timing attacks.
@@ -68,7 +73,7 @@ Every user-supplied text field in `schemas.py` is sanitized on import:
 - **Rich-text body fields** (proposals, discussions, agenda items, groups, notes): `strict_clean_html()` — safe tags preserved, dangerous tags/attributes stripped
 - **TextDocument body**: `strip_html()` — the document text is plaintext, no HTML allowed
 
-Sanitization happens in Pydantic `@validator` methods (with `pre=True`) before the data reaches the model layer. Model-level `RichTextField` cleaners then act as a second pass.
+Sanitization happens in Pydantic `@field_validator` methods (with `mode="before"`) before the data reaches the model layer. Model-level `RichTextField` cleaners then act as a second pass.
 
 ### Synchronous import
 `POST /meeting-data/{id}/import/` validates and runs `importer.run()` inside `transaction.atomic(durable=True)`, returning `200 OK` + the stats dict. Import is fully synchronous in the request thread.
