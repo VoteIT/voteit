@@ -90,15 +90,12 @@ def ai_channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
 
 @receiver(post_save, sender=AgendaItem)
 @disable_on_raw_save
-def agenda_change(instance: AgendaItem = None, created=None, **kw):
+def agenda_change(instance: AgendaItem = None, **kw):
     participants_ch = ParticipantsChannel.from_instance(instance.meeting)
     moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
     data = AgendaItemListSerializer(instance).data
     # Base message that might only get sent to moderators
-    if created:
-        msg = AgendaChanged(payload=data)
-    else:
-        msg = AgendaChanged(payload=data)
+    msg = AgendaChanged(payload=data)
     if not instance.is_private:
         # The agenda item isn't private so publish to everyone
         participants_ch.sync_publish(msg)
@@ -106,11 +103,7 @@ def agenda_change(instance: AgendaItem = None, created=None, **kw):
     # And body for AI channel
     ai_ch = AgendaItemChannel.from_instance(instance)
     data = AgendaItemBodySerializer(instance).data
-    if created:
-        msg = AgendaBodyChanged(payload=data)
-    else:
-        msg = AgendaBodyChanged(payload=data)
-    ai_ch.sync_publish(msg)
+    ai_ch.sync_publish(AgendaBodyChanged(payload=data))
 
 
 @receiver(after_sm_transition, sender=AgendaItem)

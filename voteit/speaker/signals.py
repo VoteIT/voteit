@@ -97,21 +97,14 @@ def notify_active_list_changed(instance: SpeakerListSystem, **kwargs):
 # System signals
 @receiver(post_save, sender=SpeakerListSystem)
 @disable_on_raw_save
-def notify_added_or_changed_speaker_system(
-    instance: SpeakerListSystem, created=None, **kw
-):
+def notify_added_or_changed_speaker_system(instance: SpeakerListSystem, **kw):
     """
     Updates to speaker system, pushed to meeting channel.
     """
     if instance.meeting_id:
         meeting_ch = MeetingChannel(instance.meeting_id)
-        if created:
-            msg_class = SpeakerSystemChanged
-        else:
-            msg_class = SpeakerSystemChanged
         data = SpeakerListSystemSerializer(instance).data
-        msg = msg_class(payload=data)
-        meeting_ch.sync_publish(msg)
+        meeting_ch.sync_publish(SpeakerSystemChanged(payload=data))
 
 
 @receiver(post_save, sender=Speaker)
@@ -161,12 +154,8 @@ def notify_added_or_changed_speaker_list(instance: SpeakerList, created=None, **
     """
     Send to Agenda or meeting channel depending on if it's the active list.
     """
-    if created:
-        msg_class = SpeakerListChanged
-    else:
-        msg_class = SpeakerListChanged
     data = SpeakerListSerializer(instance).data
-    msg = msg_class(payload=data)
+    msg = SpeakerListChanged(payload=data)
     if instance.agenda_item_id:
         ai_channel = AgendaItemChannel(instance.agenda_item_id)
         ai_channel.sync_publish(msg)
@@ -190,14 +179,11 @@ def notify_deleted_speaker_list(instance: SpeakerList, **kw):
 @receiver(post_save, sender=Speaker)
 @disable_on_raw_save
 @on_transaction_commit
-def push_speaker_added_or_changed(instance: Speaker, created=False, **kwargs):
+def push_speaker_added_or_changed(instance: Speaker, **kwargs):
     # Speakers in the queue are sent as order on list - so we don't need to bother about lists that aren't active
     if instance.speaker_list.is_active_list:
         data = SpeakerSerializer(instance).data
-        if created:
-            msg = SpeakerChanged(payload=data)
-        else:
-            msg = SpeakerChanged(payload=data)
+        msg = SpeakerChanged(payload=data)
         room_ch = RoomChannel(instance.speaker_list.room_id)
         room_ch.sync_publish(msg, on_commit=False)  # Already post transaction
 

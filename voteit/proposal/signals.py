@@ -115,7 +115,7 @@ def moderators_channel_subscribed(context: Meeting, app_state: AppState, **kw):
 
 @receiver_all_subclasses(post_save, sender=Proposal)
 @disable_on_raw_save
-def proposal_updated(instance: Proposal = None, created=None, **kw):
+def proposal_updated(instance: Proposal = None, **kw):
     if not instance.agenda_item_id:
         return
     meeting_pk = instance.agenda_item.meeting_id
@@ -125,10 +125,7 @@ def proposal_updated(instance: Proposal = None, created=None, **kw):
     data = GenericProposalSerializer(instance).data
     # Inject meeting attr
     data["m"] = meeting_pk
-    if created:
-        msg = ProposalChanged(payload=data)
-    else:
-        msg = ProposalChanged(payload=data)
+    msg = ProposalChanged(payload=data)
     moderators_ch.sync_publish(msg)
     if instance.agenda_item_id and not instance.agenda_item.is_private:
         participants_ch = ParticipantsChannel(meeting_pk)
@@ -190,7 +187,7 @@ def agenda_item_channel_subscribed(context: AgendaItem, app_state: AppState, **k
 
 @receiver(post_save, sender=TextDocument)
 # @disable_on_raw_save FIXME?
-def text_document_updated(instance: TextDocument = None, created=None, **kw):
+def text_document_updated(instance: TextDocument = None, **kw):
     """
     Create TextParagraphs and push result.
     We need to create text paragraphs post save but we want to do it before the message is sent
@@ -203,11 +200,7 @@ def text_document_updated(instance: TextDocument = None, created=None, **kw):
         return
     ch = AgendaItemChannel.from_instance(instance.agenda_item)
     data = TextDocumentSerializer(instance).data
-    if created:
-        msg = TextDocumentChanged(payload=data)
-    else:
-        msg = TextDocumentChanged(payload=data)
-    ch.sync_publish(msg)
+    ch.sync_publish(TextDocumentChanged(payload=data))
 
 
 @receiver(pre_delete, sender=TextDocument)

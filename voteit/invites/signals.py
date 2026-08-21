@@ -60,14 +60,10 @@ def invites_channel_subscribed(
 @receiver(post_save, sender=MeetingInvite)
 @disable_on_raw_save
 @on_transaction_commit
-def meeting_invite_changed(instance: MeetingInvite = None, created=None, **kw):
+def meeting_invite_changed(instance: MeetingInvite = None, **kw):
     ch = MeetingInvitesChannel(instance.meeting_id)
     data = MeetingInviteSerializer(instance).data
-    if created:
-        msg = MeetingInviteChanged(payload=data)
-    else:
-        msg = MeetingInviteChanged(payload=data)
-    ch.sync_publish(msg, on_commit=False)  # No need
+    ch.sync_publish(MeetingInviteChanged(payload=data), on_commit=False)  # No need
 
 
 @receiver(pre_delete, sender=MeetingInvite)

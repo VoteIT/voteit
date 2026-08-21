@@ -71,16 +71,10 @@ def ai_channel_subscribed(
 
 @receiver(post_save, sender=ReactionButton)
 @disable_on_raw_save
-def reaction_button_updated(
-    instance: ReactionButton = None, created: bool = None, **kw
-):
+def reaction_button_updated(instance: ReactionButton = None, **kw):
     ch = MeetingChannel.from_instance(instance.meeting)
     data = ButtonDetailSerializer(instance).data
-    if created:
-        msg = ButtonChanged(payload=data)
-    else:
-        msg = ButtonChanged(payload=data)
-    ch.sync_publish(msg)
+    ch.sync_publish(ButtonChanged(payload=data))
 
 
 @receiver(pre_delete, sender=ReactionButton)

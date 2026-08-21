@@ -151,12 +151,8 @@ def poll_change(*, instance: Poll, created: bool, **kw):
             mod_data = part_data = PollDetailSerializer(instance).data
         participants_ch = ParticipantsChannel.from_instance(instance.meeting)
         moderators_ch = ModeratorsChannel.from_instance(instance.meeting)
-        if created:
-            mod_msg = PollChanged(payload=mod_data)
-            part_msg = PollChanged(payload=part_data)
-        else:
-            mod_msg = PollChanged(payload=mod_data)
-            part_msg = PollChanged(payload=part_data)
+        mod_msg = PollChanged(payload=mod_data)
+        part_msg = PollChanged(payload=part_data)
         if instance.is_private:
             # Only care about transmitting to participants if it existed previously
             if not created:
@@ -285,14 +281,10 @@ def remove_vote_transfers(instance: MeetingRoles, **kwargs):
 
 @receiver(post_save, sender=VoteTransfer)
 @disable_on_raw_save
-def send_vote_transfer(instance: VoteTransfer, *, created, **kwargs):
+def send_vote_transfer(instance: VoteTransfer, **kwargs):
     serializer = VoteTransferSerializer(instance)
-    if created:
-        msg = VoteTransferChanged(payload=serializer.data)
-    else:
-        msg = VoteTransferChanged(payload=serializer.data)
     meeting_ch = MeetingChannel(instance.meeting_id)
-    meeting_ch.sync_publish(msg)
+    meeting_ch.sync_publish(VoteTransferChanged(payload=serializer.data))
 
 
 @receiver(pre_delete, sender=VoteTransfer)

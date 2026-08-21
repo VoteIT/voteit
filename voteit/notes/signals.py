@@ -16,7 +16,7 @@ from voteit.notes.models import Note
 
 @receiver(post_save, sender=Note)
 @on_transaction_commit
-def _send_created_updated(*, instance: Note, created: bool, **kwargs):
+def _send_created_updated(*, instance: Note, **kwargs):
     ch = UserChannel(instance.user_id)
     data = {
         "pk": instance.pk,
@@ -28,11 +28,7 @@ def _send_created_updated(*, instance: Note, created: bool, **kwargs):
         "intent": instance.intent,
         "created": instance.created,
     }
-    if created:
-        msg = NoteChanged(payload=data)
-    else:
-        msg = NoteChanged(payload=data)
-    ch.sync_publish(msg)
+    ch.sync_publish(NoteChanged(payload=data))
 
 
 @receiver(pre_delete, sender=Note)
