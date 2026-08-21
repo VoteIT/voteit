@@ -67,7 +67,7 @@ All messages are outgoing-only, published to `MeetingChannel`.
 
 - `post_save` on `ParticipantTags` — skipped on `created=True` (tags are always updated immediately after creation, so the create-only save carries no tag data worth broadcasting); on update publishes `ParticipantTagsChanged` with the current tags to `MeetingChannel`.
 - `pre_delete` on `ParticipantTags` — publishes `ParticipantTagsChanged` with `tags={}` to `MeetingChannel`, signalling removal without a separate deleted message type.
-- `channel_subscribed` on `MeetingChannel` — only fires if at least one of `GenderTags` or `PronounTags` is enabled on the meeting. Queries all `ParticipantTags` for the meeting using `.values("user_id", "tags")`, flattens them into the `"ns:value" → [user_ids]` format, and appends an `AllParticipantTags` message to the `app_state`.
+- `participant_tags.all` collector on `MeetingChannel` — `applicable()` requires at least one of `GenderTags` or `PronounTags` to be enabled on the meeting. Queries all `ParticipantTags` for the meeting using `.values("user_id", "tags")`, flattens them into the `"ns:value" → [user_ids]` format, and appends an `AllParticipantTags` message to the `app_state`.
 
 ## Notable design decisions
 

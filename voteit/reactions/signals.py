@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Count
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from voteit.messaging.channels import UserChannel
-from voteit.messaging.signals import channel_subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.decorators import disable_on_raw_save
@@ -25,48 +22,6 @@ from voteit.reactions.models import Reaction
 from voteit.reactions.models import ReactionButton
 from voteit.reactions.rest_api.serializers import ButtonDetailSerializer
 from voteit.reactions.rest_api.serializers import ReactionSerializer
-
-
-if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractUser
-    from voteit.messaging.state import AppState
-    from voteit.meeting.models import Meeting
-    from voteit.agenda.models import AgendaItem
-
-
-@receiver(channel_subscribed, sender=MeetingChannel)
-def meeting_channel_subscribed(
-    context: Meeting, app_state: AppState, user: AbstractUser, **kw
-):
-    for item in ButtonDetailSerializer(context.reaction_buttons.all(), many=True).data:
-        app_state.append(ButtonChanged(payload=item))
-
-
-@receiver(channel_subscribed, sender=AgendaItemChannel)
-def ai_channel_subscribed(
-    context: AgendaItem, app_state: AppState, user: AbstractUser, **kw
-):
-    """
-    Send users own reactions and the total count for this agenda items content
-    """
-    all_buttons = (
-        context.reactions.values("content_type", "object_id", "button")
-        .annotate(count=Count("pk"))
-        .order_by()
-    )
-    for button in all_buttons:
-        # FIXME: Serializer should handle this
-        ct = ContentType.objects.get_for_id(button["content_type"])
-        model = ct.model_class()
-        button["content_type"] = get_model_shortname(model)
-        app_state.append(ReactionCount(payload=button))
-    # Users own reactions
-    serializer = ReactionSerializer(
-        context.reactions.filter(user=user),
-        many=True,
-    )
-    if serializer.data:
-        app_state.add_batch(UserReactionChanged, serializer.data)
 
 
 @receiver(post_save, sender=ReactionButton)

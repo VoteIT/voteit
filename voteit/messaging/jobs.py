@@ -1,9 +1,9 @@
 """Background jobs for the websocket layer.
 
-Building a channel's initial state means running every ``channel_subscribed``
-receiver, each of which hits the database, so it stays off the event loop --
-as it did under envelope's DeferredJob. The consumer only enqueues; the worker
-streams the result straight back to that one consumer.
+Building a channel's initial state means running every collector registered
+for that channel, each of which hits the database, so it stays off the event
+loop -- as it did under envelope's DeferredJob. The consumer only enqueues; the
+worker streams the result straight back to that one consumer.
 
 ``close_stale_connections`` is unrelated to subscribing: it is the periodic
 tidy-up for the Connection table, which nothing else ever reaps.
@@ -20,20 +20,23 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.db.transaction import get_connection
 from django.utils.timezone import now
 from django.utils.translation import activate
 
 from voteit.core import RQ_DEFAULT_QUEUE
 from voteit.core.decorators import schedule_job
+from voteit.messaging.bundle import iter_bundles
 from voteit.messaging.messages import ChannelLeft
 from voteit.messaging.messages import ChannelStateComplete
 from voteit.messaging.messages import ChannelSubscribed
 from voteit.messaging.messages import ChannelSubscribeError
 from voteit.messaging.models import ABNORMAL_CLOSURE
 from voteit.messaging.models import Connection
+from voteit.messaging.registry import collectors_for
 from voteit.messaging.registry import context_channel_registry
-from voteit.messaging.signals import channel_subscribed
 from voteit.messaging.state import AppState
+from voteit.messaging.utils import send_to_consumer
 
 logger = getLogger(__name__)
 
@@ -70,9 +73,64 @@ def enqueue_recheck(*, user_pk: int, consumer_channel: str, subscriptions: list[
 
 
 def _send(message, consumer_channel: str) -> None:
+    """Send a protocol message through chanx's typed event dispatcher.
+
+    Not the cheaper passthrough that ``_send_state`` uses: ``on_subscribed``
+    and ``on_left`` maintain the consumer's own ``channel_subs`` set, and those
+    handlers only run on this path.
+    """
     from voteit.messaging.consumer import VoteitConsumer
 
     VoteitConsumer.send_event_sync(message, consumer_channel)
+
+
+def _send_state(message, consumer_channel: str) -> None:
+    """Send a state bundle the cheap way: serialise once, forward verbatim.
+
+    ``on_state_bundle`` is a pure passthrough, so nothing is lost by skipping
+    chanx's dispatcher -- and two things are gained. A bundle is up to a
+    megabyte of deeply nested models, and the typed path would re-validate all
+    of it on the consumer's event loop. Worse, ``handle_channel_event``
+    swallows a ValidationError with nothing but a log line, so any drift in the
+    payload union would make the entire initial state vanish silently.
+
+    Ordering against ``_send`` holds: Channels awaits both handlers inline on
+    the same consumer, in channel-layer order.
+    """
+    send_to_consumer(message, consumer_channel, on_commit=False)
+
+
+def _applicable(collector) -> bool:
+    """Whether this collector wants to run, tolerating a broken guess."""
+    try:
+        return collector.applicable()
+    except Exception:
+        if get_connection().needs_rollback:
+            raise
+        logger.exception(
+            "applicable() failed for app state collector %r", collector.name
+        )
+        return False
+
+
+def _collect(collector, app_state: AppState) -> None:
+    """Run one collector, keeping a failure inside its own section.
+
+    A collector that raises marks its section ``failed`` and the rest still
+    run, so one broken app no longer costs the client its entire initial state.
+    The exception is a database error: it leaves the atomic block unusable and
+    there is no savepoint to roll back to -- taking one per collector would
+    cost an extra round trip each, which is most of what this rework set out to
+    save.
+    """
+    with app_state.section(collector.name) as section:
+        try:
+            collector.collect(app_state)
+        except Exception:
+            if get_connection().needs_rollback:
+                raise
+            section.failed = True
+            logger.exception("App state collector %r failed", collector.name)
 
 
 def subscribe_job(
@@ -85,15 +143,16 @@ def subscribe_job(
 ) -> None:
     """Check permission, join the group, then stream the initial state.
 
-    The client receives channel.subscribed, then one message per contributing
-    receiver -- usually a batch -- then channel.state_complete.
+    The client receives channel.subscribed -- carrying the names of every
+    collector that will contribute -- then one or more channel.state bundles,
+    then channel.state_complete. An ordinary meeting fits in a single bundle.
     """
     activate(language or settings.LANGUAGE_CODE)
     channel_cls = context_channel_registry[channel_type]
     channel = channel_cls(pk, consumer_channel=consumer_channel)
     user = get_user_model().objects.filter(pk=user_pk).first()
 
-    # durable=True so every receiver sees one consistent snapshot, matching
+    # durable=True so every collector sees one consistent snapshot, matching
     # what envelope's DeferredJob.atomic did.
     with transaction.atomic(durable=True):
         try:
@@ -119,17 +178,30 @@ def subscribe_job(
             "channel_type": channel_type,
             "channel_name": channel.channel_name,
         }
-        _send(ChannelSubscribed(payload=ref), consumer_channel)
+
+        # Settled before anything is sent, so the client is told up front
+        # exactly which sections to expect and never waits on a collector that
+        # opted out.
+        collectors = [
+            collector
+            for collector in (cls(channel, user) for cls in collectors_for(channel_cls))
+            if _applicable(collector)
+        ]
+        _send(
+            ChannelSubscribed(
+                payload={**ref, "collectors": [c.name for c in collectors]}
+            ),
+            consumer_channel,
+        )
 
         app_state = AppState()
-        channel_subscribed.send(
-            sender=channel_cls,
-            context=channel.context,
-            user=user,
-            app_state=app_state,
-        )
-        for message in app_state:
-            _send(message, consumer_channel)
+        for collector in collectors:
+            _collect(collector, app_state)
+
+        for bundle in iter_bundles(
+            app_state.sections, pk=pk, channel_type=channel_type
+        ):
+            _send_state(bundle, consumer_channel)
 
         _send(ChannelStateComplete(payload=ref), consumer_channel)
 

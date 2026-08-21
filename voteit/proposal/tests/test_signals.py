@@ -7,6 +7,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import payloads_of
+from voteit.proposal.messages import TextDocumentChanged
 
 from voteit.messaging.state import AppState
 
@@ -94,7 +96,7 @@ class MeetingSubscribedTests(TestCase):
         self.assertEqual(set(), pks)
 
     def test_attach_proposals_query_count(self):
-        from voteit.proposal.signals import attach_proposals
+        from voteit.proposal.collectors import attach_proposals
 
         self.prop1.mentions.add(self.user)
         app_state = AppState()
@@ -374,5 +376,5 @@ class AgendaItemChannelTests(TestCase):
 
     def test_subscribe_fetches_text_doc(self):
         app_state = build_app_state("agenda_item", self.ai.pk, self.user.pk)
-        pks = {x.payload.pk for x in app_state if x.action == "text_document.changed"}
+        pks = {p.pk for p in payloads_of(app_state, TextDocumentChanged)}
         self.assertEqual({self.text_document.pk}, pks)

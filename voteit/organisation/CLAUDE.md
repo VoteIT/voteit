@@ -113,12 +113,12 @@ Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`:
 
 `OrganisationChannel` is a `ContextChannel` keyed by `Organisation` pk. Has `permission = None` (no explicit subscribe permission; any authenticated user can subscribe).
 
-On subscribe, `organisation_channel_subscribed` pushes the user's current org roles as a `RolesChanged` message appended to the initial app state. This is how the frontend learns its own role set on connection.
+On subscribe, the `organisation.roles` collector pushes the user's current org roles as a `RolesChanged` message in the initial `channel.state` bundle. This is how the frontend learns its own role set on connection.
 
 ## Signals (`signals.py`)
 
 - `Organisation post_save` (not created) — publishes `OrganisationChanged` to `OrganisationChannel`. Skipped on `raw` saves.
-- `channel_subscribed` on `OrganisationChannel` — pushes the subscribing user's roles in the initial app state.
+- `organisation.roles` collector on `OrganisationChannel` — the subscribing user's roles.
 - `roles_added` on `OrganisationRoles` — publishes `RolesChanged` to both `OrganisationChannel` and the affected user's personal `UserChannel`. Skipped on `raw` saves.
 - `roles_removed` on `OrganisationRoles` — same dual-publish for `RolesRemoved`. Not guarded by `@disable_on_raw_save` (intentional asymmetry).
 

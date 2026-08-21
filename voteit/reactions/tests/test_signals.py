@@ -6,9 +6,12 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.test import TestCase
 from django.test import override_settings
 from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import payloads_of
+from voteit.messaging.testing import run_collector
+from voteit.reactions.messages import ButtonChanged
+from voteit.reactions.messages import ReactionCount
 
 from voteit.messaging.channels import UserChannel
-from voteit.messaging.state import AppState
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.discussion.models import DiscussionPost
@@ -76,9 +79,9 @@ class SignalButtonTests(TestCase):
 
     def test_meeting_channel_subscribed(self):
         app_state = build_app_state("meeting", self.meeting.pk, self.moderator.pk)
-        unpacked = {x.action: x.payload for x in app_state}
-        self.assertIn("reaction_button.changed", unpacked)
-        self.assertEqual(self.button.pk, unpacked["reaction_button.changed"].pk)
+        payloads = payloads_of(app_state, ButtonChanged)
+        self.assertEqual(1, len(payloads))
+        self.assertEqual(self.button.pk, payloads[0].pk)
 
     def test_ai_channel_subscribed(self):
         other = User.objects.create(username="other")
@@ -99,13 +102,11 @@ class SignalButtonTests(TestCase):
         payloads = batched_payload[0]
         self.assertEqual(2, len(payloads))
         self.assertEqual(self.button.pk, payloads[0].button)
-        counts = [m for m in app_state if m.action == "reaction.count"]
+        counts = payloads_of(app_state, ReactionCount)
         self.assertEqual(len(counts), 2)
-        self.assertEqual(sum(c.payload.count for c in counts), 3)
+        self.assertEqual(sum(c.count for c in counts), 3)
 
     def test_ai_channel_subscribed_n1_problem(self):
-        from voteit.reactions.signals import ai_channel_subscribed
-
         button2: ReactionButton = self.meeting.reaction_buttons.create(title="2")
         button3 = self.meeting.reaction_buttons.create(title="3")
         flag1 = self.meeting.reaction_buttons.create(flag_mode=True, title="f1")
@@ -114,9 +115,11 @@ class SignalButtonTests(TestCase):
         for btn in (self.button, button2, button3, flag1, flag2, flag3):
             btn.reactions.create(object=self.prop, user=self.moderator)
             btn.reactions.create(object=self.disc, user=self.moderator)
-        app_state = AppState()
-        with self.assertNumQueries(2):
-            ai_channel_subscribed(self.ai, app_state, self.moderator)
+        # One aggregate query for the counts, one for the user's own reactions
+        with self.assertNumQueries(1):
+            run_collector("reactions.counts", self.ai, self.moderator)
+        with self.assertNumQueries(1):
+            run_collector("reactions.own", self.ai, self.moderator)
 
 
 class SignalReactionTests(TestCase):

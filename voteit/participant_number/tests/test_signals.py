@@ -7,6 +7,8 @@ from django.test import TestCase
 from django.test import override_settings
 
 from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import payloads_of
+from voteit.participant_number.messages import PNChanged
 
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
@@ -43,7 +45,7 @@ class SignalsTests(TestCase):
         app_state = build_app_state(
             MeetingChannel.name, self.meeting.pk, self.user_a.pk
         )
-        pks = {x.payload.pk for x in app_state if x.action == "pn.changed"}
+        pks = {p.pk for p in payloads_of(app_state, PNChanged)}
         self.assertEqual({self.one.pk, self.two.pk}, pks)
 
     @patch.object(MeetingChannel, "sync_publish")

@@ -33,7 +33,7 @@ All messages are outgoing-only, published to `MeetingChannel`.
 
 ## Signals (`signals.py`)
 
-- `channel_subscribed` on `MeetingChannel` — when a user subscribes to the meeting channel, all current participant numbers are appended to `app_state` as `PNChanged` messages. Silently skips if no `PNSystem` exists for the meeting.
+- `participant_number.numbers` collector on `MeetingChannel` — all current participant numbers as one `pn.changed.batch`. `applicable()` returns False when the meeting has no `PNSystem`.
 - `post_save` on `ParticipantNumber` — publishes `PNChanged` on both creation and update via `MeetingChannel.sync_publish`. Skips if `pns.meeting` is `None`. Uses `@disable_on_raw_save` to avoid firing during data loads.
 - `pre_delete` on `ParticipantNumber` — publishes `PNDeleted` synchronously before the row is removed.
 

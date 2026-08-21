@@ -1,11 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
-from voteit.messaging.signals import channel_subscribed
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.invites.channels import MeetingInvitesChannel
@@ -14,15 +12,9 @@ from voteit.invites.messages import MeetingInviteDeleted
 from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api.serializers import MeetingInviteSerializer
 from voteit.invites.statemachines import InviteStateMachine
-from voteit.invites.utils import get_invite_adapter_registry
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.signals import archive_meeting
 from voteit.meeting.signals import meeting_joined
-
-if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractUser
-    from voteit.meeting.models import Meeting
-    from voteit.messaging.state import AppState
 
 
 @receiver(archive_meeting)
@@ -40,21 +32,6 @@ def auto_use_invite(meeting, user, **kw):
         if invite is not None:
             invite.accept(user)
             invite.save()
-
-
-@receiver(channel_subscribed, sender=MeetingInvitesChannel)
-def invites_channel_subscribed(
-    context: Meeting, app_state: AppState, user: AbstractUser, **kw
-):
-    # FIXME: We may not want to load all invites unless they're needed
-    reg = get_invite_adapter_registry()
-    invites_qs = reg.prep_invites_qs_for_subscribe(context.invites.all())
-    serializer = MeetingInviteSerializer(invites_qs, many=True)
-    if serializer.data:
-        payloads = []
-        for item in serializer.data:
-            payloads.append({**item})
-        app_state.add_batch(MeetingInviteChanged, payloads)
 
 
 @receiver(post_save, sender=MeetingInvite)

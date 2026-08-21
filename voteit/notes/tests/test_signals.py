@@ -1,9 +1,9 @@
 from django.test import TestCase
 from django.test import override_settings
 from voteit.messaging.channels import UserChannel
-from voteit.messaging.state import AppState
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import run_collector
 from voteit.messaging.testing import ChannelMessageCatcher
 from voteit.messaging.testing import testing_channel_layers_setting
 
@@ -124,8 +124,6 @@ class SignalTests(TestCase):
         self.assertEqual(0, len(batch_msg))
 
     def test_subscribe_n1(self):
-        from voteit.notes.signals import send_notes_appstruct
-
         self.participant.notes.create(
             proposal=self.prop2,
             intent=NoteIntent.APPROVE,
@@ -134,8 +132,6 @@ class SignalTests(TestCase):
             proposal=self.prop3,
             intent=NoteIntent.APPROVE,
         )
-        app_state = AppState()
+        # One to check the component is on, one for the notes themselves
         with self.assertNumQueries(2):
-            send_notes_appstruct(
-                context=self.ai, user=self.participant, app_state=app_state
-            )
+            run_collector("notes.notes", self.ai, self.participant)

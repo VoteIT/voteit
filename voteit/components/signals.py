@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 from voteit.core.signals import after_sm_transition
-from voteit.messaging.signals import channel_subscribed
 
 from voteit.components.messages import MeetingComponentChanged
 from voteit.components.messages import MeetingComponentDeleted
@@ -18,27 +16,6 @@ from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
 from voteit.components.models import MeetingComponent
 from voteit.meeting.statemachines import MeetingStateMachine
-
-if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractUser
-    from voteit.messaging.state import AppState
-
-
-@receiver(channel_subscribed, sender=MeetingChannel)
-def meeting_channel_subscribed(
-    context: Meeting, app_state: AppState, user: AbstractUser, **kw
-):
-    """
-    Send active components
-    """
-    # Append enabled components
-    for component in context.components.all():
-        if component.is_valid:
-            app_state.append(
-                MeetingComponentChanged(
-                    payload=MeetingComponentSerializer(component).data
-                )
-            )
 
 
 @receiver(post_save, sender=MeetingComponent)

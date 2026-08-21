@@ -230,11 +230,14 @@ Custom signals defined in `signals.py`:
 - `before_sm_transition(Meeting, target=closed/deleting)` → same check meeting-wide
 - `after_sm_transition(AgendaItem, target=closed)` → closes all lists and deactivates any active list for that item
 - `archive_meeting` → archives all systems in the meeting
-- `channel_subscribed(MeetingChannel)` → pushes all systems and user's system roles to the subscriber
-- `channel_subscribed(RoomChannel)` → pushes active list and its speakers to the subscriber
-- `channel_subscribed(AgendaItemChannel)` → pushes all active-system lists for that item to the subscriber
 - `roles_added(SpeakerSystemRoles)` → ensures user has `ROLE_PARTICIPANT` in the meeting; also pushes `RolesChanged` to `MeetingChannel` and `UserChannel`
 - `roles_removed(MeetingRoles, ROLE_PARTICIPANT in roles)` → removes all speaker system roles for that user from all systems in the meeting
+
+**Initial state (collectors.py):**
+
+- `speaker.systems` / `speaker.roles` (`MeetingChannel`) → all systems, and the user's roles within them
+- `speaker.active_list` (`RoomChannel`) → the active list and its speakers; `applicable()` is False when the room has no system or no active list
+- `speaker.lists` (`AgendaItemChannel`) → all active-system lists for that item
 
 ## Notable Design Decisions
 

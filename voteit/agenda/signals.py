@@ -1,24 +1,20 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 
 from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
-from voteit.messaging.signals import channel_subscribed
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.messages import AgendaChanged
 from voteit.agenda.messages import AgendaBodyChanged
 from voteit.agenda.messages import AgendaBodyDeleted
 from voteit.agenda.messages import AgendaDeleted
-from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import AgendaItemBodySerializer
 from voteit.agenda.rest_api.serializers import AgendaItemListSerializer
-from voteit.agenda.rest_api.serializers import LastReadSerializer
 from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.decorators import disable_on_raw_save
@@ -30,62 +26,6 @@ from voteit.meeting.models import Meeting
 from voteit.core.signals import after_sm_transition
 from voteit.meeting.signals import archive_meeting
 from voteit.proposal.models import Proposal
-
-if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractUser
-    from django.db import models
-    from voteit.messaging.state import AppState
-
-
-def _attach_agenda_items(qs: models.QuerySet[AgendaItem], app_state: AppState):
-    serializer = AgendaItemListSerializer(qs, many=True)
-    if serializer.data:
-        app_state.add_batch(AgendaChanged, serializer.data)
-
-
-@receiver(channel_subscribed, sender=ParticipantsChannel)
-def participants_channel_subscribed(
-    context: Meeting, app_state: AppState, user: AbstractUser, **kw
-):
-    """
-    Send non-private agenda items to regular users.
-    """
-    _attach_agenda_items(
-        context.agenda_items.exclude(state=AgendaItemStateMachine.private.value),
-        app_state,
-    )
-
-
-@receiver(channel_subscribed, sender=ModeratorsChannel)
-def moderators_channel_subscribed(
-    context: Meeting, app_state: AppState, user: AbstractUser, **kw
-):
-    """
-    Send all agenda items
-    """
-    _attach_agenda_items(context.agenda_items.all(), app_state)
-
-
-@receiver(channel_subscribed, sender=MeetingChannel)
-def meeting_channel_subscribed(
-    context: Meeting, app_state: AppState, user: AbstractUser, **kw
-):
-    # This will cause last read to be sent for private agenda items that the user has visited,
-    # but that shouldn't be a problem.
-    serializer = LastReadSerializer(
-        context.last_read_set.filter(user=user).select_related("agenda_item"), many=True
-    )
-    if serializer.data:
-        app_state.add_batch(LastReadChanged, serializer.data)
-
-
-@receiver(channel_subscribed, sender=AgendaItemChannel)
-def ai_channel_subscribed(context: AgendaItem, app_state: AppState, **kw):
-    """
-    Send full AI info
-    """
-    msg = AgendaBodyChanged(payload=AgendaItemBodySerializer(context).data)
-    app_state.append(msg)
 
 
 @receiver(post_save, sender=AgendaItem)

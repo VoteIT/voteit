@@ -71,7 +71,7 @@ Annotations are applied alongside invite creation via the JSON REST endpoint or 
 - `meeting_joined` → auto-accept any open email invite matching the user.
 - `pre_delete` on `MeetingRoles` → delete all used invites for that user+meeting.
 - `post_save` / `pre_delete` on `MeetingInvite` → publish WS messages on `MeetingInvitesChannel`.
-- `channel_subscribed` on `MeetingInvitesChannel` → send all current invites as a `Batch` on subscribe.
+- `invites.invites` collector on `MeetingInvitesChannel` → all current invites as one `meeting_invite.changed.batch` on subscribe.
 
 ## WebSocket messages (`messages.py`)
 

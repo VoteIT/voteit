@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 from django.conf import settings
 from django.test import override_settings
 
+from voteit.messaging.bundle import iter_bundles
+from voteit.messaging.messages import AppStateBundle
 from voteit.messaging.registry import action_of  # noqa: F401
+from voteit.messaging.registry import app_state_collectors
+from voteit.messaging.registry import collectors_for
 from voteit.messaging.registry import context_channel_registry
-from voteit.messaging.signals import channel_subscribed
 from voteit.messaging.state import AppState
 
 if TYPE_CHECKING:
@@ -174,10 +178,13 @@ class ChannelMessageCatcher(BaseMessageCatcher):
 
 
 def build_app_state(channel_type: str, pk: int, user) -> AppState:
-    """Run the channel_subscribed receivers and return what they produced.
+    """Run a channel's collectors and return what they produced.
 
-    Replaces constructing an envelope Subscribe message and calling
-    get_app_state on it. ``user`` may be a user or a pk.
+    The flat iterable most tests assert on, plus ``.sections`` for anything
+    that cares which collector produced what. ``user`` may be a user or a pk.
+
+    Unlike the subscribe job this does not swallow a collector's exception --
+    a test wants the traceback, not a section quietly marked failed.
     """
     if isinstance(user, int):
         from django.contrib.auth import get_user_model
@@ -186,25 +193,86 @@ def build_app_state(channel_type: str, pk: int, user) -> AppState:
     channel_cls = context_channel_registry[channel_type]
     channel = channel_cls(pk)
     app_state = AppState()
-    channel_subscribed.send(
-        sender=channel_cls, context=channel.context, user=user, app_state=app_state
-    )
+    for collector_cls in collectors_for(channel_cls):
+        collector = collector_cls(channel, user)
+        if not collector.applicable():
+            continue
+        with app_state.section(collector.name):
+            collector.collect(app_state)
     return app_state
 
 
+def run_collector(name: str, context, user, *, channel_cls=None) -> AppState:
+    """Run one named collector against an already-loaded context object.
+
+    ``from_instance`` pre-seeds the channel's context, so an
+    ``assertNumQueries`` around this measures the collector and nothing else.
+    Both ``applicable()`` and ``collect()`` run: between them they are what the
+    single ``channel_subscribed`` receiver used to do.
+
+    Pass ``channel_cls`` for a collector registered on more than one channel --
+    the participants/moderators pairs behave differently depending on which.
+    """
+    collector_cls = app_state_collectors[name]
+    channel = (channel_cls or collector_cls.channels[0]).from_instance(context)
+    collector = collector_cls(channel, user)
+    app_state = AppState()
+    if collector.applicable():
+        with app_state.section(name):
+            collector.collect(app_state)
+    return app_state
+
+
+def build_bundles(
+    channel_type: str, pk: int, user, *, budget: int | None = None
+) -> list[AppStateBundle]:
+    """The channel.state frames a subscriber would actually receive."""
+    app_state = build_app_state(channel_type, pk, user)
+    return list(
+        iter_bundles(
+            app_state.sections, pk=pk, channel_type=channel_type, budget=budget
+        )
+    )
+
+
+def unbundle(messages) -> Iterator[BaseMessage]:
+    """Yield messages, replacing each channel.state frame with its contents.
+
+    So a test can assert the same way whether it was handed an AppState, a
+    MessageCatcher, or the bundles a consumer received.
+    """
+    for message in messages:
+        if isinstance(message, AppStateBundle):
+            for section in message.payload.sections:
+                yield from section.messages
+        else:
+            yield message
+
+
 def actions(messages) -> list[str]:
-    return [m.action for m in messages]
+    return [m.action for m in unbundle(messages)]
+
+
+def section_names(bundles) -> list[str]:
+    """Collector names in the order their sections appear, without repeats."""
+    names = []
+    for bundle in bundles:
+        for section in bundle.payload.sections:
+            if section.name not in names:
+                names.append(section.name)
+    return names
 
 
 def payloads_of(messages, message_cls: type[BaseMessage]) -> list:
     """Every payload of this type, whether or not it arrived batched.
 
-    Lets a test assert on content without knowing if the receiver chose to
-    batch, which is otherwise a constant source of breakage.
+    Lets a test assert on content without knowing whether the collector chose
+    to batch or how the bundler happened to split things up, which is
+    otherwise a constant source of breakage.
     """
     action = message_cls.model_fields["action"].default
     found = []
-    for message in messages:
+    for message in unbundle(messages):
         if message.action == action:
             found.append(message.payload)
         elif message.action == f"{action}.batch":

@@ -206,6 +206,80 @@ class SubscribeTests(ConsumerTestCase):
         self.assertEqual(f"meeting_{self.meeting.pk}", subscribed.payload.channel_name)
         await communicator.disconnect()
 
+    async def test_state_arrives_as_bundles_between_the_two_markers(self):
+        """subscribed, then channel.state frames, then state_complete."""
+        communicator = await self._connect(self.moderator)
+        messages = await self._subscribe(communicator, "meeting", self.meeting.pk)
+        actions = [m.action for m in messages]
+        self.assertEqual("channel.subscribed", actions[0])
+        self.assertEqual("channel.state_complete", actions[-1])
+        middle = set(actions[1:-1])
+        # Every message in between is a bundle -- nothing goes out loose any
+        # more, which is the whole point of the rework.
+        self.assertEqual({"channel.state"}, middle)
+        await communicator.disconnect()
+
+    async def test_announced_collectors_all_report_complete(self):
+        communicator = await self._connect(self.moderator)
+        messages = await self._subscribe(communicator, "meeting", self.meeting.pk)
+        announced = next(
+            m for m in messages if m.action == "channel.subscribed"
+        ).payload.collectors
+        self.assertIn("meeting.roles", announced)
+        completed = [
+            section.name
+            for m in messages
+            if m.action == "channel.state"
+            for section in m.payload.sections
+            if section.complete
+        ]
+        self.assertEqual(sorted(announced), sorted(completed))
+        self.assertFalse(
+            [
+                section.name
+                for m in messages
+                if m.action == "channel.state"
+                for section in m.payload.sections
+                if section.failed
+            ]
+        )
+        await communicator.disconnect()
+
+    async def test_a_channel_with_no_collectors_announces_none(self):
+        communicator = await self._connect(self.moderator)
+        messages = await self._subscribe(communicator, "user", self.moderator.pk)
+        subscribed = next(m for m in messages if m.action == "channel.subscribed")
+        self.assertEqual([], subscribed.payload.collectors)
+        self.assertEqual(
+            ["channel.subscribed", "channel.state_complete"],
+            [m.action for m in messages],
+        )
+        await communicator.disconnect()
+
+    async def test_bundles_survive_the_typed_fallback(self):
+        """VOTEIT_WS_FAST_FANOUT=False sends bundles through chanx instead.
+
+        That path re-validates the frame against the payload union on the
+        consumer, and swallows a ValidationError with only a log line -- so if
+        the union were wrong, the state would silently disappear rather than
+        fail loudly. This is what notices.
+        """
+        communicator = await self._connect(self.moderator)
+        with override_settings(VOTEIT_WS_FAST_FANOUT=False):
+            messages = await self._subscribe(communicator, "meeting", self.meeting.pk)
+        bundles = [m for m in messages if m.action == "channel.state"]
+        self.assertTrue(bundles)
+        roles = [
+            message
+            for bundle in bundles
+            for section in bundle.payload.sections
+            for message in section.messages
+            if message.action == "roles.changed"
+        ]
+        self.assertEqual(1, len(roles))
+        self.assertEqual(self.moderator.pk, roles[0].payload.user_pk)
+        await communicator.disconnect()
+
     async def test_permission_denied(self):
         communicator = await self._connect(self.participant)
         await communicator.send_message(

@@ -12,6 +12,7 @@ from typing import Literal
 from chanx.messages.base import BaseMessage
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import SerializeAsAny
 
 
 class ChannelRef(BaseModel):
@@ -27,6 +28,13 @@ class SubscribedPayload(ChannelRef):
     channel_name: str
 
 
+class SubscriptionAcceptedPayload(SubscribedPayload):
+    #: Names of the collectors that will contribute this channel's initial
+    #: state, in the order they run. The client knows from this exactly which
+    #: sections to expect before channel.state_complete.
+    collectors: list[str] = []
+
+
 class ChannelSubscribe(BaseMessage):
     action: Literal["channel.subscribe"] = "channel.subscribe"
     payload: ChannelRef
@@ -36,7 +44,46 @@ class ChannelSubscribed(BaseMessage):
     """Subscription accepted. Initial state follows, then state_complete."""
 
     action: Literal["channel.subscribed"] = "channel.subscribed"
-    payload: SubscribedPayload
+    payload: SubscriptionAcceptedPayload
+
+
+class BundleSection(BaseModel):
+    """One collector's messages inside a ``channel.state`` frame.
+
+    ``complete`` is False when the collector's output did not fit in this
+    bundle and continues in the next one. ``failed`` means the collector
+    raised: whatever it managed to produce is still here, but it is partial and
+    the client should not treat the absence of an object as a deletion.
+    """
+
+    name: str
+    complete: bool = True
+    failed: bool = False
+    # Resolved to a discriminated union of every @outgoing type by
+    # voteit.messaging.bundle.bind_bundle_schema(), which cannot run until
+    # every app's messages.py has been imported. SerializeAsAny keeps the wire
+    # format correct in the meantime -- and if the rebuild is ever dropped,
+    # only the AsyncAPI schema gets vaguer.
+    messages: list[SerializeAsAny[BaseMessage]] = []
+
+
+class AppStateBundlePayload(ChannelRef):
+    #: 0-based position in this channel's run of bundles.
+    seq: int = 0
+    sections: list[BundleSection] = []
+
+
+class AppStateBundle(BaseMessage):
+    """A slice of a channel's initial state: several messages in one frame.
+
+    Sits between ``channel.subscribed`` and ``channel.state_complete``.
+    Deliberately not registered with ``@outgoing`` -- a ``channel.state.batch``
+    sibling would be nonsense. The consumer picks it up from its handler
+    signature like the rest of the protocol.
+    """
+
+    action: Literal["channel.state"] = "channel.state"
+    payload: AppStateBundlePayload
 
 
 class ChannelStateComplete(BaseMessage):

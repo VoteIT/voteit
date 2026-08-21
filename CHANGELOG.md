@@ -26,9 +26,19 @@ the whole codebase to v1.
   `VOTEIT_BATCH_THRESHOLD` (3) or more, but initial state is always sent
   batched however few rows there are. Do not treat `.batch` as "several".
 - **`channel.subscribed` no longer carries `app_state`.** Subscribing now
-  streams: `channel.subscribed` (channel metadata only), then the initial state
-  as a series of messages, then the new **`channel.state_complete`**. Large
-  meetings no longer arrive as one very big frame.
+  streams: `channel.subscribed`, then the initial state as one or more of the
+  new **`channel.state`** messages, then the new **`channel.state_complete`**.
+- **Initial state arrives bundled and named.** A `channel.state` payload is
+  `{pk, channel_type, seq, sections}`; each section is `{name, complete,
+  failed, messages}`, where `name` identifies the server-side collector that
+  produced it and `messages` holds ordinary outgoing messages verbatim. The
+  names of every collector that will contribute are listed on
+  `channel.subscribed` as `collectors`, so the client knows up front what to
+  expect and, from `complete`, exactly when each part has fully arrived.
+  Sections are packed to just under 1 MB per frame
+  (`VOTEIT_APP_STATE_BUNDLE_BYTES`), so a meeting that used to take 50-100
+  separate frames now takes one or two. A collector that fails marks its own
+  section `failed` and no longer costs the client the rest of its state.
 - **Component settings JSON Schema** (`/api/*-components/`) is now pydantic v2
   output: `$defs` rather than `definitions`, `anyOf` for optional fields, and
   draft 2020-12 refs.
@@ -55,6 +65,14 @@ the whole codebase to v1.
 
 ### Changes
 
+- **`channel_subscribed` is replaced by an app state collector registry.** The
+  signal is gone. Each app declares `AppStateCollector` subclasses in its own
+  `collectors.py` with a `name`, the `channels` they serve, an `order`, and a
+  cheap `applicable()` that keeps a switched-off feature from being announced
+  at all. `voteit/messaging/registry.py` holds `app_state_collectors` and
+  `collectors_for()`; the names are unique project-wide because they go on the
+  wire. `voteit.proposal.signals.attach_proposals` moved to
+  `voteit.proposal.collectors`.
 - **pydantic v2**. Messages raised by our own validators are unchanged: v2's
   `"Value error, "` prefix is stripped before the message reaches the API.
   pydantic's *built-in* messages did change, though, and there is no way around

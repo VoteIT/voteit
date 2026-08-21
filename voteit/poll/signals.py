@@ -3,7 +3,6 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-from django.contrib.auth.models import AbstractUser
 from django.db import IntegrityError
 from django.db import models
 from django.db import transaction
@@ -14,8 +13,6 @@ from django.dispatch import Signal
 from django.dispatch import receiver
 from voteit.core.signals import after_sm_transition
 from voteit.messaging.channels import UserChannel
-from voteit.messaging.signals import channel_subscribed
-from sql_util.aggregates import SubqueryCount
 
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.statemachines import AgendaItemStateMachine
@@ -24,7 +21,6 @@ from voteit.core.decorators import on_transaction_commit
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
-from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.poll.jobs import schedule_poll_status_publish
 from voteit.poll.messages import ElectoralRegisterChanged
@@ -32,7 +28,6 @@ from voteit.poll.messages import ElectoralRegisterDeleted
 from voteit.poll.messages import GenericVoteResponse
 from voteit.poll.messages import PollChanged
 from voteit.poll.messages import PollDeleted
-from voteit.poll.messages import PollStatus
 from voteit.poll.messages import VoteTransferChanged
 from voteit.poll.messages import VoteTransferDeleted
 from voteit.poll.models import ElectoralRegister
@@ -45,7 +40,6 @@ from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.rest_api.serializers import VoteTransferSerializer
 
 if TYPE_CHECKING:
-    from voteit.messaging.state import AppState
     from voteit.proposal.models import Proposal
 
 logger = getLogger(__name__)
@@ -55,80 +49,6 @@ logger = getLogger(__name__)
 # arguments:
 #   instance: The electoral register
 new_er_created = Signal()
-
-
-@receiver(channel_subscribed, sender=MeetingChannel)
-def send_ongoing_meeting_poll_stats(context: Meeting, app_state: AppState, **kw):
-    """
-    Populate app_state with current poll status
-    """
-    payloads = []
-    for poll in (
-        context.polls.filter(state="ongoing")
-        .annotate(voted=SubqueryCount("votes"))
-        .select_related("electoral_register")
-    ):
-        total = (
-            len(poll.electoral_register.voter_data) if poll.electoral_register else 0
-        )
-        payloads.append({"pk": poll.pk, "voted": poll.voted, "total": total})
-    app_state.add_batch(PollStatus, payloads)
-
-
-@receiver(channel_subscribed, sender=ParticipantsChannel)
-def participants_subscribed(
-    context: Meeting, app_state: AppState, user: AbstractUser, **kw
-):
-    """
-    Populate app_state with current meeting polls, except private ones
-    """
-    qs = (
-        context.polls.exclude(state="private")
-        .exclude(agenda_item__state=AgendaItemStateMachine.private.value)
-        .prefetch_related("proposals")
-    )
-    serializer = PollDetailSerializer(qs, many=True)
-    if serializer.data:
-        app_state.add_batch(PollChanged, serializer.data)
-
-
-@receiver(channel_subscribed, sender=MeetingChannel)
-def meeting_subscribed(context: Meeting, app_state: AppState, user: AbstractUser, **kw):
-    # FIXME: Transmitting all vote data is probably not a good idea for large meetings.
-    # Perhaps change this?
-    # We're sending all votes, it is the users own data so private AI shouldn't matter here.
-    vote_qs = Vote.objects.filter(
-        poll__in=context.polls.all(), user=user
-    ).prefetch_related("poll")
-    vote_serializer = VoteSerializer(vote_qs, many=True)
-    for item in vote_serializer.data:
-        app_state.append(GenericVoteResponse(payload=item))
-    if context.latest_er:
-        app_state.append(
-            ElectoralRegisterChanged(
-                payload=ElectoralRegisterSerializer(context.latest_er).data
-            )
-        )
-    if context.vote_transfer_policy is not None:
-        vt_serializer = VoteTransferSerializer(context.vote_transfers.all(), many=True)
-        if vt_serializer.data:
-            app_state.add_batch(VoteTransferChanged, vt_serializer.data)
-
-
-@receiver(channel_subscribed, sender=ModeratorsChannel)
-def moderators_subscribed(
-    context: Meeting, app_state: AppState, user: AbstractUser, **kw
-):
-    """
-    Populate app_state with current meeting polls
-    """
-    serializer = PollDetailSerializer(
-        context.polls.all().prefetch_related("proposals"),
-        many=True,
-        context={"show_withheld": True},
-    )
-    if serializer.data:
-        app_state.add_batch(PollChanged, serializer.data)
 
 
 @receiver(post_save, sender=Poll)

@@ -26,10 +26,12 @@ from django.utils.module_loading import autodiscover_modules
 from django.utils.timezone import now
 
 from voteit.core.messages.version import VersionMessage
+from voteit.messaging.bundle import bind_bundle_schema
 from voteit.messaging.channels import ONLINE_GROUP
 from voteit.messaging.channels import user_group
 from voteit.messaging.jobs import enqueue_recheck
 from voteit.messaging.jobs import enqueue_subscribe
+from voteit.messaging.messages import AppStateBundle
 from voteit.messaging.messages import ChannelLeave
 from voteit.messaging.messages import ChannelLeft
 from voteit.messaging.messages import ChannelListSubscriptions
@@ -56,6 +58,9 @@ if TYPE_CHECKING:
 # messages.py must already have run. MessagingConfig.ready() does this too;
 # repeating it here keeps the consumer importable on its own.
 autodiscover_modules("messages")
+# Same reason: AppStateBundle's payload union is built from the registry that
+# the line above just filled. Idempotent, so ready() calling it again is fine.
+bind_bundle_schema()
 
 
 class AuthenticatedUserAuthenticator(BaseAuthenticator):
@@ -102,6 +107,10 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
         self.channel_subs.add(
             ChannelRef(pk=event.payload.pk, channel_type=event.payload.channel_type)
         )
+        return event
+
+    @event_handler
+    async def on_state_bundle(self, event: AppStateBundle) -> AppStateBundle:
         return event
 
     @event_handler

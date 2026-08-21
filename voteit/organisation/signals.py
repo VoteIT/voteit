@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from voteit.messaging.channels import UserChannel
-from voteit.messaging.signals import channel_subscribed
 
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.messages.role_updates import RolesChanged
@@ -20,10 +18,6 @@ from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.rest_api.serializers import OrganisationSerializer
 
-if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractUser
-    from voteit.messaging.state import AppState
-
 
 @receiver(post_save, sender=Organisation)
 @disable_on_raw_save
@@ -33,26 +27,6 @@ def organisation_change(instance, created=None, **kw):
         ch = OrganisationChannel.from_instance(instance)
         msg = OrganisationChanged(payload=data)
         ch.sync_publish(msg)
-
-
-@receiver(channel_subscribed, sender=OrganisationChannel)
-def organisation_channel_subscribed(
-    context: Organisation, app_state: AppState, user: AbstractUser, **kw
-):
-    """
-    Send users organisation roles as response
-    """
-    roles = context.get_roles(user)
-    if roles:
-        msg = RolesChanged(
-            payload={
-                "roles": roles,
-                "pk": context.pk,
-                "model": get_model_shortname(context),
-                "user_pk": user.pk,
-            }
-        )
-        app_state.append(msg)
 
 
 def _role_msg_publish(instance: OrganisationRoles, msg):

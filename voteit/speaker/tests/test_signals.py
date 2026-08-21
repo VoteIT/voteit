@@ -142,9 +142,7 @@ class AppStateTests(TestCase):
             MeetingChannel.name, self.meeting.pk, self.participant.pk
         )
         system_payload = [
-            x.payload.model_dump()
-            for x in app_state
-            if x.action == action_of(SpeakerSystemChanged)
+            p.model_dump() for p in payloads_of(app_state, SpeakerSystemChanged)
         ]
         self.assertEqual(1, len(system_payload))
         self.assertEqual(
@@ -163,9 +161,9 @@ class AppStateTests(TestCase):
             system_payload[0],
         )
         speaker_roles_payload = [
-            x.payload.model_dump()
-            for x in app_state
-            if x.action == action_of(RolesChanged) and ROLE_SPEAKER in x.payload.roles
+            p.model_dump()
+            for p in payloads_of(app_state, RolesChanged)
+            if ROLE_SPEAKER in p.roles
         ]
         self.assertEqual(1, len(speaker_roles_payload))
         self.assertEqual(
@@ -182,13 +180,8 @@ class AppStateTests(TestCase):
         app_state = build_app_state(
             AgendaItemChannel.name, self.ai.pk, self.moderator.pk
         )
-        self.assertEqual(
-            sum(x.action == action_of(SpeakerListChanged) for x in app_state), 1
-        )
         speaker_lists_added = [
-            x.payload.model_dump()
-            for x in app_state
-            if x.action == action_of(SpeakerListChanged)
+            p.model_dump() for p in payloads_of(app_state, SpeakerListChanged)
         ]
         self.assertEqual(1, len(speaker_lists_added))
         self.assertEqual(

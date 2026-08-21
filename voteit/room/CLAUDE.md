@@ -108,8 +108,8 @@ All messages are outgoing, published to `MeetingChannel` (for room-level CRUD) o
 
 ### Signal handlers (`signals.py`)
 
-- `channel_subscribed` on `MeetingChannel` — serialises all rooms for the meeting and appends them as `RoomChanged` messages to `app_state`.
-- `channel_subscribed` on `RoomChannel` — appends a `RoomHighlighted` message with the current `highlighted_proposal_pks`.
+- `room.rooms` collector on `MeetingChannel` — all rooms for the meeting as one `room.changed.batch`.
+- `room.highlighted` collector on `RoomChannel` — a `RoomHighlighted` message with the current `highlighted_proposal_pks`.
 - `post_save` on `Room` — publishes `RoomChanged` to `MeetingChannel` on create and update. Decorated with `@disable_on_raw_save`.
 - `pre_delete` on `Room` — publishes `RoomDeleted` to `MeetingChannel`.
 - `highlighted_proposals_changed` signal — publishes `RoomHighlighted` (with token) to `RoomChannel`.

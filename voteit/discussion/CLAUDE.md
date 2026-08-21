@@ -74,7 +74,7 @@ All three messages extend base classes from `voteit.messaging.base`:
 
 All messages are published synchronously (`ch.sync_publish`) to `AgendaItemChannel` for the post's agenda item.
 
-On `AgendaItemChannel` subscription (`channel_subscribed` signal), existing posts are appended to `app_state` with `add_batch(DiscussionPostChanged, ...)`, arriving as one `discussion_post.changed.batch` for efficient initial load.
+The `discussion.posts` collector (`collectors.py`) appends existing posts on `AgendaItemChannel` subscription with `add_batch(DiscussionPostChanged, ...)`, arriving as one `discussion_post.changed.batch` inside the channel's `channel.state` bundle.
 
 The `@disable_on_raw_save` decorator on `discussion_post_change` suppresses broadcasts during data migrations (raw saves).
 
@@ -88,7 +88,7 @@ The `@disable_on_raw_save` decorator on `discussion_post_change` suppresses broa
 
 ### list endpoint always returns empty
 
-`DiscussionPostViewSet.get_queryset()` returns `DiscussionPost.objects.none()` for the `list` action. This is intentional: the frontend receives all posts via the WebSocket `app_state` batch on channel subscription. The REST list endpoint exists only to satisfy DRF's router conventions; it is never used for data retrieval.
+`DiscussionPostViewSet.get_queryset()` returns `DiscussionPost.objects.none()` for the `list` action. This is intentional: the frontend receives all posts in the initial `channel.state` bundle on channel subscription. The REST list endpoint exists only to satisfy DRF's router conventions; it is never used for data retrieval.
 
 ### ADD permission is checked against AgendaItem, not DiscussionPost
 

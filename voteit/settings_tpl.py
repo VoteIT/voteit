@@ -159,6 +159,11 @@ VOTEIT_BATCH_THRESHOLD = 3
 # dispatcher, which re-validates it per recipient. Same frame either way; the
 # difference is CPU on wide fan-out. Set to False to use the library's own path.
 VOTEIT_WS_FAST_FANOUT = True
+# Byte budget for one channel.state frame of initial state. Collector output is
+# packed up to this size before a new frame is started, and an oversized
+# <action>.batch is re-chunked to fit. Comfortably under the 5 MiB
+# --websocket-max-message-size daphne runs with.
+VOTEIT_APP_STATE_BUNDLE_BYTES = 1_000_000
 
 RQ_QUEUES = {
     "default": {

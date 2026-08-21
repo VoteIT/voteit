@@ -51,7 +51,8 @@ Both are outgoing-only, published to `MeetingChannel`:
 
 ## Signals (`signals.py`)
 
-- `channel_subscribed` on `MeetingChannel` → pushes `ActiveUsers` if component is enabled.
+- `active.users` collector on `MeetingChannel` → pushes `ActiveUsers`. `applicable()`
+  returns False when the component is off, so the section is never even announced.
 - `post_save` on `MeetingComponent` → when `ActiveUsersComponent` is enabled, immediately pushes the current `ActiveUsers` list.
 - `post_save` on `ActiveUser` (created only) → publishes `ActiveUserChanged(active=True)` synchronously.
 - `pre_delete` on `ActiveUser` → publishes `ActiveUserChanged(active=False)` deferred to transaction commit.

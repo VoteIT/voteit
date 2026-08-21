@@ -85,9 +85,10 @@ message was migrated to REST.
 - Each outgoing type also gets a generated `<action>.batch` sibling. Runs of the same
   message to the same target within one transaction collapse into one batch on commit
   (`voteit/messaging/utils.py::TransactionBatcher`, threshold `VOTEIT_BATCH_THRESHOLD`).
-- Subscribing is deferred to RQ. The worker streams `channel.subscribed`, then the
-  initial state (built by the `channel_subscribed` signal receivers in `*/signals.py`),
-  then `channel.state_complete`.
+- Subscribing is deferred to RQ. The worker streams `channel.subscribed` (naming the
+  collectors that will contribute), then the initial state as `channel.state` bundles
+  built by the named, ordered collectors in `voteit/*/collectors.py`, then
+  `channel.state_complete`.
 - Connection rows live in `voteit/messaging/models.py`; `code` is null while open.
 - RQ queues: `default`, `long`.
 - `/asyncapi/docs/` (DEBUG only) publishes the full message schema.

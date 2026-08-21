@@ -1,18 +1,22 @@
-"""Registries for outgoing messages and context channels.
+"""Registries for outgoing messages, context channels and state collectors.
 
 VoteIT owns these rather than chanx: the consumer needs a single list of every
-outgoing type to declare as ``passthrough_events``, and ``channel.subscribe``
-dispatches on a channel-type name rather than a handler per domain.
+outgoing type to declare as ``passthrough_events``, ``channel.subscribe``
+dispatches on a channel-type name rather than a handler per domain, and the
+subscribe job needs the initial state broken into named, ordered pieces.
 """
 
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ImproperlyConfigured
 
+from voteit.core.component import Registry
 from voteit.messaging.batch import make_batch
+from voteit.messaging.collectors import AppStateCollector
 
 if TYPE_CHECKING:
     from chanx.messages.base import BaseMessage
@@ -25,6 +29,58 @@ _outgoing: dict[str, type[BaseMessage]] = {}
 _batch_for: dict[type[BaseMessage], type[BaseMessage]] = {}
 # channel type name -> channel class
 context_channel_registry: dict[str, type[ContextChannel]] = {}
+
+
+class CollectorRegistry(Registry[AppStateCollector]):
+    """Collectors by name.
+
+    Unlike the other registries in the project this one refuses to overwrite:
+    a collector name is part of the wire contract -- it is announced on
+    ``channel.subscribed`` and repeated on every section -- so a silent
+    collision would drop one app's initial state with nothing to show for it.
+    """
+
+    def __setitem__(self, key: str, factory):
+        existing = self.get(key)
+        if existing is not None and existing is not factory:
+            raise ImproperlyConfigured(
+                f"Duplicate app state collector {key!r}: "
+                f"{existing.__module__}.{existing.__name__} and "
+                f"{factory.__module__}.{factory.__name__}"
+            )
+        super().__setitem__(key, factory)
+        reset_collector_index()
+
+
+app_state_collectors = CollectorRegistry(AppStateCollector)
+
+# channel type name -> collectors, ordered. Built on first use; every
+# registration drops it, so import order never matters.
+_collector_index: dict[str, list[type[AppStateCollector]]] | None = None
+
+
+def reset_collector_index() -> None:
+    """Drop the per-channel collector index so it is rebuilt on next use."""
+    global _collector_index
+    _collector_index = None
+
+
+def collectors_for(channel_cls: type[ContextChannel]) -> list[type[AppStateCollector]]:
+    """Every collector registered for this channel, in the order they run.
+
+    Sorted by ``(order, name)``, so a collector's position never depends on
+    which app happened to be imported first.
+    """
+    global _collector_index
+    if _collector_index is None:
+        index: dict[str, list[type[AppStateCollector]]] = defaultdict(list)
+        for collector_cls in app_state_collectors.values():
+            for target in collector_cls.channels:
+                index[target.name].append(collector_cls)
+        for entries in index.values():
+            entries.sort(key=lambda c: (c.order, c.name))
+        _collector_index = dict(index)
+    return _collector_index.get(channel_cls.name, [])
 
 
 def action_of(message_cls: type[BaseMessage]) -> str:

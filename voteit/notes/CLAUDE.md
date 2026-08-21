@@ -64,11 +64,11 @@ There is no `note.added`; the client upserts on `pk`.
 
 - `post_save` on `Note` — deferred to transaction commit via `@on_transaction_commit`; publishes `NoteChanged` to `UserChannel(instance.user_id)`.
 - `pre_delete` on `Note` — not deferred (must fire before the row is gone); publishes `NoteDeleted` to `UserChannel(instance.user_id)`.
-- `channel_subscribed` on `AgendaItemChannel` — fires when a user subscribes to an agenda item channel. If `NotesComponent` is enabled for the meeting, it queries the user's notes for that agenda item and appends them with `app_state.add_batch(NoteChanged, payloads)`, i.e. as one `note.changed.batch`. Uses `.values()` to avoid N+1 (two queries total regardless of note count).
+- `notes.notes` collector on `AgendaItemChannel` — runs when a user subscribes to an agenda item channel. `applicable()` checks `NotesComponent` is enabled for the meeting, then `collect()` queries the user's notes for that agenda item and appends them with `app_state.add_batch(NoteChanged, payloads)`, i.e. as one `note.changed.batch`. Uses `.values()` to avoid N+1 (two queries total regardless of note count).
 
 ## Components (`components.py`)
 
-`NotesComponent` is a `MeetingComponent` registered in `meeting_components` under the name `"notes"`. When disabled, the `channel_subscribed` handler sends no notes, but the REST API remains functional. The component gate is only checked during the initial channel subscription.
+`NotesComponent` is a `MeetingComponent` registered in `meeting_components` under the name `"notes"`. When disabled, the collector opts out in `applicable()` and `notes.notes` is not even announced on `channel.subscribed`, but the REST API remains functional. The component gate is only checked during the initial channel subscription.
 
 ## Non-obvious design decisions
 

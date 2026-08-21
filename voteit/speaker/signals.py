@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 
-from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
 from django.dispatch import Signal
 from django.dispatch import receiver
 from voteit.messaging.channels import UserChannel
 from voteit.messaging.registry import batch_for
-from voteit.messaging.signals import channel_subscribed
 from rest_framework.exceptions import ValidationError
 
 from voteit.agenda.channels import AgendaItemChannel
@@ -46,12 +43,6 @@ from voteit.speaker.models import SpeakerSystemRoles
 from voteit.speaker.rest_api.serializers import SpeakerListSerializer
 from voteit.speaker.rest_api.serializers import SpeakerListSystemSerializer
 from voteit.speaker.rest_api.serializers import SpeakerSerializer
-from voteit.speaker.statemachines import SpeakerSystemStateMachine
-
-if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractUser
-    from voteit.messaging.state import AppState
-    from voteit.room.models import Room
 
 # instance
 active_list_changed = Signal()
@@ -250,69 +241,6 @@ def close_and_deactivate_when_ai_closes(
                 # Don't use cached version here due to select_for_update
                 speaker_list.speaker_system.active_list = None
                 speaker_list.speaker_system.save()
-
-
-# Channels
-@receiver(channel_subscribed, sender=MeetingChannel)
-def meeting_channel_subscribed(
-    context: Meeting, app_state: AppState, user: AbstractUser, **kw
-):
-    """
-    Send current state to meeting channel.
-    - Speaker systems
-    - User roles within speaker systems
-    """
-    systems_qs = context.speaker_systems.all()
-    sys_serializer = SpeakerListSystemSerializer(systems_qs, many=True)
-    for item in sys_serializer.data:
-        app_state.append(SpeakerSystemChanged(payload=item))
-    model_shortname = get_model_shortname(SpeakerListSystem)
-    for rdata in SpeakerSystemRoles.objects.filter(
-        user=user, context__in=systems_qs
-    ).values("assigned", "context_id"):
-        msg = RolesChanged(
-            payload={
-                "roles": rdata["assigned"],
-                "pk": rdata["context_id"],
-                "model": model_shortname,
-                "user_pk": user.pk,
-            }
-        )
-        app_state.append(msg)
-
-
-@receiver(channel_subscribed, sender=RoomChannel)
-def send_active_speaker_list_speakers(context: Room, app_state: AppState, **kwargs):
-    try:
-        active_list = context.sls.active_list
-    except ObjectDoesNotExist:
-        return  # sls will raise this
-    if active_list:
-        qs = Speaker.objects.filter(
-            speaker_list__room=context,
-            speaker_list=active_list,
-        ).select_related("speaker_list")
-        speaker_serializer = SpeakerSerializer(qs, many=True)
-        for item in speaker_serializer.data:
-            app_state.append(SpeakerChanged(payload=item))
-        list_serializer = SpeakerListSerializer(active_list)
-        app_state.append(SpeakerListChanged(payload=list_serializer.data))
-
-
-@receiver(channel_subscribed, sender=AgendaItemChannel)
-def ai_channel_subscribed(
-    context: AgendaItem, app_state: AppState, user: AbstractUser, **kw
-):
-    """
-    Send any lists related to this agenda item.
-    """
-    # FIXME: So... inactive systems... What happens when they get enabled again?
-    lists_qs = context.speaker_lists.filter(
-        speaker_system__state=SpeakerSystemStateMachine.active.value
-    )
-    serializer = SpeakerListSerializer(lists_qs, many=True)
-    for item in serializer.data:
-        app_state.append(SpeakerListChanged(payload=item))
 
 
 # Archiving

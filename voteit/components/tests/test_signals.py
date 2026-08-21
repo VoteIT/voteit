@@ -4,6 +4,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 from voteit.messaging.testing import build_app_state
+from voteit.components.messages import MeetingComponentChanged
+from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.active.components import ActiveUsersComponent
@@ -40,9 +42,7 @@ class MeetingChannelSubscribedTests(TestCase):
     def test_meeting_components_in_app_state(self):
         app_state = self._mk_subscribe()
         payloads = [
-            x.payload.model_dump()
-            for x in app_state
-            if x.action == "meeting_component.changed"
+            p.model_dump() for p in payloads_of(app_state, MeetingComponentChanged)
         ]
         self.assertEqual(2, len(payloads))
         self.assertEqual(
@@ -75,9 +75,7 @@ class MeetingChannelSubscribedTests(TestCase):
         self.flash.save()
         app_state = self._mk_subscribe()
         payloads = [
-            x.payload.model_dump()
-            for x in app_state
-            if x.action == "meeting_component.changed"
+            p.model_dump() for p in payloads_of(app_state, MeetingComponentChanged)
         ]
         # Only prop_print here, flash should have invalid settings
         self.assertEqual(1, len(payloads))
@@ -88,9 +86,7 @@ class MeetingChannelSubscribedTests(TestCase):
         self.flash.save()
         app_state = self._mk_subscribe()
         payloads = [
-            x.payload.model_dump()
-            for x in app_state
-            if x.action == "meeting_component.changed"
+            p.model_dump() for p in payloads_of(app_state, MeetingComponentChanged)
         ]
         # All sent, but one is disabled
         self.assertEqual(2, len(payloads))

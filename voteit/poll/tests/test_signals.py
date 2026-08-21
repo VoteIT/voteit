@@ -6,9 +6,11 @@ from django.test import TestCase
 from django.test import override_settings
 
 from voteit.messaging.channels import UserChannel
-from voteit.messaging.state import AppState
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import payloads_of
+from voteit.messaging.testing import run_collector
+from voteit.poll.messages import GenericVoteResponse
 from voteit.messaging.testing import ChannelMessageCatcher
 from voteit.messaging.testing import testing_channel_layers_setting
 
@@ -68,12 +70,6 @@ class MeetingSubscribedTests(TestCase):
         self.er.refresh_from_db()
         self.poll.refresh_from_db()
 
-    @property
-    def _fut(self):
-        from voteit.poll.signals import meeting_subscribed
-
-        return meeting_subscribed
-
     def test_app_state_sent_participants_poll_added(self):
         app_state = build_app_state(
             ParticipantsChannel.name, self.meeting.pk, self.user.pk
@@ -101,7 +97,7 @@ class MeetingSubscribedTests(TestCase):
 
     def test_app_state_sent_votes(self):
         app_state = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
-        pks = {x.payload.pk for x in app_state if x.action == "vote.changed"}
+        pks = {p.pk for p in payloads_of(app_state, GenericVoteResponse)}
         self.assertEqual({self.vote.pk, self.vote2.pk, self.vote_private.pk}, pks)
 
     def test_app_state_sent_latest_er(self):
@@ -115,9 +111,20 @@ class MeetingSubscribedTests(TestCase):
         self.assertFalse([x for x in app_state if x.action == "er.changed"])
 
     def test_n1_problem(self):
-        app_state = AppState()
+        """Flat query count however many polls, votes or transfers exist.
+
+        Three between them: the votes plus their prefetched polls, and the
+        latest electoral register. Vote transfers cost nothing at all here --
+        this meeting has no transfer policy, so that collector opts out in
+        ``applicable()``.
+        """
         with self.assertNumQueries(3):
-            self._fut(self.meeting, app_state, self.user)
+            for name in (
+                "poll.own_votes",
+                "poll.electoral_register",
+                "poll.vote_transfers",
+            ):
+                run_collector(name, self.meeting, self.user)
 
     def test_withheld_result_participant(self):
         self.meeting.er_policy_name = AutoAlways.name

@@ -21,7 +21,13 @@ class MessagingConfig(AppConfig):
         UserChannel.model = get_user_model()
         # The consumer reads the outgoing registry when its class is created,
         # so every app's messages.py and channels.py must have been imported.
-        autodiscover_modules("messages", "channels")
+        # Collectors come last of the three: they import both.
+        autodiscover_modules("messages", "channels", "collectors")
+        # Now that every outgoing type is known, the bundle message can be
+        # given its real payload union.
+        from voteit.messaging.bundle import bind_bundle_schema
+
+        bind_bundle_schema()
         # Last: importing jobs runs @schedule_job, and jobs.py pulls in the
         # message and channel registries it just populated.
         from voteit.messaging import jobs  # noqa: F401

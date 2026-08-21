@@ -5,8 +5,9 @@ from django.test import TestCase
 from django.test import override_settings
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import build_app_state
+from voteit.messaging.testing import payloads_of
+from voteit.messaging.testing import run_collector
 
-from voteit.messaging.state import AppState
 
 from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.models import Meeting
@@ -39,9 +40,7 @@ class SubscriptionTests(TestCase):
 
     def test_subscribe_meeting(self):
         app_state = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
-        payloads = [
-            x.payload.model_dump() for x in app_state if x.action == "room.changed"
-        ]
+        payloads = [p.model_dump() for p in payloads_of(app_state, RoomChanged)]
         self.assertEqual(1, len(payloads))
         data = payloads[0]
         self.assertTrue(data.pop("created", None))
@@ -81,12 +80,9 @@ class SubscriptionTests(TestCase):
         )
 
     def test_subscribe_room_queries(self):
-        from voteit.room.signals import room_subscribed
-
         room = Room.objects.get(pk=self.room.pk)
-        app_state = AppState()
         with self.assertNumQueries(1):
-            room_subscribed(room, app_state)
+            run_collector("room.highlighted", room, self.user)
 
     @patch.object(MeetingChannel, "sync_publish")
     def test_room_changed(self, mock_publish):

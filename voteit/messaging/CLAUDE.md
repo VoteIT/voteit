@@ -16,14 +16,16 @@ channel definitions and the `Connection` model. Built on
 |---|---|
 | `consumer.py` | `VoteitConsumer` plus `SubscriptionMixin` and `ConnectionMixin`. One consumer for the whole app, mounted at `/ws/`. |
 | `channels.py` | `PubSubChannel` / `ContextChannel` and the built-in `UserChannel` / `OnlineChannel`. Domain channels live in each app's `channels.py`. |
-| `messages.py` | Protocol messages (`channel.*`, `s.*`). Deliberately **not** registered with `@outgoing` — they must not get `.batch` siblings. |
-| `registry.py` | `@outgoing` / `@channel` targets. `all_outgoing_messages()` feeds the consumer's `passthrough_events`. |
+| `messages.py` | Protocol messages (`channel.*`, `s.*`), including the `channel.state` bundle. Deliberately **not** registered with `@outgoing` — they must not get `.batch` siblings. |
+| `registry.py` | `@outgoing` / `@channel` targets, plus `app_state_collectors` and `collectors_for()`. `all_outgoing_messages()` feeds the consumer's `passthrough_events`. |
 | `batch.py` | `make_batch()` — generates the `<action>.batch` sibling of an outgoing type. |
+| `collectors.py` | `AppStateCollector`, the ABC each app subclasses in its own `collectors.py`. |
+| `bundle.py` | Packs collector output into `channel.state` frames under `VOTEIT_APP_STATE_BUNDLE_BYTES`, and binds the bundle's payload union. |
 | `utils.py` | `publish()`, `Target`, `TransactionBatcher`, and `_send_now()`, the single point where anything reaches the channel layer. |
 | `jobs.py` | `subscribe_job` / `recheck_job`, run on the `default` RQ queue, plus `close_stale_connections` (see below). |
 | `admin.py` | Read-only `Connection` admin, the `/admin/.../connection/online/` page and the stale-row action. |
-| `state.py` | `AppState`, the accumulator receivers append to. |
-| `testing.py` | `MessageCatcher`, `ChannelMessageCatcher`, `build_app_state`, `payloads_of`, `ws_test_settings`. |
+| `state.py` | `AppState`, the accumulator collectors append to, grouped into `StateSection`s. |
+| `testing.py` | `MessageCatcher`, `ChannelMessageCatcher`, `build_app_state`, `build_bundles`, `run_collector`, `payloads_of`, `unbundle`, `ws_test_settings`. |
 
 ## Adding an outgoing message
 
@@ -53,13 +55,50 @@ frame the client sees is the same either way.
 permission, joins the group and streams back:
 
 ```
-channel.subscribed        <- channel metadata only
-<action>.batch  x N       <- initial state, from channel_subscribed receivers
+channel.subscribed    <- channel metadata + the names of every contributing collector
+channel.state  x N    <- the initial state itself, usually one frame
 channel.state_complete
 ```
 
-Contribute initial state by receiving `channel_subscribed` and calling
-`app_state.add_batch(MessageCls, payloads)`.
+A `channel.state` payload is `{pk, channel_type, seq, sections}`, where each
+section is one collector's output:
+
+```json
+{"name": "poll.own_votes", "complete": true, "failed": false,
+ "messages": [{"action": "vote.changed.batch", "payload": {"items": [...]}}]}
+```
+
+`complete` is False when that collector's output continues in the next bundle;
+`failed` means it raised, so what is there is partial. Sections are packed
+until `VOTEIT_APP_STATE_BUNDLE_BYTES` (1 MB), so an ordinary meeting arrives in
+a single frame instead of the dozens of loose messages this replaced.
+
+### Contributing initial state
+
+Declare a collector in the owning app's `collectors.py` (autodiscovered):
+
+```python
+@app_state_collectors
+class Polls(AppStateCollector):
+    name = "poll.polls"              # goes on the wire; must be unique
+    channels = (ParticipantsChannel, ModeratorsChannel)
+    order = 50                       # 10 structural, 50 content, 200 user-specific
+
+    def applicable(self) -> bool:    # cheap; False = skipped and never announced
+        return True
+
+    def collect(self, state: AppState) -> None:
+        state.add_batch(PollChanged, serializer.data)
+```
+
+`self.channel`, `self.context` and `self.user` are set for you. A collector
+registered on several channels branches on `self.channel` — that is how the
+participants/moderators visibility pairs work.
+
+A collector that raises only loses its own section (`failed: true`); the rest
+still run. The exception is a database error, which leaves the durable atomic
+block unusable and is re-raised — there is deliberately no savepoint per
+collector.
 
 ## Connections and presence
 
@@ -98,6 +137,19 @@ alive heals itself: its next message sets `code` back to NULL. Setting
 
 - Handlers run in a **background task**, so ordering between separately-sent
   messages is not guaranteed. Tests synchronise on the completion ack.
+- `jobs._send` and `jobs._send_state` take different routes on purpose.
+  `channel.subscribed` / `channel.left` must go through chanx's typed
+  dispatcher because `on_subscribed` / `on_left` maintain the consumer's own
+  `channel_subs` set; bundles skip it, since re-validating a megabyte of nested
+  models on the event loop is the cost this rework exists to remove — and
+  `handle_channel_event` swallows a ValidationError with only a log line, which
+  would make the whole initial state vanish silently.
+- `bundle.bind_bundle_schema()` retargets `BundleSection.messages` at the real
+  outgoing union *after* `autodiscover_modules("messages")`. It is the one
+  thing here pydantic does not formally promise;
+  `tests/test_bundle.py::BundleSchemaTests` is what tells you if it breaks. The
+  fallback is the declared `SerializeAsAny[BaseMessage]`, which produces the
+  same bytes and a vaguer schema.
 - Don't name anything `self.subscriptions` on the consumer; chanx uses it for
   its own topic registry.
 - `UserChannel.model` is bound in `AppConfig.ready()`, not as a classproperty:

@@ -74,7 +74,7 @@ Three channels in `channels.py`, all scoped to a `Meeting` pk:
 - **`participants`** — non-moderator view; receives non-private polls and agenda items only
 - **`moderators`** — moderator-only; receives everything including private items
 
-On `channel_subscribed`, the `meeting_channel_subscribed` signal handler pushes the subscriber's current roles, all groups, all group memberships, and (if active) all group roles in one burst.
+Three collectors in `collectors.py` build the meeting channel's initial state: `meeting.roles` (the subscriber's own roles), `meeting.groups` (groups plus memberships) and `meeting.group_roles`, which opts out in `applicable()` unless `group_roles_active`.
 
 ## Signals
 

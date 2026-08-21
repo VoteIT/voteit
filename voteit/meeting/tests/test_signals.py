@@ -5,6 +5,8 @@ from django.dispatch import receiver
 from django.test import TestCase
 from django.test import override_settings
 from voteit.messaging.testing import build_app_state
+from voteit.meeting.messages import GroupRoleChanged
+from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.meeting.models import GroupMembership
@@ -124,10 +126,9 @@ class MeetingChannelSubscribedTests(TestCase):
         payload = added[0].payload.items[0]
         self.assertEqual(self.group.pk, payload.pk)
         # GroupRole
-        added = [x for x in app_state if x.action == "group_role.changed"]
-        self.assertEqual(1, len(added))
-        payload = added[0].payload
-        self.assertEqual(self.group_role.pk, payload.pk)
+        payloads = payloads_of(app_state, GroupRoleChanged)
+        self.assertEqual(1, len(payloads))
+        self.assertEqual(self.group_role.pk, payloads[0].pk)
         # GroupMembership
         added = [x for x in app_state if x.action == "group_membership.changed.batch"]
         self.assertEqual(1, len(added))
