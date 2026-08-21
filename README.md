@@ -31,7 +31,7 @@ The frontend is a separate single-page application that communicates with this b
 | Background jobs | RQ + RQ Scheduler                          |
 | Auth            | Token auth, Session auth, OAuth2 (IDProxy) |
 | Permissions     | `django-rules` (object-level predicates)   |
-| State machines  | `django-fsm`                               |
+| State machines  | `python-statemachine`                      |
 | Validation      | Pydantic v2                                |
 | Package manager | `uv`                                       |
 

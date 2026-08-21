@@ -118,15 +118,48 @@ Abstract base classes enforce this:
 | `MeetingContext`      | `.meeting`                |
 | `AgendaItemContext`   | `.agenda_item` |
 
-### State machines (django-fsm)
+### State machines (python-statemachine)
 
-Most domain models have a `state` field managed by `django-fsm`. Transitions are defined as methods decorated with `@transition`. Valid state combinations across the hierarchy are documented in [docs/workflows.md](docs/workflows.md).
+Most domain models have a `state` field driven by a state machine. The machine
+lives in the app's `statemachines.py`, is named `*StateMachine`, and subclasses
+`StateChart` with `TransitionSignalMixin` (which fires the `before_sm_transition`
+/ `after_sm_transition` signals). Valid state combinations across the hierarchy
+are documented in [docs/workflows.md](docs/workflows.md).
+
+Transitions are `Event` objects. Guards go in `validators` — permission checks
+raise, so they produce a real error rather than a silent no-op — and pure
+conditions go in `cond`.
 
 ```python
-@transition(field="state", source="upcoming", target="ongoing")
-def publish(self, by=None):
-    ...
+# voteit/meeting/statemachines.py
+class MeetingStateMachine(StateChart, TransitionSignalMixin):
+    upcoming = State(value="upcoming", name="Upcoming", initial=True)
+    ongoing = State(value="ongoing", name="Ongoing")
+
+    make_ongoing = Event(
+        upcoming.to(ongoing, validators=["has_moderate_permission", "valid_er_policy"]),
+        name=_("Make ongoing"),
+    )
+
+    def has_moderate_permission(self, *, user, **kw):
+        perm = self.model.get_perm(PERM.MODERATE)
+        if not user.has_perm(perm, self.model):
+            raise PermissionDenied(perm_denied_msg(perm, self.model))
 ```
+
+The model binds to it with `statemachine.mixins.MachineMixin`:
+
+```python
+class Meeting(..., MachineMixin):
+    state_machine_name = "voteit.meeting.statemachines.MeetingStateMachine"
+    state_machine_attr = "sm"
+    sm: MeetingStateMachine
+```
+
+Fire a transition with `instance.sm.send("make_ongoing", user=user)` — always
+pass `user`, since the validators expect it. Over REST, `StateMachineMixin`
+adds `POST|GET|PATCH /{id}/event/` to the ViewSet, and every machine's schema
+is published read-only at `GET /api/state-machines/`.
 
 ### Permissions (django-rules)
 
@@ -178,7 +211,7 @@ voteit/myapp/
   apps.py          # AppConfig — import rules and REST views in ready()
   models.py        # Model inheriting from the right context mixin
   rules.py         # Permission predicates and rules.add_perm() calls
-  workflows.py     # FSM state + transitions (if the model has a lifecycle)
+  statemachines.py # StateChart states + transitions (if the model has a lifecycle)
   signals.py       # Django signals, WebSocket broadcasts
   channels.py      # ContextChannel subclass for WS push (if needed)
   messages.py      # Outgoing chanx message classes for WS events (if needed)

@@ -152,11 +152,12 @@ Allows a ViewSet to declare `serializer_classes = {"action_name": SerializerClas
 
 ### `StateMachineMixin`
 
-Adds two actions to any ViewSet whose model uses `MachineMixin`:
-- `GET /…/state-machine/` — returns a schema description of all states, transitions, and events (useful for frontend introspection)
-- `POST|GET|PATCH /…/{id}/event/` — sends an event to the instance's state machine; wraps the call in a durable atomic transaction
+Adds one action to any ViewSet whose model uses `MachineMixin`:
+- `POST|GET|PATCH /…/{id}/event/` — sends an event to the instance's state machine; wraps the call in a durable atomic transaction. `GET` returns the current state without sending anything. The browsable-API description for this action renders the machine as a mermaid diagram (`_sm_to_mermaid`).
 
 Events are dispatched by `SMEventSerializer`, which calls `instance.sm.send(event, user=user)`.
+
+Schema introspection is **not** on this mixin. `StateMachinesViewSet` (`rest_api/views.py`) publishes every registered machine read-only and unauthenticated at `GET /api/state-machines/` and `GET /api/state-machines/<MachineName>/`.
 
 ### `ModelContextMixin`
 
