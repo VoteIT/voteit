@@ -88,6 +88,9 @@ def notify_active_list_changed(instance: SpeakerListSystem, **kwargs):
                         "seconds": item["seconds"],
                     }
                 )
+            # Pre-built batch rather than N messages: the whole active list is
+            # replaced at once. TransactionBatcher passes an already-batched
+            # message straight through.
             room_ch.sync_publish(batch_for(SpeakerChanged)(payload={"items": payloads}))
 
 

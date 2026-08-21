@@ -18,7 +18,7 @@ from channels.layers import get_channel_layer
 from django.conf import settings
 from django.db.transaction import get_connection
 
-from voteit.messaging.registry import batch_for
+from voteit.messaging.registry import maybe_batch_for
 
 if TYPE_CHECKING:
     from chanx.messages.base import BaseMessage
@@ -107,8 +107,12 @@ class TransactionBatcher:
         for key in order:
             messages = grouped[key]
             target = key[1]
-            if len(messages) >= threshold:
-                batch_cls = batch_for(type(messages[0]))
+            # None for a message that is already a batch, or for one that was
+            # never registered with @outgoing. Both go out as they are: this
+            # runs from an on_commit hook, after the write has been committed,
+            # so raising here would lose every message still queued behind it.
+            batch_cls = maybe_batch_for(type(messages[0]))
+            if len(messages) >= threshold and batch_cls is not None:
                 result.append(
                     (
                         batch_cls(payload={"items": [m.payload for m in messages]}),

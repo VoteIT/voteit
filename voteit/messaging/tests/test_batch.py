@@ -102,3 +102,34 @@ class TransactionBatcherTests(TestCase):
 
     def test_empty(self):
         self.assertEqual([], self._collapse([]))
+
+    def test_already_batched_messages_are_passed_through(self):
+        # A publisher may hand sync_publish a pre-built <action>.batch -- see
+        # voteit.speaker.signals.notify_active_list_changed. A batch has no
+        # batch sibling of its own, so trying to collapse a run of them used to
+        # raise LookupError from inside the on_commit hook, after the write had
+        # already been committed.
+        batch = batch_for(AgendaChanged)
+        out = self._collapse(
+            [(batch(payload={"items": [{"pk": i}]}), self.target) for i in range(3)]
+        )
+        self.assertEqual(["agenda_item.changed.batch"] * 3, [m.action for m, _ in out])
+
+    def test_unregistered_messages_are_passed_through(self):
+        # Same reasoning: never raise from the commit hook.
+        from typing import Literal
+
+        from chanx.messages.base import BaseMessage
+        from pydantic import BaseModel
+
+        class Payload(BaseModel):
+            pk: int
+
+        class Unregistered(BaseMessage):
+            action: Literal["test.unregistered"] = "test.unregistered"
+            payload: Payload
+
+        out = self._collapse(
+            [(Unregistered(payload={"pk": i}), self.target) for i in range(3)]
+        )
+        self.assertEqual(["test.unregistered"] * 3, [m.action for m, _ in out])

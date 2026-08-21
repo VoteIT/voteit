@@ -65,13 +65,24 @@ def register_channel(channel_cls: type[ContextChannel]) -> type[ContextChannel]:
 
 def batch_for(message_cls: type[BaseMessage]) -> type[BaseMessage]:
     """The batch sibling of an outgoing message type."""
-    try:
-        return _batch_for[message_cls]
-    except KeyError:
+    batch_cls = maybe_batch_for(message_cls)
+    if batch_cls is None:
         raise LookupError(
             f"{message_cls.__name__} is not registered as an outgoing message; "
             "decorate it with @outgoing"
-        ) from None
+        )
+    return batch_cls
+
+
+def maybe_batch_for(message_cls: type[BaseMessage]) -> type[BaseMessage] | None:
+    """The batch sibling, or None if this type cannot be batched.
+
+    A generated ``<action>.batch`` class has no sibling of its own, so anything
+    that collapses a run of messages has to cope with being handed one -- see
+    ``TransactionBatcher.collapse``, which runs inside an on_commit hook where
+    raising would be far worse than not batching.
+    """
+    return _batch_for.get(message_cls)
 
 
 def all_outgoing_messages() -> list[type[BaseMessage]]:
