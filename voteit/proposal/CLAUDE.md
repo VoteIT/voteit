@@ -10,7 +10,7 @@ python manage.py test voteit.proposal --keepdb --failfast
 
 ## Key files
 
-- `models.py` — `Proposal`, `DiffProposal` (MTI), `TextDocument`, `TextParagraph`; bind to state machine via `MachineMixin` (access as `proposal.sm`)
+- `models.py` — `Proposal`, `DiffProposal` (MTI), `TextDocument`, `TextParagraph`; bind to state machine via `StateMachineModelMixin` (access as `proposal.sm`)
 - `statemachines.py` — `ProposalStateMachine`: states PUBLISHED / RETRACTED / VOTING / APPROVED / DENIED / UNHANDLED
 - `rules.py` — django-rules permission predicates for ADD / CHANGE / DELETE / RETRACT
 - `signals.py` — post-save/pre-delete handlers that broadcast to ParticipantsChannel and ModeratorsChannel

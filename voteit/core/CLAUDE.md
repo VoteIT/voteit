@@ -123,7 +123,9 @@ These are combined with model names by `RulesModelMixin.get_perm()` to produce f
 - `before_sm_transition` — sent before a transition executes; args: `instance`, `source`, `target`, `event`
 - `after_sm_transition` — sent after a transition completes; same args
 
-State machine classes follow the naming convention `*StateMachine` and inherit from `StateChart` and `TransitionSignalMixin`. Models bind their state machine via `statemachine.mixins.MachineMixin`; the machine is accessible as `instance.sm`.
+State machine classes follow the naming convention `*StateMachine` and inherit from `StateChart` and `TransitionSignalMixin`. Models bind their state machine via `StateMachineModelMixin` (same module); the machine is accessible as `instance.sm`.
+
+`StateMachineModelMixin` replaces the upstream `statemachine.mixins.MachineMixin`, which built a machine inside every `Model.__init__` — once per row of every queryset, at 209 µs / 31 kB for a `MeetingInvite` and 946 µs / 143 kB for a `Poll`, on rows that almost never read `.sm`. Here `sm` is a `cached_property`, built on first access. This is safe because every such model gives `state` a non-null default, which makes `SyncEngine.start()` an early return, and because the machine reads `state` off the model live rather than snapshotting it. `voteit/core/tests/test_statemachine.py` pins both invariants.
 
 ## Shared Rules / Predicates (`rules.py`)
 
@@ -152,7 +154,7 @@ Allows a ViewSet to declare `serializer_classes = {"action_name": SerializerClas
 
 ### `StateMachineMixin`
 
-Adds one action to any ViewSet whose model uses `MachineMixin`:
+Adds one action to any ViewSet whose model uses `StateMachineModelMixin`:
 - `POST|GET|PATCH /…/{id}/event/` — sends an event to the instance's state machine; wraps the call in a durable atomic transaction. `GET` returns the current state without sending anything. The browsable-API description for this action renders the machine as a mermaid diagram (`_sm_to_mermaid`).
 
 Events are dispatched by `SMEventSerializer`, which calls `instance.sm.send(event, user=user)`.

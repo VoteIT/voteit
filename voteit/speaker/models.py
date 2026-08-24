@@ -17,7 +17,7 @@ from django.db import IntegrityError
 from django.db import models
 from django.utils.timezone import now
 from pydantic.main import BaseModel
-from statemachine.mixins import MachineMixin
+from voteit.core.statemachines import StateMachineModelMixin
 from rules.contrib.models import RulesModelMixin
 
 from voteit.agenda.models import AgendaItem
@@ -93,7 +93,7 @@ class SpeakerListSystem(
     RoleContextMixin,
     MeetingContext,
     SpeakerSystemContext,
-    MachineMixin,
+    StateMachineModelMixin,
 ):
     """
     All speaker list things relate here, while this in turn might relate to a meeting.
@@ -102,7 +102,6 @@ class SpeakerListSystem(
 
     name = "speaker_system"
     state_machine_name = "voteit.speaker.statemachines.SpeakerSystemStateMachine"
-    state_machine_attr = "sm"
     sm: SpeakerSystemStateMachine
     state: str = models.CharField(
         default=SpeakerSystemStateMachine.initial_state.value,

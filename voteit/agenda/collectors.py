@@ -32,10 +32,13 @@ class AgendaItems(AppStateCollector):
     """The agenda, minus anything private unless this is the moderator channel.
 
     Uses ``.values()`` rather than the serializer, for the same reason
-    ``proposal.collectors.attach_proposals`` does: instantiating the models
-    would bind a ``python-statemachine`` instance to each one via
-    ``MachineMixin.__init__``, which costs around 120 kB per agenda item --
-    roughly 600x the bytes that item contributes to the wire. The serializer
+    ``proposal.collectors.attach_proposals`` does: it skips building a model
+    instance per row entirely. Historically the dominant cost was the
+    ``python-statemachine`` instance that ``MachineMixin.__init__`` bound to
+    every agenda item -- around 120 kB each, roughly 600x the bytes that item
+    contributes to the wire. ``StateMachineModelMixin`` made that binding lazy,
+    so what remains is the model and DRF overhead; still worth avoiding here,
+    but no longer the order-of-magnitude difference it was. The serializer
     declares nine plain columns and no method fields, so the payloads are
     identical either way; ``test_values_matches_the_serializer`` holds that.
     """

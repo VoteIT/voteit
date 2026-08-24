@@ -11,7 +11,7 @@ from django.conf import settings
 from django.db import models, transaction
 from django.utils.timezone import now
 from model_utils.managers import InheritanceManager
-from statemachine.mixins import MachineMixin
+from voteit.core.statemachines import StateMachineModelMixin
 from rules.contrib.models import RulesModelMixin
 
 from voteit.core.abcs import AgendaItemContext, MeetingContext
@@ -52,7 +52,9 @@ _PROP_LOG_FIELDS = [
 @auditlog.register(
     include_fields=_PROP_LOG_FIELDS,
 )
-class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable, MachineMixin):
+class Proposal(
+    BaseContent, AgendaItemContext, MeetingContext, Reactable, StateMachineModelMixin
+):
     """
     A motion or amendment submitted by a participant within an agenda item.
 
@@ -69,7 +71,6 @@ class Proposal(BaseContent, AgendaItemContext, MeetingContext, Reactable, Machin
 
     name = "proposal"
     state_machine_name = "voteit.proposal.statemachines.ProposalStateMachine"
-    state_machine_attr = "sm"
     sm: ProposalStateMachine
     state: str = models.CharField(
         default=ProposalStateMachine.initial_state.value,

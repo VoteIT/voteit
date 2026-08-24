@@ -111,6 +111,17 @@ the whole codebase to v1.
   aggregates they feed.
 - First end-to-end websocket tests: previously everything was tested at the
   signal level and nothing exercised the consumer itself.
+- **State machines are bound lazily.** `statemachine.mixins.MachineMixin` built
+  a whole `StateChart` inside every `Model.__init__` — so once per row of every
+  queryset, on the seven models that carry one. Measured at 209 µs / 30.8 kB per
+  `MeetingInvite` and 946 µs / 143 kB per `Poll`, against 5.4 µs / 584 B for the
+  bare model. `voteit.core.statemachines.StateMachineModelMixin` replaces it and
+  builds the machine on first access to `.sm`; nothing that iterates these
+  models in bulk reads it. Subscribing a moderator to `MeetingInvitesChannel` on
+  a 50 000-invite meeting drops from ~7.6 s and ~1.5 GB allocated to ~0.6 s and
+  ~50 MB. `.only()` / `.defer()` also become usable on these models for the
+  first time: the eager machine read the deferred `state` field, turning one
+  query into one per row.
 
 ### Fixes
 

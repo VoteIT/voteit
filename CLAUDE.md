@@ -62,7 +62,7 @@ Abstract base classes enforce consistent context properties across all models:
 
 ### State Machines
 
-`python-statemachine` is used on most models. State machine classes follow the pattern `*StateMachine` (e.g. `MeetingStateMachine`, `PollStateMachine`, `ProposalStateMachine`) and live in each app's `statemachines.py`. They subclass `StateChart` and mix in `TransitionSignalMixin`. Models bind to their machine via `statemachine.mixins.MachineMixin` (accessed as `instance.sm`). Transitions are `Event` objects with `validators` for permission and condition guards. The REST layer exposes a `POST /{id}/event/` endpoint via `StateMachineMixin`.
+`python-statemachine` is used on most models. State machine classes follow the pattern `*StateMachine` (e.g. `MeetingStateMachine`, `PollStateMachine`, `ProposalStateMachine`) and live in each app's `statemachines.py`. They subclass `StateChart` and mix in `TransitionSignalMixin`. Models bind to their machine via `voteit.core.statemachines.StateMachineModelMixin` (accessed as `instance.sm`, built lazily on first access — the upstream `MachineMixin` built one inside every `Model.__init__`). Transitions are `Event` objects with `validators` for permission and condition guards. The REST layer exposes a `POST /{id}/event/` endpoint via `StateMachineMixin`.
 
 ### REST API
 

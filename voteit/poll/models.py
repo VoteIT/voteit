@@ -18,7 +18,7 @@ from django.db.models import UniqueConstraint
 from django.utils.functional import cached_property
 from django.utils.timezone import now
 from statemachine.exceptions import TransitionNotAllowed
-from statemachine.mixins import MachineMixin
+from voteit.core.statemachines import StateMachineModelMixin
 from pydantic.main import BaseModel
 from rules.contrib.models import RulesModelMixin
 
@@ -173,7 +173,7 @@ class ElectoralRegister(RulesModelMixin, MeetingContext):
         "withheld_result",
     ],
 )
-class Poll(BaseContent, MeetingContext, AgendaItemContext, MachineMixin):
+class Poll(BaseContent, MeetingContext, AgendaItemContext, StateMachineModelMixin):
     """
     A vote taken on a set of proposals within an agenda item.
 
@@ -194,7 +194,6 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext, MachineMixin):
 
     name = "poll"
     state_machine_name = "voteit.poll.statemachines.PollStateMachine"
-    state_machine_attr = "sm"
     sm: PollStateMachine
     state: str = models.CharField(
         default=PollStateMachine.initial_state.value,

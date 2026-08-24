@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.timezone import now
-from statemachine.mixins import MachineMixin
+from voteit.core.statemachines import StateMachineModelMixin
 
 from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.core.abcs import AgendaItemContext
@@ -35,7 +35,9 @@ from voteit.stats.registry import history_log
         "tags",
     ],
 )
-class AgendaItem(BaseContent, MeetingContext, AgendaItemContext, MachineMixin):
+class AgendaItem(
+    BaseContent, MeetingContext, AgendaItemContext, StateMachineModelMixin
+):
     """
     A structured discussion/voting point within a meeting.
 
@@ -53,7 +55,6 @@ class AgendaItem(BaseContent, MeetingContext, AgendaItemContext, MachineMixin):
 
     name: str = "agenda_item"
     state_machine_name = "voteit.agenda.statemachines.AgendaItemStateMachine"
-    state_machine_attr = "sm"
     sm: AgendaItemStateMachine
     body: str = RichTextField(blank=True, default="", html_cleaner=relaxed_clean_html)
     title: str = models.CharField(max_length=100)

@@ -18,7 +18,7 @@ from rest_framework.utils import formatting
 from rules.contrib.rest_framework import (
     AutoPermissionViewSetMixin as RulesAutoPermissionViewSetMixin,
 )
-from statemachine.mixins import MachineMixin
+from voteit.core.statemachines import StateMachineModelMixin
 
 from voteit.core.rest_api.serializers import SMEventSerializer
 from voteit.core.rest_api.utils import perm_denied_msg
@@ -127,7 +127,7 @@ class ModelContextMixin(ABC):
 
 
 class StateMachineMixin:
-    instance: MachineMixin
+    instance: StateMachineModelMixin
 
     def get_view_description(self, html=False):
         if getattr(self, "action", None) == "event":

@@ -102,10 +102,14 @@ collector.
 
 **Prefer `.values()` to a ModelSerializer for anything bulk.** Six models carry
 a `python-statemachine` machine (`Meeting`, `AgendaItem`, `Proposal`, `Poll`,
-`SpeakerListSystem`, `MeetingInvite`), and `MachineMixin.__init__` builds a
-whole machine — callback registries and dispatchers — for *every* instance.
-Measured: **120 kB per model instance against 0.4 kB per `.values()` row, 280x**.
-Serializing 100 agenda items through DRF cost 12 MB to produce 20 kB of wire.
+`SpeakerListSystem`, `MeetingInvite`). This used to be the dominant cost:
+`MachineMixin.__init__` built a whole machine — callback registries and
+dispatchers — for *every* instance, measured at **120 kB per model instance
+against 0.4 kB per `.values()` row, 280x**. `StateMachineModelMixin` made that
+binding lazy (`voteit/core/statemachines.py`), so a model instance now costs
+about 0.6 kB and the machine is built only when something reads `.sm`. Skipping
+the instance is still cheaper, but this is now a DRF-overhead argument, not an
+order-of-magnitude one — do not contort a collector to avoid model instances.
 
 `agenda.items` and `proposal.collectors.attach_proposals` both take the
 `.values()` route for this reason. It is only valid while the serializer has no

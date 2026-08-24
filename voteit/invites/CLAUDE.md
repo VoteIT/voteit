@@ -14,7 +14,7 @@ Handles meeting invitations: creating them, matching identity data to users, acc
 
 ## State machine (`statemachines.py`)
 
-`InviteStateMachine(StateChart)` from `python-statemachine`. Bound to `MeetingInvite` via `MachineMixin`; access via `invite.sm`.
+`InviteStateMachine(StateChart)` from `python-statemachine`. Bound to `MeetingInvite` via `StateMachineModelMixin`; access via `invite.sm` (built lazily on first access).
 
 States (all final except `open`): `open` (initial), `accepted`, `rejected`, `revoked`, `expired`.
 

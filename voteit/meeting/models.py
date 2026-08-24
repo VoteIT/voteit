@@ -12,7 +12,7 @@ from django.db import models
 from django.utils.functional import cached_property
 from django.utils.text import slugify
 from rules.contrib.models import RulesModelMixin
-from statemachine.mixins import MachineMixin
+from voteit.core.statemachines import StateMachineModelMixin
 
 from voteit.core import PERM
 from voteit.core.abcs import MeetingContext, OrganisationContext
@@ -132,7 +132,7 @@ class Meeting(
     MeetingContext,
     OrganisationContext,
     RulesModelMixin,
-    MachineMixin,
+    StateMachineModelMixin,
 ):
     """
     The primary container for all democratic activity within VoteIT.
@@ -155,7 +155,6 @@ class Meeting(
     """
 
     state_machine_name = "voteit.meeting.statemachines.MeetingStateMachine"
-    state_machine_attr = "sm"
     sm: MeetingStateMachine
 
     name = "meeting"

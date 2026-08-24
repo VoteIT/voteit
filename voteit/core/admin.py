@@ -414,7 +414,7 @@ _sm_event_action.short_description = "Send state machine event..."
 
 
 class StateMachineAdminMixin:
-    """Add to any ModelAdmin whose model uses MachineMixin to get the SM event action."""
+    """Add to any ModelAdmin whose model uses StateMachineModelMixin for the SM event action."""
 
     def get_actions(self, request):
         actions = super().get_actions(request)

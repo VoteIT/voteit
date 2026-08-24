@@ -18,7 +18,7 @@ from django.db import IntegrityError
 from django.db import models
 from django.utils.timezone import now
 from rules.contrib.models import RulesModelMixin
-from statemachine.mixins import MachineMixin
+from voteit.core.statemachines import StateMachineModelMixin
 
 from voteit.core.abcs import MeetingContext
 from voteit.core.decorators import ensure_atomic
@@ -269,11 +269,10 @@ class MeetingInviteManager(models.Manager):
     mask_fields=["user_data"],
     mask_callable="voteit.invites.utils.user_data_mask",
 )
-class MeetingInvite(RulesModelMixin, MeetingContext, MachineMixin):
+class MeetingInvite(RulesModelMixin, MeetingContext, StateMachineModelMixin):
     name = "meeting_invite"
     sm: InviteStateMachine
     state_machine_name = "voteit.invites.statemachines.InviteStateMachine"
-    state_machine_attr = "sm"
     state: str = models.CharField(
         default=InviteStateMachine.open.id,
         choices=[(x.id, str(x.name)) for x in InviteStateMachine.states],
