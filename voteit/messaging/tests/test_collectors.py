@@ -4,7 +4,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
 from voteit.core.messages.user import InvalidateUserCache
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
 from voteit.messaging.collectors import AppStateCollector
@@ -18,7 +18,7 @@ from voteit.messaging.state import AppState
 
 class Noop(AppStateCollector):
     name = "test.noop"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel,)
 
     def collect(self, state):
         pass
@@ -36,7 +36,7 @@ class RegistryTests(TestCase):
     def test_abstract_collector_is_refused(self):
         class Incomplete(AppStateCollector):
             name = "test.incomplete"
-            channels = (MeetingChannel,)
+            channels = (ParticipantsChannel,)
 
         with self.assertRaises(TypeError):
             self._registry()(Incomplete)
@@ -61,7 +61,7 @@ class RegistryTests(TestCase):
 
 class CollectorsForTests(TestCase):
     def test_sorted_by_order_then_name(self):
-        for channel in (MeetingChannel, ModeratorsChannel):
+        for channel in (ParticipantsChannel, ModeratorsChannel):
             with self.subTest(channel=channel.name):
                 found = collectors_for(channel)
                 self.assertEqual(sorted(found, key=lambda c: (c.order, c.name)), found)
@@ -72,27 +72,27 @@ class CollectorsForTests(TestCase):
         self.assertIn("agenda.items", names)
 
     def test_unknown_channel_has_none(self):
-        class Unregistered(MeetingChannel):
+        class Unregistered(ParticipantsChannel):
             name = "test.nothing.here"
 
         self.assertEqual([], collectors_for(Unregistered))
 
     def test_index_is_rebuilt_after_registration(self):
-        before = len(collectors_for(MeetingChannel))
+        before = len(collectors_for(ParticipantsChannel))
         try:
             app_state_collectors(Noop)
-            self.assertEqual(before + 1, len(collectors_for(MeetingChannel)))
+            self.assertEqual(before + 1, len(collectors_for(ParticipantsChannel)))
         finally:
             del app_state_collectors["test.noop"]
             from voteit.messaging.registry import reset_collector_index
 
             reset_collector_index()
-        self.assertEqual(before, len(collectors_for(MeetingChannel)))
+        self.assertEqual(before, len(collectors_for(ParticipantsChannel)))
 
 
 class Boom(AppStateCollector):
     name = "test.boom"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel,)
 
     def collect(self, state):
         state.append(InvalidateUserCache(payload={"pk": 1}))
@@ -101,7 +101,7 @@ class Boom(AppStateCollector):
 
 class Fussy(AppStateCollector):
     name = "test.fussy"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel,)
 
     def applicable(self):
         raise ValueError("nope")
@@ -115,7 +115,7 @@ class FailureIsolationTests(TestCase):
 
     def setUp(self):
         self.meeting = Meeting.objects.create()
-        self.channel = MeetingChannel.from_instance(self.meeting)
+        self.channel = ParticipantsChannel.from_instance(self.meeting)
 
     def test_failure_marks_the_section_and_keeps_what_it_built(self):
         state = AppState()

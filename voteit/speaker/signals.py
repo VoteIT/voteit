@@ -23,7 +23,7 @@ from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import broadcast_meeting
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingRoles
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -90,12 +90,11 @@ def notify_active_list_changed(instance: SpeakerListSystem, **kwargs):
 @disable_on_raw_save
 def notify_changed_speaker_system(instance: SpeakerListSystem, **kw):
     """
-    Updates to speaker system, pushed to meeting channel.
+    Updates to speaker system, broadcast to everyone in the meeting.
     """
     if instance.meeting_id:
-        meeting_ch = MeetingChannel(instance.meeting_id)
         data = SpeakerListSystemSerializer(instance).data
-        meeting_ch.sync_publish(SpeakerSystemChanged(payload=data))
+        broadcast_meeting(instance.meeting_id, SpeakerSystemChanged(payload=data))
 
 
 @receiver(post_save, sender=Speaker)
@@ -130,8 +129,7 @@ def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
     """
     if instance.meeting_id:
         msg = SpeakerSystemDeleted(payload={"pk": instance.pk})
-        ch = MeetingChannel(instance.meeting_id)
-        ch.sync_publish(msg)
+        broadcast_meeting(instance.meeting_id, msg)
     # Notify in case method needs any other cleanup
     if instance.method_name:
         instance.signal_list_method_removed(force=True)
@@ -143,7 +141,7 @@ def notify_deleted_speaker_system(instance: SpeakerListSystem, **kw):
 @on_transaction_commit
 def notify_changed_speaker_list(instance: SpeakerList, created=None, **kw):
     """
-    Send to Agenda or meeting channel depending on if it's the active list.
+    Send to the agenda item, or the whole meeting, depending on if it's the active list.
     """
     data = SpeakerListSerializer(instance).data
     msg = SpeakerListChanged(payload=data)
@@ -276,8 +274,7 @@ def remove_list_roles_when_participant_removed(instance: MeetingRoles, roles, **
 
 def _role_msg_publish(instance: SpeakerSystemRoles, msg):
     if isinstance(instance.meeting, Meeting):
-        meeting_ch = MeetingChannel.from_instance(instance.meeting)
-        meeting_ch.sync_publish(msg)
+        broadcast_meeting(instance.meeting, msg)
     # FIXME: Duplicate message to user, but we might not send to meeting later on
     # This is a temporary thing
     user_ch = UserChannel.from_instance(instance.user)

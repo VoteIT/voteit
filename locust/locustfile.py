@@ -99,7 +99,9 @@ class SocketUser(HttpUser):
 
     @task
     def subscribe_meeting(self):
-        payload = {"pk": MEETING_ID, "channel_type": "meeting"}
+        # "participants" is what a non-moderator client subscribes to; it now
+        # carries the meeting-wide state the separate "meeting" channel used to.
+        payload = {"pk": MEETING_ID, "channel_type": "participants"}
         self.ws.send(json.dumps({"action": "channel.subscribe", "payload": payload}))
         # The initial state now arrives as a stream terminated by
         # channel.state_complete, rather than inside the subscribed frame.

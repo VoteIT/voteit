@@ -6,7 +6,7 @@ from voteit.messaging.testing import testing_channel_layers_setting
 from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.poll.app.polls.simple import Simple as SimplePoll
@@ -231,7 +231,7 @@ class RoomsViewTestCase(APITestCase):
         self.room.refresh_from_db()
         self.assertFalse(self.room.show_ballot)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_patch_with_token_includes_token_in_message(self, mock_publish):
         url = reverse("rooms-handle", kwargs={"pk": self.room.pk})
         self.client.force_login(self.moderator)

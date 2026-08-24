@@ -13,7 +13,7 @@ from voteit.active.models import ActiveUser
 from voteit.components.models import MeetingComponent
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import broadcast_meeting
 from voteit.meeting.models import MeetingRoles
 
 
@@ -22,13 +22,11 @@ def send_active_state_when_enabled(instance: MeetingComponent, **kwargs):
     if instance.component_name == ActiveUsersComponent.name and instance.enabled:
         users = list(instance.meeting.active_users.values_list("user_id", flat=True))
         msg = ActiveUsers(payload={"users": users, "meeting": instance.meeting.pk})
-        ch = MeetingChannel.from_instance(instance.meeting)
-        ch.sync_publish(msg)
+        broadcast_meeting(instance.meeting, msg)
 
 
 def _send_active_user(*, instance: ActiveUser, active: bool):
     with suppress(ObjectDoesNotExist):
-        ch = MeetingChannel.from_instance(instance.meeting)
         msg = ActiveUserChanged(
             payload={
                 "user": instance.user_id,
@@ -36,7 +34,7 @@ def _send_active_user(*, instance: ActiveUser, active: bool):
                 "meeting": instance.meeting.pk,
             }
         )
-        ch.sync_publish(msg)
+        broadcast_meeting(instance.meeting, msg)
 
 
 @disable_on_raw_save

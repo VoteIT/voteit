@@ -98,7 +98,7 @@ Registered at `meeting-components/`. Only `MeetingComponent` has a dedicated Vie
 
 ## WebSocket messages (`messages.py`)
 
-All are outgoing-only, published to `MeetingChannel`:
+All are outgoing-only, published via `broadcast_meeting`:
 
 - **`meeting_component.changed`** (`MeetingComponentChanged`) — new or updated valid component, and the channel subscribe initial state. There is no `.added`; the client upserts.
 - **`meeting_component.changed`** (`MeetingComponentChanged`) — component updated and still valid.
@@ -108,7 +108,7 @@ All are outgoing-only, published to `MeetingChannel`:
 
 ## Signals (`signals.py`)
 
-- `components.meeting` collector on `MeetingChannel` — pushes one `meeting_component.changed.batch` covering every component where `is_valid` is `True`, regardless of `enabled`. The frontend uses this to populate its data layer for all components, including disabled ones.
+- `components.meeting` collector on `ParticipantsChannel` + `ModeratorsChannel` — pushes one `meeting_component.changed.batch` covering every component where `is_valid` is `True`, regardless of `enabled`. The frontend uses this to populate its data layer for all components, including disabled ones.
 - `post_save` on `MeetingComponent` (deferred to transaction commit) — publishes `MeetingComponentChanged` if valid, otherwise `MeetingComponentDeleted` (telling the frontend to drop the record).
 - `pre_delete` on `MeetingComponent` — publishes `MeetingComponentDeleted` immediately (before the row is gone).
 - `after_sm_transition` on `Meeting` — when the meeting enters `closed`, iterates all adapters with `disable_on_close = True`, finds enabled components with those names, calls `component.disable()` and saves.

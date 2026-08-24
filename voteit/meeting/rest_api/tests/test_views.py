@@ -14,7 +14,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.components.app.components.dialects import DialectsFilter
 from voteit.components.app.components.proposal_print import ProposalPrint
 from voteit.core.testing import run_permission_tests
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.dialects import DialectHandler
 from voteit.meeting.dialects import get_named_paths
 from voteit.meeting.messages import MeetingDialectChanged
@@ -366,7 +366,7 @@ class MeetingViewSetTests(APITestCase):
         self.meeting.refresh_from_db()
         self.assertEqual("main_subst", self.meeting.installed_dialect)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_install_dialect_sends_notification(self, mock_publish):
         url = reverse("meeting-install-dialect", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.moderator)
@@ -419,7 +419,7 @@ class MeetingViewSetTests(APITestCase):
         self.meeting.refresh_from_db()
         self.assertIsNone(self.meeting.installed_dialect)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_remove_dialect_sends_notification(self, mock_publish):
         Meeting.objects.filter(pk=self.meeting.pk).update(
             installed_dialect="main_subst"

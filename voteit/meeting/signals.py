@@ -20,7 +20,7 @@ from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import broadcast_meeting
 from voteit.meeting.messages import GroupMembershipChanged
 from voteit.meeting.messages import GroupMembershipDeleted
 from voteit.meeting.messages import GroupRoleChanged
@@ -122,21 +122,19 @@ def remove_group_memberships(instance: MeetingRoles, **kw):
 def meeting_change(instance, created=None, **kw):
     if not created:
         data = MeetingDetailSerializer(instance).data
-        ch = MeetingChannel.from_instance(instance)
         msg = MeetingChanged(payload=data)
-        ch.sync_publish(msg)
+        broadcast_meeting(instance, msg)
 
 
 @receiver(pre_delete, sender=Meeting)
 @receiver(pre_delete, sender=MeetingGroup)
 @receiver(pre_delete, sender=GroupRole)
 @receiver(pre_delete, sender=GroupMembership)
-def publish_deleted_to_meeting_ch(instance: MeetingContext, *, sender, **kwargs):
+def publish_deleted_to_meeting(instance: MeetingContext, *, sender, **kwargs):
     if instance.meeting and instance.pk is not None:
-        meeting_ch = MeetingChannel.from_instance(instance.meeting)
         msg_class = _del_msg_class.get(sender)
         msg = msg_class(payload={"pk": instance.pk})
-        meeting_ch.sync_publish(msg, on_commit=True)
+        broadcast_meeting(instance.meeting, msg, on_commit=True)
 
 
 @receiver(post_save, sender=MeetingGroup)
@@ -144,12 +142,11 @@ def publish_deleted_to_meeting_ch(instance: MeetingContext, *, sender, **kwargs)
 @receiver(post_save, sender=GroupRole)
 @disable_on_raw_save
 def context_changed_publish_to_meeting(instance, *, sender, **kwargs):
-    meeting_ch = MeetingChannel.from_instance(instance.meeting)
     data = _serializer_class[sender](instance).data
     if sender is GroupMembership:
         data["m"] = instance.meeting.pk
     msg = _msg_class[sender](payload=data)
-    meeting_ch.sync_publish(msg, on_commit=True)
+    broadcast_meeting(instance.meeting, msg, on_commit=True)
 
 
 @receiver(pre_save, sender=MeetingGroup)
@@ -171,8 +168,7 @@ def adjust_membership_voting_power_when_group_changes(*, instance: MeetingGroup,
 
 
 def _role_msg_publish(instance: MeetingRoles, msg):
-    meeting_ch = MeetingChannel.from_instance(instance.meeting)
-    meeting_ch.sync_publish(msg)
+    broadcast_meeting(instance.meeting, msg)
     # FIXME: Duplicate message to user, but we might not send to meeting later on
     # This is a temporary thing
     user_ch = UserChannel.from_instance(instance.user)

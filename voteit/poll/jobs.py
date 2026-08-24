@@ -10,7 +10,7 @@ from redis.exceptions import TimeoutError
 from rq.job import Job
 
 from voteit.core import RQ_DEFAULT_QUEUE
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import broadcast_meeting
 from voteit.poll.messages import PollStatus
 from voteit.poll.models import Poll
 
@@ -50,7 +50,7 @@ def publish_poll_status(poll_pk: int) -> None:
             "total": len(poll.electoral_register.voter_data),
         }
     )
-    MeetingChannel(poll.meeting_id).sync_publish(msg)
+    broadcast_meeting(poll.meeting_id, msg)
 
 
 def schedule_poll_status_publish(poll_pk: int) -> None:

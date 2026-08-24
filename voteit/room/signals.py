@@ -6,7 +6,7 @@ from django.dispatch import Signal
 from django.dispatch import receiver
 
 from voteit.core.decorators import disable_on_raw_save
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import broadcast_meeting
 from voteit.room.channels import RoomChannel
 from voteit.room.messages import RoomChanged
 from voteit.room.messages import RoomDeleted
@@ -21,20 +21,18 @@ highlighted_proposals_changed = Signal()
 @receiver(post_save, sender=Room)
 @disable_on_raw_save
 def send_room_updates(*, instance: Room, created: bool, **kwargs):
-    meeting_ch = MeetingChannel(instance.meeting_id)
     data = RoomSerializer(instance).data
     if created:
         msg = RoomChanged(payload=data)
     else:
         msg = RoomChanged(payload={**data, "token": instance.token})
-    meeting_ch.sync_publish(msg)
+    broadcast_meeting(instance.meeting_id, msg)
 
 
 @receiver(pre_delete, sender=Room)
 def send_room_deleted(*, instance: Room, **kwargs):
-    meeting_ch = MeetingChannel(instance.meeting_id)
     msg = RoomDeleted(payload={"pk": instance.pk})
-    meeting_ch.sync_publish(msg)
+    broadcast_meeting(instance.meeting_id, msg)
 
 
 @receiver(highlighted_proposals_changed, sender=Room)

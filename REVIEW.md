@@ -262,10 +262,15 @@ print('incoming:', sorted(VoteitConsumer._MESSAGE_HANDLER_INFO_MAP))"
 Manual smoke, in this order — the batch check is the one that matters most:
 
 1. `/asyncapi/docs/` — all types render, no `*.added`.
-2. `wscat`: connect → `s.versions`; `s.ping` → `s.pong`; subscribe to a meeting
-   → `channel.subscribed`, state messages, `channel.state_complete`.
+2. `wscat`: connect → `s.versions`; `s.ping` → `s.pong`; subscribe to
+   `participants` → `channel.subscribed`, state messages, `channel.state_complete`
+   — one stream carrying what used to need a second `meeting` subscribe too
+   (`meeting.roles`, `room.rooms`, `speaker.systems`, `poll.own_votes` …).
 3. Subscribe to `moderators` as a non-participant → `channel.subscribe_error`
-   and nothing else.
+   and nothing else. Subscribe to `meeting` at all → `channel.subscribe_error`,
+   `"Unknown channel type"`.
+3b. Edit a room with a participant tab and a moderator tab open → **both** get
+   `room.changed` exactly once.
 4. **Add 5 proposals in one request → the other tab gets ONE
    `proposal.changed.batch` with 5 items. Add 2 → two individual messages.**
 5. Remove a moderator role via REST → `channel.left`.

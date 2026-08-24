@@ -13,7 +13,7 @@ python manage.py test voteit.reactions --keepdb --failfast
 - `models.py` — `ReactionButton` (meeting-scoped configuration), `Reaction` (the actual user action via GenericForeignKey)
 - `mixins.py` — `Reactable` abstract mixin; adds `reaction_set` GenericRelation to a model
 - `rules.py` — permission predicates for ADD/CHANGE/DELETE on buttons and SET/REMOVE on reactions
-- `signals.py` — post_save/pre_delete handlers that broadcast WebSocket messages to `MeetingChannel`, `AgendaItemChannel`, and `UserChannel`
+- `signals.py` — post_save/pre_delete handlers that broadcast WebSocket messages via `broadcast_meeting`, `AgendaItemChannel`, and `UserChannel`
 - `messages.py` — outgoing WebSocket message types: `ButtonChanged`, `ButtonDeleted`, `ReactionCount`, `UserReactionChanged`, `UserReactionDeleted`
 - `rest_api/views.py` — `ReactionButtonViewSet` with `set`, `remove`, `list_reactions` custom actions
 - `rest_api/serializers.py` — `ButtonCreateSerializer`, `ButtonDetailSerializer`, `ReactionTargetSerializer`, `ReactionSerializer`
@@ -95,14 +95,14 @@ The `content_type` field in request bodies is a model shortname string (e.g. `"p
 
 All messages are outgoing only (server → client).
 
-**On MeetingChannel subscribe:** all `ReactionButton` records for the meeting are pushed as individual `ButtonChanged` messages.
+**On participants/moderators subscribe:** all `ReactionButton` records for the meeting are pushed as individual `ButtonChanged` messages.
 
 **On AgendaItemChannel subscribe:** aggregated `ReactionCount` messages (one per button+object combination with count > 0) plus one `reaction.changed.batch` covering the subscribing user's own reactions within that agenda item are pushed. This is done in exactly 2 queries regardless of the number of buttons or reactions.
 
 | Message name | Type | Payload | Channel |
 |---|---|---|---|
-| `reaction_button.changed` | `ButtonChanged` | Full button serialization | `MeetingChannel` |
-| `reaction_button.deleted` | `ButtonDeleted` | `{pk}` | `MeetingChannel` |
+| `reaction_button.changed` | `ButtonChanged` | Full button serialization | `broadcast_meeting` |
+| `reaction_button.deleted` | `ButtonDeleted` | `{pk}` | `broadcast_meeting` |
 | `reaction.count` | `ReactionCount` | `{content_type, object_id, button, count}` | `AgendaItemChannel` |
 | `reaction.changed` | `UserReactionChanged` | `{pk, content_type, object_id, button, user, agenda_item}` | `UserChannel` (reaction owner) |
 | `reaction.deleted` | `UserReactionDeleted` | `{pk}` | `UserChannel` (reaction owner) |

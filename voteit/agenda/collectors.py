@@ -10,7 +10,6 @@ from voteit.agenda.rest_api.serializers import AgendaItemBodySerializer
 from voteit.agenda.rest_api.serializers import AgendaItemListSerializer
 from voteit.agenda.rest_api.serializers import LastReadSerializer
 from voteit.agenda.statemachines import AgendaItemStateMachine
-from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.messaging.collectors import AppStateCollector
@@ -77,7 +76,7 @@ class AgendaLastRead(AppStateCollector):
     """
 
     name = "agenda.last_read"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 200
 
     def collect(self, state: AppState) -> None:

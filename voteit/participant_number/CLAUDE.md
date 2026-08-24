@@ -25,7 +25,7 @@ There is no `rules.py` in this app. Permission checks delegate to the related me
 
 ## WebSocket messages (`messages.py`)
 
-All messages are outgoing-only, published to `MeetingChannel`.
+All messages are outgoing-only, published via `broadcast_meeting`.
 
 - **`pn.changed`** (`PNChanged`) — a number was assigned or updated; payload: `{meeting, number, user, pk}`. There is no `.added`; the client upserts on `pk`.
 - **`pn.changed`** (`PNChanged`) — an existing assignment was updated; same payload.
@@ -33,8 +33,8 @@ All messages are outgoing-only, published to `MeetingChannel`.
 
 ## Signals (`signals.py`)
 
-- `participant_number.numbers` collector on `MeetingChannel` — all current participant numbers as one `pn.changed.batch`. `applicable()` returns False when the meeting has no `PNSystem`.
-- `post_save` on `ParticipantNumber` — publishes `PNChanged` on both creation and update via `MeetingChannel.sync_publish`. Skips if `pns.meeting` is `None`. Uses `@disable_on_raw_save` to avoid firing during data loads.
+- `participant_number.numbers` collector on `ParticipantsChannel` + `ModeratorsChannel` — all current participant numbers as one `pn.changed.batch`. `applicable()` returns False when the meeting has no `PNSystem`.
+- `post_save` on `ParticipantNumber` — publishes `PNChanged` on both creation and update via `broadcast_meeting`. Skips if `pns.meeting` is `None`. Uses `@disable_on_raw_save` to avoid firing during data loads.
 - `pre_delete` on `ParticipantNumber` — publishes `PNDeleted` synchronously before the row is removed.
 
 ## Management command

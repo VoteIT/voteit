@@ -95,6 +95,11 @@ class Polls(AppStateCollector):
 registered on several channels branches on `self.channel` — that is how the
 participants/moderators visibility pairs work.
 
+There is no `meeting` channel. Anything meeting-wide now
+goes through `voteit.meeting.channels.broadcast_meeting`, which publishes to both
+groups, and every collector that used to serve `meeting` declares
+`channels = (ParticipantsChannel, ModeratorsChannel)`.
+
 A collector that raises only loses its own section (`failed: true`); the rest
 still run. The exception is a database error, which leaves the durable atomic
 block unusable and is re-raised — there is deliberately no savepoint per

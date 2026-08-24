@@ -10,7 +10,7 @@ from voteit.messaging.testing import build_app_state
 from voteit.messaging.testing import payloads_of
 from voteit.participant_number.messages import PNChanged
 
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -43,12 +43,12 @@ class SignalsTests(TestCase):
 
     def test_app_state_sent(self):
         app_state = build_app_state(
-            MeetingChannel.name, self.meeting.pk, self.user_a.pk
+            ParticipantsChannel.name, self.meeting.pk, self.user_a.pk
         )
         pks = {p.pk for p in payloads_of(app_state, PNChanged)}
         self.assertEqual({self.one.pk, self.two.pk}, pks)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_added_pn(self, mock_publish):
         from voteit.participant_number.messages import PNChanged
 
@@ -61,7 +61,7 @@ class SignalsTests(TestCase):
         self.assertEqual(pn.number, msg.payload.number)
         self.assertEqual(3, pn.number)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_pn_changed(self, mock_publish):
         from voteit.participant_number.messages import PNChanged
 
@@ -73,7 +73,7 @@ class SignalsTests(TestCase):
         self.assertIsInstance(msg, PNChanged)
         self.assertEqual(self.one.number, msg.payload.number)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_pn_deleted(self, mock_publish):
         from voteit.participant_number.messages import PNDeleted
 

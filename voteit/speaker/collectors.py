@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
 
+from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.messages.role_updates import RolesChanged
 from voteit.core.utils import get_model_shortname
-from voteit.meeting.channels import MeetingChannel
 from voteit.messaging.collectors import AppStateCollector
 from voteit.messaging.registry import app_state_collectors
 from voteit.room.channels import RoomChannel
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
 @app_state_collectors
 class SpeakerSystems(AppStateCollector):
     name = "speaker.systems"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 30
 
     def collect(self, state: AppState) -> None:
@@ -46,7 +47,7 @@ class SpeakerSystemRolesCollector(AppStateCollector):
     """The subscriber's own roles within each speaker system."""
 
     name = "speaker.roles"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 30
 
     def collect(self, state: AppState) -> None:

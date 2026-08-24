@@ -13,7 +13,7 @@ from rest_framework.test import APITestCase
 from voteit.active.components import ActiveUsersComponent
 from voteit.messaging.models import Connection
 from voteit.active.messages import ActiveUserChanged
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -176,7 +176,7 @@ class PurgeActionTests(ActiveUserViewSetBase):
 class ActiveActionMessageTests(ActiveUserViewSetBase):
     """Verify that ActiveUserChanged is published when the REST endpoint changes active state."""
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_set_active_publishes_active_user_changed(self, mock_publish):
         url = reverse("active-users-active", kwargs={"pk": self.meeting.pk})
         self.client.force_login(self.participant)
@@ -188,7 +188,7 @@ class ActiveActionMessageTests(ActiveUserViewSetBase):
         self.assertEqual(msg.payload.meeting, self.meeting.pk)
         self.assertTrue(msg.payload.active)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_set_inactive_publishes_active_user_changed(self, mock_publish):
         self.meeting.active_users.create(user=self.participant)
         url = reverse("active-users-active", kwargs={"pk": self.meeting.pk})

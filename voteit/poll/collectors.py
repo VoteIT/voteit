@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from sql_util.aggregates import SubqueryCount
 
 from voteit.agenda.statemachines import AgendaItemStateMachine
-from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.messaging.collectors import AppStateCollector
@@ -59,7 +58,7 @@ class PollStatuses(AppStateCollector):
     """Vote counts for the polls that are open right now."""
 
     name = "poll.status"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 60
 
     def collect(self, state: AppState) -> None:
@@ -89,7 +88,7 @@ class OwnVotes(AppStateCollector):
     """
 
     name = "poll.own_votes"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 200
 
     def collect(self, state: AppState) -> None:
@@ -102,7 +101,7 @@ class OwnVotes(AppStateCollector):
 @app_state_collectors
 class LatestElectoralRegister(AppStateCollector):
     name = "poll.electoral_register"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 60
 
     def collect(self, state: AppState) -> None:
@@ -117,7 +116,7 @@ class LatestElectoralRegister(AppStateCollector):
 @app_state_collectors
 class VoteTransfers(AppStateCollector):
     name = "poll.vote_transfers"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 60
 
     def applicable(self) -> bool:

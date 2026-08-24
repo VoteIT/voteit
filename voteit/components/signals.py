@@ -12,7 +12,7 @@ from voteit.components.rest_api.serializers import MeetingComponentSerializer
 from voteit.components.utils import get_meeting_component_adapters
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import broadcast_meeting
 from voteit.meeting.models import Meeting
 from voteit.components.models import MeetingComponent
 from voteit.meeting.statemachines import MeetingStateMachine
@@ -28,27 +28,26 @@ def meeting_component_updated(instance: MeetingComponent = None, created=None, *
 
     To actually edit components (including disabled ones) we'll use the ones from the rest endpoint.
     """
-    meeting_ch = MeetingChannel.from_instance(instance.meeting)
     data = MeetingComponentSerializer(instance).data
     is_valid = data["is_valid"]
     if created:
         if is_valid:
-            meeting_ch.sync_publish(MeetingComponentChanged(payload=data))
+            broadcast_meeting(instance.meeting, MeetingComponentChanged(payload=data))
     else:
         # Update
-        meeting_ch.sync_publish(
+        broadcast_meeting(
+            instance.meeting,
             MeetingComponentChanged(payload=data)
             if is_valid
-            else MeetingComponentDeleted(payload=data)
+            else MeetingComponentDeleted(payload=data),
         )
 
 
 @receiver(pre_delete, sender=MeetingComponent)
 def meeting_component_delete(instance=None, **kw):
-    meeting_ch = MeetingChannel.from_instance(instance.meeting)
     msg = MeetingComponentDeleted(payload={"pk": instance.pk})
     # Sent after transaction commit!
-    meeting_ch.sync_publish(msg)
+    broadcast_meeting(instance.meeting, msg)
 
 
 @receiver(after_sm_transition, sender=Meeting)

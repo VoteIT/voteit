@@ -14,7 +14,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -83,7 +83,7 @@ class ContextChannelPermissionTests(TestCase):
         self.assertFalse(ModeratorsChannel(self.meeting.pk).allow_subscribe(None))
 
     def test_a_channel_without_a_permission_lets_anyone_in(self):
-        class OpenChannel(MeetingChannel):
+        class OpenChannel(ParticipantsChannel):
             name = "open-for-testing"
             permission = None
 
@@ -91,12 +91,12 @@ class ContextChannelPermissionTests(TestCase):
 
     def test_missing_context_raises_does_not_exist(self):
         """The subscribe and recheck jobs both rely on catching this."""
-        channel = MeetingChannel(self.meeting.pk + 1000)
+        channel = ParticipantsChannel(self.meeting.pk + 1000)
         with self.assertRaises(Meeting.DoesNotExist):
             channel.allow_subscribe(self.moderator)
 
     def test_from_instance_skips_the_lookup(self):
-        channel = MeetingChannel.from_instance(self.meeting)
+        channel = ParticipantsChannel.from_instance(self.meeting)
         with self.assertNumQueries(0):
             self.assertEqual(self.meeting, channel.context)
 
@@ -107,14 +107,14 @@ class SubscribeLeaveTests(TestCase):
 
     def test_subscribe_then_leave(self):
         layer = get_channel_layer()
-        channel = MeetingChannel(1, consumer_channel=self.consumer_channel)
+        channel = ParticipantsChannel(1, consumer_channel=self.consumer_channel)
 
         async_to_sync(channel.subscribe)()
-        async_to_sync(layer.group_send)("meeting_1", {"type": "x"})
+        async_to_sync(layer.group_send)("participants_1", {"type": "x"})
         self.assertIsNotNone(receive_or_none(layer, self.consumer_channel))
 
         async_to_sync(channel.leave)()
-        async_to_sync(layer.group_send)("meeting_1", {"type": "x"})
+        async_to_sync(layer.group_send)("participants_1", {"type": "x"})
         self.assertIsNone(receive_or_none(layer, self.consumer_channel))
 
 

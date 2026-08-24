@@ -22,7 +22,7 @@ from rq import Queue
 from rq import SimpleWorker
 
 from voteit.agenda.messages import AgendaChanged
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
@@ -191,7 +191,7 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_stream_order(self):
         communicator = await self._connect(self.moderator)
-        messages = await self._subscribe(communicator, "meeting", self.meeting.pk)
+        messages = await self._subscribe(communicator, "participants", self.meeting.pk)
         actions = [m.action for m in messages]
         self.assertEqual("channel.subscribed", actions[0])
         self.assertEqual("channel.state_complete", actions[-1])
@@ -199,17 +199,19 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_subscribed_payload(self):
         communicator = await self._connect(self.moderator)
-        messages = await self._subscribe(communicator, "meeting", self.meeting.pk)
+        messages = await self._subscribe(communicator, "participants", self.meeting.pk)
         subscribed = next(m for m in messages if m.action == "channel.subscribed")
         self.assertEqual(self.meeting.pk, subscribed.payload.pk)
-        self.assertEqual("meeting", subscribed.payload.channel_type)
-        self.assertEqual(f"meeting_{self.meeting.pk}", subscribed.payload.channel_name)
+        self.assertEqual("participants", subscribed.payload.channel_type)
+        self.assertEqual(
+            f"participants_{self.meeting.pk}", subscribed.payload.channel_name
+        )
         await communicator.disconnect()
 
     async def test_state_arrives_as_bundles_between_the_two_markers(self):
         """subscribed, then channel.state frames, then state_complete."""
         communicator = await self._connect(self.moderator)
-        messages = await self._subscribe(communicator, "meeting", self.meeting.pk)
+        messages = await self._subscribe(communicator, "participants", self.meeting.pk)
         actions = [m.action for m in messages]
         self.assertEqual("channel.subscribed", actions[0])
         self.assertEqual("channel.state_complete", actions[-1])
@@ -221,7 +223,7 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_announced_collectors_all_report_complete(self):
         communicator = await self._connect(self.moderator)
-        messages = await self._subscribe(communicator, "meeting", self.meeting.pk)
+        messages = await self._subscribe(communicator, "participants", self.meeting.pk)
         announced = next(
             m for m in messages if m.action == "channel.subscribed"
         ).payload.collectors
@@ -266,7 +268,9 @@ class SubscribeTests(ConsumerTestCase):
         """
         communicator = await self._connect(self.moderator)
         with override_settings(VOTEIT_WS_FAST_FANOUT=False):
-            messages = await self._subscribe(communicator, "meeting", self.meeting.pk)
+            messages = await self._subscribe(
+                communicator, "participants", self.meeting.pk
+            )
         bundles = [m for m in messages if m.action == "channel.state"]
         self.assertTrue(bundles)
         roles = [
@@ -308,10 +312,30 @@ class SubscribeTests(ConsumerTestCase):
         self.assertIn("channel.subscribe_error", [m.action for m in messages])
         await communicator.disconnect()
 
+    async def test_removed_meeting_channel_is_refused(self):
+        """``meeting`` was dropped; it must fail like any unknown type.
+
+        Its permission was identical to ``participants``, so it reached nobody
+        the two role channels do not -- it only cost a second subscribe and a
+        second app state snapshot. See voteit.meeting.channels.broadcast_meeting.
+        """
+        communicator = await self._connect(self.moderator)
+        await communicator.send_message(
+            ChannelSubscribe(payload={"channel_type": "meeting", "pk": self.meeting.pk})
+        )
+        messages = await communicator.receive_all_messages(
+            stop_action="channel.subscribe_error", timeout=2
+        )
+        error = next(m for m in messages if m.action == "channel.subscribe_error")
+        self.assertEqual("Unknown channel type", error.payload.detail)
+        # Refused inline, so it never costs a worker round trip.
+        self.assertEqual([], self.queue.job_ids)
+        await communicator.disconnect()
+
     async def test_group_fanout(self):
         communicator = await self._connect(self.moderator)
-        await self._subscribe(communicator, "meeting", self.meeting.pk)
-        await sync_to_async(MeetingChannel(self.meeting.pk).sync_publish)(
+        await self._subscribe(communicator, "participants", self.meeting.pk)
+        await sync_to_async(ParticipantsChannel(self.meeting.pk).sync_publish)(
             AgendaChanged(payload={"pk": 1, "title": "Hello"}), on_commit=False
         )
         messages = await communicator.receive_all_messages(
@@ -327,9 +351,9 @@ class SubscribeTests(ConsumerTestCase):
         # event dispatcher instead, which re-validates it per recipient. The
         # frame the client sees must be identical.
         communicator = await self._connect(self.moderator)
-        await self._subscribe(communicator, "meeting", self.meeting.pk)
+        await self._subscribe(communicator, "participants", self.meeting.pk)
         with override_settings(VOTEIT_WS_FAST_FANOUT=False):
-            await sync_to_async(MeetingChannel(self.meeting.pk).sync_publish)(
+            await sync_to_async(ParticipantsChannel(self.meeting.pk).sync_publish)(
                 AgendaChanged(payload={"pk": 1, "title": "Hello"}), on_commit=False
             )
             messages = await communicator.receive_all_messages(
@@ -343,11 +367,11 @@ class SubscribeTests(ConsumerTestCase):
     async def test_batch_collapse_end_to_end(self):
         """Several changes in one transaction arrive as one batch."""
         communicator = await self._connect(self.moderator)
-        await self._subscribe(communicator, "meeting", self.meeting.pk)
+        await self._subscribe(communicator, "participants", self.meeting.pk)
 
         def publish_four():
             with transaction.atomic():
-                channel = MeetingChannel(self.meeting.pk)
+                channel = ParticipantsChannel(self.meeting.pk)
                 for pk in range(4):
                     channel.sync_publish(AgendaChanged(payload={"pk": pk}))
 
@@ -363,11 +387,11 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_below_threshold_stays_individual(self):
         communicator = await self._connect(self.moderator)
-        await self._subscribe(communicator, "meeting", self.meeting.pk)
+        await self._subscribe(communicator, "participants", self.meeting.pk)
 
         def publish_two():
             with transaction.atomic():
-                channel = MeetingChannel(self.meeting.pk)
+                channel = ParticipantsChannel(self.meeting.pk)
                 for pk in range(2):
                     channel.sync_publish(AgendaChanged(payload={"pk": pk}))
 
@@ -381,9 +405,11 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_leave_stops_delivery(self):
         communicator = await self._connect(self.moderator)
-        await self._subscribe(communicator, "meeting", self.meeting.pk)
+        await self._subscribe(communicator, "participants", self.meeting.pk)
         await communicator.send_message(
-            ChannelLeave(payload={"channel_type": "meeting", "pk": self.meeting.pk})
+            ChannelLeave(
+                payload={"channel_type": "participants", "pk": self.meeting.pk}
+            )
         )
         messages = await communicator.receive_all_messages(
             stop_action="channel.left", timeout=2
@@ -391,7 +417,7 @@ class SubscribeTests(ConsumerTestCase):
         self.assertIn("channel.left", [m.action for m in messages])
         # Drain the completion ack so receive_nothing() below is meaningful.
         await communicator.receive_all_messages(timeout=1)
-        await sync_to_async(MeetingChannel(self.meeting.pk).sync_publish)(
+        await sync_to_async(ParticipantsChannel(self.meeting.pk).sync_publish)(
             AgendaChanged(payload={"pk": 1}), on_commit=False
         )
         self.assertTrue(await communicator.receive_nothing(timeout=0.5))
@@ -399,7 +425,7 @@ class SubscribeTests(ConsumerTestCase):
 
     async def test_list_subscriptions(self):
         communicator = await self._connect(self.moderator)
-        await self._subscribe(communicator, "meeting", self.meeting.pk)
+        await self._subscribe(communicator, "participants", self.meeting.pk)
         await self._subscribe(communicator, "moderators", self.meeting.pk)
         await communicator.send_message(ChannelListSubscriptions())
         messages = await communicator.receive_all_messages(
@@ -408,7 +434,7 @@ class SubscribeTests(ConsumerTestCase):
         listed = next(m for m in messages if m.action == "channel.subscriptions")
         self.assertEqual(
             {
-                ChannelRef(pk=self.meeting.pk, channel_type="meeting"),
+                ChannelRef(pk=self.meeting.pk, channel_type="participants"),
                 ChannelRef(pk=self.meeting.pk, channel_type="moderators"),
             },
             set(listed.payload.subscriptions),
@@ -424,7 +450,7 @@ class SubscribeTests(ConsumerTestCase):
         communicator = await self._connect(self.moderator)
         await communicator.send_message(
             ChannelSubscribe(
-                payload={"channel_type": "meeting", "pk": self.meeting.pk + 1000}
+                payload={"channel_type": "participants", "pk": self.meeting.pk + 1000}
             )
         )
         await communicator.receive_all_messages(timeout=1)
@@ -497,9 +523,9 @@ class RecheckTests(ConsumerTestCase):
         await communicator.disconnect()
 
     async def test_still_allowed_channel_is_kept(self):
-        """Losing moderator must not cost the plain meeting channel."""
+        """Losing moderator must not cost the participants channel."""
         communicator = await self._connect(self.moderator)
-        await self._subscribe(communicator, "meeting", self.meeting.pk)
+        await self._subscribe(communicator, "participants", self.meeting.pk)
         await self._subscribe(communicator, "moderators", self.meeting.pk)
 
         await sync_to_async(self.meeting.remove_roles)(self.moderator, ROLE_MODERATOR)
@@ -507,7 +533,7 @@ class RecheckTests(ConsumerTestCase):
         await communicator.receive_all_messages(stop_action="channel.left", timeout=2)
         await communicator.receive_all_messages(timeout=1)
 
-        await sync_to_async(MeetingChannel(self.meeting.pk).sync_publish)(
+        await sync_to_async(ParticipantsChannel(self.meeting.pk).sync_publish)(
             AgendaChanged(payload={"pk": 1, "title": "Public"}), on_commit=False
         )
         messages = await communicator.receive_all_messages(
@@ -519,7 +545,7 @@ class RecheckTests(ConsumerTestCase):
     async def test_left_channel_drops_out_of_list_subscriptions(self):
         """on_left has to keep the consumer's own set in step."""
         communicator = await self._connect(self.moderator)
-        await self._subscribe(communicator, "meeting", self.meeting.pk)
+        await self._subscribe(communicator, "participants", self.meeting.pk)
         await self._subscribe(communicator, "moderators", self.meeting.pk)
 
         await sync_to_async(self.meeting.remove_roles)(self.moderator, ROLE_MODERATOR)
@@ -532,7 +558,7 @@ class RecheckTests(ConsumerTestCase):
         )
         listed = next(m for m in messages if m.action == "channel.subscriptions")
         self.assertEqual(
-            [ChannelRef(pk=self.meeting.pk, channel_type="meeting")],
+            [ChannelRef(pk=self.meeting.pk, channel_type="participants")],
             listed.payload.subscriptions,
         )
         await communicator.disconnect()

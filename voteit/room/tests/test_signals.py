@@ -9,7 +9,7 @@ from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
 
 
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.room.channels import RoomChannel
@@ -39,7 +39,9 @@ class SubscriptionTests(TestCase):
         cls.hl1 = cls.room.highlighted_proposals.create(proposal=cls.prop1)
 
     def test_subscribe_meeting(self):
-        app_state = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
+        app_state = build_app_state(
+            ParticipantsChannel.name, self.meeting.pk, self.user.pk
+        )
         payloads = [p.model_dump() for p in payloads_of(app_state, RoomChanged)]
         self.assertEqual(1, len(payloads))
         data = payloads[0]
@@ -84,7 +86,7 @@ class SubscriptionTests(TestCase):
         with self.assertNumQueries(1):
             run_collector("room.highlighted", room, self.user)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_room_changed(self, mock_publish):
         with self.captureOnCommitCallbacks(execute=True):
             self.room.title = "Hello world"
@@ -98,7 +100,7 @@ class SubscriptionTests(TestCase):
         msg = messages[0]
         self.assertEqual("Hello world", msg.payload.title)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_room_deleted(self, mock_publish):
         room_pk = self.room.pk
         with self.captureOnCommitCallbacks(execute=True):

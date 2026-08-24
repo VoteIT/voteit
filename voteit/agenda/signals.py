@@ -19,7 +19,7 @@ from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.core.abcs import AgendaItemContext
 from voteit.core.decorators import disable_on_raw_save
 from voteit.discussion.models import DiscussionPost
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import broadcast_meeting
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
@@ -64,12 +64,11 @@ def ai_made_private(instance: AgendaItem, source, target, event, **kw):
 @receiver(pre_delete, sender=AgendaItem)
 def agenda_delete(instance: AgendaItem = None, **kw):
     if instance.meeting:
-        meeting_ch = MeetingChannel.from_instance(instance.meeting)
         msg = AgendaDeleted(payload={"pk": instance.pk})
-        meeting_ch.sync_publish(msg)
+        broadcast_meeting(instance.meeting, msg)
         # We can send this to meeting too, it might not exist though
         msg = AgendaBodyDeleted(payload={"pk": instance.pk})
-        meeting_ch.sync_publish(msg)
+        broadcast_meeting(instance.meeting, msg)
 
 
 @receiver(archive_meeting)

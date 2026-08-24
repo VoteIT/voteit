@@ -5,9 +5,10 @@ from typing import TYPE_CHECKING
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count
 
+from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.utils import get_model_shortname
-from voteit.meeting.channels import MeetingChannel
 from voteit.messaging.collectors import AppStateCollector
 from voteit.messaging.registry import app_state_collectors
 from voteit.reactions.messages import ButtonChanged
@@ -23,7 +24,7 @@ if TYPE_CHECKING:
 @app_state_collectors
 class ReactionButtons(AppStateCollector):
     name = "reactions.buttons"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 40
 
     def collect(self, state: AppState) -> None:

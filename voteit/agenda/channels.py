@@ -19,7 +19,7 @@ class AgendaItemChannel(ContextChannel):
     - Discussions
     - Any metadata around those
 
-    Agenda Items themselves go in the meeting channel
+    Agenda Items themselves go to the participants and moderators channels
     """
 
     name = "agenda_item"

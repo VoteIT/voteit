@@ -12,7 +12,7 @@ from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.meeting.models import GroupMembership
 from voteit.meeting.models import GroupRole
 from voteit.meeting.models import Meeting
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import MeetingGroup
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -72,7 +72,7 @@ class MeetingChangedTests(TestCase):
         self.meeting = Meeting.objects.create()
 
     # We don't handle added right now
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed(self, mock_publish):
         from voteit.meeting.messages import MeetingChanged
 
@@ -86,7 +86,7 @@ class MeetingChangedTests(TestCase):
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
-class MeetingChannelSubscribedTests(TestCase):
+class ParticipantsAppStateTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
@@ -101,7 +101,7 @@ class MeetingChannelSubscribedTests(TestCase):
         )
 
     def _mk_subscribe(self):
-        return build_app_state("meeting", self.meeting.pk, self.user.pk)
+        return build_app_state("participants", self.meeting.pk, self.user.pk)
 
     def test_roles_in_app_state(self):
         app_state = self._mk_subscribe()
@@ -146,7 +146,7 @@ class MeetingGroupChangedTests(TestCase):
         cls.user = cls.meeting.participants.create(username="maybe_member")
         cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_added(self, mock_publish):
         from voteit.meeting.messages import MeetingGroupChanged
 
@@ -157,7 +157,7 @@ class MeetingGroupChangedTests(TestCase):
         self.assertIsInstance(msg, MeetingGroupChanged)
         self.assertEqual(group.pk, msg.payload.pk)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed(self, mock_publish):
         from voteit.meeting.messages import MeetingGroupChanged
 
@@ -169,7 +169,7 @@ class MeetingGroupChangedTests(TestCase):
         self.assertIsInstance(msg, MeetingGroupChanged)
         self.assertEqual(self.group.pk, msg.payload.pk)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted(self, mock_publish):
         from voteit.meeting.messages import MeetingGroupDeleted
 
@@ -180,7 +180,7 @@ class MeetingGroupChangedTests(TestCase):
         self.assertIsInstance(msg, MeetingGroupDeleted)
         self.assertEqual(group_pk, msg.payload.pk)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_member_added_compat(self, mock_publish):
         from voteit.meeting.messages import GroupMembershipChanged
 
@@ -192,7 +192,7 @@ class MeetingGroupChangedTests(TestCase):
         self.assertEqual(self.group.pk, msg.payload.meeting_group)
         self.assertEqual(self.meeting.pk, msg.payload.m)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_member_added_compat_reverse(self, mock_publish):
         from voteit.meeting.messages import GroupMembershipChanged
 
@@ -204,7 +204,7 @@ class MeetingGroupChangedTests(TestCase):
         self.assertEqual(self.group.pk, msg.payload.meeting_group)
         self.assertEqual(self.meeting.pk, msg.payload.m)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_member_removed_compat(self, mock_publish):
         from voteit.meeting.messages import GroupMembershipDeleted
 
@@ -215,7 +215,7 @@ class MeetingGroupChangedTests(TestCase):
         msg = messages[0]
         self.assertIsInstance(msg, GroupMembershipDeleted)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_member_removed_compat_reverse(self, mock_publish):
         from voteit.meeting.messages import GroupMembershipDeleted
 
@@ -251,7 +251,7 @@ class RoleChangesPublishedTests(TestCase):
         cls.user = cls.meeting.participants.create(username="user", organisation=org)
         cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_added(self, mock_publish):
         from voteit.core.messages.role_updates import RolesChanged
 
@@ -263,7 +263,7 @@ class RoleChangesPublishedTests(TestCase):
         self.assertEqual(self.meeting.pk, msg.payload.pk)
         self.assertEqual({ROLE_MODERATOR}, set(msg.payload.roles))
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_removed(self, mock_publish):
         from voteit.core.messages.role_updates import RolesRemoved
 

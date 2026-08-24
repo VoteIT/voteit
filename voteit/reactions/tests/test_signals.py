@@ -15,7 +15,7 @@ from voteit.messaging.channels import UserChannel
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.discussion.models import DiscussionPost
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.proposal.models import DiffProposal
@@ -44,7 +44,7 @@ class SignalButtonTests(TestCase):
         cls.moderator = User.objects.create(username="moderator")
         cls.meeting.add_roles(cls.moderator, ROLE_MODERATOR)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_button_added(self, mock_publish):
         from voteit.reactions.messages import ButtonChanged
 
@@ -54,7 +54,7 @@ class SignalButtonTests(TestCase):
         self.assertIsInstance(msg, ButtonChanged)
         self.assertEqual(button.pk, msg.payload.pk)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_button_changed(self, mock_publish):
         from voteit.reactions.messages import ButtonChanged
 
@@ -66,7 +66,7 @@ class SignalButtonTests(TestCase):
         self.assertEqual(self.button.pk, msg.payload.pk)
         self.assertEqual(self.button.title, "I'm new")
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_button_deleted(self, mock_publish):
         from voteit.reactions.messages import ButtonDeleted
 
@@ -77,8 +77,8 @@ class SignalButtonTests(TestCase):
         self.assertIsInstance(msg, ButtonDeleted)
         self.assertEqual(button_pk, msg.payload.pk)
 
-    def test_meeting_channel_subscribed(self):
-        app_state = build_app_state("meeting", self.meeting.pk, self.moderator.pk)
+    def test_participants_app_state(self):
+        app_state = build_app_state("participants", self.meeting.pk, self.moderator.pk)
         payloads = payloads_of(app_state, ButtonChanged)
         self.assertEqual(1, len(payloads))
         self.assertEqual(self.button.pk, payloads[0].pk)

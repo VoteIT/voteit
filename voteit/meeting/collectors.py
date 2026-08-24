@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.core.messages.role_updates import RolesChanged
 from voteit.core.utils import get_model_shortname
-from voteit.meeting.channels import MeetingChannel
 from voteit.meeting.messages import GroupMembershipChanged
 from voteit.meeting.messages import GroupRoleChanged
 from voteit.meeting.messages import MeetingGroupChanged
@@ -24,7 +25,7 @@ class MeetingRoles(AppStateCollector):
     """The subscribing user's own roles in this meeting."""
 
     name = "meeting.roles"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 10
 
     def collect(self, state: AppState) -> None:
@@ -47,7 +48,7 @@ class MeetingGroups(AppStateCollector):
     """Meeting groups and who is in them."""
 
     name = "meeting.groups"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 20
 
     def collect(self, state: AppState) -> None:
@@ -73,7 +74,7 @@ class MeetingGroups(AppStateCollector):
 @app_state_collectors
 class MeetingGroupRoles(AppStateCollector):
     name = "meeting.group_roles"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 20
 
     def applicable(self) -> bool:

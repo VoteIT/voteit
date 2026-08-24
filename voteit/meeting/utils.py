@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from django.db import models
 from django.db.models.functions import Collate
 
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import broadcast_meeting
 from voteit.meeting.messages import MeetingDialectChanged
 
 if TYPE_CHECKING:
@@ -27,5 +27,4 @@ def sort_agenda_items(
 
 def notify_dialect_changed(meeting: Meeting) -> None:
     msg = MeetingDialectChanged(payload={"pk": meeting.pk})
-    ch = MeetingChannel(meeting.pk)
-    ch.sync_publish(msg)
+    broadcast_meeting(meeting.pk, msg)

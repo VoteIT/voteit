@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.messaging.collectors import AppStateCollector
 from voteit.messaging.registry import app_state_collectors
 from voteit.room.channels import RoomChannel
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 @app_state_collectors
 class Rooms(AppStateCollector):
     name = "room.rooms"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 20
 
     def collect(self, state: AppState) -> None:

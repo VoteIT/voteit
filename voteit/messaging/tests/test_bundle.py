@@ -22,7 +22,9 @@ def section(name, messages, failed=False):
 
 
 def bundles(sections, budget=None):
-    return list(iter_bundles(sections, pk=1, channel_type="meeting", budget=budget))
+    return list(
+        iter_bundles(sections, pk=1, channel_type="participants", budget=budget)
+    )
 
 
 def flatten(result):
@@ -67,7 +69,7 @@ class IterBundlesTests(TestCase):
         self.assertGreater(len(result), 1)
         for bundle in result:
             self.assertEqual(1, bundle.payload.pk)
-            self.assertEqual("meeting", bundle.payload.channel_type)
+            self.assertEqual("participants", bundle.payload.channel_type)
 
     def test_seq_counts_up(self):
         result = bundles([section("a", self._messages(4))], budget=FRAME_OVERHEAD + 120)

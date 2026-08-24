@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
 
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.messaging.collectors import AppStateCollector
 from voteit.messaging.registry import app_state_collectors
 from voteit.participant_number.messages import PNChanged
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
 @app_state_collectors
 class ParticipantNumbers(AppStateCollector):
     name = "participant_number.numbers"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 40
 
     def applicable(self) -> bool:

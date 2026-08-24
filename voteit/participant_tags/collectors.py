@@ -3,7 +3,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.messaging.collectors import AppStateCollector
 from voteit.messaging.registry import app_state_collectors
 from voteit.participant_tags.components import GenderTags
@@ -19,7 +20,7 @@ class AllTags(AppStateCollector):
     """Every participant tag in the meeting, inverted to tag -> user pks."""
 
     name = "participant_tags.all"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 40
 
     def applicable(self) -> bool:

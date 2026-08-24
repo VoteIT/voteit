@@ -79,6 +79,11 @@ message was migrated to REST.
 
 - `voteit/*/channels.py` declares `ContextChannel` subclasses: a channel-layer group
   (`"<name>_<pk>"`) plus the object and permission that decide who may subscribe.
+  A meeting has two, `participants` and `moderators`, and a client subscribes to
+  exactly one. They partition the audience, so anything meeting-wide goes out with
+  `voteit.meeting.channels.broadcast_meeting`, which publishes to both. (There is no
+  `meeting` channel; it shared `participants`' permission and only cost clients a
+  second subscribe and a second app state snapshot.)
 - `voteit/*/messages.py` declares outgoing messages — `chanx` `BaseMessage` subclasses
   with a `Literal` action and a pydantic payload, registered with `@outgoing`. There is
   no `*.added`; the client upserts on `*.changed`.

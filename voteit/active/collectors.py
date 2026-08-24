@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from voteit.meeting.channels import ModeratorsChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.active.messages import ActiveUsers
 from voteit.active.utils import active_enabled_for_meeting
-from voteit.meeting.channels import MeetingChannel
 from voteit.messaging.collectors import AppStateCollector
 from voteit.messaging.registry import app_state_collectors
 
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
 @app_state_collectors
 class ActiveUsersCollector(AppStateCollector):
     name = "active.users"
-    channels = (MeetingChannel,)
+    channels = (ParticipantsChannel, ModeratorsChannel)
     order = 40
 
     def applicable(self) -> bool:

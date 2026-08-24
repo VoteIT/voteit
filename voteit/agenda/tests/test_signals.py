@@ -18,9 +18,8 @@ from voteit.agenda.messages import AgendaBodyChanged
 from voteit.agenda.messages import LastReadChanged
 from voteit.agenda.models import AgendaItem
 from voteit.core.testing import FakeCommit
-from voteit.meeting.channels import MeetingChannel
-from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
+from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 
@@ -61,8 +60,10 @@ class SubscribedTests(TestCase):
         self.assertEqual({self.ai.pk, self.ai_private.pk}, pks)
 
     def test_app_state_last_read_sent(self):
-        command = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
-        ch = MeetingChannel(self.meeting.pk)
+        command = build_app_state(
+            ParticipantsChannel.name, self.meeting.pk, self.user.pk
+        )
+        ch = ParticipantsChannel(self.meeting.pk)
         self.assertTrue(ch.allow_subscribe(self.user))
         app_state = command
         batch_msgs = [
@@ -152,7 +153,7 @@ class AgendaChangedTests(TestCase):
         )
         self.assertEqual(5, len(batch.payload.items))
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted_moderators(self, mock_publish):
         from voteit.agenda.messages import AgendaDeleted
         from voteit.agenda.messages import AgendaBodyDeleted

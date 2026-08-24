@@ -56,7 +56,7 @@ The `set` action uses `get_or_create` so posting to a meeting where the user has
 
 ## WebSocket messages (`messages.py`)
 
-All messages are outgoing-only, published to `MeetingChannel`.
+All messages are outgoing-only, published via `broadcast_meeting`.
 
 | Message name | Class | Payload |
 |---|---|---|
@@ -65,9 +65,9 @@ All messages are outgoing-only, published to `MeetingChannel`.
 
 ## Signals (`signals.py`)
 
-- `post_save` on `ParticipantTags` — skipped on `created=True` (tags are always updated immediately after creation, so the create-only save carries no tag data worth broadcasting); on update publishes `ParticipantTagsChanged` with the current tags to `MeetingChannel`.
-- `pre_delete` on `ParticipantTags` — publishes `ParticipantTagsChanged` with `tags={}` to `MeetingChannel`, signalling removal without a separate deleted message type.
-- `participant_tags.all` collector on `MeetingChannel` — `applicable()` requires at least one of `GenderTags` or `PronounTags` to be enabled on the meeting. Queries all `ParticipantTags` for the meeting using `.values("user_id", "tags")`, flattens them into the `"ns:value" → [user_ids]` format, and appends an `AllParticipantTags` message to the `app_state`.
+- `post_save` on `ParticipantTags` — skipped on `created=True` (tags are always updated immediately after creation, so the create-only save carries no tag data worth broadcasting); on update publishes `ParticipantTagsChanged` with the current tags via `broadcast_meeting`.
+- `pre_delete` on `ParticipantTags` — publishes `ParticipantTagsChanged` with `tags={}` via `broadcast_meeting`, signalling removal without a separate deleted message type.
+- `participant_tags.all` collector on `ParticipantsChannel` + `ModeratorsChannel` — `applicable()` requires at least one of `GenderTags` or `PronounTags` to be enabled on the meeting. Queries all `ParticipantTags` for the meeting using `.values("user_id", "tags")`, flattens them into the `"ns:value" → [user_ids]` format, and appends an `AllParticipantTags` message to the `app_state`.
 
 ## Notable design decisions
 

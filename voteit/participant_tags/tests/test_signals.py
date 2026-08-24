@@ -6,7 +6,7 @@ from voteit.messaging.testing import build_app_state
 from voteit.messaging.testing import ChannelMessageCatcher
 from voteit.messaging.testing import testing_channel_layers_setting
 
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.organisation.models import Organisation
 from voteit.participant_tags.components import GenderTags
@@ -47,9 +47,9 @@ class SignalAndSubscribeTests(TestCase):
             tags={PronounTags.namespace: ["hon", "hen"], GenderTags.namespace: "nb"},
         )
 
-    def test_ptags_to_meeting_ch(self):
+    def test_ptags_broadcast_to_meeting(self):
         app_state = build_app_state(
-            MeetingChannel.name, self.meeting.pk, self.participant.pk
+            ParticipantsChannel.name, self.meeting.pk, self.participant.pk
         )
         tags_payload = [
             x.payload.model_dump()
@@ -70,7 +70,9 @@ class SignalAndSubscribeTests(TestCase):
         )
 
     def test_changed(self):
-        with ChannelMessageCatcher(MeetingChannel, ParticipantTagsChanged) as messages:
+        with ChannelMessageCatcher(
+            ParticipantsChannel, ParticipantTagsChanged
+        ) as messages:
             self.moderator_tags.save()
         self.assertEqual(
             {
@@ -82,7 +84,9 @@ class SignalAndSubscribeTests(TestCase):
         )
 
     def test_deleted_sent_as_changed(self):
-        with ChannelMessageCatcher(MeetingChannel, ParticipantTagsChanged) as messages:
+        with ChannelMessageCatcher(
+            ParticipantsChannel, ParticipantTagsChanged
+        ) as messages:
             self.moderator_tags.delete()
         self.assertEqual(
             {

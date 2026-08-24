@@ -39,6 +39,21 @@ the whole codebase to v1.
   (`VOTEIT_APP_STATE_BUNDLE_BYTES`), so a meeting that used to take 50-100
   separate frames now takes one or two. A collector that fails marks its own
   section `failed` and no longer costs the client the rest of its state.
+- **The `meeting` channel is gone.** A client opening a meeting subscribed twice:
+  `meeting`, then one of `participants` / `moderators`. Now it subscribes **once**,
+  to `participants` or `moderators`, and everything that used to arrive on
+  `meeting` arrives on whichever of the two it is on.
+  `channel.subscribe` with `{"channel_type": "meeting"}` now answers
+  `channel.subscribe_error` / `"Unknown channel type"`.
+
+  The split never bought anything: `meeting` required `Meeting.VIEW`, exactly what
+  `participants` requires, and `moderators` requires `MODERATE`, which implies it —
+  so `meeting` reached nobody the other two do not.
+
+  Server-side, `MeetingChannel` is replaced by
+  `voteit.meeting.channels.broadcast_meeting(meeting, message)`, which publishes to
+  both groups; collectors that served `meeting` now declare
+  `channels = (ParticipantsChannel, ModeratorsChannel)`.
 - **Component settings JSON Schema** (`/api/*-components/`) is now pydantic v2
   output: `$defs` rather than `definitions`, `anyOf` for optional fields, and
   draft 2020-12 refs.

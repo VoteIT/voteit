@@ -8,7 +8,7 @@ from django.test import override_settings
 
 from redis.exceptions import ConnectionError
 
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
@@ -35,7 +35,7 @@ class PublishPollStatusTests(TestCase):
         cls.poll.ongoing(force=True)
         cls.poll.save()
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_publishes_current_count(self, mock_publish):
         self.poll.votes.create(user=self.user, vote="yes")
 
@@ -47,16 +47,18 @@ class PublishPollStatusTests(TestCase):
         self.assertEqual(1, msg.payload.voted)
         self.assertEqual(1, msg.payload.total)
 
-    @patch.object(MeetingChannel, "sync_publish")
-    def test_missing_poll_is_noop(self, mock_publish):
+    def test_missing_poll_is_noop(self):
         poll_pk = self.poll.pk
+        # Patch around the call only: deleting the poll publishes a
+        # PollDeleted to this same channel, which is not what is under test.
         self.poll.delete()
 
-        publish_poll_status(poll_pk)
+        with patch.object(ParticipantsChannel, "sync_publish") as mock_publish:
+            publish_poll_status(poll_pk)
 
         mock_publish.assert_not_called()
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_missing_electoral_register_is_noop(self, mock_publish):
         self.poll.electoral_register = None
         self.poll.save()

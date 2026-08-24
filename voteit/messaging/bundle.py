@@ -1,7 +1,7 @@
 """Packing a channel's initial state into as few frames as possible.
 
 Subscribing used to cost one channel-layer round trip and one websocket frame
-per message, and a busy ``MeetingChannel`` produces dozens. Here the collectors'
+per message, and a busy meeting produces dozens. Here the collectors'
 output is packed into ``channel.state`` bundles instead: sections from
 consecutive collectors are appended until the byte budget is reached, so an
 ordinary meeting arrives in a single frame.

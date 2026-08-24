@@ -11,7 +11,7 @@ from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.messages.role_updates import RolesChanged
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.statemachines import MeetingStateMachine
@@ -139,7 +139,7 @@ class AppStateTests(TestCase):
 
     def test_system_and_roles_sent_to_meeting(self):
         app_state = build_app_state(
-            MeetingChannel.name, self.meeting.pk, self.participant.pk
+            ParticipantsChannel.name, self.meeting.pk, self.participant.pk
         )
         system_payload = [
             p.model_dump() for p in payloads_of(app_state, SpeakerSystemChanged)
@@ -292,9 +292,11 @@ class SendStateChangesTestsTests(TestCase):
             self.system.save()
         self.assertEqual(0, len(messages))
 
-    def test_meeting_channel_receives_system_added(self):
+    def test_participants_receive_system_added(self):
         new_room = self.meeting.rooms.create()
-        with ChannelMessageCatcher(MeetingChannel, SpeakerSystemChanged) as messages:
+        with ChannelMessageCatcher(
+            ParticipantsChannel, SpeakerSystemChanged
+        ) as messages:
             new_system = self.meeting.speaker_systems.create(
                 method_name="simple", room=new_room, safe_positions=2
             )
@@ -314,8 +316,10 @@ class SendStateChangesTestsTests(TestCase):
             messages[0].payload.model_dump(),
         )
 
-    def test_meeting_channel_receives_system_changed(self):
-        with ChannelMessageCatcher(MeetingChannel, SpeakerSystemChanged) as messages:
+    def test_participants_receive_system_changed(self):
+        with ChannelMessageCatcher(
+            ParticipantsChannel, SpeakerSystemChanged
+        ) as messages:
             self.system.save()
         self.assertEqual(
             {
@@ -333,9 +337,11 @@ class SendStateChangesTestsTests(TestCase):
             messages[0].payload.model_dump(),
         )
 
-    def test_meeting_channel_receives_system_deleted(self):
+    def test_participants_receive_system_deleted(self):
         system_pk = self.system.pk
-        with ChannelMessageCatcher(MeetingChannel, SpeakerSystemDeleted) as messages:
+        with ChannelMessageCatcher(
+            ParticipantsChannel, SpeakerSystemDeleted
+        ) as messages:
             self.system.delete()
         self.assertEqual(
             {

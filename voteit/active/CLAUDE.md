@@ -44,14 +44,14 @@ Body: `{"hours": 1}` (default 1, range 0–72). Removes `ActiveUser` records whe
 
 ## WebSocket messages (`messages.py`)
 
-Both are outgoing-only, published to `MeetingChannel`:
+Both are outgoing-only, published via `broadcast_meeting`:
 
 - **`active_user.all`** (`ActiveUsers`) — full list of active user PKs for a meeting. Pushed on channel subscribe and when the component is enabled.
 - **`active_user.changed`** (`ActiveUserChanged`) — delta: `{meeting, user, active: bool}`. Pushed on `ActiveUser` creation (`active=true`) and deletion (`active=false`).
 
 ## Signals (`signals.py`)
 
-- `active.users` collector on `MeetingChannel` → pushes `ActiveUsers`. `applicable()`
+- `active.users` collector on `ParticipantsChannel` + `ModeratorsChannel` → pushes `ActiveUsers`. `applicable()`
   returns False when the component is off, so the section is never even announced.
 - `post_save` on `MeetingComponent` → when `ActiveUsersComponent` is enabled, immediately pushes the current `ActiveUsers` list.
 - `post_save` on `ActiveUser` (created only) → publishes `ActiveUserChanged(active=True)` synchronously.

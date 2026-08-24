@@ -68,13 +68,27 @@ Changing `er_policy_name` via `MeetingDetailSerializer` is blocked if any poll i
 
 ## WebSocket Channels
 
-Three channels in `channels.py`, all scoped to a `Meeting` pk:
+Two channels in `channels.py`, both scoped to a `Meeting` pk, plus one helper:
 
-- **`meeting`** — general channel; all role/group/membership changes broadcast here
-- **`participants`** — non-moderator view; receives non-private polls and agenda items only
-- **`moderators`** — moderator-only; receives everything including private items
+- **`participants`** (`Meeting.VIEW`) — non-moderator view; non-private polls and agenda items
+- **`moderators`** (`Meeting.MODERATE`) — everything, including private items
+- **`broadcast_meeting(meeting, message)`** — publishes to *both* groups. This is how
+  anything meeting-wide goes out: role/group/membership changes, rooms, speaker systems,
+  reaction buttons, participant numbers, poll status.
 
-Three collectors in `collectors.py` build the meeting channel's initial state: `meeting.roles` (the subscriber's own roles), `meeting.groups` (groups plus memberships) and `meeting.group_roles`, which opts out in `applicable()` unless `group_roles_active`.
+A client subscribes to exactly one of the two. The pair partitions the audience:
+`ROLE_MODERATOR` requires `ROLE_PARTICIPANT` (`roles.py`), so `MODERATE` implies the
+`VIEW` that `participants` needs, and `broadcast_meeting` therefore reaches every
+subscriber exactly once.
+
+> There used to be a third, `meeting`, that everyone subscribed to *in addition*. Its
+> permission was identical to `participants`, so it reached nobody the other two do not
+> — it only cost a second subscribe, a second RQ job and a second app state snapshot.
+> `broadcast_meeting` replaced it.
+
+Three collectors in `collectors.py` contribute to both channels: `meeting.roles` (the
+subscriber's own roles), `meeting.groups` (groups plus memberships) and
+`meeting.group_roles`, which opts out in `applicable()` unless `group_roles_active`.
 
 ## Signals
 
@@ -83,8 +97,8 @@ Three collectors in `collectors.py` build the meeting channel's initial state: `
 1. `MeetingRoles` created → `meeting_joined` (deferred to transaction commit)
 2. `MeetingRoles` deleted → cascade delete `GroupMembership` for that user
 3. `GroupMembership` saved/deleted → `group_role_added` / `group_role_removed` → updates `MeetingRoles`
-4. `MeetingRoles` roles changed → `RolesChanged` / `RolesRemoved` pushed to `meeting` and user channels (deltas, not upserts)
-5. `Meeting` / `MeetingGroup` / `GroupMembership` saved → corresponding `Changed` message pushed to `meeting` channel
+4. `MeetingRoles` roles changed → `RolesChanged` / `RolesRemoved` broadcast to the meeting and pushed to the user channel (deltas, not upserts)
+5. `Meeting` / `MeetingGroup` / `GroupMembership` saved → corresponding `Changed` message broadcast to the meeting
 6. Any of the above deleted → `Deleted` message pushed (via `pre_delete`, deferred to commit)
 
 All signal handlers that publish messages defer via `on_transaction_commit=True` to avoid pushing before the DB row is visible.

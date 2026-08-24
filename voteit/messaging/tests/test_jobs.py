@@ -154,17 +154,17 @@ class RecheckJobTests(TestCase):
 
     def test_checks_each_subscription_separately(self):
         """One revoked channel must not take the still-allowed ones with it."""
-        sent = self._recheck(self.participant, "meeting", "moderators", "participants")
+        sent = self._recheck(self.participant, "participants", "moderators")
         self.assertEqual(["moderators"], [m.payload.channel_type for m in sent])
 
     def test_leaves_when_the_context_is_gone(self):
         """A meeting deleted while a socket was subscribed to it."""
-        sent = self._recheck(self.moderator, "meeting", pk=self.meeting.pk + 1000)
-        self.assertEqual(["meeting"], [m.payload.channel_type for m in sent])
+        sent = self._recheck(self.moderator, "participants", pk=self.meeting.pk + 1000)
+        self.assertEqual(["participants"], [m.payload.channel_type for m in sent])
 
     def test_leaves_when_the_user_is_gone(self):
-        sent = self._recheck(None, "meeting")
-        self.assertEqual(["meeting"], [m.payload.channel_type for m in sent])
+        sent = self._recheck(None, "participants")
+        self.assertEqual(["participants"], [m.payload.channel_type for m in sent])
 
     def test_skips_an_unknown_channel_type(self):
         """Stale client state must not fail the job for the other entries."""

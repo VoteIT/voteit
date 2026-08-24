@@ -18,7 +18,7 @@ from voteit.agenda.models import AgendaItem
 from voteit.agenda.statemachines import AgendaItemStateMachine
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import broadcast_meeting
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import MeetingRoles
@@ -120,10 +120,9 @@ def push_new_er(instance: ElectoralRegister, **kwargs):
     """
     Special signals for ER since they have M2M relations that are updated after post_save signal is sent.
     """
-    meeting_ch = MeetingChannel(instance.meeting_id)
     data = ElectoralRegisterSerializer(instance).data
     msg = ElectoralRegisterChanged(payload=data)
-    meeting_ch.sync_publish(msg)
+    broadcast_meeting(instance.meeting_id, msg)
 
 
 @receiver(pre_delete, sender=ElectoralRegister)
@@ -134,9 +133,8 @@ def er_deleted(*, instance: ElectoralRegister, **kw):
     """
     if instance.meeting_id is not None:
         # We can't really do anything if it is!
-        meeting_ch = MeetingChannel(instance.meeting_id)
         msg = ElectoralRegisterDeleted(payload={"pk": instance.pk})
-        meeting_ch.sync_publish(msg)
+        broadcast_meeting(instance.meeting_id, msg)
 
 
 @receiver(m2m_changed, sender=Poll.proposals.through)
@@ -203,12 +201,10 @@ def remove_vote_transfers(instance: MeetingRoles, **kwargs):
 @disable_on_raw_save
 def send_vote_transfer(instance: VoteTransfer, **kwargs):
     serializer = VoteTransferSerializer(instance)
-    meeting_ch = MeetingChannel(instance.meeting_id)
-    meeting_ch.sync_publish(VoteTransferChanged(payload=serializer.data))
+    broadcast_meeting(instance.meeting_id, VoteTransferChanged(payload=serializer.data))
 
 
 @receiver(pre_delete, sender=VoteTransfer)
 def send_vote_transfer_deleted(instance: VoteTransfer, **kwargs):
-    meeting_ch = MeetingChannel(instance.meeting_id)
     msg = VoteTransferDeleted(payload={"pk": instance.pk})
-    meeting_ch.sync_publish(msg)
+    broadcast_meeting(instance.meeting_id, msg)

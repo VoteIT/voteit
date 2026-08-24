@@ -11,12 +11,12 @@ from voteit.messaging.testing import build_app_state
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
 from voteit.poll.messages import GenericVoteResponse
+from voteit.poll.messages import PollStatus
 from voteit.messaging.testing import ChannelMessageCatcher
 from voteit.messaging.testing import testing_channel_layers_setting
 
-from voteit.meeting.channels import MeetingChannel
-from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
+from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -96,18 +96,24 @@ class MeetingSubscribedTests(TestCase):
         )
 
     def test_app_state_sent_votes(self):
-        app_state = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
+        app_state = build_app_state(
+            ParticipantsChannel.name, self.meeting.pk, self.user.pk
+        )
         pks = {p.pk for p in payloads_of(app_state, GenericVoteResponse)}
         self.assertEqual({self.vote.pk, self.vote2.pk, self.vote_private.pk}, pks)
 
     def test_app_state_sent_latest_er(self):
-        app_state = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
+        app_state = build_app_state(
+            ParticipantsChannel.name, self.meeting.pk, self.user.pk
+        )
         pks = {x.payload.pk for x in app_state if x.action == "er.changed"}
         self.assertEqual({self.er.pk}, pks)
 
     def test_app_state_doesnt_break_without_er(self):
         self.er.delete()
-        app_state = build_app_state(MeetingChannel.name, self.meeting.pk, self.user.pk)
+        app_state = build_app_state(
+            ParticipantsChannel.name, self.meeting.pk, self.user.pk
+        )
         self.assertFalse([x for x in app_state if x.action == "er.changed"])
 
     def test_n1_problem(self):
@@ -186,12 +192,12 @@ class MeetingSubscribedTests(TestCase):
         )
 
     def test_app_state_ongoing_poll(self):
-        app_state = build_app_state("meeting", self.meeting.pk, self.user.pk)
-        message = [x for x in app_state if x.action.endswith(".batch")][0]
-        self.assertEqual(1, len(message.payload.items))
+        app_state = build_app_state("participants", self.meeting.pk, self.user.pk)
+        statuses = payloads_of(app_state, PollStatus)
+        self.assertEqual(1, len(statuses))
         self.assertEqual(
             {"pk": self.poll2.pk, "voted": 1, "total": 2},
-            message.payload.items[0].model_dump(),
+            statuses[0].model_dump(),
         )
 
     def test_app_state_multiple_ongoing_poll(self):
@@ -201,9 +207,8 @@ class MeetingSubscribedTests(TestCase):
         self.poll2.votes.create(user=self.moderator, vote="yes")
         # Build after the mutations: build_app_state runs the receivers now,
         # where the old Subscribe message was only evaluated on run_job().
-        app_state = build_app_state("meeting", self.meeting.pk, self.user.pk)
-        message = [x for x in app_state if x.action.endswith(".batch")][0]
-        dict_payloads = [x.model_dump() for x in message.payload.items]
+        app_state = build_app_state("participants", self.meeting.pk, self.user.pk)
+        dict_payloads = [x.model_dump() for x in payloads_of(app_state, PollStatus)]
         self.assertIn({"pk": self.poll.pk, "voted": 2, "total": 2}, dict_payloads)
         self.assertIn({"pk": self.poll2.pk, "voted": 2, "total": 2}, dict_payloads)
 
@@ -353,7 +358,7 @@ class NewERSentToMeetingTests(TestCase):
         cls.user = User.objects.create(username="user")
         cls.meeting.add_roles(cls.user, ROLE_PARTICIPANT, ROLE_POTENTIAL_VOTER)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_added(self, mock_publish):
         from voteit.poll.messages import ElectoralRegisterChanged
 
@@ -423,7 +428,7 @@ class VoteSignalsTests(TestCase):
         self.assertEqual({"choice": "no"}, msg.payload.vote)
 
     @patch("voteit.poll.signals.schedule_poll_status_publish")
-    def test_count_sent_to_meeting_ch(self, mock_schedule):
+    def test_count_broadcast_to_meeting(self, mock_schedule):
         with self.captureOnCommitCallbacks(execute=True):
             self.poll.votes.create(user=self.user, vote="yes")
         mock_schedule.assert_called_once_with(self.poll.pk)
@@ -467,7 +472,7 @@ class VoteTransferSignalsTests(TestCase):
 
     def test_add_message_sent(self):
         self.transfer.delete()
-        with ChannelMessageCatcher(MeetingChannel) as messages:
+        with ChannelMessageCatcher(ParticipantsChannel) as messages:
             transfer = self.meeting.vote_transfers.create(
                 source=self.moderator, target=self.participant
             )
@@ -484,7 +489,7 @@ class VoteTransferSignalsTests(TestCase):
         )
 
     def test_change_message_sent(self):
-        with ChannelMessageCatcher(MeetingChannel) as messages:
+        with ChannelMessageCatcher(ParticipantsChannel) as messages:
             self.transfer.target = self.other
             self.transfer.save()
         msg = messages[0]
@@ -501,7 +506,7 @@ class VoteTransferSignalsTests(TestCase):
 
     def test_delete_message_sent(self):
         transfer_pk = self.transfer.pk
-        with ChannelMessageCatcher(MeetingChannel) as messages:
+        with ChannelMessageCatcher(ParticipantsChannel) as messages:
             self.transfer.delete()
         msg = messages[0]
         self.assertIsInstance(msg, VoteTransferDeleted)
@@ -509,7 +514,7 @@ class VoteTransferSignalsTests(TestCase):
 
     def test_subscribe_message_sent(self):
         command = build_app_state(
-            MeetingChannel.name, self.meeting.pk, self.participant.pk
+            ParticipantsChannel.name, self.meeting.pk, self.participant.pk
         )
 
         app_state = command
@@ -533,7 +538,7 @@ class VoteTransferSignalsTests(TestCase):
         self.meeting.er_policy_name = AutoAlways.name
         self.meeting.save()
         command = build_app_state(
-            MeetingChannel.name, self.meeting.pk, self.participant.pk
+            ParticipantsChannel.name, self.meeting.pk, self.participant.pk
         )
 
         app_state = command

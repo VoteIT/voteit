@@ -10,7 +10,7 @@ from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.active.components import ActiveUsersComponent
 from voteit.active.messages import ActiveUserChanged
 from voteit.active.messages import ActiveUsers
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 
@@ -33,10 +33,10 @@ class SignalsTests(TestCase):
 
     def _mk_msg(self):
         return build_app_state(
-            MeetingChannel.name, self.meeting.pk, self.participant.pk
+            ParticipantsChannel.name, self.meeting.pk, self.participant.pk
         )
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed(self, mock_publish):
         obj = self.meeting.active_users.create(user=self.participant)
         self.assertTrue(mock_publish.called)
@@ -54,14 +54,14 @@ class SignalsTests(TestCase):
         self.assertEqual(msg.payload.meeting, self.meeting.pk)
         self.assertFalse(msg.payload.active)
 
-    def test_meeting_channel_subscribed(self):
+    def test_participants_app_state(self):
         msg = self._mk_msg()
         app_state = msg
         active_msgs = [x for x in app_state if x.action == action_of(ActiveUsers)]
         self.assertEqual(1, len(active_msgs))
         self.assertEqual([self.active.user_id], active_msgs[0].payload.users)
 
-    def test_meeting_channel_subscribed_not_sent_when_disabled(self):
+    def test_app_state_not_sent_when_disabled(self):
         self.component.delete()
         msg = self._mk_msg()
         app_state = msg
@@ -69,7 +69,7 @@ class SignalsTests(TestCase):
             [], [x for x in app_state if x.action == action_of(ActiveUsers)]
         )
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_enable_disable_component(self, mock_publish):
         with self.captureOnCommitCallbacks(execute=True):
             self.component.disable()

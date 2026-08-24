@@ -10,7 +10,7 @@ from voteit.messaging.channels import UserChannel
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.utils import get_model_shortname
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import broadcast_meeting
 from voteit.proposal.models import DiffProposal
 from voteit.proposal.models import Proposal
 from voteit.reactions.messages import ButtonChanged
@@ -27,16 +27,14 @@ from voteit.reactions.rest_api.serializers import ReactionSerializer
 @receiver(post_save, sender=ReactionButton)
 @disable_on_raw_save
 def reaction_button_updated(instance: ReactionButton = None, **kw):
-    ch = MeetingChannel.from_instance(instance.meeting)
     data = ButtonDetailSerializer(instance).data
-    ch.sync_publish(ButtonChanged(payload=data))
+    broadcast_meeting(instance.meeting, ButtonChanged(payload=data))
 
 
 @receiver(pre_delete, sender=ReactionButton)
 def reaction_button_delete(instance: ReactionButton = None, **kw):
-    ch = MeetingChannel.from_instance(instance.meeting)
     msg = ButtonDeleted(payload={"pk": instance.pk})
-    ch.sync_publish(msg)
+    broadcast_meeting(instance.meeting, msg)
 
 
 def _send_count(instance: Reaction, pre_delete=False):

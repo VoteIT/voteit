@@ -13,7 +13,7 @@ from voteit.core.testing import FakeCommit
 from voteit.components.app.components.message import FlashMessage
 from voteit.components.app.components.proposal_print import ProposalPrint
 from voteit.meeting.models import Meeting
-from voteit.meeting.channels import MeetingChannel
+from voteit.meeting.channels import ParticipantsChannel
 from voteit.components.models import MeetingComponent
 from voteit.meeting.roles import ROLE_MODERATOR
 
@@ -21,7 +21,7 @@ User = get_user_model()
 
 
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
-class MeetingChannelSubscribedTests(TestCase):
+class ParticipantsAppStateTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.meeting: Meeting = Meeting.objects.create()
@@ -37,7 +37,7 @@ class MeetingChannelSubscribedTests(TestCase):
         )
 
     def _mk_subscribe(self):
-        return build_app_state("meeting", self.meeting.pk, self.user.pk)
+        return build_app_state("participants", self.meeting.pk, self.user.pk)
 
     def test_meeting_components_in_app_state(self):
         app_state = self._mk_subscribe()
@@ -127,14 +127,14 @@ class MeetingComponentChangedTests(TestCase):
             component_name=FlashMessage.name, settings={"msg": "Hello"}
         )
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_added_disabled(self, mock_publish):
         with FakeCommit():
             self.meeting.components.create(component_name=ProposalPrint.name)
         # Disabled components still published
         self.assertIs(True, mock_publish.called)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_added_enabled(self, mock_publish):
         from voteit.components.messages import MeetingComponentChanged
 
@@ -147,7 +147,7 @@ class MeetingComponentChangedTests(TestCase):
         self.assertIsInstance(msg, MeetingComponentChanged)
         self.assertEqual(component.pk, msg.payload.pk)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed_enabled(self, mock_publish):
         from voteit.components.messages import MeetingComponentChanged
 
@@ -160,7 +160,7 @@ class MeetingComponentChangedTests(TestCase):
         self.assertIsInstance(msg, MeetingComponentChanged)
         self.assertEqual(self.component.pk, msg.payload.pk)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_changed_disabled(self, mock_publish):
         from voteit.components.messages import MeetingComponentChanged
 
@@ -173,7 +173,7 @@ class MeetingComponentChangedTests(TestCase):
         self.assertIsInstance(msg, MeetingComponentChanged)
         self.assertEqual(self.component.pk, msg.payload.pk)
 
-    @patch.object(MeetingChannel, "sync_publish")
+    @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted(self, mock_publish):
         from voteit.components.messages import MeetingComponentDeleted
 
