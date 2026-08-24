@@ -12,6 +12,7 @@ class NoteAddedOrUpdatedSchema(AddedOrUpdatedSchema):
 @outgoing
 class NoteChanged(ObjectAddedOrChanged):
     action: Literal["note.changed"] = "note.changed"
+    payload: NoteAddedOrUpdatedSchema
 
 
 @outgoing

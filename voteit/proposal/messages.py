@@ -16,6 +16,7 @@ class ProposalAddedOrUpdatedSchema(AddedOrUpdatedSchema):
 @outgoing
 class ProposalChanged(ObjectAddedOrChanged):
     action: Literal["proposal.changed"] = "proposal.changed"
+    payload: ProposalAddedOrUpdatedSchema
 
 
 @outgoing

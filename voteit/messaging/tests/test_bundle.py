@@ -10,6 +10,10 @@ from voteit.messaging.registry import batch_for
 from voteit.messaging.state import StateSection
 from voteit.proposal.messages import ProposalChanged
 
+# ProposalChanged is used here only as a convenient concrete message type;
+# its payload schema requires `created`.
+CREATED = "2026-01-01T00:00:00+01:00"
+
 
 def section(name, messages, failed=False):
     result = StateSection(name, failed=failed)
@@ -103,7 +107,9 @@ class IterBundlesTests(TestCase):
 class SplitBatchTests(TestCase):
     def _batch(self, count):
         batch_cls = batch_for(ProposalChanged)
-        return batch_cls(payload={"items": [{"pk": i} for i in range(count)]})
+        return batch_cls(
+            payload={"items": [{"pk": i, "created": CREATED} for i in range(count)]}
+        )
 
     def test_oversized_batch_is_rechunked(self):
         result = bundles([section("a", [self._batch(30)])], budget=FRAME_OVERHEAD + 300)
@@ -117,7 +123,7 @@ class SplitBatchTests(TestCase):
 
     def test_single_oversized_message_goes_out_alone(self):
         """Nothing can be split; it is sent anyway rather than dropped."""
-        big = ProposalChanged(payload={"pk": 1, "body": "x" * 5000})
+        big = ProposalChanged(payload={"pk": 1, "created": CREATED, "body": "x" * 5000})
         result = bundles([section("a", [big])], budget=FRAME_OVERHEAD + 100)
         self.assertEqual([(0, "a", True, 1)], flatten(result))
 
@@ -131,7 +137,9 @@ class BundleSchemaTests(TestCase):
         ever stops working, this is what says so.
         """
         bind_bundle_schema()
-        original = bundles([section("a", [ProposalChanged(payload={"pk": 7})])])[0]
+        original = bundles(
+            [section("a", [ProposalChanged(payload={"pk": 7, "created": CREATED})])]
+        )[0]
         restored = AppStateBundle.model_validate(original.model_dump(mode="json"))
         message = restored.payload.sections[0].messages[0]
         self.assertIsInstance(message, ProposalChanged)
