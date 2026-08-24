@@ -156,7 +156,6 @@ class AgendaChangedTests(TestCase):
     @patch.object(ParticipantsChannel, "sync_publish")
     def test_deleted_moderators(self, mock_publish):
         from voteit.agenda.messages import AgendaDeleted
-        from voteit.agenda.messages import AgendaBodyDeleted
 
         self.assertFalse(mock_publish.called)
         ai_pk = self.ai.pk
@@ -165,10 +164,6 @@ class AgendaChangedTests(TestCase):
         # Agenda
         msg = mock_publish.mock_calls[0].args[0]
         self.assertIsInstance(msg, AgendaDeleted)
-        self.assertEqual(ai_pk, msg.payload.pk)
-        # Body
-        msg = mock_publish.mock_calls[1].args[0]
-        self.assertIsInstance(msg, AgendaBodyDeleted)
         self.assertEqual(ai_pk, msg.payload.pk)
 
 

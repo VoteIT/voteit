@@ -10,7 +10,6 @@ from django.dispatch import receiver
 from voteit.agenda.channels import AgendaItemChannel
 from voteit.agenda.messages import AgendaChanged
 from voteit.agenda.messages import AgendaBodyChanged
-from voteit.agenda.messages import AgendaBodyDeleted
 from voteit.agenda.messages import AgendaDeleted
 from voteit.agenda.models import AgendaItem
 from voteit.agenda.rest_api.serializers import AgendaItemBodySerializer
@@ -65,9 +64,6 @@ def ai_made_private(instance: AgendaItem, source, target, event, **kw):
 def agenda_delete(instance: AgendaItem = None, **kw):
     if instance.meeting:
         msg = AgendaDeleted(payload={"pk": instance.pk})
-        broadcast_meeting(instance.meeting, msg)
-        # We can send this to meeting too, it might not exist though
-        msg = AgendaBodyDeleted(payload={"pk": instance.pk})
         broadcast_meeting(instance.meeting, msg)
 
 
