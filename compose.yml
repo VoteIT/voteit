@@ -10,12 +10,33 @@ services:
       - ./volumes/backup:/var/backup
     ports:
       - "5432:5432"
+  db-test:
+    # A throwaway postgres for the test runner, on 5433.
+    #
+    # Every TransactionTestCase flushes the database, and a 72-table TRUNCATE
+    # costs ~195ms against db above and ~33ms here. Two things make the
+    # difference: the data directory is a named volume, so it lives in the
+    # Docker VM rather than behind the host filesystem share that ./volumes
+    # goes through, and fsync is off. Both would be reckless for real data;
+    # this cluster only ever holds test_postgres, which the runner recreates
+    # on demand.
+    image: postgres:${POSTGRES_VERSION}
+    command: -c fsync=off -c full_page_writes=off -c synchronous_commit=off
+    environment:
+      - POSTGRES_PASSWORD
+    volumes:
+      - db-test:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
   redis:
     image: redis:7
     volumes:
       - ./volumes/redis:/data
     ports:
       - "6379:6379"
+
+volumes:
+  db-test:
 
 
 

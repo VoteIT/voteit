@@ -9,7 +9,7 @@ audit:
 shell:
 	python manage.py shell
 coverage:
-	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 coverage run && coverage report
+	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 coverage run && coverage report
 migrations:
 	python manage.py makemigrations
 migrate:
@@ -25,9 +25,9 @@ down:
 run:
 	python -W once manage.py runserver
 test:
-	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 python manage.py test voteit --keepdb --failfast
+	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 python manage.py test voteit --keepdb --failfast
 test-deps:
-	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 python manage.py test voteit_org --keepdb --failfast
+	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 python manage.py test voteit_org --keepdb --failfast
 build:
 	uv build --all-packages -o ./dist
 dev: build
@@ -41,6 +41,7 @@ compilemessages:
 envtest:
 	export DJANGO_DEBUG=1 \
 	POSTGRES_HOST=127.0.0.1 \
+	POSTGRES_PORT=5433 \
 	OAUTHLIB_INSECURE_TRANSPORT=1 \
 	ID_HOST=http://localhost:8001 \
 	DJANGO_SETTINGS_MODULE=project.settings \

@@ -113,6 +113,56 @@ class ConsumerTestCase(WebsocketTestCase):
         raw = await communicator.receive_json_from(timeout)
         return communicator.consumer.outgoing_message_adapter.validate_python(raw)
 
+    async def _quiet(self, communicator, timeout=0.05):
+        """Read whatever is already buffered, without waiting for more.
+
+        A drain that stops on a specific action leaves the completion frame
+        chanx sends after it behind. The next drain would then stop on that
+        stale frame instead of on what the test is waiting for, so anything
+        that stops early has to leave the socket quiet.
+        """
+        while not await communicator.receive_nothing(timeout=timeout):
+            await communicator.receive_json_from(timeout)
+
+    async def _receive_until(self, communicator, action, count, timeout=2):
+        """Collect messages until `count` of `action` have arrived.
+
+        For server-initiated traffic, where receive_all_messages() has nothing
+        to stop on: each group send gets its own group_complete, so stopping
+        on that would stop after the first message. Returns what did arrive if
+        the timeout runs out, leaving the assertion to the caller.
+        """
+        messages = []
+        seen = 0
+        deadline = time.monotonic() + timeout
+        while seen < count:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                message = await self._receive_one(communicator, remaining)
+            except asyncio.TimeoutError:
+                break
+            messages.append(message)
+            if message.action == action:
+                seen += 1
+        return messages
+
+    async def _subscribe(self, communicator, channel_type, pk):
+        await communicator.send_message(
+            ChannelSubscribe(payload={"channel_type": channel_type, "pk": pk})
+        )
+        # Handlers run in a background task, so wait for the completion ack
+        # before running the worker -- otherwise the job is not enqueued yet.
+        await communicator.receive_all_messages(timeout=1)
+        # The handler only enqueues; the worker produces the stream.
+        await sync_to_async(self._work)()
+        messages = await communicator.receive_all_messages(
+            stop_action="channel.state_complete", timeout=2
+        )
+        await self._quiet(communicator)
+        return messages
+
     def _work(self):
         """Drain the subscribe queue with an in-process worker."""
         SimpleWorker([self.queue], connection=self.queue.connection).work(burst=True)
@@ -176,19 +226,6 @@ class ConnectionTests(ConsumerTestCase):
 
 
 class SubscribeTests(ConsumerTestCase):
-    async def _subscribe(self, communicator, channel_type, pk):
-        await communicator.send_message(
-            ChannelSubscribe(payload={"channel_type": channel_type, "pk": pk})
-        )
-        # Handlers run in a background task, so wait for the completion ack
-        # before running the worker -- otherwise the job is not enqueued yet.
-        await communicator.receive_all_messages(timeout=1)
-        # The handler only enqueues; the worker produces the stream.
-        await sync_to_async(self._work)()
-        return await communicator.receive_all_messages(
-            stop_action="channel.state_complete", timeout=2
-        )
-
     async def test_stream_order(self):
         communicator = await self._connect(self.moderator)
         messages = await self._subscribe(communicator, "participants", self.meeting.pk)
@@ -396,7 +433,9 @@ class SubscribeTests(ConsumerTestCase):
                     channel.sync_publish(AgendaChanged(payload={"pk": pk}))
 
         await sync_to_async(publish_two)()
-        messages = await communicator.receive_all_messages(timeout=2)
+        messages = await self._receive_until(communicator, "agenda_item.changed", 2)
+        # Had the batcher collapsed them, one agenda_item.changed.batch would
+        # have arrived instead and this count would come up short.
         self.assertEqual(
             2, len([m for m in messages if m.action == "agenda_item.changed"])
         )
@@ -472,22 +511,14 @@ class RecheckTests(ConsumerTestCase):
     is already open. Removing a role in the REST layer broadcasts it.
     """
 
-    async def _subscribe(self, communicator, channel_type, pk):
-        await communicator.send_message(
-            ChannelSubscribe(payload={"channel_type": channel_type, "pk": pk})
-        )
-        await communicator.receive_all_messages(timeout=1)
-        await sync_to_async(self._work)()
-        return await communicator.receive_all_messages(
-            stop_action="channel.state_complete", timeout=2
-        )
-
     async def _recheck(self, communicator, user):
         await sync_to_async(VoteitConsumer.broadcast_event_sync)(
             RecheckSubscriptions(), user_group(user.pk)
         )
         # The handler only enqueues; let it get that far before working.
-        await communicator.receive_all_messages(timeout=1)
+        # An event ends with event_complete, not the complete that
+        # receive_all_messages() waits for by default.
+        await communicator.receive_all_messages(stop_action="event_complete", timeout=1)
         await sync_to_async(self._work)()
 
     async def test_revoked_channel_is_left(self):

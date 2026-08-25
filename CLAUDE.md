@@ -9,7 +9,7 @@ VoteIT is a Django-based backend for online democratic decision-making. It suppo
 All commands assume the virtualenv is active. Use `uv sync` to install dependencies (creates `.venv`).
 
 ```bash
-# Dev infrastructure (postgres + redis only)
+# Dev infrastructure (postgres + redis + the test postgres on 5433)
 docker compose up -d
 
 # Full dev start
@@ -23,8 +23,10 @@ make test        # python manage.py test voteit --keepdb --failfast
 make test-deps   # tests for src/ packages (voteit_org, member_dialects)
 make coverage    # coverage run + report
 
-# Run a single test module
-python manage.py test voteit.poll.tests --keepdb --failfast
+# Run a single test module -- POSTGRES_PORT picks the db-test service, which
+# the make targets set for you. Tests run against the dev database without it,
+# and every TransactionTestCase then pays ~0.6s to flush it.
+POSTGRES_PORT=5433 python manage.py test voteit.poll.tests --keepdb --failfast
 
 # Linting
 ruff check voteit/ src/
