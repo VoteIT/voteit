@@ -95,6 +95,77 @@ class GroupAnnotationTests(TestCase):
             data,
         )
 
+    def _annotate(self, columns, rows):
+        return self._cut.annotate(
+            invites_qs=self.meeting.invites.all(),
+            columns=columns,
+            annotations_formatted=list(self.registry.format_effect_rows(columns, rows)),
+            meeting=self.meeting,
+            registry=self.registry,
+        )
+
+    def test_annotate_duplicate_row(self):
+        """
+        The same row twice must not reach the upsert twice — Postgres rejects a
+        statement that touches the same row a second time — and must be counted
+        once.
+        """
+        columns = ["email", "group", "grouprole"]
+        rows = [
+            ["vader@betahaus.net", "sw", "sith"],
+            ["vader@betahaus.net", "sw", "sith"],
+        ]
+        result = self._annotate(columns, rows)
+        self.assertEqual(1, result.added)
+        self.assertEqual(0, result.changed)
+        self.assertEqual(0, result.existed)
+        annotation = self.inv_vader.group_annotations.get()
+        self.assertEqual(self.group_sw, annotation.meeting_group)
+        self.assertEqual(self.role_sith, annotation.group_role)
+
+    def test_annotate_same_group_twice_with_different_role_last_wins(self):
+        """Same person and group on two rows with different grouproles: the last row wins."""
+        columns = ["email", "group", "grouprole"]
+        rows = [
+            ["vader@betahaus.net", "sw", "sith"],
+            ["vader@betahaus.net", "sw", "jedi"],
+        ]
+        result = self._annotate(columns, rows)
+        self.assertEqual(1, result.added)
+        annotation = self.inv_vader.group_annotations.get()
+        self.assertEqual(self.role_jedi, annotation.group_role)
+
+    def test_annotate_duplicate_row_for_accepted_invite(self):
+        """The already-accepted branch writes one membership and counts it once."""
+        self.inv_vader.accept(self.vader)
+        self.inv_vader.save()
+        columns = ["email", "group", "grouprole"]
+        rows = [
+            ["vader@betahaus.net", "sw", "sith"],
+            ["vader@betahaus.net", "sw", "sith"],
+        ]
+        result = self._annotate(columns, rows)
+        self.assertEqual(1, result.added)
+        self.assertEqual(0, result.changed)
+        self.assertEqual(0, result.existed)
+        membership = self.group_sw.memberships.get(user=self.vader)
+        self.assertEqual(self.role_sith, membership.role)
+
+    def test_annotate_duplicate_row_different_groups_still_both_annotated(self):
+        """Collapsing duplicates must not collapse distinct groups."""
+        columns = ["email", "group"]
+        rows = [
+            ["vader@betahaus.net", "sw"],
+            ["vader@betahaus.net", "sabreclub"],
+            ["vader@betahaus.net", "sw"],
+        ]
+        result = self._annotate(columns, rows)
+        self.assertEqual(2, result.added)
+        self.assertEqual(
+            {self.group_sw, self.group_sabreclub},
+            {x.meeting_group for x in self.inv_vader.group_annotations.all()},
+        )
+
     def test_annotate_some_existed(self):
         columns, rows = get_unvalidated_fixture_content("grouprole.csv")
         annotations_formatted = list(self.registry.format_effect_rows(columns, rows))

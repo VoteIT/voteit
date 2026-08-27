@@ -721,6 +721,24 @@ class ImportInvitesFunctionalTests(APITestCase):
         )
         self.assertEqual(["mo", "pa"], alice.roles)
 
+    def test_same_email_and_group_on_two_rows_with_different_grouproles(self):
+        """
+        Two rows for the same person and group but different grouproles used to
+        reach the annotation upsert twice and crash Postgres. The last row wins.
+        """
+        self.meeting.group_roles.create(role_id="member")
+        response = self._post(
+            "email\tgroup\tgrouprole\n"
+            "alice@example.com\tboard\tchair\n"
+            "alice@example.com\tboard\tmember\n"
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code, response.json())
+        alice = MeetingInvite.objects.get(
+            meeting=self.meeting, user_data__email="alice@example.com"
+        )
+        annotation = alice.group_annotations.get(meeting_group=self.group_board)
+        self.assertEqual("member", annotation.group_role.role_id)
+
     def test_unknown_group_returns_400(self):
         response = self._post("email\tgroup\nalice@example.com\tunknown_group\n")
         self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)

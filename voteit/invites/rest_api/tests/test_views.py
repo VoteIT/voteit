@@ -336,6 +336,9 @@ class MeetingInviteViewSetCreateTests(APITestCase):
         cls.meeting: Meeting = Meeting.objects.get(pk=1)
         cls.participant: User = cls.meeting.participants.get(username="participant")
         cls.moderator: User = cls.meeting.participants.get(username="moderator")
+        cls.group = MeetingGroup.objects.create(
+            meeting=cls.meeting, groupid="committee"
+        )
 
     def _url(self):
         return reverse("meeting-invites-list")
@@ -376,6 +379,31 @@ class MeetingInviteViewSetCreateTests(APITestCase):
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["invites"]["added"], 2)
+
+    def test_create_duplicate(self):
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [{"email": "a@example.com"}, {"email": "a@example.com"}],
+            }
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["invites"]["added"], 1)
+
+    def test_create_duplicate_with_group(self):
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [
+                    {"email": "a@example.com", "group": self.group.groupid},
+                    {"email": "a@example.com", "group": self.group.groupid},
+                ],
+            }
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["invites"]["added"], 1)
 
     def test_create_existing_unchanged(self):
         self.meeting.invites.create(
@@ -506,7 +534,6 @@ class MeetingInviteViewSetCreateTests(APITestCase):
         )
 
     def test_create_with_group_annotation(self):
-        MeetingGroup.objects.create(meeting=self.meeting, groupid="committee")
         response = self._post(
             {
                 "meeting": self.meeting.pk,
@@ -526,7 +553,6 @@ class MeetingInviteViewSetCreateTests(APITestCase):
 
     def test_annotate_existing_invite(self):
         """Posting with a group annotation against an already-existing invite adds the annotation."""
-        MeetingGroup.objects.create(meeting=self.meeting, groupid="committee")
         invite = self.meeting.invites.create(
             user_data={"email": "existing@example.com"}, roles=["pa"]
         )

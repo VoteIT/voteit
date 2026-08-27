@@ -104,6 +104,32 @@ class InviteGroup(AnnotationDataAdapter):
             )
 
     @classmethod
+    def _collapse_matched_rows(
+        cls,
+        matched_rows: list[dict],
+        group_mapping: dict[str, int],
+        role_mapping: dict[str, int],
+    ) -> dict[int, int | None]:
+        """
+        Reduce the rows matching one invite to a single desired role per group.
+
+        The same person may appear on several rows -- one per group -- and the
+        same group may even be repeated, with or without the same grouprole.
+        Each (invite, group) pair must be written only once: Postgres rejects an
+        upsert whose statement touches the same row twice ("ON CONFLICT DO
+        UPDATE command cannot affect row a second time"). When a group repeats
+        with different roles the last row wins.
+        """
+        from voteit.invites.app.invites.grouprole import InviteGroupRole
+
+        desired: dict[int, int | None] = {}
+        for row_data in matched_rows:
+            if meeting_group := row_data.get(cls.name):
+                mg_id = group_mapping[meeting_group]
+                desired[mg_id] = role_mapping.get(row_data.get(InviteGroupRole.name))
+        return desired
+
+    @classmethod
     def annotate(
         cls,
         *,
@@ -149,26 +175,25 @@ class InviteGroup(AnnotationDataAdapter):
 
             if invite.used_by_id:
                 # Already accepted — apply GroupMembership directly (keep per-invite for signals)
-                for row_data in matched_rows:
-                    if meeting_group := row_data.get(cls.name):
-                        mg_id = group_mapping[meeting_group]
-                        role_pk = role_mapping.get(row_data.get(InviteGroupRole.name))
-                        if GroupMembership.objects.filter(
+                for mg_id, role_pk in cls._collapse_matched_rows(
+                    matched_rows, group_mapping, role_mapping
+                ).items():
+                    if GroupMembership.objects.filter(
+                        meeting_group_id=mg_id,
+                        user_id=invite.used_by_id,
+                        role_id=role_pk,
+                    ).exists():
+                        result.existed += 1
+                    else:
+                        _, created = GroupMembership.objects.update_or_create(
                             meeting_group_id=mg_id,
-                            user_id=invite.used_by_id,
-                            role_id=role_pk,
-                        ).exists():
-                            result.existed += 1
+                            user=invite.used_by,
+                            defaults={"role_id": role_pk},
+                        )
+                        if created:
+                            result.added += 1
                         else:
-                            _, created = GroupMembership.objects.update_or_create(
-                                meeting_group_id=mg_id,
-                                user=invite.used_by,
-                                defaults={"role_id": role_pk},
-                            )
-                            if created:
-                                result.added += 1
-                            else:
-                                result.changed += 1
+                            result.changed += 1
             else:
                 pending_invites.append((invite, matched_rows))
 
@@ -184,26 +209,15 @@ class InviteGroup(AnnotationDataAdapter):
             to_upsert = []
             newly_annotated: set[int] = set()
             for invite, matched_rows in pending_invites:
-                for row_data in matched_rows:
-                    if meeting_group := row_data.get(cls.name):
-                        mg_id = group_mapping[meeting_group]
-                        role_pk = role_mapping.get(row_data.get(InviteGroupRole.name))
-                        lookup_key = (invite.pk, mg_id)
-                        if lookup_key in existing:
-                            if existing[lookup_key] == role_pk:
-                                result.existed += 1
-                            else:
-                                result.changed += 1
-                                to_upsert.append(
-                                    MeetingGroupAnnotation(
-                                        meeting_invite_id=invite.pk,
-                                        meeting_group_id=mg_id,
-                                        group_role_id=role_pk,
-                                    )
-                                )
+                for mg_id, role_pk in cls._collapse_matched_rows(
+                    matched_rows, group_mapping, role_mapping
+                ).items():
+                    lookup_key = (invite.pk, mg_id)
+                    if lookup_key in existing:
+                        if existing[lookup_key] == role_pk:
+                            result.existed += 1
                         else:
-                            result.added += 1
-                            newly_annotated.add(invite.pk)
+                            result.changed += 1
                             to_upsert.append(
                                 MeetingGroupAnnotation(
                                     meeting_invite_id=invite.pk,
@@ -211,6 +225,16 @@ class InviteGroup(AnnotationDataAdapter):
                                     group_role_id=role_pk,
                                 )
                             )
+                    else:
+                        result.added += 1
+                        newly_annotated.add(invite.pk)
+                        to_upsert.append(
+                            MeetingGroupAnnotation(
+                                meeting_invite_id=invite.pk,
+                                meeting_group_id=mg_id,
+                                group_role_id=role_pk,
+                            )
+                        )
             if to_upsert:
                 MeetingGroupAnnotation.objects.bulk_create(
                     to_upsert,
