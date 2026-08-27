@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-08-27 18:28+0200\n"
-"PO-Revision-Date: 2026-08-27 18:47+0200\n"
+"PO-Revision-Date: 2026-08-27 19:51+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -24,15 +24,15 @@ msgstr "Ge användare access automatiskt"
 
 #: agenda/rest_api/serializers.py:118
 msgid "Duplicate agenda item IDs are not allowed."
-msgstr ""
+msgstr "Dubbletter av dagordningspunkt-ID är inte tillåtna."
 
 #: agenda/rest_api/serializers.py:130
 msgid "One or more agenda items not found in the specified meeting."
-msgstr ""
+msgstr "En eller flera dagordningspunkter hittades inte i det angivna mötet."
 
 #: agenda/rest_api/serializers.py:161
 msgid "state, block_discussion or block_proposals required"
-msgstr ""
+msgstr "state, block_discussion eller block_proposals krävs"
 
 #: agenda/rest_api/serializers.py:169
 msgid "Can't bulk delete in ongoing meeting"
@@ -140,6 +140,9 @@ msgid ""
 "%(described)s: %(old)s vs %(new)s. The later row would silently overwrite "
 "the earlier one - remove one of them or make the rows agree."
 msgstr ""
+"Rad %(first_row)s och %(row_no)s anger olika ’%(column)s’ för samma "
+"%(described)s: %(old)s mot %(new)s. Den senare raden skulle tyst skriva över "
+"den tidigare - ta bort en av dem eller se till att raderna stämmer överens."
 
 #: invites/app/invites/email.py:41
 msgid "Email"
@@ -152,7 +155,7 @@ msgstr "GruppID"
 #: invites/app/invites/group.py:107
 #, python-format
 msgid "The following groupids doesn't exist: %(groupids)s"
-msgstr ""
+msgstr "Följande gruppID existerar inte: %(groupids)s"
 
 #: invites/app/invites/grouprole.py:34
 msgid "Group role"
@@ -160,16 +163,16 @@ msgstr "Grupproll"
 
 #: invites/app/invites/grouprole.py:56
 msgid "GroupRole requires the column left of it to be group"
-msgstr ""
+msgstr "GroupRole kräver att kolumnen till vänster om den är group"
 
 #: invites/app/invites/grouprole.py:71
 #, python-format
 msgid "The following role_ids don't exist: %(role_ids)s"
-msgstr ""
+msgstr "Följande role_id existerar inte: %(role_ids)s"
 
 #: invites/app/invites/swedish_ssn.py:43
 msgid "Incorrect swedish personnummer"
-msgstr ""
+msgstr "Felaktigt svenskt personnummer"
 
 #: invites/app/invites/swedish_ssn.py:60
 msgid "Swedish social security number"
@@ -178,12 +181,12 @@ msgstr "Svenskt personnummer"
 #: invites/registries.py:139
 #, python-format
 msgid "%(column)s is not a valid column"
-msgstr ""
+msgstr "%(column)s är inte en giltig kolumn"
 
 #: invites/registries.py:142
 #, python-format
 msgid "Duplicate columns. Found several %(column)s"
-msgstr ""
+msgstr "Dubbletter av kolumner. Hittade flera %(column)s"
 
 #: invites/registries.py:172
 #, python-format
@@ -191,6 +194,8 @@ msgid ""
 "The value %(key)s=%(value)s is used within different subsets of user data. "
 "Offending row: %(row_no)s"
 msgstr ""
+"Värdet %(key)s=%(value)s används inom olika delmängder av användardata. Rad "
+"som orsakar problemet: %(row_no)s"
 
 #: invites/registries.py:224
 #, python-format
@@ -198,58 +203,65 @@ msgid ""
 "The same user data has different roles on rows %(first_row)s and %(row_no)s: "
 "%(values)s"
 msgstr ""
+"Samma användardata har olika roller på rad %(first_row)s och %(row_no)s: "
+"%(values)s"
 
 #: invites/rest_api/import_utils.py:63
 #, python-format
 msgid ""
 "File is too large (%(size)s KB). Maximum allowed size is %(maximum)s MB."
 msgstr ""
+"Filen är för stor (%(size)s KB). Största tillåtna storlek är %(maximum)s MB."
 
 #: invites/rest_api/import_utils.py:79
 msgid ""
 "Unsupported file format. Upload an Excel file (.xlsx), an ODS spreadsheet, "
 "or a UTF-8 CSV/TSV file."
 msgstr ""
+"Filformatet stöds inte. Ladda upp en Excel-fil (.xlsx), ett ODS-kalkylblad "
+"eller en CSV/TSV-fil i UTF-8."
 
 #: invites/rest_api/import_utils.py:96
 #, python-format
 msgid "The file contains an entry that is too large to process (%(name)s)."
-msgstr ""
+msgstr "Filen innehåller en post som är för stor för att bearbeta (%(name)s)."
 
 #: invites/rest_api/import_utils.py:113
 #, python-format
 msgid ""
 "Unsupported ODF format '%(mime)s'. Only spreadsheets (.ods) are supported."
-msgstr ""
+msgstr "ODF-formatet ’%(mime)s’ stöds inte. Bara kalkylblad (.ods) stöds."
 
 #: invites/rest_api/import_utils.py:125
 msgid ""
 "Unrecognised ZIP-based format. Upload an Excel (.xlsx) or ODS (.ods) file."
 msgstr ""
+"Okänt ZIP-baserat format. Ladda upp en Excel-fil (.xlsx) eller ODS-fil "
+"(.ods)."
 
 #: invites/rest_api/import_utils.py:131
 msgid "The file appears to be corrupt or is not a valid spreadsheet."
-msgstr ""
+msgstr "Filen verkar vara skadad eller är inte ett giltigt kalkylblad."
 
 #: invites/rest_api/import_utils.py:157
 msgid "No worksheet found in the Excel file."
-msgstr ""
+msgstr "Hittade inget kalkylblad i Excel-filen."
 
 #: invites/rest_api/import_utils.py:196
 msgid "No sheet found in the ODS file."
-msgstr ""
+msgstr "Hittade inget blad i ODS-filen."
 
 #: invites/rest_api/import_utils.py:238
 msgid "The spreadsheet contains no data."
-msgstr ""
+msgstr "Kalkylbladet innehåller ingen data."
 
 #: invites/rest_api/import_utils.py:249
 msgid "The spreadsheet header row is empty."
-msgstr ""
+msgstr "Kalkylbladets rubrikrad är tom."
 
 #: invites/rest_api/import_utils.py:294
 msgid "File is empty"
-msgstr ""
+msgstr "Filen är tom"
 
 #: invites/rest_api/lock.py:6
 msgid "Invite operation already in progress."
@@ -258,11 +270,11 @@ msgstr "Det pågår redan en inbjudningsoperation."
 #: invites/rest_api/serializers.py:121
 #, python-format
 msgid "Invalid %(column)s value at row(s): %(rows)s"
-msgstr ""
+msgstr "Ogiltigt värde i %(column)s på rad: %(rows)s"
 
 #: invites/rest_api/serializers.py:140
 msgid "The file contains duplicate rows"
-msgstr ""
+msgstr "Filen innehåller dubblettrader"
 
 #: invites/rest_api/serializers.py:152
 #, python-format
@@ -285,44 +297,45 @@ msgstr ""
 
 #: invites/rest_api/serializers.py:193
 msgid "The file contains no data rows"
-msgstr ""
+msgstr "Filen innehåller inga datarader"
 
 #: invites/rest_api/serializers.py:255
 #, python-format
 msgid "Item %(item_no)s has no identity field (e.g. email)."
-msgstr ""
+msgstr "Post %(item_no)s saknar identitetsfält (t.ex. epost)."
 
 #: invites/rest_api/serializers.py:262
 #, python-format
 msgid "Item %(item_no)s: '%(key)s' is not a valid field."
-msgstr ""
+msgstr "Post %(item_no)s: ’%(key)s’ är inte ett giltigt fält."
 
 #: invites/rest_api/serializers.py:272
 #, python-format
 msgid "Item %(item_no)s: invalid value for '%(key)s': %(error)s"
-msgstr ""
+msgstr "Post %(item_no)s: ogiltigt värde för ’%(key)s’: %(error)s"
 
 #: invites/rest_api/views.py:526
 msgid "Organisation required"
-msgstr ""
+msgstr "Organisation krävs"
 
 #: invites/schemas.py:120
 #, python-format
 msgid "Got bogus value on row %(row_no)s: %(row)s"
-msgstr ""
+msgstr "Felaktigt värde på rad %(row_no)s: %(row)s"
 
 #: invites/schemas.py:125
 msgid "Couldn't validate rows because of invalid column names"
-msgstr ""
+msgstr "Kunde inte validera raderna på grund av ogiltiga kolumnnamn"
 
 #: invites/schemas.py:130
 msgid "Initial value of rows must be either string or list"
-msgstr ""
+msgstr "Ursprungsvärdet för rader måste vara antingen en sträng eller en lista"
 
 #: invites/schemas.py:165
 #, python-format
 msgid "We only allow %(limit)s rows to be added this way at one time"
 msgstr ""
+"Vi tillåter bara att %(limit)s rader läggs till på det här sättet åt gången"
 
 #: invites/schemas.py:187
 #, python-format
@@ -331,6 +344,9 @@ msgid ""
 "many columns. Example on line %(line)s - with tabs replaced:\n"
 "'%(example)s'\n"
 msgstr ""
+"Du har rader som innehåller data som inte skulle användas eftersom de har "
+"för många kolumner. Exempel på rad %(line)s - med tabbar ersatta:\n"
+"’%(example)s’\n"
 
 #: invites/schemas.py:199
 #, python-format
@@ -338,6 +354,8 @@ msgid ""
 "\n"
 "There are %(count)s other lines too - check your data."
 msgstr ""
+"\n"
+"Det finns %(count)s andra rader också - kontrollera din data."
 
 #: invites/schemas.py:204
 #, python-format
@@ -345,6 +363,8 @@ msgid ""
 "\n"
 "%(lines)s are also too long"
 msgstr ""
+"\n"
+"%(lines)s är också för långa"
 
 #: invites/statemachines.py:27
 msgid "Accept"
@@ -602,7 +622,7 @@ msgstr "Majoritet"
 
 #: poll/app/polls/majority.py:112
 msgid "Must have at least 2 proposals"
-msgstr "Metoden %(method)s kräver minst 2 förslag"
+msgstr "Måste ha minst 2 förslag"
 
 #: poll/app/polls/majority.py:116
 msgid "Invalid choice"
@@ -678,11 +698,11 @@ msgstr "Mötet är inte pågående"
 
 #: poll/rest_api/serializers.py:335
 msgid "Can't provide a vote when abstaining."
-msgstr ""
+msgstr "Du kan inte ange en röst när du avstår."
 
 #: poll/rest_api/serializers.py:343
 msgid "Must be an object matching this poll's vote format."
-msgstr ""
+msgstr "Måste vara ett objekt som matchar omröstningens röstformat."
 
 #: poll/statemachines.py:71
 msgid "Start"
