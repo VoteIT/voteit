@@ -5,6 +5,7 @@ from logging import getLogger
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils.functional import cached_property
+from django.utils.translation import gettext as _
 from rest_framework import mixins
 from rest_framework import status
 from rest_framework import viewsets
@@ -522,7 +523,7 @@ class HandleMatchedInvitesViewSet(
     def get_queryset(self):
         organisation = self.request.user.organisation
         if organisation is None:
-            raise ValidationError("Organisation required")
+            raise ValidationError(_("Organisation required"))
         if matched := get_idproxy_user_data(self.request.user):
             return MeetingInvite.objects.find_open_invites(
                 organisation=organisation, **matched

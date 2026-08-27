@@ -5,6 +5,8 @@ import re
 import xml.etree.ElementTree as ET
 import zipfile
 
+from django.utils.translation import gettext_lazy as _
+
 from voteit.meeting.roles import ROLE_PARTICIPANT
 
 # Mostly for doctests...
@@ -57,8 +59,14 @@ def detect_and_parse_file(raw: bytes) -> tuple[list[str], list[list[str]]]:
     """
     if len(raw) > MAX_UPLOAD_BYTES:
         raise ValueError(
-            f"File is too large ({len(raw) // 1024} KB). Maximum allowed size is "
-            f"{MAX_UPLOAD_BYTES // (1024 * 1024)} MB."
+            _(
+                "File is too large (%(size)s KB). Maximum allowed size is "
+                "%(maximum)s MB."
+            )
+            % {
+                "size": len(raw) // 1024,
+                "maximum": MAX_UPLOAD_BYTES // (1024 * 1024),
+            }
         )
     if raw[:4] == _ZIP_MAGIC:
         return _parse_zip_spreadsheet(raw)
@@ -67,8 +75,10 @@ def detect_and_parse_file(raw: bytes) -> tuple[list[str], list[list[str]]]:
         content = raw.decode("utf-8-sig")
     except UnicodeDecodeError:
         raise ValueError(
-            "Unsupported file format. Upload an Excel file (.xlsx), "
-            "an ODS spreadsheet, or a UTF-8 CSV/TSV file."
+            _(
+                "Unsupported file format. Upload an Excel file (.xlsx), "
+                "an ODS spreadsheet, or a UTF-8 CSV/TSV file."
+            )
         )
     return parse_invite_file(content)
 
@@ -83,7 +93,8 @@ def _safe_zip_read(zf: zipfile.ZipFile, name: str) -> bytes:
     info = zf.getinfo(name)
     if info.file_size > _MAX_XML_ENTRY_BYTES:
         raise ValueError(
-            f"The file contains an entry that is too large to process ({name})."
+            _("The file contains an entry that is too large to process (%(name)s).")
+            % {"name": name}
         )
     return zf.read(name)
 
@@ -98,7 +109,11 @@ def _parse_zip_spreadsheet(raw: bytes) -> tuple[list[str], list[list[str]]]:
                 if mime == _ODS_MIMETYPE:
                     return _parse_ods_zip(zf)
                 raise ValueError(
-                    f"Unsupported ODF format '{mime}'. Only spreadsheets (.ods) are supported."
+                    _(
+                        "Unsupported ODF format '%(mime)s'. Only spreadsheets (.ods) "
+                        "are supported."
+                    )
+                    % {"mime": mime}
                 )
             # XLSX: has xl/ directory and [Content_Types].xml
             if "[Content_Types].xml" in names and any(
@@ -106,11 +121,14 @@ def _parse_zip_spreadsheet(raw: bytes) -> tuple[list[str], list[list[str]]]:
             ):
                 return _parse_xlsx_zip(zf)
             raise ValueError(
-                "Unrecognised ZIP-based format. Upload an Excel (.xlsx) or ODS (.ods) file."
+                _(
+                    "Unrecognised ZIP-based format. Upload an Excel (.xlsx) or "
+                    "ODS (.ods) file."
+                )
             )
     except zipfile.BadZipFile:
         raise ValueError(
-            "The file appears to be corrupt or is not a valid spreadsheet."
+            _("The file appears to be corrupt or is not a valid spreadsheet.")
         )
 
 
@@ -136,7 +154,7 @@ def _parse_xlsx_zip(zf: zipfile.ZipFile) -> tuple[list[str], list[list[str]]]:
         n for n in zf.namelist() if re.match(r"xl/worksheets/sheet\d+\.xml", n)
     )
     if not sheet_names:
-        raise ValueError("No worksheet found in the Excel file.")
+        raise ValueError(_("No worksheet found in the Excel file."))
 
     sheet_root = ET.fromstring(_safe_zip_read(zf, sheet_names[0]))
     raw_rows: dict[int, dict[int, str]] = {}  # {row_idx: {col_idx: value}}
@@ -175,7 +193,7 @@ def _parse_ods_zip(zf: zipfile.ZipFile) -> tuple[list[str], list[list[str]]]:
     root = ET.fromstring(_safe_zip_read(zf, "content.xml").decode("utf-8"))
     sheet = root.find(f".//{{{_ODS_TABLE_NS}}}table")
     if sheet is None:
-        raise ValueError("No sheet found in the ODS file.")
+        raise ValueError(_("No sheet found in the ODS file."))
 
     raw_rows: dict[int, dict[int, str]] = {}
     row_idx = 0
@@ -194,7 +212,7 @@ def _parse_ods_zip(zf: zipfile.ZipFile) -> tuple[list[str], list[list[str]]]:
                 break
             if value is not None:
                 has_data = True
-                for _ in range(col_repeat):
+                for _repeat in range(col_repeat):
                     raw_rows.setdefault(row_idx, {})[col_idx] = value
                     col_idx += 1
             else:
@@ -217,7 +235,7 @@ def _dict_rows_to_columns_rows(
     raw_rows: dict[int, dict[int, str]],
 ) -> tuple[list[str], list[list[str]]]:
     if not raw_rows:
-        raise ValueError("The spreadsheet contains no data.")
+        raise ValueError(_("The spreadsheet contains no data."))
 
     sorted_row_indices = sorted(raw_rows)
     header_dict = raw_rows[sorted_row_indices[0]]
@@ -228,7 +246,7 @@ def _dict_rows_to_columns_rows(
     while columns and not columns[-1]:
         columns.pop()
     if not columns:
-        raise ValueError("The spreadsheet header row is empty.")
+        raise ValueError(_("The spreadsheet header row is empty."))
 
     n_cols = len(columns)
     rows = []
@@ -273,7 +291,7 @@ def parse_invite_file(content: str) -> tuple[list[str], list[list[str]]]:
     """
     lines = [line for line in content.splitlines() if line.strip()]
     if not lines:
-        raise ValueError("File is empty")
+        raise ValueError(_("File is empty"))
 
     if "\t" in lines[0]:
         sep = "\t"

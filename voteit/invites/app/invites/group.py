@@ -43,6 +43,10 @@ class InviteGroup(AnnotationDataAdapter):
     schema = GroupSchema
     title = _("GroupID")
     is_clearable = True
+    # One MeetingGroupAnnotation / GroupMembership per (recipient, group), carrying
+    # the grouprole -- so rows repeating a group must agree on the role.
+    collapse_key_columns = ("group",)
+    no_overwrite_columns = ("grouprole",)
 
     def accepted(self):
         """
@@ -100,7 +104,8 @@ class InviteGroup(AnnotationDataAdapter):
         )
         if missing:
             raise ValueError(
-                "The following groupids doesn't exist: %s" % ",".join(missing)
+                _("The following groupids doesn't exist: %(groupids)s")
+                % {"groupids": ",".join(missing)}
             )
 
     @classmethod
@@ -117,8 +122,12 @@ class InviteGroup(AnnotationDataAdapter):
         same group may even be repeated, with or without the same grouprole.
         Each (invite, group) pair must be written only once: Postgres rejects an
         upsert whose statement touches the same row twice ("ON CONFLICT DO
-        UPDATE command cannot affect row a second time"). When a group repeats
-        with different roles the last row wins.
+        UPDATE command cannot affect row a second time").
+
+        When a group repeats with different roles the last row wins. That is a
+        defensive fallback for internal callers only -- every entry point runs
+        registry.check_conflicting_annotations first, which rejects such rows
+        rather than letting one silently overwrite the other.
         """
         from voteit.invites.app.invites.grouprole import InviteGroupRole
 

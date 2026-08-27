@@ -40,7 +40,7 @@ with suppress(ImportError):
         def validate_ssn(cls, v: str) -> str:
             with suppress(PersonnummerException):
                 return Personnummer(v.strip()).format(long_format=True)
-            raise ValueError("Incorrect swedish personnummer")
+            raise ValueError(_("Incorrect swedish personnummer"))
 
     @invite_adapter_registry
     class InviteSweSSN(InviteUserDataAdapter):

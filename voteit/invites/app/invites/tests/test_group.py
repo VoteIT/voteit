@@ -124,7 +124,13 @@ class GroupAnnotationTests(TestCase):
         self.assertEqual(self.role_sith, annotation.group_role)
 
     def test_annotate_same_group_twice_with_different_role_last_wins(self):
-        """Same person and group on two rows with different grouproles: the last row wins."""
+        """
+        Same person and group on two rows with different grouproles: the last row wins.
+
+        This is the adapter-level fallback only. Every entry point runs
+        registry.check_conflicting_annotations first, which rejects such rows --
+        see the tests in rest_api/tests/.
+        """
         columns = ["email", "group", "grouprole"]
         rows = [
             ["vader@betahaus.net", "sw", "sith"],

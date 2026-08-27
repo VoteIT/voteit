@@ -20,6 +20,35 @@ if TYPE_CHECKING:
     from voteit.invites.schemas import AnnotationResultSchema
 
 
+def get_cell(row: list, i: int):
+    """
+    Fetch a cell from a row, normalising anything empty to None.
+
+    Rows may be shorter or longer than the column list, and empty values vary in
+    type -- see RowColInvitesBaseSchema.check_important_data_outside_read_columns.
+
+    >>> get_cell(['a', '', '  ', None, 0], 0)
+    'a'
+    >>> get_cell(['a', '', '  ', None, 0], 1) is None
+    True
+    >>> get_cell(['a', '', '  ', None, 0], 2) is None
+    True
+    >>> get_cell(['a', '', '  ', None, 0], 3) is None
+    True
+    >>> get_cell(['a', '', '  ', None, 0], 4) is None
+    True
+    >>> get_cell(['a'], 10) is None
+    True
+    """
+    try:
+        val = row[i]
+    except IndexError:
+        return None
+    if isinstance(val, str):
+        val = val.strip()
+    return val or None
+
+
 @dataclass(frozen=True)
 class FormattedAnnotationRow:
     """A CSV row split into identity data (for invite matching) and full row data (for effect application)."""
@@ -127,6 +156,14 @@ class InviteDataAdapter(ABC):
 
 
 class AnnotationDataAdapter(InviteDataAdapter, ABC):
+    # Columns that, together with the row's identity data, identify the single
+    # record this adapter writes. Rows sharing that key collapse into one write.
+    collapse_key_columns: tuple[str, ...] = ()
+    # Columns whose value must not differ between rows sharing a collapse key --
+    # a later row silently winning is a data error, not an update.
+    # Empty disables the check.
+    no_overwrite_columns: tuple[str, ...] = ()
+
     @abstractmethod
     def accepted(self):
         """
@@ -145,6 +182,128 @@ class AnnotationDataAdapter(InviteDataAdapter, ABC):
 
         raise DataColValidationError if something goes wrong
         """
+
+    @classmethod
+    def check_conflicting_rows(
+        cls,
+        *,
+        columns: list[str],
+        rows: list[list[str | None | int]],
+        registry: InviteAdapterRegistry,
+    ):
+        """
+        Reject rows that collapse into the same write but disagree about its content.
+
+        Several rows may describe the same recipient -- one per group, say -- and
+        several of them may collapse into a single record. Repeating a row verbatim
+        is harmless, but when two such rows differ the later one silently wins and
+        the earlier one is thrown away without a word. Adapters opt in by declaring
+        ``collapse_key_columns`` and ``no_overwrite_columns``.
+
+        Rows are numbered from 1, like everywhere else in this pipeline. Run this
+        after preflight, so values have been normalised and 'Main' doesn't look
+        different from 'main'.
+
+        >>> from voteit.invites.app.invites.email import InviteEmail
+        >>> from voteit.invites.app.invites.group import InviteGroup
+        >>> from voteit.invites.registries import InviteAdapterRegistry
+        >>> testing_reg = InviteAdapterRegistry(InviteDataAdapter)
+        >>> _ = testing_reg(InviteEmail)
+        >>> _ = testing_reg(InviteGroup)
+        >>> columns = ['email', 'group', 'grouprole']
+
+        A repeated row is fine, and so is the same person in two groups:
+
+        >>> InviteGroup.check_conflicting_rows(
+        ...     columns=columns,
+        ...     rows=[['a@x.com', 'board', 'main'], ['a@x.com', 'board', 'main']],
+        ...     registry=testing_reg,
+        ... )
+        >>> InviteGroup.check_conflicting_rows(
+        ...     columns=columns,
+        ...     rows=[['a@x.com', 'board', 'main'], ['a@x.com', 'staff', 'subst']],
+        ...     registry=testing_reg,
+        ... )
+
+        Two roles for the same person and group are not:
+
+        >>> InviteGroup.check_conflicting_rows(
+        ...     columns=columns,
+        ...     rows=[['a@x.com', 'board', 'main'], ['a@x.com', 'board', 'subst']],
+        ...     registry=testing_reg,
+        ... )
+        Traceback (most recent call last):
+        ...
+        voteit.invites.exceptions.DataColValidationError: Rows 1 and 2 set
+        different 'grouprole' for the same email=a@x.com, group=board:
+        'main' vs 'subst'. The later row would silently overwrite the earlier
+        one - remove one of them or make the rows agree.
+
+        Leaving the column blank on one of them counts as a difference, since the
+        role would be dropped:
+
+        >>> InviteGroup.check_conflicting_rows(
+        ...     columns=columns,
+        ...     rows=[['a@x.com', 'board', 'main'], ['a@x.com', 'board', '']],
+        ...     registry=testing_reg,
+        ... )
+        Traceback (most recent call last):
+        ...
+        voteit.invites.exceptions.DataColValidationError: Rows 1 and 2 set different ...
+        """
+        # Duplicate columns are rejected by registry.check_column_req before we get
+        # here, so a column name maps to exactly one index.
+        value_cols = [
+            (c, columns.index(c)) for c in cls.no_overwrite_columns if c in columns
+        ]
+        if not value_cols:
+            return
+        key_cols = [
+            (c, columns.index(c)) for c in cls.collapse_key_columns if c in columns
+        ]
+        seen: dict[tuple, tuple[int, tuple]] = {}
+        ud_seq = registry.build_ud_query_seq(columns, rows)
+        for num, (ud, row) in enumerate(zip(ud_seq, rows), 1):
+            if not ud:
+                continue
+            key_values = tuple(get_cell(row, i) for _c, i in key_cols)
+            if any(v is None for v in key_values):
+                # Nothing is written for this row
+                continue
+            key = (frozenset(ud.items()), key_values)
+            values = tuple(get_cell(row, i) for _c, i in value_cols)
+            first_num, first_values = seen.setdefault(key, (num, values))
+            if first_values == values:
+                continue
+            (col_name, col_idx), old_val, new_val = next(
+                (col, old, new)
+                for col, old, new in zip(value_cols, first_values, values)
+                if old != new
+            )
+            described = ", ".join(
+                f"{k}={v}"
+                for k, v in sorted(ud.items())
+                + [(c, v) for (c, _i), v in zip(key_cols, key_values)]
+            )
+            raise DataColValidationError(
+                name=col_name,
+                index=col_idx + 1,
+                rows=[first_num, num],
+                message=_(
+                    "Rows %(first_row)s and %(row_no)s set different '%(column)s' "
+                    "for the same %(described)s: %(old)s vs %(new)s. The later row "
+                    "would silently overwrite the earlier one - remove one of them "
+                    "or make the rows agree."
+                )
+                % {
+                    "first_row": first_num,
+                    "row_no": num,
+                    "column": col_name,
+                    "described": described,
+                    "old": repr(old_val),
+                    "new": repr(new_val),
+                },
+            )
 
     @classmethod
     @abstractmethod

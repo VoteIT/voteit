@@ -723,8 +723,8 @@ class ImportInvitesFunctionalTests(APITestCase):
 
     def test_same_email_and_group_on_two_rows_with_different_grouproles(self):
         """
-        Two rows for the same person and group but different grouproles used to
-        reach the annotation upsert twice and crash Postgres. The last row wins.
+        Two rows for the same person and group collapse into a single annotation,
+        so disagreeing grouproles would let the last row silently win. Rejected.
         """
         self.meeting.group_roles.create(role_id="member")
         response = self._post(
@@ -732,12 +732,62 @@ class ImportInvitesFunctionalTests(APITestCase):
             "alice@example.com\tboard\tchair\n"
             "alice@example.com\tboard\tmember\n"
         )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+        error = str(response.json())
+        self.assertIn("grouprole", error)
+        self.assertIn("rows 1 and 2", error.lower())
+        self.assertIn("chair", error)
+        self.assertIn("member", error)
+        self.assertFalse(MeetingInvite.objects.filter(meeting=self.meeting).exists())
+
+    def test_same_email_and_group_on_two_rows_with_same_grouprole(self):
+        """Repeating a row verbatim is harmless -- nothing is overwritten."""
+        response = self._post(
+            "email\tgroup\tgrouprole\n"
+            "alice@example.com\tboard\tchair\n"
+            "bob@example.com\tboard\tchair\n"
+        )
         self.assertEqual(HTTPStatus.OK, response.status_code, response.json())
         alice = MeetingInvite.objects.get(
             meeting=self.meeting, user_data__email="alice@example.com"
         )
         annotation = alice.group_annotations.get(meeting_group=self.group_board)
-        self.assertEqual("member", annotation.group_role.role_id)
+        self.assertEqual("chair", annotation.group_role.role_id)
+
+    def test_same_email_two_groups_with_different_grouproles(self):
+        """Different groups are different records -- no conflict."""
+        self.meeting.group_roles.create(role_id="member")
+        staff = self.meeting.groups.create(groupid="staff")
+        response = self._post(
+            "email\tgroup\tgrouprole\n"
+            "alice@example.com\tboard\tchair\n"
+            "alice@example.com\tstaff\tmember\n"
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code, response.json())
+        alice = MeetingInvite.objects.get(
+            meeting=self.meeting, user_data__email="alice@example.com"
+        )
+        self.assertEqual(
+            "chair",
+            alice.group_annotations.get(
+                meeting_group=self.group_board
+            ).group_role.role_id,
+        )
+        self.assertEqual(
+            "member",
+            alice.group_annotations.get(meeting_group=staff).group_role.role_id,
+        )
+
+    def test_same_email_and_group_with_grouprole_dropped_on_second_row(self):
+        """A blank grouprole would wipe the role set on the earlier row."""
+        response = self._post(
+            "email\tgroup\tgrouprole\n"
+            "alice@example.com\tboard\tchair\n"
+            "alice@example.com\tboard\t\n"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+        self.assertIn("grouprole", str(response.json()))
+        self.assertFalse(MeetingInvite.objects.filter(meeting=self.meeting).exists())
 
     def test_unknown_group_returns_400(self):
         response = self._post("email\tgroup\nalice@example.com\tunknown_group\n")

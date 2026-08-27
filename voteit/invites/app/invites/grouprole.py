@@ -33,6 +33,8 @@ class InviteGroupRole(AnnotationDataAdapter):
     schema = GroupRoleSchema
     title = _("Group role")
     is_runnable = False
+    # collapse_key_columns / no_overwrite_columns are left empty: InviteGroup owns
+    # every write this column takes part in, and declares the check for it.
 
     @classmethod
     def check_column_req(cls, columns: list[str]):
@@ -50,7 +52,9 @@ class InviteGroupRole(AnnotationDataAdapter):
         """
         for i in cls.get_colidx(columns):
             if columns[i - 1] != InviteGroup.name:
-                raise ValueError("GroupRole requires the column left of it to be group")
+                raise ValueError(
+                    _("GroupRole requires the column left of it to be group")
+                )
 
     @classmethod
     def validate(
@@ -64,7 +68,8 @@ class InviteGroupRole(AnnotationDataAdapter):
         )
         if missing:
             raise ValueError(
-                "The following role_ids don't exist: %s" % ",".join(missing)
+                _("The following role_ids don't exist: %(role_ids)s")
+                % {"role_ids": ",".join(missing)}
             )
 
     def accepted(self):

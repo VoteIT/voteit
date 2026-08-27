@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-15 14:59+0200\n"
-"PO-Revision-Date: 2026-06-15 15:01+0200\n"
+"POT-Creation-Date: 2026-08-27 18:28+0200\n"
+"PO-Revision-Date: 2026-08-27 18:47+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -22,7 +22,19 @@ msgstr ""
 msgid "Give users access automatically"
 msgstr "Ge användare access automatiskt"
 
-#: agenda/messages.py:133
+#: agenda/rest_api/serializers.py:118
+msgid "Duplicate agenda item IDs are not allowed."
+msgstr ""
+
+#: agenda/rest_api/serializers.py:130
+msgid "One or more agenda items not found in the specified meeting."
+msgstr ""
+
+#: agenda/rest_api/serializers.py:161
+msgid "state, block_discussion or block_proposals required"
+msgstr ""
+
+#: agenda/rest_api/serializers.py:169
 msgid "Can't bulk delete in ongoing meeting"
 msgstr "Kan inte radera många på en gång i ett pågående möte"
 
@@ -76,12 +88,12 @@ msgstr ""
 msgid "You can only pick existing users within this meeting"
 msgstr "Du kan bara välja existerande användare som är med i mötet"
 
-#: core/rest_api/utils.py:25
+#: core/rest_api/utils.py:26
 #, python-format
 msgid "You're missing the permission '%(perm)s' on %(obj)s."
 msgstr "Du saknar behörigheten ’%(perm)s’ på %(obj)s."
 
-#: core/rest_api/utils.py:111
+#: core/rest_api/utils.py:112
 msgid "Can't find meeting"
 msgstr "Kan inte hitta mötet"
 
@@ -121,27 +133,138 @@ msgstr "Det pågår redan en import."
 msgid "Please wait a few seconds before running another import."
 msgstr "Vänta några sekunder innan du kör en ny import."
 
+#: invites/abcs.py:293
+#, python-format
+msgid ""
+"Rows %(first_row)s and %(row_no)s set different '%(column)s' for the same "
+"%(described)s: %(old)s vs %(new)s. The later row would silently overwrite "
+"the earlier one - remove one of them or make the rows agree."
+msgstr ""
+
 #: invites/app/invites/email.py:41
 msgid "Email"
 msgstr "Epost"
 
-#: invites/app/invites/group.py:41
+#: invites/app/invites/group.py:44
 msgid "GroupID"
 msgstr "GruppID"
 
-#: invites/app/invites/grouprole.py:32
+#: invites/app/invites/group.py:107
+#, python-format
+msgid "The following groupids doesn't exist: %(groupids)s"
+msgstr ""
+
+#: invites/app/invites/grouprole.py:34
 msgid "Group role"
 msgstr "Grupproll"
+
+#: invites/app/invites/grouprole.py:56
+msgid "GroupRole requires the column left of it to be group"
+msgstr ""
+
+#: invites/app/invites/grouprole.py:71
+#, python-format
+msgid "The following role_ids don't exist: %(role_ids)s"
+msgstr ""
+
+#: invites/app/invites/swedish_ssn.py:43
+msgid "Incorrect swedish personnummer"
+msgstr ""
 
 #: invites/app/invites/swedish_ssn.py:60
 msgid "Swedish social security number"
 msgstr "Svenskt personnummer"
 
+#: invites/registries.py:139
+#, python-format
+msgid "%(column)s is not a valid column"
+msgstr ""
+
+#: invites/registries.py:142
+#, python-format
+msgid "Duplicate columns. Found several %(column)s"
+msgstr ""
+
+#: invites/registries.py:172
+#, python-format
+msgid ""
+"The value %(key)s=%(value)s is used within different subsets of user data. "
+"Offending row: %(row_no)s"
+msgstr ""
+
+#: invites/registries.py:224
+#, python-format
+msgid ""
+"The same user data has different roles on rows %(first_row)s and %(row_no)s: "
+"%(values)s"
+msgstr ""
+
+#: invites/rest_api/import_utils.py:63
+#, python-format
+msgid ""
+"File is too large (%(size)s KB). Maximum allowed size is %(maximum)s MB."
+msgstr ""
+
+#: invites/rest_api/import_utils.py:79
+msgid ""
+"Unsupported file format. Upload an Excel file (.xlsx), an ODS spreadsheet, "
+"or a UTF-8 CSV/TSV file."
+msgstr ""
+
+#: invites/rest_api/import_utils.py:96
+#, python-format
+msgid "The file contains an entry that is too large to process (%(name)s)."
+msgstr ""
+
+#: invites/rest_api/import_utils.py:113
+#, python-format
+msgid ""
+"Unsupported ODF format '%(mime)s'. Only spreadsheets (.ods) are supported."
+msgstr ""
+
+#: invites/rest_api/import_utils.py:125
+msgid ""
+"Unrecognised ZIP-based format. Upload an Excel (.xlsx) or ODS (.ods) file."
+msgstr ""
+
+#: invites/rest_api/import_utils.py:131
+msgid "The file appears to be corrupt or is not a valid spreadsheet."
+msgstr ""
+
+#: invites/rest_api/import_utils.py:157
+msgid "No worksheet found in the Excel file."
+msgstr ""
+
+#: invites/rest_api/import_utils.py:196
+msgid "No sheet found in the ODS file."
+msgstr ""
+
+#: invites/rest_api/import_utils.py:238
+msgid "The spreadsheet contains no data."
+msgstr ""
+
+#: invites/rest_api/import_utils.py:249
+msgid "The spreadsheet header row is empty."
+msgstr ""
+
+#: invites/rest_api/import_utils.py:294
+msgid "File is empty"
+msgstr ""
+
 #: invites/rest_api/lock.py:6
 msgid "Invite operation already in progress."
 msgstr "Det pågår redan en inbjudningsoperation."
 
-#: invites/rest_api/serializers.py:136
+#: invites/rest_api/serializers.py:121
+#, python-format
+msgid "Invalid %(column)s value at row(s): %(rows)s"
+msgstr ""
+
+#: invites/rest_api/serializers.py:140
+msgid "The file contains duplicate rows"
+msgstr ""
+
+#: invites/rest_api/serializers.py:152
 #, python-format
 msgid ""
 "Found existing invites matching only parts of a row. Check for conflicting "
@@ -150,7 +273,7 @@ msgstr ""
 "Hittade existerande inbjudningar som bara matchade en del av raden. Leta "
 "efter rader med följande innehåll: %(cols)s"
 
-#: invites/rest_api/serializers.py:156
+#: invites/rest_api/serializers.py:172
 #, python-format
 msgid ""
 "Your action would downgrade permissions for some moderators. Handle "
@@ -159,6 +282,69 @@ msgstr ""
 "Din åtgärd skulle leda till att behörigheterna för vissa moderatorer sänks. "
 "Hantera istället moderatorerna via fliken ”Deltagare”. Berörda användar-ID: "
 "%(userids)s"
+
+#: invites/rest_api/serializers.py:193
+msgid "The file contains no data rows"
+msgstr ""
+
+#: invites/rest_api/serializers.py:255
+#, python-format
+msgid "Item %(item_no)s has no identity field (e.g. email)."
+msgstr ""
+
+#: invites/rest_api/serializers.py:262
+#, python-format
+msgid "Item %(item_no)s: '%(key)s' is not a valid field."
+msgstr ""
+
+#: invites/rest_api/serializers.py:272
+#, python-format
+msgid "Item %(item_no)s: invalid value for '%(key)s': %(error)s"
+msgstr ""
+
+#: invites/rest_api/views.py:526
+msgid "Organisation required"
+msgstr ""
+
+#: invites/schemas.py:120
+#, python-format
+msgid "Got bogus value on row %(row_no)s: %(row)s"
+msgstr ""
+
+#: invites/schemas.py:125
+msgid "Couldn't validate rows because of invalid column names"
+msgstr ""
+
+#: invites/schemas.py:130
+msgid "Initial value of rows must be either string or list"
+msgstr ""
+
+#: invites/schemas.py:165
+#, python-format
+msgid "We only allow %(limit)s rows to be added this way at one time"
+msgstr ""
+
+#: invites/schemas.py:187
+#, python-format
+msgid ""
+"You have rows that contain data that wouldn't be used since they have to "
+"many columns. Example on line %(line)s - with tabs replaced:\n"
+"'%(example)s'\n"
+msgstr ""
+
+#: invites/schemas.py:199
+#, python-format
+msgid ""
+"\n"
+"There are %(count)s other lines too - check your data."
+msgstr ""
+
+#: invites/schemas.py:204
+#, python-format
+msgid ""
+"\n"
+"%(lines)s are also too long"
+msgstr ""
 
 #: invites/statemachines.py:27
 msgid "Accept"
@@ -359,95 +545,92 @@ msgstr ""
 "till i röstlängden när närvarokontrollen stängs. Om gruppröster är aktivt så "
 "kommer rösterna fördelas jämt mellan närvarande."
 
-#: poll/app/polls/combined_simple.py:23 poll/app/polls/simple.py:22
+#: poll/app/polls/combined_simple.py:20 poll/app/polls/simple.py:18
 msgid "Yes"
 msgstr "Ja"
 
-#: poll/app/polls/combined_simple.py:23 poll/app/polls/simple.py:22
+#: poll/app/polls/combined_simple.py:20 poll/app/polls/simple.py:18
 msgid "No"
 msgstr "Nej"
 
-#: poll/app/polls/combined_simple.py:23
+#: poll/app/polls/combined_simple.py:20
 msgid "Abstain"
 msgstr "Avstå"
 
-#: poll/app/polls/combined_simple.py:64
+#: poll/app/polls/combined_simple.py:51
 msgid "Combined Simple"
 msgstr "Kombinerad enkel"
 
-#: poll/app/polls/dutt.py:150 poll/app/polls/dutt.py:162
-#: poll/app/polls/dutt.py:180 poll/app/polls/irv.py:201
-#: poll/app/polls/irv.py:216 poll/app/polls/majority.py:130
-#: poll/app/polls/schulze.py:172 poll/app/polls/scottish_stv.py:155
-msgid "Invalid vote"
-msgstr "Ogiltig röst"
-
-#: poll/app/polls/dutt.py:154
+#: poll/app/polls/dutt.py:136
 msgid "Too few proposals picked"
 msgstr "För få förslag valda"
 
-#: poll/app/polls/dutt.py:166
+#: poll/app/polls/dutt.py:138
 msgid "Too many proposals picked"
 msgstr "För många förslag valda"
 
-#: poll/app/polls/dutt.py:185 poll/app/polls/schulze.py:177
-#: poll/app/polls/scottish_stv.py:160
+#: poll/app/polls/dutt.py:143 poll/app/polls/schulze.py:148
+#: poll/app/polls/scottish_stv.py:144
 #, python-format
 msgid "Invalid choice, the following proposals don't exist: %s"
 msgstr "Ogiltigt val, följande förslag existerar inte: %s"
 
-#: poll/app/polls/irv.py:39
+#: poll/app/polls/irv.py:31
 msgid "Instant-Runoff Voting"
 msgstr "Instant-Runoff Voting"
 
-#: poll/app/polls/irv.py:56 poll/app/polls/irv.py:186
+#: poll/app/polls/irv.py:48 poll/app/polls/irv.py:175
 #, python-format
 msgid "The method %(method)s require at least 3 proposals"
 msgstr "Metoden %(method)s kräver minst 3 förslag"
 
-#: poll/app/polls/irv.py:168
+#: poll/app/polls/irv.py:157
 msgid "Repeated Instant-Runoff Voting"
 msgstr "Repeterad Instant-Runoff Voting"
 
-#: poll/app/polls/irv.py:205
+#: poll/app/polls/irv.py:185
 msgid "Too few selected"
 msgstr "För få valda"
 
-#: poll/app/polls/irv.py:220
+#: poll/app/polls/irv.py:187
 msgid "Too many selected"
 msgstr "För många valda"
 
-#: poll/app/polls/majority.py:67
+#: poll/app/polls/majority.py:55
 msgid "Majority"
 msgstr "Majoritet"
 
-#: poll/app/polls/majority.py:124
+#: poll/app/polls/majority.py:112
 msgid "Must have at least 2 proposals"
 msgstr "Metoden %(method)s kräver minst 2 förslag"
 
-#: poll/app/polls/schulze.py:73
+#: poll/app/polls/majority.py:116
+msgid "Invalid choice"
+msgstr "Ogiltigt val"
+
+#: poll/app/polls/schulze.py:53
 msgid "Schulze"
 msgstr "Schulze"
 
-#: poll/app/polls/schulze.py:227
+#: poll/app/polls/schulze.py:197
 msgid "Repeated Schulze"
 msgstr "Repeterad Schulze"
 
-#: poll/app/polls/scottish_stv.py:86
+#: poll/app/polls/scottish_stv.py:80
 msgid "Scottish STV"
 msgstr "Skotsk STV"
 
-#: poll/app/polls/scottish_stv.py:172
+#: poll/app/polls/scottish_stv.py:154
 #, python-format
 msgid "The method %(method)s can't have as many winners as proposals"
 msgstr "Metoden %(method)s kan inte ha lika många vinnare som förslag"
 
-#: poll/app/polls/scottish_stv.py:177
+#: poll/app/polls/scottish_stv.py:159
 #, python-format
 msgid "The method %(method)s require at least %(min_winners)d winners"
 msgstr "Metoden %(method)s kräver minst %(min_winners)d vinnare"
 
-#: poll/app/polls/simple.py:58
+#: poll/app/polls/simple.py:44
 msgid "Simple"
 msgstr "Enkel"
 
@@ -489,9 +672,17 @@ msgstr "Ogiltiga omröstningsinställningar."
 msgid "Invalid proposal count."
 msgstr "Fel antal förslag."
 
-#: poll/rest_api/serializers.py:221 poll/rest_api/serializers.py:251
+#: poll/rest_api/serializers.py:224 poll/rest_api/serializers.py:254
 msgid "Meeting isn't ongoing"
 msgstr "Mötet är inte pågående"
+
+#: poll/rest_api/serializers.py:335
+msgid "Can't provide a vote when abstaining."
+msgstr ""
+
+#: poll/rest_api/serializers.py:343
+msgid "Must be an object matching this poll's vote format."
+msgstr ""
 
 #: poll/statemachines.py:71
 msgid "Start"

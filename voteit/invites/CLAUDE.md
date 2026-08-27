@@ -31,7 +31,7 @@ Events:
 All identity and annotation logic is pluggable via `InviteAdapterRegistry` (`registries.py`). Two adapter base classes in `abcs.py`:
 
 - **`InviteUserDataAdapter`** — identity data (e.g. `email`, `swedish_ssn`). Used for querying invites and masking sensitive data in auditlog. Must not clash on schema field names; registry enforces this at registration time.
-- **`AnnotationDataAdapter`** — secondary effect data (e.g. `group`, `grouprole`). Has `preflight`, `validate`, `annotate`, `accepted`, `clear`, `get_annotations` hooks.
+- **`AnnotationDataAdapter`** — secondary effect data (e.g. `group`, `grouprole`). Has `preflight`, `validate`, `check_conflicting_rows`, `annotate`, `accepted`, `clear`, `get_annotations` hooks.
 
 Built-in adapters under `app/invites/`:
 - `InviteEmail` — email identity, normalises to lowercase.
@@ -50,6 +50,7 @@ Two REST entry points feed the same write path. Both paths run the same registry
 2. `preflight` — transforms data in-place (normalise case, strip whitespace, validate format). Must not touch the DB.
 3. `check_intersections` — rejects rows where a single identity value appears in multiple distinct user_data subsets (identity columns only).
 4. `check_conflicting_roles` — file imports only: rejects files where the same identity appears on rows with different roles. Repeating an identity is otherwise fine (one row per group), but rows are grouped by role combination when written, so conflicting roles would let the last combination silently win.
+5. `check_conflicting_annotations` — rejects rows that collapse into the same annotation record but disagree about its content, which would let a later row silently overwrite an earlier one. Runs after `preflight`, so values are already normalised. Each `AnnotationDataAdapter` opts in declaratively: `collapse_key_columns` names the columns that (with the row identity) identify the record written, `no_overwrite_columns` names the columns that must then agree. `InviteGroup` sets `("group",)` / `("grouprole",)`; a blank value counts as a distinct value, since collapsing would drop the role. Raises `DataColValidationError` with a `message` explaining which rows and values clash. Repeating a row verbatim stays fine, and a stored grouprole may still be corrected by a later import.
 
 Write path: `MeetingInviteManager.create_or_update_mixed`:
 - Finds existing exact-match invites and updates roles / re-opens them if needed.

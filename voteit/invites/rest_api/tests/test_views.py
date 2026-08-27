@@ -16,6 +16,7 @@ from voteit.invites.channels import MeetingInvitesChannel
 from voteit.invites.messages import MeetingInviteChanged
 from voteit.invites.models import MeetingGroupAnnotation
 from voteit.invites.models import MeetingInvite
+from voteit.invites.rest_api.lock import invites_lock
 from voteit.invites.statemachines import InviteStateMachine
 from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
@@ -339,6 +340,8 @@ class MeetingInviteViewSetCreateTests(APITestCase):
         cls.group = MeetingGroup.objects.create(
             meeting=cls.meeting, groupid="committee"
         )
+        cls.role_main = cls.meeting.group_roles.create(role_id="main")
+        cls.role_subst = cls.meeting.group_roles.create(role_id="subst")
 
     def _url(self):
         return reverse("meeting-invites-list")
@@ -351,6 +354,13 @@ class MeetingInviteViewSetCreateTests(APITestCase):
             user = self.moderator
         self.client.force_login(user)
         return self.client.post(self._url(), data, content_type="application/json")
+
+    def _clear_lock(self):
+        """Let the same session post twice without tripping the request lock."""
+        sk = self.client.session.session_key
+        if sk:
+            cache.delete(invites_lock._processing_key(sk))
+            cache.delete(invites_lock._cooldown_key(sk))
 
     def test_create_single(self):
         response = self._post(
@@ -403,6 +413,151 @@ class MeetingInviteViewSetCreateTests(APITestCase):
             }
         )
         self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["invites"]["added"], 1)
+
+    def test_create_duplicate_with_group_and_roleid(self):
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [
+                    {
+                        "email": "a@example.com",
+                        "group": self.group.groupid,
+                        "grouprole": self.role_main.role_id,
+                    },
+                    {
+                        "email": "a@example.com",
+                        "group": self.group.groupid,
+                        "grouprole": self.role_main.role_id,
+                    },
+                ],
+            }
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["invites"]["added"], 1)
+
+    def test_create_duplicate_with_group_with_roleid_owerwriting_earlier(self):
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [
+                    {
+                        "email": "a@example.com",
+                        "group": self.group.groupid,
+                        "grouprole": self.role_main.role_id,
+                    },
+                    {
+                        "email": "a@example.com",
+                        "group": self.group.groupid,
+                        "grouprole": self.role_subst.role_id,
+                    },
+                ],
+            }
+        )
+        self.assertEqual(response.status_code, 400)
+        error = str(response.json())
+        self.assertIn("grouprole", error)
+        self.assertIn("rows 1 and 2", error.lower())
+        self.assertIn(self.role_main.role_id, error)
+        self.assertIn(self.role_subst.role_id, error)
+        self.assertFalse(self.meeting.invites.exists())
+
+    def test_create_duplicate_with_group_and_grouprole_dropped(self):
+        """A blank grouprole would wipe the role set on the earlier row."""
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [
+                    {
+                        "email": "a@example.com",
+                        "group": self.group.groupid,
+                        "grouprole": self.role_main.role_id,
+                    },
+                    {
+                        "email": "a@example.com",
+                        "group": self.group.groupid,
+                        "grouprole": "",
+                    },
+                ],
+            }
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("grouprole", str(response.json()))
+        self.assertFalse(self.meeting.invites.exists())
+
+    def test_create_two_groups_with_different_roleid(self):
+        """Different groups are different records -- no conflict."""
+        other = MeetingGroup.objects.create(meeting=self.meeting, groupid="board")
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [
+                    {
+                        "email": "a@example.com",
+                        "group": self.group.groupid,
+                        "grouprole": self.role_main.role_id,
+                    },
+                    {
+                        "email": "a@example.com",
+                        "group": other.groupid,
+                        "grouprole": self.role_subst.role_id,
+                    },
+                ],
+            }
+        )
+        self.assertEqual(response.status_code, 201, response.json())
+        self.assertEqual(response.json()["invites"]["added"], 1)
+        invite = self.meeting.invites.get(user_data__email="a@example.com")
+        self.assertEqual(
+            {(self.group.pk, self.role_main.pk), (other.pk, self.role_subst.pk)},
+            set(invite.group_annotations.values_list("meeting_group", "group_role")),
+        )
+
+    def test_second_request_may_correct_an_earlier_grouprole(self):
+        """
+        The overwrite check is about rows within one request. Correcting a stored
+        grouprole with a later request is a deliberate update and stays allowed.
+        """
+        payload = {
+            "meeting": self.meeting.pk,
+            "roles": ["pa"],
+            "data": [
+                {
+                    "email": "a@example.com",
+                    "group": self.group.groupid,
+                    "grouprole": self.role_main.role_id,
+                }
+            ],
+        }
+        self.assertEqual(self._post(payload).status_code, 201)
+        self._clear_lock()
+        payload["data"][0]["grouprole"] = self.role_subst.role_id
+        response = self._post(payload)
+        self.assertEqual(response.status_code, 201, response.json())
+        self.assertEqual(response.json()["annotations"][0]["changed"], 1)
+        invite = self.meeting.invites.get(user_data__email="a@example.com")
+        self.assertEqual(
+            self.role_subst,
+            invite.group_annotations.get(meeting_group=self.group).group_role,
+        )
+
+    def test_create_duplicate_with_group_without_roleid(self):
+        """Repeated rows with no grouprole at all have nothing to overwrite."""
+        response = self._post(
+            {
+                "meeting": self.meeting.pk,
+                "roles": ["pa"],
+                "data": [
+                    {"email": "a@example.com", "group": self.group.groupid},
+                    {"email": "a@example.com", "group": self.group.groupid},
+                ],
+            }
+        )
+        self.assertEqual(response.status_code, 201, response.json())
         self.assertEqual(response.json()["invites"]["added"], 1)
 
     def test_create_existing_unchanged(self):

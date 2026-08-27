@@ -109,6 +109,20 @@ class ExternalMeetingInviteSerializer(serializers.ModelSerializer):
         return instance.meeting.title
 
 
+def _datacol_message(err: DataColValidationError) -> str:
+    """
+    Render a DataColValidationError for the user. Checks that can explain
+    themselves set ``message``; the rest only know which rows went wrong.
+    """
+    if err.message:
+        return str(err.message)
+    row_str = ", ".join(str(r) for r in err.rows)
+    return str(
+        _("Invalid %(column)s value at row(s): %(rows)s")
+        % {"column": err.name, "rows": row_str}
+    )
+
+
 def _pydantic_to_user_messages(exc: PydanticValidationError) -> list[str]:
     """
     Extract readable error strings from a pydantic ValidationError,
@@ -121,10 +135,9 @@ def _pydantic_to_user_messages(exc: PydanticValidationError) -> list[str]:
         # than on the v1-style dotted error type.
         err = e.get("ctx", {}).get("error")
         if isinstance(err, DataColValidationError):
-            row_str = ", ".join(str(r) for r in err.rows)
-            messages.append(f"Invalid {err.name} value at row(s): {row_str}")
+            messages.append(_datacol_message(err))
         elif isinstance(err, DuplicateItemsError):
-            messages.append("The file contains duplicate rows")
+            messages.append(_("The file contains duplicate rows"))
         else:
             messages.append(_clean_msg(e["msg"]))
     return messages
@@ -177,7 +190,7 @@ class InviteImportSerializer(serializers.Serializer):
             raise serializers.ValidationError({"file": str(exc)})
         if not rows:
             raise serializers.ValidationError(
-                {"file": "The file contains no data rows"}
+                {"file": _("The file contains no data rows")}
             )
         columns, rows, roles_per_row = extract_roles_per_row(columns, rows)
         try:
@@ -239,13 +252,15 @@ class InviteCreateSerializer(serializers.Serializer):
                 continue
             if not any(k in reg.user_data_keys for k in item):
                 raise serializers.ValidationError(
-                    f"Item {i + 1} has no identity field (e.g. email)."
+                    _("Item %(item_no)s has no identity field (e.g. email).")
+                    % {"item_no": i + 1}
                 )
             normalised_item = {}
             for key, val in item.items():
                 if key not in reg:
                     raise serializers.ValidationError(
-                        f"Item {i + 1}: '{key}' is not a valid field."
+                        _("Item %(item_no)s: '%(key)s' is not a valid field.")
+                        % {"item_no": i + 1, "key": key}
                     )
                 if key in reg.user_data_keys:
                     try:
@@ -253,7 +268,10 @@ class InviteCreateSerializer(serializers.Serializer):
                         normalised_item[key] = getattr(schema_data, key)
                     except (ValueError, TypeError) as e:
                         raise serializers.ValidationError(
-                            f"Item {i + 1}: invalid value for '{key}': {e}"
+                            _(
+                                "Item %(item_no)s: invalid value for '%(key)s': %(error)s"
+                            )
+                            % {"item_no": i + 1, "key": key, "error": e}
                         ) from e
                 else:
                     normalised_item[key] = val
@@ -266,7 +284,12 @@ class InviteCreateSerializer(serializers.Serializer):
         ann_keys = [k for k in all_keys if k not in reg.user_data_keys]
         if ann_keys:
             col_rows = [[item.get(k, "") for k in all_keys] for item in normalised]
-            reg.preflight(all_keys, col_rows)
+            try:
+                reg.preflight(all_keys, col_rows)
+                # After preflight, so normalised values are compared
+                reg.check_conflicting_annotations(all_keys, col_rows)
+            except DataColValidationError as exc:
+                raise serializers.ValidationError(_datacol_message(exc)) from exc
             for item, row in zip(normalised, col_rows):
                 for k, cell in zip(all_keys, row):
                     item[k] = cell

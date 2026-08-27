@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from typing import TypeVar
 
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from typing import Generator
 
 from voteit.core.component import Registry
@@ -135,9 +136,11 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
             try:
                 self[k].check_column_req(columns)
             except KeyError:
-                raise ValueError(f"{k} is not a valid column")
+                raise ValueError(_("%(column)s is not a valid column") % {"column": k})
             if columns.count(k) > 1:
-                raise ValueError(f"Duplicate columns. Found several {k}")
+                raise ValueError(
+                    _("Duplicate columns. Found several %(column)s") % {"column": k}
+                )
 
     def preflight(self, columns: list[str], rows: list[list[str]]) -> None:
         """
@@ -165,7 +168,11 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
                 di = {k: v}.items()
                 if any(di <= x for x in cmpvals if items != x):
                     raise ValueError(
-                        f"The value {k}={v} is used within different subsets of user data. Offending row: {i}"
+                        _(
+                            "The value %(key)s=%(value)s is used within different "
+                            "subsets of user data. Offending row: %(row_no)s"
+                        )
+                        % {"key": k, "value": v, "row_no": i}
                     )
             checked.append(items)
 
@@ -213,9 +220,51 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
             if list(first_roles) != list(roles):
                 values = ", ".join(f"{k}={v}" for k, v in sorted(ud.items()))
                 raise ValueError(
-                    f"The same user data has different roles on rows "
-                    f"{first_row} and {i}: {values}"
+                    _(
+                        "The same user data has different roles on rows "
+                        "%(first_row)s and %(row_no)s: %(values)s"
+                    )
+                    % {"first_row": first_row, "row_no": i, "values": values}
                 )
+
+    def check_conflicting_annotations(
+        self, columns: list[str], rows: list[list[str]]
+    ) -> None:
+        """
+        Let every annotation adapter reject rows that would silently overwrite
+        each other. See AnnotationDataAdapter.check_conflicting_rows.
+
+        Must run after preflight, so values are already normalised.
+
+        >>> from voteit.invites.app.invites.email import InviteEmail
+        >>> from voteit.invites.app.invites.group import InviteGroup
+        >>> from voteit.invites.app.invites.grouprole import InviteGroupRole
+        >>> from voteit.invites.abcs import InviteDataAdapter
+        >>> testing_reg = InviteAdapterRegistry(InviteDataAdapter)
+        >>> _ = testing_reg(InviteEmail)
+        >>> _ = testing_reg(InviteGroup)
+        >>> _ = testing_reg(InviteGroupRole)
+        >>> columns = ['email', 'group', 'grouprole']
+
+        >>> testing_reg.check_conflicting_annotations(
+        ...     columns, [['a@x.com', 'board', 'main'], ['a@x.com', 'board', 'main']]
+        ... )
+        >>> testing_reg.check_conflicting_annotations(
+        ...     columns, [['a@x.com', 'board', 'main'], ['a@x.com', 'board', 'subst']]
+        ... )
+        Traceback (most recent call last):
+        ...
+        voteit.invites.exceptions.DataColValidationError: Rows 1 and 2 set
+        different 'grouprole' ...
+
+        Adapters that declare no columns to protect are simply skipped:
+
+        >>> testing_reg.check_conflicting_annotations(
+        ...     ['email', 'group'], [['a@x.com', 'board'], ['a@x.com', 'staff']]
+        ... )
+        """
+        for adapter in self.get_annotations(columns):
+            adapter.check_conflicting_rows(columns=columns, rows=rows, registry=self)
 
     def build_ud_query_seq(
         self, columns: list[str], rows: list[list[str]]

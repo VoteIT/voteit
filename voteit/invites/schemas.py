@@ -2,6 +2,8 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import List, TYPE_CHECKING
 
+from django.utils.translation import gettext_lazy as _
+
 from pydantic import field_validator, StringConstraints, ConfigDict, BaseModel
 from pydantic import ValidationInfo
 from pydantic import Field
@@ -114,15 +116,18 @@ class RowColInvitesBaseSchema(BaseModel):
                     if any(row):
                         result.append(row)
                 else:
-                    raise ValueError(f"Got bogus value on row {i}: {row}")
+                    raise ValueError(
+                        _("Got bogus value on row %(row_no)s: %(row)s")
+                        % {"row_no": i, "row": row}
+                    )
             if "columns" not in info.data:
                 raise ValueError(
-                    "Couldn't validate rows because of invalid column names"
+                    _("Couldn't validate rows because of invalid column names")
                 )
             reg = get_invite_adapter_registry()
             reg.preflight(info.data["columns"], result)
             return result
-        raise ValueError("Initial value of rows must be either string or list")
+        raise ValueError(_("Initial value of rows must be either string or list"))
 
     @field_validator("rows")
     @classmethod
@@ -157,7 +162,8 @@ class RowColInvitesBaseSchema(BaseModel):
         ctx = _inv_schema_vars.get()
         if ctx.limit and len(v) > ctx.limit:
             raise ValueError(
-                f"We only allow {ctx.limit} rows to be added this way at one time"
+                _("We only allow %(limit)s rows to be added this way at one time")
+                % {"limit": ctx.limit}
             )
         return v
 
@@ -176,16 +182,28 @@ class RowColInvitesBaseSchema(BaseModel):
                 bad_rows.append(i)
 
         if bad_rows:
-            msg = (
-                f"You have rows that contain data that wouldn't be used since they have to many columns. "
-                f"Example on line {bad_rows[0]} - with tabs replaced:\n'%s'\n"
-                % "', '".join(first_offender)
+            msg = str(
+                _(
+                    "You have rows that contain data that wouldn't be used since "
+                    "they have to many columns. Example on line %(line)s - with "
+                    "tabs replaced:\n'%(example)s'\n"
+                )
+                % {
+                    "line": bad_rows[0],
+                    "example": "', '".join(first_offender),
+                }
             )
             if len(bad_rows) > 1:
                 if len(bad_rows) > 5:
-                    msg += f"\nThere are {len(bad_rows) - 1} other lines too - check your data."
+                    msg += str(
+                        _("\nThere are %(count)s other lines too - check your data.")
+                        % {"count": len(bad_rows) - 1}
+                    )
                 else:
-                    msg += "\n%s are also too long" % ",".join(bad_rows[1:])
+                    msg += str(
+                        _("\n%(lines)s are also too long")
+                        % {"lines": ",".join(bad_rows[1:])}
+                    )
             raise ValueError(msg)
         return v
 
@@ -194,6 +212,17 @@ class RowColInvitesBaseSchema(BaseModel):
     def check_user_data_intersections(cls, v: list[list[str]], info: ValidationInfo):
         reg = get_invite_adapter_registry()
         reg.check_intersections(info.data["columns"], v)
+        return v
+
+    @field_validator("rows")
+    @classmethod
+    def check_conflicting_annotations(cls, v: list[list[str]], info: ValidationInfo):
+        """
+        Rows that collapse into one annotation record must agree about it,
+        otherwise a later row would silently overwrite an earlier one.
+        """
+        reg = get_invite_adapter_registry()
+        reg.check_conflicting_annotations(info.data["columns"], v)
         return v
 
 
