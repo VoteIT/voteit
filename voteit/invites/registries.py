@@ -169,6 +169,54 @@ class InviteAdapterRegistry(Registry[AnnotationDataAdapter, InviteUserDataAdapte
                     )
             checked.append(items)
 
+    def check_conflicting_roles(
+        self,
+        columns: list[str],
+        rows: list[list[str]],
+        roles_per_row: list[list[str]],
+    ) -> None:
+        """
+        The same recipient may appear on several rows -- one row per group, say --
+        but those rows must agree on roles. Rows are grouped by role combination
+        before invites are written, so conflicting roles would simply mean that
+        the last combination processed wins, silently discarding the others.
+
+        ``roles_per_row`` must be parallel to ``rows``, as returned by
+        ``extract_roles_per_row``.
+
+        >>> from voteit.invites.app.invites.email import InviteEmail
+        >>> from voteit.invites.app.invites.group import InviteGroup
+        >>> from voteit.invites.abcs import InviteDataAdapter
+        >>> testing_reg = InviteAdapterRegistry(InviteDataAdapter)
+        >>> _ = testing_reg(InviteEmail)
+        >>> _ = testing_reg(InviteGroup)
+        >>> columns = ['email', 'group']
+        >>> rows = [['a@x.com', 'board'], ['a@x.com', 'staff']]
+
+        Same recipient in two groups with the same roles is fine:
+
+        >>> testing_reg.check_conflicting_roles(columns, rows, [['pa'], ['pa']])
+
+        Differing roles are not:
+
+        >>> testing_reg.check_conflicting_roles(columns, rows, [['mo', 'pa'], ['pa']])
+        Traceback (most recent call last):
+        ...
+        ValueError: The same user data has different roles on rows 1 and 2: email=a@x.com
+        """
+        seen: dict[frozenset, tuple[int, list[str]]] = {}
+        for i, ud in enumerate(self.build_ud_query_seq(columns, rows), 1):
+            if not ud:
+                continue
+            roles = roles_per_row[i - 1]
+            first_row, first_roles = seen.setdefault(frozenset(ud.items()), (i, roles))
+            if list(first_roles) != list(roles):
+                values = ", ".join(f"{k}={v}" for k, v in sorted(ud.items()))
+                raise ValueError(
+                    f"The same user data has different roles on rows "
+                    f"{first_row} and {i}: {values}"
+                )
+
     def build_ud_query_seq(
         self, columns: list[str], rows: list[list[str]]
     ) -> Generator[dict[str, str]]:

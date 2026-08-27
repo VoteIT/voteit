@@ -336,6 +336,113 @@ class MeetingInviteManagerTests(TestCase):
         # for now we'll simply block this behaviour
         self.assertEqual("Partial invites found", str(cm.exception))
 
+    # --- Duplicate rows -------------------------------------------------
+    # The same person can legitimately appear on several rows of an import
+    # file (one row per group, for instance), so the same user_data dict
+    # reaches these methods more than once. It must never trip the
+    # unique_meeting_invite_user_data constraint or inflate the counters.
+
+    def test_create_or_update_mixed_duplicate_new_email(self):
+        result = self.meeting.invites.create_or_update_mixed(
+            meeting=self.meeting,
+            data=[{"email": "c@betahaus.net"}, {"email": "c@betahaus.net"}],
+            roles=[ROLE_PARTICIPANT],
+        )
+        self.assertEqual(1, result.added)
+        self.assertEqual(0, result.changed)
+        self.assertEqual(0, result.existed)
+        self.assertEqual(1, len(result.pks))
+        self.assertEqual(
+            1, self.meeting.invites.filter(user_data__email="c@betahaus.net").count()
+        )
+
+    def test_create_or_update_mixed_duplicate_existing_email(self):
+        result = self.meeting.invites.create_or_update_mixed(
+            meeting=self.meeting,
+            data=[{"email": "b@betahaus.net"}, {"email": "b@betahaus.net"}],
+            roles=[ROLE_PARTICIPANT],
+        )
+        self.assertEqual(0, result.added)
+        self.assertEqual(0, result.changed)
+        self.assertEqual(1, result.existed)
+        self.assertEqual({self.inv2.pk}, result.pks)
+        self.assertEqual(
+            1, self.meeting.invites.filter(user_data__email="b@betahaus.net").count()
+        )
+
+    def test_create_or_update_mixed_duplicate_existing_email_with_new_roles(self):
+        result = self.meeting.invites.create_or_update_mixed(
+            meeting=self.meeting,
+            data=[{"email": "b@betahaus.net"}, {"email": "b@betahaus.net"}],
+            roles=[ROLE_PARTICIPANT, ROLE_DISCUSSER],
+        )
+        self.assertEqual(0, result.added)
+        self.assertEqual(1, result.changed)
+        self.assertEqual(0, result.existed)
+        self.inv2.refresh_from_db()
+        self.assertEqual([ROLE_DISCUSSER, ROLE_PARTICIPANT], self.inv2.roles)
+
+    def test_create_or_update_mixed_duplicate_multi_key_user_data(self):
+        data = {"email": "c@betahaus.net", "swedish_ssn": "131313-1313"}
+        result = self.meeting.invites.create_or_update_mixed(
+            meeting=self.meeting,
+            data=[dict(data), dict(data)],
+            roles=[ROLE_PARTICIPANT],
+        )
+        self.assertEqual(1, result.added)
+        self.assertEqual(1, self.meeting.invites.filter(user_data=data).count())
+
+    def test_create_or_update_mixed_duplicate_updates_assigned_roles_once(self):
+        self.inv2.accept(self.user)
+        self.inv2.save()
+        result = self.meeting.invites.create_or_update_mixed(
+            meeting=self.meeting,
+            data=[{"email": "b@betahaus.net"}, {"email": "b@betahaus.net"}],
+            roles=[ROLE_PARTICIPANT, ROLE_DISCUSSER],
+        )
+        self.assertEqual(1, result.changed)
+        self.assertEqual(
+            {ROLE_PARTICIPANT, ROLE_DISCUSSER}, self.meeting.get_roles(self.user)
+        )
+
+    def test_create_or_update_typed_duplicate_values(self):
+        result = self.meeting.invites.create_or_update_typed(
+            invite_type="email",
+            meeting=self.meeting,
+            values=["c@betahaus.net", "c@betahaus.net", "b@betahaus.net"],
+            roles=[ROLE_PARTICIPANT],
+        )
+        self.assertEqual(1, result.added)
+        self.assertEqual(0, result.changed)
+        self.assertEqual(1, result.existed)
+        self.assertEqual(2, len(result.pks))
+        self.assertEqual(
+            1, self.meeting.invites.filter(user_data__email="c@betahaus.net").count()
+        )
+
+    def test_create_or_update_mixed_duplicate_row_from_import(self):
+        """
+        A file with group/grouprole columns hands the manager only the user_data
+        part of each row, so two rows for the same person in different groups
+        arrive as identical dicts.
+        """
+        result = self.meeting.invites.create_or_update_mixed(
+            meeting=self.meeting,
+            data=[
+                # email,group,grouprole -> alice,board,chair
+                {"email": "alice@betahaus.net"},
+                # email,group,grouprole -> alice,staff,member
+                {"email": "alice@betahaus.net"},
+            ],
+            roles=[ROLE_PARTICIPANT],
+        )
+        self.assertEqual(1, result.added)
+        self.assertEqual(1, len(result.pks))
+        self.assertEqual(
+            1,
+            self.meeting.invites.filter(user_data__email="alice@betahaus.net").count(),
+        )
+
     def test_should_expire(self):
         self.assertFalse(self.meeting.invites.should_expire())
         self.assertFalse(MeetingInvite.objects.should_expire())

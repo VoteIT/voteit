@@ -73,6 +73,8 @@ Validation pipeline (`InviteCreateSerializer`):
 5. `reg.run_validators` — DB-level checks (e.g. group IDs must exist in the meeting).
 6. `_raise_if_moderator_lockout` — prevents downgrading existing moderators.
 
+The file-upload endpoint (`InviteImportSerializer`) additionally runs `reg.check_conflicting_roles` after schema validation, since it is the only path with per-row roles: the same identity may repeat across rows (one per group), but those rows must agree on roles.
+
 Column ordering for the registry is computed by `_items_to_columns`: user-data keys sorted alphabetically, then annotation keys in registry registration order (ensuring `group` always precedes `grouprole`).
 
 ## File import endpoint (`POST /api/meeting-invites/import/`)

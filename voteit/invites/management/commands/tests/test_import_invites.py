@@ -1,5 +1,6 @@
 from io import StringIO
 
+from django.core.management import CommandError
 from django.core.management import call_command
 from django.test import TestCase
 
@@ -52,6 +53,20 @@ class ImportInvitesCommandTests(TestCase):
         self.assertEqual(3, group_sw.invite_annotations.count())
         out_text = self.call_command(m=meeting.pk, f=fixture_file("grouprole.csv"))
         self.assertIn("Annotation 'group'", out_text)
+
+    def test_conflicting_roles_for_same_email_raises(self):
+        """
+        conflicting_roles.csv lists vader twice, in two groups but with
+        different roles. Rows are grouped by role combination when invites are
+        written, so one of the combinations would silently be discarded.
+        """
+        meeting = self.meeting
+        meeting.groups.create(groupid="sw")
+        meeting.groups.create(groupid="sabreclub")
+        with self.assertRaises(CommandError) as cm:
+            self.call_command(m=meeting.pk, f=fixture_file("conflicting_roles.csv"))
+        self.assertIn("different roles", str(cm.exception))
+        self.assertEqual(0, meeting.invites.count())
 
     def test_dryrun_does_not_save(self):
         out = self.call_command(

@@ -57,6 +57,10 @@ class Command(BaseCommand):
         rows = validated.rows
 
         reg = get_invite_adapter_registry()
+        try:
+            reg.check_conflicting_roles(columns, rows, roles_per_row)
+        except ValueError as exc:
+            raise CommandError(str(exc))
         total_added = total_changed = total_existed = 0
 
         with transaction.atomic(durable=True):

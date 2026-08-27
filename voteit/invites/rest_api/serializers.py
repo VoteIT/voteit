@@ -187,6 +187,12 @@ class InviteImportSerializer(serializers.Serializer):
             raise serializers.ValidationError({"file": _pydantic_to_user_messages(exc)})
         except Exception as exc:
             raise serializers.ValidationError({"file": str(exc)})
+        try:
+            get_invite_adapter_registry().check_conflicting_roles(
+                validated.columns, validated.rows, roles_per_row
+            )
+        except ValueError as exc:
+            raise serializers.ValidationError({"file": [str(exc)]})
         data["columns"] = validated.columns
         data["rows"] = validated.rows
         data["roles_per_row"] = roles_per_row

@@ -655,6 +655,72 @@ class ImportInvitesFunctionalTests(APITestCase):
         ann = alice.group_annotations.get(meeting_group=self.group_board)
         self.assertEqual(self.role_chair, ann.group_role)
 
+    def test_same_email_on_two_rows_with_different_groups(self):
+        """
+        The same person may legitimately appear on several rows, one per group.
+        Only the user_data part reaches create_or_update_mixed, so the manager
+        sees the same dict twice and must collapse it into one invite.
+        """
+        self.meeting.groups.create(groupid="staff")
+        self.meeting.group_roles.create(role_id="member")
+        response = self._post(
+            "email\tgroup\tgrouprole\n"
+            "alice@example.com\tboard\tchair\n"
+            "alice@example.com\tstaff\tmember\n"
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code, response.json())
+        data = response.json()
+        self.assertEqual({"added": 1, "changed": 0, "existed": 0}, data["invites"])
+        self.assertEqual(2, data["annotations"][0]["added"])
+        alice = MeetingInvite.objects.get(
+            meeting=self.meeting, user_data__email="alice@example.com"
+        )
+        self.assertEqual(
+            {"board", "staff"},
+            set(
+                alice.group_annotations.values_list("meeting_group__groupid", flat=True)
+            ),
+        )
+
+    def test_same_email_on_two_rows_with_same_group_and_grouprole(self):
+        """A verbatim duplicate row is rejected before it reaches the manager."""
+        response = self._post(
+            "email\tgroup\tgrouprole\n"
+            "alice@example.com\tboard\tchair\n"
+            "alice@example.com\tboard\tchair\n"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+        self.assertIn("duplicate", str(response.json()).lower())
+
+    def test_same_email_on_two_rows_with_different_roles_returns_400(self):
+        """
+        Rows are grouped by role combination before invites are written, so the
+        same recipient with conflicting roles would silently end up with
+        whichever combination happens to be processed last. Reject instead.
+        """
+        self.meeting.groups.create(groupid="staff")
+        response = self._post(
+            "email,roles,group\nalice@example.com,mo,board\nalice@example.com,,staff\n"
+        )
+        self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)
+        error = str(response.json()).lower()
+        self.assertIn("different roles", error)
+        self.assertIn("alice@example.com", error)
+        self.assertFalse(MeetingInvite.objects.filter(meeting=self.meeting).exists())
+
+    def test_same_email_on_two_rows_with_same_roles_is_accepted(self):
+        """Repeating the roles column on every row of the same person is fine."""
+        self.meeting.groups.create(groupid="staff")
+        response = self._post(
+            "email,roles,group\nalice@example.com,mo,board\nalice@example.com,mo,staff\n"
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code, response.json())
+        self.assertEqual(1, response.json()["invites"]["added"])
+        alice = MeetingInvite.objects.get(
+            meeting=self.meeting, user_data__email="alice@example.com"
+        )
+        self.assertEqual(["mo", "pa"], alice.roles)
+
     def test_unknown_group_returns_400(self):
         response = self._post("email\tgroup\nalice@example.com\tunknown_group\n")
         self.assertEqual(HTTPStatus.BAD_REQUEST, response.status_code)

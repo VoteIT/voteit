@@ -49,6 +49,7 @@ Two REST entry points feed the same write path. Both paths run the same registry
 1. `check_column_req` — validates column names and cross-column requirements (e.g. `grouprole` requires `group` to its left).
 2. `preflight` — transforms data in-place (normalise case, strip whitespace, validate format). Must not touch the DB.
 3. `check_intersections` — rejects rows where a single identity value appears in multiple distinct user_data subsets (identity columns only).
+4. `check_conflicting_roles` — file imports only: rejects files where the same identity appears on rows with different roles. Repeating an identity is otherwise fine (one row per group), but rows are grouped by role combination when written, so conflicting roles would let the last combination silently win.
 
 Write path: `MeetingInviteManager.create_or_update_mixed`:
 - Finds existing exact-match invites and updates roles / re-opens them if needed.
