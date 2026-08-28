@@ -109,6 +109,13 @@ See `rest_api/CLAUDE.md` for details. Summary:
 
 `import_invites` — imports invites (and optional annotations) from a file or stdin. Same pipeline as the file-upload REST endpoint: `detect_and_parse_file` → `extract_roles_per_row` → `RowColInvitesBaseSchema` → groupby-roles → `run_annotations`. Supports `--dryrun`.
 
+The grouping step indexes `roles_per_row` against the validated rows, so those
+two lists have to stay index parallel. `RowColInvitesBaseSchema` silently drops
+rows that are blank after the roles column is removed, which is why
+`extract_roles_per_row` drops them too (`schemas.is_blank_row` is the shared
+rule). Get that wrong and roles land on the wrong invitee -- a row carrying
+only `roles` is enough to shift everyone below it.
+
 ## Testing fixtures
 
 `testing.py` exposes `fixture_file(name)` and `get_unvalidated_fixture_content(name)` for loading fixtures from `tests/fixtures/`.

@@ -15,6 +15,7 @@ from voteit.invites.rest_api.import_utils import detect_and_parse_file
 from voteit.invites.rest_api.lock import invites_lock
 from voteit.invites.rest_api.import_utils import extract_roles_per_row
 from voteit.invites.rest_api.import_utils import parse_invite_file
+from voteit.invites.schemas import RowColInvitesBaseSchema
 from voteit.meeting.models import Meeting
 from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.organisation.models import Organisation
@@ -260,6 +261,33 @@ class ExtractRolesPerRowTests(TestCase):
             [["a@x.com", "mo"], ["b@x.com", ""], ["c@x.com", "pv"]],
         )
         self.assertEqual([["mo", "pa"], ["pa"], ["pa", "pv"]], roles_per_row)
+
+    def test_row_with_only_roles_is_dropped_with_its_roles(self):
+        # RowColInvitesBaseSchema drops rows that are blank once the roles
+        # cell is gone. Keeping their roles here would shift every later row.
+        cols, rows, roles_per_row = extract_roles_per_row(
+            ["email", "roles"],
+            [["", "mo"], ["a@x.com", "pa"], ["b@x.com", "mo"]],
+        )
+        self.assertEqual(["email"], cols)
+        self.assertEqual([["a@x.com"], ["b@x.com"]], rows)
+        self.assertEqual([["pa"], ["mo", "pa"]], roles_per_row)
+
+    def test_blank_row_dropped_without_a_roles_column(self):
+        _, rows, roles_per_row = extract_roles_per_row(
+            ["email"], [["a@x.com"], ["  "], ["b@x.com"]]
+        )
+        self.assertEqual([["a@x.com"], ["b@x.com"]], rows)
+        self.assertEqual([["pa"], ["pa"]], roles_per_row)
+
+    def test_rows_stay_index_parallel_with_roles_through_the_schema(self):
+        columns, rows, roles_per_row = extract_roles_per_row(
+            ["email", "roles"],
+            [["", "mo"], ["a@x.com", "pa"], ["b@x.com", "mo"]],
+        )
+        validated = RowColInvitesBaseSchema(columns=columns, rows=rows)
+        self.assertEqual(rows, validated.rows)
+        self.assertEqual(len(validated.rows), len(roles_per_row))
 
 
 # ---------------------------------------------------------------------------
@@ -634,6 +662,21 @@ class ImportInvitesFunctionalTests(APITestCase):
             meeting=self.meeting, user_data__email="alice@example.com"
         )
         self.assertEqual(["pa"], invite.roles)
+
+    def test_row_with_roles_but_no_email_does_not_shift_later_roles(self):
+        """A stray roles cell on an otherwise empty row must not promote anyone."""
+        response = self._post(
+            "email,roles\n,mo\nalice@example.com,pa\nbob@example.com,mo\n"
+        )
+        self.assertEqual(HTTPStatus.OK, response.status_code, response.json())
+        alice = MeetingInvite.objects.get(
+            meeting=self.meeting, user_data__email="alice@example.com"
+        )
+        bob = MeetingInvite.objects.get(
+            meeting=self.meeting, user_data__email="bob@example.com"
+        )
+        self.assertEqual(["pa"], alice.roles)
+        self.assertEqual(["mo", "pa"], bob.roles)
 
     def test_group_annotation_stored_on_pending_invite(self):
         response = self._post("email\tgroup\nalice@example.com\tboard\n")

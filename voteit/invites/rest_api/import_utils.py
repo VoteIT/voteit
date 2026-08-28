@@ -7,6 +7,7 @@ import zipfile
 
 from django.utils.translation import gettext_lazy as _
 
+from voteit.invites.schemas import is_blank_row
 from voteit.meeting.roles import ROLE_PARTICIPANT
 
 # Mostly for doctests...
@@ -324,6 +325,10 @@ def extract_roles_per_row(
     Remove the 'roles' column and return per-row roles.
     PARTICIPANT is always included implicitly.
 
+    Rows that are blank once the roles cell is gone are dropped here, because
+    ``RowColInvitesBaseSchema`` drops them too and the callers index the
+    validated rows and ``roles_per_row`` against each other.
+
     Returns (columns_without_roles, rows_without_roles, roles_per_row).
 
     >>> extract_roles_per_row(['email', 'roles'], [['a@x.com', 'mo'], ['b@x.com', '']])
@@ -331,17 +336,27 @@ def extract_roles_per_row(
 
     >>> extract_roles_per_row(['email'], [['a@x.com']])
     (['email'], [['a@x.com']], [['pa']])
-    """
-    if "roles" not in columns:
-        return columns, rows, [[_PARTICIPANT]] * len(rows)
 
-    role_idx = columns.index("roles")
+    A row carrying only roles is dropped together with its roles:
+
+    >>> extract_roles_per_row(['email', 'roles'], [['', 'mo'], ['a@x.com', 'pa']])
+    (['email'], [['a@x.com']], [['pa']])
+    """
+    has_roles = "roles" in columns
+    role_idx = columns.index("roles") if has_roles else -1
     new_columns = [c for c in columns if c != "roles"]
     roles_per_row = []
     new_rows = []
     for row in rows:
-        raw = row[role_idx] if role_idx < len(row) else ""
-        extra = {r.strip() for r in raw.split(",") if r.strip()}
+        if has_roles:
+            raw = row[role_idx] if role_idx < len(row) else ""
+            new_row = [v for i, v in enumerate(row) if i != role_idx]
+        else:
+            raw = ""
+            new_row = row
+        if is_blank_row(new_row):
+            continue
+        extra = {r.strip() for r in str(raw or "").split(",") if r.strip()}
         roles_per_row.append(sorted({_PARTICIPANT} | extra))
-        new_rows.append([v for i, v in enumerate(row) if i != role_idx])
+        new_rows.append(new_row)
     return new_columns, new_rows, roles_per_row
