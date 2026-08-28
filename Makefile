@@ -24,8 +24,16 @@ down:
 	docker compose down
 run:
 	python -W once manage.py runserver
+# `make test` runs the whole voteit suite; `make test voteit.messaging` runs just
+# that target. Extra words on the command line are swallowed by the catch-all rule
+# below (only enabled when test is the first goal) instead of being treated as goals.
+TEST_TARGET := $(or $(filter-out test,$(MAKECMDGOALS)),voteit)
 test:
-	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 python manage.py test voteit --keepdb --failfast
+	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 python manage.py test $(TEST_TARGET) --keepdb --failfast
+ifeq (test,$(firstword $(MAKECMDGOALS)))
+%:
+	@:
+endif
 test-deps:
 	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 python manage.py test voteit_org --keepdb --failfast
 build:
