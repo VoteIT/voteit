@@ -37,6 +37,48 @@ def schema_context(**kwargs):
         _inv_schema_vars.reset(token)
 
 
+def normalize_row(row: str | list) -> list:
+    r"""
+    Split a raw tab separated row and strip its string cells.
+
+    >>> normalize_row(" a@x.com \t mo ")
+    ['a@x.com', 'mo']
+    >>> normalize_row([" a@x.com ", None, 1])
+    ['a@x.com', None, 1]
+    """
+    if isinstance(row, str):
+        row = row.split("\t")
+    return [x.strip() if isinstance(x, str) else x for x in row]
+
+
+def is_blank_row(row: str | list) -> bool:
+    r"""
+    True for rows ``RowColInvitesBaseSchema.convert_rows`` will silently drop.
+
+    Anything that builds a per row structure alongside the rows -- see
+    ``extract_roles_per_row`` -- has to drop the same rows, or the two lists
+    stop being index parallel.
+
+    >>> is_blank_row(["", "  "])
+    True
+    >>> is_blank_row(" \t ")
+    True
+    >>> is_blank_row(["", "a@x.com"])
+    False
+    """
+    return not any(normalize_row(row))
+
+
+def _as_text(cell) -> str:
+    """
+    Render one cell for an error message. Cells may be None or int.
+
+    >>> [_as_text(c) for c in ["a", None, 1]]
+    ['a', '', '1']
+    """
+    return "" if cell is None else str(cell)
+
+
 class RowColInvitesBaseSchema(BaseModel):
     r"""<- Note raw string for doctests here!
     >>> s = RowColInvitesBaseSchema
@@ -107,19 +149,14 @@ class RowColInvitesBaseSchema(BaseModel):
         if isinstance(v, list):
             result = []
             for i, row in enumerate(v):
-                if isinstance(row, str):
-                    row = [x.strip() for x in row.split("\t")]
-                    if any(row):
-                        result.append(row)
-                elif isinstance(row, list):
-                    row = [x.strip() if isinstance(x, str) else x for x in row]
-                    if any(row):
-                        result.append(row)
-                else:
+                if not isinstance(row, (str, list)):
                     raise ValueError(
                         _("Got bogus value on row %(row_no)s: %(row)s")
                         % {"row_no": i, "row": row}
                     )
+                row = normalize_row(row)
+                if any(row):
+                    result.append(row)
             if "columns" not in info.data:
                 raise ValueError(
                     _("Couldn't validate rows because of invalid column names")
@@ -190,7 +227,7 @@ class RowColInvitesBaseSchema(BaseModel):
                 )
                 % {
                     "line": bad_rows[0],
-                    "example": "', '".join(first_offender),
+                    "example": "', '".join(_as_text(c) for c in first_offender),
                 }
             )
             if len(bad_rows) > 1:
@@ -202,7 +239,7 @@ class RowColInvitesBaseSchema(BaseModel):
                 else:
                     msg += str(
                         _("\n%(lines)s are also too long")
-                        % {"lines": ",".join(bad_rows[1:])}
+                        % {"lines": ", ".join(str(i) for i in bad_rows[1:])}
                     )
             raise ValueError(msg)
         return v
