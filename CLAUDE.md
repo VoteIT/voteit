@@ -23,6 +23,12 @@ make test        # python manage.py test voteit --keepdb --failfast
 make test-deps   # tests for src/ packages (voteit_org, member_dialects)
 make coverage    # coverage run + report
 
+# Both test and coverage take an optional target as a bare argument. Coverage
+# limits the report to that target's own files, so the numbers are not diluted
+# by the rest of voteit (which is still measured, since `source` covers it all).
+make test voteit.speaker
+make coverage voteit.speaker
+
 # Run a single test module -- POSTGRES_PORT picks the db-test service, which
 # the make targets set for you. Tests run against the dev database without it,
 # and every TransactionTestCase then pays ~0.6s to flush it.
@@ -118,6 +124,7 @@ Pluggable per-meeting or per-org features (`MeetingComponent`, `OrganisationComp
 - **Auditlog context**: All models using `django-auditlog` implement `get_additional_data()` returning `{o, m, ai}` context keys.
 - **Pydantic v2** is used for schemas/validation.
 - **Test runner**: Django's built-in `manage.py test`, not pytest. Coverage via the `coverage` package.
+- **Makefile**: macOS ships GNU Make 3.81, where `.ONESHELL:` is a no-op -- each recipe line runs in its own shell. A recipe needing state across lines must join them (`&&`, backslash continuation) or compute the value in Make itself.
 - **Package manager**: `uv` with `uv.lock`. Do not use pip or poetry.
 - **Linting**: `ruff` only (includes isort with `force-single-line = true`).
 
