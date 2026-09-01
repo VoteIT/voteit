@@ -15,6 +15,7 @@ from typing import Any
 from typing import MutableMapping
 
 from asgiref.sync import sync_to_async
+from channels.db import database_sync_to_async
 from chanx.channels.websocket import AsyncJsonWebsocketConsumer
 from chanx.core.authenticator import BaseAuthenticator
 from chanx.core.decorators import channel
@@ -27,8 +28,8 @@ from django.utils.timezone import now
 
 from voteit.core.messages.version import VersionMessage
 from voteit.messaging.bundle import bind_bundle_schema
-from voteit.messaging.channels import ONLINE_GROUP
 from voteit.messaging.channels import user_group
+from voteit.messaging.jobs import build_subscription
 from voteit.messaging.jobs import enqueue_recheck
 from voteit.messaging.jobs import enqueue_subscribe
 from voteit.messaging.messages import AppStateBundle
@@ -50,6 +51,7 @@ from voteit.messaging.models import ABNORMAL_CLOSURE
 from voteit.messaging.models import Connection
 from voteit.messaging.registry import all_outgoing_messages
 from voteit.messaging.registry import context_channel_registry
+from voteit.organisation.channels import OrganisationChannel
 
 if TYPE_CHECKING:
     from voteit.core.models import User
@@ -104,10 +106,19 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
 
     @event_handler
     async def on_subscribed(self, event: ChannelSubscribed) -> ChannelSubscribed:
-        self.channel_subs.add(
-            ChannelRef(pk=event.payload.pk, channel_type=event.payload.channel_type)
-        )
+        self.track_subscription(event.payload)
         return event
+
+    def track_subscription(self, payload) -> None:
+        """Remember a granted subscription, whoever built it.
+
+        The queued path reaches this through ``on_subscribed``; a subscription
+        the consumer builds itself never goes through the dispatcher, so it
+        calls this directly.
+        """
+        self.channel_subs.add(
+            ChannelRef(pk=payload.pk, channel_type=payload.channel_type)
+        )
 
     @event_handler
     async def on_state_bundle(self, event: AppStateBundle) -> AppStateBundle:
@@ -242,7 +253,6 @@ class VoteitConsumer(
         self.user = self.scope["user"]
         self.channel_subs = set()
         await self.channel_layer.group_add(user_group(self.user.pk), self.channel_name)
-        await self.channel_layer.group_add(ONLINE_GROUP, self.channel_name)
         self.last_connection_update = now()
         await Connection.objects.acreate(
             user_id=self.user.pk, channel_name=self.channel_name
@@ -255,3 +265,37 @@ class VoteitConsumer(
                 }
             )
         )
+        await self.subscribe_to_organisation()
+
+    async def subscribe_to_organisation(self) -> None:
+        """Join the user's own organisation channel without being asked.
+
+        A user belongs to exactly one organisation and the client wants its
+        state on every connection, so there is nothing for a
+        ``channel.subscribe`` to decide. The client sees the same three-part
+        stream it would have got had it asked, and ``channel.leave`` and
+        ``channel.recheck`` treat the subscription like any other.
+
+        Built here rather than on a worker: one collector and a handful of
+        rows is less work than the queue round trip that would carry it. The
+        thread keeps those queries off the event loop. Weigh this again if
+        anything substantial is ever registered on ``OrganisationChannel``.
+        """
+        if not self.user.organisation_id:
+            # Nullable only to ease testing; such a user has no org state.
+            return
+        channel = OrganisationChannel(
+            self.user.organisation_id, consumer_channel=self.channel_name
+        )
+        # database_sync_to_async, not a loose thread: it runs on the one sync
+        # thread the ORM is meant to be used from and hands the connection back
+        # afterwards, the same way Channels' own database access does.
+        messages = await database_sync_to_async(build_subscription)(
+            channel,
+            self.user,
+            self.scope.get("language") or settings.LANGUAGE_CODE,
+        )
+        for message in messages:
+            if isinstance(message, ChannelSubscribed):
+                self.track_subscription(message.payload)
+            await self.send_message(message)

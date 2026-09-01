@@ -2,8 +2,11 @@
 
 Building a channel's initial state means running every collector registered
 for that channel, each of which hits the database, so it stays off the event
-loop -- as it did under envelope's DeferredJob. The consumer only enqueues; the
-worker streams the result straight back to that one consumer.
+loop -- as it did under envelope's DeferredJob. A client-requested subscribe is
+only enqueued by the consumer; the worker streams the result straight back to
+that one consumer. ``build_subscription`` is the part that does the work, split
+out so the consumer can also run a channel small enough not to be worth a queue
+round trip -- the organisation channel -- on Channels' own sync thread.
 
 ``close_stale_connections`` is unrelated to subscribing: it is the periodic
 tidy-up for the Connection table, which nothing else ever reaps.
@@ -13,6 +16,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from logging import getLogger
+from typing import TYPE_CHECKING
 
 import django_rq
 from asgiref.sync import async_to_sync
@@ -21,12 +25,13 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.transaction import get_connection
+from django.utils import translation
 from django.utils.timezone import now
-from django.utils.translation import activate
 
 from voteit.core import RQ_DEFAULT_QUEUE
 from voteit.core.decorators import schedule_job
 from voteit.messaging.bundle import iter_bundles
+from voteit.messaging.messages import AppStateBundle
 from voteit.messaging.messages import ChannelLeft
 from voteit.messaging.messages import ChannelStateComplete
 from voteit.messaging.messages import ChannelSubscribed
@@ -37,6 +42,11 @@ from voteit.messaging.registry import collectors_for
 from voteit.messaging.registry import context_channel_registry
 from voteit.messaging.state import AppState
 from voteit.messaging.utils import send_to_consumer
+
+if TYPE_CHECKING:
+    from chanx.messages.base import BaseMessage
+
+    from voteit.messaging.channels import ContextChannel
 
 logger = getLogger(__name__)
 
@@ -133,6 +143,80 @@ def _collect(collector, app_state: AppState) -> None:
             logger.exception("App state collector %r failed", collector.name)
 
 
+def build_subscription(
+    channel: ContextChannel, user, language: str | None = None
+) -> list[BaseMessage]:
+    """Check permission, join the group and build the whole subscribe stream.
+
+    Returns channel.subscribed -- carrying the names of every collector that
+    will contribute -- then one or more channel.state bundles, then
+    channel.state_complete. An ordinary meeting fits in a single bundle. A
+    refusal is the single channel.subscribe_error instead.
+
+    Nothing is sent here, and every query is done by the time it returns, so
+    the caller decides where the work happens: ``subscribe_job`` runs it on a
+    worker, while the consumer runs a small channel inline (in a thread; see
+    ``VoteitConsumer.subscribe_to_organisation``).
+    """
+    channel_cls = type(channel)
+    ref = {
+        "pk": channel.pk,
+        "channel_type": channel_cls.name,
+        "channel_name": channel.channel_name,
+    }
+    # override rather than activate: a thread from the pool is reused, so the
+    # language must not outlive the subscription that asked for it.
+    with translation.override(language or settings.LANGUAGE_CODE):
+        # durable=True so every collector sees one consistent snapshot,
+        # matching what envelope's DeferredJob.atomic did.
+        with transaction.atomic(durable=True):
+            try:
+                allowed = channel.allow_subscribe(user)
+            except ObjectDoesNotExist:
+                allowed = False
+            if not allowed:
+                return [
+                    ChannelSubscribeError(
+                        payload={
+                            "pk": channel.pk,
+                            "channel_type": channel_cls.name,
+                            "detail": "Not allowed to subscribe",
+                        }
+                    )
+                ]
+
+            async_to_sync(channel.subscribe)()
+
+            # Settled before anything is sent, so the client is told up front
+            # exactly which sections to expect and never waits on a collector
+            # that opted out. A list, not a generator: it is walked twice,
+            # once for the names below and once to run them.
+            collectors = [
+                collector
+                for collector in (
+                    cls(channel, user) for cls in collectors_for(channel_cls)
+                )
+                if _applicable(collector)
+            ]
+            messages: list[BaseMessage] = [
+                ChannelSubscribed(
+                    payload={**ref, "collectors": [c.name for c in collectors]}
+                )
+            ]
+
+            app_state = AppState()
+            for collector in collectors:
+                _collect(collector, app_state)
+
+            messages.extend(
+                iter_bundles(
+                    app_state.sections, pk=channel.pk, channel_type=channel_cls.name
+                )
+            )
+            messages.append(ChannelStateComplete(payload=ref))
+            return messages
+
+
 def subscribe_job(
     *,
     user_pk: int,
@@ -141,70 +225,16 @@ def subscribe_job(
     pk: int,
     language: str | None = None,
 ) -> None:
-    """Check permission, join the group, then stream the initial state.
-
-    The client receives channel.subscribed -- carrying the names of every
-    collector that will contribute -- then one or more channel.state bundles,
-    then channel.state_complete. An ordinary meeting fits in a single bundle.
-    """
-    activate(language or settings.LANGUAGE_CODE)
-    channel_cls = context_channel_registry[channel_type]
-    channel = channel_cls(pk, consumer_channel=consumer_channel)
+    """Build a subscription on the worker and stream it to one consumer."""
+    channel = context_channel_registry[channel_type](
+        pk, consumer_channel=consumer_channel
+    )
     user = get_user_model().objects.filter(pk=user_pk).first()
-
-    # durable=True so every collector sees one consistent snapshot, matching
-    # what envelope's DeferredJob.atomic did.
-    with transaction.atomic(durable=True):
-        try:
-            allowed = channel.allow_subscribe(user)
-        except ObjectDoesNotExist:
-            allowed = False
-        if not allowed:
-            _send(
-                ChannelSubscribeError(
-                    payload={
-                        "pk": pk,
-                        "channel_type": channel_type,
-                        "detail": "Not allowed to subscribe",
-                    }
-                ),
-                consumer_channel,
-            )
-            return
-
-        async_to_sync(channel.subscribe)()
-        ref = {
-            "pk": pk,
-            "channel_type": channel_type,
-            "channel_name": channel.channel_name,
-        }
-
-        # Settled before anything is sent, so the client is told up front
-        # exactly which sections to expect and never waits on a collector that
-        # opted out. A list, not a generator: it is walked twice, once for the
-        # names below and once to run them.
-        collectors = [
-            collector
-            for collector in (cls(channel, user) for cls in collectors_for(channel_cls))
-            if _applicable(collector)
-        ]
-        _send(
-            ChannelSubscribed(
-                payload={**ref, "collectors": [c.name for c in collectors]}
-            ),
-            consumer_channel,
-        )
-
-        app_state = AppState()
-        for collector in collectors:
-            _collect(collector, app_state)
-
-        for bundle in iter_bundles(
-            app_state.sections, pk=pk, channel_type=channel_type
-        ):
-            _send_state(bundle, consumer_channel)
-
-        _send(ChannelStateComplete(payload=ref), consumer_channel)
+    for message in build_subscription(channel, user, language):
+        if isinstance(message, AppStateBundle):
+            _send_state(message, consumer_channel)
+        else:
+            _send(message, consumer_channel)
 
 
 def recheck_job(

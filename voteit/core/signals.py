@@ -39,11 +39,14 @@ def deferred_register_model(sender: Model, **kw):
 def post_init_registrations():
     User = get_user_model()
     from voteit.core.messages.user import InvalidateUserCache
-    from voteit.messaging.channels import OnlineChannel
+    from voteit.organisation.channels import OrganisationChannel
 
     @receiver(pre_delete, sender=User)
     @receiver(post_save, sender=User)
     def invalidate_user_cache(*, instance: User, created=False, **kwargs):
-        if not created:
-            msg = InvalidateUserCache(payload={"pk": instance.pk})
-            OnlineChannel().sync_publish(msg)
+        # The user's own organisation channel reaches everyone who could be
+        # holding a cached copy of them: every socket joins it on connect.
+        if created or not instance.organisation_id:
+            return
+        msg = InvalidateUserCache(payload={"pk": instance.pk})
+        OrganisationChannel(instance.organisation_id).sync_publish(msg)

@@ -19,8 +19,6 @@ from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
-from voteit.messaging.channels import ONLINE_GROUP
-from voteit.messaging.channels import OnlineChannel
 from voteit.messaging.channels import UserChannel
 from voteit.messaging.channels import user_group
 from voteit.messaging.testing import testing_channel_layers_setting
@@ -116,8 +114,3 @@ class SubscribeLeaveTests(TestCase):
         async_to_sync(channel.leave)()
         async_to_sync(layer.group_send)("participants_1", {"type": "x"})
         self.assertIsNone(receive_or_none(layer, self.consumer_channel))
-
-
-class OnlineChannelTests(TestCase):
-    def test_group_name_is_shared_by_every_socket(self):
-        self.assertEqual(ONLINE_GROUP, OnlineChannel().channel_name)

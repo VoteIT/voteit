@@ -15,14 +15,14 @@ channel definitions and the `Connection` model. Built on
 | | |
 |---|---|
 | `consumer.py` | `VoteitConsumer` plus `SubscriptionMixin` and `ConnectionMixin`. One consumer for the whole app, mounted at `/ws/`. |
-| `channels.py` | `PubSubChannel` / `ContextChannel` and the built-in `UserChannel` / `OnlineChannel`. Domain channels live in each app's `channels.py`. |
+| `channels.py` | `PubSubChannel` / `ContextChannel` and the built-in `UserChannel`. Domain channels live in each app's `channels.py`. |
 | `messages.py` | Protocol messages (`channel.*`, `s.*`), including the `channel.state` bundle. Deliberately **not** registered with `@outgoing` — they must not get `.batch` siblings. |
 | `registry.py` | `@outgoing` / `@channel` targets, plus `app_state_collectors` and `collectors_for()`. `all_outgoing_messages()` feeds the consumer's `passthrough_events`. |
 | `batch.py` | `make_batch()` — generates the `<action>.batch` sibling of an outgoing type. |
 | `collectors.py` | `AppStateCollector`, the ABC each app subclasses in its own `collectors.py`. |
 | `bundle.py` | Packs collector output into `channel.state` frames under `VOTEIT_APP_STATE_BUNDLE_BYTES`, and binds the bundle's payload union. |
 | `utils.py` | `publish()`, `Target`, `TransactionBatcher`, and `_send_now()`, the single point where anything reaches the channel layer. |
-| `jobs.py` | `subscribe_job` / `recheck_job`, run on the `default` RQ queue, plus `close_stale_connections` (see below). |
+| `jobs.py` | `build_subscription` plus `subscribe_job` / `recheck_job`, run on the `default` RQ queue, and `close_stale_connections` (see below). |
 | `admin.py` | Read-only `Connection` admin, the `/admin/.../connection/online/` page and the stale-row action. |
 | `state.py` | `AppState`, the accumulator collectors append to, grouped into `StateSection`s. |
 | `testing.py` | `MessageCatcher`, `ChannelMessageCatcher`, `build_app_state`, `build_bundles`, `run_collector`, `payloads_of`, `unbundle`, `ws_test_settings`. |
@@ -48,6 +48,20 @@ their first message was added -- not full insertion order; see the
 and lets each consumer forward the frame unchanged. Turning it off routes
 through chanx's event dispatcher instead, which re-validates per recipient. The
 frame the client sees is the same either way.
+
+## Connect
+
+An authenticated socket joins its own `user_<pk>` group, gets `s.versions`, and
+is then subscribed to the organisation the user belongs to -- the client never
+asks for it, because there is nothing to choose. That one stream is built
+inline in `post_authentication` (`build_subscription` on Channels' sync thread)
+rather than queued: `organisation.roles` is the only collector on the channel,
+so the queue round trip would cost more than the work. A user without an
+organisation (the FK is nullable only to ease testing) is subscribed to
+nothing.
+
+Everything the User model pushes -- `user.inv` -- goes to that channel too.
+There is no longer an `online` group holding every open socket.
 
 ## Subscribe
 
@@ -161,6 +175,11 @@ alive heals itself: its next message sets `code` back to NULL. Setting
 
 - Handlers run in a **background task**, so ordering between separately-sent
   messages is not guaranteed. Tests synchronise on the completion ack.
+- `build_subscription` returns the whole stream instead of sending it, which
+  is what lets the same code serve both `subscribe_job` and the inline
+  organisation subscribe. It joins the group itself, so a caller that already
+  holds an event loop has to reach it through `database_sync_to_async` -- a
+  loose thread leaves a connection behind and deadlocks the test teardown.
 - `jobs._send` and `jobs._send_state` take different routes on purpose.
   `channel.subscribed` / `channel.left` must go through chanx's typed
   dispatcher because `on_subscribed` / `on_left` maintain the consumer's own

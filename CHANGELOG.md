@@ -54,6 +54,10 @@ the whole codebase to v1.
   `voteit.meeting.channels.broadcast_meeting(meeting, message)`, which publishes to
   both groups; collectors that served `meeting` now declare
   `channels = (ParticipantsChannel, ModeratorsChannel)`.
+- **The organisation channel is subscribed for you.** An authenticated socket is
+  now subscribed to the organisation the user belongs to as part of connecting:
+  right after `s.versions` the client gets the ordinary `channel.subscribed`,
+  `channel.state`, `channel.state_complete` stream.
 - **Component settings JSON Schema** (`/api/*-components/`) is now pydantic v2
   output: `$defs` rather than `definitions`, `anyOf` for optional fields, and
   draft 2020-12 refs.

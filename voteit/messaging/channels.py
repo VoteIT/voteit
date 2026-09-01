@@ -146,19 +146,5 @@ class UserChannel(ContextChannel):
         return bool(user and user.pk and user.pk == self.pk)
 
 
-class OnlineChannel(PubSubChannel):
-    """Everyone with an open socket.
-
-    Only as accurate as the channel layer -- consumers that vanish without
-    closing stay joined until the group expires.
-    """
-
-    name = "online"
-    channel_name = "online_users"
-
-
 def user_group(user_pk: int) -> str:
     return f"{UserChannel.name}_{user_pk}"
-
-
-ONLINE_GROUP = OnlineChannel.channel_name

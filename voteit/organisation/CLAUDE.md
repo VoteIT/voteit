@@ -113,6 +113,8 @@ Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`:
 
 `OrganisationChannel` is a `ContextChannel` keyed by `Organisation` pk. Has `permission = None` (no explicit subscribe permission; any authenticated user can subscribe).
 
+The client never subscribes to it: the consumer does it on connect, for the organisation the user belongs to (`VoteitConsumer.subscribe_to_organisation`). The stream is the ordinary one, built inline rather than on a worker because the channel is small.
+
 On subscribe, the `organisation.roles` collector pushes the user's current org roles as a `RolesChanged` message in the initial `channel.state` bundle. This is how the frontend learns its own role set on connection.
 
 ## Signals (`signals.py`)
@@ -121,6 +123,7 @@ On subscribe, the `organisation.roles` collector pushes the user's current org r
 - `organisation.roles` collector on `OrganisationChannel` — the subscribing user's roles.
 - `roles_added` on `OrganisationRoles` — publishes `RolesChanged` to both `OrganisationChannel` and the affected user's personal `UserChannel`. Skipped on `raw` saves.
 - `roles_removed` on `OrganisationRoles` — same dual-publish for `RolesRemoved`. Not guarded by `@disable_on_raw_save` (intentional asymmetry).
+- `User post_save` / `pre_delete` (in `voteit.core.signals`) — publishes `InvalidateUserCache` to the user's own organisation channel.
 
 ## WebSocket Messages (`messages.py`)
 
@@ -137,6 +140,8 @@ On subscribe, the `organisation.roles` collector pushes the user's current org r
 **`OrganisationViewSet.list` returns one item, not a list.** The endpoint name follows REST convention (`-list`) but the view returns a single object. This is intentional: the SPA always fetches "its" organisation, and having a list endpoint avoids a custom action name.
 
 **`social_user` pipeline step replaces PSA's built-in.** The built-in would return an inactive user when a `UserSocialAuth` points to one, causing PSA's `do_complete` to reject every login attempt in a persistent loop. The custom step detects inactive users and redirects auth to an active duplicate (by `identity_id`) within the same organisation.
+
+**Subscribed on connect, not on request.** A user belongs to exactly one organisation, so a `channel.subscribe` for it would only ever have one right answer. The consumer subscribes for them and sends the state straight away, which also makes the organisation channel the natural home for anything addressed to "every socket of this tenant" — `InvalidateUserCache` used to go to a global `online` group instead.
 
 **Role push on channel subscribe, not on login.** Org roles are not embedded in the login response. They are pushed as a `RolesChanged` message when the frontend subscribes to `OrganisationChannel`. This keeps the auth flow simple and the WS channel as the single source of truth for role state.
 

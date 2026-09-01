@@ -43,6 +43,7 @@ from voteit.messaging.testing import WS_TEST_ORIGIN_HEADER
 from voteit.messaging.testing import widen_receive_timeout
 from voteit.messaging.testing import ws_test_settings
 from voteit.organisation.models import Organisation
+from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 User = get_user_model()
 
@@ -85,7 +86,9 @@ class ConsumerTestCase(WebsocketTestCase):
         """Connect, authenticated as user unless anonymous is wanted.
 
         An authenticated socket starts with s.versions, which is read here so
-        every test starts from a quiet socket.
+        every test starts from a quiet socket. A user with an organisation is
+        also auto-subscribed to it, and that stream follows s.versions
+        straight away -- see OrganisationAutoSubscribeTests.
         """
         headers = list(self.ws_headers)
         if user is not None:
@@ -652,3 +655,110 @@ class CloseConnectionTests(ConsumerTestCase):
             {"type": "websocket.close", "code": NORMAL_CLOSURE},
             await communicator.receive_output(),
         )
+
+
+class OrganisationAutoSubscribeTests(ConsumerTestCase):
+    """Connecting subscribes the user to their own organisation.
+
+    There is nothing for the client to decide -- a user belongs to exactly one
+    organisation -- so the consumer enqueues the subscribe itself instead of
+    waiting for a channel.subscribe. The stream is the ordinary one.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.member = User.objects.create(
+            username="member", organisation=self.organisation
+        )
+        self.organisation.add_roles(self.member, ROLE_ORG_MANAGER)
+
+    async def _receive_subscribe_stream(self, communicator):
+        """Read the stream the consumer sent on its own, right after connect."""
+        messages = await communicator.receive_all_messages(
+            stop_action="channel.state_complete", timeout=2
+        )
+        await self._quiet(communicator)
+        return messages
+
+    async def test_it_costs_no_worker_round_trip(self):
+        """Small enough to build inline; nothing reaches the queue."""
+        communicator = await self._connect(self.member)
+        await self._receive_subscribe_stream(communicator)
+        self.assertEqual([], self.queue.job_ids)
+        await communicator.disconnect()
+
+    async def test_stream_matches_an_ordinary_subscribe(self):
+        communicator = await self._connect(self.member)
+        messages = await self._receive_subscribe_stream(communicator)
+        actions = [m.action for m in messages]
+        self.assertEqual("channel.subscribed", actions[0])
+        self.assertEqual("channel.state_complete", actions[-1])
+        subscribed = messages[0]
+        self.assertEqual("organisation", subscribed.payload.channel_type)
+        self.assertEqual(self.organisation.pk, subscribed.payload.pk)
+        self.assertEqual(
+            f"organisation_{self.organisation.pk}", subscribed.payload.channel_name
+        )
+        await communicator.disconnect()
+
+    async def test_organisation_state_arrives(self):
+        """The point of subscribing: the org appstruct, roles included."""
+        communicator = await self._connect(self.member)
+        messages = await self._receive_subscribe_stream(communicator)
+        roles = [
+            message
+            for m in messages
+            if m.action == "channel.state"
+            for section in m.payload.sections
+            for message in section.messages
+            if message.action == "roles.changed"
+        ]
+        self.assertEqual(1, len(roles))
+        self.assertEqual(self.member.pk, roles[0].payload.user_pk)
+        self.assertEqual([ROLE_ORG_MANAGER], list(roles[0].payload.roles))
+        await communicator.disconnect()
+
+    async def test_it_is_a_subscription_like_any_other(self):
+        communicator = await self._connect(self.member)
+        await self._receive_subscribe_stream(communicator)
+        await communicator.send_message(ChannelListSubscriptions())
+        messages = await communicator.receive_all_messages(
+            stop_action="channel.subscriptions", timeout=2
+        )
+        listed = next(m for m in messages if m.action == "channel.subscriptions")
+        self.assertEqual(
+            [ChannelRef(pk=self.organisation.pk, channel_type="organisation")],
+            listed.payload.subscriptions,
+        )
+        await communicator.disconnect()
+
+    async def test_group_fanout_reaches_the_socket(self):
+        """A user change now goes to the organisation, not to every socket."""
+        communicator = await self._connect(self.member)
+        await self._receive_subscribe_stream(communicator)
+
+        def rename():
+            self.member.first_name = "Ivan"
+            self.member.save()
+
+        await sync_to_async(rename)()
+        messages = await communicator.receive_all_messages(
+            stop_action="user.inv", timeout=2
+        )
+        invalidated = [m for m in messages if m.action == "user.inv"]
+        self.assertEqual(1, len(invalidated))
+        self.assertEqual(self.member.pk, invalidated[0].payload.pk)
+        await communicator.disconnect()
+
+    async def test_no_organisation_subscribes_to_nothing(self):
+        """The FK is nullable only to ease testing -- but the socket still works.
+
+        Channels awaits websocket_connect before dispatching anything from the
+        socket, so a pong proves the auto-subscribe is over, not merely late.
+        """
+        communicator = await self._connect(self.moderator)
+        await communicator.send_message(Ping())
+        messages = await communicator.receive_all_messages(timeout=1)
+        self.assertIn(Pong(), messages)
+        self.assertNotIn("channel.subscribed", [m.action for m in messages])
+        await communicator.disconnect()

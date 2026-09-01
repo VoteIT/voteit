@@ -62,7 +62,7 @@ All methods silently return an empty result for anonymous (unauthenticated) user
 
 `userid` uniqueness is enforced per organisation via a `UniqueConstraint`. The `UserIDValidator` restricts charset to `[a-z0-9-_]`.
 
-On `post_save` / `pre_delete`, an `InvalidateUserCache` WebSocket message is broadcast to the user's online channel to flush any SPA-side cache.
+On `post_save` (not on create) / `pre_delete`, an `InvalidateUserCache` WebSocket message is broadcast to the user's own `OrganisationChannel` to flush any SPA-side cache. Every socket joins that channel on connect, so it reaches everyone who could hold a cached copy. A user without an organisation publishes nothing.
 
 ## Registry Pattern (`component.py`)
 
