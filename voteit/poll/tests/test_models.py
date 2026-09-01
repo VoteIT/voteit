@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
+from django.test import SimpleTestCase
 from django.test import TestCase
 from django.test import override_settings
 from voteit.messaging.testing import testing_channel_layers_setting
@@ -14,6 +15,12 @@ from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.poll.app.er_policies.auto_always import AutoAlways
 from voteit.poll.app.er_policies.auto_before_poll import AutoBeforePoll
+from voteit.poll.app.polls.combined_simple import CombinedSimple
+from voteit.poll.app.polls.combined_simple import CombinedSimpleVoteSchema
+from voteit.poll.app.polls.historic import HistoricVoteData
+from voteit.poll.app.polls.historic import HistoricWithVoteData
+from voteit.poll.app.polls.majority import Majority
+from voteit.poll.app.polls.majority import MajorityVoteSchema
 from voteit.poll.app.polls.simple import Simple
 from voteit.poll.app.polls.simple import SimplePollResult
 from voteit.poll.exceptions import ElectoralRegisterMissing
@@ -28,6 +35,12 @@ from voteit.poll.testing import UnrestrictedVoteTransferPolicy
 from voteit.proposal.models import Proposal
 
 User = get_user_model()
+
+
+class _HistoricDummy(HistoricWithVoteData):
+    """Concrete stand-in; HistoricWithVoteData is abstract."""
+
+    name = "dummy"
 
 
 class PollMethodTests(TestCase):
@@ -62,6 +75,65 @@ class PollMethodTests(TestCase):
                 pass
 
         self.assertIn("hello", poll_method)
+
+
+class VoteJsonTests(SimpleTestCase):
+    """Pin the exact bytes of every vote string built by ``vote_json``.
+
+    ``Poll.finalize_vote_data`` uses the serialised vote verbatim as a Counter
+    key and hashes it into ``ballot_checksum``, so the spacing is stored data,
+    not a formatting detail. Every ballot already in the database uses pydantic
+    v1's ``", "``/``": "`` separators; v2's ``model_dump_json()`` emits compact
+    ones, which would split identical ballots across two keys -- and change the
+    checksum -- for any poll open across an upgrade. Replacing ``vote_json``
+    with ``model_dump_json()`` must fail here.
+    """
+
+    def test_majority(self):
+        self.assertEqual(
+            '{"choice": 42}',
+            Majority(None).vote_to_str(MajorityVoteSchema(choice=42)),
+        )
+
+    def test_combined_simple(self):
+        # Multi-element and empty lists together pin both separators.
+        self.assertEqual(
+            '{"yes": [1, 3], "no": [2], "abstain": []}',
+            CombinedSimple(None).vote_to_str(
+                CombinedSimpleVoteSchema(yes=[3, 1], no=[2])
+            ),
+        )
+
+    def test_historic(self):
+        self.assertEqual(
+            '{"what": 1, "ever": "we", "want": false}',
+            _HistoricDummy(None).vote_to_str(
+                HistoricVoteData(what=1, ever="we", want=False)
+            ),
+        )
+
+    def test_non_ascii_is_escaped(self):
+        # v1 serialised through json.dumps, so ensure_ascii applied; v2 would
+        # emit raw UTF-8 and change the checksum of any ballot holding one.
+        self.assertEqual(
+            '{"name": "\\u00c5sa"}',
+            _HistoricDummy(None).vote_to_str(HistoricVoteData(name="Åsa")),
+        )
+
+    def test_compact_separators_would_regress(self):
+        # Guards the reason vote_json exists at all.
+        data = CombinedSimpleVoteSchema(yes=[3, 1], no=[2])
+        self.assertNotEqual(
+            data.model_dump_json(), CombinedSimple(None).vote_to_str(data)
+        )
+
+    def test_round_trip(self):
+        for method, data in (
+            (Majority(None), MajorityVoteSchema(choice=42)),
+            (CombinedSimple(None), CombinedSimpleVoteSchema(yes=[3, 1], no=[2])),
+        ):
+            with self.subTest(method=method.name):
+                self.assertEqual(data, method.vote_to_obj(method.vote_to_str(data)))
 
 
 class PollTests(TestCase):
