@@ -13,45 +13,97 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# Actions are pinned to full commit SHAs, not tags. A tag is mutable: whoever
+# controls the action's repository can repoint v6 at a different commit, and
+# every workflow that says @v6 runs it on the next push. That is how
+# tj-actions/changed-files was used to dump runner secrets in March 2025.
+# Dependabot (.github/dependabot.yml) keeps these SHAs current.
 jobs:
-  docker:
+  # Building the wheels means executing a build backend fetched from PyPI, so
+  # this job gets no credentials worth stealing: contents:read only, no
+  # packages:write, no id-token:write, and no token left behind in .git/config.
+  wheels:
     runs-on: ubuntu-latest
-    # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
       contents: read
-      packages: write
-      id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          # Default is true, which writes GITHUB_TOKEN into .git/config where
+          # anything running later in the job can read it. Nothing here runs
+          # git afterwards, so drop it.
+          persist-credentials: false
 
       - name: Checkout / voteit_org
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           repository: voteit/voteit_org
           path: src/voteit_org
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          version: "0.12.9"
 
       - name: Build wheels
         run: uv build --all-packages --wheel -o ./dist
 
+      - name: Upload wheels
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wheels
+          path: dist/
+          retention-days: 1
+          if-no-files-found: error
+
+  # This job holds the registry credential, so nothing untrusted may run in it
+  # before the push. The only steps between login and build-push are pinned
+  # Docker actions; dependency resolution happens inside the container, which
+  # does not inherit the runner environment.
+  docker:
+    needs: wheels
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Checkout / voteit_org
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: voteit/voteit_org
+          path: src/voteit_org
+          persist-credentials: false
+
+      - name: Download wheels
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: wheels
+          path: dist
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      # Keep the login as late as possible: it writes the credential to
+      # ~/.docker/config.json, where every later step can read it.
       - name: Log in to the Container registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
       - name: Build and push docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           # Manual or tagged

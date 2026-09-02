@@ -44,9 +44,10 @@ test-deps:
 	REDIS_CACHE_LOCATION=redis://127.0.0.1:6379/9 POSTGRES_PORT=5433 python manage.py test voteit_org --keepdb --failfast
 build:
 	uv build --all-packages -o ./dist
+# No `docker pull` here: the Dockerfile pins its base by digest, so buildkit
+# fetches exactly that and pulling the floating tag would only warm the cache
+# with an image the build does not use.
 dev: build
-	set -e
-	docker pull python:3.13-slim
 	docker build . -t voteit/voteit4dev:dev
 messages:
 	cd voteit && python ../manage.py makemessages  -l sv -i=.venv -i=src

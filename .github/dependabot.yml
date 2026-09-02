@@ -1,0 +1,18 @@
+# Pinning actions and base images to SHAs stops a mutable tag from being
+# repointed at malicious code, but it also freezes security updates. These
+# entries are what unfreezes them: Dependabot opens a PR when a pinned SHA
+# falls behind, and rewrites the trailing "# vX.Y.Z" comment as it goes.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
