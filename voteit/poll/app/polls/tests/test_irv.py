@@ -138,7 +138,7 @@ class ValidateVoteTests(TestCase):
         self.assertRaises(DRFValidationError, self.irv_poll.method.validate_vote, vote)
 
     def test_min(self):
-        settings = self.repeated_irv_poll.settings.dict()
+        settings = self.repeated_irv_poll.settings.model_dump()
         settings["min"] = 2
         self.repeated_irv_poll.settings = settings
         self.repeated_irv_poll.save()
@@ -149,7 +149,7 @@ class ValidateVoteTests(TestCase):
         self.assertEqual({"ranking": "Too few selected"}, cm.exception.detail)
 
     def test_max(self):
-        settings = self.repeated_irv_poll.settings.dict()
+        settings = self.repeated_irv_poll.settings.model_dump()
         settings["max"] = 2
         self.repeated_irv_poll.settings = settings
         self.repeated_irv_poll.save()

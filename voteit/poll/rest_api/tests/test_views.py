@@ -114,7 +114,7 @@ class PollViewSetTests(APITestCase):
         self.assertIn("method_name", data)
         self.assertIn("settings", data)
         self.assertEqual(
-            [["stars", 5], ["deny_proposal", False], ["winners", 2]],
+            {"stars": 5, "deny_proposal": False, "winners": 2},
             data["settings"],
         )
 
@@ -986,7 +986,7 @@ class VoteViewSetTests(APITestCase):
         self.assertEqual(200, response.status_code)
         self.assertEqual(1, self.poll.votes.filter(user=self.voter).count())
         vote.refresh_from_db()
-        self.assertEqual({"choice": "no"}, vote.vote.dict())
+        self.assertEqual({"choice": "no"}, vote.vote.model_dump())
 
     def test_add_vote_exists(self):
         self.poll.ongoing(force=True)

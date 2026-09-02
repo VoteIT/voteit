@@ -287,7 +287,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext, StateMachineModelMixi
             data = value
         else:  # pragma: no cover
             raise ValueError(f"{value} is not a settings schema or a dict")
-        self.settings_data = data.dict()
+        self.settings_data = data.model_dump()
 
     @property
     def result(self) -> PollResult | None:
@@ -306,7 +306,7 @@ class Poll(BaseContent, MeetingContext, AgendaItemContext, StateMachineModelMixi
             data = value
         else:  # pragma: no cover
             raise ValueError(f"{value} is not a result schema or a dict")
-        self.result_data = data.dict()
+        self.result_data = data.model_dump()
 
     def cleanup_removed_from_er_votes(self) -> int | None:
         voter_pks = [int(k) for k in self.electoral_register.voter_data.keys()]

@@ -351,12 +351,12 @@ class PydanticFieldSerializer(serializers.JSONField):
 
     def to_internal_value(self, data):
         if isinstance(data, BaseModel):
-            data = data.dict()
+            data = data.model_dump()
         return super().to_internal_value(data)
 
     def to_representation(self, value):
         if isinstance(value, BaseModel):
-            value = value.dict()
+            value = value.model_dump()
         return super().to_representation(value)
 
 

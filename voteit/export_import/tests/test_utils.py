@@ -36,7 +36,7 @@ class UtilsTests(TestCase):
             include_reactions=True,
         )
         self.assertEqual(
-            {**self.default_stats, "reactions": 4}, importer.stats().dict()
+            {**self.default_stats, "reactions": 4}, importer.stats().model_dump()
         )
         self.assertSetEqual(
             self.meeting.agenda_items.values_list("title", flat=True),
@@ -52,7 +52,7 @@ class UtilsTests(TestCase):
         )
         self.assertEqual(
             {**self.default_stats, "reactions": 4},
-            importer.stats().dict(),
+            importer.stats().model_dump(),
         )
         self.assertSetEqual(
             self.meeting.agenda_items.none(),
@@ -69,7 +69,7 @@ class UtilsTests(TestCase):
         )
         self.assertEqual(
             {**self.default_stats, "discussion_posts": 0, "reactions": 3},
-            importer.stats().dict(),
+            importer.stats().model_dump(),
         )
 
     def test_direct_clone_notes(self):
@@ -84,7 +84,7 @@ class UtilsTests(TestCase):
                 **self.default_stats,
                 "notes": 3,
             },
-            importer.stats().dict(),
+            importer.stats().model_dump(),
         )
 
     def test_direct_clone_group_with_delegate_to(self):
@@ -95,7 +95,9 @@ class UtilsTests(TestCase):
             target=self.new_meeting,
             dry_run=False,
         )
-        self.assertEqual({**self.default_stats, "groups": 2}, importer.stats().dict())
+        self.assertEqual(
+            {**self.default_stats, "groups": 2}, importer.stats().model_dump()
+        )
         cloned_the_hellos = self.new_meeting.groups.get(groupid="the-hellos")
         cloned_delegating = self.new_meeting.groups.get(groupid="delegating-group")
         self.assertEqual(cloned_the_hellos, cloned_delegating.delegate_to)
@@ -139,7 +141,7 @@ class UtilsTests(TestCase):
         )
         self.assertEqual(
             {**self.default_stats, "reactions": 4},
-            importer.stats().dict(),
+            importer.stats().model_dump(),
         )
         # And once again
         importer = direct_clone(
@@ -155,7 +157,7 @@ class UtilsTests(TestCase):
                 "groups_reused": 1,
                 "buttons_reused": 2,
             },
-            importer.stats().dict(),
+            importer.stats().model_dump(),
         )
         self.assertEqual(2, self.new_meeting.reaction_buttons.count())
         new_gilla_btn = self.new_meeting.reaction_buttons.get(title="Gilla")
@@ -196,7 +198,7 @@ class CloneMaxLengthTitleTests(TestCase):
         )
         self.assertEqual(2, self.target.groups.count())
         self.assertEqual(2, self.target.agenda_items.count())
-        stats = importer.stats().dict()
+        stats = importer.stats().model_dump()
         self.assertEqual(2, stats["groups"])
         self.assertEqual(2, stats["agenda_items"])
         titles = set(self.target.agenda_items.values_list("title", flat=True))

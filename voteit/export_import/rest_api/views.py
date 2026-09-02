@@ -116,7 +116,7 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             with transaction.atomic(durable=True):
                 importer.run()
             return Response(
-                data=importer.stats().dict(),
+                data=importer.stats().model_dump(),
                 status=status.HTTP_200_OK,
             )
         finally:
@@ -164,7 +164,9 @@ class MeetingDataViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericView
             importer = direct_clone(
                 source=source, target=instance, dry_run=False, **clone_kwargs
             )
-            return Response(data=importer.stats().dict(), status=status.HTTP_200_OK)
+            return Response(
+                data=importer.stats().model_dump(), status=status.HTTP_200_OK
+            )
         except PydanticValidationError as exc:
             raise pydantic_to_drf_validation_error(exc)
         finally:

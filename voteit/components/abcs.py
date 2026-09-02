@@ -87,7 +87,7 @@ class Component(RulesModelMixin, ABCModel):
             data = value
         else:  # pragma: no cover
             raise ValueError(f"{value} is not a schema or a dict")
-        self.settings_data = data.dict()
+        self.settings_data = data.model_dump()
 
     def valid_component_name(self) -> bool:
         return self.component_name in self.get_registry()

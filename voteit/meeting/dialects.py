@@ -232,12 +232,12 @@ class DialectHandler:
         for roomdata in self.data.rooms:
             room = meeting.rooms.create(**roomdata.dict(exclude={"sls"}))
             if roomdata.sls:
-                meeting.speaker_systems.create(room=room, **roomdata.sls.dict())
+                meeting.speaker_systems.create(room=room, **roomdata.sls.model_dump())
         # GroupRoles
         for gr_data in self.data.roles:
             group_role = meeting.group_roles.filter(role_id=gr_data.role_id).first()
             if group_role is None:
-                meeting.group_roles.create(**gr_data.dict())
+                meeting.group_roles.create(**gr_data.model_dump())
             else:
                 for k, v in gr_data.dict(exclude={"role_id"}).items():
                     if getattr(group_role, k, object()) != v:
@@ -247,7 +247,7 @@ class DialectHandler:
         for g_data in self.data.groups:
             group = meeting.groups.filter(groupid=g_data.groupid).first()
             if group is None:
-                meeting.groups.create(**g_data.dict())
+                meeting.groups.create(**g_data.model_dump())
             else:
                 for k, v in g_data.dict(exclude={"groupid"}).items():
                     if getattr(group, k, object()) != v:

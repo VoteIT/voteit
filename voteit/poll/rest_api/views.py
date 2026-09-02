@@ -189,7 +189,7 @@ class ElectoralRegisterPoliciesViewSet(ViewSet):
         results = []
         for er_policy in reg.values():
             data = ElectoralRegistryPolicySchema.model_validate(er_policy)
-            results.append(data.dict())
+            results.append(data.model_dump())
         return Response(data=results)
 
 

@@ -77,7 +77,7 @@ class GroupAnnotationTests(TestCase):
             meeting=self.meeting,
             registry=self.registry,
         )
-        data = result.dict()
+        data = result.model_dump()
         self.assertEqual(
             {self.inv_vader.pk, self.inv_luke.pk, self.inv_din.pk},
             set(data.pop("newly_annotated_invites")),
@@ -191,7 +191,7 @@ class GroupAnnotationTests(TestCase):
             meeting=self.meeting,
             registry=self.registry,
         )
-        data = result.dict()
+        data = result.model_dump()
         newly_annotated_invites = set(data.pop("newly_annotated_invites"))
         self.assertEqual(
             {
@@ -232,7 +232,7 @@ class GroupAnnotationTests(TestCase):
             meeting=self.meeting,
             registry=self.registry,
         )
-        data = result.dict()
+        data = result.model_dump()
         newly_annotated_invites = set(data.pop("newly_annotated_invites"))
         self.assertEqual(
             {
@@ -304,7 +304,7 @@ class GroupAnnotationTests(TestCase):
                 "total": None,
                 "newly_annotated_invites": [],
             },
-            result.dict(),
+            result.model_dump(),
         )
 
     def test_prep_invites_qs_for_subscribe(self):

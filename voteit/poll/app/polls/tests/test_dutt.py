@@ -50,7 +50,7 @@ class DuttTests(TestCase):
         self.poll.votes.create(user=self.voter_b, vote=f"[{self.prop2.pk}]")
         self.poll.close(force=True)
         self.assertEqual(
-            self.poll.result.dict(),
+            self.poll.result.model_dump(),
             {
                 "results": [
                     {"proposal": self.prop1.pk, "votes": 1},

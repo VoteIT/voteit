@@ -205,7 +205,7 @@ class SpeakerListSystem(
             data = value
         else:  # pragma: no cover
             raise ValueError(f"{value} is not a settings schema or a dict")
-        self.settings_data = data.dict()
+        self.settings_data = data.model_dump()
 
     @property
     def organisation(self) -> Organisation:

@@ -354,7 +354,7 @@ class MeetingInviteViewSet(
 
             return Response(
                 {
-                    "invites": invite_result.dict(),
+                    "invites": invite_result.model_dump(),
                     "annotations": annotation_results,
                     "dryrun": dryrun,
                 }
@@ -621,5 +621,5 @@ class InviteDataTypesViewSet(ViewSet):
             if v.is_user_data and v.name not in scopes:
                 continue
             data = InviteDataTypesSchema.model_validate(v)
-            results.append(data.dict())
+            results.append(data.model_dump())
         return Response(data=results)

@@ -488,7 +488,7 @@ class SpeakerListSystemViewTests(APITestCase):
         response = self.client.patch(url, data)
         self.assertEqual(200, response.status_code)
         self.system.refresh_from_db()
-        self.assertEqual({"max_times": 0}, self.system.settings.dict())
+        self.assertEqual({"max_times": 0}, self.system.settings.model_dump())
 
     def test_patch_with_odd_state(self):
         self.system.archive()

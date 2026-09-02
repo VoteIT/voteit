@@ -531,7 +531,7 @@ class VoteTransferSignalsTests(TestCase):
                 "source": self.moderator.pk,
                 "target": self.participant.pk,
             },
-            payloads[0].dict(),
+            payloads[0].model_dump(),
         )
 
     def test_subscribe_message_not_sent_if_not_active(self):

@@ -59,7 +59,7 @@ class HistoricWithVoteData(HistoricPollMethod, ABC):
         ...
         >>> text = '{"what": 1, "ever": "we", "want": false}'
         >>> data = SomeMethod(None).vote_to_obj(text)
-        >>> [(k, getattr(data, k)) for k in sorted(data.dict().keys())]
+        >>> [(k, getattr(data, k)) for k in sorted(data.model_dump().keys())]
         [('ever', 'we'), ('want', False), ('what', 1)]
         """
         return self.vote_schema(**json.loads(text))

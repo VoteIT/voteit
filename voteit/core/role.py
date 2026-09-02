@@ -50,7 +50,7 @@ class Role(str):
     {'comp_owner'}
 
     And they can produce output with pydantic:
-    >>> COMPUTER_OWNER.output().dict()
+    >>> COMPUTER_OWNER.output().model_dump()
     {'name': 'comp_owner', 'title': 'Comp_Owner', 'description': '',
     'require_names': [], 'predicate_info': None}
 

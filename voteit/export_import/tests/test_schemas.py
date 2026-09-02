@@ -45,8 +45,8 @@ class ExportImportMeetingTests(TestCase):
             import_data = self._cut(**import_dict, include_reactions=True)
             export_data = self._cut.model_validate(self.meeting)
         self.assertEqual(import_data, export_data)
-        import_agenda_data = import_data.agenda_items[0].dict()
-        export_agenda_data = export_data.agenda_items[0].dict()
+        import_agenda_data = import_data.agenda_items[0].model_dump()
+        export_agenda_data = export_data.agenda_items[0].model_dump()
         self.assertEqual(import_agenda_data, export_agenda_data)
 
 
@@ -105,7 +105,7 @@ class SchemasMatchCommonSerializersTests(TestCase):
                 for x in serializer.data[0]
                 if x not in {"pk", "agenda_item", "paragraphs"}
             },
-            set(self.export_data.agenda_items[0].text_documents[0].dict()),
+            set(self.export_data.agenda_items[0].text_documents[0].model_dump()),
         )
 
     def test_serializer_to_schema_for_proposal(self):

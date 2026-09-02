@@ -197,9 +197,6 @@ Everything the SPA team needs is in the CHANGELOG entry. In short:
 - **`src/member_dialects/`** is a stale directory — nothing references it in
   `pyproject.toml`, `uv.lock`, `Makefile`, settings or `project/`. Deleting it
   is a separate tidy-up.
-- **`.dict()` → `.model_dump()`** is not finished everywhere. The remaining
-  calls work (deprecated in v2) but emit warnings; converting them all was
-  judged more risk than value in this branch.
 - **`ExportMeetingMeta.created: datetime = now()`** evaluates its default at
   import time, so it is frozen at process start rather than per instance. A
   pre-existing bug, found while building the shape-diff harness; `default_factory`

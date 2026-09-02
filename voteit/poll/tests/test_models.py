@@ -187,7 +187,7 @@ class PollTests(TestCase):
         self.assertIn(vote2, votes)
         self.poll.close(force=True)
         self.assertEqual(
-            self.poll.result.dict(),
+            self.poll.result.model_dump(),
             {
                 "yes": 2,
                 "no": 0,
@@ -234,7 +234,7 @@ class PollTests(TestCase):
         self.assertIn(vote1, votes)
         self.assertNotIn(vote2, votes)
         self.assertEqual(
-            self.poll.result.dict(),
+            self.poll.result.model_dump(),
             {
                 "yes": 1,
                 "no": 0,
@@ -268,7 +268,7 @@ class PollTests(TestCase):
         self.poll.votes.create(user=self.participant, vote="yes")
         self.poll.close(force=True)
         self.assertEqual(
-            self.poll.result.dict(),
+            self.poll.result.model_dump(),
             {
                 "yes": 1,
                 "no": 0,
@@ -371,7 +371,7 @@ class VoteWeightTests(TestCase):
         self.poll.votes.create(user=self.user3, vote_data="no")
         self.poll.close(force=True)
         self.assertEqual(
-            self.poll.result.dict(),
+            self.poll.result.model_dump(),
             {
                 "yes": 2,
                 "no": 3,

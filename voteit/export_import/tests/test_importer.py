@@ -71,7 +71,7 @@ class ImporterTests(TestCase):
         )
         self.assertDictEqual(
             {**self.default_result, "notes": 3, "reactions": 4},
-            importer.stats().dict(),
+            importer.stats().model_dump(),
         )
         self.assertEqual(
             {"Hot dogs", "Crisps", "Pickles"},
@@ -324,18 +324,18 @@ class ImporterTests(TestCase):
                 "reactions": 1,
                 "proposals": 0,
             },
-            importer.stats().dict(),
+            importer.stats().model_dump(),
         )
 
     def test_stats(self):
         importer = self._cut(self.meeting)
         importer.from_file(os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml"))
-        self.assertEqual(self.default_result, importer.stats().dict())
+        self.assertEqual(self.default_result, importer.stats().model_dump())
         importer = self._cut(self.meeting, include_notes=True, include_reactions=True)
         importer.from_file(os.path.join(FIXTURES_DIR, "combined_meeting_fixture.yaml"))
         self.assertEqual(
             {**self.default_result, "notes": 3, "reactions": 4},
-            importer.stats().dict(),
+            importer.stats().model_dump(),
         )
 
 

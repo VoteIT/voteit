@@ -66,7 +66,7 @@ class ExporterTests(TestCase):
                 "allowed_models",
                 "reactions",
             },
-            set(exporter.data.reaction_buttons[1].dict()),
+            set(exporter.data.reaction_buttons[1].model_dump()),
         )
 
     def test_bad_kwargs(self):
@@ -115,7 +115,7 @@ class ExporterTests(TestCase):
                 "object_id": "_2",
                 "username": "participant",
             },
-            exporter.data.reaction_buttons[0].reactions[0].dict(),
+            exporter.data.reaction_buttons[0].reactions[0].model_dump(),
         )
         self.assertDictEqual(
             {
@@ -124,7 +124,7 @@ class ExporterTests(TestCase):
                 "object_id": "_2",
                 "username": "moderator",
             },
-            exporter.data.reaction_buttons[0].reactions[1].dict(),
+            exporter.data.reaction_buttons[0].reactions[1].model_dump(),
         )
         self.assertDictEqual(
             {
@@ -133,7 +133,7 @@ class ExporterTests(TestCase):
                 "object_id": "_1",
                 "username": "moderator",
             },
-            exporter.data.reaction_buttons[0].reactions[2].dict(),
+            exporter.data.reaction_buttons[0].reactions[2].model_dump(),
         )
         # Button 2
         self.assertEqual(
