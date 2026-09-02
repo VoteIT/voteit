@@ -102,7 +102,7 @@ class PollListSerializer(PollDetailSerializer):
 
 class PollCreateSerializer(serializers.ModelSerializer):
     start = serializers.BooleanField(write_only=True, required=False, default=False)
-    settings = serializers.JSONField(allow_null=True, write_only=True, required=False)
+    settings = serializers.JSONField(allow_null=True, required=False)
 
     def validate(self, attrs):
         """

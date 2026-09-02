@@ -105,12 +105,18 @@ class PollViewSetTests(APITestCase):
             "agenda_item": self.ai.pk,
             "proposals": [self.prop.pk, self.prop2.pk, self.prop3.pk],
             "method_name": RepeatedSchulze.name,
-            "settings": {"winners": ""},
+            "settings": {"winners": "2"},
         }
         self.client.force_login(self.moderator)
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, 201)
-        self.assertIn("method_name", response.json())
+        data = response.json()
+        self.assertEqual(response.status_code, 201, data)
+        self.assertIn("method_name", data)
+        self.assertIn("settings", data)
+        self.assertEqual(
+            [["stars", 5], ["deny_proposal", False], ["winners", 2]],
+            data["settings"],
+        )
 
     def test_list_poll_in_this_meeting(self):
         poll = self.meeting.polls.create(
