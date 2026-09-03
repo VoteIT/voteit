@@ -398,7 +398,6 @@ class VoteSerializerTests(TestCase):
         serializer = self._cut(self.vote)
         data = serializer.data
         self.assertEqual(self.vote.pk, data.pop("pk"))
-        self.assertEqual(self.vote.user.pk, data.pop("user"))
         self.assertEqual(self.vote.poll.pk, data.pop("poll"))
         self.assertEqual(self.vote.abstain, data.pop("abstain"))
         self.assertEqual({"choice": "yes"}, data.pop("vote"))

@@ -304,10 +304,7 @@ class VoteSerializer(serializers.ModelSerializer):
         model = Vote
         fields = read_only_fields = (
             "pk",
-            "user",
             "poll",
-            "created",
-            "changed",
             "abstain",
             "vote",
         )
