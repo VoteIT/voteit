@@ -39,7 +39,7 @@ def meeting_component_updated(instance: MeetingComponent = None, created=None, *
             instance.meeting,
             MeetingComponentChanged(payload=data)
             if is_valid
-            else MeetingComponentDeleted(payload=data),
+            else MeetingComponentDeleted(payload={"pk": instance.pk}),
         )
 
 
