@@ -25,7 +25,8 @@ channel definitions and the `Connection` model. Built on
 | `jobs.py` | `build_subscription` plus `subscribe_job` / `recheck_job`, run on the `default` RQ queue, and `close_stale_connections` (see below). |
 | `admin.py` | Read-only `Connection` admin, the `/admin/.../connection/online/` page and the stale-row action. |
 | `state.py` | `AppState`, the accumulator collectors append to, grouped into `StateSection`s. |
-| `testing.py` | `MessageCatcher`, `ChannelMessageCatcher`, `build_app_state`, `build_bundles`, `run_collector`, `payloads_of`, `unbundle`, `ws_test_settings`. |
+| `values.py` | `wire_values()` / `wire_field_names()` — build a `.values()` payload whose keys come from a DRF serializer instead of a hand-written list. |
+| `testing.py` | `MessageCatcher`, `ChannelMessageCatcher`, `build_app_state`, `build_bundles`, `run_collector`, `payloads_of`, `assert_frames_equal`, `unbundle`, `ws_test_settings`. |
 
 ## Adding an outgoing message
 
@@ -126,17 +127,62 @@ a `python-statemachine` machine (`Meeting`, `AgendaItem`, `Proposal`, `Poll`,
 dispatchers — for *every* instance, measured at **120 kB per model instance
 against 0.4 kB per `.values()` row, 280x**. `StateMachineModelMixin` made that
 binding lazy (`voteit/core/statemachines.py`), so a model instance now costs
-about 0.6 kB and the machine is built only when something reads `.sm`. Skipping
-the instance is still cheaper, but this is now a DRF-overhead argument, not an
-order-of-magnitude one — do not contort a collector to avoid model instances.
+about 0.6 kB and the machine is built only when something reads `.sm`.
 
-`agenda.items` and `proposal.collectors.attach_proposals` both take the
-`.values()` route for this reason. It is only valid while the serializer has no
-method fields or nested serializers, so assert the equivalence rather than
-assume it — see `voteit/agenda/tests/test_collectors.py`. `poll.polls` and
-`invites.invites` still serialize instances; neither converts safely
-(`SerializerMethodField`, `PydanticFieldSerializer`, M2M), so they remain the
-two places where a very large meeting will show up in worker memory.
+That removed the order-of-magnitude argument but not the argument. What is left
+is plain model construction plus a bound DRF field per row, and it does not
+shrink. Measured against the dev database, per subscribe:
+
+| collector | rows | serializer | `.values()` | |
+|---|---|---|---|---|
+| `reactions.own` | 131 | 46.3 ms, 132 queries | 0.8 ms, 1 query | 58x |
+| `meeting.groups` (groups) | 315 | 6.4 ms | 1.0 ms | 6.6x |
+| `speaker.active_list` | 125 | 3.2 ms | 0.6 ms | 5.3x |
+| `meeting.groups` (members) | 417 | 6.0 ms | 2.0 ms | 3.0x |
+| `discussion.posts` | 281 | 8.3 ms | 3.7 ms | 2.3x |
+
+`reactions.own` is the outlier because `ReactionSerializer` renders
+`content_type` with a `CharField` subclass, which gets none of DRF's pk-only
+optimisation and loaded a `ContentType` per row. Watch for that shape: a
+declared non-`RelatedField` over a FK is an N+1 waiting to happen.
+
+### How to write one
+
+Do not spell the field list out — read it off the serializer:
+
+```python
+from voteit.messaging.values import wire_values
+
+def note_payloads(qs):
+    return wire_values(NoteSerializer, qs, agenda_item=F("proposal__agenda_item_id"))
+```
+
+`wire_values` takes the keys from the instantiated serializer (so `Meta.exclude`
+works too) and passes them to `.values()`. Fields that are not columns are the
+only thing written by hand, as `aliases`; they are checked against the
+serializer, so an alias the REST representation does not have is an error.
+Everything else must be a column — `.values()` raises `FieldError` otherwise,
+which is the point: a `SerializerMethodField` added later fails loudly instead
+of quietly going missing from the payload.
+
+Put the builder in the app's `collectors.py` and have the app's signals import
+it when they publish the same object in bulk, so the push and the initial state
+cannot disagree (`notes`, `speaker`). A signal publishing a *single* instance can
+keep using the serializer — the field list is derived from it either way.
+
+**Always assert the equivalence, never assume it.** Each app's
+`tests/test_collectors.py` has a `test_values_matches_the_serializer` built on
+`messaging.testing.assert_frames_equal`, which renders both routes through the
+real message class and compares — that is what catches a method field, a wrong
+alias, or a datetime rendered in a different timezone. It fails on empty input,
+so a fixture that produces no rows cannot leave it vacuously green.
+
+`poll.polls`, `invites.invites`, `speaker.lists`, `speaker.systems`,
+`proposal.text_documents`, `components.meeting` and `poll.own_votes` still
+serialize instances; none converts safely (`SerializerMethodField`,
+`PydanticFieldSerializer`, nested serializers, M2M fan-out). `poll.polls` and
+`invites.invites` are therefore where a very large meeting will show up in
+worker memory.
 
 ## Connections and presence
 

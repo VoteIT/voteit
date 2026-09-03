@@ -11,6 +11,7 @@ from voteit.agenda.channels import AgendaItemChannel
 from voteit.core.utils import get_model_shortname
 from voteit.messaging.collectors import AppStateCollector
 from voteit.messaging.registry import app_state_collectors
+from voteit.messaging.values import wire_values
 from voteit.reactions.messages import ButtonChanged
 from voteit.reactions.messages import ReactionCount
 from voteit.reactions.messages import UserReactionChanged
@@ -18,7 +19,50 @@ from voteit.reactions.rest_api.serializers import ButtonDetailSerializer
 from voteit.reactions.rest_api.serializers import ReactionSerializer
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from django.db.models import QuerySet
+
     from voteit.messaging.state import AppState
+
+
+def content_type_shortname(pk: int) -> str:
+    """The model shortname the wire uses for a content type pk.
+
+    ``ContentType.objects.get_for_id`` is cached per process, so this is free
+    after the first call for a given type. Going through the FK descriptor
+    instead is not: it issues a plain SELECT per access, which is what made
+    ``reactions.own`` cost one query per reaction.
+    """
+    return get_model_shortname(ContentType.objects.get_for_id(pk).model_class())
+
+
+def button_payloads(qs: QuerySet) -> QuerySet:
+    """The ``reaction_button.changed`` payload for every button in ``qs``.
+
+    ``.values()`` rather than ButtonDetailSerializer, which is sixteen plain
+    columns and no method fields. ``change_roles`` and ``list_roles`` are
+    declared RolesFields, but those are ListFields of CharFields over
+    ArrayField columns and render the same list either way.
+    """
+    return wire_values(ButtonDetailSerializer, qs)
+
+
+def reaction_payloads(qs: QuerySet) -> Iterator[dict]:
+    """The ``reaction.changed`` payload for every reaction in ``qs``.
+
+    ``.values()`` here is not a tuning choice. ``ReactionSerializer`` renders
+    ``content_type`` with a CharField subclass, so it gets none of DRF's
+    pk-only optimisation and loads a ContentType per row: 132 queries and
+    44.8 ms for the 131 reactions one user holds on the busiest agenda item in
+    the dev data, against one query and 0.6 ms here. The mapping is the same
+    one ``ReactionCounts`` does, and is mandatory rather than cosmetic --
+    ``UserReactionResponseSchema.content_type`` is a validated shortname, so a
+    raw pk would be rejected rather than sent.
+    """
+    for row in wire_values(ReactionSerializer, qs):
+        row["content_type"] = content_type_shortname(row["content_type"])
+        yield row
 
 
 @app_state_collectors
@@ -29,8 +73,7 @@ class ReactionButtons(AppStateCollector):
 
     def collect(self, state: AppState) -> None:
         state.add_batch(
-            ButtonChanged,
-            ButtonDetailSerializer(self.context.reaction_buttons.all(), many=True).data,
+            ButtonChanged, button_payloads(self.context.reaction_buttons.all())
         )
 
 
@@ -49,9 +92,7 @@ class ReactionCounts(AppStateCollector):
             .annotate(count=Count("pk"))
             .order_by()
         ):
-            # FIXME: Serializer should handle this
-            model = ContentType.objects.get_for_id(button["content_type"]).model_class()
-            button["content_type"] = get_model_shortname(model)
+            button["content_type"] = content_type_shortname(button["content_type"])
             payloads.append(button)
         state.add_batch(ReactionCount, payloads)
 
@@ -67,7 +108,5 @@ class OwnReactions(AppStateCollector):
     def collect(self, state: AppState) -> None:
         state.add_batch(
             UserReactionChanged,
-            ReactionSerializer(
-                self.context.reactions.filter(user=self.user), many=True
-            ).data,
+            reaction_payloads(self.context.reactions.filter(user=self.user)),
         )

@@ -12,6 +12,7 @@ from django.test import override_settings
 from voteit.messaging.bundle import iter_bundles
 from voteit.messaging.messages import AppStateBundle
 from voteit.messaging.registry import action_of  # noqa: F401
+from voteit.messaging.registry import batch_for
 from voteit.messaging.registry import app_state_collectors
 from voteit.messaging.registry import collectors_for
 from voteit.messaging.registry import context_channel_registry
@@ -261,6 +262,40 @@ def section_names(bundles) -> list[str]:
             if section.name not in names:
                 names.append(section.name)
     return names
+
+
+def assert_frames_equal(
+    test_case,
+    message_cls: type[BaseMessage],
+    from_values,
+    from_serializer,
+) -> None:
+    """Assert two payload lists render the identical ``<action>.batch`` frame.
+
+    The standard check for a collector that builds payloads with
+    ``messaging.values.wire_values`` rather than its app's DRF serializer:
+    running both through the real message class catches a key that is missing,
+    renamed, or serialised differently -- a datetime rendered in another
+    timezone, say -- which comparing the raw dicts would not.
+
+    Pass querysets in a deterministic order; several of these models have no
+    ``Meta.ordering`` and are free to come back in different orders.
+
+    Empty input fails: two empty lists are trivially equal, and a fixture that
+    quietly produces no rows would otherwise leave the test passing while
+    asserting nothing.
+    """
+    values_items = list(from_values)
+    serializer_items = list(from_serializer)
+    test_case.assertTrue(
+        values_items and serializer_items,
+        "nothing to compare -- the test data produced no rows",
+    )
+    batch_cls = batch_for(message_cls)
+    test_case.assertEqual(
+        batch_cls(payload={"items": serializer_items}).model_dump(mode="json"),
+        batch_cls(payload={"items": values_items}).model_dump(mode="json"),
+    )
 
 
 def payloads_of(messages, message_cls: type[BaseMessage]) -> list:

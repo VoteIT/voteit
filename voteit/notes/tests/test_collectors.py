@@ -3,14 +3,13 @@ from django.test import override_settings
 
 from voteit.meeting.models import Meeting
 from voteit.messaging.channels import UserChannel
-from voteit.messaging.registry import batch_for
 from voteit.messaging.testing import ChannelMessageCatcher
+from voteit.messaging.testing import assert_frames_equal
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
 from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.notes import NoteIntent
-from voteit.notes.collectors import NOTE_ANNOTATIONS
-from voteit.notes.collectors import NOTE_FIELDS
+from voteit.messaging.values import wire_field_names
 from voteit.notes.collectors import note_payloads
 from voteit.notes.components import NotesComponent
 from voteit.notes.messages import NoteChanged
@@ -54,31 +53,36 @@ class NoteWireShapeTests(TestCase):
 
     def test_values_matches_the_serializer(self):
         """Byte-for-byte identical frames, whichever route built them."""
-        batch_cls = batch_for(NoteChanged)
-        from_values = batch_cls(payload={"items": list(note_payloads(self.notes))})
-        from_serializer = batch_cls(
-            payload={
-                "items": NoteSerializer(
-                    self.notes.select_related("proposal"), many=True
-                ).data
-            }
-        )
-        self.assertEqual(
-            from_serializer.model_dump(mode="json"),
-            from_values.model_dump(mode="json"),
+        assert_frames_equal(
+            self,
+            NoteChanged,
+            note_payloads(self.notes),
+            NoteSerializer(self.notes.select_related("proposal"), many=True).data,
         )
 
-    def test_field_list_tracks_the_serializer(self):
-        self.assertEqual(
-            set(NoteSerializer.Meta.fields),
-            set(NOTE_FIELDS) | set(NOTE_ANNOTATIONS),
-        )
+    def test_wire_fields_are_pinned(self):
+        """Changing what goes on the wire must fail loudly, not silently.
 
-    def test_every_field_is_a_concrete_column(self):
-        """A method field added to the serializer must fail loudly, not silently."""
-        # .values() raises FieldError for anything that is not a column or an
-        # alias, so simply evaluating the queryset is the assertion.
+        Two halves. ``.values()`` raises FieldError for anything that is not a
+        column or an alias, so evaluating the queryset is the assertion for a
+        method field. The field list is spelled out on purpose: renaming or
+        dropping one is a wire-format change, and breaking here is how the
+        person making it finds out.
+        """
         list(note_payloads(self.notes))
+        self.assertSetEqual(
+            {
+                "agenda_item",
+                "body",
+                "created",
+                "intent",
+                "meeting",
+                "pk",
+                "proposal",
+                "user",
+            },
+            set(wire_field_names(NoteSerializer)),
+        )
 
     def test_collector_matches_the_signal(self):
         """The initial state and the push describe a note the same way."""

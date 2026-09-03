@@ -64,7 +64,7 @@ There is no `note.added`; the client upserts on `pk`.
 
 - `post_save` on `Note` — deferred to transaction commit via `@on_transaction_commit`; publishes `NoteChanged` to `UserChannel(instance.user_id)`, built by the same `note_payloads` the collector uses.
 - `pre_delete` on `Note` — not deferred (must fire before the row is gone); publishes `NoteDeleted` to `UserChannel(instance.user_id)`.
-- `notes.notes` collector on `AgendaItemChannel` — runs when a user subscribes to an agenda item channel. `applicable()` checks `NotesComponent` is enabled for the meeting, then `collect()` queries the user's notes for that agenda item and appends them with `app_state.add_batch(NoteChanged, payloads)`, i.e. as one `note.changed.batch`. Builds the payloads with `.values()` (`note_payloads`), so it stays at two queries regardless of note count and never instantiates a Note.
+- `notes.notes` collector on `AgendaItemChannel` — runs when a user subscribes to an agenda item channel. `applicable()` checks `NotesComponent` is enabled for the meeting, then `collect()` queries the user's notes for that agenda item and appends them with `app_state.add_batch(NoteChanged, payloads)`, i.e. as one `note.changed.batch`. Builds the payloads with `.values()` (`note_payloads`, via `messaging.values.wire_values`), so it stays at two queries regardless of note count and never instantiates a Note.
 
 ## Components (`components.py`)
 

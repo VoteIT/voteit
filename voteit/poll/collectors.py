@@ -9,6 +9,7 @@ from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
 from voteit.messaging.collectors import AppStateCollector
 from voteit.messaging.registry import app_state_collectors
+from voteit.messaging.values import wire_values
 from voteit.poll.messages import ElectoralRegisterChanged
 from voteit.poll.messages import GenericVoteResponse
 from voteit.poll.messages import PollChanged
@@ -21,7 +22,22 @@ from voteit.poll.rest_api.serializers import VoteSerializer
 from voteit.poll.rest_api.serializers import VoteTransferSerializer
 
 if TYPE_CHECKING:
+    from django.db.models import QuerySet
+
     from voteit.messaging.state import AppState
+
+
+def vote_transfer_payloads(qs: QuerySet) -> QuerySet:
+    """The ``vt.changed`` payload for every transfer in ``qs``.
+
+    ``.values()`` rather than VoteTransferSerializer, which is four plain
+    columns and no method fields. ``meeting``, ``source`` and ``target`` are
+    declared fields, but all three are RelatedFields over concrete FK columns,
+    so ``.values()`` yields the same pks the serializer does.
+    ``test_values_matches_the_serializer`` holds that. The post_save signal
+    still uses the serializer for its single instance.
+    """
+    return wire_values(VoteTransferSerializer, qs)
 
 
 @app_state_collectors
@@ -125,5 +141,5 @@ class VoteTransfers(AppStateCollector):
     def collect(self, state: AppState) -> None:
         state.add_batch(
             VoteTransferChanged,
-            VoteTransferSerializer(self.context.vote_transfers.all(), many=True).data,
+            vote_transfer_payloads(self.context.vote_transfers.all()),
         )

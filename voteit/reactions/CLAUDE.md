@@ -99,6 +99,8 @@ All messages are outgoing only (server → client).
 
 **On AgendaItemChannel subscribe:** aggregated `ReactionCount` messages (one per button+object combination with count > 0) plus one `reaction.changed.batch` covering the subscribing user's own reactions within that agenda item are pushed. This is done in exactly 2 queries regardless of the number of buttons or reactions.
 
+That was not true until `reactions.own` stopped handing the queryset to `ReactionSerializer`. `content_type` is rendered by `ContentTypeShortnameSerializer`, a `CharField` subclass — so it gets none of DRF's pk-only optimisation for related fields and loaded a whole `ContentType` per row through the FK descriptor, which does not use `get_for_id`'s process cache. One query per reaction: 132 queries and 46 ms for the 131 reactions one user held on the busiest agenda item in the dev data. Both collectors now build payloads with `.values()` and map the pk through `collectors.content_type_shortname` (cached), which is 1 query and 0.8 ms. The mapping is mandatory, not cosmetic: `UserReactionResponseSchema.content_type` is a validated shortname, so a raw pk is rejected rather than sent.
+
 | Message name | Type | Payload | Channel |
 |---|---|---|---|
 | `reaction_button.changed` | `ButtonChanged` | Full button serialization | `broadcast_meeting` |

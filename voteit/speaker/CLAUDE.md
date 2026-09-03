@@ -208,7 +208,7 @@ There is no `*.added` message; the client upserts on `*.changed`.
 
 `SpeakerSerializer` includes a denormalised `room` field (source: `speaker_list.room`) so clients can route messages without traversing the list.
 
-The `active_list_changed` batch and the `speaker.active_list` collector both build their payloads with `collectors.speaker_payloads`, a `.values()` query whose field list is derived from `SpeakerSerializer.Meta.fields` (`room` becomes an `F("speaker_list__room_id")` alias, since it is not a column). `.values()` rather than the serializer because it is about 5x faster and uses 3x less memory; `tests/test_collectors.py::test_values_matches_the_serializer` holds that the two produce identical frames.
+The `active_list_changed` batch and the `speaker.active_list` collector both build their payloads with `collectors.speaker_payloads`, a `messaging.values.wire_values` query whose field list is derived from `SpeakerSerializer` (`room` becomes an `F("speaker_list__room_id")` alias, since it is not a column). `.values()` rather than the serializer because it is about 5x faster and uses 3x less memory; `tests/test_collectors.py::test_values_matches_the_serializer` holds that the two produce identical frames.
 
 ## Signals
 

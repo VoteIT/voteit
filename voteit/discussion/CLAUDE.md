@@ -74,7 +74,7 @@ All three messages extend base classes from `voteit.messaging.base`:
 
 All messages are published synchronously (`ch.sync_publish`) to `AgendaItemChannel` for the post's agenda item.
 
-The `discussion.posts` collector (`collectors.py`) appends existing posts on `AgendaItemChannel` subscription with `add_batch(DiscussionPostChanged, ...)`, arriving as one `discussion_post.changed.batch` inside the channel's `channel.state` bundle.
+The `discussion.posts` collector (`collectors.py`) appends existing posts on `AgendaItemChannel` subscription with `add_batch(DiscussionPostChanged, ...)`, arriving as one `discussion_post.changed.batch` inside the channel's `channel.state` bundle. Payloads are built by `discussion_post_payloads`, a `.values()` query whose field list comes from `DiscussionPostDetailSerializer` via `messaging.values.wire_values` — one query and 2.3x cheaper than the serializer over the 281 posts the busiest agenda item in the dev data holds. The `post_save` signal still uses the serializer for its single instance; `tests/test_collectors.py` asserts the two agree.
 
 The `@disable_on_raw_save` decorator on `discussion_post_change` suppresses broadcasts during data migrations (raw saves).
 

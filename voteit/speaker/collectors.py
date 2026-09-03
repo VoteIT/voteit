@@ -12,6 +12,7 @@ from voteit.core.messages.role_updates import RolesChanged
 from voteit.core.utils import get_model_shortname
 from voteit.messaging.collectors import AppStateCollector
 from voteit.messaging.registry import app_state_collectors
+from voteit.messaging.values import wire_values
 from voteit.room.channels import RoomChannel
 from voteit.speaker.messages import SpeakerChanged
 from voteit.speaker.messages import SpeakerListChanged
@@ -28,17 +29,6 @@ if TYPE_CHECKING:
     from voteit.messaging.state import AppState
 
 
-# Taken from the serializer rather than repeated, so the two cannot drift.
-# ``room`` is the one field that is not a column on Speaker -- SpeakerSerializer
-# reads it through speaker_list, and the queryset does the same with an alias,
-# which keeps every other name a plain column. A method field added to the
-# serializer makes .values() raise FieldError rather than silently dropping it.
-SPEAKER_ANNOTATIONS = {"room": models.F("speaker_list__room_id")}
-SPEAKER_FIELDS = tuple(
-    f for f in SpeakerSerializer.Meta.fields if f not in SPEAKER_ANNOTATIONS
-)
-
-
 def speaker_payloads(qs: models.QuerySet) -> models.QuerySet:
     """The ``speaker.changed`` payload for every speaker in ``qs``.
 
@@ -50,12 +40,15 @@ def speaker_payloads(qs: models.QuerySet) -> models.QuerySet:
     time and 3.1x the memory to produce the identical frame. Nothing here binds
     a state machine -- Speaker does not use StateMachineModelMixin, only
     SpeakerListSystem does -- so unlike ``agenda.items`` that gap is plain model
-    construction and DRF field overhead, and it does not shrink. The ``room``
-    join costs about 15% against spelling the six keys out by hand (0.90 ms vs
-    0.78 ms); drift safety is worth more.
+    construction and DRF field overhead, and it does not shrink.
+
+    ``room`` is the one field that is not a column on Speaker --
+    SpeakerSerializer reads it through speaker_list, and the queryset does the
+    same with an alias. The join costs about 15% against spelling the six keys
+    out by hand (0.90 ms vs 0.78 ms); drift safety is worth more.
     ``test_values_matches_the_serializer`` holds that the frames are equal.
     """
-    return qs.values(*SPEAKER_FIELDS, **SPEAKER_ANNOTATIONS)
+    return wire_values(SpeakerSerializer, qs, room=models.F("speaker_list__room_id"))
 
 
 @app_state_collectors

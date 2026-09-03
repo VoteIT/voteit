@@ -7,15 +7,14 @@ from django.test.utils import CaptureQueriesContext
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.statemachines import MeetingStateMachine
-from voteit.messaging.registry import batch_for
 from voteit.messaging.testing import ChannelMessageCatcher
+from voteit.messaging.testing import assert_frames_equal
 from voteit.messaging.testing import action_of
 from voteit.messaging.testing import payloads_of
 from voteit.messaging.testing import run_collector
 from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.room.channels import RoomChannel
-from voteit.speaker.collectors import SPEAKER_ANNOTATIONS
-from voteit.speaker.collectors import SPEAKER_FIELDS
+from voteit.messaging.values import wire_field_names
 from voteit.speaker.collectors import speaker_payloads
 from voteit.speaker.messages import SpeakerChanged
 from voteit.speaker.models import Speaker
@@ -63,31 +62,27 @@ class SpeakerWireShapeTests(TestCase):
         # Speaker has no Meta.ordering, so pin one -- otherwise the two
         # executions are free to disagree about row order.
         qs = Speaker.objects.filter(speaker_list=self.speaker_list).order_by("pk")
-        batch_cls = batch_for(SpeakerChanged)
-        from_values = batch_cls(payload={"items": list(speaker_payloads(qs))})
-        from_serializer = batch_cls(
-            payload={
-                "items": SpeakerSerializer(
-                    qs.select_related("speaker_list"), many=True
-                ).data
-            }
-        )
-        self.assertEqual(
-            from_serializer.model_dump(mode="json"),
-            from_values.model_dump(mode="json"),
+        assert_frames_equal(
+            self,
+            SpeakerChanged,
+            speaker_payloads(qs),
+            SpeakerSerializer(qs.select_related("speaker_list"), many=True).data,
         )
 
-    def test_field_list_tracks_the_serializer(self):
-        self.assertEqual(
-            set(SpeakerSerializer.Meta.fields),
-            set(SPEAKER_FIELDS) | set(SPEAKER_ANNOTATIONS),
-        )
+    def test_wire_fields_are_pinned(self):
+        """Changing what goes on the wire must fail loudly, not silently.
 
-    def test_every_field_is_a_concrete_column(self):
-        """A method field added to the serializer must fail loudly, not silently."""
-        # .values() raises FieldError for anything that is not a column or an
-        # alias, so simply evaluating the queryset is the assertion.
+        Two halves. ``.values()`` raises FieldError for anything that is not a
+        column or an alias, so evaluating the queryset is the assertion for a
+        method field. The field list is spelled out on purpose: renaming or
+        dropping one is a wire-format change, and breaking here is how the
+        person making it finds out.
+        """
         list(speaker_payloads(Speaker.objects.filter(speaker_list=self.speaker_list)))
+        self.assertSetEqual(
+            {"pk", "room", "seconds", "speaker_list", "started", "user"},
+            set(wire_field_names(SpeakerSerializer)),
+        )
 
     def test_signal_matches_the_collector(self):
         """The active-list batch and the initial state agree, field for field."""

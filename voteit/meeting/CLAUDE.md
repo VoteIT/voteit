@@ -90,6 +90,14 @@ Three collectors in `collectors.py` contribute to both channels: `meeting.roles`
 subscriber's own roles), `meeting.groups` (groups plus memberships) and
 `meeting.group_roles`, which opts out in `applicable()` unless `group_roles_active`.
 
+The last two build their payloads with `.values()` via `messaging.values.wire_values`,
+which reads the field list off `MeetingGroupSerializer` / `GroupMembershipSerializer` /
+`GroupRoleSerializer` rather than repeating it. Groups and memberships both scale with
+the meeting — 315 groups and 417 memberships in the largest meeting in the dev data, at
+6.6x and 3.0x the serializer's cost. `tests/test_collectors.py` asserts both routes
+render identical frames. Note there is no `prefetch_related("delegate_to")`: it is a
+ForeignKey rendered as a pk, so the prefetch was a second query that bought nothing.
+
 ## Signals
 
 `signals.py` wires everything together. Key chains:
