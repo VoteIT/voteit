@@ -143,7 +143,10 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
 
     class Meta:
         model = Proposal
-        read_only_fields = ["prop_id"]
+        read_only_fields = [
+            "pk",
+            "prop_id",
+        ]
         fields = [
             "author",
             "agenda_item",
