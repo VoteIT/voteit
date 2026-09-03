@@ -148,10 +148,6 @@ Extends `rules.contrib.rest_framework.AutoPermissionViewSetMixin`. Two additions
 
 The `permission_type_map` extends the base class to mark `"metadata"` and `"transitions"` as `None` (no permission check).
 
-### `SerializerClassesMixin`
-
-Allows a ViewSet to declare `serializer_classes = {"action_name": SerializerClass, ...}` and fall back to `serializer_class` for unlisted actions. Transition actions return an empty `Serializer`. If `"update"` is in `serializer_classes` without `"partial_update"`, the same serializer is automatically added for `partial_update` (with a warning).
-
 ### `StateMachineMixin`
 
 Adds one action to any ViewSet whose model uses `StateMachineModelMixin`:
@@ -165,7 +161,7 @@ Schema introspection is **not** on this mixin. `StateMachinesViewSet` (`rest_api
 
 Helper for ViewSets that need to look up a context object (e.g. a Meeting) from request data. Subclasses declare `context_queryset` and optionally `context_lookup_kwarg` / `context_lookup_field`. Call `self.get_context(request)` inside an action.
 
-### `SerializerClassesMixin` (serializers)
+### Serializer mixins (`rest_api/serializers.py`)
 
 `BaseModelSerializer` validates `author` and `meeting_group` with meeting-scoped permission checks. `RichTextSerializerMixin` auto-extracts hashtags from body into `tags` and numeric `@mentions` into `mentions` (filtered to actual meeting participants).
 

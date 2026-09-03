@@ -80,7 +80,6 @@ class OrganisationViewSet(
 
 # @router.register("id-organisations", basename="id-organisations")
 # class IDProxyOrganisationViewSet(
-#     SerializerClassesMixin,
 #     mixins.CreateModelMixin,
 #     mixins.RetrieveModelMixin,
 #     mixins.UpdateModelMixin,

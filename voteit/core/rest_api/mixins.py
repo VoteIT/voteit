@@ -1,7 +1,5 @@
 from abc import ABC
 from abc import abstractmethod
-from logging import getLogger
-from typing import Dict
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -13,7 +11,6 @@ from django.utils.module_loading import import_string
 from rest_framework import exceptions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.serializers import Serializer
 from rest_framework.utils import formatting
 from rules.contrib.rest_framework import (
     AutoPermissionViewSetMixin as RulesAutoPermissionViewSetMixin,
@@ -33,9 +30,6 @@ def _sm_to_mermaid(sm_class) -> str:
         if state.final:
             lines.append(f"    {state.id} --> [*]")
     return "\n".join(lines)
-
-
-logger = getLogger(__name__)
 
 
 class VerboseAutoPermissionViewSetMixin(RulesAutoPermissionViewSetMixin):
@@ -64,34 +58,6 @@ class VerboseAutoPermissionViewSetMixin(RulesAutoPermissionViewSetMixin):
                 raise exceptions.PermissionDenied(perm_denied_msg(perm, obj)) from exc
             else:
                 raise
-
-
-class SerializerClassesMixin:
-    serializer_classes: Dict[str, Serializer] = {}
-
-    def get_serializer_class(self):
-        """
-        Use serializer_classes and fall back to serializer_class.
-        Return empty serializer for transition actions.
-        """
-        if self.name == "Transition action":
-            return Serializer
-        return self.serializer_classes.get(self.action, self.serializer_class)
-
-    def __init_subclass__(cls, **kwargs):
-        """
-        Make sure subclasses that have 'update' specified also have 'partial_update'
-        """
-        if (
-            "update" in cls.serializer_classes
-            and "partial_update" not in cls.serializer_classes
-        ):
-            logger.warning(
-                "%s has 'update' in serializer_classes, but not 'partial_update'. "
-                "Adding serializer to partial update too.",
-                cls,
-            )
-            cls.serializer_classes["partial_update"] = cls.serializer_classes["update"]
 
 
 class ModelContextMixin(ABC):
