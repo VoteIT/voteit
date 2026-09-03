@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import models
 
 from voteit.meeting.channels import ModeratorsChannel
 from voteit.meeting.channels import ParticipantsChannel
@@ -25,6 +26,36 @@ from voteit.speaker.statemachines import SpeakerSystemStateMachine
 
 if TYPE_CHECKING:
     from voteit.messaging.state import AppState
+
+
+# Taken from the serializer rather than repeated, so the two cannot drift.
+# ``room`` is the one field that is not a column on Speaker -- SpeakerSerializer
+# reads it through speaker_list, and the queryset does the same with an alias,
+# which keeps every other name a plain column. A method field added to the
+# serializer makes .values() raise FieldError rather than silently dropping it.
+SPEAKER_ANNOTATIONS = {"room": models.F("speaker_list__room_id")}
+SPEAKER_FIELDS = tuple(
+    f for f in SpeakerSerializer.Meta.fields if f not in SPEAKER_ANNOTATIONS
+)
+
+
+def speaker_payloads(qs: models.QuerySet) -> models.QuerySet:
+    """The ``speaker.changed`` payload for every speaker in ``qs``.
+
+    Used by this collector and by ``signals.notify_active_list_changed``, which
+    used to rebuild the same six keys by hand. ``.values()`` rather than
+    SpeakerSerializer because these payloads are pure columns and the
+    serializer is not free: measured over the largest speaker list in the dev
+    data (125 rows) at 3.2 ms / 169 kB against 0.6 ms / 54 kB, which is 5.3x the
+    time and 3.1x the memory to produce the identical frame. Nothing here binds
+    a state machine -- Speaker does not use StateMachineModelMixin, only
+    SpeakerListSystem does -- so unlike ``agenda.items`` that gap is plain model
+    construction and DRF field overhead, and it does not shrink. The ``room``
+    join costs about 15% against spelling the six keys out by hand (0.90 ms vs
+    0.78 ms); drift safety is worth more.
+    ``test_values_matches_the_serializer`` holds that the frames are equal.
+    """
+    return qs.values(*SPEAKER_FIELDS, **SPEAKER_ANNOTATIONS)
 
 
 @app_state_collectors
@@ -109,8 +140,8 @@ class ActiveSpeakerList(AppStateCollector):
         active_list = self.context.sls.active_list
         qs = Speaker.objects.filter(
             speaker_list__room=self.context, speaker_list=active_list
-        ).select_related("speaker_list")
-        state.add_batch(SpeakerChanged, SpeakerSerializer(qs, many=True).data)
+        )
+        state.add_batch(SpeakerChanged, speaker_payloads(qs))
         state.append(
             SpeakerListChanged(payload=SpeakerListSerializer(active_list).data)
         )

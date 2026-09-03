@@ -53,7 +53,7 @@ All messages are outgoing-only and sent exclusively to the owning user's `UserCh
 
 | Message name | Class | Payload |
 |---|---|---|
-| `note.changed` | `NoteChanged` | Full note data including `pk`, `proposal`, `agenda_item`, `meeting`, `user`, `body`, `intent`, `created` |
+| `note.changed` | `NoteChanged` | `pk`, `proposal`, `agenda_item`, `meeting`, `user`, `body`, `intent`, `created` — the `NoteSerializer` field list, via `note_payloads` |
 | `note.deleted` | `NoteDeleted` | `pk` only |
 
 There is no `note.added`; the client upserts on `pk`.
@@ -62,9 +62,9 @@ There is no `note.added`; the client upserts on `pk`.
 
 ### Signal handlers (`signals.py`)
 
-- `post_save` on `Note` — deferred to transaction commit via `@on_transaction_commit`; publishes `NoteChanged` to `UserChannel(instance.user_id)`.
+- `post_save` on `Note` — deferred to transaction commit via `@on_transaction_commit`; publishes `NoteChanged` to `UserChannel(instance.user_id)`, built by the same `note_payloads` the collector uses.
 - `pre_delete` on `Note` — not deferred (must fire before the row is gone); publishes `NoteDeleted` to `UserChannel(instance.user_id)`.
-- `notes.notes` collector on `AgendaItemChannel` — runs when a user subscribes to an agenda item channel. `applicable()` checks `NotesComponent` is enabled for the meeting, then `collect()` queries the user's notes for that agenda item and appends them with `app_state.add_batch(NoteChanged, payloads)`, i.e. as one `note.changed.batch`. Uses `.values()` to avoid N+1 (two queries total regardless of note count).
+- `notes.notes` collector on `AgendaItemChannel` — runs when a user subscribes to an agenda item channel. `applicable()` checks `NotesComponent` is enabled for the meeting, then `collect()` queries the user's notes for that agenda item and appends them with `app_state.add_batch(NoteChanged, payloads)`, i.e. as one `note.changed.batch`. Builds the payloads with `.values()` (`note_payloads`), so it stays at two queries regardless of note count and never instantiates a Note.
 
 ## Components (`components.py`)
 
@@ -94,6 +94,7 @@ python manage.py test voteit.notes --keepdb --failfast
 ```
 
 Test modules:
+- `tests/test_collectors.py` — that `note_payloads`' `.values()` output is byte-identical to `NoteSerializer`, that its field list tracks `Meta.fields`, and that the collector and the signal agree
 - `tests/test_models.py` — model creation, meeting auto-population, duplicate constraint
 - `tests/test_signals.py` — WebSocket message emission on add/change/delete, subscription batch, N+1 query guard on subscription
 - `rest_api/tests/test_views.py` — full CRUD, upsert behaviour, HTML sanitisation, cross-user isolation, list filter enforcement, `delete-all` scoping

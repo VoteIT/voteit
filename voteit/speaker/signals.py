@@ -30,6 +30,7 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.signals import archive_meeting
 from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.room.channels import RoomChannel
+from voteit.speaker.collectors import speaker_payloads
 from voteit.speaker.messages import SpeakerChanged
 from voteit.speaker.messages import SpeakerDeleted
 from voteit.speaker.messages import SpeakerListChanged
@@ -62,23 +63,13 @@ def notify_active_list_changed(instance: SpeakerListSystem, **kwargs):
         msg = SpeakerListChanged(payload=serializer.data)
         room_ch = RoomChannel(instance.room_id)
         room_ch.sync_publish(msg)
-        speaker_qs = Speaker.objects.filter(
-            # speaker_list__room=context,
-            speaker_list=instance.active_list,
-        ).values("user_id", "started", "pk", "seconds")
-        if speaker_qs:
-            payloads = []
-            for item in speaker_qs:
-                payloads.append(
-                    {
-                        "room": instance.room_id,
-                        "user": item["user_id"],
-                        "speaker_list": instance.active_list_id,
-                        "started": item["started"],
-                        "pk": item["pk"],
-                        "seconds": item["seconds"],
-                    }
-                )
+        # Same builder as the speaker.active_list collector, so this batch and a
+        # subscriber's initial state cannot describe a speaker differently. The
+        # six keys used to be spelled out here by hand.
+        payloads = list(
+            speaker_payloads(Speaker.objects.filter(speaker_list=instance.active_list))
+        )
+        if payloads:
             # Pre-built batch rather than N messages: the whole active list is
             # replaced at once. TransactionBatcher passes an already-batched
             # message straight through.

@@ -208,10 +208,12 @@ There is no `*.added` message; the client upserts on `*.changed`.
 
 `SpeakerSerializer` includes a denormalised `room` field (source: `speaker_list.room`) so clients can route messages without traversing the list.
 
+The `active_list_changed` batch and the `speaker.active_list` collector both build their payloads with `collectors.speaker_payloads`, a `.values()` query whose field list is derived from `SpeakerSerializer.Meta.fields` (`room` becomes an `F("speaker_list__room_id")` alias, since it is not a column). `.values()` rather than the serializer because it is about 5x faster and uses 3x less memory; `tests/test_collectors.py::test_values_matches_the_serializer` holds that the two produce identical frames.
+
 ## Signals
 
 Custom signals defined in `signals.py`:
-- `active_list_changed(instance: SpeakerListSystem)` — fired when `active_list_id` changes; handler publishes `SpeakerListChanged` plus a pre-built `speaker.changed.batch` covering every existing speaker, to the `RoomChannel`
+- `active_list_changed(instance: SpeakerListSystem)` — fired when `active_list_id` changes; handler publishes `SpeakerListChanged` plus a pre-built `speaker.changed.batch` covering every existing speaker, to the `RoomChannel`. The batch is `speaker_payloads()` over the list's speakers
 - `list_method_added(sender=method_class, instance: SpeakerListSystem)` — fired on method assignment or system creation
 - `list_method_removed(sender=method_class, instance: SpeakerListSystem)` — fired on method change or system deletion
 
