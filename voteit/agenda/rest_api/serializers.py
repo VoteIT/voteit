@@ -68,6 +68,7 @@ class CreateAgendaItemSerializer(AgendaItemSerializer):
         read_only_fields = []
         exclude = (
             "author",
+            "id",
             "related_modified",
             "mentions",
             "state",
