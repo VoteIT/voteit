@@ -46,7 +46,7 @@ def _fetch_mentions_map(pks: list[int]) -> dict[int, list[int]]:
 def attach_proposals(meeting: Meeting, app_state: AppState, include_private=False):
     # Proposals — exclude "mentions" from .values() because M2M in values() produces one row
     # per relationship (fan-out), causing duplicate proposals. Inject mentions separately.
-    exclude_fields = {"body_diff_brief", "body_diff", "shortname", "mentions"}
+    exclude_fields = {"body_diff_brief", "shortname", "mentions"}
     proposal_fields = set(ProposalDetailSerializer.Meta.fields) - exclude_fields
     qs = Proposal.objects.filter(
         agenda_item__meeting=meeting, diffproposal__isnull=True

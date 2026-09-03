@@ -165,14 +165,12 @@ class ProposalCreateSerializer(RichTextSerializerMixin, BaseModelSerializer):
 
 
 class DiffProposalCreateSerializer(ProposalCreateSerializer):
-    body_diff = serializers.SerializerMethodField()
     body_diff_brief = serializers.SerializerMethodField()
 
     class Meta(ProposalCreateSerializer.Meta):
         model = DiffProposal
         fields = [
             "paragraph",
-            "body_diff",
             "body_diff_brief",
         ] + ProposalCreateSerializer.Meta.fields
 
@@ -385,7 +383,7 @@ class ExportDiffProposalSerializer(
             list(
                 x
                 for x in DiffProposalDetailSerializer.Meta.fields
-                if x not in ["body_diff", "body_diff_brief", "mentions"]
+                if x not in ["body_diff_brief", "mentions"]
             )
             + ExportBaseSerializerMixin.Meta.fields
         )

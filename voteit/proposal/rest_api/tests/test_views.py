@@ -239,7 +239,7 @@ class ProposalsAPITests(APITestCase):
         )
         self.assertEqual(
             '<span class="text-diff-removed">I am the eggman <br/> I am the walrus</span> <span class="text-diff-added">Hello world!</span>',
-            data["body_diff"],
+            data["body_diff_brief"],
         )
 
     @patch.object(ParticipantsChannel, "sync_publish")
