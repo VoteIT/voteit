@@ -83,6 +83,8 @@ def close_session_connections(
 
     What an ordinary logout wants: the tabs that actually lost their login, and
     not the same user's other browser or phone, whose session is still valid.
+    A logout passes ``code=LOGGED_OUT`` (4000) and no notice -- the code is the
+    whole message, and the client words it.
     """
     _close(group=session_group(session_key), code=code, notice=notice)
 
@@ -99,6 +101,8 @@ def close_user_connections(
     With ``flush_session`` each consumer deletes its own session on the way
     out. That is the only way to reach a session we cannot name from here --
     see ``voteit.core.sessions`` for the other half of "log out everywhere".
+    A logout everywhere passes ``code=LOGGED_OUT_EVERYWHERE`` (4001), the
+    all-devices counterpart of the 4000 above.
     """
     _close(
         group=user_group(user_pk),

@@ -76,13 +76,21 @@ everywhere" closes `user_<pk>` instead.
 
 `close.py` sends `s.close`; the consumer answers with `s.closing` and then closes.
 That frame carries **nothing but a close code** — 1000 means stay out, 1001 that
-the server is going away and the client should come back. Anything the *user*
-should read is a separate `s.msg`, which every function here sends first if given
-one, to the same target so it cannot arrive after the socket has gone.
+the server is going away and the client should come back, and the two codes from
+the application-private range say the session behind the socket is gone: 4000
+(`LOGGED_OUT`) for an ordinary logout, 4001 (`LOGGED_OUT_EVERYWHERE`) when the
+user logged out on every device. Anything the *user* should read beyond that is
+a separate `s.msg`, which every function here sends first if given one, to the
+same target so it cannot arrive after the socket has gone.
+
+A logout sends no notice: the code already says what happened, and the client is
+what knows how to word it — which is the whole reason the two logout cases have
+separate codes. All four are in `NORMAL_CLOSE_CODES`, so neither a logout nor a
+maintenance window reads as a wave of abnormal closures in the socket stats.
 
 ```python
-close_session_connections(request.session.session_key, notice=Notice(...))
-close_user_connections(user.pk, flush_session=True, notice=Notice(...))
+close_session_connections(request.session.session_key, code=LOGGED_OUT)
+close_user_connections(user.pk, code=LOGGED_OUT_EVERYWHERE, flush_session=True)
 close_all_connections(notice=Notice(...))      # manage.py close_sockets
 ```
 

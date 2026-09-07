@@ -3,7 +3,6 @@ from django.contrib.auth import login
 from django.contrib.auth import logout
 from django.contrib.messages import get_messages
 from django.db import transaction
-from django.utils.translation import gettext as _
 from rest_framework import filters
 from rest_framework import mixins
 from rest_framework import permissions
@@ -17,7 +16,6 @@ from statemachine import registry as sm_registry
 
 from voteit.core import PERM
 from voteit.core.loggers import log_auth
-from voteit.core.messages.notice import Notice
 from voteit.core.rest_api import router
 from voteit.core.rest_api.filters import ActionAnnotatedDjangoFilterBackend
 from voteit.core.rest_api.mixins import ModelContextMixin
@@ -33,6 +31,8 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.close import close_session_connections
 from voteit.messaging.close import close_user_connections
+from voteit.messaging.models import LOGGED_OUT
+from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
 from voteit.organisation.pipeline import _transfer_social_auths
 from voteit.organisation.utils import get_idproxy_user_data
 
@@ -125,29 +125,19 @@ class UserView(
         elif session_key:
             forget_session(user_pk, session_key)
         logout(request)
+        # No notice beside the close: the close code says "logged out" by
+        # itself -- 4001 for every device, 4000 for this one -- and the client
+        # is what knows how to word either.
         if everywhere:
             close_user_connections(
                 user_pk,
+                code=LOGGED_OUT_EVERYWHERE,
                 # Sockets flush their own session on the way out, which is what
                 # reaches a device end_tracked_sessions could not name.
                 flush_session=True,
-                notice=Notice(
-                    payload={
-                        "type": "info",
-                        "message": _("You have been logged out on all devices."),
-                    }
-                ),
             )
         elif session_key:
-            close_session_connections(
-                session_key,
-                notice=Notice(
-                    payload={
-                        "type": "info",
-                        "message": _("You have been logged out."),
-                    }
-                ),
-            )
+            close_session_connections(session_key, code=LOGGED_OUT)
         return Response()
 
     @action(methods=["POST"], detail=True)

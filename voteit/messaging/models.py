@@ -14,7 +14,19 @@ NORMAL_CLOSURE = 1000
 GOING_AWAY = 1001
 ABNORMAL_CLOSURE = 1006
 
-NORMAL_CLOSE_CODES = (NORMAL_CLOSURE, GOING_AWAY)
+# 4000-4999 is the application-private range. These two say "the session behind
+# this socket is gone", which is all the client needs to react to a logout on
+# its own -- no notice has to be sent alongside them. They are split because
+# the client words the two cases differently: one device, or all of them.
+LOGGED_OUT = 4000
+LOGGED_OUT_EVERYWHERE = 4001
+
+NORMAL_CLOSE_CODES = (
+    NORMAL_CLOSURE,
+    GOING_AWAY,
+    LOGGED_OUT,
+    LOGGED_OUT_EVERYWHERE,
+)
 
 
 class ConnectionQuerySet(models.QuerySet):

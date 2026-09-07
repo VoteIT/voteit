@@ -148,9 +148,11 @@ class Pong(BaseMessage):
 class ClosePayload(BaseModel):
     """What the client is told immediately before its socket goes away."""
 
-    #: RFC 6455 close code. Both codes we send are in NORMAL_CLOSE_CODES, so a
-    #: maintenance window does not read as a wave of abnormal closures in the
-    #: socket stats.
+    #: Close code: RFC 6455's, plus LOGGED_OUT (4000) and
+    #: LOGGED_OUT_EVERYWHERE (4001) from the application-private range. Every
+    #: code we send is in NORMAL_CLOSE_CODES, so neither a logout nor a
+    #: maintenance window reads as a wave of abnormal closures in the socket
+    #: stats.
     code: int = NORMAL_CLOSURE
 
 

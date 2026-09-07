@@ -24,6 +24,8 @@ from voteit.messaging.close import close_all_connections
 from voteit.messaging.close import close_session_connections
 from voteit.messaging.close import close_user_connections
 from voteit.messaging.models import GOING_AWAY
+from voteit.messaging.models import LOGGED_OUT
+from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
 from voteit.messaging.models import NORMAL_CLOSURE
 from voteit.messaging.models import Connection
 from voteit.messaging.testing import ChannelMessageCatcher
@@ -153,17 +155,9 @@ class LiveSocketTests(ConsumerTestCase):
 
         self.assertEqual(200, response.status_code)
         for communicator in (first, second):
-            messages = await communicator.receive_all_messages(
-                stop_action="s.closing", timeout=2
-            )
-            notice = next(m for m in messages if m.action == "s.msg")
-            # The view supplies it; an empty one would mean the SPA has
-            # nothing to show and the wiring only looks right.
-            self.assertNotEqual("", notice.payload.message)
-            self.assertEqual(
-                NORMAL_CLOSURE,
-                next(m for m in messages if m.action == "s.closing").payload.code,
-            )
+            # 4000 and no s.msg: the code is the whole message, and the SPA is
+            # what words it.
+            await self._assert_closed(communicator, code=LOGGED_OUT)
         self.assertTrue(await elsewhere.receive_nothing(timeout=0.5))
         await elsewhere.disconnect()
 
@@ -180,10 +174,9 @@ class LiveSocketTests(ConsumerTestCase):
 
         self.assertEqual(200, response.status_code)
         for communicator in (here, elsewhere):
-            await self._assert_closed(
-                communicator,
-                notice=("info", "You have been logged out on all devices."),
-            )
+            # A separate code from the 4000 above, because the SPA words "you
+            # were logged out here" and "on every device" differently.
+            await self._assert_closed(communicator, code=LOGGED_OUT_EVERYWHERE)
         self.assertTrue(await other_user.receive_nothing(timeout=0.5))
         await other_user.disconnect()
 

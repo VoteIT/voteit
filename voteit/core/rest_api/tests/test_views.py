@@ -25,6 +25,8 @@ from voteit.core.testing import IsolatedCacheMixin
 from voteit.core.statemachines import TransitionSignalMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.messaging.models import LOGGED_OUT
+from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.roles import ROLE_ORG_MANAGER
@@ -286,6 +288,10 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
         self.assertNotIn("_auth_user_id", self.client.session)
         close.assert_called_once()
         self.assertEqual(session_key, close.call_args.args[0])
+        # The close code is the whole message -- no notice is sent, so a wrong
+        # code would leave the SPA with nothing to react to.
+        self.assertEqual(LOGGED_OUT, close.call_args.kwargs["code"])
+        self.assertNotIn("notice", close.call_args.kwargs)
 
     def test_logout_closes_only_that_sessions_sockets(self):
         """The socket scope's user is resolved once, at handshake, so nothing
@@ -315,6 +321,9 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
         self.assertEqual(200, response.status_code)
         close_session.assert_not_called()
         self.assertEqual(self.participant.pk, close_user.call_args.args[0])
+        # Its own code, so the SPA can tell "logged out here" from "logged out
+        # on every device" without being sent a notice.
+        self.assertEqual(LOGGED_OUT_EVERYWHERE, close_user.call_args.kwargs["code"])
         # Without this the sockets close but the sessions behind them live on.
         self.assertIs(True, close_user.call_args.kwargs["flush_session"])
 
