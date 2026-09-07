@@ -22,6 +22,8 @@ channel definitions and the `Connection` model. Built on
 | `collectors.py` | `AppStateCollector`, the ABC each app subclasses in its own `collectors.py`. |
 | `bundle.py` | Packs collector output into `channel.state` frames under `VOTEIT_APP_STATE_BUNDLE_BYTES`, and binds the bundle's payload union. |
 | `utils.py` | `publish()`, `Target`, `TransactionBatcher`, and `_send_now()`, the single point where anything reaches the channel layer. |
+| `presence.py` | `presence(window)` — who is online, in total and per organisation. Behind both the admin page and `manage.py online_connections`. |
+| `close.py` | `close_session_connections()` / `close_user_connections()` / `close_all_connections()`. Server-initiated disconnects, which do **not** go through `utils.py` -- see below. |
 | `jobs.py` | `build_subscription` plus `subscribe_job` / `recheck_job`, run on the `default` RQ queue, and `close_stale_connections` (see below). |
 | `admin.py` | Read-only `Connection` admin, the `/admin/.../connection/online/` page and the stale-row action. |
 | `state.py` | `AppState`, the accumulator collectors append to, grouped into `StateSection`s. |
@@ -52,7 +54,8 @@ frame the client sees is the same either way.
 
 ## Connect
 
-An authenticated socket joins its own `user_<pk>` group, gets `s.versions`, and
+An authenticated socket joins its own `user_<pk>` group and the
+`session_<key>` group of the Django session that opened it, gets `s.versions`, and
 is then subscribed to the organisation the user belongs to -- the client never
 asks for it, because there is nothing to choose. That one stream is built
 inline in `post_authentication` (`build_subscription` on Channels' sync thread)
@@ -64,125 +67,53 @@ nothing.
 Everything the User model pushes -- `user.inv` -- goes to that channel too.
 There is no longer an `online` group holding every open socket.
 
-## Subscribe
+The two groups differ in blast radius, which is the whole reason both exist: a
+logout closes `session_<key>`, so the tabs that actually lost their login go and
+the same user's phone -- a different session, still valid -- stays. "Log out
+everywhere" closes `user_<pk>` instead.
 
-`channel.subscribe {channel_type, pk}` only enqueues; the worker checks
-permission, joins the group and streams back:
+## Closing a socket from the server
 
-```
-channel.subscribed    <- channel metadata + the names of every contributing collector
-channel.state  x N    <- the initial state itself, usually one frame
-channel.state_complete
-```
-
-A `channel.state` payload is `{pk, channel_type, seq, sections}`, where each
-section is one collector's output:
-
-```json
-{"name": "poll.own_votes", "complete": true, "failed": false,
- "messages": [{"action": "vote.changed.batch", "payload": {"items": [...]}}]}
-```
-
-`complete` is False when that collector's output continues in the next bundle;
-`failed` means it raised, so what is there is partial. Sections are packed
-until `VOTEIT_APP_STATE_BUNDLE_BYTES` (1 MB), so an ordinary meeting arrives in
-a single frame instead of the dozens of loose messages this replaced.
-
-### Contributing initial state
-
-Declare a collector in the owning app's `collectors.py` (autodiscovered):
+`close.py` sends `s.close`; the consumer answers with `s.closing` and then closes.
+That frame carries **nothing but a close code** — 1000 means stay out, 1001 that
+the server is going away and the client should come back. Anything the *user*
+should read is a separate `s.msg`, which every function here sends first if given
+one, to the same target so it cannot arrive after the socket has gone.
 
 ```python
-@app_state_collectors
-class Polls(AppStateCollector):
-    name = "poll.polls"              # goes on the wire; must be unique
-    channels = (ParticipantsChannel, ModeratorsChannel)
-    order = 50                       # 10 structural, 50 content, 200 user-specific
-
-    def applicable(self) -> bool:    # cheap; False = skipped and never announced
-        return True
-
-    def collect(self, state: AppState) -> None:
-        state.add_batch(PollChanged, serializer.data)
+close_session_connections(request.session.session_key, notice=Notice(...))
+close_user_connections(user.pk, flush_session=True, notice=Notice(...))
+close_all_connections(notice=Notice(...))      # manage.py close_sockets
 ```
 
-`self.channel`, `self.context` and `self.user` are set for you. A collector
-registered on several channels branches on `self.channel` — that is how the
-participants/moderators visibility pairs work.
+**Do not send `s.close` through `publish()` or `send_to_consumer()`.** It is not
+registered with `@outgoing`, so with `VOTEIT_WS_FAST_FANOUT` on -- the default --
+`_send_now` takes the passthrough route, which forwards the raw frame to the
+browser and never runs an event handler. The client would receive
+`{"action": "s.close"}`, ignore it, and stay connected. The close goes through
+chanx's typed dispatcher instead, which is also why it is immediate rather than
+deferred to commit by `TransactionBatcher` -- and why the notice beside it is
+published with `on_commit=False`, or it would be flushed after the socket had
+already gone.
 
-There is no `meeting` channel. Anything meeting-wide now
-goes through `voteit.meeting.channels.broadcast_meeting`, which publishes to both
-groups, and every collector that used to serve `meeting` declares
-`channels = (ParticipantsChannel, ModeratorsChannel)`.
+`s.close` and `s.closing` deliberately have **separate payload classes**.
+`flush_session` is an instruction to the consumer -- delete your own session on
+the way out, which is how "log out everywhere" reaches a device whose session key
+we cannot name -- and has no business on the wire. `close_connection` rebuilds the
+outgoing payload rather than passing the incoming one through, because a
+`CloseRequestPayload` satisfies the `ClosePayload` annotation and would serialise
+its extra field along with the rest.
 
-A collector that raises only loses its own section (`failed: true`); the rest
-still run. The exception is a database error, which leaves the durable atomic
-block unusable and is re-raised — there is deliberately no savepoint per
-collector.
+`close_all_connections` addresses sockets one at a time by `Connection.channel_name`,
+since no group holds all of them; `manage.py close_sockets --message "..."` is the
+operator front end. `manage.py online_connections` says how many that will be.
 
-**Prefer `.values()` to a ModelSerializer for anything bulk.** Six models carry
-a `python-statemachine` machine (`Meeting`, `AgendaItem`, `Proposal`, `Poll`,
-`SpeakerListSystem`, `MeetingInvite`). This used to be the dominant cost:
-`MachineMixin.__init__` built a whole machine — callback registries and
-dispatchers — for *every* instance, measured at **120 kB per model instance
-against 0.4 kB per `.values()` row, 280x**. `StateMachineModelMixin` made that
-binding lazy (`voteit/core/statemachines.py`), so a model instance now costs
-about 0.6 kB and the machine is built only when something reads `.sm`.
+## Notices (`s.msg`)
 
-That removed the order-of-magnitude argument but not the argument. What is left
-is plain model construction plus a bound DRF field per row, and it does not
-shrink. Measured against the dev database, per subscribe:
-
-| collector | rows | serializer | `.values()` | |
-|---|---|---|---|---|
-| `reactions.own` | 131 | 46.3 ms, 132 queries | 0.8 ms, 1 query | 58x |
-| `meeting.groups` (groups) | 315 | 6.4 ms | 1.0 ms | 6.6x |
-| `speaker.active_list` | 125 | 3.2 ms | 0.6 ms | 5.3x |
-| `meeting.groups` (members) | 417 | 6.0 ms | 2.0 ms | 3.0x |
-| `discussion.posts` | 281 | 8.3 ms | 3.7 ms | 2.3x |
-
-`reactions.own` is the outlier because `ReactionSerializer` renders
-`content_type` with a `CharField` subclass, which gets none of DRF's pk-only
-optimisation and loaded a `ContentType` per row. Watch for that shape: a
-declared non-`RelatedField` over a FK is an N+1 waiting to happen.
-
-### How to write one
-
-Do not spell the field list out — read it off the serializer:
-
-```python
-from voteit.messaging.values import wire_values
-
-def note_payloads(qs):
-    return wire_values(NoteSerializer, qs, agenda_item=F("proposal__agenda_item_id"))
-```
-
-`wire_values` takes the keys from the instantiated serializer (so `Meta.exclude`
-works too) and passes them to `.values()`. Fields that are not columns are the
-only thing written by hand, as `aliases`; they are checked against the
-serializer, so an alias the REST representation does not have is an error.
-Everything else must be a column — `.values()` raises `FieldError` otherwise,
-which is the point: a `SerializerMethodField` added later fails loudly instead
-of quietly going missing from the payload.
-
-Put the builder in the app's `collectors.py` and have the app's signals import
-it when they publish the same object in bulk, so the push and the initial state
-cannot disagree (`notes`, `speaker`). A signal publishing a *single* instance can
-keep using the serializer — the field list is derived from it either way.
-
-**Always assert the equivalence, never assume it.** Each app's
-`tests/test_collectors.py` has a `test_values_matches_the_serializer` built on
-`messaging.testing.assert_frames_equal`, which renders both routes through the
-real message class and compares — that is what catches a method field, a wrong
-alias, or a datetime rendered in a different timezone. It fails on empty input,
-so a fixture that produces no rows cannot leave it vacuously green.
-
-`poll.polls`, `invites.invites`, `speaker.lists`, `speaker.systems`,
-`proposal.text_documents`, `components.meeting` and `poll.own_votes` still
-serialize instances; none converts safely (`SerializerMethodField`,
-`PydanticFieldSerializer`, nested serializers, M2M fan-out). `poll.polls` and
-`invites.invites` are therefore where a very large meeting will show up in
-worker memory.
+`voteit.core.messages.notice.Notice` is a free-standing message to connected
+clients: `{type, message}`, where `type` is `info` / `warning` / `error`. It is not part of the connection lifecycle and does not close anything,
+so it is equally the thing to send beside a close and the thing to send on its
+own.
 
 ## Connections and presence
 
@@ -206,6 +137,20 @@ changes no visible number -- those rows were already outside every `online()`
 window -- it just keeps the partial index small. A socket that turns out to be
 alive heals itself: its next message sets `code` back to NULL. Setting
 `VOTEIT_CONNECTION_RETENTION_DAYS` additionally purges long-closed rows.
+
+## Counting who is online
+
+`presence(window)` returns totals plus a per-organisation breakdown, both
+counting users and sockets (one person with four tabs is one user and four
+sockets). "Online" means open **and** active recently -- an open row on its own
+is not evidence of presence, because Channels never reports a consumer that died
+with its process.
+
+It is the one implementation behind both the "Online now" admin page and
+`manage.py online_connections [--window MINUTES]`, so the two cannot drift. The
+grouping goes through `User`, since `Connection` has no organisation column;
+`users_without_organisation` catches the case where the rows do not add up to the
+total, which in production should be zero.
 
 ## Admin
 

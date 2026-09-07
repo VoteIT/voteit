@@ -64,6 +64,27 @@ All methods silently return an empty result for anonymous (unauthenticated) user
 
 On `post_save` (not on create) / `pre_delete`, an `InvalidateUserCache` WebSocket message is broadcast to the user's own `OrganisationChannel` to flush any SPA-side cache. Every socket joins that channel on connect, so it reaches everyone who could hold a cached copy. A user without an organisation publishes nothing.
 
+## Sessions (`sessions.py`)
+
+`POST /api/user/logout/` accepts `{"everywhere": true}`, which has to end sessions
+Django gives no way to enumerate — the production `SESSION_ENGINE` is cache-backed,
+so there is not even a table to scan. A `user_logged_in` receiver (`signals.py`) records the
+session key in the cache, and `end_tracked_sessions(user_pk)` deletes each one
+through the configured store.
+
+It is **best effort**, and deliberately not relied on alone. The cache list is
+read-modify-write, so two near-simultaneous logins can lose a key.
+What covers every *connected* device regardless is the second layer: `close_user_connections(pk,
+flush_session=True)` asks each consumer to delete its own session on the way out
+(`voteit/messaging/close.py`). This module is what additionally reaches a device
+that is logged in but has no socket open.
+
+An ordinary logout closes only that session's sockets and calls `forget_session`,
+so it does not leave a dead key behind.
+
+Tests that touch the cache must use `IsolatedCacheMixin` from `testing.py` — the
+default cache is the developer's real redis, never cleared between tests.
+
 ## Registry Pattern (`component.py`)
 
 `Registry(Dict[str, T])` is a typed dict that doubles as a decorator:
@@ -194,6 +215,7 @@ All ViewSets in the project register themselves here. The router is a `DefaultRo
 
 Custom Django signals defined here:
 
+- `remember_session_key` — receiver on Django's `user_logged_in`, feeding `sessions.py`. Connected to the signal rather than to any one view so every way in (password, social auth, `switch`, `force_login`) is covered
 - `roles_added` — fired after roles are added; args: `sender` (Roles class), `instance` (Roles row), `roles` (set of Role)
 - `roles_removed` — symmetric
 - `before_sm_transition` / `after_sm_transition` — state machine lifecycle hooks (see State Machine Integration above)
@@ -202,11 +224,12 @@ Custom Django signals defined here:
 
 ## WebSocket Messages (`messages/`)
 
-Three outgoing message types defined here:
+Four outgoing message types defined here:
 
 - `VersionMessage` (`s.versions`) — backend + frontend version strings; sent on every WebSocket connect
 - `RolesChanged` (`roles.changed`) / `RolesRemoved` (`roles.removed`) — notifies clients of role changes with `{user_pk, roles, pk, model}`. These are **deltas**, not object upserts: branch on the action pair, not on the name.
 - `InvalidateUserCache` (`user.inv`) — tells the SPA to re-fetch user data after a save or delete
+- `Notice` (`s.msg`) — an arbitrary `{type, message}` notice for connected clients, where `type` is `info` / `warning` / `error`. Unrelated to anything else: no pk, no owning model, and not part of the connection lifecycle. Sent on its own with `manage.py send_notice`, or beside a close (`voteit/messaging/close.py`), since `s.closing` carries only a close code
 
 ## Background Jobs (`jobs.py`)
 
@@ -240,6 +263,7 @@ Doctests across all modules are run via `test_docs.py` using `load_doctests` fro
 - `run_permission_tests(tester, url=..., method=..., expected=[...])` — iterates a matrix of (user, expected_status) pairs, rolling back after each via savepoints
 - `mk_usertag(value)` / `mk_hashtag(tag)` — produce Quill editor mention HTML for use in body field tests
 - `load_doctests(tests, package)` — wires a package's doctests into Django's test loader
+- `IsolatedCacheMixin` / `isolated_cache` / `ISOLATED_CACHES` — a per-process cache, emptied before each test. Anything that both writes and reads the cache needs this: the default one is the developer's real redis, shared and never cleared, so such a test passes alone and fails in a full run
 
 ## Non-obvious Design Decisions
 

@@ -10,11 +10,13 @@ truncated between tests, and objects must be re-fetched in setUp.
 
 import asyncio
 import time
+from importlib import import_module
 from unittest.mock import patch
 
 from asgiref.sync import sync_to_async
 from chanx.channels.testing import WebsocketTestCase
 from django.db import transaction
+from django.conf import settings
 from django.test import override_settings
 from django.contrib.auth import get_user_model
 from fakeredis import FakeRedis
@@ -615,22 +617,72 @@ class RecheckTests(ConsumerTestCase):
 
 
 class CloseConnectionTests(ConsumerTestCase):
-    """s.close, the server-side "go away" -- e.g. on logout.
+    """s.close, the server-side "go away".
 
-    Nothing in the repo sends it yet, so these tests are the only thing
-    holding the handler to its contract.
+    Sent by voteit.messaging.close on logout and by the close_sockets command;
+    what those senders do with it is tested in test_close.py. These tests hold
+    the handler itself to its contract.
     """
 
-    async def test_warns_before_closing(self):
-        communicator = await self._connect(self.moderator)
+    async def _close_and_read(self, communicator, payload=None):
         await sync_to_async(VoteitConsumer.broadcast_event_sync)(
-            CloseConnection(payload={"code": 4001}), user_group(self.moderator.pk)
+            CloseConnection(payload=payload) if payload else CloseConnection(),
+            user_group(self.moderator.pk),
         )
         messages = await communicator.receive_all_messages(
             stop_action="s.closing", timeout=2
         )
-        closing = next(m for m in messages if m.action == "s.closing")
+        return next(m for m in messages if m.action == "s.closing")
+
+    async def test_warns_before_closing(self):
+        communicator = await self._connect(self.moderator)
+        closing = await self._close_and_read(communicator, {"code": 4001})
         self.assertEqual(4001, closing.payload.code)
+
+    async def test_the_client_is_told_nothing_but_the_code(self):
+        """Anything the user should read is a separate s.msg. Keeping it out of
+        here is what lets a notice be sent without closing anything."""
+        communicator = await self._connect(self.moderator)
+        closing = await self._close_and_read(communicator)
+        self.assertEqual({"code": NORMAL_CLOSURE}, closing.payload.model_dump())
+
+    async def test_flush_session_is_not_put_on_the_wire(self):
+        """It is an instruction to the consumer, not news for the client --
+        which is why s.close and s.closing have separate payload classes."""
+        communicator = await self._connect(self.moderator)
+        await sync_to_async(VoteitConsumer.broadcast_event_sync)(
+            CloseConnection(payload={"flush_session": True}),
+            user_group(self.moderator.pk),
+        )
+        raw = None
+        while raw is None or raw.get("action") != "s.closing":
+            raw = await communicator.receive_json_from(2)
+        self.assertNotIn("flush_session", raw["payload"])
+
+    async def test_flush_session_deletes_the_scope_session(self):
+        communicator = await self._connect(self.moderator)
+        session_key = self.async_client.cookies[settings.SESSION_COOKIE_NAME].value
+        await sync_to_async(VoteitConsumer.broadcast_event_sync)(
+            CloseConnection(payload={"flush_session": True}),
+            user_group(self.moderator.pk),
+        )
+        await communicator.receive_all_messages(stop_action="s.closing", timeout=2)
+        self.assertNotIn(
+            "_auth_user_id", await sync_to_async(self._session)(session_key)
+        )
+
+    async def test_the_session_survives_an_ordinary_close(self):
+        communicator = await self._connect(self.moderator)
+        session_key = self.async_client.cookies[settings.SESSION_COOKIE_NAME].value
+        await self._close_and_read(communicator)
+        self.assertIn("_auth_user_id", await sync_to_async(self._session)(session_key))
+
+    @staticmethod
+    def _session(session_key):
+        store = import_module(settings.SESSION_ENGINE).SessionStore(
+            session_key=session_key
+        )
+        return store.load()
 
     async def test_socket_is_closed_with_the_requested_code(self):
         """assert_closed() is not used here -- it only matches a bare close

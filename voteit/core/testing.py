@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.db.transaction import get_connection
+from django.core.cache import caches
+from django.test import override_settings
 
 from voteit.core.utils import exectime  # noqa
 
@@ -213,3 +215,34 @@ def run_permission_tests(
                         ],
                     )
         transaction.savepoint_rollback(sid)
+
+
+#: A cache of this test process's own.
+#:
+#: The default cache is the developer's real redis, shared with whatever else
+#: is running against it and never cleared between tests or between runs.
+#: Anything that both writes and reads it -- session-key tracking, say -- needs
+#: this, or it passes alone and fails in a full run when another test happens
+#: to have written the same key.
+ISOLATED_CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "voteit-isolated-cache",
+    }
+}
+
+#: The same thing as a decorator, for a class that does not want the mixin.
+#: Note it does not empty the cache: LocMemCache keeps its data in a
+#: module-level dict keyed by LOCATION, so the next test's fresh instance finds
+#: the previous one's entries. Use IsolatedCacheMixin unless you are clearing
+#: it yourself.
+isolated_cache = override_settings(CACHES=ISOLATED_CACHES)
+
+
+class IsolatedCacheMixin:
+    """A private cache, emptied before each test. Mix in before the TestCase."""
+
+    def setUp(self):
+        super().setUp()
+        self.enterContext(self.settings(CACHES=ISOLATED_CACHES))
+        caches["default"].clear()

@@ -19,6 +19,9 @@ from statemachine import Event
 from statemachine import State
 from statemachine import StateChart
 
+from voteit.core.sessions import end_tracked_sessions
+from voteit.core.sessions import tracked_sessions
+from voteit.core.testing import IsolatedCacheMixin
 from voteit.core.statemachines import TransitionSignalMixin
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
@@ -27,6 +30,9 @@ from voteit.organisation.models import Organisation
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 User = get_user_model()
+
+#: Patch targets live where the view imported them, not where they are defined.
+VIEWS = "voteit.core.rest_api.views"
 
 
 class UserSearchViewSetTests(APITestCase):
@@ -128,7 +134,7 @@ class UserSearchViewSetTests(APITestCase):
         self.assertEqual(405, response.status_code)
 
 
-class UserViewSetTests(APITestCase):
+class UserViewSetTests(IsolatedCacheMixin, APITestCase):
     fixtures = ["meeting_test_fixture"]
 
     @classmethod
@@ -272,8 +278,95 @@ class UserViewSetTests(APITestCase):
 
     def test_logout(self):
         self.client.force_login(self.participant)
+        session_key = self.client.session.session_key
         url = reverse("user-logout")
-        self.client.post(url)
+        with patch(f"{VIEWS}.close_session_connections") as close:
+            response = self.client.post(url)
+        self.assertEqual(200, response.status_code)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        close.assert_called_once()
+        self.assertEqual(session_key, close.call_args.args[0])
+
+    def test_logout_closes_only_that_sessions_sockets(self):
+        """The socket scope's user is resolved once, at handshake, so nothing
+        else would ever tell the other tab it had been logged out."""
+        self.client.force_login(self.participant)
+        session_key = self.client.session.session_key
+        with ExitStack() as stack:
+            close_session = stack.enter_context(
+                patch(f"{VIEWS}.close_session_connections")
+            )
+            close_user = stack.enter_context(patch(f"{VIEWS}.close_user_connections"))
+            self.client.post(reverse("user-logout"))
+        close_session.assert_called_once()
+        self.assertEqual(session_key, close_session.call_args.args[0])
+        close_user.assert_not_called()
+
+    def test_logout_everywhere_closes_every_socket_and_flushes(self):
+        self.client.force_login(self.participant)
+        with ExitStack() as stack:
+            close_session = stack.enter_context(
+                patch(f"{VIEWS}.close_session_connections")
+            )
+            close_user = stack.enter_context(patch(f"{VIEWS}.close_user_connections"))
+            response = self.client.post(
+                reverse("user-logout"), {"everywhere": True}, format="json"
+            )
+        self.assertEqual(200, response.status_code)
+        close_session.assert_not_called()
+        self.assertEqual(self.participant.pk, close_user.call_args.args[0])
+        # Without this the sockets close but the sessions behind them live on.
+        self.assertIs(True, close_user.call_args.kwargs["flush_session"])
+
+    def test_logout_everywhere_ends_the_other_session(self):
+        other = self.client_class()
+        other.force_login(self.participant)
+        self.client.force_login(self.participant)
+
+        with patch(f"{VIEWS}.close_user_connections"):
+            self.client.post(
+                reverse("user-logout"), {"everywhere": True}, format="json"
+            )
+
+        self.assertNotIn("_auth_user_id", other.session)
+
+    def test_an_ordinary_logout_leaves_the_other_session_alone(self):
+        other = self.client_class()
+        other.force_login(self.participant)
+        self.client.force_login(self.participant)
+
+        with patch(f"{VIEWS}.close_session_connections"):
+            self.client.post(reverse("user-logout"))
+
+        self.assertIn("_auth_user_id", other.session)
+
+    def test_switching_user_does_not_leave_a_key_that_could_kill_the_new_session(self):
+        """switch() re-points one session at another user, so the first user
+        keeps a tracked key for a session that is now somebody else's. It must
+        not be able to end it. Django saves us here -- login() cycles the key
+        when the user changes -- but the consequence if that ever stopped being
+        true is one user logging another out, so it is pinned."""
+        self.client.force_login(self.participant)
+        stale_key = self.client.session.session_key
+        self.client.post(reverse("user-switch", kwargs={"pk": self.moderator.pk}))
+        self.assertNotEqual(stale_key, self.client.session.session_key)
+        self.assertEqual(self.moderator.pk, int(self.client.session["_auth_user_id"]))
+
+        end_tracked_sessions(self.participant.pk)
+
+        self.assertIn("_auth_user_id", self.client.session)
+
+    def test_an_ordinary_logout_stops_tracking_its_own_session(self):
+        """Otherwise every logout leaves a dead key behind for the next
+        "everywhere" to walk over."""
+        self.client.force_login(self.participant)
+        session_key = self.client.session.session_key
+        self.assertIn(session_key, tracked_sessions(self.participant.pk))
+
+        with patch(f"{VIEWS}.close_session_connections"):
+            self.client.post(reverse("user-logout"))
+
+        self.assertNotIn(session_key, tracked_sessions(self.participant.pk))
 
     def test_email_choices(self):
         self.client.force_login(self.participant)

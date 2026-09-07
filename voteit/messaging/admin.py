@@ -27,6 +27,7 @@ from voteit.core.models import User
 from voteit.messaging.models import ABNORMAL_CLOSURE
 from voteit.messaging.models import NORMAL_CLOSE_CODES
 from voteit.messaging.models import Connection
+from voteit.messaging.presence import presence
 from voteit.organisation.models import Organisation
 
 # Windows offered by the "Online now" page, in minutes.
@@ -310,20 +311,17 @@ class ConnectionAdmin(admin.ModelAdmin):
         online = Connection.objects.online(window)
         changelist_url = reverse("admin:voteit_messaging_connection_changelist")
 
-        socket_count = online.count()
-        user_count = online.values("user_id").distinct().count()
+        counted = presence(window)
 
         context = {
             **self.admin_site.each_context(request),
             "title": "Online now",
             "minutes": minutes,
             "window_choices": WINDOW_CHOICES,
-            "socket_count": socket_count,
-            "user_count": user_count,
-            "sockets_per_user": (
-                round(socket_count / user_count, 2) if user_count else 0
-            ),
-            "organisations": self._online_per_organisation(online, changelist_url),
+            "socket_count": counted.sockets,
+            "user_count": counted.users,
+            "sockets_per_user": counted.sockets_per_user,
+            "organisations": self._organisation_rows(counted, changelist_url),
             "longest": self._longest_sessions(online),
             "buckets": self._connected_for_buckets(online, reference),
             "stale_count": Connection.objects.stale(window).count(),
@@ -335,29 +333,18 @@ class ConnectionAdmin(admin.ModelAdmin):
         )
 
     @staticmethod
-    def _online_per_organisation(online, changelist_url: str) -> list[dict]:
-        """Group open sockets by org -- via User, since Connection has no FK."""
-        counts = (
-            User.objects.filter(pk__in=online.user_ids(), organisation__isnull=False)
-            .values("organisation")
-            .annotate(users=models.Count("pk", distinct=True))
-            .order_by("-users")
-        )
-        counts = list(counts)
-        orgs_by_id = Organisation.objects.in_bulk(
-            [row["organisation"] for row in counts]
-        )
-        rows = []
-        for row in counts:
-            if org := orgs_by_id.get(row["organisation"]):
-                rows.append(
-                    {
-                        "organisation": org,
-                        "users": row["users"],
-                        "url": f"{changelist_url}?org={org.pk}",
-                    }
-                )
-        return rows
+    def _organisation_rows(counted, changelist_url: str) -> list[dict]:
+        """The counting lives in presence.py, which the management command uses
+        too; all this adds is the link into the changelist."""
+        return [
+            {
+                "organisation": row.organisation,
+                "users": row.users,
+                "sockets": row.sockets,
+                "url": f"{changelist_url}?org={row.organisation.pk}",
+            }
+            for row in counted.organisations
+        ]
 
     @staticmethod
     def _longest_sessions(online, limit: int = 10) -> list[dict]:

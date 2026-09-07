@@ -25,6 +25,16 @@ the whole codebase to v1.
   A batch may carry **one** item: live updates only collapse at
   `VOTEIT_BATCH_THRESHOLD` (3) or more, but initial state is always sent
   batched however few rows there are. Do not treat `.batch` as "several".
+- **New `s.closing`** The server warns before it closes a
+  socket. The frame carries only `{"code": ...}`, and the code is the whole
+  signal: 1000 means stay out (you were logged out), 1001 that the server is
+  going away and the client should reconnect shortly.
+- **New `s.msg`**: `{"type": "info"|"warning"|"error", "message": "..."}`
+  — an arbitrary notice to show the user, already translated. It is independent
+  of everything else: it may arrive at any time, on its own.
+- **`POST /api/user/logout/` takes an optional body.** `{"everywhere": true}`
+  also ends the user's other sessions, on every device, and closes their
+  sockets.
 - **`channel.subscribed` no longer carries `app_state`.** Subscribing now
   streams: `channel.subscribed`, then the initial state as one or more of the
   new **`channel.state`** messages, then the new **`channel.state_complete`**.
@@ -81,6 +91,13 @@ the whole codebase to v1.
   rolled back, and will be dropped in a later one.
 - The websocket now enforces `AllowedHostsOriginValidator`, which it did not
   before. Verify `ALLOWED_HOSTS` covers the SPA's origin.
+- **`manage.py close_sockets [--message "..." --type warning]`** disconnects
+  clients, sending them an `s.msg` first if given one. Meant for
+  just before a restart; it ends nobody's session.
+- **`manage.py online_connections [--window MINUTES]`** prints online per org.
+- **`manage.py send_notice --type error --message "..." [--organisation N]`**
+  sends an `s.msg` to everyone or to one
+  organisation.
 
 ### Changes
 
@@ -146,6 +163,10 @@ the whole codebase to v1.
 
 - A websocket disconnect whose ASGI message carried no close code used to write
   the `Connection` row back as still open. It now records 1006.
+- **Logging out left the websockets open.** The socket's user is resolved once,
+  at handshake, so nothing told the other tab its login was gone — it kept
+  running with an identity that no longer existed. `POST /api/user/logout/` now
+  closes the sockets belonging to that session.
 
 
 ## v0.47 (2026-08-17)

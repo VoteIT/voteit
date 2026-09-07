@@ -20,6 +20,7 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.channels import UserChannel
+from voteit.messaging.channels import session_group
 from voteit.messaging.channels import user_group
 from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.organisation.models import Organisation
@@ -58,6 +59,21 @@ class UserChannelTests(TestCase):
     def test_model_is_bound_at_app_ready(self):
         """It cannot be set at class-creation time -- see the app config."""
         self.assertIs(User, UserChannel.model)
+
+
+class SessionGroupTests(TestCase):
+    """The group an ordinary logout closes.
+
+    Not a channel: nothing publishes to it and nobody subscribes, so the only
+    contract is that the name is stable and does not collide with a user
+    group -- both are joined by the same consumer.
+    """
+
+    def test_name(self):
+        self.assertEqual("session_abc123", session_group("abc123"))
+
+    def test_does_not_collide_with_a_user_group(self):
+        self.assertNotEqual(session_group("1"), user_group(1))
 
 
 class ContextChannelPermissionTests(TestCase):

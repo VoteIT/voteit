@@ -148,3 +148,14 @@ class UserChannel(ContextChannel):
 
 def user_group(user_pk: int) -> str:
     return f"{UserChannel.name}_{user_pk}"
+
+
+def session_group(session_key: str) -> str:
+    """Every socket opened by one Django session.
+
+    Not a ``PubSubChannel``: nothing is ever published to it and no client may
+    subscribe. It exists so an ordinary logout can close exactly the tabs that
+    lost their login, rather than every socket the user has anywhere. A session
+    key is 32 characters of ``[a-z0-9]``, so the name needs no sanitising.
+    """
+    return f"session_{session_key}"

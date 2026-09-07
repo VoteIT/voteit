@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.signals import user_logged_in
 from django.db.models.signals import class_prepared
 from django.db.models.signals import post_save
 from django.db.models.signals import pre_delete
@@ -50,3 +51,18 @@ def post_init_registrations():
             return
         msg = InvalidateUserCache(payload={"pk": instance.pk})
         OrganisationChannel(instance.organisation_id).sync_publish(msg)
+
+
+@receiver(user_logged_in)
+def remember_session_key(*, request, user, **kwargs):
+    """Note the session key so "log out everywhere" can find it later.
+
+    Connected to ``user_logged_in`` rather than to any one view, so every way
+    in -- password, social auth, the switch-user action, force_login in tests
+    -- is covered. ``login()`` cycles the key before sending the signal, so
+    what is recorded here is the final one.
+    """
+    from voteit.core.sessions import remember_session
+
+    if key := getattr(getattr(request, "session", None), "session_key", None):
+        remember_session(user.pk, key)

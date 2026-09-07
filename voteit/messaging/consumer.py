@@ -1,8 +1,6 @@
 """The single VoteIT websocket consumer.
 
-The socket is push-only apart from subscription control and ping: every
-app-level incoming message was migrated to REST (see CHANGELOG v0.47), so
-there are no domain handlers here at all.
+The socket is push-only apart from subscription control and ping.
 """
 
 from __future__ import annotations
@@ -28,6 +26,7 @@ from django.utils.timezone import now
 
 from voteit.core.messages.version import VersionMessage
 from voteit.messaging.bundle import bind_bundle_schema
+from voteit.messaging.channels import session_group
 from voteit.messaging.channels import user_group
 from voteit.messaging.jobs import build_subscription
 from voteit.messaging.jobs import enqueue_recheck
@@ -43,6 +42,7 @@ from voteit.messaging.messages import ChannelSubscribed
 from voteit.messaging.messages import ChannelSubscribeError
 from voteit.messaging.messages import ChannelSubscriptions
 from voteit.messaging.messages import CloseConnection
+from voteit.messaging.messages import ClosePayload
 from voteit.messaging.messages import ClosingConnection
 from voteit.messaging.messages import Ping
 from voteit.messaging.messages import Pong
@@ -180,15 +180,6 @@ class SubscriptionMixin(ChanxWebsocketConsumerMixin):
         )
         return None
 
-    # output_type is spelled out because the warning goes out through
-    # send_message rather than as a return value, and chanx builds the
-    # outgoing union -- and /asyncapi/docs/ -- from handler annotations only.
-    @event_handler(output_type=ClosingConnection)
-    async def close_connection(self, event: CloseConnection) -> None:
-        await self.send_message(ClosingConnection(payload=event.payload))
-        await self.close(event.payload.code)
-        return None
-
 
 class ConnectionMixin(ChanxWebsocketConsumerMixin):
     """Keeps the Connection row roughly up to date.
@@ -234,6 +225,42 @@ class ConnectionMixin(ChanxWebsocketConsumerMixin):
             user_id=user.pk, channel_name=self.channel_name
         ).aupdate(last_action=now(), code=code)
 
+    # output_type is spelled out because the warning goes out through
+    # send_message rather than as a return value, and chanx builds the
+    # outgoing union -- and /asyncapi/docs/ -- from handler annotations only.
+    @event_handler(output_type=ClosingConnection)
+    async def close_connection(self, event: CloseConnection) -> None:
+        if event.payload.flush_session:
+            # This consumer is the only thing that knows its own session, which
+            # is what makes "log out everywhere" reach a device we cannot
+            # otherwise address. Channels' SessionMiddleware saves the session
+            # at websocket.accept and never again, so nothing re-persists what
+            # is deleted here.
+            if session := self.scope.get("session"):
+                await database_sync_to_async(session.flush)()
+        # Stamped here rather than left to websocket_disconnect: whether the
+        # server sends us a websocket.disconnect after we close is up to the
+        # ASGI server, and the test communicator does not. Without this the row
+        # stays open until the stale-connection job gets to it, which would make
+        # every deliberate close look like a socket that vanished.
+        #
+        # Before the client is told, not after: the row is then already correct
+        # by the time anything can observe the close, and a failure in the send
+        # cannot leave it open.
+        await self.update_connection(code=event.payload.code)
+        # Rebuilt rather than passed straight through: event.payload is a
+        # CloseRequestPayload, which satisfies the ClosePayload annotation and
+        # would serialise flush_session onto the wire with it.
+        await self.send_message(
+            ClosingConnection(
+                payload=ClosePayload(
+                    **event.payload.model_dump(exclude={"flush_session"})
+                )
+            )
+        )
+        await self.close(event.payload.code)
+        return None
+
 
 @channel(name="voteit")
 class VoteitConsumer(
@@ -253,6 +280,15 @@ class VoteitConsumer(
         self.user = self.scope["user"]
         self.channel_subs = set()
         await self.channel_layer.group_add(user_group(self.user.pk), self.channel_name)
+        # The session group is how an ordinary logout closes exactly the tabs
+        # that lost their login. session_key is a plain attribute on an already
+        # resolved SessionStore, so reading it here costs no I/O. An
+        # authenticated scope without one is not expected, but it should mean
+        # "no session group" rather than a failed handshake.
+        if session_key := getattr(self.scope.get("session"), "session_key", None):
+            await self.channel_layer.group_add(
+                session_group(session_key), self.channel_name
+            )
         self.last_connection_update = now()
         await Connection.objects.acreate(
             user_id=self.user.pk, channel_name=self.channel_name

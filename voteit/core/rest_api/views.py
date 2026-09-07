@@ -3,10 +3,10 @@ from django.contrib.auth import login
 from django.contrib.auth import logout
 from django.contrib.messages import get_messages
 from django.db import transaction
+from django.utils.translation import gettext as _
 from rest_framework import filters
 from rest_framework import mixins
 from rest_framework import permissions
-from rest_framework import serializers
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -17,16 +17,22 @@ from statemachine import registry as sm_registry
 
 from voteit.core import PERM
 from voteit.core.loggers import log_auth
+from voteit.core.messages.notice import Notice
 from voteit.core.rest_api import router
 from voteit.core.rest_api.filters import ActionAnnotatedDjangoFilterBackend
 from voteit.core.rest_api.mixins import ModelContextMixin
+from voteit.core.rest_api.serializers import LogoutSerializer
 from voteit.core.rest_api.serializers import MessageSerializer
 from voteit.core.rest_api.serializers import StateMachineSchemaSerializer
 from voteit.core.rest_api.serializers import UserAndRolesSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
+from voteit.core.sessions import end_tracked_sessions
+from voteit.core.sessions import forget_session
 from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.messaging.close import close_session_connections
+from voteit.messaging.close import close_user_connections
 from voteit.organisation.pipeline import _transfer_social_auths
 from voteit.organisation.utils import get_idproxy_user_data
 
@@ -95,10 +101,53 @@ class UserView(
         serializer = self.serializer_class(request.user)
         return Response(serializer.data)
 
-    @action(methods=["POST"], detail=False, serializer_class=serializers.Serializer)
+    @action(methods=["POST"], detail=False, serializer_class=LogoutSerializer)
     def logout(self, request):
-        log_auth("Logout", request=request)
+        """End this session, or -- with ``everywhere`` -- all of them.
+
+        Either way the sockets that just lost their login are closed rather
+        than left running with an identity that no longer exists: the socket
+        scope's user is resolved once, at handshake, so nothing else would ever
+        tell them.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        everywhere = serializer.validated_data["everywhere"]
+        # Both are read before logout(): afterwards request.user is anonymous
+        # and the session key is gone.
+        user_pk = request.user.pk
+        session_key = request.session.session_key
+        log_auth("Logout everywhere" if everywhere else "Logout", request=request)
+        if everywhere:
+            # First, so no in-flight request can refresh a session that is
+            # about to be killed.
+            end_tracked_sessions(user_pk)
+        elif session_key:
+            forget_session(user_pk, session_key)
         logout(request)
+        if everywhere:
+            close_user_connections(
+                user_pk,
+                # Sockets flush their own session on the way out, which is what
+                # reaches a device end_tracked_sessions could not name.
+                flush_session=True,
+                notice=Notice(
+                    payload={
+                        "type": "info",
+                        "message": _("You have been logged out on all devices."),
+                    }
+                ),
+            )
+        elif session_key:
+            close_session_connections(
+                session_key,
+                notice=Notice(
+                    payload={
+                        "type": "info",
+                        "message": _("You have been logged out."),
+                    }
+                ),
+            )
         return Response()
 
     @action(methods=["POST"], detail=True)

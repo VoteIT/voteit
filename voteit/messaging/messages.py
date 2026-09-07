@@ -14,6 +14,8 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import SerializeAsAny
 
+from voteit.messaging.models import NORMAL_CLOSURE
+
 
 class ChannelRef(BaseModel):
     """Identifies a channel: its type name plus the object's pk."""
@@ -144,14 +146,27 @@ class Pong(BaseMessage):
 
 
 class ClosePayload(BaseModel):
-    code: int = 1000
+    """What the client is told immediately before its socket goes away."""
+
+    #: RFC 6455 close code. Both codes we send are in NORMAL_CLOSE_CODES, so a
+    #: maintenance window does not read as a wave of abnormal closures in the
+    #: socket stats.
+    code: int = NORMAL_CLOSURE
+
+
+class CloseRequestPayload(ClosePayload):
+    """The s.close half. ``flush_session`` is an instruction to the consumer,
+    not something the client is told, which is why the two halves are separate
+    classes -- see ``ConnectionMixin.close_connection``."""
+
+    flush_session: bool = False
 
 
 class CloseConnection(BaseMessage):
     """Internal: ask a consumer to close, e.g. when the user logs out."""
 
     action: Literal["s.close"] = "s.close"
-    payload: ClosePayload = ClosePayload()
+    payload: CloseRequestPayload = CloseRequestPayload()
 
 
 class ClosingConnection(BaseMessage):

@@ -223,6 +223,16 @@ class MessageSerializer(serializers.Serializer):
     tags = serializers.CharField()
 
 
+class LogoutSerializer(serializers.Serializer):
+    everywhere = serializers.BooleanField(
+        default=False,
+        help_text=(
+            "Also end this user's other sessions, on every device, and close "
+            "the websockets belonging to them."
+        ),
+    )
+
+
 class SMEventSerializer(serializers.Serializer):
     event = serializers.CharField(validators=[SMEventValidator()])
 
