@@ -1,11 +1,13 @@
 import itertools
 import json
 import os
+from contextlib import suppress
 from time import sleep
 
 from locust.clients import HttpSession
 from requests.cookies import RequestsCookieJar
 from websocket import WebSocket
+from websocket import WebSocketException
 from websocket import create_connection
 
 from locust import HttpUser
@@ -22,6 +24,7 @@ def _require_env(name: str) -> str:
 
 HOST = os.getenv("HOST", "http://voteit.localhost:8000")
 MEETING_ID = int(_require_env("MEETING_ID"))
+AGENDA_ITEM_ID = int(_require_env("AGENDA_ITEM_ID"))
 USER_PASSWORD = _require_env("USER_PASSWORD")
 USER_COUNT = int(os.getenv("USER_COUNT", "50"))
 LOGIN_URL = "/admin/login/"
@@ -125,19 +128,48 @@ def get_cookie_string(cookies: RequestsCookieJar) -> str:
 # Look at https://github.com/locustio/locust/blob/master/locust/contrib/socketio.py for inspiration
 class SocketUser(VoteitUser):
     weight = 3
+    # Slower than the REST users on purpose. Every subscribe queues an RQ job
+    # that runs the channel's collectors, so it is far more server work than a
+    # read endpoint and nothing like it happens once a second in real use. The
+    # two tasks share this schedule, so each user re-subscribes to each channel
+    # roughly once a minute.
+    wait_time = between(20, 40)
     ws: WebSocket = None
 
     @task
     def subscribe_meeting(self):
         # "participants" is what a non-moderator client subscribes to; it now
         # carries the meeting-wide state the separate "meeting" channel used to.
-        payload = {"pk": MEETING_ID, "channel_type": "participants"}
-        self.ws.send(json.dumps({"action": "channel.subscribe", "payload": payload}))
-        # The initial state now arrives as a stream terminated by
-        # channel.state_complete, rather than inside the subscribed frame.
-        self._drain_state("participants")
-        sleep(1)
-        self.ws.send(json.dumps({"action": "channel.leave", "payload": payload}))
+        self._subscribe_cycle(MEETING_ID, "participants")
+
+    @task
+    def subscribe_agenda_item(self):
+        # Proposals, discussion posts and their metadata. The agenda items
+        # themselves travel on participants/moderators, not here.
+        self._subscribe_cycle(AGENDA_ITEM_ID, "agenda_item")
+
+    def _subscribe_cycle(self, pk: int, channel_type: str):
+        """Subscribe, wait for the initial state, then leave again."""
+        if self.ws is None:
+            self._connect()
+        payload = {"pk": pk, "channel_type": channel_type}
+        try:
+            self.ws.send(
+                json.dumps({"action": "channel.subscribe", "payload": payload})
+            )
+            # The initial state now arrives as a stream terminated by
+            # channel.state_complete, rather than inside the subscribed frame.
+            self._drain_state(channel_type)
+            sleep(1)
+            self.ws.send(json.dumps({"action": "channel.leave", "payload": payload}))
+        except (WebSocketException, OSError):
+            # A socket that timed out mid-frame is desynced, not merely idle:
+            # every later send and recv on it raises too, and on_stop's close()
+            # raises on top of that. Reporting one root failure per task and
+            # reconnecting on the next beats a storm of "socket is already
+            # closed" hiding the first real error.
+            self._disconnect()
+            raise
 
     def _drain_state(self, channel_type: str, limit: int = 200):
         """Read frames until this channel's initial state is done.
@@ -161,6 +193,9 @@ class SocketUser(VoteitUser):
 
     def on_start(self):
         super().on_start()
+        self._connect()
+
+    def _connect(self):
         cookies = get_cookie_string(self.client.cookies)
         # Replace http* -> ws* (https* -> wss*) and add path.
         socket_url = f"ws{self.host[4:]}/ws/"
@@ -178,6 +213,13 @@ class SocketUser(VoteitUser):
         # state_complete and every measurement after it would be one behind.
         self._drain_state("organisation")
 
+    def _disconnect(self):
+        if self.ws is not None:
+            # Closing a socket that is already gone raises; that exception says
+            # nothing the failure that got us here has not already said.
+            with suppress(WebSocketException, OSError):
+                self.ws.close()
+            self.ws = None
+
     def on_stop(self):
-        if self.ws:
-            self.ws.close()
+        self._disconnect()
