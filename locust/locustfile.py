@@ -32,6 +32,9 @@ LOGIN_URL = "/admin/login/"
 #: and never a state_complete, and a stopped RQ worker answers with nothing at
 #: all -- without a timeout either one wedges the user instead of reporting.
 WS_TIMEOUT = 10
+#: The two frames that end a subscribe stream, one way or the other.
+STATE_COMPLETE = "channel.state_complete"
+SUBSCRIBE_ERROR = "channel.subscribe_error"
 
 
 def do_login(_id: int, client: HttpSession):
@@ -124,8 +127,6 @@ def get_cookie_string(cookies: RequestsCookieJar) -> str:
     return "; ".join(f"{key}={value}" for key, value in cookies.items())
 
 
-# TODO: Measure performance and errors.
-# Look at https://github.com/locustio/locust/blob/master/locust/contrib/socketio.py for inspiration
 class SocketUser(VoteitUser):
     weight = 3
     # Slower than the REST users on purpose. Every subscribe queues an RQ job
@@ -149,46 +150,69 @@ class SocketUser(VoteitUser):
         self._subscribe_cycle(AGENDA_ITEM_ID, "agenda_item")
 
     def _subscribe_cycle(self, pk: int, channel_type: str):
-        """Subscribe, wait for the initial state, then leave again."""
+        """Subscribe, wait for the initial state, then leave again.
+
+        Reported to locust as one request: the response time is the round trip
+        from channel.subscribe to channel.state_complete, which is what a real
+        client waits through before it can show anything, and the length is the
+        state that arrived.
+        """
         if self.ws is None:
             self._connect()
+        if self.ws is None:  # the connect failed and has already been reported
+            return
         payload = {"pk": pk, "channel_type": channel_type}
+        with self.environment.events.request.measure(
+            "WS", f"subscribe {channel_type}"
+        ) as meta:
+            try:
+                self.ws.send(
+                    json.dumps({"action": "channel.subscribe", "payload": payload})
+                )
+                # The initial state now arrives as a stream terminated by
+                # channel.state_complete, rather than inside the subscribed frame.
+                action, meta["response_length"] = self._drain_state(channel_type)
+                if action == SUBSCRIBE_ERROR:
+                    # A refusal is a fast, cheap answer. Left unraised it would
+                    # be indistinguishable from a subscribe that worked, and the
+                    # fastest rows in the table would be the broken ones.
+                    raise RuntimeError(f"refused: {channel_type} {pk}")
+            except (WebSocketException, OSError):
+                # A socket that timed out mid-frame is desynced, not merely
+                # idle: every later send and recv on it raises too, and
+                # on_stop's close() raises on top of that. measure() records
+                # this exception and swallows it, so the socket has to be
+                # dropped here or the next task would inherit the wreckage.
+                self._disconnect()
+                raise
+        if meta["exception"] is not None:
+            return
+        sleep(1)
         try:
-            self.ws.send(
-                json.dumps({"action": "channel.subscribe", "payload": payload})
-            )
-            # The initial state now arrives as a stream terminated by
-            # channel.state_complete, rather than inside the subscribed frame.
-            self._drain_state(channel_type)
-            sleep(1)
             self.ws.send(json.dumps({"action": "channel.leave", "payload": payload}))
         except (WebSocketException, OSError):
-            # A socket that timed out mid-frame is desynced, not merely idle:
-            # every later send and recv on it raises too, and on_stop's close()
-            # raises on top of that. Reporting one root failure per task and
-            # reconnecting on the next beats a storm of "socket is already
-            # closed" hiding the first real error.
             self._disconnect()
-            raise
 
-    def _drain_state(self, channel_type: str, limit: int = 200):
+    def _drain_state(self, channel_type: str, limit: int = 200) -> tuple[str, int]:
         """Read frames until this channel's initial state is done.
 
-        Returns on channel.subscribe_error too: a refusal never sends a
-        state_complete, so waiting for one would only burn the frame limit and
-        then the socket timeout. Frames for other channels are skipped rather
-        than counted as the answer -- the meeting stream is not the only one in
-        flight.
+        Returns the action that ended the stream and the size of the JSON read
+        along the way, for the caller to report. Ends on channel.subscribe_error
+        too: a refusal never sends a state_complete, so waiting for one would
+        only burn the frame limit and then the socket timeout. Frames for other
+        channels are skipped rather than counted as the answer -- the meeting
+        stream is not the only one in flight.
         """
+        received = 0
         for _ in range(limit):
-            frame = json.loads(self.ws.recv())
+            raw = self.ws.recv()
+            received += len(raw)
+            frame = json.loads(raw)
             if (frame.get("payload") or {}).get("channel_type") != channel_type:
                 continue
-            if frame.get("action") in (
-                "channel.state_complete",
-                "channel.subscribe_error",
-            ):
-                return
+            action = frame.get("action")
+            if action in (STATE_COMPLETE, SUBSCRIBE_ERROR):
+                return action, received
         raise RuntimeError(f"No state_complete for {channel_type} in {limit} frames")
 
     def on_start(self):
@@ -196,22 +220,33 @@ class SocketUser(VoteitUser):
         self._connect()
 
     def _connect(self):
+        """Open the socket. Measured: the handshake is not free either.
+
+        The time covers the organisation stream the server pushes unasked, so
+        it is comparable to a subscribe rather than to a bare TCP connect.
+        """
         cookies = get_cookie_string(self.client.cookies)
         # Replace http* -> ws* (https* -> wss*) and add path.
         socket_url = f"ws{self.host[4:]}/ws/"
-        self.ws = create_connection(
-            socket_url,
-            cookie=cookies,
-            timeout=WS_TIMEOUT,
-            # AllowedHostsOriginValidator drops a handshake whose Origin is not
-            # in ALLOWED_HOSTS, which is only "*" in development.
-            origin=self.host,
-        )
-        # The consumer pushes s.versions and then a whole subscribe stream for
-        # the user's organisation channel without being asked. Left buffered,
-        # the first subscribe_meeting would return on *this* stream's
-        # state_complete and every measurement after it would be one behind.
-        self._drain_state("organisation")
+        with self.environment.events.request.measure("WS", "connect") as meta:
+            try:
+                self.ws = create_connection(
+                    socket_url,
+                    cookie=cookies,
+                    timeout=WS_TIMEOUT,
+                    # AllowedHostsOriginValidator drops a handshake whose Origin
+                    # is not in ALLOWED_HOSTS, which is only "*" in development.
+                    origin=self.host,
+                )
+                # The consumer pushes s.versions and then a whole subscribe
+                # stream for the user's organisation channel without being
+                # asked. Left buffered, the first subscribe_meeting would return
+                # on *this* stream's state_complete and every measurement after
+                # it would be one behind.
+                _, meta["response_length"] = self._drain_state("organisation")
+            except (WebSocketException, OSError):
+                self._disconnect()
+                raise
 
     def _disconnect(self):
         if self.ws is not None:

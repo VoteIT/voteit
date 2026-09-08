@@ -49,6 +49,22 @@ Then open the web UI, or add `--headless -u 10 -r 2 -t 60s` for a scripted run.
 | `USER_PASSWORD` | required | The password argument given to `testing_meeting`. |
 | `USER_COUNT` | `50` | Must match `-u` on `testing_meeting`, or logins fail for users that were never created. |
 
+## Reading the results
+
+Websocket work is reported to locust like any HTTP request, so it appears in the
+statistics table (and the web UI's Statistics tab) with type `WS`:
+
+| Name | What its response time means |
+| --- | --- |
+| `connect` | Handshake plus the organisation state the server pushes unasked. |
+| `subscribe participants` | Round trip from `channel.subscribe` to `channel.state_complete` -- what a client waits through before it can render. |
+| `subscribe agenda_item` | The same, for the agenda item channel. |
+
+A refused subscribe (`channel.subscribe_error`) is counted as a **failure**, not
+as a very fast success -- otherwise the quickest rows in the table would be the
+broken ones. The `response_length` column is the size of the JSON state that
+arrived, which is a useful check that collectors are returning what you expect.
+
 ## Requirements on the server
 
 - **An RQ worker on the `default` queue.** `channel.subscribe` is enqueued, not
