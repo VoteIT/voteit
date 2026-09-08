@@ -105,6 +105,10 @@ docker = [
     "slack-logger (>=0.3.1,<0.4.0)",
     "personnummer (>=3.2.1,<4.0.0)",
 ]
+locust = [
+    "locust>=2.46.4",
+    "websocket-client>=1.8.0",
+]
 
 
 [tool.coverage.run]
@@ -133,7 +137,7 @@ exclude_also = [
 ]
 
 [tool.ruff]
-include = ["pyproject.toml", "voteit/**/*.py", "src/**/*.py"]
+include = ["pyproject.toml", "voteit/**/*.py", "src/**/*.py", "locust/*.py"]
 lint.isort.force-single-line = true
 # E402: load_dotenv() must run before "from .settings import *" so that
 # settings can read the environment.

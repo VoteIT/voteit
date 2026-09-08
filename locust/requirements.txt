@@ -1,3 +1,0 @@
-locust
-python_dotenv
-websocket-client
