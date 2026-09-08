@@ -47,6 +47,7 @@ Then open the web UI, or add `--headless -u 10 -r 2 -t 60s` for a scripted run.
 | `MEETING_ID` | required | Printed by `testing_meeting` as `Meeting:`. |
 | `AGENDA_ITEM_ID` | required | Printed by `testing_meeting` as `AI:`. Used by the `agenda_item` subscribe task. |
 | `USER_PASSWORD` | required | The password argument given to `testing_meeting`. |
+| `SUBSCRIPTION_HOLD` | `27` | Seconds a socket user stays subscribed, reading, before leaving. The socket must be read throughout -- see below. |
 | `USER_COUNT` | `50` | Must match `-u` on `testing_meeting`, or logins fail for users that were never created. |
 
 ## Reading the results
@@ -59,6 +60,7 @@ statistics table (and the web UI's Statistics tab) with type `WS`:
 | `connect` | Handshake plus the organisation state the server pushes unasked. |
 | `subscribe participants` | Round trip from `channel.subscribe` to `channel.state_complete` -- what a client waits through before it can render. |
 | `subscribe agenda_item` | The same, for the agenda item channel. |
+| `hold participants` / `hold agenda_item` | **Failures only, no timing.** Appears when the socket died during the hold; the duration would be `SUBSCRIPTION_HOLD` every time and would swamp the percentiles. |
 
 A refused subscribe (`channel.subscribe_error`) is counted as a **failure**, not
 as a very fast success -- otherwise the quickest rows in the table would be the
@@ -70,6 +72,17 @@ arrived, which is a useful check that collectors are returning what you expect.
 - **An RQ worker on the `default` queue.** `channel.subscribe` is enqueued, not
   handled inline — with no worker the socket never answers and `SocketUser`
   fails on the 10s websocket timeout.
+- **Nothing to do -- but know why the test reads while it waits.** Production and
+  staging run daphne with `--ping-interval 10` (see `docker-entrypoint.sh`) and
+  `--ping-timeout` at its default 30s: the server pings every 10 seconds and
+  drops a connection 30 seconds after an unanswered ping. `websocket-client`
+  replies to a PING only from inside `recv()`, so a socket nobody reads never
+  pongs and gets closed, which then surfaces as `BrokenPipeError` or
+  `WebSocketConnectionClosedException` on the next send. That is why the socket
+  user holds its subscription by *reading* (`SocketUser._pump`) rather than
+  sleeping. Do not "fix" this by raising the server's ping timeout -- a browser
+  answers pings automatically, so the server setting is right and it is the test
+  client that has to behave.
 - **The host in `ALLOWED_HOSTS`.** `AllowedHostsOriginValidator` rejects the
   websocket handshake by `Origin`. Development sets `["*"]`; staging builds the
   list from the `HOST` env var.

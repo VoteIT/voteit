@@ -2,12 +2,13 @@ import itertools
 import json
 import os
 from contextlib import suppress
-from time import sleep
+from time import monotonic
 
 from locust.clients import HttpSession
 from requests.cookies import RequestsCookieJar
 from websocket import WebSocket
 from websocket import WebSocketException
+from websocket import WebSocketTimeoutException
 from websocket import create_connection
 
 from locust import HttpUser
@@ -35,6 +36,11 @@ WS_TIMEOUT = 10
 #: The two frames that end a subscribe stream, one way or the other.
 STATE_COMPLETE = "channel.state_complete"
 SUBSCRIBE_ERROR = "channel.subscribe_error"
+#: Seconds to stay subscribed, reading, before leaving again. A real client
+#: holds its subscription and receives pushes; it does not subscribe and
+#: immediately walk away. This is also what keeps the socket alive -- see
+#: SocketUser._pump.
+SUBSCRIPTION_HOLD = float(os.getenv("SUBSCRIPTION_HOLD", "27"))
 
 
 def do_login(_id: int, client: HttpSession):
@@ -128,13 +134,11 @@ def get_cookie_string(cookies: RequestsCookieJar) -> str:
 
 
 class SocketUser(VoteitUser):
-    weight = 3
-    # Slower than the REST users on purpose. Every subscribe queues an RQ job
-    # that runs the channel's collectors, so it is far more server work than a
-    # read endpoint and nothing like it happens once a second in real use. The
-    # two tasks share this schedule, so each user re-subscribes to each channel
-    # roughly once a minute.
-    wait_time = between(20, 40)
+    # Short, because the pacing now lives inside the task: a cycle is dominated
+    # by SUBSCRIPTION_HOLD seconds spent subscribed and listening. With two
+    # tasks that still comes to roughly one subscribe per channel per minute,
+    # but the socket is being read throughout instead of lying idle.
+    wait_time = between(1, 5)
     ws: WebSocket = None
 
     @task
@@ -187,11 +191,49 @@ class SocketUser(VoteitUser):
                 raise
         if meta["exception"] is not None:
             return
-        sleep(1)
+        # Stay subscribed and keep reading, the way a real client does.
         try:
+            self._pump(SUBSCRIPTION_HOLD)
             self.ws.send(json.dumps({"action": "channel.leave", "payload": payload}))
-        except (WebSocketException, OSError):
+        except (WebSocketException, OSError) as error:
             self._disconnect()
+            # Not measured as a timing -- the duration would just be
+            # SUBSCRIPTION_HOLD every time and would swamp the percentiles --
+            # but a socket dying mid-hold is exactly what we want to see, so it
+            # is reported as a failure with no timing attached.
+            self.environment.events.request.fire(
+                request_type="WS",
+                name=f"hold {channel_type}",
+                response_time=0,
+                response_length=0,
+                exception=error,
+                context={},
+            )
+
+    def _pump(self, seconds: float) -> None:
+        """Read and discard frames for a while, keeping the socket answered.
+
+        websocket-client replies to the server's PING only from inside recv():
+        there is no background thread, so a socket nobody reads never sends a
+        PONG. Staging's daphne pings every 10s (--ping-interval 10) and autobahn
+        drops the connection 30s after an unanswered one, which is why an idle
+        user used to lose its socket and then raise BrokenPipeError on the next
+        send. Reading here also consumes what the server pushes to a subscriber,
+        which is traffic a real client handles and this test otherwise ignores.
+        """
+        deadline = monotonic() + seconds
+        try:
+            while (remaining := deadline - monotonic()) > 0:
+                self.ws.settimeout(min(remaining, WS_TIMEOUT))
+                try:
+                    self.ws.recv()
+                except WebSocketTimeoutException:
+                    # Nothing arrived in the window, which is the normal case on
+                    # a quiet meeting. The timeout lands between frames rather
+                    # than inside one, so the stream stays in step.
+                    pass
+        finally:
+            self.ws.settimeout(WS_TIMEOUT)
 
     def _drain_state(self, channel_type: str, limit: int = 200) -> tuple[str, int]:
         """Read frames until this channel's initial state is done.
