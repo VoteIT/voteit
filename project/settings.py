@@ -118,6 +118,22 @@ CHANNEL_LAYERS = {
 
 
 # Database
+#
+# Set PGBOUNCER when HOST/PORT point at a pgbouncer running in transaction
+# pooling mode. That mode multiplexes many client connections onto few backends,
+# which rules out anything that carries session state across transactions:
+#
+# - psycopg's own pool is redundant behind it (and Django refuses to combine a
+#   pool with persistent connections), so drop it and keep the cheap client
+#   connection open instead -- pgbouncer does the real pooling.
+# - Named cursors span transactions, hence DISABLE_SERVER_SIDE_CURSORS. The one
+#   .iterator() in the codebase lives in a data migration, and migrations must
+#   bypass pgbouncer anyway.
+#
+# Health checks matter more here than usual: a pgbouncer restart leaves every
+# cached connection dead.
+PGBOUNCER = bool(os.getenv("PGBOUNCER"))
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -128,9 +144,10 @@ DATABASES = {
         # Empty means the driver's default. The test targets in the Makefile
         # point this at the db-test service in compose.yml.
         "PORT": os.getenv("POSTGRES_PORT", ""),
-        "OPTIONS": {
-            "pool": True,
-        },
+        "CONN_MAX_AGE": None if PGBOUNCER else 0,
+        "CONN_HEALTH_CHECKS": True,
+        "DISABLE_SERVER_SIDE_CURSORS": PGBOUNCER,
+        "OPTIONS": {} if PGBOUNCER else {"pool": True},
     }
 }
 
