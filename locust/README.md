@@ -73,9 +73,9 @@ arrived, which is a useful check that collectors are returning what you expect.
   handled inline — with no worker the socket never answers and `SocketUser`
   fails on the 10s websocket timeout.
 - **Nothing to do -- but know why the test reads while it waits.** Production and
-  staging run daphne with `--ping-interval 10` (see `docker-entrypoint.sh`) and
-  `--ping-timeout` at its default 30s: the server pings every 10 seconds and
-  drops a connection 30 seconds after an unanswered ping. `websocket-client`
+  staging run uvicorn with `--ws-ping-interval 10 --ws-ping-timeout 20` (see the
+  `run-ws` branch of `docker-entrypoint.sh`): the server pings every 10 seconds
+  and drops a connection 20 seconds after an unanswered ping. `websocket-client`
   replies to a PING only from inside `recv()`, so a socket nobody reads never
   pongs and gets closed, which then surfaces as `BrokenPipeError` or
   `WebSocketConnectionClosedException` on the next send. That is why the socket

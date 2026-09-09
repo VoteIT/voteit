@@ -6,9 +6,9 @@ output is packed into ``channel.state`` bundles instead: sections from
 consecutive collectors are appended until the byte budget is reached, so an
 ordinary meeting arrives in a single frame.
 
-The budget (``VOTEIT_APP_STATE_BUNDLE_BYTES``, 1 MB) is well under daphne's
-``--websocket-max-message-size`` of 5 MiB, which is the only hard ceiling in the
-stack -- redis and channels_redis limit queue *depth*, not message size.
+The budget (``VOTEIT_APP_STATE_BUNDLE_BYTES``, 1 MB) is well under uvicorn's
+``--ws-max-size`` of 5 MiB, which is the only hard ceiling in the stack -- redis
+and channels_redis limit queue *depth*, not message size.
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ def _split_batch(message: BaseMessage, limit: int) -> Iterator[tuple[BaseMessage
 
     Anything else -- a single message that is simply too big -- is yielded as
     it is. There is no smaller frame to put it in, and it is still far under
-    daphne's limit.
+    uvicorn's limit.
     """
     batch_cls = type(message)
     items = getattr(message.payload, "items", None)

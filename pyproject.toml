@@ -29,7 +29,7 @@ dependencies = [
     "django (>=5.2.7,<6.0.0)",
     "channels-redis (>=4.3.0,<5.0.0)",
     "channels (>=4.3.1,<5.0.0)",
-    "daphne (>=4.2.1,<5.0.0)",
+    "uvicorn[standard] (>=0.38.0,<0.39.0)",
     "psycopg[binary,pool] (>=3.2.12,<4.0.0)",
     "bs4 (>=0.0.2,<0.0.3)",
     "python-json-logger (>=4.0.0,<5.0.0)",
@@ -86,6 +86,10 @@ exclude = [
 
 [dependency-groups]
 dev = [
+    # Test-only. Nothing serves traffic with daphne any more, but
+    # `channels.testing.__init__` imports ChannelsLiveServerTestCase, which
+    # imports daphne.testing unconditionally.
+    "daphne (>=4.2.1,<5.0.0)",
     "django-hijack (>=3.7.4,<4.0.0)",
     "ipython (>=9.6.0,<10.0.0)",
     "ruff (>=0.13.3,<0.14.0)",

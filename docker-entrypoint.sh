@@ -1,11 +1,36 @@
 #!/bin/bash
 set -e
 
+# Uvicorn flags shared by both halves of the ASGI deployment.
+#
+# --forwarded-allow-ips: --proxy-headers alone only trusts 127.0.0.1, and behind
+# traefik the peer is another container, so every request would be attributed to
+# the proxy's address. Nothing but traefik can reach these ports.
+# --ws-max-size: one setting for what daphne split into --websocket-max-message-size
+# and --websocket-max-frame-size. VOTEIT_APP_STATE_BUNDLE_BYTES stays well under it.
+UVICORN_COMMON=(
+  --host 0.0.0.0 --port 8000
+  --proxy-headers --forwarded-allow-ips='*'
+  --ws-max-size 5242880
+)
+
 if [[ "$1" == "run" ]]; then
-  echo "Starting Daphne"
+  echo "Starting uvicorn (http)"
   exec ./wait-for-it.sh db:5432 -s -- \
     ./wait-for-it.sh redis:6379 -s -- \
-    daphne --access-log - -p 8000 -b 0.0.0.0 --ping-interval 10 --proxy-headers --websocket-max-message-size 5242880 --websocket-max-frame-size 5242880 project.asgi:application
+    uvicorn "${UVICORN_COMMON[@]}" --access-log "${@:2}" project.asgi:application
+elif [[ "$1" == "run-ws" ]]; then
+  # Same image and same ASGI application as `run`; traefik decides which process
+  # gets which path. What differs is the tuning: websockets are long-lived, so
+  # they need keepalive pings and a longer window to drain on shutdown, and the
+  # access log would otherwise emit one line per connection for no benefit.
+  echo "Starting uvicorn (websocket)"
+  exec ./wait-for-it.sh db:5432 -s -- \
+    ./wait-for-it.sh redis:6379 -s -- \
+    uvicorn "${UVICORN_COMMON[@]}" --no-access-log \
+      --ws-ping-interval 10 --ws-ping-timeout 20 \
+      --timeout-graceful-shutdown 20 \
+      "${@:2}" project.asgi:application
 elif [[ "$1" == "worker" ]]; then
   QUEUES=("${@:2}")
   if [[ ${#QUEUES[@]} -eq 0 ]]; then

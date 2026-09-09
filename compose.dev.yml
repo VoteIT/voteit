@@ -3,8 +3,10 @@ services:
   django:
     build:
       dockerfile: ./dev.Dockerfile
-    command: |
-      python manage.py runserver
+    # The entrypoint's `run`, plus the reload watcher. Everything after `run` is
+    # handed to uvicorn; --reload-dir is limited to the mounts below so watchfiles
+    # does not walk /app/media.
+    command: ["run", "--reload", "--reload-dir", "/app/voteit", "--reload-dir", "/app/project"]
     env_file:
       - .env
     ports:

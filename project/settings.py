@@ -147,7 +147,14 @@ DATABASES = {
         "CONN_MAX_AGE": None if PGBOUNCER else 0,
         "CONN_HEALTH_CHECKS": True,
         "DISABLE_SERVER_SIDE_CURSORS": PGBOUNCER,
-        "OPTIONS": {} if PGBOUNCER else {"pool": True},
+        # psycopg_pool defaults to min_size=4 and max_size=None, and max_size=None
+        # means max == min -- so a bare {"pool": True} caps every Django process at
+        # four concurrent DB-touching requests and queues the rest until
+        # PoolTimeout. Under ASGI nothing else applies backpressure (Django mints a
+        # fresh single-worker thread pool per request), so this number is the
+        # process's real concurrency limit. 20 per process against
+        # max_connections=600 leaves plenty of headroom at the scale we run.
+        "OPTIONS": {} if PGBOUNCER else {"pool": {"min_size": 4, "max_size": 20}},
     }
 }
 

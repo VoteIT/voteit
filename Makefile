@@ -14,14 +14,24 @@ migrate:
 	python manage.py migrate
 rqworker:
 	python manage.py devrqworker default long --with-scheduler
+# Development runs the same ASGI server as production (see docker-entrypoint.sh).
+# `manage.py runserver` is a plain WSGI dev server now that the daphne app is gone
+# from INSTALLED_APPS, so it answers REST but not /ws/. --reload-dir is not
+# optional: watchfiles otherwise walks the whole working directory, ./volumes and
+# ./.venv included.
+DEV_UVICORN = DJANGO_SETTINGS_MODULE=project.settings_development PYTHONWARNINGS=once \
+	uvicorn --host 127.0.0.1 --port 8000 --reload \
+	--reload-dir voteit --reload-dir project --reload-dir src \
+	--ws-ping-interval 10 --ws-ping-timeout 20 --ws-max-size 5242880 \
+	project.asgi:application
 up:
 	docker compose up -d
 	python manage.py rqworker --with-scheduler default long &
-	python -W once manage.py runserver
+	$(DEV_UVICORN)
 down:
 	docker compose down
 run:
-	python -W once manage.py runserver
+	$(DEV_UVICORN)
 # `make test` runs the whole voteit suite; `make test voteit.messaging` runs just
 # that target. The same goes for `make coverage`. Extra words on the command line
 # are swallowed by the catch-all rule below (only enabled when test or coverage is

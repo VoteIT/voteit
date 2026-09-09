@@ -98,6 +98,11 @@ the whole codebase to v1.
 - **`manage.py send_notice --type error --message "..." [--organisation N]`**
   sends an `s.msg` to everyone or to one
   organisation.
+- **Development runs uvicorn too** (`make run`, `make up`). `manage.py
+  runserver` no longer serves websockets: the `daphne` app is gone from
+  `INSTALLED_APPS`, so runserver falls back to its WSGI handler. Daphne remains
+  a *dev* dependency because `channels.testing` imports it, and is no longer in
+  the image.
 
 ### Changes
 

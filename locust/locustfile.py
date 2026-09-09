@@ -215,11 +215,12 @@ class SocketUser(VoteitUser):
 
         websocket-client replies to the server's PING only from inside recv():
         there is no background thread, so a socket nobody reads never sends a
-        PONG. Staging's daphne pings every 10s (--ping-interval 10) and autobahn
-        drops the connection 30s after an unanswered one, which is why an idle
-        user used to lose its socket and then raise BrokenPipeError on the next
-        send. Reading here also consumes what the server pushes to a subscriber,
-        which is traffic a real client handles and this test otherwise ignores.
+        PONG. Staging's uvicorn pings every 10s (--ws-ping-interval 10) and drops
+        the connection 20s after an unanswered one (--ws-ping-timeout 20), which
+        is why an idle user used to lose its socket and then raise BrokenPipeError
+        on the next send. Reading here also consumes what the server pushes to a
+        subscriber, which is traffic a real client handles and this test
+        otherwise ignores.
         """
         deadline = monotonic() + seconds
         try:

@@ -13,10 +13,11 @@ All commands assume the virtualenv is active. Use `uv sync` to install dependenc
 docker compose up -d
 
 # Full dev start
-make up          # docker compose + rqworker + runserver
+make up          # docker compose + rqworker + uvicorn
 
-# Run dev server only
-make run         # python -W once manage.py runserver
+# Run dev server only. Development runs the same ASGI server as production;
+# `manage.py runserver` is WSGI-only now and does not serve /ws/.
+make run         # uvicorn --reload project.asgi:application
 
 # Tests
 make test        # python manage.py test voteit --keepdb --failfast

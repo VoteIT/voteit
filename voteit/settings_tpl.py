@@ -38,7 +38,6 @@ MIDDLEWARE = [
 
 # Installed apps
 INSTALLED_APPS = [
-    "daphne",
     "voteit.stats",  # Before admin, to override templates
     "django.contrib.admin",
     "django.contrib.auth",
@@ -162,7 +161,7 @@ VOTEIT_WS_FAST_FANOUT = True
 # Byte budget for one channel.state frame of initial state. Collector output is
 # packed up to this size before a new frame is started, and an oversized
 # <action>.batch is re-chunked to fit. Comfortably under the 5 MiB
-# --websocket-max-message-size daphne runs with.
+# --ws-max-size uvicorn runs with.
 VOTEIT_APP_STATE_BUNDLE_BYTES = int(
     os.getenv("VOTEIT_APP_STATE_BUNDLE_BYTES", 1_000_000)
 )
