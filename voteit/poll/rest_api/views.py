@@ -182,7 +182,7 @@ class VoteViewSet(VerboseAutoPermissionViewSetMixin, viewsets.GenericViewSet):
 
 @router.register("electoral-register-policies", basename="electoral-register-policies")
 class ElectoralRegisterPoliciesViewSet(ViewSet):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def list(self, request):
         reg = get_electoral_policy_registry()
