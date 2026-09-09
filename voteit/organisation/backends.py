@@ -34,7 +34,7 @@ class IDProxyOAuth2(BaseOAuth2):
     """
 
     name = "idproxy"
-    REDIRECT_STATE = True
+    REDIRECT_STATE = False
     ID_KEY = "identity_id"
     AUTHORIZATION_URL = "https://id.voteit.se/o/authorize/"
     ACCESS_TOKEN_URL = "https://id.voteit.se/o/token/"
