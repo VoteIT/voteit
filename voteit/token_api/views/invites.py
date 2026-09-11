@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import mixins
 
 from voteit.invites.models import MeetingInvite
@@ -59,3 +60,7 @@ class InvitesView(
         if self.action == "create":
             return InviteCreateViaTokenSerializer
         return super().get_serializer_class()
+
+    def perform_destroy(self, instance):
+        with transaction.atomic(durable=True):
+            instance.delete()

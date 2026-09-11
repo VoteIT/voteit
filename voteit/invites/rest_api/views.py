@@ -113,6 +113,10 @@ class MeetingInviteViewSet(
         """
         return Response([])
 
+    def perform_destroy(self, instance):
+        with transaction.atomic(durable=True):
+            instance.delete()
+
     def create(self, request, *args, **kwargs):
         """
         POST /api/meeting-invites/
@@ -495,7 +499,7 @@ class MatchInvitesViewSet(viewsets.GenericViewSet):
         """
         # Note: Permissions doesn't apply here since it's handled by the queryset
         instance: MeetingInvite = self.get_object()
-        with transaction.atomic():
+        with transaction.atomic(durable=True):
             instance.reject(request.user)
             instance.save()
         return Response(status=200, data=self.serializer_class(instance).data)
@@ -546,7 +550,7 @@ class HandleMatchedInvitesViewSet(
         """
         # Note: Permissions doesn't apply here since it's handled by the queryset
         instance: MeetingInvite = self.get_object()
-        with transaction.atomic():
+        with transaction.atomic(durable=True):
             instance.accept(request.user)
             instance.save()
         return Response(status=200, data=self.serializer_class(instance).data)
@@ -567,7 +571,7 @@ class HandleMatchedInvitesViewSet(
         """
         # Note: Permissions doesn't apply here since it's handled by the queryset
         instance: MeetingInvite = self.get_object()
-        with transaction.atomic():
+        with transaction.atomic(durable=True):
             instance.reject(request.user)
             instance.save()
         return Response(status=200, data=self.serializer_class(instance).data)
