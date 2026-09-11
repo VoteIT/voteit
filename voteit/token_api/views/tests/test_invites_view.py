@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from voteit.invites.models import MeetingInvite
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
+from voteit.meeting.roles import ROLE_POTENTIAL_VOTER
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.organisation.models import Organisation
 from voteit.token_api.models import MeetingAPIKey
@@ -16,6 +17,8 @@ User = get_user_model()
 
 LIST_URL = "token-api:invites-list"
 DETAIL_URL = "token-api:invites-detail"
+ADD_ROLES_URL = "token-api:invites-add-roles"
+REMOVE_ROLES_URL = "token-api:invites-remove-roles"
 
 
 class InvitesViewTest(APITestCase):
@@ -381,6 +384,156 @@ class InvitesViewTest(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("roles", response.json())
         self.assertIn(ROLE_MODERATOR, self.meeting.get_roles(moderator))
+
+    # --- add / remove roles ---
+
+    def _post_roles(self, url_name, invite, roles, scopes=("invites.*",)):
+        _, key = self._create_key(scopes=list(scopes))
+        self._api_key_client(key)
+        return self.client.post(
+            reverse(url_name, args=[invite.pk]), {"roles": roles}, format="json"
+        )
+
+    def test_add_roles(self):
+        response = self._post_roles(ADD_ROLES_URL, self.invite, [ROLE_PROPOSER])
+        self.assertEqual(response.status_code, 200, response.json())
+        self.assertEqual(self.invite.pk, response.json()["pk"])
+        self.assertEqual([ROLE_PARTICIPANT, ROLE_PROPOSER], response.json()["roles"])
+        self.invite.refresh_from_db()
+        self.assertEqual([ROLE_PARTICIPANT, ROLE_PROPOSER], self.invite.roles)
+
+    def test_add_roles_adds_required_roles(self):
+        invite = self.meeting.invites.create(
+            user_data={"email": "pv@example.com"}, roles=[ROLE_POTENTIAL_VOTER]
+        )
+        response = self._post_roles(ADD_ROLES_URL, invite, [ROLE_PROPOSER])
+        self.assertEqual(response.status_code, 200, response.json())
+        invite.refresh_from_db()
+        self.assertEqual(
+            [ROLE_PARTICIPANT, ROLE_PROPOSER, ROLE_POTENTIAL_VOTER], invite.roles
+        )
+
+    def test_add_roles_updates_user(self):
+        self.invite.accept(self.participant)
+        self.invite.save()
+        response = self._post_roles(ADD_ROLES_URL, self.invite, [ROLE_PROPOSER])
+        self.assertEqual(response.status_code, 200, response.json())
+        self.assertEqual(
+            {ROLE_PARTICIPANT, ROLE_PROPOSER}, self.meeting.get_roles(self.participant)
+        )
+
+    def test_remove_roles_updates_user(self):
+        invite = self.meeting.invites.create(
+            user_data={"email": "x@example.com"},
+            roles=[ROLE_PARTICIPANT, ROLE_PROPOSER],
+        )
+        invite.accept(self.participant)
+        invite.save()
+        self.assertEqual(
+            {ROLE_PARTICIPANT, ROLE_PROPOSER}, self.meeting.get_roles(self.participant)
+        )
+        response = self._post_roles(REMOVE_ROLES_URL, invite, [ROLE_PROPOSER])
+        self.assertEqual(response.status_code, 200, response.json())
+        self.assertEqual([ROLE_PARTICIPANT], response.json()["roles"])
+        self.assertEqual({ROLE_PARTICIPANT}, self.meeting.get_roles(self.participant))
+
+    def test_remove_roles_not_on_invite_changes_nothing(self):
+        response = self._post_roles(REMOVE_ROLES_URL, self.invite, [ROLE_PROPOSER])
+        self.assertEqual(response.status_code, 200, response.json())
+        self.assertEqual([ROLE_PARTICIPANT], response.json()["roles"])
+
+    def test_remove_roles_must_keep_one_role(self):
+        invite = self.meeting.invites.create(
+            user_data={"email": "x@example.com"},
+            roles=[ROLE_PARTICIPANT, ROLE_PROPOSER],
+        )
+        # Proposer requires participant, so both would go
+        response = self._post_roles(REMOVE_ROLES_URL, invite, [ROLE_PARTICIPANT])
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("roles", response.json())
+        invite.refresh_from_db()
+        self.assertEqual([ROLE_PARTICIPANT, ROLE_PROPOSER], invite.roles)
+
+    def test_change_roles_rejects_moderator_role(self):
+        for url_name in (ADD_ROLES_URL, REMOVE_ROLES_URL):
+            with self.subTest(url_name=url_name):
+                response = self._post_roles(url_name, self.invite, [ROLE_MODERATOR])
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("roles", response.json())
+        self.invite.refresh_from_db()
+        self.assertEqual([ROLE_PARTICIPANT], self.invite.roles)
+
+    def test_change_roles_rejects_moderator_invite(self):
+        invite = self.meeting.invites.create(
+            user_data={"email": "mod@example.com"},
+            roles=[ROLE_PARTICIPANT, ROLE_MODERATOR],
+        )
+        for url_name in (ADD_ROLES_URL, REMOVE_ROLES_URL):
+            with self.subTest(url_name=url_name):
+                response = self._post_roles(url_name, invite, [ROLE_PROPOSER])
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("roles", response.json())
+        invite.refresh_from_db()
+        self.assertEqual([ROLE_MODERATOR, ROLE_PARTICIPANT], invite.roles)
+
+    def test_change_roles_rejects_invite_accepted_by_moderator(self):
+        moderator = User.objects.get(username="moderator")
+        # The invite doesn't carry the moderator role, the user does.
+        invite = self.meeting.invites.create(
+            user_data={"email": "mod@example.com"}, roles=[ROLE_PARTICIPANT]
+        )
+        invite.accept(moderator)
+        invite.save()
+        for url_name in (ADD_ROLES_URL, REMOVE_ROLES_URL):
+            with self.subTest(url_name=url_name):
+                response = self._post_roles(url_name, invite, [ROLE_PROPOSER])
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("roles", response.json())
+        self.assertIn(ROLE_MODERATOR, self.meeting.get_roles(moderator))
+
+    def test_change_roles_invalid_role(self):
+        response = self._post_roles(ADD_ROLES_URL, self.invite, ["boo"])
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("roles", response.json())
+
+    def test_change_roles_requires_roles(self):
+        for body in ({}, {"roles": []}):
+            with self.subTest(body=body):
+                _, key = self._create_key(scopes=["invites.*"])
+                self._api_key_client(key)
+                response = self.client.post(
+                    reverse(ADD_ROLES_URL, args=[self.invite.pk]), body, format="json"
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("roles", response.json())
+
+    def test_change_roles_requires_scope(self):
+        for url_name, scope in (
+            (ADD_ROLES_URL, "invites.add_roles"),
+            (REMOVE_ROLES_URL, "invites.remove_roles"),
+        ):
+            with self.subTest(url_name=url_name):
+                response = self._post_roles(
+                    url_name, self.invite, [ROLE_PROPOSER], scopes=["invites.list"]
+                )
+                self.assertEqual(response.status_code, 403)
+                self.assertIn(scope, response.json()["detail"])
+
+    def test_change_roles_specific_scope(self):
+        response = self._post_roles(
+            ADD_ROLES_URL, self.invite, [ROLE_PROPOSER], scopes=["invites.add_roles"]
+        )
+        self.assertEqual(response.status_code, 200, response.json())
+
+    def test_change_roles_other_meeting_not_found(self):
+        other_meeting = self.org.meetings.create(title="Other meeting")
+        invite = other_meeting.invites.create(
+            user_data={"email": "other@example.com"}, roles=[ROLE_PARTICIPANT]
+        )
+        response = self._post_roles(ADD_ROLES_URL, invite, [ROLE_PROPOSER])
+        self.assertEqual(response.status_code, 404)
+        invite.refresh_from_db()
+        self.assertEqual([ROLE_PARTICIPANT], invite.roles)
 
     # --- auditlog ---
 

@@ -157,6 +157,17 @@ class is built lazily by `get_invite_filterset_class()` (exposed through a
 `filterset_class` property on the view) because adapters register in
 `InvitesConfig.ready()`. As usual with django-filter, unknown params are ignored.
 
+`POST /{pk}/add-roles/` and `/{pk}/remove-roles/` (scopes `invites.add_roles`,
+`invites.remove_roles`) take only `roles` and return the invite. Required roles follow
+along like `Roles.add` / `Roles.remove`, and the result is always closed under
+requirements. That matters: `_update_assigned_roles` diffs the user's roles against
+the invite's, so an invite lacking `pa` would strip `pa` from the user, and the
+requirement cascade would take their other roles with it. An invite must keep one
+role. `MeetingInvite.change_roles()` saves and syncs to the user when the invite is
+accepted. On top of the usual moderator checks (`mo` in the body or on the invite), an
+invite accepted by a current moderator is rejected, since the sync would remove `mo`
+from them. The invite row is locked with `select_for_update` for the duration.
+
 ## Non-obvious design decisions
 
 **Auditlog actor patching.** Django's `AuditlogMiddleware` captures `request.user`

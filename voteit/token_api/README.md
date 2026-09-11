@@ -101,6 +101,36 @@ Invalid values are rejected:
     >>> response.json()
     {'email': ["'not-an-email' is not a valid email."]}
 
+## Changing roles on an invite
+
+`POST /token-api/invites/{pk}/add-roles/` and `.../remove-roles/` take only
+`roles`. Required roles follow along, so adding `pr` also adds `pa`:
+
+    >>> jane = meeting.invites.get(user_data__email="jane@example.com")
+    >>> response = client.post(
+    ...     reverse("token-api:invites-add-roles", args=[jane.pk]),
+    ...     {"roles": ["pr"]},
+    ...     format="json",
+    ... )
+    >>> response.json()["roles"]
+    ['pa', 'pr']
+    >>> response = client.post(
+    ...     reverse("token-api:invites-remove-roles", args=[jane.pk]),
+    ...     {"roles": ["pr"]},
+    ...     format="json",
+    ... )
+    >>> response.json()["roles"]
+    ['pa']
+
+The moderator role can't be changed this way:
+
+    >>> client.post(
+    ...     reverse("token-api:invites-add-roles", args=[jane.pk]),
+    ...     {"roles": ["mo"]},
+    ...     format="json",
+    ... ).status_code
+    400
+
 ## Revoking a key
 
 Call `DELETE /api/meeting-api-token/{prefix}/` as a meeting moderator.

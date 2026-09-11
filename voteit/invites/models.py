@@ -323,6 +323,20 @@ class MeetingInvite(RulesModelMixin, MeetingContext, StateMachineModelMixin):
     def revoke(self, user: UserType = None, force=False):
         self.sm.revoke(user=user, force=force)
 
+    @ensure_atomic
+    def change_roles(self, roles: Collection[str]) -> None:
+        """
+        Set roles, and sync them to the user if the invite was accepted.
+        Roles blocked by the meeting's dialect are left out, like in create_or_update_mixed.
+        """
+        ignore_roles = MeetingInvite.objects._ignore_roles(self.meeting)
+        self.roles = sorted(str(x) for x in roles if x not in ignore_roles)
+        self.save()
+        if self.state == InviteStateMachine.accepted.id:
+            MeetingInvite.objects._update_assigned_roles(
+                self.meeting, [self], ignore_roles=ignore_roles
+            )
+
     objects = MeetingInviteManager()
 
     def __repr__(self):
