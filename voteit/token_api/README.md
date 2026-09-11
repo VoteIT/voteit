@@ -75,6 +75,32 @@ specific scopes are normalised away on save:
     >>> normalize_scopes(["invites.*", "invites.list", "meeting.list"])
     ['invites.*', 'meeting.list']
 
+## Filtering invites
+
+The invite list takes any registered user data key (e.g. `email`), `roles` and `state` as
+query params. Values are normalised like on create. Separate values with commas
+to match any of them; different params must all match.
+
+    >>> client.credentials(HTTP_AUTHORIZATION=f"Api-Key {raw_key}")
+    >>> _ = meeting.invites.create(user_data={"email": "jane@example.com"}, roles=["pa"])
+    >>> _ = meeting.invites.create(user_data={"email": "joe@example.com"}, roles=["pa", "pr"])
+    >>> url = reverse("token-api:invites-list")
+    >>> [x["user_data"] for x in client.get(url, {"email": "Jane@Example.com"}).json()]
+    [{'email': 'jane@example.com'}]
+    >>> [x["user_data"] for x in client.get(url, {"roles": "pr"}).json()]
+    [{'email': 'joe@example.com'}]
+
+    >>> [x["user_data"] for x in client.get(url, {"email": "jane@example.com,joe@example.com", "roles": "pr"}).json()]
+    [{'email': 'joe@example.com'}]
+
+Invalid values are rejected:
+
+    >>> response = client.get(url, {"email": "not-an-email"})
+    >>> response.status_code
+    400
+    >>> response.json()
+    {'email': ["'not-an-email' is not a valid email."]}
+
 ## Revoking a key
 
 Call `DELETE /api/meeting-api-token/{prefix}/` as a meeting moderator.

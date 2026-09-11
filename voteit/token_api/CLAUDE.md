@@ -149,6 +149,14 @@ row that matches an existing invite carrying `mo`. Nothing extra is needed to st
 existing moderators being downgraded: the inherited `_raise_if_moderator_lockout`
 only skips its check when `mo` is in `roles`, which can't happen here.
 
+Filtering uses django-filter (`filters.py`): `roles`, `state` and one filter per registered
+user data key (`email`, `swedish_ssn`, ...). Values are comma-separated and OR'd;
+different params are AND'd. User data values run through the adapter schema first,
+so they match the normalised stored form, and invalid ones give 400. The FilterSet
+class is built lazily by `get_invite_filterset_class()` (exposed through a
+`filterset_class` property on the view) because adapters register in
+`InvitesConfig.ready()`. As usual with django-filter, unknown params are ignored.
+
 ## Non-obvious design decisions
 
 **Auditlog actor patching.** Django's `AuditlogMiddleware` captures `request.user`

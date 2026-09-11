@@ -75,6 +75,123 @@ class InvitesViewTest(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [])
 
+    # --- list filters ---
+
+    def _filtered_emails(self, params):
+        _, key = self._create_key(scopes=["invites.list"])
+        self._api_key_client(key)
+        response = self.client.get(reverse(LIST_URL), params)
+        self.assertEqual(response.status_code, 200, response.json())
+        return {item["user_data"]["email"] for item in response.json()}
+
+    def _create_filter_invites(self):
+        # self.invite is test@example.com with participant only
+        self.meeting.invites.create(
+            user_data={"email": "prop@example.com"},
+            roles=[ROLE_PARTICIPANT, ROLE_PROPOSER],
+        )
+        self.meeting.invites.create(
+            user_data={"email": "mod@example.com"},
+            roles=[ROLE_PARTICIPANT, ROLE_MODERATOR],
+        )
+
+    def test_list_filter_email_is_normalised(self):
+        self._create_filter_invites()
+        self.assertEqual(
+            {"prop@example.com"}, self._filtered_emails({"email": " Prop@Example.com"})
+        )
+
+    def test_list_filter_roles(self):
+        self._create_filter_invites()
+        self.assertEqual(
+            {"prop@example.com"}, self._filtered_emails({"roles": ROLE_PROPOSER})
+        )
+        self.assertEqual(
+            {"test@example.com", "prop@example.com", "mod@example.com"},
+            self._filtered_emails({"roles": ROLE_PARTICIPANT}),
+        )
+
+    def test_list_filter_state(self):
+        self._create_filter_invites()
+        self.meeting.invites.create(
+            user_data={"email": "revoked@example.com"},
+            roles=[ROLE_PARTICIPANT],
+            state="revoked",
+        )
+        self.meeting.invites.create(
+            user_data={"email": "expired@example.com"},
+            roles=[ROLE_PARTICIPANT],
+            state="expired",
+        )
+        self.assertEqual(
+            {"revoked@example.com"}, self._filtered_emails({"state": "revoked"})
+        )
+        self.assertEqual(
+            {"revoked@example.com", "expired@example.com"},
+            self._filtered_emails({"state": "revoked,expired"}),
+        )
+        self.assertEqual(
+            {"prop@example.com"},
+            self._filtered_emails({"state": "open", "roles": ROLE_PROPOSER}),
+        )
+
+    def test_list_filter_invalid_state(self):
+        _, key = self._create_key(scopes=["invites.list"])
+        self._api_key_client(key)
+        response = self.client.get(reverse(LIST_URL), {"state": "open,boo"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("state", response.json())
+
+    def test_list_filter_comma_separated_matches_any(self):
+        self._create_filter_invites()
+        self.assertEqual(
+            {"prop@example.com", "mod@example.com"},
+            self._filtered_emails({"roles": f"{ROLE_PROPOSER},{ROLE_MODERATOR}"}),
+        )
+
+    def test_list_filter_different_params_must_all_match(self):
+        self._create_filter_invites()
+        self.assertEqual(
+            set(),
+            self._filtered_emails(
+                {"email": "test@example.com", "roles": ROLE_PROPOSER}
+            ),
+        )
+        self.assertEqual(
+            {"prop@example.com"},
+            self._filtered_emails(
+                {"email": "test@example.com,prop@example.com", "roles": "pr"}
+            ),
+        )
+
+    def test_list_filter_empty_value_is_ignored(self):
+        self._create_filter_invites()
+        self.assertEqual(
+            {"test@example.com", "prop@example.com", "mod@example.com"},
+            self._filtered_emails({"email": "", "roles": ""}),
+        )
+
+    def test_list_filter_excludes_other_meetings(self):
+        other_meeting = self.org.meetings.create(title="Other meeting")
+        other_meeting.invites.create(
+            user_data={"email": "test@example.com"}, roles=[ROLE_PARTICIPANT]
+        )
+        _, key = self._create_key(scopes=["invites.list"])
+        self._api_key_client(key)
+        response = self.client.get(reverse(LIST_URL), {"email": "test@example.com"})
+        self.assertEqual([self.invite.pk], [item["pk"] for item in response.json()])
+
+    def test_list_filter_invalid_values(self):
+        _, key = self._create_key(scopes=["invites.list"])
+        self._api_key_client(key)
+        response = self.client.get(
+            reverse(LIST_URL), {"email": "not-an-email", "roles": "pa,boo"}
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(["'not-an-email' is not a valid email."], data["email"])
+        self.assertIn("roles", data)
+
     # --- retrieve ---
 
     def test_retrieve_returns_invite(self):

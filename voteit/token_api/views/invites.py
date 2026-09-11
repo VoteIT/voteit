@@ -1,4 +1,5 @@
 from django.db import transaction
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework import serializers
 
@@ -9,6 +10,7 @@ from voteit.invites.utils import get_invite_adapter_registry
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.token_api import register_meeting_api
 from voteit.token_api.base import MeetingApiBaseViewSet
+from voteit.token_api.filters import get_invite_filterset_class
 
 
 class InviteCreateViaTokenSerializer(InviteCreateSerializer):
@@ -70,6 +72,17 @@ class InvitesView(
     | create   | `invites.create` or `invites.*`   |
     | destroy  | `invites.destroy` or `invites.*`  |
 
+    **Query params (list)**
+
+    - Any registered user data key, e.g. `?email=user@example.com`. Values are
+      normalised like on create, so email matching isn't case sensitive.
+    - `roles` — invites carrying the role, e.g. `?roles=pa`.
+    - `state` — e.g. `?state=open`. One of `open`, `accepted`, `rejected`,
+      `revoked` or `expired`.
+
+    Separate values with commas to match any of them (`?roles=pa,pr`); different
+    params must all match. Invalid values return 400.
+
     **POST body (create)**
 
     - `roles` — list of role identifiers, e.g. `["pa"]`. At least one required.
@@ -85,6 +98,11 @@ class InvitesView(
 
     token_api_scope = "invites"
     serializer_class = MeetingInviteSerializer
+    filter_backends = [DjangoFilterBackend]
+
+    @property
+    def filterset_class(self):
+        return get_invite_filterset_class()
 
     def get_queryset(self):
         if api_key := getattr(self.request, "meeting_api_key", None):
