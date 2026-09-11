@@ -144,6 +144,11 @@ meeting. The `meeting` field is removed from the create serializer
 injection attacks. Supports `dryrun=true` (validates and returns result without
 persisting).
 
+The moderator role is off limits. `mo` in `roles` fails validation, and so does any
+row that matches an existing invite carrying `mo`. Nothing extra is needed to stop
+existing moderators being downgraded: the inherited `_raise_if_moderator_lockout`
+only skips its check when `mo` is in `roles`, which can't happen here.
+
 ## Non-obvious design decisions
 
 **Auditlog actor patching.** Django's `AuditlogMiddleware` captures `request.user`
@@ -188,3 +193,8 @@ python manage.py test voteit.token_api --keepdb --failfast
 Tests are split across `tests/` (unit tests for auth, validators, and the key
 management viewset) and `views/tests/` (integration tests for each token-API
 resource view). `test_docs.py` runs `README.md` as a doctest suite.
+
+
+## Error message translations
+
+Since these endpoints aren't used by regular users, there's no need to use translations within this module.

@@ -5,6 +5,7 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 
 from voteit.invites.models import MeetingInvite
+from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.meeting.roles import ROLE_PROPOSER
 from voteit.organisation.models import Organisation
@@ -205,6 +206,64 @@ class InvitesViewTest(APITestCase):
         self.assertEqual(response.status_code, 204)
         # No effect
         self.assertEqual({ROLE_PARTICIPANT}, self.meeting.get_roles(self.participant))
+
+    # --- Moderator role is off limits ---
+
+    def test_create_rejects_moderator_role(self):
+        _, key = self._create_key(scopes=["invites.create"])
+        self._api_key_client(key)
+        response = self.client.post(
+            reverse(LIST_URL),
+            {
+                "roles": [ROLE_PARTICIPANT, ROLE_MODERATOR],
+                "data": [{"email": "new@example.com"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("roles", response.json())
+        self.assertFalse(
+            MeetingInvite.objects.filter(user_data__email="new@example.com").exists()
+        )
+
+    def test_create_rejects_changing_moderator_invite(self):
+        _, key = self._create_key(scopes=["invites.create"])
+        self._api_key_client(key)
+        invite = self.meeting.invites.create(
+            user_data={"email": "mod@example.com"},
+            roles=[ROLE_PARTICIPANT, ROLE_MODERATOR],
+        )
+        response = self.client.post(
+            reverse(LIST_URL),
+            {"roles": [ROLE_PARTICIPANT], "data": [{"email": "mod@example.com"}]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("roles", response.json())
+        invite.refresh_from_db()
+        self.assertIn(ROLE_MODERATOR, invite.roles)
+
+    def test_create_rejects_removing_moderator_from_user(self):
+        _, key = self._create_key(scopes=["invites.create"])
+        self._api_key_client(key)
+        moderator = User.objects.get(username="moderator")
+        # The invite doesn't carry the moderator role, the user does.
+        invite = self.meeting.invites.create(
+            user_data={"email": "mod@example.com"}, roles=[ROLE_PARTICIPANT]
+        )
+        invite.accept(moderator)
+        invite.save()
+        response = self.client.post(
+            reverse(LIST_URL),
+            {
+                "roles": [ROLE_PARTICIPANT, ROLE_PROPOSER],
+                "data": [{"email": "mod@example.com"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("roles", response.json())
+        self.assertIn(ROLE_MODERATOR, self.meeting.get_roles(moderator))
 
     # --- auditlog ---
 

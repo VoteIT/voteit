@@ -168,12 +168,14 @@ def _raise_if_moderator_lockout(meeting, items: list[dict], roles: list[str]) ->
                 x for x in at_risk.values_list("used_by__userid", flat=True) if x
             )
             raise serializers.ValidationError(
-                _(
-                    "Your action would downgrade permissions for some moderators. "
-                    "Handle moderators via participants tab instead. "
-                    "Related to userID(s): %(userids)s"
-                )
-                % {"userids": userids}
+                {
+                    "roles": _(
+                        "Your action would downgrade permissions for some moderators. "
+                        "Handle moderators via participants tab instead. "
+                        "Related to userID(s): %(userids)s"
+                    )
+                    % {"userids": userids}
+                }
             )
 
 

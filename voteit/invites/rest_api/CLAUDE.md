@@ -84,7 +84,7 @@ Accepts multipart form with `meeting`, `file`, and optional `dryrun`. File is pa
 ## Shared helpers (`serializers.py`)
 
 - `_raise_if_conflicting_partials(meeting, items)` — called before `create_or_update_mixed`; raises `ValidationError` if any incoming identity values partially match different DB invites (e.g. `email` matches one invite, `ssn` matches another). Used by both the JSON serializer and the file import view.
-- `_raise_if_moderator_lockout(meeting, items, roles)` — raises `ValidationError` with affected userids if the new roles would downgrade an existing moderator. Used by both paths.
+- `_raise_if_moderator_lockout(meeting, items, roles)` — raises `ValidationError` on the `roles` key, with affected userids, if the new roles would downgrade an existing moderator. Used by both paths; the file import has no `roles` field but still gets the error under that key.
 - `_items_to_columns(items, reg)` — builds a stable, constraint-satisfying column list from a list of dicts.
 
 ## Serializers

@@ -841,7 +841,7 @@ class MeetingInviteViewSetCreateTests(APITestCase):
             }
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("moderator", response.json()["non_field_errors"][0])
+        self.assertIn("moderator", response.json()["roles"][0])
 
     def test_create_annotation_group_not_in_meeting(self):
         """Annotation with a group ID that doesn't exist in the meeting → 400."""
