@@ -16,3 +16,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # We want the digest refreshed, not the Python version bumped.
+      # Upgrading major/minor is done in:
+      # Dockerfile (both stages) and the matrix in .github/workflows/test.yml.
+      - dependency-name: python
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
