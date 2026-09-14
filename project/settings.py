@@ -14,7 +14,11 @@ MEDIA_URL = "media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 STATIC_ROOT = "/app/static/"
-ALLOWED_HOSTS = ["127.0.0.1"] + os.getenv("HOST", "").split()
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    ".voteit.se",
+    ".betahaus.net",
+] + os.getenv("HOST", "").split()
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://\w+\.voteit\.se$",
     r"^https://\w+\.betahaus\.net$",
