@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.0 (2026-09-14)
 
 Replaces the `channels-envelope` websocket library with
 [chanx](https://pypi.org/project/chanx/), and upgrades pydantic from v1 to v2.
@@ -11,7 +11,7 @@ the whole codebase to v1.
 
 - **Wire format**: `{"t": ..., "p": ..., "i": ..., "s": ...}` becomes
   `{"action": ..., "payload": ...}`. The `i` (message id) and `s` (state) fields
-  are gone. Action names are otherwise unchanged apart from the next point.
+  are gone.
 - **`*.added` messages are gone.** Every one is now `*.changed`; the client
   should upsert. The 20 types that had both actions lose the `.added` one, and
   the four that only had `.added` (`er`, `vote`, `reaction`, `roles`) are
@@ -19,19 +19,16 @@ the whole codebase to v1.
   Note `reaction.changed` and `roles.changed` are *deltas*, not object upserts,
   and keep their partner actions (`reaction.deleted`, `roles.removed`) — branch
   on the action pair rather than inferring intent from the name.
-- **`s.batch` and `s.batch2` are gone.** Runs of the same message now collapse
+- **Batch messages** Runs of the same message now collapse
   into a generated per-type `<action>.batch`, whose payload is
   `{"items": [<the normal payload>, ...]}` — typed, and described in the schema.
   A batch may carry **one** item: live updates only collapse at
   `VOTEIT_BATCH_THRESHOLD` (3) or more, but initial state is always sent
   batched however few rows there are. Do not treat `.batch` as "several".
 - **New `s.closing`** The server warns before it closes a
-  socket. The frame carries only `{"code": ...}`, and the code is the whole
-  signal: 1000 means stay out (you were logged out), 1001 that the server is
-  going away and the client should reconnect shortly.
+  socket. The frame carries only `{"code": ...}`.
 - **New `s.msg`**: `{"type": "info"|"warning"|"error", "message": "..."}`
-  — an arbitrary notice to show the user, already translated. It is independent
-  of everything else: it may arrive at any time, on its own.
+  — an arbitrary notice to show the user, already translated.
 - **`POST /api/user/logout/` takes an optional body.** `{"everywhere": true}`
   also ends the user's other sessions, on every device, and closes their
   sockets.
@@ -48,26 +45,13 @@ the whole codebase to v1.
   Sections are packed to just under 1 MB per frame
   (`VOTEIT_APP_STATE_BUNDLE_BYTES`), so a meeting that used to take 50-100
   separate frames now takes one or two. A collector that fails marks its own
-  section `failed` and no longer costs the client the rest of its state.
+  section `failed`.
 - **The `meeting` channel is gone.** A client opening a meeting subscribed twice:
   `meeting`, then one of `participants` / `moderators`. Now it subscribes **once**,
   to `participants` or `moderators`, and everything that used to arrive on
   `meeting` arrives on whichever of the two it is on.
-  `channel.subscribe` with `{"channel_type": "meeting"}` now answers
-  `channel.subscribe_error` / `"Unknown channel type"`.
-
-  The split never bought anything: `meeting` required `Meeting.VIEW`, exactly what
-  `participants` requires, and `moderators` requires `MODERATE`, which implies it —
-  so `meeting` reached nobody the other two do not.
-
-  Server-side, `MeetingChannel` is replaced by
-  `voteit.meeting.channels.broadcast_meeting(meeting, message)`, which publishes to
-  both groups; collectors that served `meeting` now declare
-  `channels = (ParticipantsChannel, ModeratorsChannel)`.
 - **The organisation channel is subscribed for you.** An authenticated socket is
-  now subscribed to the organisation the user belongs to as part of connecting:
-  right after `s.versions` the client gets the ordinary `channel.subscribed`,
-  `channel.state`, `channel.state_complete` stream.
+  now subscribed to the organisation the user belongs to as part of connecting.
 - **Component settings JSON Schema** (`/api/*-components/`) is now pydantic v2
   output: `$defs` rather than `definitions`, `anyOf` for optional fields, and
   draft 2020-12 refs.
@@ -78,17 +62,15 @@ the whole codebase to v1.
 ### Breaking changes — deployment
 
 - **The `conn` and `ts` RQ queues are removed.** Connection tracking is now done
-  inline from the consumer. Workers should run `default long`; running the old
-  queue names will simply idle. Update any process manager or compose file.
-- **`ASGI_APPLICATION` moves to `project.asgi.application`** (was
-  `project.routing.application`).
+  inline from the consumer.
+- **`ASGI_APPLICATION` moves to `project.asgi.application`**.
 - **New `voteit_messaging_connection` table** replaces `envelope_connection`.
   The app label is `voteit_messaging`, not `messaging`: an unrelated
   `voteit.messaging` app existed in 2021, and long-lived databases still carry
   its `messaging.0001_initial` row, which would make Django skip our initial
   migration as already applied. The migration copies existing rows;
   `envelope_connection` is deliberately left in place so this release can be
-  rolled back, and will be dropped in a later one.
+  rolled back.
 - The websocket now enforces `AllowedHostsOriginValidator`, which it did not
   before. Verify `ALLOWED_HOSTS` covers the SPA's origin.
 - **`manage.py close_sockets [--message "..." --type warning]`** disconnects
@@ -112,14 +94,9 @@ the whole codebase to v1.
   cheap `applicable()` that keeps a switched-off feature from being announced
   at all. `voteit/messaging/registry.py` holds `app_state_collectors` and
   `collectors_for()`; the names are unique project-wide because they go on the
-  wire. `voteit.proposal.signals.attach_proposals` moved to
-  `voteit.proposal.collectors`.
+  wire.
 - **pydantic v2**. Messages raised by our own validators are unchanged: v2's
   `"Value error, "` prefix is stripped before the message reaches the API.
-  pydantic's *built-in* messages did change, though, and there is no way around
-  it — `"value is not a valid integer"` is now `"Input should be a valid
-  integer, unable to parse string as an integer"`. Any client matching on error
-  strings rather than field names will need updating.
   Errors from a model validator, which belong to no single field, are reported
   under `non_field_errors` (v1 used `__root__`).
 - Vote serialisation is byte-for-byte identical to v1, deliberately. Serialised
@@ -128,18 +105,9 @@ the whole codebase to v1.
   across two keys for any poll open across the upgrade.
 - `conlist(unique_items=True)` is replaced by an explicit validator that runs
   *after* field coercion, so duplicates differing only in case or whitespace
-  are now correctly rejected on invite CSV upload — the misbehaviour noted in
-  the old code.
+  are now correctly rejected on invite CSV upload.
 - `Connection` gains indexes; the equivalent lookup went from a 38ms sequential
   scan to 0.1ms on a table of ~860k rows.
-- **Websocket connections are visible in the admin.** `voteit.messaging` gets a
-  read-only `Connection` changelist (filter by online / stale / closed and by
-  organisation, sort by session duration, search by user), a live
-  `.../connection/online/` page (users online, sockets per user, per-org
-  breakdown, connected-for histogram, longest current sessions) and a new
-  `Sockets` dashboard tab under `/admin/dashboard/` with connections-per-hour,
-  session-length and close-code charts. Until now the only way to see who was
-  online was the online/offline filter on the user list.
 - **Stale connections are cleaned up.** `close_stale_connections` runs every 30
   minutes and stamps close code 1006 on open rows that have been silent longer
   than `VOTEIT_CONNECTION_STALE_JOB_AFTER` (1h). Nothing reaped this table
@@ -150,19 +118,12 @@ the whole codebase to v1.
   `VOTEIT_CONNECTION_RETENTION_DAYS` (default `None`, off) additionally deletes
   long-closed rows; `voteit.stats.HistoryLog` already holds the daily
   aggregates they feed.
-- First end-to-end websocket tests: previously everything was tested at the
-  signal level and nothing exercised the consumer itself.
 - **State machines are bound lazily.** `statemachine.mixins.MachineMixin` built
   a whole `StateChart` inside every `Model.__init__` — so once per row of every
-  queryset, on the seven models that carry one. Measured at 209 µs / 30.8 kB per
-  `MeetingInvite` and 946 µs / 143 kB per `Poll`, against 5.4 µs / 584 B for the
-  bare model. `voteit.core.statemachines.StateMachineModelMixin` replaces it and
-  builds the machine on first access to `.sm`; nothing that iterates these
-  models in bulk reads it. Subscribing a moderator to `MeetingInvitesChannel` on
-  a 50 000-invite meeting drops from ~7.6 s and ~1.5 GB allocated to ~0.6 s and
-  ~50 MB. `.only()` / `.defer()` also become usable on these models for the
-  first time: the eager machine read the deferred `state` field, turning one
-  query into one per row.
+  queryset, on the seven models that carry one.
+- **token-api / invites**
+  - add / remove roles actions added. (Rather than just set).
+  - Invites related to moderator roles can no longer be modified this way.
 
 ### Fixes
 
