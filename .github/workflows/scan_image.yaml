@@ -1,0 +1,113 @@
+name: Scan published image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Image ref to scan, e.g. ghcr.io/voteit/voteit:v1.0 (default: the latest release)"
+        required: false
+        default: ""
+  schedule:
+    # Mondays, 05:17 UTC.
+    - cron: "17 5 * * 1"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# Actions are pinned to full commit SHAs, not tags -- see build_docker.yaml for
+# why. Dependabot (.github/dependabot.yml) keeps these SHAs current.
+jobs:
+  # Unlike the build job, this one has to hold a registry credential *before*
+  # the scanner runs, because the package is private and the image has to be
+  # pulled first. The credential is read-only: no packages:write, so nothing
+  # running here can publish an image, and no contents:write, so nothing can
+  # push to the repository.
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    steps:
+      # upload-sarif reads the repository's git context; without a checkout it
+      # has nothing to attach the results to.
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      # Every v* tag push publishes both the version tag and `latest`
+      # (docker/metadata-action's default latest=auto), so `latest` is the most
+      # recent release -- which is the thing worth re-scanning. A dispatch can
+      # name an older tag instead, to check what a specific deployment is
+      # exposed to.
+      - name: Resolve image to scan
+        id: image
+        env:
+          INPUT_IMAGE: ${{ inputs.image }}
+          DEFAULT_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        run: |
+          ref="${INPUT_IMAGE:-$DEFAULT_IMAGE}"
+          # The registry rejects an uppercase path, and github.repository is
+          # VoteIT/voteit. metadata-action lowercases this for us in the build
+          # workflow; here we do it ourselves.
+          ref="$(tr '[:upper:]' '[:lower:]' <<<"$ref")"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "Scanning $ref"
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image
+        env:
+          IMAGE: ${{ steps.image.outputs.ref }}
+        run: |
+          if ! docker pull "$IMAGE"; then
+            echo "::error::Could not pull $IMAGE. If no release has been tagged" \
+                 "yet, there is no :latest to scan and this workflow has nothing" \
+                 "to do until one exists."
+            exit 1
+          fi
+
+      # Same two-pass split as the build workflow, and for the same reasons:
+      # this pass reports everything fixable and must not fail, so that the
+      # upload below always runs.
+      - name: Scan image with Trivy (report)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.ref }}
+          format: sarif
+          output: trivy-results.sarif
+          ignore-unfixed: true
+
+      # A category of its own. The build workflow's results describe an image
+      # built from HEAD; these describe a released one. Sharing a category would
+      # make each upload close the other's alerts, and the Security tab would
+      # flip between two different sets of findings.
+      - name: Upload Trivy results to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-image-published
+
+      # Failing the job is the notification: GitHub mails the repository's
+      # maintainers when a scheduled workflow fails, which is what turns this
+      # from a page nobody visits into something that reaches a person.
+      - name: Scan image with Trivy (gate)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.ref }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+          skip-setup-trivy: true
+        env:
+          TRIVY_SKIP_DB_UPDATE: true
+          TRIVY_SKIP_JAVA_DB_UPDATE: true

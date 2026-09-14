@@ -59,15 +59,20 @@ jobs:
           if-no-files-found: error
 
   # This job holds the registry credential, so nothing untrusted may run in it
-  # before the push. The only steps between login and build-push are pinned
-  # Docker actions; dependency resolution happens inside the container, which
-  # does not inherit the runner environment.
+  # before the push. It builds, scans, and only then logs in and pushes, so the
+  # credential exists for two steps at the end and the scanner never shares a
+  # job state with it. Dependency resolution happens inside the container,
+  # which does not inherit the runner environment.
   docker:
     needs: wheels
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      # Trivy's findings are uploaded as SARIF to the Security tab. Free for
+      # this repo because it is public; a private repo needs GitHub Advanced
+      # Security, and without it the upload step fails.
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -93,20 +98,83 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
+      # Build without pushing, so the scan below decides whether this image is
+      # allowed to leave the runner at all. The image stays in the runner's
+      # docker daemon; the push step further down sends the very bytes that
+      # were scanned, rather than rebuilding them.
+      - name: Build docker image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Select image to scan
+        id: image
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: echo "ref=$(head -n 1 <<<"$TAGS")" >> "$GITHUB_OUTPUT"
+
+      # Two passes over the same image, because they answer different
+      # questions. This one reports: every fixable finding, at any severity,
+      # goes to the Security tab so it is visible and tracked even when it is
+      # not bad enough to stop a release. It must not fail the job, or the
+      # upload below never runs.
+      - name: Scan image with Trivy (report)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.ref }}
+          format: sarif
+          output: trivy-results.sarif
+          # Unfixed CVEs in the Debian base are not actionable here -- there is
+          # no version to upgrade to -- and they drown out what is. Rebuilds
+          # pick them up as soon as Debian ships a fix, since the base image
+          # digest is bumped by Dependabot.
+          ignore-unfixed: true
+
+      - name: Upload Trivy results to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-image
+
+      # And this one gates. Trivy is already installed and the vulnerability
+      # database is cached from the pass above, so this is a second read of
+      # local data, not a second download.
+      - name: Scan image with Trivy (gate)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.ref }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+          skip-setup-trivy: true
+        env:
+          TRIVY_SKIP_DB_UPDATE: true
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
+
       # Keep the login as late as possible: it writes the credential to
-      # ~/.docker/config.json, where every later step can read it.
+      # ~/.docker/config.json, where every later step can read it. Everything
+      # above -- including the scanner, which is third-party code -- runs
+      # before the job has a registry credential to leak.
       - name: Log in to the Container registry
+        if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push docker image
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
-        with:
-          context: .
-          # Manual or tagged
-          push: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+      # Manual or tagged
+      - name: Push docker image
+        if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          for tag in $TAGS; do
+            docker push "$tag"
+          done
