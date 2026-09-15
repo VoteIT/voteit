@@ -1,7 +1,7 @@
 # Base images are pinned by digest so a rebuild of an old tag cannot silently
 # change what lands in the image. Dependabot (.github/dependabot.yml) bumps
 # these; without it, security updates to the base stop arriving.
-FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285 AS builder
+FROM python:3.13-slim@sha256:f3fa4e3967b78516d783a1008d8847df6ada924050c01639f44a9c001a5ac1d6 AS builder
 # This copies an executable that then runs as root during the build, so it is
 # the last place to accept a floating tag.
 COPY --from=ghcr.io/astral-sh/uv:0.12.9@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff /uv /uvx /bin/
@@ -33,9 +33,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH" \
     DJANGO_SETTINGS_MODULE=project.settings_production
 
+# Removing pip is not housekeeping, it pulls in debian-built packages that already has fixes for no reason.
+#
+# libmagic1 is python-magic's shared library; it has no wheel to bundle it.
+
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl libmagic1 \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends libmagic1 \
     && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /usr/local/lib/python3.13/site-packages/pip /usr/local/bin/pip* \
     && groupadd -g 555 voteit \
     && useradd -u 555 -g voteit --system --no-create-home voteit \
     && mkdir -p /app/media \
