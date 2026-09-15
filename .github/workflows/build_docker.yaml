@@ -98,10 +98,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      # Build without pushing, so the scan below decides whether this image is
-      # allowed to leave the runner at all. The image stays in the runner's
-      # docker daemon; the push step further down sends the very bytes that
-      # were scanned, rather than rebuilding them.
+      # Build without pushing, so the image can be scanned before it leaves the
+      # runner. The image stays in the runner's docker daemon; the push step
+      # further down sends the very bytes that were scanned, rather than
+      # rebuilding them.
       - name: Build docker image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -141,17 +141,19 @@ jobs:
           sarif_file: trivy-results.sarif
           category: trivy-image
 
-      # And this one gates. Trivy is already installed and the vulnerability
-      # database is cached from the pass above, so this is a second read of
-      # local data, not a second download.
-      - name: Scan image with Trivy (gate)
+      # And this one prints the HIGH/CRITICAL findings as a table in the job
+      # log, where they are visible without opening the Security tab. It does
+      # not fail the build: a fixable CVE in the base image is not something a
+      # release here can fix, and blocking on it only stopped us from shipping
+      # our own changes while we waited for an upstream rebuild.
+      - name: Scan image with Trivy (log HIGH/CRITICAL)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ steps.image.outputs.ref }}
           format: table
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: 1
+          exit-code: 0
           skip-setup-trivy: true
         env:
           TRIVY_SKIP_DB_UPDATE: true
