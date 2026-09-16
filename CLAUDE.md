@@ -21,7 +21,7 @@ make run         # uvicorn --reload project.asgi:application
 
 # Tests
 make test        # python manage.py test voteit --keepdb --failfast
-make test-deps   # tests for src/ packages (voteit_org, member_dialects)
+make test-deps   # tests for src/ packages (voteit_org)
 make coverage    # coverage run + report
 
 # Both test and coverage take an optional target as a bare argument. Coverage
@@ -124,14 +124,18 @@ Pluggable per-meeting or per-org features (`MeetingComponent`, `OrganisationComp
 - **Narrative docs as doctests**: `docs/narrative.md` and `docs/workflows.md` are runnable as doctests, asserted in each app's `test_docs.py`. These serve as integration-level documentation and must stay passing.
 - **Auditlog context**: All models using `django-auditlog` implement `get_additional_data()` returning `{o, m, ai}` context keys.
 - **Pydantic v2** is used for schemas/validation.
-- **Test runner**: Django's built-in `manage.py test`, not pytest. Coverage via the `coverage` package.
+- **Test runner**: Django's built-in `manage.py test`. Coverage via the `coverage` package.
 - **Makefile**: macOS ships GNU Make 3.81, where `.ONESHELL:` is a no-op -- each recipe line runs in its own shell. A recipe needing state across lines must join them (`&&`, backslash continuation) or compute the value in Make itself.
-- **Package manager**: `uv` with `uv.lock`. Do not use pip or poetry.
+- **Package manager**: `uv` with `uv.lock`.
 - **Linting**: `ruff` only (includes isort with `force-single-line = true`).
 
 ### Key Packages in `src/`
 
 Local editable sub-packages (separate git repos, mounted via uv workspace):
 - `src/voteit_org/` — org-level membership and REST features
-- `src/member_dialects/` — voting behaviour plugins
 - `src/dialect_configs/` — YAML dialect configuration files
+
+### Texts
+
+Write comments in english. Keep comments short and precise, we can read source code and commits.
+We only need comments in case something is quirky or to point to related logic that might not be obvious.
