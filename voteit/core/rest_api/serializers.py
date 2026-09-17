@@ -26,6 +26,7 @@ from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
 from voteit.core.validators import get_invalid_tags
 from voteit.core.validators import valid_userid
+from voteit.organisation.utils import get_enabled_backends
 from voteit.organisation.utils import get_user_identity_data
 
 if TYPE_CHECKING:
@@ -231,6 +232,55 @@ class LogoutSerializer(serializers.Serializer):
             "the websockets belonging to them."
         ),
     )
+
+
+class UserConnectionSerializer(serializers.Serializer):
+    """
+    One way of logging in to this account.
+    """
+
+    pk = serializers.IntegerField(read_only=True)
+    provider = serializers.CharField(read_only=True)
+    title = serializers.SerializerMethodField()
+    created = serializers.DateTimeField(read_only=True)
+    modified = serializers.DateTimeField(read_only=True)
+    is_only_login_method = serializers.SerializerMethodField()
+
+    def get_title(self, instance) -> str:
+        backend = get_enabled_backends().get(instance.provider)
+        return backend.get_title() if backend else instance.provider
+
+    def get_is_only_login_method(self, instance) -> bool:
+        """
+        Removing this one would leave the account with no way in.
+
+        Not a refusal -- a credential can land on the wrong account, and its
+        owner has to be able to take it back off. The UI warns on this.
+        """
+        return not instance.user.social_auth.exclude(
+            provider=instance.provider
+        ).exists()
+
+
+class ProviderSerializer(serializers.Serializer):
+    """
+    Names one of the organisation's login methods.
+    """
+
+    provider = serializers.CharField(write_only=True)
+
+    def validate_provider(self, value: str):
+        organisation = self.context["request"].user.organisation
+        if organisation is None:
+            raise ValidationError(_("Organisation required"))
+        try:
+            provider = organisation.get_provider(value)
+        except ObjectDoesNotExist:
+            raise ValidationError(_("No such login method here."))
+        if provider.backend is None:
+            # Configured for the org, but left out of this deployment.
+            raise ValidationError(_("That login method is not available."))
+        return provider
 
 
 class SMEventSerializer(serializers.Serializer):

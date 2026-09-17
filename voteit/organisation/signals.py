@@ -6,9 +6,11 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.test.signals import setting_changed
 from social_core.backends.utils import load_backends
+from social_django.models import UserSocialAuth
 from voteit.messaging.channels import UserChannel
 
 from voteit.core.decorators import disable_on_raw_save
+from voteit.core.decorators import on_transaction_commit
 from voteit.core.messages.role_updates import RolesChanged
 from voteit.core.messages.role_updates import RolesRemoved
 from voteit.core.role import Role
@@ -16,6 +18,7 @@ from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
 from voteit.organisation.channels import OrganisationChannel
+from voteit.organisation.jobs import email_login_method_added
 from voteit.organisation.messages import OrganisationChanged
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
@@ -33,6 +36,26 @@ def reload_social_backends(setting, **kw):
     """
     if setting == "AUTHENTICATION_BACKENDS":
         load_backends(settings.AUTHENTICATION_BACKENDS, force_load=True)
+
+
+@receiver(post_save, sender=UserSocialAuth)
+@disable_on_raw_save
+@on_transaction_commit
+def notify_login_method_added(instance: UserSocialAuth, created=False, **kw):
+    """
+    Someone gaining a second way into their account should hear about it.
+
+    A first credential is a registration, not an addition, so it stays quiet.
+    Anything beyond that was either asked for -- in which case the mail is a
+    receipt -- or was not, in which case it is the only way the account's owner
+    finds out, and the disconnect endpoint is how they undo it.
+    """
+    if not created:
+        return
+    user = instance.user
+    if not user.email or user.social_auth.count() < 2:
+        return
+    email_login_method_added.delay(social_auth_pk=instance.pk)
 
 
 @receiver(post_save, sender=Organisation)

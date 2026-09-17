@@ -1,0 +1,19 @@
+{% extends "voteit/base_email.html" %}
+{% load i18n %}
+{% block body %}
+
+    <h2>{% blocktranslate %}Hi {{ full_name }}!{% endblocktranslate %}</h2>
+
+    <p>
+        {% blocktranslate %}A new way of signing in, <strong>{{ provider_title }}</strong>, was just connected to your account at {{ org_title }}.{% endblocktranslate %}
+    </p>
+
+    <p>
+        {% translate "If that was you, there is nothing to do." %}
+    </p>
+
+    <p>
+        {% blocktranslate %}If it was not, someone else's login may have been connected to your account by mistake. Remove it under your profile at <a href="{{ site_url }}">{{ site_url }}</a>, and contact the organisers if anything looks wrong.{% endblocktranslate %}
+    </p>
+
+{% endblock %}

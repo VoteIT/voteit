@@ -89,6 +89,22 @@ The serializer also exposes read-only computed fields: `providers` and `componen
 ### `MatchOrphansViewSet` (`/api/match-orphans/`)
 ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?email_in=a@b.com,c@d.com` (comma-separated, required). Returns users with no `identity_id` matching those emails, along with their organisation host. Used for pre-login orphan matching.
 
+### Login methods (on `UserView`, `voteit/core/rest_api/views.py`)
+
+The connect flow needs almost no machinery: a signed-in user visiting
+`/login/<backend>/` already gets the credential attached to their existing account by
+`associate_user`. What is around it:
+
+- `GET /api/user/connections/` — the ways this account can be signed into: `provider`,
+  `title` (from the backend), `created`, `modified`, `is_only_login_method`.
+- `POST /api/user/connect/` — `{"provider": "scoutid"}`. Records the intent in the session
+  and returns `{"provider", "login_url"}` for the SPA to redirect to. Without this record
+  `require_connect_intent` treats the returning credential as a different person at an open
+  session, which is what it is when nobody pressed the button.
+- `POST /api/user/disconnect/` — `{"provider": "scoutid"}`, `204`. Goes through
+  social_core's `do_disconnect` for the token revocation it does where a provider is
+  configured for it.
+
 ### `HandleIdentitiesViewSet` (`/api/handle-identities/`)
 ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?identity_in=uid1,uid2` (required). Provides a `query` action that returns user details for the matched identities. Raises `ValidationError` if >3 users would be affected, if any affected user has org roles / staff / superuser status, or if identities span multiple organisations. All validation errors are also emitted to the `notification_logger`.
 
@@ -120,6 +136,7 @@ ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?identity_in=ui
 Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`:
 
 - `org_active` — raises `AuthException` if `backend.organisation.active` is `False`.
+- `require_connect_intent` — runs **before** `social_user`, while `user` is still only whoever the browser is signed in as and nothing has resolved the credential yet. If an unknown credential is about to be attached to that account without anyone having pressed connect, it returns `{"user": None}` so the rest of the pipeline treats this as the fresh login it is. Without it, B walking up to A's open session on a shared computer and signing in with ScoutID would put B's credential on A's account. The intent flag is popped whatever happens, so it can never wave through a later login.
 - `social_user` — replaces PSA's built-in `social_user`. For `idproxy` it handles two problematic scenarios that cause infinite redirect loops:
   - A `UserSocialAuth` pointing to an inactive user: redirects the auth to the most-recently-active user sharing the same `identity_id`, transferring the social auth record in the process.
   - Identity-ID lookup with no social auth: only considers `is_active=True` users.
@@ -130,6 +147,9 @@ Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`:
 - `inherit_users` — maintains `identity_id` for `idproxy` only: it overwrites when the uid has changed, and `extra_identity_ids` in the response updates all same-org active users carrying those IDs to share the authenticated user's `identity_id`. Returns immediately for every other backend — see "`identity_id` belongs to the id proxy" below.
 - `bump_permissions` — if the identity server response includes `is_superuser: true`, grants `org_manager` role to the user.
 - `remove_nonmatching_email` — syncs the user's `email` field against the identity server's email scope data. Clears email if the scope is not present, but only when `idproxy` is the provider.
+- `log_new_association` — `log_auth` for a login method attached to an account that already existed. A brand new account picking up its first credential is a registration, not a connection, and is skipped.
+
+`SOCIAL_AUTH_DISCONNECT_PIPELINE` is social_core's default **minus `allowed_to_disconnect`**. Accounts here are SSO-only and have no password, so that step would refuse to remove anyone's last login method — but a credential can land on the wrong account, and its owner has to be able to take it back off even though the account is then unreachable. That is where a stale account started anyway. The API reports `is_only_login_method` so the UI can warn instead.
 
 ## WebSocket Channel (`channels.py`)
 
@@ -142,6 +162,7 @@ On subscribe, the `organisation.roles` collector pushes the user's current org r
 ## Signals (`signals.py`)
 
 - `setting_changed` → `reload_social_backends` — force-reloads social_core's backend cache when `AUTHENTICATION_BACKENDS` changes. `load_backends()` caches in a module-global `BACKENDSCACHE` and **ignores its argument once warm**, so without this, `override_settings(AUTHENTICATION_BACKENDS=...)` is a silent no-op and `OAuth2Provider.backend` answers from stale data. Only fires under test overrides; in production the setting never changes.
+- `UserSocialAuth post_save` (created) → `notify_login_method_added` — enqueues the mail above when the user already had another credential. Deferred to commit.
 - `Organisation post_save` (not created) — publishes `OrganisationChanged` to `OrganisationChannel`. Skipped on `raw` saves.
 - `organisation.roles` collector on `OrganisationChannel` — the subscribing user's roles.
 - `roles_added` on `OrganisationRoles` — publishes `RolesChanged` to both `OrganisationChannel` and the affected user's personal `UserChannel`. Skipped on `raw` saves.
@@ -154,6 +175,7 @@ On subscribe, the `organisation.roles` collector pushes the user's current org r
 
 ## Scheduled Jobs (`jobs.py`)
 
+- `email_login_method_added` (RQ, `long`) — tells someone a login method was attached to their account. Enqueued by the `notify_login_method_added` signal, and only for a *second* or later credential: a first one is a registration. The mail goes to the address the **account already had**, never the one the new credential brought, because the point is to reach whoever owns the account — which matters most when they are not the person who just logged in.
 - `cleanup_extra_data_for_older_users` (daily at 04:00) — clears `UserSocialAuth.extra_data` for records not modified in the past 365 days. Prevents long-lived accumulation of potentially sensitive identity data. The credential row itself survives — it is still how its owner reaches the account it belongs to.
 
 ## Non-obvious design decisions
@@ -213,9 +235,9 @@ Test modules:
 - `tests/test_models.py` — model and `OAuth2Provider` basics.
 - `tests/test_rules.py` — predicate logic for `is_manager` and `is_meeting_creator`.
 - `tests/test_backends.py` — `IDProxyOAuth2` scope merging.
-- `tests/test_pipeline.py` — pipeline steps: `ensure_userid`, `social_user` inactive-user handling, `inherit_users` identity ownership, social auth transfer.
+- `tests/test_pipeline.py` — pipeline steps: `ensure_userid`, `social_user` inactive-user handling and credential-only resolution, `require_connect_intent`, `inherit_users` identity ownership, social auth transfer.
 - `tests/test_signals.py` — WS publish on org save, role changes, and channel subscribe.
-- `tests/test_jobs.py` — `cleanup_extra_data_for_older_users`.
+- `tests/test_jobs.py` — `cleanup_extra_data_for_older_users`, `email_login_method_added` and when it is enqueued.
 - `tests/test_utils.py` — `get_user_identity_data` across duplicate users, providers and disabled backends.
 - `tests/test_auditlog.py` — auditlog field coverage.
 - `tests/test_docs.py` — runs module doctests (`backends.py` docstrings).

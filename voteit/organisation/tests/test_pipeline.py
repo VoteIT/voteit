@@ -9,8 +9,10 @@ from voteit.app.scouterna import SCOUTID_PROVIDER
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
 from voteit.organisation.pipeline import _transfer_social_auths
+from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
 from voteit.organisation.pipeline import ensure_userid
 from voteit.organisation.pipeline import inherit_users
+from voteit.organisation.pipeline import require_connect_intent
 from voteit.organisation.pipeline import social_user
 
 User = get_user_model()
@@ -361,3 +363,59 @@ class SocialUserOtherProviderTests(TestCase):
         result = social_user(self._make_backend(), "a-sub", user=user)
         self.assertEqual(user, result["user"])
         self.assertTrue(result["new_association"])
+
+
+class RequireConnectIntentTests(TestCase):
+    """
+    A signed-in account only picks up a new login method on purpose.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+
+    def _make_backend(self, session=None, social=None):
+        backend = MagicMock()
+        backend.name = SCOUTID_PROVIDER
+        backend.organisation = self.org
+        backend.strategy.session_pop.return_value = session
+        backend.strategy.storage.user.get_social_auth.return_value = social
+        return backend
+
+    def test_anonymous_visitor_is_untouched(self):
+        self.assertIsNone(require_connect_intent(self._make_backend(), "a-sub"))
+
+    def test_a_known_credential_is_social_users_business(self):
+        user = self.org.users.create(username="kim")
+        social = user.social_auth.create(
+            provider=SCOUTID_PROVIDER, uid="a-sub", extra_data={}
+        )
+        backend = self._make_backend(social=social)
+        self.assertIsNone(require_connect_intent(backend, "a-sub", user=user))
+
+    def test_intent_lets_the_connection_through(self):
+        user = self.org.users.create(username="kim")
+        backend = self._make_backend(session=SCOUTID_PROVIDER)
+        self.assertIsNone(require_connect_intent(backend, "a-sub", user=user))
+
+    def test_an_unasked_for_credential_drops_the_session_user(self):
+        user = self.org.users.create(username="kim")
+        backend = self._make_backend()
+        self.assertEqual(
+            {"user": None}, require_connect_intent(backend, "a-sub", user=user)
+        )
+
+    def test_intent_for_another_provider_does_not_count(self):
+        user = self.org.users.create(username="kim")
+        backend = self._make_backend(session=IDPROXY_PROVIDER)
+        self.assertEqual(
+            {"user": None}, require_connect_intent(backend, "a-sub", user=user)
+        )
+
+    def test_the_intent_is_always_consumed(self):
+        """
+        A flag left behind could wave through some later login nobody asked for.
+        """
+        backend = self._make_backend(session=SCOUTID_PROVIDER)
+        require_connect_intent(backend, "a-sub")
+        backend.strategy.session_pop.assert_called_once_with(CONNECT_INTENT_SESSION_KEY)

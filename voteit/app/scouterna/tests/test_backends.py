@@ -14,6 +14,7 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.test import TestCase
 from django.test import override_settings
+from django.urls import reverse
 from rest_framework.test import APITestCase
 from social_django.storage import BaseDjangoStorage
 from social_django.strategy import DjangoStrategy
@@ -23,6 +24,7 @@ from voteit.app.scouterna.backends import SCOUTNET_MEMBER_NO
 from voteit.app.scouterna.backends import ScoutIDOpenIdConnect
 from voteit.app.scouterna.testing import scoutid_enabled
 from voteit.organisation import IDPROXY_PROVIDER
+from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
 from voteit.organisation.models import Organisation
 
 User = get_user_model()
@@ -522,6 +524,15 @@ class ScoutIDLoginTests(APITestCase):
             social.extra_data["user_data"],
         )
 
+    def _existing_user(self):
+        user = self.org.users.create(
+            username="kim", identity_id="an-id-proxy-identity", is_active=True
+        )
+        user.social_auth.create(
+            provider=IDPROXY_PROVIDER, uid="an-id-proxy-identity", extra_data={}
+        )
+        return user
+
     @responses.activate
     def test_connecting_scoutid_keeps_the_id_proxy_identity(self):
         """
@@ -529,13 +540,13 @@ class ScoutIDLoginTests(APITestCase):
         credential attaches to the account they already have, and identity_id
         -- which is the *person*, and what groups their accounts -- stays put.
         """
-        existing = self.org.users.create(
-            username="kim", identity_id="an-id-proxy-identity", is_active=True
-        )
-        existing.social_auth.create(
-            provider=IDPROXY_PROVIDER, uid="an-id-proxy-identity", extra_data={}
-        )
+        existing = self._existing_user()
         self.client.force_login(existing)
+        connect = self.client.post(
+            reverse("user-connect"), data={"provider": SCOUTID_PROVIDER}
+        )
+        self.assertEqual(200, connect.status_code)
+        self.assertEqual("/login/scoutid/", connect.json()["login_url"])
 
         state, nonce = self._begin()
         self.realm.register(
@@ -555,6 +566,56 @@ class ScoutIDLoginTests(APITestCase):
         )
         # No second account was created for the same person.
         self.assertEqual(1, self.org.users.filter(username="kim").count())
+
+    @responses.activate
+    def test_scoutid_login_on_someone_elses_session_does_not_connect(self):
+        """
+        A shared computer: A is signed in, B logs in with ScoutID without
+        anyone having pressed connect. B's credential must not land on A's
+        account -- B gets their own, and A's session is replaced.
+        """
+        existing = self._existing_user()
+        self.client.force_login(existing)
+
+        state, nonce = self._begin()
+        self.realm.register(
+            self.realm.id_token("voteit", nonce),
+            userinfo={"sub": "b4d3e2f1-0000-4000-8000-000000000001"},
+        )
+        response = self.client.get(
+            "/complete/scoutid/", data={"state": state, "code": "auth-code"}
+        )
+        self.assertEqual(302, response.status_code)
+
+        existing.refresh_from_db()
+        self.assertEqual(
+            [IDPROXY_PROVIDER],
+            list(existing.social_auth.values_list("provider", flat=True)),
+        )
+        stranger = User.objects.get(
+            social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001"
+        )
+        self.assertNotEqual(existing, stranger)
+
+    @responses.activate
+    def test_connect_intent_is_not_reusable(self):
+        """
+        The flag is popped on the login it was meant for, so a second,
+        unasked-for credential later cannot ride in on it.
+        """
+        existing = self._existing_user()
+        self.client.force_login(existing)
+        self.client.post(reverse("user-connect"), data={"provider": SCOUTID_PROVIDER})
+
+        state, nonce = self._begin()
+        self.realm.register(
+            self.realm.id_token("voteit", nonce),
+            userinfo={"sub": "b4d3e2f1-0000-4000-8000-000000000001"},
+        )
+        self.client.get(
+            "/complete/scoutid/", data={"state": state, "code": "auth-code"}
+        )
+        self.assertNotIn(CONNECT_INTENT_SESSION_KEY, self.client.session)
 
     @responses.activate
     def test_an_identity_id_matching_the_sub_is_not_adopted(self):

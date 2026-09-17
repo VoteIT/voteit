@@ -82,6 +82,8 @@ SOCIAL_AUTH_PIPELINE = [
     "social_core.pipeline.social_auth.social_uid",
     # "social_core.pipeline.social_auth.auth_allowed",
     # "social_core.pipeline.social_auth.social_user",
+    # Before social_user, while `user` is still only the session's user.
+    "voteit.organisation.pipeline.require_connect_intent",
     "voteit.organisation.pipeline.social_user",
     "social_core.pipeline.user.get_username",
     "voteit.organisation.pipeline.create_user",
@@ -92,6 +94,18 @@ SOCIAL_AUTH_PIPELINE = [
     "voteit.organisation.pipeline.inherit_users",
     "voteit.organisation.pipeline.bump_permissions",
     "voteit.organisation.pipeline.remove_nonmatching_email",
+    "voteit.organisation.pipeline.log_new_association",
+]
+
+#: social_core's default, minus ``allowed_to_disconnect``. Nobody here has a
+#: password -- accounts are SSO-only -- so that step would refuse to remove
+#: anyone's last login method. But a credential can end up on the wrong account,
+#: and then unlinking it is exactly what the person needs: the account returns to
+#: having no way in, which is where it started. The UI warns instead of blocking.
+SOCIAL_AUTH_DISCONNECT_PIPELINE = [
+    "social_core.pipeline.disconnect.get_entries",
+    "social_core.pipeline.disconnect.revoke_tokens",
+    "social_core.pipeline.disconnect.disconnect",
 ]
 
 

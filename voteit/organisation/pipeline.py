@@ -1,13 +1,21 @@
+from logging import getLogger
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from social_core.exceptions import AuthException
 from django.utils.translation import gettext as _
 from social_django.models import UserSocialAuth
 
+from voteit.core.loggers import log_auth
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
+logger = getLogger(__name__)
 User = get_user_model()
+
+#: Set by ``POST /api/user/connect/``, consumed by :func:`require_connect_intent`.
+#: Holds the provider_id the user meant to attach.
+CONNECT_INTENT_SESSION_KEY = "voteit_connect_intent"
 
 
 def org_active(strategy, details, backend, user=None, *args, **kwargs):
@@ -56,7 +64,12 @@ def social_user(backend, uid, user=None, *args, **kwargs):
     provider = backend.name
     social = backend.strategy.storage.user.get_social_auth(provider, uid)
     if provider != IDPROXY_PROVIDER:
-        if social and not user:
+        if social:
+            if user and social.user != user:
+                # Someone else's session is open in this browser. The credential
+                # says who just proved themselves, so log that person in rather
+                # than leaving the other one signed in.
+                _reauth_user(backend, social.user)
             user = social.user
         return {
             "social": social,
@@ -115,6 +128,38 @@ def social_user(backend, uid, user=None, *args, **kwargs):
         "is_new": user is None,
         "new_association": social is None,
     }
+
+
+def require_connect_intent(backend, uid, user=None, *args, **kwargs):
+    """
+    A signed-in account only picks up a new login method on purpose.
+
+    Runs before ``social_user``, so ``user`` here is whoever the browser is
+    signed in as and nothing has resolved the credential yet. If that person is
+    about to have an unknown credential attached to their account without having
+    asked for it -- B walking up to A's open session on a shared computer and
+    logging in with ScoutID -- drop the session user and let the rest of the
+    pipeline treat this as the fresh login it really is. ``django.contrib.auth``
+    flushes the session when a different user logs in, so nothing of A's
+    survives.
+
+    The intent is popped whatever happens, so a flag can never sit in the
+    session waiting to wave through some later login.
+    """
+    intent = backend.strategy.session_pop(CONNECT_INTENT_SESSION_KEY)
+    if user is None:
+        return
+    if backend.strategy.storage.user.get_social_auth(backend.name, uid):
+        # A credential we already know. Whose it is, is social_user's call.
+        return
+    if intent == backend.name:
+        return
+    logger.info(
+        "Unintended %s association refused for user %s; continuing as a new login",
+        backend.name,
+        user.pk,
+    )
+    return {"user": None}
 
 
 def create_user(strategy, details, backend, uid, user=None, *args, **kwargs):
@@ -193,3 +238,24 @@ def remove_nonmatching_email(backend, user, social, *args, **kwargs):
     elif user.email:
         user.email = ""
         user.save()
+
+
+def log_new_association(
+    backend, user, social, is_new=False, new_association=False, *args, **kwargs
+):
+    """
+    Record a login method being attached to an account that already existed.
+
+    A brand new account picking up its first credential is a registration, not
+    a connection, and is not what this is for.
+    """
+    if not (new_association and user and not is_new):
+        return
+    log_auth(
+        "Login method connected",
+        request=backend.strategy.request,
+        for_user=user,
+        context=backend.organisation,
+        provider=backend.name,
+        uid=social.uid if social else None,
+    )
