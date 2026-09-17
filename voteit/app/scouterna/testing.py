@@ -24,3 +24,17 @@ def scoutid_enabled() -> override_settings:
     """
     others = [b for b in settings.AUTHENTICATION_BACKENDS if b != BACKEND]
     return override_settings(AUTHENTICATION_BACKENDS=[BACKEND, *others])
+
+
+def scoutid_disabled() -> override_settings:
+    """
+    Remove the ScoutID backend from AUTHENTICATION_BACKENDS for the duration.
+
+    The mirror of :func:`scoutid_enabled`, for asserting that a deployment
+    without this backend behaves. Same caveat about the backend cache.
+    """
+    return override_settings(
+        AUTHENTICATION_BACKENDS=[
+            b for b in settings.AUTHENTICATION_BACKENDS if b != BACKEND
+        ]
+    )

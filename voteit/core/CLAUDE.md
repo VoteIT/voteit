@@ -233,7 +233,9 @@ Four outgoing message types defined here:
 
 ## Background Jobs (`jobs.py`)
 
-`deactivate_unused_users` — runs weekly (Monday 04:35). Deactivates users who have not logged in for 30 days AND have no meeting or organisation roles. Also deletes their `UserSocialAuth` records so they can re-register via social login later.
+`deactivate_unused_users` — runs weekly (Monday 04:35). Deactivates users who have not logged in for 30 days AND have no meeting or organisation roles; an account that never took part in anything is almost always a registration made by mistake.
+
+The delete is the point, not incidental: the account is left deactivated, and `do_complete` refuses an inactive user.
 
 ## Managers (`managers.py`)
 

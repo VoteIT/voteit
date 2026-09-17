@@ -26,7 +26,7 @@ from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
 from voteit.core.validators import get_invalid_tags
 from voteit.core.validators import valid_userid
-from voteit.organisation.utils import get_idproxy_user_data
+from voteit.organisation.utils import get_user_identity_data
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -193,7 +193,7 @@ class UserSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         if user.email == value:
             return value
-        valid_emails = get_idproxy_user_data(user).get("email", [])
+        valid_emails = get_user_identity_data(user).get("email", [])
         if value not in valid_emails:
             raise ValidationError(
                 _("Email you specified isn't validated. It must exist on your profile.")

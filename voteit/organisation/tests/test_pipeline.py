@@ -5,8 +5,12 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from social_django.models import UserSocialAuth
 
+from voteit.app.scouterna import SCOUTID_PROVIDER
+from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
+from voteit.organisation.pipeline import _transfer_social_auths
 from voteit.organisation.pipeline import ensure_userid
+from voteit.organisation.pipeline import inherit_users
 from voteit.organisation.pipeline import social_user
 
 User = get_user_model()
@@ -203,3 +207,157 @@ class SocialAuthTransferTests(TestCase):
 
         extra_social.refresh_from_db()
         self.assertEqual(active, extra_social.user)
+
+
+class InheritUsersTests(TestCase):
+    """
+    identity_id is an id proxy identifier, and only the id proxy writes it.
+
+    It is what ``UserView.alternate`` / ``switch``, ``UserMerger`` and the admin
+    duplicate filter group accounts by. Another provider's uid has no place in
+    that namespace, so those backends leave the field entirely alone.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+
+    def _make_backend(self, name):
+        backend = MagicMock()
+        backend.name = name
+        backend.organisation = self.org
+        return backend
+
+    def test_other_provider_leaves_an_established_identity_alone(self):
+        user = self.org.users.create(username="kim", identity_id="an-id-proxy-identity")
+        inherit_users(self._make_backend(SCOUTID_PROVIDER), user, {}, "a-keycloak-sub")
+        user.refresh_from_db()
+        self.assertEqual("an-id-proxy-identity", user.identity_id)
+
+    def test_other_provider_never_writes_an_identity(self):
+        """
+        Not even into an empty field: the namespace is the id proxy's.
+        """
+        user = self.org.users.create(username="kim")
+        inherit_users(self._make_backend(SCOUTID_PROVIDER), user, {}, "a-keycloak-sub")
+        user.refresh_from_db()
+        self.assertIsNone(user.identity_id)
+
+    def test_id_proxy_still_rekeys(self):
+        """
+        The id proxy is authoritative for identities, so it may overwrite.
+        """
+        user = self.org.users.create(username="kim", identity_id="old")
+        inherit_users(self._make_backend(IDPROXY_PROVIDER), user, {}, "new")
+        user.refresh_from_db()
+        self.assertEqual("new", user.identity_id)
+
+    def test_id_proxy_still_inherits_extra_identities(self):
+        user = self.org.users.create(username="kim", identity_id="new")
+        duplicate = self.org.users.create(username="kim-again", identity_id="old")
+        inherit_users(
+            self._make_backend(IDPROXY_PROVIDER),
+            user,
+            {"extra_identity_ids": ["old"]},
+            "new",
+        )
+        duplicate.refresh_from_db()
+        self.assertEqual("new", duplicate.identity_id)
+
+    def test_other_provider_does_not_inherit_extra_identities(self):
+        """
+        ``extra_identity_ids`` is the id proxy's own re-keying channel.
+        """
+        user = self.org.users.create(username="kim", identity_id="a-keycloak-sub")
+        duplicate = self.org.users.create(username="kim-again", identity_id="old")
+        inherit_users(
+            self._make_backend(SCOUTID_PROVIDER),
+            user,
+            {"extra_identity_ids": ["old"]},
+            "a-keycloak-sub",
+        )
+        duplicate.refresh_from_db()
+        self.assertEqual("old", duplicate.identity_id)
+
+
+class TransferSocialAuthsTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+
+    def test_every_provider_moves_by_default(self):
+        """
+        ``UserView.switch`` moves the whole person, so leaving a login method
+        behind would send the next login straight back to the old row.
+        """
+        source = self.org.users.create(username="source", identity_id="same")
+        target = self.org.users.create(username="target", identity_id="same")
+        source.social_auth.create(provider=IDPROXY_PROVIDER, uid="same", extra_data={})
+        source.social_auth.create(provider=SCOUTID_PROVIDER, uid="sub", extra_data={})
+        _transfer_social_auths(source, target)
+        self.assertEqual(0, source.social_auth.count())
+        self.assertEqual(
+            {IDPROXY_PROVIDER, SCOUTID_PROVIDER},
+            set(target.social_auth.values_list("provider", flat=True)),
+        )
+
+    def test_a_single_provider_can_still_be_named(self):
+        source = self.org.users.create(username="source", identity_id="same")
+        target = self.org.users.create(username="target", identity_id="same")
+        source.social_auth.create(provider=IDPROXY_PROVIDER, uid="same", extra_data={})
+        source.social_auth.create(provider=SCOUTID_PROVIDER, uid="sub", extra_data={})
+        _transfer_social_auths(source, target, IDPROXY_PROVIDER)
+        self.assertEqual(
+            [SCOUTID_PROVIDER],
+            list(source.social_auth.values_list("provider", flat=True)),
+        )
+        self.assertEqual(
+            [IDPROXY_PROVIDER],
+            list(target.social_auth.values_list("provider", flat=True)),
+        )
+
+
+class SocialUserOtherProviderTests(TestCase):
+    """
+    A backend that is not the id proxy resolves by credential alone.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+
+    def _make_backend(self, social=None):
+        backend = MagicMock()
+        backend.name = SCOUTID_PROVIDER
+        backend.organisation = self.org
+        backend.strategy.storage.user.get_social_auth.return_value = social
+        return backend
+
+    def test_matching_identity_id_is_not_adopted(self):
+        """
+        An id proxy identity that happens to equal another provider's uid is a
+        different namespace, not the same person.
+        """
+        self.org.users.create(username="kim", identity_id="collides")
+        result = social_user(self._make_backend(), "collides")
+        self.assertIsNone(result["user"])
+        self.assertTrue(result["is_new"])
+
+    def test_credential_resolves_its_own_user(self):
+        user = self.org.users.create(username="kim")
+        social = user.social_auth.create(
+            provider=SCOUTID_PROVIDER, uid="a-sub", extra_data={}
+        )
+        result = social_user(self._make_backend(social), "a-sub")
+        self.assertEqual(user, result["user"])
+        self.assertFalse(result["is_new"])
+        self.assertFalse(result["new_association"])
+
+    def test_logged_in_user_is_kept_for_a_new_credential(self):
+        """
+        The connect case: someone signed in attaches a second login method.
+        """
+        user = self.org.users.create(username="kim", identity_id="an-id-proxy-identity")
+        result = social_user(self._make_backend(), "a-sub", user=user)
+        self.assertEqual(user, result["user"])
+        self.assertTrue(result["new_association"])

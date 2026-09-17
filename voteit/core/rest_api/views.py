@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth import logout
 from django.contrib.messages import get_messages
+from django.db import models
 from django.db import transaction
 from rest_framework import filters
 from rest_framework import mixins
@@ -34,7 +35,7 @@ from voteit.messaging.close import close_user_connections
 from voteit.messaging.models import LOGGED_OUT
 from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
 from voteit.organisation.pipeline import _transfer_social_auths
-from voteit.organisation.utils import get_idproxy_user_data
+from voteit.organisation.utils import get_user_identity_data
 
 __all__ = ()
 
@@ -93,9 +94,20 @@ class UserView(
     serializer_class = UserAndRolesSerializer
 
     def get_queryset(self):
-        if identity_id := getattr(self.request.user, "identity_id", None):
-            return User.objects.filter(identity_id=identity_id, is_active=True)
-        return User.objects.none()
+        """
+        The requesting user, plus the other accounts that are the same person.
+
+        identity_id groups those, but it belongs to the id proxy alone -- anyone
+        who only ever logged in with another provider has none, and must still
+        reach their own row to read or edit it.
+        """
+        user = self.request.user
+        if not user.is_authenticated:
+            return User.objects.none()
+        query = models.Q(pk=user.pk)
+        if user.identity_id:
+            query |= models.Q(identity_id=user.identity_id, is_active=True)
+        return User.objects.filter(query)
 
     def list(self, request):
         serializer = self.serializer_class(request.user)
@@ -145,7 +157,10 @@ class UserView(
     def switch(self, request, pk):
         user = self.get_object()
         log_auth("Switch user", for_user=user, request=request)
-        _transfer_social_auths(request.user, user, "idproxy")
+        # Every credential follows, not just the id proxy's: the account being
+        # switched to is the same person, and leaving a login method behind on
+        # the old row would send the next login straight back to it.
+        _transfer_social_auths(request.user, user)
         login(request, user, backend="voteit.core.backends.PrefetchedModelBackend")
         serializer = self.get_serializer(user)
         return Response(serializer.data)
@@ -161,7 +176,7 @@ class UserView(
 
     @action(methods=["GET"], detail=False)
     def email_choices(self, request):
-        emails = get_idproxy_user_data(request.user).get("email", [])
+        emails = get_user_identity_data(request.user).get("email", [])
         return Response(data={"emails": sorted(emails)})
 
     @action(

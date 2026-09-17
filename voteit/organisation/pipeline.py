@@ -27,15 +27,16 @@ def _reauth_user(backend, user):
         backend.strategy.session_set(redirect_name, next_url)
 
 
-def _transfer_social_auths(from_user, to_user, provider):
+def _transfer_social_auths(from_user, to_user, provider: str | None = None):
     """
-    Move all social auth records for provider from from_user to to_user.
+    Move social auth records from from_user to to_user, one provider or all.
     No conflict check needed: UserSocialAuth has a global unique constraint on
     (provider, uid), so the same uid can never exist on two users simultaneously.
     """
-    UserSocialAuth.objects.filter(user=from_user, provider=provider).update(
-        user=to_user
-    )
+    qs = UserSocialAuth.objects.filter(user=from_user)
+    if provider is not None:
+        qs = qs.filter(provider=provider)
+    qs.update(user=to_user)
 
 
 def social_user(backend, uid, user=None, *args, **kwargs):
@@ -45,10 +46,24 @@ def social_user(backend, uid, user=None, *args, **kwargs):
     Handles two loop-causing scenarios with pre-existing/duplicate accounts:
     - social.user is inactive: prefer an active user with the same identity_id
     - identity_id lookup: only consider active users to avoid picking deactivated duplicates
+
+    All of that is the id proxy's, and only the id proxy's: ``identity_id``
+    holds an id proxy identifier, so no other provider's uid may ever be looked
+    up in it. Every other backend resolves by credential alone, which is what
+    stock PSA does -- matching one of those to an existing account is the
+    account matcher's job, not this step's.
     """
-    # FIXME: Not valid with providers other than IDProxy, use default pipeline?
     provider = backend.name
     social = backend.strategy.storage.user.get_social_auth(provider, uid)
+    if provider != IDPROXY_PROVIDER:
+        if social and not user:
+            user = social.user
+        return {
+            "social": social,
+            "user": user,
+            "is_new": user is None,
+            "new_association": social is None,
+        }
     if social:
         if user and social.user != user:
             # Odd case, this is a duplicate user that's authenticated, we may want to move the social auth...
@@ -112,11 +127,13 @@ def create_user(strategy, details, backend, uid, user=None, *args, **kwargs):
     if not fields:
         return
     organisation = backend.organisation
+    if backend.name == IDPROXY_PROVIDER:
+        # identity_id is an id proxy identifier. An account created by any other
+        # provider simply has none, and is reached through its UserSocialAuth.
+        fields["identity_id"] = uid
     return {
         "is_new": True,
-        "user": strategy.create_user(
-            organisation=organisation, identity_id=uid, **fields
-        ),
+        "user": strategy.create_user(organisation=organisation, **fields),
     }
 
 
@@ -131,7 +148,16 @@ def ensure_userid(backend, user, *args, **kwargs):
 
 
 def inherit_users(backend, user, response, uid, *args, **kwargs):
-    if not user:
+    """
+    Keep identity_id in step with the id proxy, which owns it.
+
+    identity_id is an id proxy identifier and nothing else; it is what groups a
+    person's id proxy accounts, which ``UserView.alternate`` / ``switch``,
+    ``UserMerger`` and the admin duplicate filter all read. Another provider's
+    uid must never be written there -- it would claim an identity in a
+    namespace it has no part in.
+    """
+    if not user or backend.name != IDPROXY_PROVIDER:
         return
     if user.identity_id != uid:
         user.identity_id = uid

@@ -23,9 +23,10 @@ def deactivate_unused_users() -> int:
     - More than 30 days since last_login (or never logged in)
     - No MeetingRoles and no OrganisationRoles
 
-    Also clears UserSocialAuth so the user can re-register via social login later.
-
     Returns count of deactivated users.
+
+    Clearing UserSocialAuth here is mandatory since it would've blocked login or
+    re-registration later on otherwise.
     """
     cutoff = now() - timedelta(days=30)
     qs = (

@@ -32,8 +32,7 @@ from voteit.invites.utils import send_updated_invites
 from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.statemachines import MeetingStateMachine
-from voteit.organisation.utils import get_idproxy_user_data
-from voteit.organisation import IDPROXY_PROVIDER
+from voteit.organisation.utils import get_user_identity_data
 
 logger = getLogger(__name__)
 
@@ -529,7 +528,15 @@ class HandleMatchedInvitesViewSet(
         organisation = self.request.user.organisation
         if organisation is None:
             raise ValidationError(_("Organisation required"))
-        if matched := get_idproxy_user_data(self.request.user):
+        # Providers vouch for more than the invite system indexes -- ScoutID
+        # also sends a membership number -- so keep only what has an adapter.
+        reg = get_invite_adapter_registry()
+        matched = {
+            k: v
+            for k, v in get_user_identity_data(self.request.user).items()
+            if k in reg and reg[k].is_user_data
+        }
+        if matched:
             return MeetingInvite.objects.find_open_invites(
                 organisation=organisation, **matched
             )
@@ -616,12 +623,13 @@ class InviteDataTypesViewSet(ViewSet):
                 }
             ]
         """
-        scopes = ["email"]
+        # Invite adapters map onto the providers' user_data scopes, so the
+        # answer is the union across every login method this org offers.
+        scopes = set()
         with suppress(ObjectDoesNotExist, AttributeError):
-            # The invite adapters map onto the id proxy's user_data scopes, so
-            # these are specifically the id proxy's, not every provider's.
-            scope = request.user.organisation.get_provider(IDPROXY_PROVIDER).scope
-            scopes = scope.split()
+            for provider in request.user.organisation.providers.all():
+                scopes.update(provider.scope.split())
+        scopes = scopes or {"email"}
         reg = get_invite_adapter_registry()
         results = []
         for v in reg.values():

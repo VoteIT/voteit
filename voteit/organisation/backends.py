@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from logging import getLogger
 from typing import Any
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.urls import reverse
@@ -9,6 +12,9 @@ from social_core.exceptions import AuthException
 
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
+
+if TYPE_CHECKING:
+    from social_django.models import UserSocialAuth
 
 logger = getLogger(__name__)
 
@@ -49,6 +55,21 @@ class OrganisationBackendMixin:
         Where to send the user to end the provider's own session.
         """
         return None
+
+    @classmethod
+    def get_identity_data(cls, social: UserSocialAuth) -> dict[str, list[str]]:
+        """
+        What the provider vouches for about this person, as ``{scope: [value, ...]}``.
+
+        The shape is the id proxy's, which got here first; every backend
+        normalises into it on the way in, so one lookup reads them all. Only
+        validated data belongs here -- it decides which invites a user matches
+        and which email they may set.
+
+        ``extra_data`` is blanked after a year by
+        ``cleanup_extra_data_for_older_users``, so an empty dict is normal.
+        """
+        return social.extra_data.get("user_data", {})
 
     @cached_property
     def organisation(self) -> Organisation:

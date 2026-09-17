@@ -178,6 +178,27 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
         response = self.client.put(url, data={"userid": "aneeewooone"})
         self.assertEqual(404, response.status_code)
 
+    def test_update_without_an_identity_id(self):
+        """
+        identity_id belongs to the id proxy. Someone who only ever logged in
+        with another provider has none, and must still reach their own row.
+        """
+        self.participant.identity_id = None
+        self.participant.save()
+        self.client.force_login(self.participant)
+        url = reverse("user-detail", kwargs={"pk": self.participant.pk})
+        response = self.client.put(url, data={"userid": "anewone"})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("anewone", response.json()["userid"])
+
+    def test_no_identity_id_reaches_no_one_else(self):
+        self.participant.identity_id = None
+        self.participant.save()
+        self.client.force_login(self.participant)
+        url = reverse("user-detail", kwargs={"pk": self.moderator.pk})
+        response = self.client.put(url, data={"userid": "aneeewooone"})
+        self.assertEqual(404, response.status_code)
+
     def test_update_owned_other_user(self):
         self.client.force_login(self.participant)
         url = reverse("user-detail", kwargs={"pk": 1})

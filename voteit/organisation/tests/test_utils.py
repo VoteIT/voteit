@@ -1,9 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from voteit.app.scouterna import SCOUTID_PROVIDER
+from voteit.app.scouterna.backends import SCOUTNET_MEMBER_NO
+from voteit.app.scouterna.testing import scoutid_disabled
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
-from voteit.organisation.utils import get_idproxy_user_data
+from voteit.organisation.utils import get_user_identity_data
 
 User = get_user_model()
 
@@ -29,13 +32,13 @@ class UtilsTests(TestCase):
             username="duplicate", identity_id=SAME_UID
         )
 
-    def test_get_idproxy_user_data(self):
-        self.assertEqual({"email": {"a@hi.se"}}, get_idproxy_user_data(self.user))
+    def test_get_user_identity_data(self):
+        self.assertEqual({"email": {"a@hi.se"}}, get_user_identity_data(self.user))
         self.assertEqual(
-            {"email": {"a@hi.se"}}, get_idproxy_user_data(self.duplicate_user)
+            {"email": {"a@hi.se"}}, get_user_identity_data(self.duplicate_user)
         )
 
-    def test_get_idproxy_user_data_several_items(self):
+    def test_get_user_identity_data_several_items(self):
         self.duplicate_user.social_auth.create(
             provider=IDPROXY_PROVIDER,
             uid="abcd",
@@ -50,9 +53,54 @@ class UtilsTests(TestCase):
         )
         self.assertEqual(
             {"email": {"a@hi.se", "b@hi.se"}, "swedish_ssn": {"121212-1212"}},
-            get_idproxy_user_data(self.user),
+            get_user_identity_data(self.user),
         )
         self.assertEqual(
             {"email": {"a@hi.se", "b@hi.se"}, "swedish_ssn": {"121212-1212"}},
-            get_idproxy_user_data(self.duplicate_user),
+            get_user_identity_data(self.duplicate_user),
         )
+
+    def test_unlinked_users_do_not_share_identity_data(self):
+        """
+        A null identity_id must not join an account to every other unlinked one.
+        """
+        orphan = self.organisation.users.create(username="orphan")
+        other_orphan = self.organisation.users.create(username="other-orphan")
+        other_orphan.social_auth.create(
+            provider=IDPROXY_PROVIDER,
+            uid="xyz",
+            extra_data={"user_data": {"email": ["not-yours@hi.se"]}},
+        )
+        self.assertEqual({}, get_user_identity_data(orphan))
+
+    def test_data_is_merged_across_providers(self):
+        self.user.social_auth.create(
+            provider=SCOUTID_PROVIDER,
+            uid="a-keycloak-uuid",
+            extra_data={
+                "user_data": {
+                    "email": ["kim@scoutkaren.example"],
+                    SCOUTNET_MEMBER_NO: ["9876543"],
+                },
+            },
+        )
+        self.assertEqual(
+            {
+                "email": {"a@hi.se", "kim@scoutkaren.example"},
+                SCOUTNET_MEMBER_NO: {"9876543"},
+            },
+            get_user_identity_data(self.user),
+        )
+
+    def test_disabled_backends_contribute_nothing(self):
+        """
+        voteit ships as a package; a deployment may leave a backend out, and a
+        credential for one nobody can log in with vouches for nothing.
+        """
+        self.user.social_auth.create(
+            provider=SCOUTID_PROVIDER,
+            uid="a-keycloak-uuid",
+            extra_data={"user_data": {"email": ["kim@scoutkaren.example"]}},
+        )
+        with scoutid_disabled():
+            self.assertEqual({"email": {"a@hi.se"}}, get_user_identity_data(self.user))
