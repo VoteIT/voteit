@@ -1,0 +1,1 @@
+SCOUTID_PROVIDER = "scoutid"

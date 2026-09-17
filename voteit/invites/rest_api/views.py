@@ -33,6 +33,7 @@ from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.organisation.utils import get_idproxy_user_data
+from voteit.organisation import IDPROXY_PROVIDER
 
 logger = getLogger(__name__)
 
@@ -617,7 +618,9 @@ class InviteDataTypesViewSet(ViewSet):
         """
         scopes = ["email"]
         with suppress(ObjectDoesNotExist, AttributeError):
-            scope = request.user.organisation.provider.scope
+            # The invite adapters map onto the id proxy's user_data scopes, so
+            # these are specifically the id proxy's, not every provider's.
+            scope = request.user.organisation.get_provider(IDPROXY_PROVIDER).scope
             scopes = scope.split()
         reg = get_invite_adapter_registry()
         results = []

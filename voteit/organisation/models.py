@@ -5,8 +5,10 @@ from typing import TYPE_CHECKING
 
 from auditlog.registry import auditlog
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.timezone import now
+from social_core.backends.utils import load_backends
 
 from voteit.core.abcs import OrganisationContext
 from voteit.core.fields import RichTextField
@@ -15,6 +17,7 @@ from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.utils import relaxed_clean_html
+from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
@@ -83,13 +86,12 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
     """
     Top-level tenant that owns all meetings, users, and settings.
 
-    The ``host`` field maps a hostname (e.g. ``"meeting.myorg.se"``) to this tenant.
+    The ``host`` field maps a hostname to this tenant.
     Every ``User`` in the system belongs to exactly one organisation via
     ``User.organisation``. Superusers and users with ``org_manager`` role can
     access all meetings belonging to the organisation.
 
     ``active=False`` disables login for all users of this organisation.
-    ``OAuth2Provider`` (one-to-one) holds the OAuth2 credentials used for SSO.
     """
 
     name = "organisation"
@@ -148,30 +150,37 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
             self.page_title = self.title
         super().save(**kwargs)
 
+    def get_provider(self, provider_id: str) -> OAuth2Provider:
+        return self.providers.get(provider_id=provider_id)
+
     # Type annotations
-    provider: OAuth2Provider  # May raise ObjectDoesNotExist
     objects: models.Manager
     tos: models.QuerySet
     users: models.QuerySet
     meetings: models.QuerySet[Meeting]
     components: models.QuerySet[OrganisationComponent]
     roles: models.QuerySet[OrganisationRoles]
+    providers: models.QuerySet[OAuth2Provider]
 
 
 class OAuth2Provider(OrganisationContext):
     """
-    This is the identity provider, which uses OAuth2 protocol for exchange.
-    We (currently) don't allow more than one.
-    Login providers from other services should be added via the id proxy instead.
+    Credentials for one social auth backend, for one organisation.
+
+    ``provider_id`` is the ``name`` of the ``social_core`` backend these
+    credentials belong to.
     """
 
     name = "oauth2_provider"
-    organisation: Organisation | None = models.OneToOneField(
+    organisation: Organisation | None = models.ForeignKey(
         "organisation.Organisation",
         on_delete=models.CASCADE,
-        related_name="provider",
-        blank=True,
-        null=True,
+        related_name="providers",
+    )
+    provider_id: str = models.CharField(
+        verbose_name="Backend name",
+        max_length=30,
+        default=IDPROXY_PROVIDER,
     )
     scope: str = models.CharField(
         verbose_name="OAuth scopes",
@@ -180,23 +189,52 @@ class OAuth2Provider(OrganisationContext):
     )
     client_id: str = models.CharField(max_length=100)
     client_secret: str = models.CharField(max_length=200)
+    oidc_endpoint: str = models.URLField(
+        verbose_name="OIDC issuer",
+        help_text=(
+            "OpenID Connect issuer base URL, without "
+            "/.well-known/openid-configuration. Only used by OIDC backends, "
+            "and only to override the backend's own default."
+        ),
+        max_length=300,
+        blank=True,
+        default="",
+    )
 
     @property
-    def id_backend_host(self):
+    def backend(self):
         """
-        ID_BACKEND_HOST only needed in dev
+        The social auth backend class, or None when it isn't enabled here.
         """
-        return getattr(settings, "ID_HOST_BACKEND", settings.ID_HOST)
+        return load_backends(settings.AUTHENTICATION_BACKENDS).get(self.provider_id)
 
     @property
     def title(self):
         if self.organisation:
-            return self.organisation.title
-        return f"Provider {self.pk}"
+            return f"{self.organisation.title} ({self.provider_id})"
+        return f"Provider {self.pk} ({self.provider_id})"
 
     class Meta:
         verbose_name = "OAuth2Provider"
         verbose_name_plural = "OAuth2Providers"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organisation", "provider_id"],
+                name="unique org provider_id",
+            ),
+        ]
+
+    def clean(self):
+        if self.backend is None:
+            available = load_backends(settings.AUTHENTICATION_BACKENDS)
+            raise ValidationError(
+                {
+                    "provider_id": (
+                        f"'{self.provider_id}' is not an enabled social auth "
+                        f"backend. Available: {', '.join(sorted(available))}"
+                    )
+                }
+            )
 
     def __str__(self):
         return self.title

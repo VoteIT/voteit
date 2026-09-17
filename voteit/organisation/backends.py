@@ -1,16 +1,93 @@
 from logging import getLogger
 from typing import Any
 
+from django.conf import settings
+from django.urls import reverse
 from django.utils.functional import cached_property
 from social_core.backends.oauth import BaseOAuth2
 from social_core.exceptions import AuthException
 
+from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 
 logger = getLogger(__name__)
 
 
-class IDProxyOAuth2(BaseOAuth2):
+class OrganisationBackendMixin:
+    """
+    Resolves the tenant, and that tenant's credentials, for a social auth backend.
+
+    Every ``Organisation`` brings its own OAuth credentials, stored as an
+    ``OAuth2Provider`` row keyed by the backend's ``name``. The organisation
+    comes from the request's ``Host`` header, as everywhere else.
+
+    Mix in *before* the ``social_core`` backend, so :meth:`get_scope` can extend
+    ``DEFAULT_SCOPE`` via ``super()``.
+    """
+
+    name: str
+    TITLE: str = ""
+
+    @classmethod
+    def get_title(cls) -> str:
+        return cls.TITLE or cls.name
+
+    @classmethod
+    def get_login_url(cls, provider: OAuth2Provider) -> str:
+        return reverse("social:begin", args=[cls.name])
+
+    @classmethod
+    def get_profile_url(cls, provider: OAuth2Provider) -> str | None:
+        """
+        Where the user manages their account at the provider.
+        """
+        return None
+
+    @classmethod
+    def get_logout_url(cls, provider: OAuth2Provider) -> str | None:
+        """
+        Where to send the user to end the provider's own session.
+        """
+        return None
+
+    @cached_property
+    def organisation(self) -> Organisation:
+        host = self.strategy.request.get_host().split(":")[0]
+        try:
+            return Organisation.objects.get(host=host)
+        except Organisation.DoesNotExist:
+            logger.info("No organisation found for %s ", host)
+            raise AuthException(self, "No organisation found for %s " % host)
+
+    @cached_property
+    def provider(self) -> OAuth2Provider:
+        """
+        The credentials this organisation has configured for this backend.
+        """
+        try:
+            return self.organisation.get_provider(self.name)
+        except OAuth2Provider.DoesNotExist:
+            logger.info(
+                "Organisation %s has no %s provider configured",
+                self.organisation.host,
+                self.name,
+            )
+            raise AuthException(
+                self,
+                "No %s login configured for %s" % (self.name, self.organisation.host),
+            )
+
+    def get_scope(self) -> list[str]:
+        # Sort so we have a deterministic order
+        return sorted(
+            set(super().get_scope()) | {x for x in self.provider.scope.split() if x}
+        )
+
+    def get_key_and_secret(self) -> tuple[str, str]:
+        return (self.provider.client_id, self.provider.client_secret)
+
+
+class IDProxyOAuth2(OrganisationBackendMixin, BaseOAuth2):
     """
     >>> backend = IDProxyOAuth2()
     >>> backend.AUTHORIZATION_URL
@@ -34,6 +111,7 @@ class IDProxyOAuth2(BaseOAuth2):
     """
 
     name = "idproxy"
+    TITLE = "VoteIT ID"
     REDIRECT_STATE = False
     ID_KEY = "identity_id"
     AUTHORIZATION_URL = "https://id.voteit.se/o/authorize/"
@@ -48,12 +126,21 @@ class IDProxyOAuth2(BaseOAuth2):
         ("is_superuser", "is_superuser", True),
     ]
 
-    def get_scope(self) -> list[str]:
-        # Sort so we have a deterministic order
-        return sorted(
-            set(super().get_scope())
-            | {x for x in self.organisation.provider.scope.split() if x}
-        )
+    @classmethod
+    def get_login_url(cls, provider: OAuth2Provider) -> str:
+        """
+        The id proxy is entered through itself, not through social_django.
+        This is to check required data before starting the login process.
+        """
+        return f"{settings.ID_HOST}/login-to/{provider.organisation.host}"
+
+    @classmethod
+    def get_profile_url(cls, provider: OAuth2Provider) -> str:
+        return f"{settings.ID_HOST}/"
+
+    @classmethod
+    def get_logout_url(cls, provider: OAuth2Provider) -> str:
+        return f"{settings.ID_HOST}/log-out"
 
     def identity_url(self):
         return self.setting("IDENTITY_URL") or self.IDENTITY_URL
@@ -98,18 +185,3 @@ class IDProxyOAuth2(BaseOAuth2):
             type_data.append(ud["data"])
         data["user_data"] = ud_scopes
         return data
-
-    def get_key_and_secret(self) -> tuple[str, str]:
-        return (
-            self.organisation.provider.client_id,
-            self.organisation.provider.client_secret,
-        )
-
-    @cached_property
-    def organisation(self):
-        host = self.strategy.request.get_host().split(":")[0]
-        try:
-            return Organisation.objects.select_related("provider").get(host=host)
-        except Organisation.DoesNotExist:
-            logger.info("No organisation found for %s ", host)
-            raise AuthException(self, "No organisation found for %s " % host)

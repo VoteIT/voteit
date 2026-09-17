@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "voteit.app.sfs",
     "voteit.app.skk",
     "voteit.app.skr",
+    "voteit.app.scouterna",
 ]
 
 CONTROLCENTER_DASHBOARDS = (

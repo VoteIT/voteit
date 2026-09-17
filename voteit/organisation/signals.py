@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 
+from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.test.signals import setting_changed
+from social_core.backends.utils import load_backends
 from voteit.messaging.channels import UserChannel
 
 from voteit.core.decorators import disable_on_raw_save
@@ -17,6 +20,19 @@ from voteit.organisation.messages import OrganisationChanged
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.rest_api.serializers import OrganisationSerializer
+
+
+@receiver(setting_changed)
+def reload_social_backends(setting, **kw):
+    """
+    Keep social_core's backend cache in step with AUTHENTICATION_BACKENDS.
+
+    load_backends() caches globally and ignores its argument once warm, so
+    override_settings(AUTHENTICATION_BACKENDS=...) would otherwise be a silent
+    no-op. Only fires under test overrides.
+    """
+    if setting == "AUTHENTICATION_BACKENDS":
+        load_backends(settings.AUTHENTICATION_BACKENDS, force_load=True)
 
 
 @receiver(post_save, sender=Organisation)

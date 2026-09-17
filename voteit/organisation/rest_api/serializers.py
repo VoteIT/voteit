@@ -1,29 +1,58 @@
 from __future__ import annotations
-from contextlib import suppress
 from typing import List
-from typing import Optional
 from typing import TYPE_CHECKING
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 from voteit.components.rest_api.serializers import OrganisationComponentSerializer
 from voteit.core.rest_api.fields import SameOrgUserField
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.validators import RoleValidator
+from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
+
 
 if TYPE_CHECKING:
     pass
 
 
-class OrganisationSerializer(serializers.ModelSerializer):
+class OAuth2ProviderSerializer(serializers.Serializer):
+    """
+    One way of logging in to an organisation.
+    """
+
+    provider_id = serializers.CharField(read_only=True)
+    title = serializers.SerializerMethodField()
     login_url = serializers.SerializerMethodField()
-    id_host = serializers.SerializerMethodField()
+    profile_url = serializers.SerializerMethodField()
+    logout_url = serializers.SerializerMethodField()
     scope = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_title(instance: OAuth2Provider) -> str:
+        return instance.backend.get_title()
+
+    @staticmethod
+    def get_login_url(instance: OAuth2Provider) -> str:
+        return instance.backend.get_login_url(instance)
+
+    @staticmethod
+    def get_profile_url(instance: OAuth2Provider) -> str | None:
+        return instance.backend.get_profile_url(instance)
+
+    @staticmethod
+    def get_logout_url(instance: OAuth2Provider) -> str | None:
+        return instance.backend.get_logout_url(instance)
+
+    @staticmethod
+    def get_scope(instance: OAuth2Provider) -> List[str]:
+        return instance.scope.split()
+
+
+class OrganisationSerializer(serializers.ModelSerializer):
+    providers = serializers.SerializerMethodField()
     components = OrganisationComponentSerializer(
         read_only=True, many=True, source="enabled_components"
     )
@@ -33,10 +62,8 @@ class OrganisationSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "active",
             "components",
-            "id_host",
-            "login_url",
             "pk",
-            "scope",
+            "providers",
             "title",
         ]
         fields = read_only_fields + [
@@ -46,20 +73,12 @@ class OrganisationSerializer(serializers.ModelSerializer):
         ]
 
     @staticmethod
-    def get_login_url(instance: Organisation) -> Optional[str]:
-        with suppress(ObjectDoesNotExist):
-            return instance.provider and f"{settings.ID_HOST}/login-to/{instance.host}"
-
-    @staticmethod
-    def get_id_host(instance: Organisation) -> Optional[str]:
-        return settings.ID_HOST
-
-    @staticmethod
-    def get_scope(instance: Organisation) -> List[str]:
-        with suppress(ObjectDoesNotExist):
-            if instance.provider:
-                return instance.provider.scope.split()
-        return []
+    def get_providers(instance: Organisation) -> List[dict]:
+        # A provider can outlive its backend, and a dead login link helps nobody.
+        return OAuth2ProviderSerializer(
+            [p for p in instance.providers.order_by("pk") if p.backend],
+            many=True,
+        ).data
 
 
 # class IDProviderSerializer(serializers.ModelSerializer):

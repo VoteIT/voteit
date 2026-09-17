@@ -4,6 +4,7 @@ from social_core.exceptions import AuthException
 from django.utils.translation import gettext as _
 from social_django.models import UserSocialAuth
 
+from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 User = get_user_model()
@@ -45,6 +46,7 @@ def social_user(backend, uid, user=None, *args, **kwargs):
     - social.user is inactive: prefer an active user with the same identity_id
     - identity_id lookup: only consider active users to avoid picking deactivated duplicates
     """
+    # FIXME: Not valid with providers other than IDProxy, use default pipeline?
     provider = backend.name
     social = backend.strategy.storage.user.get_social_auth(provider, uid)
     if social:
@@ -147,8 +149,13 @@ def bump_permissions(backend, user, social, *args, **kwargs):
 
 
 def remove_nonmatching_email(backend, user, social, *args, **kwargs):
+    """
+    Sync the user's email against the identity server's email scope data.
+    """
+    if backend.name != IDPROXY_PROVIDER:
+        return
     try:
-        provider_scopes = backend.organisation.provider.scope.split()
+        provider_scopes = backend.provider.scope.split()
     except AttributeError:
         provider_scopes = []
     if "email" not in provider_scopes:

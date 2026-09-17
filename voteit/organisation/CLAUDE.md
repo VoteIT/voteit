@@ -10,7 +10,7 @@ The root tenant. Key fields:
 - `active` — when `False`, the `org_active` pipeline step blocks all logins for this organisation.
 - `body` / `help_info` — `RichTextField` values cleaned by `relaxed_clean_html`.
 - `page_title` — defaults to `title` on first save if left blank.
-- `provider` — one-to-one reverse relation to `OAuth2Provider`; raises `ObjectDoesNotExist` if no SSO is configured.
+- `providers` — reverse relation to `OAuth2Provider`, one row per configured login method. Use `get_provider(provider_id)` to fetch one.
 
 `enabled_components()` yields `OrganisationComponent` instances where `enabled=True` and `is_valid` is truthy.
 
@@ -28,7 +28,11 @@ Changes fire `roles_added` / `roles_removed` core signals, which in turn publish
 Auditlog stores `{"o": self.context_id}` in `get_additional_data()` for every change.
 
 ### OAuth2Provider
-Holds the OAuth2 credentials used for SSO login. One-to-one with `Organisation` (nullable — an org can exist without one). Fields: `scope` (space-separated), `client_id`, `client_secret`. The `id_backend_host` property prefers the `ID_HOST_BACKEND` setting over `ID_HOST` (dev override for container networking).
+Holds the OAuth2/OIDC credentials used for SSO login. **Required foreign key** to `Organisation`, one row per social auth backend, uniquely constrained on `(organisation, provider_id)`. Fields: `provider_id` (the `social_core` backend `name`), `scope` (space-separated), `client_id`, `client_secret`, `oidc_endpoint` (blank unless an OIDC backend needs to override its own default issuer).
+
+Look one up with `organisation.get_provider(provider_id)`, which raises `OAuth2Provider.DoesNotExist`.
+
+The `backend` property returns the backend class for `provider_id`, or `None` when it is not in `AUTHENTICATION_BACKENDS`. It is the single lookup point.
 
 ### TermsOfService
 A TOS document for an organisation. `required=True` means a user must consent before accessing the platform. Multiple TOS documents per organisation are supported; each is accepted independently via `UserConsent`.
@@ -69,7 +73,9 @@ All ViewSets are registered to the central router in `rest_api/views.py`.
 - `change` (`PATCH /api/organisation/change/`) — partial update of `body`, `help_info`, and `page_title`. Requires `org_manager`.
 - Create/delete are not supported (405).
 
-The serializer also exposes read-only computed fields: `login_url` (the IDProxy login entry point), `id_host` (from settings), `scope` (space-split list from `OAuth2Provider`), and `components` (enabled org components via `OrganisationComponentSerializer`).
+The serializer also exposes read-only computed fields: `providers` and `components` (enabled org components via `OrganisationComponentSerializer`).
+
+`providers` is the list of login methods.
 
 ### `OrganisationRolesViewSet` (`/api/organisation-roles/`)
 - `list` — returns all `OrganisationRoles` for the user's organisation. Non-managers see an empty list (queryset scoped by `view_roles` permission check).
@@ -84,16 +90,19 @@ ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?email_in=a@b.c
 ### `HandleIdentitiesViewSet` (`/api/handle-identities/`)
 ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?identity_in=uid1,uid2` (required). Provides a `query` action that returns user details for the matched identities. Raises `ValidationError` if >3 users would be affected, if any affected user has org roles / staff / superuser status, or if identities span multiple organisations. All validation errors are also emitted to the `notification_logger`.
 
-## SSO Backend (`backends.py`)
+## SSO Backends (`backends.py`)
 
-`IDProxyOAuth2` is a `python-social-auth` backend for the project's central identity proxy service. Key behaviours:
-- Resolves the `Organisation` from the request hostname (cached via `@cached_property`).
-- Retrieves `client_id` / `client_secret` from `Organisation.provider` rather than settings.
+`OrganisationBackendMixin` is the shared multi-tenant half of every social auth backend in the project. Mix it in **before** the `social_core` backend, so `get_scope()` can extend `DEFAULT_SCOPE` through `super()`. It provides:
+- `organisation` — resolved from the request hostname.
+- `provider` — that organisation's `OAuth2Provider` row for `self.name`; raises `AuthException` if there is none.
+- `get_key_and_secret()` / `get_scope()` — credentials and the org's scopes merged with the backend's defaults.
+- `get_title()`, `get_login_url(provider)`, `get_profile_url(provider)`, `get_logout_url(provider)` — what the SPA shows, and where it sends people to log in, manage their account and log out. Backends set `TITLE`; the default login URL is `reverse("social:begin", args=[name])` and the other two default to `None`. They take the **provider row**, not the organisation, because an OIDC backend's URLs derive from its issuer — which is a per-provider column. They are classmethods, so they work outside a login request where there is no strategy.
+
+`IDProxyOAuth2` is the backend for the project's central identity proxy service. Key behaviours:
+- Overrides `get_login_url()`: the id proxy is entered through itself (`{ID_HOST}/login-to/{host}`), because it must know which tenant is asking before it can offer a login.
 - Merges `OAuth2Provider.scope` with `DEFAULT_SCOPE = ["email", "identity"]` and sorts the combined list for deterministic OAuth requests.
 - `AUTHORIZATION_URL`, `ACCESS_TOKEN_URL`, and `IDENTITY_URL` can be overridden per-environment via `SOCIAL_AUTH_IDPROXY_<KEY>` settings.
 - `extra_data` restructures the flat `user_data` list from the identity server into `{scope: [data, ...]}` dicts before storage.
-
-The `IDPROXY_PROVIDER` constant (`"idproxy"`) is exported from `__init__.py`.
 
 ## Authentication Pipeline (`pipeline.py`)
 
@@ -107,7 +116,7 @@ Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`:
 - `ensure_userid` — generates a slugified `userid` from first/last name if not already set. Deduplicates by appending a suffix.
 - `inherit_users` — if the identity server returns `extra_identity_ids`, updates all same-org active users carrying those IDs to share the authenticated user's `identity_id`.
 - `bump_permissions` — if the identity server response includes `is_superuser: true`, grants `org_manager` role to the user.
-- `remove_nonmatching_email` — syncs the user's `email` field against the identity server's email scope data. Clears email if the scope is not present.
+- `remove_nonmatching_email` — syncs the user's `email` field against the identity server's email scope data. Clears email if the scope is not present, but only when `idproxy` is the provider.
 
 ## WebSocket Channel (`channels.py`)
 
@@ -119,6 +128,7 @@ On subscribe, the `organisation.roles` collector pushes the user's current org r
 
 ## Signals (`signals.py`)
 
+- `setting_changed` → `reload_social_backends` — force-reloads social_core's backend cache when `AUTHENTICATION_BACKENDS` changes. `load_backends()` caches in a module-global `BACKENDSCACHE` and **ignores its argument once warm**, so without this, `override_settings(AUTHENTICATION_BACKENDS=...)` is a silent no-op and `OAuth2Provider.backend` answers from stale data. Only fires under test overrides; in production the setting never changes.
 - `Organisation post_save` (not created) — publishes `OrganisationChanged` to `OrganisationChannel`. Skipped on `raw` saves.
 - `organisation.roles` collector on `OrganisationChannel` — the subscribing user's roles.
 - `roles_added` on `OrganisationRoles` — publishes `RolesChanged` to both `OrganisationChannel` and the affected user's personal `UserChannel`. Skipped on `raw` saves.
@@ -147,13 +157,21 @@ On subscribe, the `organisation.roles` collector pushes the user's current org r
 
 **`bump_permissions` grants `org_manager` when identity server returns `is_superuser`.** This is not Django's `is_superuser` flag — it is a claim from the identity server. It grants an org-scoped manager role, not platform superuser access.
 
-**`UserConsent` / `TermsOfService` models exist but have no active REST endpoints.** The ViewSets and serializers are commented out. The models remain for potential future use and because historic data may exist.
+**One `OAuth2Provider` per backend, not per organisation.**
 
+**`UserConsent` / `TermsOfService` models exist but have no active REST endpoints.** The ViewSets and serializers are commented out. They will be used later.
 ## Tests
 
 ```
 python manage.py test voteit.organisation --keepdb --failfast
 ```
+
+`testing.py` holds `DummyOAuth2`, a second social auth backend, and
+`dummy_backend_enabled()`, an `override_settings` that adds it to
+`AUTHENTICATION_BACKENDS`. Multi-provider behaviour is tested against that rather than
+against a real second backend.
+
+The override only bites because of the `setting_changed` receiver above.
 
 Test modules:
 - `tests/test_models.py` — model and `OAuth2Provider` basics.

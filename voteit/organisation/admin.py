@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+from django import forms
+from django.conf import settings
 from django.contrib import admin
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -9,6 +11,7 @@ from django.db.models import Subquery
 from django.db.models.functions import Coalesce
 from django.template.response import TemplateResponse
 from django.urls import path
+from social_core.backends.utils import load_backends
 from voteit.messaging.models import Connection
 
 from voteit.meeting.models import Meeting
@@ -72,6 +75,7 @@ class OrganisationAdmin(admin.ModelAdmin):
     search_fields = ("title",)
     list_display = (
         "title",
+        "host",
         "meeting_count",
         "users",
         "manager_count",
@@ -234,11 +238,23 @@ class UserConsentAdmin(admin.ModelAdmin):
 
 @admin.register(OAuth2Provider)
 class OAuth2ProviderAdmin(admin.ModelAdmin):
-    list_display = ["__str__", "organisation_active", "scope"]
-    list_filter = ["scope", "organisation__active"]
+    list_display = ["__str__", "provider_id", "organisation_active", "scope"]
+    list_filter = ["provider_id", "scope", "organisation__active"]
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("organisation")
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == "provider_id":
+            # Only enabled backends: a typo here means no credentials at login.
+            backends = load_backends(settings.AUTHENTICATION_BACKENDS)
+            kwargs["widget"] = forms.Select(
+                choices=sorted(
+                    (name, f"{getattr(cls, 'TITLE', '') or name} ({name})")
+                    for name, cls in backends.items()
+                )
+            )
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
     @admin.display(description="Org active?", boolean=True)
     def organisation_active(self, instance):

@@ -97,6 +97,7 @@ SOCIAL_AUTH_PIPELINE = [
 
 AUTHENTICATION_BACKENDS = [
     "voteit.organisation.backends.IDProxyOAuth2",
+    # "voteit.app.scouterna.backends.ScoutIDOpenIdConnect",
 ] + AUTHENTICATION_BACKENDS
 LOGIN_REDIRECT_URL = "/"
 LOGIN_ERROR_URL = "/error"
