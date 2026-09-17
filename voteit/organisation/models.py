@@ -200,6 +200,32 @@ class OAuth2Provider(OrganisationContext):
         blank=True,
         default="",
     )
+    primary: bool = models.BooleanField(
+        verbose_name="Primary login",
+        help_text="Listed before the others.",
+        default=False,
+    )
+    hidden: bool = models.BooleanField(
+        verbose_name="Hidden",
+        help_text="Not offered as a login option, but still usable.",
+        default=False,
+    )
+
+    @classmethod
+    def visible_for(cls, organisation: Organisation) -> list[OAuth2Provider]:
+        """
+        The login options to offer, primary first then by title, lowercased.
+
+        Drops the hidden ones, and any whose backend this deployment does not
+        have enabled -- a dead login link helps nobody. Sorting is in Python
+        because the title comes from the backend class, not the row.
+        """
+        providers = [
+            p for p in organisation.providers.filter(hidden=False) if p.backend
+        ]
+        return sorted(
+            providers, key=lambda p: (not p.primary, p.backend.get_title().lower())
+        )
 
     @property
     def backend(self):

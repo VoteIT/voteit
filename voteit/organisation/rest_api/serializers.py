@@ -74,10 +74,8 @@ class OrganisationSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_providers(instance: Organisation) -> List[dict]:
-        # A provider can outlive its backend, and a dead login link helps nobody.
         return OAuth2ProviderSerializer(
-            [p for p in instance.providers.order_by("pk") if p.backend],
-            many=True,
+            OAuth2Provider.visible_for(instance), many=True
         ).data
 
 

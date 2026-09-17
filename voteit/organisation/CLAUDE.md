@@ -28,11 +28,13 @@ Changes fire `roles_added` / `roles_removed` core signals, which in turn publish
 Auditlog stores `{"o": self.context_id}` in `get_additional_data()` for every change.
 
 ### OAuth2Provider
-Holds the OAuth2/OIDC credentials used for SSO login. **Required foreign key** to `Organisation`, one row per social auth backend, uniquely constrained on `(organisation, provider_id)`. Fields: `provider_id` (the `social_core` backend `name`), `scope` (space-separated), `client_id`, `client_secret`, `oidc_endpoint` (blank unless an OIDC backend needs to override its own default issuer).
+Holds the OAuth2/OIDC credentials used for SSO login. **Required foreign key** to `Organisation`, one row per social auth backend, uniquely constrained on `(organisation, provider_id)`. Fields: `provider_id` (the `social_core` backend `name`), `scope` (space-separated), `client_id`, `client_secret`, `oidc_endpoint` (blank unless an OIDC backend needs to override its own default issuer), `primary`, `hidden`.
 
 Look one up with `organisation.get_provider(provider_id)`, which raises `OAuth2Provider.DoesNotExist`.
 
 The `backend` property returns the backend class for `provider_id`, or `None` when it is not in `AUTHENTICATION_BACKENDS`. It is the single lookup point.
+
+`OAuth2Provider.visible_for(organisation)` returns the login options to offer: `hidden` rows and rows with no enabled backend dropped, `primary` first, the rest by title lowercased. Sorting is in Python because the title comes from the backend class, not the row. `hidden` only affects this list — such a provider still logs in fine, which is what you want for something reached by a hint rather than a button.
 
 ### TermsOfService
 A TOS document for an organisation. `required=True` means a user must consent before accessing the platform. Multiple TOS documents per organisation are supported; each is accepted independently via `UserConsent`.
@@ -75,7 +77,7 @@ All ViewSets are registered to the central router in `rest_api/views.py`.
 
 The serializer also exposes read-only computed fields: `providers` and `components` (enabled org components via `OrganisationComponentSerializer`).
 
-`providers` is the list of login methods.
+`providers` is the list of login methods, from `OAuth2Provider.visible_for()`.
 
 ### `OrganisationRolesViewSet` (`/api/organisation-roles/`)
 - `list` — returns all `OrganisationRoles` for the user's organisation. Non-managers see an empty list (queryset scoped by `view_roles` permission check).

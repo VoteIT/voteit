@@ -3,6 +3,7 @@ from django.test import override_settings
 
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
+from voteit.organisation.testing import ALT_DUMMY_PROVIDER
 from voteit.organisation.testing import DUMMY_PROVIDER
 from voteit.organisation.testing import dummy_backend_enabled
 
@@ -54,24 +55,23 @@ class OrganisationSerializerTests(TestCase):
         self.org.providers.all().delete()
         self.assertEqual([], self._cut(self.org).data["providers"])
 
-    def test_get_several_providers(self):
-        self.org.providers.create(
-            provider_id=DUMMY_PROVIDER,
+    def _add(self, provider_id, **kwargs):
+        return self.org.providers.create(
+            provider_id=provider_id,
             scope="one two",
             client_id="cid",
             client_secret="secret",
+            **kwargs,
         )
+
+    def _titles(self):
+        return [x["title"] for x in self._cut(self.org).data["providers"]]
+
+    def test_get_several_providers(self):
+        self._add(DUMMY_PROVIDER)
         data = self._cut(self.org).data
         self.assertEqual(
             [
-                {
-                    "provider_id": IDPROXY_PROVIDER,
-                    "title": "VoteIT ID",
-                    "login_url": "https://idproxy/login-to/testserver",
-                    "profile_url": "https://idproxy/",
-                    "logout_url": "https://idproxy/log-out",
-                    "scope": ["email"],
-                },
                 {
                     "provider_id": DUMMY_PROVIDER,
                     "title": "Dummy login",
@@ -80,9 +80,42 @@ class OrganisationSerializerTests(TestCase):
                     "logout_url": "https://dummy.example/logout/",
                     "scope": ["one", "two"],
                 },
+                {
+                    "provider_id": IDPROXY_PROVIDER,
+                    "title": "VoteIT ID",
+                    "login_url": "https://idproxy/login-to/testserver",
+                    "profile_url": "https://idproxy/",
+                    "logout_url": "https://idproxy/log-out",
+                    "scope": ["email"],
+                },
             ],
             [dict(x) for x in data["providers"]],
         )
+
+    def test_providers_sort_by_title_case_insensitively(self):
+        self._add(DUMMY_PROVIDER)
+        self._add(ALT_DUMMY_PROVIDER)
+        # Raw string order would put "VoteIT ID" before "alpha login".
+        self.assertEqual(["alpha login", "Dummy login", "VoteIT ID"], self._titles())
+
+    def test_primary_provider_comes_first(self):
+        self._add(DUMMY_PROVIDER)
+        self._add(ALT_DUMMY_PROVIDER)
+        self.org.providers.filter(provider_id=IDPROXY_PROVIDER).update(primary=True)
+        self.assertEqual(["VoteIT ID", "alpha login", "Dummy login"], self._titles())
+
+    def test_several_primaries_stay_sorted_among_themselves(self):
+        self._add(DUMMY_PROVIDER, primary=True)
+        self._add(ALT_DUMMY_PROVIDER, primary=True)
+        self.assertEqual(["alpha login", "Dummy login", "VoteIT ID"], self._titles())
+
+    def test_hidden_providers_are_omitted(self):
+        self._add(DUMMY_PROVIDER, hidden=True)
+        self.assertEqual(["VoteIT ID"], self._titles())
+
+    def test_hidden_wins_over_primary(self):
+        self._add(DUMMY_PROVIDER, primary=True, hidden=True)
+        self.assertEqual(["VoteIT ID"], self._titles())
 
     def test_get_skips_provider_without_enabled_backend(self):
         self.org.providers.create(

@@ -10,6 +10,7 @@ from voteit.organisation.backends import OrganisationBackendMixin
 from voteit.organisation.models import OAuth2Provider
 
 DUMMY_PROVIDER = "dummy"
+ALT_DUMMY_PROVIDER = "dummy-alt"
 
 
 class DummyOAuth2(OrganisationBackendMixin, BaseOAuth2):
@@ -35,16 +36,32 @@ class DummyOAuth2(OrganisationBackendMixin, BaseOAuth2):
         return "https://dummy.example/logout/"
 
 
-DUMMY_BACKEND = f"{DummyOAuth2.__module__}.{DummyOAuth2.__qualname__}"
+class AltDummyOAuth2(DummyOAuth2):
+    """
+    A third backend. Its title starts lowercase on purpose, so provider
+    ordering cannot pass by comparing raw strings.
+    """
+
+    name = ALT_DUMMY_PROVIDER
+    TITLE = "alpha login"
+
+
+def _path(cls) -> str:
+    return f"{cls.__module__}.{cls.__qualname__}"
+
+
+DUMMY_BACKEND = _path(DummyOAuth2)
+ALT_DUMMY_BACKEND = _path(AltDummyOAuth2)
 
 
 def dummy_backend_enabled() -> override_settings:
     """
-    Add :class:`DummyOAuth2` to AUTHENTICATION_BACKENDS for the duration.
+    Add the dummy backends to AUTHENTICATION_BACKENDS for the duration.
 
     Use as a class decorator or a context manager. Relies on
     voteit.organisation.signals.reload_social_backends to refresh social_core's
     backend cache when the setting changes.
     """
-    others = [b for b in settings.AUTHENTICATION_BACKENDS if b != DUMMY_BACKEND]
-    return override_settings(AUTHENTICATION_BACKENDS=[*others, DUMMY_BACKEND])
+    added = [DUMMY_BACKEND, ALT_DUMMY_BACKEND]
+    others = [b for b in settings.AUTHENTICATION_BACKENDS if b not in added]
+    return override_settings(AUTHENTICATION_BACKENDS=[*others, *added])

@@ -238,8 +238,15 @@ class UserConsentAdmin(admin.ModelAdmin):
 
 @admin.register(OAuth2Provider)
 class OAuth2ProviderAdmin(admin.ModelAdmin):
-    list_display = ["__str__", "provider_id", "organisation_active", "scope"]
-    list_filter = ["provider_id", "scope", "organisation__active"]
+    list_display = [
+        "__str__",
+        "provider_id",
+        "primary",
+        "hidden",
+        "organisation_active",
+        "scope",
+    ]
+    list_filter = ["provider_id", "primary", "hidden", "scope", "organisation__active"]
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("organisation")
