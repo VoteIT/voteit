@@ -253,6 +253,22 @@ override stands for. Never set it from a guess.
 zero means nothing of the person's own is on the row; the admin uses it to pick which of two
 accounts becomes the source.
 
+## Middleware (`middleware.py`)
+
+`SentryUserMiddleware` attaches `{"id": user.pk}` to the Sentry scope and nothing else.
+It exists because `send_default_pii` is **off** in `project/settings.py` — which is what
+keeps request bodies, headers, cookies and IP addresses out of Sentry, but also stops the
+Django integration attaching any user at all. Only added to `MIDDLEWARE` when a
+`SENTRY_DSN` is configured. `sentry_sdk` is imported in `__init__`, not at module scope:
+that package is in the `docker` extra and absent from a plain dev install, while this module
+gets imported by anything that walks the package — `test_docs`'s doctest loader, for one.
+
+Secrets are kept out separately, by an `EventScrubber` with an extended denylist. Sentry's
+default list matches key names **exactly** and stops at `secret` and `token`, so
+`client_secret`, `access_token` and `id_token` would otherwise sail straight through — and
+`recursive=True` matters because they arrive nested inside dicts like PSA's request params
+and `extra_data`, where a non-recursive scrubber only ever reads the outer name.
+
 ## Managers (`managers.py`)
 
 `AutoInheritanceManager` / `AutoInheritanceQuerySet` — wraps `model_utils.InheritanceManager` and calls `select_subclasses()` automatically on every queryset. `instance_of()` is explicitly disabled here; use a plain `InheritanceManager` if you need it.
