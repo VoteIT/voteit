@@ -205,6 +205,7 @@ On subscribe, the `organisation.roles` collector pushes the user's current org r
 ## Scheduled Jobs (`jobs.py`)
 
 - `email_login_method_added` (RQ, `long`) — tells someone a login method was attached to their account. Enqueued by the `notify_login_method_added` signal, and only for a *second* or later credential: a first one is a registration. The mail goes to the address the **account already had**, never the one the new credential brought, because the point is to reach whoever owns the account — which matters most when they are not the person who just logged in.
+- `cleanup_social_auth_leftovers` (daily at 04:40) — deletes `Partial` rows and unverified `Code` rows older than `SOCIAL_LEFTOVER_DAYS` (1). This is what `manage.py clearsocial` does, scheduled rather than left to a cron entry nobody remembers to add. A partial is the whole pipeline frozen mid-flight, so it carries the provider's response and the tokens in it; `clearsocial`'s own default of 14 days is far too long for that. Abandoning one costs the person nothing — they log in again and are asked again.
 - `cleanup_extra_data_for_older_users` (daily at 04:00) — clears `UserSocialAuth.extra_data` for records not modified in the past 365 days. Prevents long-lived accumulation of potentially sensitive identity data. The credential row itself survives — it is still how its owner reaches the account it belongs to.
 
 ## Non-obvious design decisions

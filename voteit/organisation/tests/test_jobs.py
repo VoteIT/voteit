@@ -1,10 +1,14 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase
 from django.test import override_settings
+from django.utils.timezone import now
 from voteit.messaging.testing import testing_channel_layers_setting
+from social_django.models import Code
+from social_django.models import Partial
 from social_django.models import UserSocialAuth
 
 from voteit.app.scouterna import SCOUTID_PROVIDER
@@ -12,6 +16,7 @@ from voteit.app.scouterna.testing import scoutid_enabled
 from voteit.core.testing import FakeCommit
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.jobs import cleanup_extra_data_for_older_users
+from voteit.organisation.jobs import cleanup_social_auth_leftovers
 from voteit.organisation.jobs import email_login_method_added
 from voteit.organisation.models import Organisation
 
@@ -122,3 +127,42 @@ class LoginMethodAddedTests(TestCase):
         social = self._social(SCOUTID_PROVIDER, "a-sub")
         email_login_method_added(social_auth_pk=social.pk)
         self.assertIn(SCOUTID_PROVIDER, mail.outbox[0].body)
+
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+class CleanupSocialAuthLeftoversTests(TestCase):
+    """
+    A partial is a paused login holding the provider's tokens. Nothing pruned
+    them before, because `clearsocial` needs a cron entry somebody remembers.
+    """
+
+    def _partial(self, age_days: int):
+        partial = Partial.objects.create(
+            token=f"token-{age_days}", backend=SCOUTID_PROVIDER, data={}, next_step=3
+        )
+        Partial.objects.filter(pk=partial.pk).update(
+            timestamp=now() - timedelta(days=age_days)
+        )
+        return partial
+
+    def test_an_abandoned_login_is_dropped(self):
+        stale = self._partial(2)
+        self.assertEqual(1, cleanup_social_auth_leftovers())
+        self.assertFalse(Partial.objects.filter(pk=stale.pk).exists())
+
+    def test_one_still_being_answered_is_left_alone(self):
+        fresh = self._partial(0)
+        self.assertEqual(0, cleanup_social_auth_leftovers())
+        self.assertTrue(Partial.objects.filter(pk=fresh.pk).exists())
+
+    def test_unused_codes_go_too(self):
+        code = Code.objects.create(email="kim@example.com", code="abc", verified=False)
+        Code.objects.filter(pk=code.pk).update(timestamp=now() - timedelta(days=2))
+        cleanup_social_auth_leftovers()
+        self.assertFalse(Code.objects.filter(pk=code.pk).exists())
+
+    def test_a_verified_code_is_not_swept_up(self):
+        code = Code.objects.create(email="kim@example.com", code="abc", verified=True)
+        Code.objects.filter(pk=code.pk).update(timestamp=now() - timedelta(days=2))
+        cleanup_social_auth_leftovers()
+        self.assertTrue(Code.objects.filter(pk=code.pk).exists())

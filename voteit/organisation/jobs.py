@@ -9,6 +9,8 @@ from django.utils.html import strip_tags
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
 from django_rq import job
+from social_django.models import Code
+from social_django.models import Partial
 from social_django.models import UserSocialAuth
 
 from voteit.core import RQ_LONG_QUEUE
@@ -28,6 +30,37 @@ def cleanup_extra_data_for_older_users(**kwargs):
         .exclude(extra_data={})
         .update(extra_data={})
     )
+
+
+#: How long a paused login may sit unanswered. ``clearsocial`` defaults to 14
+#: days; a partial holds the provider's whole response, tokens included, and a
+#: login nobody finished within a day is not going to be finished.
+SOCIAL_LEFTOVER_DAYS = 1
+
+
+@schedule_job("40 4 * * *")
+def cleanup_social_auth_leftovers(**kwargs):
+    """
+    Drop paused logins and unused codes that nobody came back for.
+
+    This is what ``manage.py clearsocial`` does, on the schedule everything else
+    here runs on -- a cron entry nobody remembers to add is how a table holding
+    access tokens grows forever.
+
+    A partial is the whole pipeline frozen mid-flight, so it carries the
+    provider's response and the tokens in it. Abandoning one costs the person
+    nothing: they log in again and are asked again.
+    """
+    cutoff = now() - timedelta(days=SOCIAL_LEFTOVER_DAYS)
+    partials, _ = Partial.objects.filter(timestamp__lt=cutoff).delete()
+    codes, _ = Code.objects.filter(verified=False, timestamp__lt=cutoff).delete()
+    if partials or codes:
+        logger.info(
+            "cleanup_social_auth_leftovers: %d partial(s), %d unused code(s)",
+            partials,
+            codes,
+        )
+    return partials + codes
 
 
 @job(RQ_LONG_QUEUE)
