@@ -18,7 +18,7 @@ from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
-from social_core.exceptions import AuthForbidden
+from social_core.exceptions import AuthException
 from social_django.models import UserSocialAuth
 from social_django.storage import BaseDjangoStorage
 from social_django.strategy import DjangoStrategy
@@ -806,7 +806,7 @@ class ScoutIDLoginTests(APITestCase):
                 "email_verified": True,
             },
         )
-        with self.assertRaises(AuthForbidden):
+        with self.assertRaises(AuthException):
             self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
         self.assertEqual(before, self.org.users.count())
         self.assertFalse(

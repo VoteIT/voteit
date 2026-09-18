@@ -230,12 +230,21 @@ waiting to happen, so they are sent back to the login they already have.
     ...     last_login=now(),
     ... )
     >>> _ = org.add_roles(manager, ROLE_ORG_MANAGER)
+    >>> _ = manager.social_auth.create(
+    ...     provider="idproxy", uid="an-identity", extra_data={}
+    ... )
     >>> signing_in("Kai", "Scout", "manager@example.com")
     Traceback (most recent call last):
-    social_core.exceptions.AuthForbidden: ...
+    social_core.exceptions.AuthException: You already have an account here that
+    manages the organisation. Sign in with VoteIT ID instead, then connect
+    ScoutID from your profile.
 
-The message reaches the SPA through `GET /api/user/messages/`, by way of
-`SocialAuthExceptionMiddleware`. An org manager on the same address under another
+It names the login methods the account actually has, because "sign in the way you
+usually do" is no help to somebody who has just been told no. The message reaches
+the SPA through `GET /api/user/messages/`, by way of
+`SocialAuthExceptionMiddleware` -- which renders `str(exception)`, so the
+exception has to be one that keeps its message. `AuthForbidden` does not: its
+`__str__` returns "Your credentials aren't allowed" whatever it was given. An org manager on the same address under another
 name is somebody else, and neither blocks nor is offered.
 
     >>> outcome(signing_in("Ida", "Scout", "manager@example.com"))

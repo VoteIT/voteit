@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from social_core.exceptions import AuthForbidden
+from social_core.exceptions import AuthException
 from django.utils.timezone import now
 from social_django.models import UserSocialAuth
 
@@ -555,14 +555,31 @@ class MatchExistingUserTests(TestCase):
         keeps them on the one path that proves both logins are theirs.
         """
         existing = self._existing()
+        existing.social_auth.create(
+            provider=IDPROXY_PROVIDER, uid="an-identity", extra_data={}
+        )
         self.org.add_roles(existing, ROLE_ORG_MANAGER)
-        with self.assertRaises(AuthForbidden):
+        with self.assertRaises(AuthException) as caught:
             self._run()
+        # Named, because "sign in the way you usually do" is no help to
+        # somebody who has just been told no.
+        self.assertIn("VoteIT ID", str(caught.exception))
 
     def test_staff_blocks_the_login_too(self):
         self._existing(is_staff=True)
-        with self.assertRaises(AuthForbidden):
+        with self.assertRaises(AuthException):
             self._run()
+
+    def test_an_elevated_account_with_no_way_in_says_so(self):
+        """
+        Matched, refused, and nothing they can do from here -- so do not tell
+        them to go and sign in with something.
+        """
+        existing = self._existing()
+        self.org.add_roles(existing, ROLE_ORG_MANAGER)
+        with self.assertRaises(AuthException) as caught:
+            self._run()
+        self.assertIn("no way to sign in", str(caught.exception))
 
     def test_an_elevated_account_under_another_name_is_simply_not_offered(self):
         """

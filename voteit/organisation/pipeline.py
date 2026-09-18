@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.contrib.auth import login
 from social_core.exceptions import AuthException
-from social_core.exceptions import AuthForbidden
 from social_core.pipeline.partial import partial
 from django.utils.translation import gettext as _
 from social_django.models import UserSocialAuth
@@ -15,6 +14,7 @@ from voteit.organisation.matching import find_candidates
 from voteit.organisation.matching import is_elevated
 from voteit.organisation.matching import names_match
 from voteit.organisation.roles import ROLE_ORG_MANAGER
+from voteit.organisation.utils import get_enabled_backends
 
 logger = getLogger(__name__)
 User = get_user_model()
@@ -174,6 +174,33 @@ LINK_ACCOUNT_FIELD = "link_account"
 LINK_ACCOUNT_NEW = "new"
 
 
+def _elevated_message(backend, candidate) -> str:
+    """
+    Why this login was refused, and what to do instead.
+
+    Names the login methods the account actually has, because "sign in the way
+    you usually do" is no help to somebody who has just been told no.
+    """
+    backends = get_enabled_backends()
+    titles = sorted(
+        backends[name].get_title()
+        for name in candidate.social_auth.values_list("provider", flat=True)
+        if name in backends
+    )
+    if not titles:
+        # Elevated, matched, and no way to sign in to it. Nothing they can do
+        # from here, so do not pretend otherwise.
+        return _(
+            "You already have an account here that manages the organisation, "
+            "but it has no way to sign in. Ask another organisation manager "
+            "for help."
+        )
+    return _(
+        "You already have an account here that manages the organisation. Sign "
+        "in with %(existing)s instead, then connect %(new)s from your profile."
+    ) % {"existing": " or ".join(titles), "new": backend.get_title()}
+
+
 def _link_account_url(strategy, token: str) -> str:
     base = getattr(settings, "LINK_ACCOUNT_URL", "/link-account")
     return f"{base}?partial_token={token}"
@@ -223,18 +250,11 @@ def match_existing_user(
         for candidate in candidates
         if names_match(candidate, details.get("first_name"), details.get("last_name"))
     ]
-    if any(is_elevated(candidate) for candidate in exact):
+    if elevated := [c for c in exact if is_elevated(c)]:
         # This login answers to a manager's account. Letting it through would
         # make a second account that someone has to merge in later; refusing it
         # keeps them on the one path that proves both logins are theirs.
-        raise AuthForbidden(
-            backend,
-            _(
-                "You already have an account here with this address, and it "
-                "manages the organisation. Sign in the way you usually do, then "
-                "connect this login from your profile."
-            ),
-        )
+        raise AuthException(backend, _elevated_message(backend, elevated[0]))
     # An elevated account on the same address under another name is somebody
     # else's, and never on offer.
     choices = [candidate for candidate in candidates if not is_elevated(candidate)]
