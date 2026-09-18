@@ -54,9 +54,6 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
     # Keycloak UUID, stable per user per realm.
     ID_KEY = "sub"
     EXTRA_DATA = [
-        ("id_token",),
-        ("refresh_token",),
-        ("expires_in", "expires"),
         ("sub", "id"),
     ]
 
