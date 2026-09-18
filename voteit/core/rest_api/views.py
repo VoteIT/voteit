@@ -42,6 +42,7 @@ from voteit.messaging.close import close_user_connections
 from voteit.messaging.models import LOGGED_OUT
 from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
 from voteit.organisation.pipeline import _transfer_social_auths
+from voteit.organisation import LOGIN_PROVIDER_SESSION_KEY
 from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
 from voteit.organisation.utils import get_user_identity_data
 
@@ -118,7 +119,9 @@ class UserView(
         return User.objects.filter(query)
 
     def list(self, request):
-        serializer = self.serializer_class(request.user)
+        # get_serializer, not the class: the payload carries session-derived
+        # fields, which need the request in context.
+        serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
     @action(methods=["POST"], detail=False, serializer_class=LogoutSerializer)
@@ -169,7 +172,13 @@ class UserView(
         # switched to is the same person, and leaving a login method behind on
         # the old row would send the next login straight back to it.
         _transfer_social_auths(request.user, user)
+        # login() flushes the session on the way to the other account, and this
+        # is not a social login so nothing puts it back. Same person, same
+        # provider -- and the client still needs it to log out of that provider.
+        login_provider = request.session.get(LOGIN_PROVIDER_SESSION_KEY)
         login(request, user, backend="voteit.core.backends.PrefetchedModelBackend")
+        if login_provider:
+            request.session[LOGIN_PROVIDER_SESSION_KEY] = login_provider
         serializer = self.get_serializer(user)
         return Response(serializer.data)
 

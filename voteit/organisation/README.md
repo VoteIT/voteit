@@ -102,7 +102,9 @@ credential to it, so the login finishes on the account they already had.
     >>> social = existing.social_auth.create(
     ...     provider="scoutid", uid="a-keycloak-sub", extra_data={}
     ... )
-    >>> client.force_login(existing)
+    >>> client.force_login(
+    ...     existing, backend="voteit.app.scouterna.backends.ScoutIDOpenIdConnect"
+    ... )
 
 Had they not recognised it -- a spouse on the same address, or whoever else reads
 `info@someorg.org` -- answering `link_account=new` carries on to a fresh account
@@ -238,6 +240,24 @@ name is somebody else, and neither blocks nor is offered.
 
     >>> outcome(signing_in("Ida", "Scout", "manager@example.com"))
     'new account'
+
+# Which provider signed this session in
+
+An organisation can offer several, and nothing on the user says which one opened
+this session -- so on the way out there is no telling where to end it. The session
+remembers, and the payload carries it.
+
+    >>> client.get("/api/user/").json()["login_provider"]
+    'scoutid'
+
+Pair it with that provider's `logout_url` from `/api/organisation/`.
+
+    >>> from voteit.organisation.models import OAuth2Provider
+    >>> OAuth2Provider.visible_for(org)[0].backend.get_logout_url(provider)
+    'https://dev.id.scouterna.se/realms/scoutnet/protocol/openid-connect/logout'
+
+A sign-in that came from no provider -- the switch-user action, `force_login` in
+tests -- reports nothing, because there is nothing to log out of.
 
 # Taking a login method back off
 

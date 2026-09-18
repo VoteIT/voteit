@@ -128,6 +128,14 @@ ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?identity_in=ui
 - `organisation` — resolved from the request hostname.
 - `provider` — that organisation's `OAuth2Provider` row for `self.name`; raises `AuthException` if there is none.
 - `get_key_and_secret()` / `get_scope()` — credentials and the org's scopes merged with the backend's defaults.
+- `utils.get_login_provider(request)` — which provider opened this session, or `None` when
+  it came from no social backend or from one this deployment no longer enables. Exposed as
+  `login_provider` on `/api/user/`, which is how the client knows where to end the session
+  at the provider as well: pair it with that provider's `logout_url` from
+  `/api/organisation/`. An account can hold several credentials, and only one of them
+  opened this session, so it is a property of the session and not of the user.
+  `UserView.switch` carries it across by hand, since `login()` flushes the session on the
+  way to the other account and switching is not a social login.
 - `get_verified_email(details, response)` — the address this provider will vouch for, or
   `None`. Account matching turns on it, so a backend that cannot tell must say nothing: an
   unverified address is a claim, and anyone can claim one. `IDProxyOAuth2` returns the
@@ -182,6 +190,7 @@ On subscribe, the `organisation.roles` collector pushes the user's current org r
 ## Signals (`signals.py`)
 
 - `setting_changed` → `reload_social_backends` — force-reloads social_core's backend cache when `AUTHENTICATION_BACKENDS` changes. `load_backends()` caches in a module-global `BACKENDSCACHE` and **ignores its argument once warm**, so without this, `override_settings(AUTHENTICATION_BACKENDS=...)` is a silent no-op and `OAuth2Provider.backend` answers from stale data. Only fires under test overrides; in production the setting never changes.
+- `user_logged_in` → `remember_login_provider` — records which login method this session signed in with, in `LOGIN_PROVIDER_SESSION_KEY`. Read from the auth backend `django.contrib.auth` just recorded, so every route in is covered. It has to be a signal rather than a pipeline step: `login()` flushes the session when the person signing in is not the one who was signed in before, which would throw away anything written earlier. A login from no social backend (the switch-user action, `force_login`) leaves whatever was there alone.
 - `UserSocialAuth post_save` (created) → `notify_login_method_added` — enqueues the mail above when the user already had another credential. Deferred to commit.
 - `Organisation post_save` (not created) — publishes `OrganisationChanged` to `OrganisationChannel`. Skipped on `raw` saves.
 - `organisation.roles` collector on `OrganisationChannel` — the subscribing user's roles.

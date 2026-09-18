@@ -28,6 +28,7 @@ from voteit.app.scouterna.backends import SCOUTNET_MEMBER_NO
 from voteit.app.scouterna.backends import ScoutIDOpenIdConnect
 from voteit.app.scouterna.testing import scoutid_enabled
 from voteit.organisation import IDPROXY_PROVIDER
+from voteit.organisation import LOGIN_PROVIDER_SESSION_KEY
 from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 from voteit.organisation.models import Organisation
@@ -810,6 +811,27 @@ class ScoutIDLoginTests(APITestCase):
         self.assertEqual(before, self.org.users.count())
         self.assertFalse(
             UserSocialAuth.objects.filter(provider=SCOUTID_PROVIDER).exists()
+        )
+
+    @responses.activate
+    def test_the_session_remembers_which_provider_signed_it_in(self):
+        """
+        An organisation can offer several, and nothing on the user says which
+        one opened this session -- so without this the client cannot end the
+        session at the provider as well.
+        """
+        state, nonce = self._begin()
+        self.realm.register(
+            self.realm.id_token("voteit", nonce),
+            userinfo={"sub": "b4d3e2f1-0000-4000-8000-000000000001"},
+        )
+        self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
+        self.assertEqual(
+            SCOUTID_PROVIDER, self.client.session[LOGIN_PROVIDER_SESSION_KEY]
+        )
+        self.assertEqual(
+            SCOUTID_PROVIDER,
+            self.client.get(reverse("user-list")).json()["login_provider"],
         )
 
     @responses.activate

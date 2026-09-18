@@ -32,6 +32,7 @@ from voteit.app.scouterna.testing import scoutid_disabled
 from voteit.app.scouterna.testing import scoutid_enabled
 from voteit.messaging.testing import testing_channel_layers_setting
 from voteit.organisation import IDPROXY_PROVIDER
+from voteit.organisation import LOGIN_PROVIDER_SESSION_KEY
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
 from voteit.organisation.models import Organisation
@@ -41,6 +42,8 @@ User = get_user_model()
 
 #: Patch targets live where the view imported them, not where they are defined.
 VIEWS = "voteit.core.rest_api.views"
+#: A sign-in that came from no provider at all.
+MODEL_BACKEND = "voteit.core.backends.PrefetchedModelBackend"
 
 
 class UserSearchViewSetTests(APITestCase):
@@ -253,6 +256,8 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
                 "organisation": 1,
                 "organisation_roles": [],
                 "email": "moderator@voteit.se",
+                # force_login() defaults to AUTHENTICATION_BACKENDS[0].
+                "login_provider": IDPROXY_PROVIDER,
             },
             data[0],
         )
@@ -279,6 +284,7 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
                 "pk": 1,
                 "userid": "moderator",
                 "email": "moderator@voteit.se",
+                "login_provider": IDPROXY_PROVIDER,
             },
             data,
         )
@@ -295,6 +301,30 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
         url = reverse("user-switch", kwargs={"pk": 3})
         response = self.client.post(url)
         self.assertEqual(404, response.status_code)
+
+    def test_switch_keeps_the_provider_this_session_signed_in_with(self):
+        """
+        login() flushes the session on the way across, and switching is not a
+        social login, so nothing would put it back -- but it is the same person
+        and the client still needs it to log out of that provider.
+        """
+        self.client.force_login(self.participant, backend=MODEL_BACKEND)
+        session = self.client.session
+        session[LOGIN_PROVIDER_SESSION_KEY] = IDPROXY_PROVIDER
+        session.save()
+        self.client.post(reverse("user-switch", kwargs={"pk": self.moderator.pk}))
+        self.assertEqual(
+            IDPROXY_PROVIDER, self.client.session.get(LOGIN_PROVIDER_SESSION_KEY)
+        )
+
+    def test_a_login_that_came_from_no_provider_reports_none(self):
+        """
+        Nothing to log out of, so nothing to tell the client about.
+        """
+        self.client.force_login(self.participant, backend=MODEL_BACKEND)
+        self.assertIsNone(
+            self.client.get(reverse("user-list")).json()["login_provider"]
+        )
 
     def test_switch_transfers_social_auths(self):
         self.participant.social_auth.create(uid="abc", provider="idproxy")

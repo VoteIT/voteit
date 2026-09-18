@@ -27,6 +27,7 @@ from voteit.core.utils import get_tagged_userids
 from voteit.core.validators import get_invalid_tags
 from voteit.core.validators import valid_userid
 from voteit.organisation.utils import get_enabled_backends
+from voteit.organisation.utils import get_login_provider
 from voteit.organisation.utils import get_user_identity_data
 
 if TYPE_CHECKING:
@@ -208,13 +209,29 @@ class UserAndRolesSerializer(UserSerializer):
     """
 
     organisation_roles = serializers.SerializerMethodField()
+    login_provider = serializers.SerializerMethodField()
 
     def get_organisation_roles(self, instance: AbstractUser):
         roles = instance.organisation_roles.first()
         return [] if roles is None else roles.assigned
 
+    def get_login_provider(self, instance: AbstractUser) -> str | None:
+        """
+        Which login method this session signed in with, or null.
+
+        A property of the session, not of the user: an account can hold several
+        credentials, and only one of them opened this session. It is what the
+        client needs to end the session at the provider too -- pair it with that
+        provider's ``logout_url`` from ``/api/organisation/``.
+        """
+        request = self.context.get("request")
+        return get_login_provider(request) if request else None
+
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ("organisation_roles",)
+        fields = UserSerializer.Meta.fields + (
+            "organisation_roles",
+            "login_provider",
+        )
 
 
 class MessageSerializer(serializers.Serializer):

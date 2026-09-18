@@ -2,6 +2,8 @@ from __future__ import annotations
 
 
 from django.conf import settings
+from django.contrib.auth import BACKEND_SESSION_KEY
+from django.contrib.auth.signals import user_logged_in
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.test.signals import setting_changed
@@ -17,11 +19,13 @@ from voteit.core.role import Role
 from voteit.core.signals import roles_added
 from voteit.core.signals import roles_removed
 from voteit.core.utils import get_model_shortname
+from voteit.organisation import LOGIN_PROVIDER_SESSION_KEY
 from voteit.organisation.channels import OrganisationChannel
 from voteit.organisation.jobs import email_login_method_added
 from voteit.organisation.messages import OrganisationChanged
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
+from voteit.organisation.utils import get_enabled_backends
 from voteit.organisation.rest_api.serializers import OrganisationSerializer
 
 
@@ -36,6 +40,34 @@ def reload_social_backends(setting, **kw):
     """
     if setting == "AUTHENTICATION_BACKENDS":
         load_backends(settings.AUTHENTICATION_BACKENDS, force_load=True)
+
+
+@receiver(user_logged_in)
+def remember_login_provider(request=None, user=None, **kw):
+    """
+    Note which login method this session signed in with.
+
+    An organisation can offer several, and afterwards nothing on the user says
+    which one was used -- so the frontend has no way to end the session at the
+    provider as well. This reads the auth backend ``django.contrib.auth`` has
+    just recorded, which covers every route in.
+
+    It has to run here rather than in the pipeline: ``login()`` flushes the
+    session when the person signing in is not the one who was signed in before,
+    which would throw away anything written earlier. By the time this signal
+    fires, the session keys are set and nothing else will clear them.
+
+    A login that came from no social backend -- the switch-user action,
+    ``force_login`` in tests -- leaves whatever was there alone.
+    """
+    session = getattr(request, "session", None)
+    if session is None:
+        return
+    path = session.get(BACKEND_SESSION_KEY)
+    for name, backend in get_enabled_backends().items():
+        if f"{backend.__module__}.{backend.__qualname__}" == path:
+            session[LOGIN_PROVIDER_SESSION_KEY] = name
+            return
 
 
 @receiver(post_save, sender=UserSocialAuth)

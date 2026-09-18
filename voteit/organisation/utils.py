@@ -12,6 +12,7 @@ from social_django.models import UserSocialAuth
 from social_django.utils import load_strategy
 
 from voteit.organisation import IDPROXY_PROVIDER
+from voteit.organisation import LOGIN_PROVIDER_SESSION_KEY
 
 if TYPE_CHECKING:
     from voteit.core.models import User
@@ -78,3 +79,18 @@ def get_user_identity_data(user: User) -> dict[str, set[str]]:
         for scope, values in backend.get_identity_data(social).items():
             results[scope].update(values)
     return dict(results)
+
+
+def get_login_provider(request) -> str | None:
+    """
+    Which login method this session signed in with, if it is one we still offer.
+
+    Recorded by ``signals.remember_login_provider``. A deployment can drop a
+    backend, and a name nobody can log in with now is no use to the client
+    either, so it reads as nothing rather than as a provider.
+    """
+    session = getattr(request, "session", None)
+    if session is None:
+        return None
+    name = session.get(LOGIN_PROVIDER_SESSION_KEY)
+    return name if name in get_enabled_backends() else None
