@@ -10,12 +10,16 @@ import jwt
 import responses
 from cryptography.hazmat.primitives.asymmetric import rsa
 from django.conf import settings
+from django.contrib import auth
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.test import TestCase
 from django.test import override_settings
 from django.urls import reverse
+from django.utils.timezone import now
 from rest_framework.test import APITestCase
+from social_core.exceptions import AuthForbidden
+from social_django.models import UserSocialAuth
 from social_django.storage import BaseDjangoStorage
 from social_django.strategy import DjangoStrategy
 
@@ -25,6 +29,7 @@ from voteit.app.scouterna.backends import ScoutIDOpenIdConnect
 from voteit.app.scouterna.testing import scoutid_enabled
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
+from voteit.organisation.roles import ROLE_ORG_MANAGER
 from voteit.organisation.models import Organisation
 
 User = get_user_model()
@@ -616,6 +621,196 @@ class ScoutIDLoginTests(APITestCase):
             "/complete/scoutid/", data={"state": state, "code": "auth-code"}
         )
         self.assertNotIn(CONNECT_INTENT_SESSION_KEY, self.client.session)
+
+    @responses.activate
+    def test_a_verified_email_and_name_finds_the_existing_account(self):
+        """
+        The whole rollout in one request: a member with no ScoutID yet signs in
+        with one and lands in the account they already had, roles and all,
+        instead of an empty new one.
+        """
+        existing = self.org.users.create(
+            username="kim",
+            first_name="Kim",
+            last_name="Scout",
+            email="kim@scoutkaren.example",
+            identity_id="an-id-proxy-identity",
+            last_login=now(),
+        )
+        before = self.org.users.count()
+        state, nonce = self._begin()
+        self.realm.register(
+            self.realm.id_token("voteit", nonce),
+            userinfo={
+                "sub": "b4d3e2f1-0000-4000-8000-000000000001",
+                "given_name": "Kim",
+                "family_name": "Scout",
+                "email": "kim@scoutkaren.example",
+                "email_verified": True,
+            },
+        )
+        response = self.client.get(
+            "/complete/scoutid/", data={"state": state, "code": "auth-code"}
+        )
+        self.assertEqual(302, response.status_code)
+        self.assertEqual(settings.LOGIN_REDIRECT_URL, response.get("Location"))
+
+        self.assertEqual(
+            existing,
+            User.objects.get(social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001"),
+        )
+        existing.refresh_from_db()
+        # Matched, not created, and the id proxy still owns identity_id.
+        self.assertEqual("an-id-proxy-identity", existing.identity_id)
+        self.assertEqual(before, self.org.users.count())
+
+    @responses.activate
+    def test_an_unverified_email_gets_its_own_account(self):
+        self.org.users.create(
+            username="kim",
+            first_name="Kim",
+            last_name="Scout",
+            email="kim@scoutkaren.example",
+            last_login=now(),
+        )
+        before = self.org.users.count()
+        state, nonce = self._begin()
+        self.realm.register(
+            self.realm.id_token("voteit", nonce, email_verified=False),
+            userinfo={
+                "sub": "b4d3e2f1-0000-4000-8000-000000000001",
+                "given_name": "Kim",
+                "family_name": "Scout",
+                "email": "kim@scoutkaren.example",
+                "email_verified": False,
+            },
+        )
+        self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
+        self.assertEqual(before + 1, self.org.users.count())
+
+    def _pause_on(self, **user_kwargs):
+        """
+        Run a ScoutID login that the matcher will not decide alone, and return
+        the partial token it paused with.
+        """
+        candidate = self.org.users.create(**user_kwargs)
+        state, nonce = self._begin()
+        self.realm.register(
+            self.realm.id_token("voteit", nonce),
+            userinfo={
+                "sub": "b4d3e2f1-0000-4000-8000-000000000001",
+                "given_name": "Kim",
+                "family_name": "Scout",
+                "email": "kim@scoutkaren.example",
+                "email_verified": True,
+            },
+        )
+        response = self.client.get(
+            "/complete/scoutid/", data={"state": state, "code": "code"}
+        )
+        self.assertEqual(302, response.status_code)
+        location = response.get("Location")
+        self.assertTrue(location.startswith("/link-account?"), location)
+        token = parse_qs(urlparse(location).query)["partial_token"][0]
+        return candidate, token
+
+    @responses.activate
+    def test_an_account_nobody_used_pauses_the_login(self):
+        """
+        Nothing is created while the question is open -- that is the point of
+        pausing rather than making an account and merging it away later.
+        """
+        before = self.org.users.count()
+        stale, token = self._pause_on(
+            username="kim",
+            first_name="Kim",
+            last_name="Scout",
+            email="kim@scoutkaren.example",
+        )
+        self.assertIsNone(stale.last_login)
+        self.assertEqual(before + 1, self.org.users.count())
+        self.assertFalse(
+            UserSocialAuth.objects.filter(provider=SCOUTID_PROVIDER).exists()
+        )
+        self.assertFalse(auth.get_user(self.client).is_authenticated)
+
+        options = self.client.get(
+            "/api/account-link-options/", data={"partial_token": token}
+        ).json()
+        self.assertEqual([stale.pk], [row["pk"] for row in options["accounts"]])
+        self.assertEqual("/complete/scoutid/", options["resume_url"])
+
+    @responses.activate
+    def test_answering_resumes_the_login_into_that_account(self):
+        stale, token = self._pause_on(
+            username="kim",
+            first_name="Kim",
+            last_name="Scout",
+            email="kim@scoutkaren.example",
+        )
+        response = self.client.get(
+            "/complete/scoutid/",
+            data={"partial_token": token, "link_account": str(stale.pk)},
+        )
+        self.assertEqual(302, response.status_code)
+        self.assertEqual(settings.LOGIN_REDIRECT_URL, response.get("Location"))
+        self.assertEqual(stale, auth.get_user(self.client))
+        self.assertEqual(
+            stale,
+            User.objects.get(social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001"),
+        )
+
+    @responses.activate
+    def test_answering_new_resumes_into_a_fresh_account(self):
+        stale, token = self._pause_on(
+            username="kim",
+            first_name="Kim",
+            last_name="Scout",
+            email="kim@scoutkaren.example",
+        )
+        response = self.client.get(
+            "/complete/scoutid/",
+            data={"partial_token": token, "link_account": "new"},
+        )
+        self.assertEqual(302, response.status_code)
+        created = User.objects.get(
+            social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001"
+        )
+        self.assertNotEqual(stale, created)
+        self.assertEqual(created, auth.get_user(self.client))
+
+    @responses.activate
+    def test_a_managers_account_blocks_the_login(self):
+        """
+        No second account to merge away later: they are told to sign in the way
+        they already can, and connect this login from their profile.
+        """
+        manager = self.org.users.create(
+            username="kim",
+            first_name="Kim",
+            last_name="Scout",
+            email="kim@scoutkaren.example",
+            last_login=now(),
+        )
+        self.org.add_roles(manager, ROLE_ORG_MANAGER)
+        before = self.org.users.count()
+        state, nonce = self._begin()
+        self.realm.register(
+            self.realm.id_token("voteit", nonce),
+            userinfo={
+                "sub": "b4d3e2f1-0000-4000-8000-000000000001",
+                "given_name": "Kim",
+                "family_name": "Scout",
+                "email": "kim@scoutkaren.example",
+                "email_verified": True,
+            },
+        )
+        with self.assertRaises(AuthForbidden):
+            self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
+        self.assertEqual(before, self.org.users.count())
+        self.assertFalse(
+            UserSocialAuth.objects.filter(provider=SCOUTID_PROVIDER).exists()
+        )
 
     @responses.activate
     def test_an_identity_id_matching_the_sub_is_not_adopted(self):

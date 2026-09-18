@@ -237,6 +237,22 @@ Four outgoing message types defined here:
 
 The delete is the point, not incidental: the account is left deactivated, and `do_complete` refuses an inactive user.
 
+## User merging (`user_merger.py`)
+
+`UserMerger(source, target, dry_run=False, same_person=False)` moves everything owned by
+`source` onto `target` and deactivates `source` (never deletes it). `merge_users` is the
+management command; `UserAdmin.merge_users_action` is the admin path, with a dry-run preview.
+
+`same_person=True` skips the `identity_id` equality check, and the admin merge passes it:
+only the id proxy writes `identity_id`, so two accounts belonging to one person through any
+other provider never match on it, and without the override the admin could not merge exactly
+the duplicates this rollout produces. A human confirming both rows in the admin is what the
+override stands for. Never set it from a guess.
+
+`user_activity_score(user)` counts meeting roles, votes, proposals and discussion posts. A
+zero means nothing of the person's own is on the row; the admin uses it to pick which of two
+accounts becomes the source.
+
 ## Managers (`managers.py`)
 
 `AutoInheritanceManager` / `AutoInheritanceQuerySet` — wraps `model_utils.InheritanceManager` and calls `select_subclasses()` automatically on every queryset. `instance_of()` is explicitly disabled here; use a plain `InheritanceManager` if you need it.

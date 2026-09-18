@@ -127,6 +127,11 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
         details["img_url"] = self._claim(response, "picture")
         return details
 
+    def get_verified_email(self, details: dict[str, Any], response: dict[str, Any]):
+        if not self._claim(response, "email_verified"):
+            return None
+        return self._claim(response, "email") or None
+
     def get_member_no(self, response: dict[str, Any]) -> str | None:
         """
         The Scoutnet membership number, from ``preferred_username``, which is

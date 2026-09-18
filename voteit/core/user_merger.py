@@ -41,6 +41,26 @@ def _is_explicitly_handled(rel) -> bool:
     return key in _EXPLICITLY_HANDLED
 
 
+def user_activity_score(user: User) -> int:
+    """
+    How much this account would lose by being merged away.
+
+    A zero here means nothing of the person's own is on the row, which is what
+    makes an automatic merge safe. Anything above zero wants a human.
+    """
+    from voteit.discussion.models import DiscussionPost
+    from voteit.meeting.models import MeetingRoles
+    from voteit.poll.models import Vote
+    from voteit.proposal.models import Proposal
+
+    return (
+        MeetingRoles.objects.filter(user=user).count()
+        + Vote.objects.filter(user=user).count()
+        + Proposal.objects.filter(author=user).count()
+        + DiscussionPost.objects.filter(author=user).count()
+    )
+
+
 @dataclass
 class MergeLog:
     moved: list[str] = field(default_factory=list)
@@ -50,10 +70,24 @@ class MergeLog:
 
 
 class UserMerger:
-    def __init__(self, source: User, target: User, dry_run: bool = False):
+    def __init__(
+        self,
+        source: User,
+        target: User,
+        dry_run: bool = False,
+        same_person: bool = False,
+    ):
+        """
+        :param same_person: skip the identity_id check, because something else
+            has established that these two rows are one person. Only the id
+            proxy writes identity_id, so a pair linked through any other
+            provider will never match on it -- see ``AccountLinkOffer``, which
+            is how that gets established. Never set this from a guess.
+        """
         self.source = source
         self.target = target
         self.dry_run = dry_run
+        self.same_person = same_person
         self.log = MergeLog()
 
     def run(self) -> MergeLog:
@@ -82,12 +116,15 @@ class UserMerger:
             )
         if not self.source.organisation_id:
             raise ValueError("Users must belong to an organisation")
+        if self.same_person:
+            return
         src_id = self.source.identity_id
         tgt_id = self.target.identity_id
         if not src_id or not tgt_id or src_id != tgt_id:
             raise ValueError(
                 f"Users must have the same identity_id to be merged "
-                f"(source={src_id!r}, target={tgt_id!r})"
+                f"(source={src_id!r}, target={tgt_id!r}). Pass same_person=True "
+                f"if something else established that these are one person."
             )
 
     def _handle_meeting_roles(self) -> None:

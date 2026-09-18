@@ -71,6 +71,16 @@ class OrganisationBackendMixin:
         """
         return social.extra_data.get("user_data", {})
 
+    def get_verified_email(self, details: dict[str, Any], response: dict[str, Any]):
+        """
+        The address this provider will vouch for, if any.
+
+        Matching a login to an existing account turns on this, so a backend that
+        cannot say whether an address was verified must say nothing: an
+        unverified address is a claim, and anyone can claim one.
+        """
+        return None
+
     @cached_property
     def organisation(self) -> Organisation:
         host = self.strategy.request.get_host().split(":")[0]
@@ -190,6 +200,13 @@ class IDProxyOAuth2(OrganisationBackendMixin, BaseOAuth2):
             "last_name": last_name,
             "img_url": response.get("img_url"),  # None is acceptable here
         }
+
+    def get_verified_email(self, details: dict[str, Any], response: dict[str, Any]):
+        """
+        The proxy only hands out addresses it has validated, and
+        ``get_user_details`` already picked one out of them.
+        """
+        return details.get("email") or None
 
     def extra_data(
         self,

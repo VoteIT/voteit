@@ -85,6 +85,7 @@ SOCIAL_AUTH_PIPELINE = [
     # Before social_user, while `user` is still only the session's user.
     "voteit.organisation.pipeline.require_connect_intent",
     "voteit.organisation.pipeline.social_user",
+    "voteit.organisation.pipeline.match_existing_user",
     "social_core.pipeline.user.get_username",
     "voteit.organisation.pipeline.create_user",
     "voteit.organisation.pipeline.ensure_userid",
@@ -98,10 +99,7 @@ SOCIAL_AUTH_PIPELINE = [
 ]
 
 #: social_core's default, minus ``allowed_to_disconnect``. Nobody here has a
-#: password -- accounts are SSO-only -- so that step would refuse to remove
-#: anyone's last login method. But a credential can end up on the wrong account,
-#: and then unlinking it is exactly what the person needs: the account returns to
-#: having no way in, which is where it started. The UI warns instead of blocking.
+#: password -- accounts are SSO-only. The UI warns instead of blocking.
 SOCIAL_AUTH_DISCONNECT_PIPELINE = [
     "social_core.pipeline.disconnect.get_entries",
     "social_core.pipeline.disconnect.revoke_tokens",
@@ -115,6 +113,9 @@ AUTHENTICATION_BACKENDS = [
 ] + AUTHENTICATION_BACKENDS
 LOGIN_REDIRECT_URL = "/"
 LOGIN_ERROR_URL = "/error"
+#: Where match_existing_user sends someone when it has to ask which account
+#: is theirs. The SPA reads the options from /api/account-link-options/.
+LINK_ACCOUNT_URL = "/link-account"
 
 # RQ
 REDIS_RQ_HOST = os.getenv("REDIS_RQ_HOST", "redis_rq")

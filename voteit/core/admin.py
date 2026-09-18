@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import timedelta
 
 from django import forms
@@ -20,10 +21,9 @@ from auditlog.models import LogEntry
 from voteit.core.models import User
 from voteit.messaging.admin import stale_after
 from voteit.messaging.models import Connection
+from voteit.core.user_merger import user_activity_score
 from voteit.core.user_merger import UserMerger
-from voteit.discussion.models import DiscussionPost
 from voteit.meeting.models import Meeting
-from voteit.proposal.models import Proposal
 
 _user_fieldsets = list(DefaultUserAdmin.fieldsets)
 _user_fieldsets[0][1]["fields"] = list(_user_fieldsets[0][1]["fields"])
@@ -68,6 +68,27 @@ class OnlineFilter(admin.SimpleListFilter):
             (self.WITHIN_LAST_MONTH, "Within last 30 days"),
         )
 
+    def _same_person_pks(self) -> list[int]:
+        """
+        Active accounts that look like the same person as another one, by the
+        rule the account matcher uses.
+
+        ``identity_id`` cannot find these. Only the id proxy writes it, so a
+        person split across two providers shares nothing there -- which is
+        exactly the duplicate this rollout creates.
+        """
+        from voteit.organisation.matching import user_match_key
+
+        counts = Counter()
+        by_pk = {}
+        for user in User.objects.filter(is_active=True).only(
+            "pk", "email", "first_name", "last_name"
+        ):
+            if key := user_match_key(user):
+                counts[key] += 1
+                by_pk[user.pk] = key
+        return [pk for pk, key in by_pk.items() if counts[key] > 1]
+
     def queryset(self, request, queryset):
         """
         Returns the filtered queryset based on the value
@@ -108,6 +129,7 @@ class LinkedFilter(admin.SimpleListFilter):
     NO = "n"
     DUPLICATES = "d"
     MAYBE_CLEARABLE = "c"
+    SAME_PERSON = "s"
 
     def lookups(self, request, model_admin):
         """
@@ -122,6 +144,7 @@ class LinkedFilter(admin.SimpleListFilter):
             (self.NO, "No"),
             (self.DUPLICATES, "Duplicates"),
             (self.MAYBE_CLEARABLE, "Maybe clearable"),
+            (self.SAME_PERSON, "Same person? (email + name)"),
         )
 
     def _dupes_qs(self) -> models.QuerySet:
@@ -154,21 +177,13 @@ class LinkedFilter(admin.SimpleListFilter):
                 return queryset.filter(
                     identity_id__in=self._dupes_qs(), meeting_roles__isnull=True
                 )
+            elif self.value() == self.SAME_PERSON:
+                return queryset.filter(pk__in=self._same_person_pks())
 
 
 def _pick_source_target(user_a, user_b):
     """Return (source, target) — least active user becomes source."""
-    from voteit.meeting.models import MeetingRoles
-    from voteit.poll.models import Vote
-
-    def score(user):
-        return (
-            MeetingRoles.objects.filter(user=user).count()
-            + Vote.objects.filter(user=user).count()
-            + Proposal.objects.filter(author=user).count()
-            + DiscussionPost.objects.filter(author=user).count()
-        )
-
+    score = user_activity_score
     score_a, score_b = score(user_a), score(user_b)
     if score_a <= score_b:
         return user_a, user_b, score_a, score_b
@@ -263,7 +278,13 @@ class UserAdmin(DefaultUserAdmin):
             self.message_user(request, "Invalid user selection.", messages.ERROR)
             return HttpResponseRedirect(reverse("admin:core_user_changelist"))
 
-        merger = UserMerger(source=source, target=target, dry_run=True)
+        # same_person: a human is looking at both rows and confirming. Only the
+        # id proxy writes identity_id, so two accounts joined through any other
+        # provider never match on it -- without this the admin could not merge
+        # exactly the duplicates this rollout produces.
+        merger = UserMerger(
+            source=source, target=target, dry_run=True, same_person=True
+        )
         try:
             preview_log = merger.run()
         except ValueError as e:
@@ -283,7 +304,9 @@ class UserAdmin(DefaultUserAdmin):
         if request.method == "POST":
             form = MergeUsersForm(request.POST)
             if form.is_valid():
-                real_merger = UserMerger(source=source, target=target, dry_run=False)
+                real_merger = UserMerger(
+                    source=source, target=target, dry_run=False, same_person=True
+                )
                 try:
                     log = real_merger.run()
                 except ValueError as e:

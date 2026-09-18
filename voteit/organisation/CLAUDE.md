@@ -89,6 +89,20 @@ The serializer also exposes read-only computed fields: `providers` and `componen
 ### `MatchOrphansViewSet` (`/api/match-orphans/`)
 ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?email_in=a@b.com,c@d.com` (comma-separated, required). Returns users with no `identity_id` matching those emails, along with their organisation host. Used for pre-login orphan matching.
 
+### `AccountLinkOptionsViewSet` (`/api/account-link-options/`)
+The accounts a paused login could be claiming. `AllowAny`, because the pipeline pauses
+before anyone is signed in — the `partial_token` stands in for a session. It is single-use
+(`do_complete` clears it on resume) and `manage.py clearsocial --age` removes stale ones.
+
+`GET /?partial_token=…` returns `provider`, `resume_url` and `accounts`: pk, full name,
+email, last sign-in and the meetings they are in. The address is not masked: whoever is
+looking already holds it — it is what raised the question — and someone deciding whether an
+account is theirs is worse served by a half-hidden address than by the address. Candidates are **recomputed**, never read back from the
+partial: the accounts on an address can change while the question is open.
+
+Answering does not happen here. The client sends the person to
+`resume_url?partial_token=…&link_account=<pk|new>` and the pipeline finishes the login.
+
 ### Login methods (on `UserView`, `voteit/core/rest_api/views.py`)
 
 The connect flow needs almost no machinery: a signed-in user visiting
@@ -114,6 +128,11 @@ ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?identity_in=ui
 - `organisation` — resolved from the request hostname.
 - `provider` — that organisation's `OAuth2Provider` row for `self.name`; raises `AuthException` if there is none.
 - `get_key_and_secret()` / `get_scope()` — credentials and the org's scopes merged with the backend's defaults.
+- `get_verified_email(details, response)` — the address this provider will vouch for, or
+  `None`. Account matching turns on it, so a backend that cannot tell must say nothing: an
+  unverified address is a claim, and anyone can claim one. `IDProxyOAuth2` returns the
+  address `get_user_details` already picked out of the proxy's validated `user_data`;
+  ScoutID returns its `email` claim only when `email_verified` is true.
 - `get_identity_data(social)` — what this provider vouches for about a person, as
   `{scope: [value, ...]}`. The shape is the id proxy's, which got here first; every backend
   normalises into it on the way in (in `extra_data()`), so one lookup reads them all. The
@@ -147,7 +166,8 @@ Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`:
 - `inherit_users` — maintains `identity_id` for `idproxy` only: it overwrites when the uid has changed, and `extra_identity_ids` in the response updates all same-org active users carrying those IDs to share the authenticated user's `identity_id`. Returns immediately for every other backend — see "`identity_id` belongs to the id proxy" below.
 - `bump_permissions` — if the identity server response includes `is_superuser: true`, grants `org_manager` role to the user.
 - `remove_nonmatching_email` — syncs the user's `email` field against the identity server's email scope data. Clears email if the scope is not present, but only when `idproxy` is the provider.
-- `log_new_association` — `log_auth` for a login method attached to an account that already existed. A brand new account picking up its first credential is a registration, not a connection, and is skipped.
+- `match_existing_user` — after `social_user`, and only when nothing else resolved the person. Finds every active account reachable at the provider's verified address. **One** of them carrying the same name, not elevated, that somebody has actually used, is returned as `user`: `create_user` short-circuits and `associate_user` attaches the credential. An **elevated** exact match raises `AuthForbidden` — a second account for a manager is a merge waiting to happen, so they are sent back to the login they already have. Anything else is a `@partial` step: it **pauses the pipeline** and redirects to `LINK_ACCOUNT_URL` with the token. Nothing is created while the question is open. Resuming with `link_account=<pk>` links that account (only if it is still among the candidates — the pk comes from the browser), and `link_account=new` carries on to a fresh one.
+- `log_new_association` — `log_auth` for a login method attached to an account that already existed. Says whether it was matched or connected. A brand new account picking up its first credential is a registration, not a connection, and is skipped.
 
 `SOCIAL_AUTH_DISCONNECT_PIPELINE` is social_core's default **minus `allowed_to_disconnect`**. Accounts here are SSO-only and have no password, so that step would refuse to remove anyone's last login method — but a credential can land on the wrong account, and its owner has to be able to take it back off even though the account is then unreachable. That is where a stale account started anyway. The API reports `is_only_login_method` so the UI can warn instead.
 
@@ -231,6 +251,11 @@ against a real second backend.
 
 The override only bites because of the `setting_changed` receiver above.
 
+`README.md` is a runnable narrative doctest of the whole matching path — a login whose
+address matches an existing account but whose name does not, the pause that raises, and the
+answer that links it — asserted by `tests/test_docs.py::OrganisationDocTests::test_readme`. It must stay
+passing.
+
 Test modules:
 - `tests/test_models.py` — model and `OAuth2Provider` basics.
 - `tests/test_rules.py` — predicate logic for `is_manager` and `is_meeting_creator`.
@@ -243,3 +268,12 @@ Test modules:
 - `tests/test_docs.py` — runs module doctests (`backends.py` docstrings).
 - `rest_api/tests/test_views.py` — `OrganisationViewSet`, `OrganisationRolesViewSet`, `MatchOrphansViewSet`, `HandleIdentitiesViewSet`.
 - `rest_api/tests/test_python_social_integration.py` — end-to-end SSO login flows using `responses` mock library.
+- `tests/test_commands.py` — `report_match_candidates`.
+
+## Management commands
+
+`report_match_candidates` — measures what the matcher would do, before letting it do
+anything. The number that matters is how many accounts share an
+`(email, first name, last name)` triple with another: that is the rate at which the matcher
+stops and asks instead. Takes `--host`, `--provider` and
+`--show-ambiguous` (which lists the colliding triples with addresses masked).

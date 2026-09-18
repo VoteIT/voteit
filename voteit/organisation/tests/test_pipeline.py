@@ -3,6 +3,8 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from social_core.exceptions import AuthForbidden
+from django.utils.timezone import now
 from social_django.models import UserSocialAuth
 
 from voteit.app.scouterna import SCOUTID_PROVIDER
@@ -12,8 +14,12 @@ from voteit.organisation.pipeline import _transfer_social_auths
 from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
 from voteit.organisation.pipeline import ensure_userid
 from voteit.organisation.pipeline import inherit_users
+from voteit.organisation.pipeline import LINK_ACCOUNT_FIELD
+from voteit.organisation.pipeline import LINK_ACCOUNT_NEW
+from voteit.organisation.pipeline import match_existing_user
 from voteit.organisation.pipeline import require_connect_intent
 from voteit.organisation.pipeline import social_user
+from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 User = get_user_model()
 
@@ -419,3 +425,182 @@ class RequireConnectIntentTests(TestCase):
         backend = self._make_backend(session=SCOUTID_PROVIDER)
         require_connect_intent(backend, "a-sub")
         backend.strategy.session_pop.assert_called_once_with(CONNECT_INTENT_SESSION_KEY)
+
+
+class MatchExistingUserTests(TestCase):
+    """
+    The one decision that hands somebody an account they did not create.
+
+    Everything it will not decide alone pauses the pipeline instead, so nothing
+    is created while the question is open.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+
+    def _make_backend(self, email="kim@example.com"):
+        backend = MagicMock()
+        backend.name = SCOUTID_PROVIDER
+        backend.organisation = self.org
+        backend.get_verified_email.return_value = email
+        return backend
+
+    def _details(self, first="Kim", last="Scout"):
+        return {"first_name": first, "last_name": last}
+
+    def _existing(self, **kwargs):
+        kwargs.setdefault("username", "kim")
+        kwargs.setdefault("first_name", "Kim")
+        kwargs.setdefault("last_name", "Scout")
+        kwargs.setdefault("email", "kim@example.com")
+        kwargs.setdefault("last_login", now())
+        return self.org.users.create(**kwargs)
+
+    def _run(self, backend=None, details=None, answer=None, **kwargs):
+        self.strategy = MagicMock()
+        self.strategy.storage.partial.prepare.return_value.token = "a-token"
+        self.strategy.request_data.return_value = (
+            {LINK_ACCOUNT_FIELD: answer} if answer else {}
+        )
+        return match_existing_user(
+            strategy=self.strategy,
+            backend=backend or self._make_backend(),
+            details=details or self._details(),
+            pipeline_index=0,
+            **kwargs,
+        )
+
+    def _asked(self) -> str:
+        """Where the paused pipeline sent them to answer."""
+        self.strategy.redirect.assert_called_once()
+        # Pausing also stores the partial, which is what lets them come back.
+        self.strategy.storage.partial.store.assert_called_once()
+        return self.strategy.redirect.call_args.args[0]
+
+    def test_an_exact_match_is_linked(self):
+        existing = self._existing()
+        self.assertEqual({"user": existing, "matched_existing": True}, self._run())
+        self.strategy.redirect.assert_not_called()
+
+    def test_case_and_spaces_are_not_differences(self):
+        existing = self._existing(email=" Kim@Example.com ", first_name="kim ")
+        self.assertEqual(
+            existing, self._run(details=self._details(first=" KIM"))["user"]
+        )
+
+    def test_nothing_on_the_address_just_carries_on(self):
+        self.assertEqual({}, self._run())
+
+    def test_an_unverified_email_matches_nothing(self):
+        self._existing()
+        self.assertEqual({}, self._run(backend=self._make_backend(email=None)))
+
+    def test_an_inactive_account_is_not_a_match(self):
+        self._existing(is_active=False)
+        self.assertEqual({}, self._run())
+
+    def test_someone_already_holding_this_provider_is_not_a_match(self):
+        existing = self._existing()
+        existing.social_auth.create(
+            provider=SCOUTID_PROVIDER, uid="another-sub", extra_data={}
+        )
+        self.assertEqual({}, self._run())
+
+    def test_an_already_resolved_login_is_left_alone(self):
+        self._existing()
+        other = self.org.users.create(username="someone-else")
+        self.assertEqual({}, self._run(user=other))
+
+    def test_the_same_address_under_another_name_asks(self):
+        """
+        One surname here, both of them there, is one person often enough that
+        refusing outright would strand the commonest case there is.
+        """
+        self._existing()
+        paused = self._run(details=self._details(last="Scout Fieldsson"))
+        self.assertNotIsInstance(paused, dict)
+        self.assertIn("partial_token=a-token", self._asked())
+
+    def test_half_a_name_asks(self):
+        self._existing(last_name="")
+        paused = self._run(details=self._details(last=""))
+        self.assertNotIsInstance(paused, dict)
+        self.assertIn("partial_token=a-token", self._asked())
+
+    def test_two_matches_ask_rather_than_guess(self):
+        self._existing(username="kim")
+        self._existing(username="kim-again")
+        paused = self._run()
+        self.assertNotIsInstance(paused, dict)
+        self.assertIn("partial_token=a-token", self._asked())
+
+    def test_an_account_nobody_ever_used_asks(self):
+        """
+        Nobody has proved it is theirs -- including the person in front of us.
+        """
+        self._existing(last_login=None)
+        paused = self._run()
+        self.assertNotIsInstance(paused, dict)
+        self.assertIn("partial_token=a-token", self._asked())
+
+    def test_a_namesake_does_not_stop_the_match(self):
+        exact = self._existing(username="kim")
+        self._existing(username="sam", first_name="Sam")
+        self.assertEqual(exact, self._run()["user"])
+
+    def test_an_elevated_match_blocks_the_login(self):
+        """
+        A second account for a manager is a merge waiting to happen. Refusing
+        keeps them on the one path that proves both logins are theirs.
+        """
+        existing = self._existing()
+        self.org.add_roles(existing, ROLE_ORG_MANAGER)
+        with self.assertRaises(AuthForbidden):
+            self._run()
+
+    def test_staff_blocks_the_login_too(self):
+        self._existing(is_staff=True)
+        with self.assertRaises(AuthForbidden):
+            self._run()
+
+    def test_an_elevated_account_under_another_name_is_simply_not_offered(self):
+        """
+        Somebody else who happens to read the same mailbox. Not this person's
+        to claim, and no reason to stop them either.
+        """
+        boss = self._existing(username="boss", first_name="Sam")
+        self.org.add_roles(boss, ROLE_ORG_MANAGER)
+        self.assertEqual({}, self._run())
+        self.strategy.redirect.assert_not_called()
+
+    def test_answering_with_an_account_links_it(self):
+        existing = self._existing(last_login=None)
+        self.assertEqual(
+            {"user": existing, "matched_existing": True},
+            self._run(answer=str(existing.pk)),
+        )
+
+    def test_answering_new_carries_on_to_a_fresh_account(self):
+        self._existing(last_login=None)
+        self.assertEqual({}, self._run(answer=LINK_ACCOUNT_NEW))
+        self.strategy.redirect.assert_not_called()
+
+    def test_an_account_that_was_never_on_offer_is_refused(self):
+        """
+        The pk arrives from the browser, so it only counts if it is still one
+        of the accounts this login could have claimed.
+        """
+        self._existing(last_login=None)
+        stranger = self.org.users.create(username="stranger")
+        paused = self._run(answer=str(stranger.pk))
+        self.assertNotIsInstance(paused, dict)
+        self.assertIn("partial_token=a-token", self._asked())
+
+    def test_an_elevated_account_cannot_be_answered_with(self):
+        self._existing(last_login=None)
+        boss = self._existing(username="boss", first_name="Sam")
+        self.org.add_roles(boss, ROLE_ORG_MANAGER)
+        paused = self._run(answer=str(boss.pk))
+        self.assertNotIsInstance(paused, dict)
+        self.assertIn("partial_token=a-token", self._asked())

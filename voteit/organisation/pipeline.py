@@ -1,13 +1,19 @@
 from logging import getLogger
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.contrib.auth import login
 from social_core.exceptions import AuthException
+from social_core.exceptions import AuthForbidden
+from social_core.pipeline.partial import partial
 from django.utils.translation import gettext as _
 from social_django.models import UserSocialAuth
 
 from voteit.core.loggers import log_auth
 from voteit.organisation import IDPROXY_PROVIDER
+from voteit.organisation.matching import find_candidates
+from voteit.organisation.matching import is_elevated
+from voteit.organisation.matching import names_match
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 logger = getLogger(__name__)
@@ -162,6 +168,97 @@ def require_connect_intent(backend, uid, user=None, *args, **kwargs):
     return {"user": None}
 
 
+#: Field the resume request carries the decision in.
+LINK_ACCOUNT_FIELD = "link_account"
+#: Value meaning "none of these, give me a new account".
+LINK_ACCOUNT_NEW = "new"
+
+
+def _link_account_url(strategy, token: str) -> str:
+    base = getattr(settings, "LINK_ACCOUNT_URL", "/link-account")
+    return f"{base}?partial_token={token}"
+
+
+@partial
+def match_existing_user(
+    *args,
+    strategy,
+    backend,
+    details,
+    current_partial,
+    response=None,
+    user=None,
+    social=None,
+    **kwargs,
+):
+    """
+    Work out whether this login belongs to an account that already exists.
+
+    Only reached when nothing else resolved the person: no credential for this
+    provider, and no identity the id proxy recognises. A second provider brings
+    no shared identifier, so the evidence is the verified address the provider
+    vouches for -- see ``voteit.organisation.matching``.
+
+    One account on that address, carrying the same name, that somebody has
+    actually used, is taken silently: returned as ``user`` so ``create_user``
+    short-circuits and ``associate_user`` attaches the credential to it.
+
+    Anything else **pauses the pipeline** and asks. Nothing is created while the
+    question is open, which is the point: an account made first and merged away
+    later gets harder to merge the longer it goes unanswered, and a question
+    nobody answers turns into support work. Here there is nothing to clean up --
+    an abandoned decision is an abandoned login, and the person simply tries
+    again.
+    """
+    if user is not None or social is not None:
+        return
+    email = backend.get_verified_email(details, response or {})
+    candidates = find_candidates(
+        backend.organisation, provider=backend.name, email=email
+    )
+    if not candidates:
+        return
+    exact = [
+        candidate
+        for candidate in candidates
+        if names_match(candidate, details.get("first_name"), details.get("last_name"))
+    ]
+    if any(is_elevated(candidate) for candidate in exact):
+        # This login answers to a manager's account. Letting it through would
+        # make a second account that someone has to merge in later; refusing it
+        # keeps them on the one path that proves both logins are theirs.
+        raise AuthForbidden(
+            backend,
+            _(
+                "You already have an account here with this address, and it "
+                "manages the organisation. Sign in the way you usually do, then "
+                "connect this login from your profile."
+            ),
+        )
+    # An elevated account on the same address under another name is somebody
+    # else's, and never on offer.
+    choices = [candidate for candidate in candidates if not is_elevated(candidate)]
+    if len(exact) == 1 and exact[0].last_login and exact[0] in choices:
+        logger.info(
+            "Matched %s login to existing user %s on a verified email and name",
+            backend.name,
+            exact[0].pk,
+        )
+        return {"user": exact[0], "matched_existing": True}
+    if not choices:
+        return
+    answer = strategy.request_data().get(LINK_ACCOUNT_FIELD)
+    if answer == LINK_ACCOUNT_NEW:
+        return
+    if answer:
+        # Never trust the pk on its own: it only counts if it is still one of
+        # the accounts this login could have claimed.
+        picked = {str(candidate.pk): candidate for candidate in choices}.get(answer)
+        if picked is not None:
+            return {"user": picked, "matched_existing": True}
+    return strategy.redirect(_link_account_url(strategy, current_partial.token))
+
+
 def create_user(strategy, details, backend, uid, user=None, *args, **kwargs):
     if user:
         return {"is_new": False}
@@ -251,11 +348,16 @@ def log_new_association(
     """
     if not (new_association and user and not is_new):
         return
+    matched = kwargs.get("matched_existing")
+    extra = {"matched_on": "verified email and name"} if matched else {}
     log_auth(
-        "Login method connected",
+        "Login method matched to existing account"
+        if matched
+        else "Login method connected",
         request=backend.strategy.request,
         for_user=user,
         context=backend.organisation,
         provider=backend.name,
         uid=social.uid if social else None,
+        **extra,
     )
