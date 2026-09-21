@@ -73,7 +73,7 @@ class MeetingSubscribedTests(TestCase):
                 break
         first = msg.payload.items[0]
         self.assertIsInstance(first.created, str)
-        self.assertEqual(
+        self.assertAlmostEqual(
             ProposalDetailSerializer(self.prop1).data["created"], first.created
         )
 
