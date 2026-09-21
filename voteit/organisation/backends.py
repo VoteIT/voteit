@@ -33,6 +33,9 @@ class OrganisationBackendMixin:
 
     name: str
     TITLE: str = ""
+    #: Key in ``user_data`` holding a verified member id, if the provider has one.
+    #: Matched against ``member_id`` invites.
+    MEMBER_ID_KEY: str | None = None
 
     @classmethod
     def get_title(cls) -> str:

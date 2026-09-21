@@ -22,6 +22,7 @@ from voteit.core.rest_api.lock import LockCooldownActive
 from voteit.core.rest_api.mixins import StateMachineMixin
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
+from voteit.invites.app.invites.member_id import InviteMemberId
 from voteit.invites.rest_api.lock import invites_lock
 from voteit.invites.models import MeetingInvite
 from voteit.invites.rest_api import serializers
@@ -33,6 +34,7 @@ from voteit.meeting.rest_api.filters import ForceMeetingWithRoleFilter
 from voteit.meeting.roles import ROLE_MODERATOR
 from voteit.meeting.statemachines import MeetingStateMachine
 from voteit.organisation.utils import get_user_identity_data
+from voteit.organisation.utils import get_user_member_ids
 
 logger = getLogger(__name__)
 
@@ -536,6 +538,8 @@ class HandleMatchedInvitesViewSet(
             for k, v in get_user_identity_data(self.request.user).items()
             if k in reg and reg[k].is_user_data
         }
+        if member_ids := get_user_member_ids(self.request.user):
+            matched[InviteMemberId.name] = member_ids
         if matched:
             return MeetingInvite.objects.find_open_invites(
                 organisation=organisation, **matched
@@ -629,6 +633,8 @@ class InviteDataTypesViewSet(ViewSet):
         with suppress(ObjectDoesNotExist, AttributeError):
             for provider in request.user.organisation.providers.all():
                 scopes.update(provider.scope.split())
+                if getattr(provider.backend, "MEMBER_ID_KEY", None):
+                    scopes.add(InviteMemberId.name)
         scopes = scopes or {"email"}
         reg = get_invite_adapter_registry()
         results = []

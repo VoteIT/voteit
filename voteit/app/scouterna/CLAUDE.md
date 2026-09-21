@@ -96,8 +96,10 @@ which is what `OrganisationBackendMixin.get_identity_data` reads for every backe
 
 That dict decides which invites a user matches and which address they may set on their
 profile (`UserSerializer.validate_email`), so an address ScoutID will not vouch for has no
-business in it. There is no `scoutnet_member_no` invite adapter yet, so the membership
-number is stored but not yet matched on.
+business in it.
+
+`MEMBER_ID_KEY = SCOUTNET_MEMBER_NO` marks the membership number as this backend's member
+id, so invites with a `member_id` column match it. See `voteit/organisation/CLAUDE.md`.
 
 `_claim()` reads a claim from userinfo and falls back to the id token, the way
 `OpenIdConnectAuth.get_user_details` does — a realm may put them in either.

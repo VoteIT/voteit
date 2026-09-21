@@ -26,6 +26,7 @@ class DummyOAuth2(OrganisationBackendMixin, BaseOAuth2):
     TITLE = "Dummy login"
     AUTHORIZATION_URL = "https://dummy.example/authorize/"
     ACCESS_TOKEN_URL = "https://dummy.example/token/"
+    MEMBER_ID_KEY = "dummy_member_no"
 
     @classmethod
     def get_profile_url(cls, provider: OAuth2Provider) -> str:
@@ -44,6 +45,7 @@ class AltDummyOAuth2(DummyOAuth2):
 
     name = ALT_DUMMY_PROVIDER
     TITLE = "alpha login"
+    MEMBER_ID_KEY = None
 
 
 def _path(cls) -> str:

@@ -7,6 +7,7 @@ from voteit.app.scouterna.testing import scoutid_disabled
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
 from voteit.organisation.utils import get_user_identity_data
+from voteit.organisation.utils import get_user_member_ids
 
 User = get_user_model()
 
@@ -104,3 +105,31 @@ class UtilsTests(TestCase):
         )
         with scoutid_disabled():
             self.assertEqual({"email": {"a@hi.se"}}, get_user_identity_data(self.user))
+
+    def test_providers_limits_the_backends(self):
+        self.user.social_auth.create(
+            provider=SCOUTID_PROVIDER,
+            uid="a-keycloak-uuid",
+            extra_data={"user_data": {SCOUTNET_MEMBER_NO: ["9876543"]}},
+        )
+        self.assertEqual(
+            {SCOUTNET_MEMBER_NO: {"9876543"}},
+            get_user_identity_data(self.user, providers=[SCOUTID_PROVIDER]),
+        )
+        self.assertEqual({}, get_user_identity_data(self.user, providers=[]))
+
+    def test_get_user_member_ids(self):
+        self.user.social_auth.create(
+            provider=SCOUTID_PROVIDER,
+            uid="a-keycloak-uuid",
+            extra_data={"user_data": {SCOUTNET_MEMBER_NO: ["9876543"]}},
+        )
+        self.assertEqual({"9876543"}, get_user_member_ids(self.user))
+        with scoutid_disabled():
+            self.assertEqual(set(), get_user_member_ids(self.user))
+
+    def test_get_user_member_ids_only_reads_the_backends_key(self):
+        # The id proxy has no MEMBER_ID_KEY
+        self.usa.extra_data["user_data"][SCOUTNET_MEMBER_NO] = ["9876543"]
+        self.usa.save()
+        self.assertEqual(set(), get_user_member_ids(self.user))

@@ -29,6 +29,7 @@ from voteit.app.scouterna.backends import ScoutIDOpenIdConnect
 from voteit.app.scouterna.testing import scoutid_enabled
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation import LOGIN_PROVIDER_SESSION_KEY
+from voteit.organisation.utils import get_user_member_ids
 from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 from voteit.organisation.models import Organisation
@@ -529,6 +530,27 @@ class ScoutIDLoginTests(APITestCase):
             },
             social.extra_data["user_data"],
         )
+
+    @responses.activate
+    def test_member_no_matches_member_id_invites(self):
+        meeting = self.org.meetings.create(title="Stämma", state="ongoing")
+        invite = meeting.invites.create(user_data={"member_id": "9876543"})
+        meeting.invites.create(user_data={"member_id": "1111111"})
+        state, nonce = self._begin()
+        self.realm.register(
+            self.realm.id_token("voteit", nonce),
+            userinfo={
+                "sub": "b4d3e2f1-0000-4000-8000-000000000001",
+                "preferred_username": "scoutnet|9876543",
+            },
+        )
+        self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
+        user = User.objects.get(social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001")
+        self.assertEqual({"9876543"}, get_user_member_ids(user))
+        self.client.force_login(user)
+        response = self.client.get(reverse("handle-matched-invites-list"))
+        self.assertEqual(200, response.status_code)
+        self.assertEqual([invite.pk], [x["pk"] for x in response.json()])
 
     def _existing_user(self):
         user = self.org.users.create(

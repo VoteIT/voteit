@@ -150,6 +150,11 @@ ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?identity_in=ui
   enabled backend and across the accounts sharing a person's `identity_id`; callers are
   `UserSerializer.validate_email`, `/api/user/email_choices/` and
   `HandleMatchedInvitesViewSet`.
+- `MEMBER_ID_KEY` — the key in `user_data` holding a verified member id, or `None`. ScoutID
+  sets `scoutnet_member_no`. `utils.get_user_member_ids(user)` collects them across every
+  enabled backend that sets one, and they match invites through the generic `member_id`
+  invite adapter. There is no switch: a provider whose backend has the key offers member-id
+  invites.
 - `get_title()`, `get_login_url(provider)`, `get_profile_url(provider)`, `get_logout_url(provider)` — what the SPA shows, and where it sends people to log in, manage their account and log out. Backends set `TITLE`; the default login URL is `reverse("social:begin", args=[name])` and the other two default to `None`. They take the **provider row**, not the organisation, because an OIDC backend's URLs derive from its issuer — which is a per-provider column. They are classmethods, so they work outside a login request where there is no strategy.
 
 `IDProxyOAuth2` is the backend for the project's central identity proxy service. Key behaviours:

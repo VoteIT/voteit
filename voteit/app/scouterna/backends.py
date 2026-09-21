@@ -43,6 +43,8 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
     True
     >>> backend.PKCE_DEFAULT_CODE_CHALLENGE_METHOD
     'S256'
+    >>> backend.MEMBER_ID_KEY
+    'scoutnet_member_no'
     """
 
     name = SCOUTID_PROVIDER
@@ -53,6 +55,7 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
     DEFAULT_USE_PKCE = True
     # Keycloak UUID, stable per user per realm.
     ID_KEY = "sub"
+    MEMBER_ID_KEY = SCOUTNET_MEMBER_NO
     EXTRA_DATA = [
         ("sub", "id"),
     ]

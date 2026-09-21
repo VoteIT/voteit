@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Collection
 from typing import Generator
 from typing import TYPE_CHECKING
 
@@ -39,7 +40,9 @@ def get_enabled_backends() -> dict[str, type[BaseAuth]]:
     return load_backends(settings.AUTHENTICATION_BACKENDS)
 
 
-def get_user_identity_data(user: User) -> dict[str, set[str]]:
+def get_user_identity_data(
+    user: User, providers: Collection[str] | None = None
+) -> dict[str, set[str]]:
     """
     Everything the enabled providers vouch for about this person, merged into
     one ``{scope: {value, ...}}`` dict.
@@ -52,10 +55,14 @@ def get_user_identity_data(user: User) -> dict[str, set[str]]:
     reasons and because ``identity_id`` groups duplicates rather than merging
     them (see ``UserView.alternate`` / ``switch``), so this follows the
     identity as well as the row.
+
+    ``providers`` limits it to those backends.
     """
     if user.is_anonymous:
         return {}
     backends = get_enabled_backends()
+    if providers is not None:
+        backends = {k: v for k, v in backends.items() if k in providers}
     # An account with no identity_id must only ever see its own rows: matching
     # on a null identity would join it to every other unlinked user.
     query = models.Q(user=user)
@@ -79,6 +86,22 @@ def get_user_identity_data(user: User) -> dict[str, set[str]]:
         for scope, values in backend.get_identity_data(social).items():
             results[scope].update(values)
     return dict(results)
+
+
+def get_user_member_ids(user: User) -> set[str]:
+    """
+    Member ids vouched for by any enabled backend that has them, i.e. sets
+    ``MEMBER_ID_KEY``.
+    """
+    keys = {
+        name: backend.MEMBER_ID_KEY
+        for name, backend in get_enabled_backends().items()
+        if getattr(backend, "MEMBER_ID_KEY", None)
+    }
+    if not keys:
+        return set()
+    data = get_user_identity_data(user, providers=keys)
+    return set().union(*(data.get(key, set()) for key in keys.values()))
 
 
 def get_login_provider(request) -> str | None:
