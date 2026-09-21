@@ -28,6 +28,7 @@ from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.models import LOGGED_OUT
 from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
 from voteit.app.scouterna import SCOUTID_PROVIDER
+from voteit.app.scouterna.backends import SCOUTNET_MEMBER_NO
 from voteit.app.scouterna.testing import scoutid_disabled
 from voteit.app.scouterna.testing import scoutid_enabled
 from voteit.messaging.testing import testing_channel_layers_setting
@@ -258,6 +259,8 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
                 "email": "moderator@voteit.se",
                 # force_login() defaults to AUTHENTICATION_BACKENDS[0].
                 "login_provider": IDPROXY_PROVIDER,
+                # Only the requesting user's own
+                "member_ids": None,
             },
             data[0],
         )
@@ -285,6 +288,7 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
                 "userid": "moderator",
                 "email": "moderator@voteit.se",
                 "login_provider": IDPROXY_PROVIDER,
+                "member_ids": [],
             },
             data,
         )
@@ -325,6 +329,17 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
         self.assertIsNone(
             self.client.get(reverse("user-list")).json()["login_provider"]
         )
+
+    @scoutid_enabled()
+    def test_member_ids(self):
+        self.participant.social_auth.create(
+            provider=SCOUTID_PROVIDER,
+            uid="a-keycloak-uuid",
+            extra_data={"user_data": {SCOUTNET_MEMBER_NO: ["9876543"]}},
+        )
+        self.client.force_login(self.participant)
+        response = self.client.get(reverse("user-list"))
+        self.assertEqual(["9876543"], response.json()["member_ids"])
 
     def test_switch_transfers_social_auths(self):
         self.participant.social_auth.create(uid="abc", provider="idproxy")

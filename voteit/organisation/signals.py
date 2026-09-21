@@ -4,6 +4,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.contrib.auth import BACKEND_SESSION_KEY
 from django.contrib.auth.signals import user_logged_in
+from django.db.models.signals import post_delete
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.test.signals import setting_changed
@@ -14,6 +15,7 @@ from voteit.messaging.channels import UserChannel
 from voteit.core.decorators import disable_on_raw_save
 from voteit.core.decorators import on_transaction_commit
 from voteit.core.messages.role_updates import RolesChanged
+from voteit.core.messages.user import InvalidateUserCache
 from voteit.core.messages.role_updates import RolesRemoved
 from voteit.core.role import Role
 from voteit.core.signals import roles_added
@@ -88,6 +90,19 @@ def notify_login_method_added(instance: UserSocialAuth, created=False, **kw):
     if not user.email or user.social_auth.count() < 2:
         return
     email_login_method_added.delay(social_auth_pk=instance.pk)
+
+
+@receiver(post_delete, sender=UserSocialAuth)
+@receiver(post_save, sender=UserSocialAuth)
+@disable_on_raw_save
+def invalidate_user_on_credential_change(instance: UserSocialAuth, **kw):
+    """
+    ``user_data`` feeds the user payload (``member_ids``), so the user's own
+    devices should refetch it. A login also saves the user, which sends this
+    through ``voteit.core.signals`` -- connecting and disconnecting do not.
+    """
+    msg = InvalidateUserCache(payload={"pk": instance.user_id})
+    UserChannel(instance.user_id).sync_publish(msg)
 
 
 @receiver(post_save, sender=Organisation)

@@ -154,7 +154,8 @@ ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?identity_in=ui
   sets `scoutnet_member_no`. `utils.get_user_member_ids(user)` collects them across every
   enabled backend that sets one, and they match invites through the generic `member_id`
   invite adapter. There is no switch: a provider whose backend has the key offers member-id
-  invites.
+  invites. The user sees their own as `member_ids` on `/api/user/` (null on other accounts'
+  rows, e.g. in `alternate/`).
 - `get_title()`, `get_login_url(provider)`, `get_profile_url(provider)`, `get_logout_url(provider)` — what the SPA shows, and where it sends people to log in, manage their account and log out. Backends set `TITLE`; the default login URL is `reverse("social:begin", args=[name])` and the other two default to `None`. They take the **provider row**, not the organisation, because an OIDC backend's URLs derive from its issuer — which is a per-provider column. They are classmethods, so they work outside a login request where there is no strategy.
 
 `IDProxyOAuth2` is the backend for the project's central identity proxy service. Key behaviours:
@@ -197,6 +198,7 @@ On subscribe, the `organisation.roles` collector pushes the user's current org r
 - `setting_changed` → `reload_social_backends` — force-reloads social_core's backend cache when `AUTHENTICATION_BACKENDS` changes. `load_backends()` caches in a module-global `BACKENDSCACHE` and **ignores its argument once warm**, so without this, `override_settings(AUTHENTICATION_BACKENDS=...)` is a silent no-op and `OAuth2Provider.backend` answers from stale data. Only fires under test overrides; in production the setting never changes.
 - `user_logged_in` → `remember_login_provider` — records which login method this session signed in with, in `LOGIN_PROVIDER_SESSION_KEY`. Read from the auth backend `django.contrib.auth` just recorded, so every route in is covered. It has to be a signal rather than a pipeline step: `login()` flushes the session when the person signing in is not the one who was signed in before, which would throw away anything written earlier. A login from no social backend (the switch-user action, `force_login`) leaves whatever was there alone.
 - `UserSocialAuth post_save` (created) → `notify_login_method_added` — enqueues the mail above when the user already had another credential. Deferred to commit.
+- `UserSocialAuth post_save` / `post_delete` → `invalidate_user_on_credential_change` — `user.inv` on the user's own `UserChannel`, so their devices refetch `/api/user/` (its `member_ids` come from `user_data`). A login saves the `User` as well, which sends `user.inv` to the organisation channel; connecting and disconnecting do not, which is what this covers.
 - `Organisation post_save` (not created) — publishes `OrganisationChanged` to `OrganisationChannel`. Skipped on `raw` saves.
 - `organisation.roles` collector on `OrganisationChannel` — the subscribing user's roles.
 - `roles_added` on `OrganisationRoles` — publishes `RolesChanged` to both `OrganisationChannel` and the affected user's personal `UserChannel`. Skipped on `raw` saves.

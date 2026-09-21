@@ -29,6 +29,7 @@ from voteit.core.validators import valid_userid
 from voteit.organisation.utils import get_enabled_backends
 from voteit.organisation.utils import get_login_provider
 from voteit.organisation.utils import get_user_identity_data
+from voteit.organisation.utils import get_user_member_ids
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -210,6 +211,7 @@ class UserAndRolesSerializer(UserSerializer):
 
     organisation_roles = serializers.SerializerMethodField()
     login_provider = serializers.SerializerMethodField()
+    member_ids = serializers.SerializerMethodField()
 
     def get_organisation_roles(self, instance: AbstractUser):
         roles = instance.organisation_roles.first()
@@ -227,10 +229,22 @@ class UserAndRolesSerializer(UserSerializer):
         request = self.context.get("request")
         return get_login_provider(request) if request else None
 
+    def get_member_ids(self, instance: AbstractUser) -> list[str] | None:
+        """
+        Member ids vouched for by the login providers, or null for anyone but the
+        requesting user -- ``alternate`` would otherwise pay a query per account.
+        Changes are announced with ``user.inv`` on the user's own channel.
+        """
+        request = self.context.get("request")
+        if request is None or request.user.pk != instance.pk:
+            return None
+        return sorted(get_user_member_ids(instance))
+
     class Meta(UserSerializer.Meta):
         fields = UserSerializer.Meta.fields + (
             "organisation_roles",
             "login_provider",
+            "member_ids",
         )
 
 
