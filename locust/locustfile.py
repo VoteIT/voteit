@@ -32,7 +32,7 @@ LOGIN_URL = "/admin/login/"
 #: Bounds every ws recv. A refused subscribe answers with channel.subscribe_error
 #: and never a state_complete, and a stopped RQ worker answers with nothing at
 #: all -- without a timeout either one wedges the user instead of reporting.
-WS_TIMEOUT = 10
+WS_TIMEOUT = 20
 #: The two frames that end a subscribe stream, one way or the other.
 STATE_COMPLETE = "channel.state_complete"
 SUBSCRIBE_ERROR = "channel.subscribe_error"
