@@ -14,6 +14,7 @@ class MeetingConfig(AppConfig):
         from voteit.meeting import roles  # noqa
         from voteit.meeting import rules  # noqa
         from voteit.meeting import channels  # noqa
+        from voteit.meeting import jobs  # noqa
         from voteit.meeting import messages  # noqa
         from voteit.meeting import signals  # noqa
         from voteit.meeting.rest_api import views  # noqa
