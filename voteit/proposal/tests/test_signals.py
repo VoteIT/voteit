@@ -71,10 +71,10 @@ class MeetingSubscribedTests(TestCase):
         for msg in app_state:
             if msg.action == "proposal.changed.batch":
                 break
-        first = msg.payload.items[0]
-        self.assertIsInstance(first.created, str)
-        self.assertAlmostEqual(
-            ProposalDetailSerializer(self.prop1).data["created"], first.created
+        item = next(x for x in msg.payload.items if x.pk == self.prop1.pk)
+        self.assertIsInstance(item.created, str)
+        self.assertEqual(
+            ProposalDetailSerializer(self.prop1).data["created"], item.created
         )
 
     def test_app_state_sent_participants(self):
