@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.1 (unreleased)
+
+Multiple login providers per organisation.
+
+- **ScoutID login** (OpenID Connect) alongside the id proxy. Providers get
+  `primary` / `hidden` flags and a sort order for the login screen.
+- **Several credentials per account.** New `/api/user/connections/`,
+  `connect/` and `disconnect/`. New logins are matched against existing users;
+  when ambiguous the user is sent to `LINK_ACCOUNT_URL` and picks from
+  `/api/account-link-options/`.
+- **User payload** gains `login_provider` (this session's provider, pair with
+  its `logout_url`) and `member_ids` (own user only, `user.inv` on change).
+- **Member ID invitations**: invites can match on provider-vouched
+  member ids.
+- Weekly job deletes meetings that never started and have been pending deletion
+  for more than 7 days.
+
 ## v1.0 (2026-09-14)
 
 Replaces the `channels-envelope` websocket library with
