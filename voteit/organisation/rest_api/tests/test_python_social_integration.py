@@ -12,6 +12,7 @@ from social_core.exceptions import AuthException
 
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.backends import IDProxyOAuth2
+from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
@@ -117,6 +118,38 @@ class SocialIntegrationTests(APITestCase):
         )
         self.assertEqual(usa.uid, user.identity_id)
         self.assertEqual("admin@betahaus.net", user.email)
+
+    @responses.activate
+    def test_complete_new_user_must_accept_tos(self):
+        gtos = GlobalTermsOfService.objects.create()
+        tos = self.organisation.tos.create(based_on=gtos)
+        users = User.objects.count()
+        state = parse_qs(self.client.get("/login/idproxy/").get("Location"))["state"][0]
+        responses.add(
+            responses.POST,
+            "https://idproxy/o/token/",
+            json={"access_token": "knock knock"},
+        )
+        responses.add(
+            responses.GET,
+            "https://idproxy/api/identity/",
+            json=_IDENTITY_RESPONSE_JSON,
+        )
+        response = self.client.get("/complete/idproxy/", data={"state": state})
+        self.assertEqual(302, response.status_code)
+        location = response.get("Location")
+        self.assertTrue(location.startswith(settings.ACCEPT_TOS_URL), location)
+        query = parse_qs(location.split("?", 1)[1])
+        self.assertEqual(["/complete/idproxy/"], query["resume_url"])
+        # No half-finished registration while the question is open
+        self.assertEqual(users, User.objects.count())
+        response = self.client.get(
+            "/complete/idproxy/",
+            data={"partial_token": query["partial_token"][0], "accept_tos": tos.pk},
+        )
+        self.assertEqual(settings.LOGIN_REDIRECT_URL, response.get("Location"))
+        user = User.objects.get(identity_id="123")
+        self.assertEqual(tos, user.tos_accepts.tos)
 
     @responses.activate
     def test_complete_existing_user(self):

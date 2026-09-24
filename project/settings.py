@@ -86,6 +86,8 @@ SOCIAL_AUTH_PIPELINE = [
     "voteit.organisation.pipeline.require_connect_intent",
     "voteit.organisation.pipeline.social_user",
     "voteit.organisation.pipeline.match_existing_user",
+    # After the user is resolved, before one is created
+    "voteit.organisation.pipeline.require_tos_accept",
     "social_core.pipeline.user.get_username",
     "voteit.organisation.pipeline.create_user",
     "voteit.organisation.pipeline.ensure_userid",
@@ -96,6 +98,7 @@ SOCIAL_AUTH_PIPELINE = [
     "voteit.organisation.pipeline.bump_permissions",
     "voteit.organisation.pipeline.remove_nonmatching_email",
     "voteit.organisation.pipeline.log_new_association",
+    "voteit.organisation.pipeline.store_tos_accept",
 ]
 
 #: social_core's default, minus ``allowed_to_disconnect``. Nobody here has a
@@ -116,6 +119,8 @@ LOGIN_ERROR_URL = "/error"
 #: Where match_existing_user sends someone when it has to ask which account
 #: is theirs. The SPA reads the options from /api/account-link-options/.
 LINK_ACCOUNT_URL = "/link-account"
+#: Where require_tos_accept sends someone who hasn't accepted the terms of service.
+ACCEPT_TOS_URL = "/accept-tos"
 
 # RQ
 REDIS_RQ_HOST = os.getenv("REDIS_RQ_HOST", "redis_rq")

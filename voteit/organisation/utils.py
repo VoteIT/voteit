@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
+from django.utils.timezone import now
 from social_core.backends.base import BaseAuth
 from social_core.backends.utils import load_backends
 from social_django.models import UserSocialAuth
@@ -14,9 +15,12 @@ from social_django.utils import load_strategy
 
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation import LOGIN_PROVIDER_SESSION_KEY
+from voteit.organisation.models import TermsOfService
+from voteit.organisation.models import UserAccept
 
 if TYPE_CHECKING:
     from voteit.core.models import User
+    from voteit.organisation.models import Organisation
 
 
 def get_psa_backends() -> Generator[BaseAuth, None, None]:
@@ -117,3 +121,30 @@ def get_login_provider(request) -> str | None:
         return None
     name = session.get(LOGIN_PROVIDER_SESSION_KEY)
     return name if name in get_enabled_backends() else None
+
+
+def get_active_tos(organisation: Organisation) -> TermsOfService | None:
+    """
+    The latest terms of service that have taken effect.
+    """
+    return organisation.tos.filter(version__lte=now()).order_by("-version").first()
+
+
+def get_tos_to_accept(user: User) -> TermsOfService | None:
+    """
+    The active terms of service, if the user hasn't accepted them.
+    """
+    if not user.organisation_id:
+        return None
+    tos = get_active_tos(user.organisation)
+    if tos and not UserAccept.objects.filter(user=user, tos=tos).exists():
+        return tos
+    return None
+
+
+def accept_tos(user: User, tos: TermsOfService) -> UserAccept:
+    # One row per user, the latest accept replaces the previous
+    obj, _ = UserAccept.objects.update_or_create(
+        user=user, defaults={"tos": tos, "accepted": now()}
+    )
+    return obj

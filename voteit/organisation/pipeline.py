@@ -1,4 +1,5 @@
 from logging import getLogger
+from urllib.parse import urlencode
 
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -13,8 +14,12 @@ from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.matching import find_candidates
 from voteit.organisation.matching import is_elevated
 from voteit.organisation.matching import names_match
+from voteit.organisation.models import TermsOfService
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 from voteit.organisation.utils import get_enabled_backends
+from voteit.organisation.utils import accept_tos
+from voteit.organisation.utils import get_active_tos
+from voteit.organisation.utils import get_tos_to_accept
 
 logger = getLogger(__name__)
 User = get_user_model()
@@ -172,6 +177,8 @@ def require_connect_intent(backend, uid, user=None, *args, **kwargs):
 LINK_ACCOUNT_FIELD = "link_account"
 #: Value meaning "none of these, give me a new account".
 LINK_ACCOUNT_NEW = "new"
+#: Field the resume request carries the accepted terms of service pk in.
+ACCEPT_TOS_FIELD = "accept_tos"
 
 
 def _elevated_message(backend, candidate) -> str:
@@ -381,3 +388,39 @@ def log_new_association(
         uid=social.uid if social else None,
         **extra,
     )
+
+
+@partial
+def require_tos_accept(*args, strategy, backend, current_partial, user=None, **kwargs):
+    """
+    Pause the login until the active terms of service are accepted.
+
+    Before ``create_user``, so nobody gets an account without accepting. The
+    client resumes with ``accept_tos=<pk>``, and the accept is stored by
+    ``store_tos_accept`` once there is a user.
+    """
+    if user is not None:
+        tos = get_tos_to_accept(user)
+    else:
+        tos = get_active_tos(backend.organisation)
+    if tos is None:
+        return
+    # Only the version they were shown counts, a newer one means asking again
+    if strategy.request_data().get(ACCEPT_TOS_FIELD) == str(tos.pk):
+        return {"accepted_tos": tos.pk}
+    base = getattr(settings, "ACCEPT_TOS_URL", "/accept-tos")
+    query = urlencode(
+        {
+            "partial_token": current_partial.token,
+            "resume_url": f"/complete/{backend.name}/",
+        }
+    )
+    return strategy.redirect(f"{base}?{query}")
+
+
+def store_tos_accept(user=None, accepted_tos=None, *args, **kwargs):
+    """
+    Store what ``require_tos_accept`` got, now that there's a user.
+    """
+    if user is not None and accepted_tos is not None:
+        accept_tos(user, TermsOfService.objects.get(pk=accepted_tos))

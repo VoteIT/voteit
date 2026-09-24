@@ -13,8 +13,10 @@ from voteit.core.testing import run_permission_tests
 from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import TermsOfService
+from voteit.organisation.models import UserAccept
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
+from voteit.organisation.utils import accept_tos
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
@@ -593,3 +595,32 @@ class TermsOfServiceViewSetTests(APITestCase):
         self.client.force_login(self.manager)
         self.assertEqual(405, self.client.put(url, {"body": "x"}).status_code)
         self.assertEqual(405, self.client.delete(url).status_code)
+
+    def _accept_url(self, tos):
+        return reverse("terms-of-service-accept", kwargs={"pk": tos.pk})
+
+    def test_accept(self):
+        for func, params in run_permission_tests(
+            self,
+            url=self._accept_url(self.current),
+            method="post",
+            expected=((None, 401), (self.user, 200), (self.manager, 200)),
+        ):
+            func(*params)
+        self.client.force_login(self.user)
+        response = self.client.post(self._accept_url(self.current))
+        self.assertEqual(self.current.pk, response.json()["tos"])
+        self.assertEqual(self.current, self.user.tos_accepts.tos)
+
+    def test_accept_replaces_previous(self):
+        accept_tos(self.user, self.old)
+        self.client.force_login(self.user)
+        self.client.post(self._accept_url(self.current))
+        self.assertEqual(self.current, UserAccept.objects.get(user=self.user).tos)
+
+    def test_accept_only_active(self):
+        self.client.force_login(self.manager)
+        for tos in (self.old, self.future):
+            response = self.client.post(self._accept_url(tos))
+            self.assertEqual(400, response.status_code)
+        self.assertFalse(UserAccept.objects.exists())

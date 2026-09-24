@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -9,17 +10,23 @@ from social_django.models import UserSocialAuth
 
 from voteit.app.scouterna import SCOUTID_PROVIDER
 from voteit.organisation import IDPROXY_PROVIDER
+from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
+from voteit.organisation.models import UserAccept
 from voteit.organisation.pipeline import _transfer_social_auths
 from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
+from voteit.organisation.pipeline import ACCEPT_TOS_FIELD
 from voteit.organisation.pipeline import ensure_userid
 from voteit.organisation.pipeline import inherit_users
 from voteit.organisation.pipeline import LINK_ACCOUNT_FIELD
 from voteit.organisation.pipeline import LINK_ACCOUNT_NEW
 from voteit.organisation.pipeline import match_existing_user
 from voteit.organisation.pipeline import require_connect_intent
+from voteit.organisation.pipeline import require_tos_accept
+from voteit.organisation.pipeline import store_tos_accept
 from voteit.organisation.pipeline import social_user
 from voteit.organisation.roles import ROLE_ORG_MANAGER
+from voteit.organisation.utils import accept_tos
 
 User = get_user_model()
 
@@ -621,3 +628,89 @@ class MatchExistingUserTests(TestCase):
         paused = self._run(answer=str(boss.pk))
         self.assertNotIsInstance(paused, dict)
         self.assertIn("partial_token=a-token", self._asked())
+
+
+class RequireTosAcceptTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+        cls.user = cls.org.users.create(username="kim")
+        cls.gtos = GlobalTermsOfService.objects.create()
+
+    def _run(self, user=None, answer=None):
+        self.strategy = MagicMock()
+        self.strategy.storage.partial.prepare.return_value.token = "a-token"
+        self.strategy.request_data.return_value = (
+            {ACCEPT_TOS_FIELD: str(answer)} if answer else {}
+        )
+        backend = MagicMock()
+        backend.name = SCOUTID_PROVIDER
+        backend.organisation = self.org
+        return require_tos_accept(
+            strategy=self.strategy, backend=backend, pipeline_index=0, user=user
+        )
+
+    def _asked(self) -> str:
+        self.strategy.redirect.assert_called_once()
+        self.strategy.storage.partial.store.assert_called_once()
+        return self.strategy.redirect.call_args.args[0]
+
+    def test_no_tos(self):
+        self.assertEqual({}, self._run())
+        self.assertEqual({}, self._run(self.user))
+
+    def test_new_user_pauses(self):
+        self.org.tos.create(based_on=self.gtos)
+        self._run()
+        self.assertEqual(
+            "/accept-tos?partial_token=a-token&resume_url=%2Fcomplete%2Fscoutid%2F",
+            self._asked(),
+        )
+
+    def test_new_user_accepts(self):
+        tos = self.org.tos.create(based_on=self.gtos)
+        self.assertEqual({"accepted_tos": tos.pk}, self._run(answer=tos.pk))
+        self.strategy.redirect.assert_not_called()
+        # Nothing stored until there's a user
+        self.assertFalse(UserAccept.objects.exists())
+
+    def test_accepting_old_version_asks_again(self):
+        old = self.org.tos.create(based_on=self.gtos, version=now() - timedelta(days=1))
+        self.org.tos.create(based_on=self.gtos)
+        self._run(answer=old.pk)
+        self._asked()
+
+    def test_existing_user_accepted(self):
+        tos = self.org.tos.create(based_on=self.gtos)
+        accept_tos(self.user, tos)
+        self.assertEqual({}, self._run(self.user))
+
+    def test_existing_user_accepted_older_version(self):
+        old = self.org.tos.create(based_on=self.gtos, version=now() - timedelta(days=1))
+        accept_tos(self.user, old)
+        tos = self.org.tos.create(based_on=self.gtos)
+        self._run(self.user)
+        self._asked()
+        self.assertEqual({"accepted_tos": tos.pk}, self._run(self.user, answer=tos.pk))
+
+    def test_future_version_not_required_yet(self):
+        tos = self.org.tos.create(based_on=self.gtos, version=now() - timedelta(days=1))
+        accept_tos(self.user, tos)
+        self.org.tos.create(based_on=self.gtos, version=now() + timedelta(days=1))
+        self.assertEqual({}, self._run(self.user))
+
+
+class StoreTosAcceptTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+        cls.user = cls.org.users.create(username="kim")
+        cls.tos = cls.org.tos.create(based_on=GlobalTermsOfService.objects.create())
+
+    def test_stores(self):
+        store_tos_accept(user=self.user, accepted_tos=self.tos.pk)
+        self.assertEqual(self.tos, UserAccept.objects.get(user=self.user).tos)
+
+    def test_nothing_accepted(self):
+        store_tos_accept(user=self.user)
+        self.assertFalse(UserAccept.objects.exists())

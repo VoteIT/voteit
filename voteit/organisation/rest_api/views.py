@@ -37,6 +37,8 @@ from voteit.organisation.rest_api import serializers
 from voteit.organisation.rest_api.filters import OrphanUserEmailFilter
 from voteit.organisation.rest_api.filters import UserIdentitiesFilter
 from voteit.organisation.rest_api.filters import UserPkFilter
+from voteit.organisation.utils import accept_tos
+from voteit.organisation.utils import get_active_tos
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
@@ -160,6 +162,22 @@ class TermsOfServiceViewSet(
 
     def perform_create(self, serializer):
         serializer.save(organisation=self.request.user.organisation)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def accept(self, request, pk=None):
+        """
+        Accept the active terms of service. A login accepts through the
+        pipeline instead, see ``require_tos_accept``.
+        """
+        tos = self.get_object()
+        if tos != get_active_tos(tos.organisation):
+            raise ValidationError(_("Only the active terms of service can be accepted"))
+        accepted = accept_tos(request.user, tos)
+        return Response({"tos": tos.pk, "accepted": accepted.accepted})
 
 
 # @router.register("user_consents", basename="user_consents")
