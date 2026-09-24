@@ -4,8 +4,10 @@ from django.db.utils import IntegrityError
 from django.test import TestCase
 
 from voteit.organisation import IDPROXY_PROVIDER
+from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
+from voteit.organisation.models import TermsOfService
 from voteit.organisation.testing import DUMMY_PROVIDER
 from voteit.organisation.testing import dummy_backend_enabled
 
@@ -64,3 +66,34 @@ class OAuth2ProviderTests(TestCase):
         self.assertIsNone(provider.backend)
         with dummy_backend_enabled():
             self.assertEqual(DUMMY_PROVIDER, provider.backend.name)
+
+
+class GlobalTermsOfServiceTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create(title="One", host="one.example.com")
+        cls.other = Organisation.objects.create(title="Two", host="two.example.com")
+        cls.inactive = Organisation.objects.create(
+            title="Gone", host="gone.example.com", active=False
+        )
+        cls.first = GlobalTermsOfService.objects.create(body="First")
+        cls.prev = TermsOfService.objects.create(
+            organisation=cls.org, based_on=cls.first, body="Org text"
+        )
+
+    def test_create_org_tos(self):
+        gtos = GlobalTermsOfService.objects.create(body="Second")
+        created = gtos.create_org_tos()
+        self.assertEqual({self.org, self.other}, {x.organisation for x in created})
+        new = self.org.tos.get(based_on=gtos)
+        self.assertEqual("Org text", new.body)
+        self.assertGreater(new.version, self.prev.version)
+        self.assertEqual("", self.other.tos.get().body)
+
+    def test_create_org_tos_again_only_adds_missing(self):
+        gtos = GlobalTermsOfService.objects.create(body="Second")
+        gtos.create_org_tos()
+        added = Organisation.objects.create(title="New", host="new.example.com")
+        created = gtos.create_org_tos()
+        self.assertEqual([added], [x.organisation for x in created])
+        self.assertEqual(3, gtos.org_tos.count())

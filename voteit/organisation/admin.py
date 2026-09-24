@@ -15,9 +15,12 @@ from social_core.backends.utils import load_backends
 from voteit.messaging.models import Connection
 
 from voteit.meeting.models import Meeting
+from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
+from voteit.organisation.models import TermsOfService
+from voteit.organisation.models import UserAccept
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
@@ -224,6 +227,74 @@ class OrganisationRolesAdmin(admin.ModelAdmin):
         return instance.assigned
 
 
+@admin.register(GlobalTermsOfService)
+class GlobalTermsOfServiceAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "version", "tos_count")
+    fields = ("body", "version")
+    actions = ["create_org_tos"]
+
+    def get_queryset(self, request):
+        return (
+            super().get_queryset(request).annotate(tos__count=models.Count("org_tos"))
+        )
+
+    @admin.display(description="Organisation ToS", ordering="tos__count")
+    def tos_count(self, obj: GlobalTermsOfService):
+        return obj.tos__count
+
+    @admin.action(description="Create organisation ToS from this version")
+    def create_org_tos(self, request, queryset):
+        if queryset.count() != 1:
+            self.message_user(request, "Select exactly one version", messages.ERROR)
+            return
+        obj = queryset.get()
+        # An older version would become the newest ToS of every organisation
+        if GlobalTermsOfService.objects.filter(version__gt=obj.version).exists():
+            self.message_user(
+                request, "Only the latest version can be used", messages.ERROR
+            )
+            return
+        created = obj.create_org_tos()
+        self.message_user(
+            request,
+            f"Created ToS for {len(created)} organisation(s)",
+            messages.SUCCESS,
+        )
+
+
+@admin.register(TermsOfService)
+class TermsOfServiceAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "organisation", "version", "based_on", "accepts_count")
+    list_select_related = ("organisation", "based_on")
+    search_fields = ("organisation__title",)
+    autocomplete_fields = ("organisation",)
+    fields = ("organisation", "based_on", "body", "version")
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(accepts__count=models.Count("accepts"))
+        )
+
+    @admin.display(description="Accepts", ordering="accepts__count")
+    def accepts_count(self, obj: TermsOfService):
+        return obj.accepts__count
+
+
+@admin.register(UserAccept)
+class UserAcceptAdmin(admin.ModelAdmin):
+    list_display = ("user", "tos", "organisation", "accepted")
+    list_select_related = ("user", "tos__organisation")
+    search_fields = (
+        "user__userid",
+        "user__first_name",
+        "user__last_name",
+        "tos__organisation__title",
+    )
+    autocomplete_fields = ("user", "tos")
+
+
 @admin.register(OAuth2Provider)
 class OAuth2ProviderAdmin(admin.ModelAdmin):
     list_display = [
@@ -234,7 +305,13 @@ class OAuth2ProviderAdmin(admin.ModelAdmin):
         "organisation_active",
         "scope",
     ]
-    list_filter = ["provider_id", "primary", "hidden", "scope", "organisation__active"]
+    list_filter = [
+        "provider_id",
+        "primary",
+        "hidden",
+        "scope",
+        "organisation__active",
+    ]
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("organisation")

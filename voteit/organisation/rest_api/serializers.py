@@ -3,15 +3,18 @@ from typing import List
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext as _
 from rest_framework import serializers
 
 from voteit.components.rest_api.serializers import OrganisationComponentSerializer
 from voteit.core.rest_api.fields import SameOrgUserField
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.validators import RoleValidator
+from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
+from voteit.organisation.models import TermsOfService
 
 
 if TYPE_CHECKING:
@@ -148,26 +151,31 @@ class OrganisationSerializer(serializers.ModelSerializer):
 #         return instance
 
 
-# class TOSSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = TermsOfService
-#         read_only_fields = [
-#             "pk",
-#             "organisation",
-#         ]
-#         fields = read_only_fields + [
-#             "required",
-#             "title",
-#             "body",
-#         ]
-#
-#
-# class TOSCreateSerializer(BaseModelSerializer):
-#     class Meta:
-#         model = TermsOfService
-#         fields = "__all__"
-#
-#
+class TermsOfServiceSerializer(serializers.ModelSerializer):
+    global_body = serializers.CharField(source="based_on.body", read_only=True)
+
+    class Meta:
+        model = TermsOfService
+        read_only_fields = [
+            "based_on",
+            "global_body",
+            "organisation",
+            "pk",
+            "version",
+        ]
+        fields = read_only_fields + ["body"]
+
+    def validate(self, attrs):
+        if self.instance is None:
+            # New versions are always based on the latest global one
+            attrs["based_on"] = GlobalTermsOfService.objects.first()
+            if attrs["based_on"] is None:
+                raise serializers.ValidationError(
+                    _("There are no global terms of service yet")
+                )
+        return attrs
+
+
 # class UserConsentSerializer(serializers.ModelSerializer):
 #     class Meta:
 #         model = UserConsent

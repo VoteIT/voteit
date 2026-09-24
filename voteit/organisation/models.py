@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from auditlog.registry import auditlog
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db import transaction
+from django.utils.timezone import now
 from social_core.backends.utils import load_backends
 
 from voteit.core.abcs import OrganisationContext
@@ -265,6 +268,132 @@ class OAuth2Provider(OrganisationContext):
 
     def __repr__(self):
         return f"OAuth2Provider {self.title}"
+
+    # Type annotations
+    objects: models.Manager
+
+
+@auditlog.register(
+    include_fields=[
+        "body",
+    ],
+)
+class GlobalTermsOfService(models.Model):
+    body: str = RichTextField(
+        blank=True,
+        default="",
+        html_cleaner=relaxed_clean_html,
+    )
+    version: datetime = models.DateTimeField(default=now, unique=True)
+
+    class Meta:
+        ordering = ["-version"]
+        verbose_name = "Global terms of service"
+        verbose_name_plural = "Global terms of service"
+
+    def __str__(self):
+        return f"Global ToS {self.version:%Y-%m-%d %H:%M}"
+
+    @transaction.atomic
+    def create_org_tos(self) -> list[TermsOfService]:
+        """
+        A TermsOfService based on this version for each active organisation that
+        doesn't have one yet, copying the organisation's latest if there is one.
+        Users must accept again. Safe to run again for organisations added later.
+        """
+        orgs = Organisation.objects.filter(active=True).exclude(tos__based_on=self)
+        latest = {
+            tos.organisation_id: tos
+            for tos in TermsOfService.objects.filter(organisation__in=orgs)
+            .order_by("organisation_id", "-version")
+            .distinct("organisation_id")
+        }
+        created = []
+        for org in orgs:
+            tos = TermsOfService(organisation=org, based_on=self)
+            if prev := latest.get(org.pk):
+                tos.body = prev.body
+            tos.save()
+            created.append(tos)
+        return created
+
+
+@auditlog.register(
+    include_fields=[
+        "based_on",
+        "body",
+        "organisation",
+        "version",
+    ],
+)
+class TermsOfService(OrganisationContext):
+    """
+    A terms-of-service document that users must confirm.
+    """
+
+    based_on: GlobalTermsOfService = models.ForeignKey(
+        GlobalTermsOfService,
+        verbose_name="Global terms of service",
+        on_delete=models.CASCADE,
+        related_name="org_tos",
+    )
+    body: str = RichTextField(
+        blank=True,
+        default="",
+        html_cleaner=relaxed_clean_html,
+    )
+    organisation: Organisation = models.ForeignKey(
+        Organisation,
+        on_delete=models.CASCADE,
+        verbose_name="Organisation",
+        related_name="tos",
+    )
+    version: datetime = models.DateTimeField(
+        default=now,
+    )
+
+    class Meta:
+        ordering = ["-version"]
+        verbose_name = "Terms Of Service"
+        verbose_name_plural = "Terms Of Service"
+        constraints = (
+            models.UniqueConstraint(
+                fields=("organisation", "version"), name="unique org tos version"
+            ),
+        )
+
+    def __str__(self):
+        return f"ToS {self.version:%Y-%m-%d %H:%M} ({self.organisation_id})"
+
+    # Type annotations
+    objects: models.Manager
+    accepts: models.QuerySet
+
+
+class UserAccept(models.Model):
+    user: AbstractUser = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tos_accepts",
+    )
+    tos: TermsOfService = models.ForeignKey(
+        TermsOfService, on_delete=models.CASCADE, related_name="accepts"
+    )
+    accepted: datetime = models.DateTimeField(editable=False, default=now)
+
+    class Meta:
+        ordering = ["-accepted"]
+        verbose_name = "User Accepts"
+        verbose_name_plural = "User Accepts"
+
+    @property
+    def organisation(self) -> Organisation:
+        return self.tos.organisation
+
+    def __str__(self):
+        return f"Consent to {self.tos_id} for user {self.user_id}"
+
+    __repr__ = __str__
 
     # Type annotations
     objects: models.Manager

@@ -5,6 +5,7 @@ from django.utils.translation import gettext as _
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db import transaction
+from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework import permissions
@@ -31,6 +32,7 @@ from voteit.organisation.matching import find_candidates
 from voteit.organisation.matching import is_elevated
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
+from voteit.organisation.models import TermsOfService
 from voteit.organisation.rest_api import serializers
 from voteit.organisation.rest_api.filters import OrphanUserEmailFilter
 from voteit.organisation.rest_api.filters import UserIdentitiesFilter
@@ -38,6 +40,19 @@ from voteit.organisation.rest_api.filters import UserPkFilter
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
+
+
+def is_org_manager(user: UserType) -> bool:
+    return user.is_authenticated and user.has_perm(
+        Organisation.get_perm(PERM.MANAGE), user.organisation
+    )
+
+
+class IsOrgManagerOrReadOnly(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return is_org_manager(request.user)
 
 
 @router.register("organisation", basename="organisation")
@@ -105,22 +120,46 @@ class OrganisationViewSet(
 #     expected_default_http_status = 401
 
 
-# @router.register("tos", basename="tos")
-# class TOSViewSet(DefaultModelViewSet):
-#     serializer_class = serializers.TOSSerializer
-#     serializer_classes = {"create": serializers.TOSCreateSerializer}
-#     context_queryset = Organisation.objects.all()
-#     context_lookup_kwarg = "organisation"
-#     model = TermsOfService
-#
-#     def get_queryset(self):
-#         if self.request.user.is_superuser:
-#             return self.model.objects.all()
-#         if self.request.user.organisation:
-#             return self.model.objects.filter(
-#                 organisation=self.request.user.organisation
-#             )
-#         return self.model.objects.none()
+@router.register("terms-of-service", basename="terms-of-service")
+class TermsOfServiceViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    GenericViewSet,
+):
+    """
+    The organisation's terms of service. Managers see every version,
+    others only the active one: the latest that has taken effect.
+
+    Managers create new versions rather than editing, users must accept each
+    version. Small fixes to body can be patched.
+    """
+
+    serializer_class = serializers.TermsOfServiceSerializer
+    permission_classes = (IsOrgManagerOrReadOnly,)
+    http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def get_organisation(self) -> Organisation:
+        user = self.request.user
+        if user.is_authenticated:
+            return user.organisation
+        # Anonymous users only have the host to go by
+        hostname = self.request.get_host().split(":")[0]
+        return get_object_or_404(Organisation.objects, host=hostname)
+
+    def get_queryset(self):
+        qs = TermsOfService.objects.filter(
+            organisation=self.get_organisation()
+        ).select_related("based_on")
+        if is_org_manager(self.request.user):
+            return qs
+        return qs.filter(
+            pk__in=qs.filter(version__lte=now()).order_by("-version").values("pk")[:1]
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(organisation=self.request.user.organisation)
 
 
 # @router.register("user_consents", basename="user_consents")

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
@@ -9,7 +10,9 @@ from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
 from voteit.core.testing import run_permission_tests
+from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
+from voteit.organisation.models import TermsOfService
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
@@ -455,3 +458,138 @@ class HandleIdentitiesViewSetTests(APITestCase):
             **self._mk_auth(),
         )
         self.assertContains(response, "required", status_code=400)
+
+
+class TermsOfServiceViewSetTests(APITestCase):
+    list_url = reverse("terms-of-service-list")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create(title="Test org", host="testserver")
+        cls.manager = cls.org.users.create(username="manager")
+        cls.org.add_roles(cls.manager, ROLE_ORG_MANAGER)
+        cls.user = cls.org.users.create(username="user")
+        cls.other_org = Organisation.objects.create(
+            title="Other org", host="other.voteit.se"
+        )
+        cls.gtos = GlobalTermsOfService.objects.create(
+            body="Global", version=now() - timedelta(days=10)
+        )
+        cls.old = cls.org.tos.create(
+            based_on=cls.gtos, body="Old", version=now() - timedelta(days=5)
+        )
+        cls.current = cls.org.tos.create(
+            based_on=cls.gtos, body="Current", version=now() - timedelta(days=1)
+        )
+        cls.future = cls.org.tos.create(
+            based_on=cls.gtos, body="Future", version=now() + timedelta(days=1)
+        )
+        cls.other_org.tos.create(based_on=cls.gtos, body="Other")
+
+    def _pks(self, response):
+        return [x["pk"] for x in response.json()]
+
+    def test_list(self):
+        for func, params in run_permission_tests(
+            self,
+            url=self.list_url,
+            expected=((None, 200), (self.user, 200), (self.manager, 200)),
+        ):
+            func(*params)
+
+    def test_list_only_active_for_non_managers(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual([self.current.pk], self._pks(response))
+        self.assertEqual("Global", response.json()[0]["global_body"])
+        self.client.force_login(self.user)
+        self.assertEqual([self.current.pk], self._pks(self.client.get(self.list_url)))
+
+    def test_list_all_for_managers(self):
+        self.client.force_login(self.manager)
+        response = self.client.get(self.list_url)
+        self.assertEqual(
+            [self.future.pk, self.current.pk, self.old.pk], self._pks(response)
+        )
+
+    def test_list_nothing_active(self):
+        self.current.delete()
+        self.old.delete()
+        self.assertEqual([], self.client.get(self.list_url).json())
+
+    def test_retrieve_old_version(self):
+        url = reverse("terms-of-service-detail", kwargs={"pk": self.old.pk})
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            expected=((None, 404), (self.user, 404), (self.manager, 200)),
+        ):
+            func(*params)
+
+    def test_create(self):
+        for func, params in run_permission_tests(
+            self,
+            url=self.list_url,
+            method="post",
+            data={"body": "New"},
+            expected=((None, 401), (self.user, 403)),
+        ):
+            func(*params)
+        self.client.force_login(self.manager)
+        response = self.client.post(self.list_url, {"body": "New"})
+        self.assertEqual(201, response.status_code, response.json())
+        tos = TermsOfService.objects.get(pk=response.json()["pk"])
+        self.assertEqual(self.org, tos.organisation)
+        self.assertEqual(self.gtos, tos.based_on)
+        self.assertEqual("New", tos.body)
+
+    def test_create_ignores_based_on_and_version(self):
+        latest = GlobalTermsOfService.objects.create(body="Latest")
+        self.client.force_login(self.manager)
+        before = now()
+        response = self.client.post(
+            self.list_url,
+            {
+                "body": "New",
+                "based_on": self.gtos.pk,
+                "version": (before + timedelta(days=5)).isoformat(),
+            },
+        )
+        self.assertEqual(201, response.status_code, response.json())
+        tos = TermsOfService.objects.get(pk=response.json()["pk"])
+        self.assertEqual(latest, tos.based_on)
+        self.assertLess(tos.version, before + timedelta(minutes=1))
+
+    def test_create_without_global(self):
+        self.client.force_login(self.manager)
+        self.gtos.delete()
+        response = self.client.post(self.list_url, {"body": "New"})
+        self.assertEqual(400, response.status_code)
+        self.assertIn("non_field_errors", response.json())
+
+    def test_patch_body_only(self):
+        url = reverse("terms-of-service-detail", kwargs={"pk": self.current.pk})
+        data = {"body": "Fixed", "version": now().isoformat()}
+        for func, params in run_permission_tests(
+            self,
+            url=url,
+            method="patch",
+            data=data,
+            expected=(
+                (None, 401),
+                (self.user, 403),
+                (self.manager, 200, {"body": "Fixed"}),
+            ),
+        ):
+            func(*params)
+        self.client.force_login(self.manager)
+        self.client.patch(url, data, format="json")
+        version = self.current.version
+        self.current.refresh_from_db()
+        self.assertEqual("Fixed", self.current.body)
+        self.assertEqual(version, self.current.version)
+
+    def test_put_and_delete_not_allowed(self):
+        url = reverse("terms-of-service-detail", kwargs={"pk": self.current.pk})
+        self.client.force_login(self.manager)
+        self.assertEqual(405, self.client.put(url, {"body": "x"}).status_code)
+        self.assertEqual(405, self.client.delete(url).status_code)

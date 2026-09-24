@@ -36,11 +36,14 @@ The `backend` property returns the backend class for `provider_id`, or `None` wh
 
 `OAuth2Provider.visible_for(organisation)` returns the login options to offer: `hidden` rows and rows with no enabled backend dropped, `primary` first, the rest by title lowercased. Sorting is in Python because the title comes from the backend class, not the row. `hidden` only affects this list — such a provider still logs in fine, which is what you want for something reached by a hint rather than a button.
 
-### TermsOfService
-A TOS document for an organisation. `required=True` means a user must consent before accessing the platform. Multiple TOS documents per organisation are supported; each is accepted independently via `UserConsent`.
+### GlobalTermsOfService
+Terms shared by every organisation, one row per `version`. The admin action "Create organisation ToS from this version" (`create_org_tos()`) gives every active organisation without one a `TermsOfService` based on it, copying the organisation's latest body. It can be run again for organisations added later.
 
-### UserConsent
-Records user acceptance of a `TermsOfService`. Unique per `(user, tos)`. `revoked` timestamp is non-null when consent has been withdrawn; check via `is_revoked` property. The `organisation` property traverses `self.tos.organisation`.
+### TermsOfService
+An organisation's terms, `based_on` a `GlobalTermsOfService`. A new version is a new row, since users must accept each one. `version` is when it takes effect: the active one is the latest with `version <= now`, so a future version can be prepared in advance.
+
+### UserAccept
+Records that a user accepted a `TermsOfService`.
 
 ## Roles
 
@@ -85,6 +88,11 @@ The serializer also exposes read-only computed fields: `providers` and `componen
 - `available` (`GET /api/organisation-roles/available/`) — lists valid role definitions; open to anonymous.
 - `add_roles` (`POST /api/organisation-roles/add/`) — adds roles; requires `change_roles` on the caller's org. The `user` field is validated by `SameOrgUserField` to block cross-org assignments. Logs the change via `log_roles_change`.
 - `remove_roles` (`POST /api/organisation-roles/remove/`) — removes roles; returns `204` if the row is deleted entirely after the last role is removed. Also logs.
+
+### `TermsOfServiceViewSet` (`/api/terms-of-service/`)
+- `list` / `retrieve` — open to anyone. Anonymous callers get the organisation by host, everyone else their own. Managers see every version, others only the active one. `global_body` is the text of `based_on`.
+- `create` — `org_manager` only, and only `body` is taken. `based_on` is always the latest global version and `version` is now.
+- `partial_update` — `org_manager` only, for small fixes to `body`. Everything else is read-only. No `PUT` or `DELETE`.
 
 ### `MatchOrphansViewSet` (`/api/match-orphans/`)
 ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?email_in=a@b.com,c@d.com` (comma-separated, required). Returns users with no `identity_id` matching those emails, along with their organisation host. Used for pre-login orphan matching.
@@ -254,7 +262,6 @@ credentials) — never by reading a uid as though it were an identity.
 
 **One `OAuth2Provider` per backend, not per organisation.**
 
-**`UserConsent` / `TermsOfService` models exist but have no active REST endpoints.** The ViewSets and serializers are commented out. They will be used later.
 ## Tests
 
 ```
