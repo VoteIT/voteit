@@ -14,8 +14,4 @@ class Migration(migrations.Migration):
             model_name='organisation',
             name='last_modified_by',
         ),
-        migrations.RemoveField(
-            model_name='termsofservice',
-            name='last_modified_by',
-        ),
     ]

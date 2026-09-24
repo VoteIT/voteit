@@ -36,35 +36,6 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name='TermsOfService',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('body', voteit.core.fields.RichTextField(blank=True, default='')),
-                ('created', models.DateTimeField(auto_now_add=True)),
-                ('modified', models.DateTimeField(auto_now=True)),
-                ('tags', django.contrib.postgres.fields.ArrayField(base_field=models.CharField(max_length=100), blank=True, default=list, size=None)),
-                ('title', models.CharField(default='', max_length=100)),
-                ('required', models.BooleanField(default=False)),
-                ('author', models.ForeignKey(editable=False, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='author_organisation_termsofservice', to=settings.AUTH_USER_MODEL)),
-                ('last_modified_by', models.ForeignKey(editable=False, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='last_modified_organisation_termsofservice', to=settings.AUTH_USER_MODEL)),
-                ('mentions', models.ManyToManyField(blank=True, related_name='mentions_organisation_termsofservice', to=settings.AUTH_USER_MODEL)),
-                ('organisation', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tos', to='organisation.organisation', verbose_name='Organisation')),
-            ],
-            options={
-                'abstract': False,
-            },
-        ),
-        migrations.CreateModel(
-            name='UserConsent',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created', models.DateTimeField(auto_now_add=True)),
-                ('revoked', models.DateTimeField(blank=True, null=True)),
-                ('tos', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='consents', to='organisation.termsofservice')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='consents', to=settings.AUTH_USER_MODEL)),
-            ],
-        ),
-        migrations.CreateModel(
             name='OrganisationRoles',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -111,9 +82,5 @@ class Migration(migrations.Migration):
                 ('provider', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='access_tokens', to='organisation.oauth2provider')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='access_tokens', to=settings.AUTH_USER_MODEL)),
             ],
-        ),
-        migrations.AddConstraint(
-            model_name='userconsent',
-            constraint=models.UniqueConstraint(fields=('user', 'tos'), name='unique user tos'),
         ),
     ]

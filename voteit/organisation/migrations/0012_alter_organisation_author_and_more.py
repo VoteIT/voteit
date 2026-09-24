@@ -44,35 +44,4 @@ class Migration(migrations.Migration):
                 to=settings.AUTH_USER_MODEL,
             ),
         ),
-        migrations.AlterField(
-            model_name="termsofservice",
-            name="author",
-            field=models.ForeignKey(
-                editable=False,
-                null=True,
-                on_delete=django.db.models.deletion.SET_NULL,
-                related_name="author_%(app_label)s_%(class)s",
-                to=settings.AUTH_USER_MODEL,
-            ),
-        ),
-        migrations.AlterField(
-            model_name="termsofservice",
-            name="last_modified_by",
-            field=models.ForeignKey(
-                editable=False,
-                null=True,
-                on_delete=django.db.models.deletion.SET_NULL,
-                related_name="last_modified_%(app_label)s_%(class)s",
-                to=settings.AUTH_USER_MODEL,
-            ),
-        ),
-        migrations.AlterField(
-            model_name="termsofservice",
-            name="mentions",
-            field=models.ManyToManyField(
-                blank=True,
-                related_name="mentions_%(app_label)s_%(class)s",
-                to=settings.AUTH_USER_MODEL,
-            ),
-        ),
     ]

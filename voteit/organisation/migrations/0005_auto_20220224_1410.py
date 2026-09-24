@@ -16,14 +16,4 @@ class Migration(migrations.Migration):
             name='created',
             field=models.DateTimeField(default=django.utils.timezone.now, editable=False),
         ),
-        migrations.AlterField(
-            model_name='termsofservice',
-            name='created',
-            field=models.DateTimeField(default=django.utils.timezone.now, editable=False),
-        ),
-        migrations.AlterField(
-            model_name='userconsent',
-            name='created',
-            field=models.DateTimeField(default=django.utils.timezone.now, editable=False),
-        ),
     ]

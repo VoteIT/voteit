@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from auditlog.registry import auditlog
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.utils.timezone import now
 from social_core.backends.utils import load_backends
 
 from voteit.core.abcs import OrganisationContext
@@ -267,77 +265,6 @@ class OAuth2Provider(OrganisationContext):
 
     def __repr__(self):
         return f"OAuth2Provider {self.title}"
-
-    # Type annotations
-    objects: models.Manager
-
-
-class TermsOfService(BaseContent, OrganisationContext):
-    """
-    A terms-of-service document that users must accept before using the platform.
-
-    ``required=True`` blocks login until the user has consented. Consents are tracked
-    via ``UserConsent``. Multiple TOS documents may exist per organisation; each is
-    accepted independently.
-    """
-
-    name = "tos"
-    title: str = models.CharField(max_length=100, default="")
-    required: bool = models.BooleanField(default=False)
-    organisation: Organisation = models.ForeignKey(
-        Organisation,
-        on_delete=models.CASCADE,
-        verbose_name="Organisation",
-        related_name="tos",
-    )
-
-    def __str__(self):
-        return self.title
-
-    def __repr__(self):
-        return f"TOS: {self.title}"
-
-    # Type annotations
-    objects: models.Manager
-    consents: models.QuerySet
-
-
-class UserConsent(OrganisationContext):
-    """
-    Records that a user has accepted a ``TermsOfService`` document.
-
-    ``revoked`` is set when the user withdraws consent. A non-null ``revoked``
-    timestamp means the consent is no longer active; check via ``is_revoked``.
-    One record per (user, tos) pair (unique constraint).
-    """
-
-    name = "user_consent"
-    user: AbstractUser = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="consents"
-    )
-    tos: TermsOfService = models.ForeignKey(
-        TermsOfService, on_delete=models.CASCADE, related_name="consents"
-    )
-    created: datetime = models.DateTimeField(editable=False, default=now)
-    revoked: datetime = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        constraints = (
-            models.UniqueConstraint(fields=("user", "tos"), name="unique user tos"),
-        )
-
-    @property
-    def is_revoked(self):
-        return self.revoked is not None
-
-    @property
-    def organisation(self) -> Organisation:
-        return self.tos.organisation
-
-    def __str__(self):
-        return f"Consent to {self.tos} for {self.user.username}"
-
-    __repr__ = __str__
 
     # Type annotations
     objects: models.Manager

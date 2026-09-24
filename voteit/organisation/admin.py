@@ -18,8 +18,6 @@ from voteit.meeting.models import Meeting
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
-from voteit.organisation.models import TermsOfService
-from voteit.organisation.models import UserConsent
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
@@ -224,16 +222,6 @@ class OrganisationRolesAdmin(admin.ModelAdmin):
 
     def get_assigned(self, instance):
         return instance.assigned
-
-
-@admin.register(TermsOfService)
-class TermsOfServiceAdmin(admin.ModelAdmin):
-    pass
-
-
-@admin.register(UserConsent)
-class UserConsentAdmin(admin.ModelAdmin):
-    pass
 
 
 @admin.register(OAuth2Provider)
