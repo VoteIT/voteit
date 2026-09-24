@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from datetime import timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING
@@ -590,10 +591,9 @@ class TermsOfServiceViewSetTests(APITestCase):
         self.assertEqual("Fixed", self.current.body)
         self.assertEqual(version, self.current.version)
 
-    def test_put_and_delete_not_allowed(self):
+    def test_delete_not_allowed(self):
         url = reverse("terms-of-service-detail", kwargs={"pk": self.current.pk})
         self.client.force_login(self.manager)
-        self.assertEqual(405, self.client.put(url, {"body": "x"}).status_code)
         self.assertEqual(405, self.client.delete(url).status_code)
 
     def _accept_url(self, tos):

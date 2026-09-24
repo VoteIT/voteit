@@ -1,26 +1,28 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from django.utils.translation import gettext as _
+
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db import transaction
 from django.utils.timezone import now
+from django.utils.translation import gettext as _
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import exceptions
 from rest_framework import mixins
 from rest_framework import permissions
 from rest_framework import viewsets
-from rest_framework import exceptions
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework.generics import get_object_or_404
-from social_django.utils import load_backend
-from social_django.utils import load_strategy
-from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.serializers import Serializer
 from rest_framework.viewsets import GenericViewSet
+from social_django.utils import load_backend
+from social_django.utils import load_strategy
 
 from voteit.core import PERM
 from voteit.core.loggers import log_roles_change
@@ -140,7 +142,6 @@ class TermsOfServiceViewSet(
 
     serializer_class = serializers.TermsOfServiceSerializer
     permission_classes = (IsOrgManagerOrReadOnly,)
-    http_method_names = ["get", "post", "patch", "head", "options"]
 
     def get_organisation(self) -> Organisation:
         user = self.request.user
@@ -167,6 +168,7 @@ class TermsOfServiceViewSet(
         detail=True,
         methods=["post"],
         permission_classes=[permissions.IsAuthenticated],
+        serializer_class=Serializer,
     )
     def accept(self, request, pk=None):
         """
