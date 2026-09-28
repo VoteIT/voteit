@@ -4,6 +4,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.test import override_settings
 
+from voteit.core.messages.user import InvalidateUserCache
+from voteit.messaging.channels import UserChannel
 from voteit.messaging.testing import build_app_state
 
 from voteit.organisation.channels import OrganisationChannel
@@ -89,3 +91,37 @@ class RoleChangesPublishedTests(TestCase):
         self.assertEqual(self.org.pk, msg.payload.pk)
         self.assertEqual(msg.payload.model, "organisation")
         self.assertEqual({"org_manager"}, set(msg.payload.roles))
+
+
+class CredentialChangeInvalidatesUserTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create(title="Test org")
+        cls.user = User.objects.create(username="kim", organisation=cls.org)
+
+    def _published(self, mock_publish) -> list:
+        return [
+            call.args[0].payload.pk
+            for call in mock_publish.mock_calls
+            if isinstance(call.args[0], InvalidateUserCache)
+        ]
+
+    @patch.object(UserChannel, "sync_publish")
+    def test_connect_and_update(self, mock_publish):
+        social = self.user.social_auth.create(provider="idproxy", uid="abc")
+        social.extra_data = {"user_data": {"email": ["kim@example.com"]}}
+        social.save()
+        self.assertEqual([self.user.pk, self.user.pk], self._published(mock_publish))
+
+    def test_disconnect(self):
+        social = self.user.social_auth.create(provider="idproxy", uid="abc")
+        with patch.object(UserChannel, "sync_publish") as mock_publish:
+            social.delete()
+        self.assertEqual([self.user.pk], self._published(mock_publish))
+
+    def test_user_channel(self):
+        with patch.object(UserChannel, "sync_publish", autospec=True) as mock_publish:
+            self.user.social_auth.create(provider="idproxy", uid="abc")
+        channel, msg = mock_publish.mock_calls[0].args
+        self.assertEqual(f"user_{self.user.pk}", channel.channel_name)
+        self.assertEqual("user.inv", msg.action)

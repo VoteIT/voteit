@@ -11,8 +11,13 @@ from rest_framework import permissions
 from rest_framework import viewsets
 from rest_framework import exceptions
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework.generics import get_object_or_404
+from social_django.utils import load_backend
+from social_django.utils import load_strategy
+from rest_framework.exceptions import NotFound
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
@@ -22,6 +27,8 @@ from voteit.core.loggers import notification_logger
 from voteit.core.rest_api import router
 from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
+from voteit.organisation.matching import find_candidates
+from voteit.organisation.matching import is_elevated
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.rest_api import serializers
@@ -310,3 +317,68 @@ class HandleIdentitiesViewSet(viewsets.GenericViewSet):
         queryset = self.get_prepped_qs(raise_exc=False, notification_log=False)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+
+@router.register("account-link-options", basename="account-link-options")
+class AccountLinkOptionsViewSet(viewsets.ViewSet):
+    """
+    The accounts a paused login could be claiming, for the screen that asks.
+
+    Unauthenticated by necessity: the pipeline pauses before anyone is signed
+    in, and the partial token is what stands in for a session. The token is
+    single-use -- ``do_complete`` clears it on resume -- and ``clearsocial``
+    removes stale ones.
+
+    Answering is not done here. The client sends the person back to
+    ``/complete/<backend>/?partial_token=...&link_account=<pk|new>``, and the
+    pipeline picks up where it left off.
+    """
+
+    permission_classes = (AllowAny,)
+    #: Without a token there is no question to answer.
+    expected_default_http_status = 400
+
+    def list(self, request):
+        token = request.query_params.get("partial_token")
+        if not token:
+            raise ValidationError({"partial_token": _("Required")})
+        strategy = load_strategy(request)
+        stored = strategy.partial_load(token)
+        if stored is None:
+            raise NotFound(_("That question has already been answered."))
+        backend = load_backend(strategy, stored.backend, redirect_uri=None)
+        details = stored.kwargs.get("details") or {}
+        # Recomputed, never read back from the partial: the accounts on an
+        # address can change while the question is open, and the answer has to
+        # be about what is true now.
+        candidates = [
+            candidate
+            for candidate in find_candidates(
+                backend.organisation,
+                provider=backend.name,
+                email=backend.get_verified_email(
+                    details, stored.kwargs.get("response") or {}
+                ),
+            )
+            if not is_elevated(candidate)
+        ]
+        return Response(
+            data={
+                "provider": stored.backend,
+                "resume_url": f"/complete/{stored.backend}/",
+                "accounts": [
+                    {
+                        "pk": candidate.pk,
+                        "name": candidate.get_full_name(),
+                        "email": candidate.email,
+                        "last_login": candidate.last_login,
+                        "meetings": sorted(
+                            candidate.meeting_roles.values_list(
+                                "context__title", flat=True
+                            )
+                        ),
+                    }
+                    for candidate in candidates
+                ],
+            }
+        )

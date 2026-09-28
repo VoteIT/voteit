@@ -233,7 +233,41 @@ Four outgoing message types defined here:
 
 ## Background Jobs (`jobs.py`)
 
-`deactivate_unused_users` — runs weekly (Monday 04:35). Deactivates users who have not logged in for 30 days AND have no meeting or organisation roles. Also deletes their `UserSocialAuth` records so they can re-register via social login later.
+`deactivate_unused_users` — runs weekly (Monday 04:35). Deactivates users who have not logged in for 30 days AND have no meeting or organisation roles; an account that never took part in anything is almost always a registration made by mistake.
+
+The delete is the point, not incidental: the account is left deactivated, and `do_complete` refuses an inactive user.
+
+## User merging (`user_merger.py`)
+
+`UserMerger(source, target, dry_run=False, same_person=False)` moves everything owned by
+`source` onto `target` and deactivates `source` (never deletes it). `merge_users` is the
+management command; `UserAdmin.merge_users_action` is the admin path, with a dry-run preview.
+
+`same_person=True` skips the `identity_id` equality check, and the admin merge passes it:
+only the id proxy writes `identity_id`, so two accounts belonging to one person through any
+other provider never match on it, and without the override the admin could not merge exactly
+the duplicates this rollout produces. A human confirming both rows in the admin is what the
+override stands for. Never set it from a guess.
+
+`user_activity_score(user)` counts meeting roles, votes, proposals and discussion posts. A
+zero means nothing of the person's own is on the row; the admin uses it to pick which of two
+accounts becomes the source.
+
+## Middleware (`middleware.py`)
+
+`SentryUserMiddleware` attaches `{"id": user.pk}` to the Sentry scope and nothing else.
+It exists because `send_default_pii` is **off** in `project/settings.py` — which is what
+keeps request bodies, headers, cookies and IP addresses out of Sentry, but also stops the
+Django integration attaching any user at all. Only added to `MIDDLEWARE` when a
+`SENTRY_DSN` is configured. `sentry_sdk` is imported in `__init__`, not at module scope:
+that package is in the `docker` extra and absent from a plain dev install, while this module
+gets imported by anything that walks the package — `test_docs`'s doctest loader, for one.
+
+Secrets are kept out separately, by an `EventScrubber` with an extended denylist. Sentry's
+default list matches key names **exactly** and stops at `secret` and `token`, so
+`client_secret`, `access_token` and `id_token` would otherwise sail straight through — and
+`recursive=True` matters because they arrive nested inside dicts like PSA's request params
+and `extra_data`, where a non-recursive scrubber only ever reads the outer name.
 
 ## Managers (`managers.py`)
 

@@ -48,9 +48,11 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
     # per relationship (fan-out), causing duplicate proposals. Inject mentions separately.
     exclude_fields = {"body_diff_brief", "shortname", "mentions"}
     proposal_fields = set(ProposalDetailSerializer.Meta.fields) - exclude_fields
+    # order_by: unordered postgres results aren't stable, and the batch order
+    # is what clients apply
     qs = Proposal.objects.filter(
         agenda_item__meeting=meeting, diffproposal__isnull=True
-    )
+    ).order_by("pk")
     if not include_private:
         qs = qs.exclude(agenda_item__state=AgendaItemStateMachine.private.value)
     payloads = []
@@ -66,8 +68,10 @@ def attach_proposals(meeting: Meeting, app_state: AppState, include_private=Fals
     diff_fields = (set(DiffProposalDetailSerializer.Meta.fields) - exclude_fields) | {
         "para_body"
     }
-    diff_qs = DiffProposal.objects.filter(agenda_item__meeting=meeting).annotate(
-        para_body=models.F("paragraph__body")
+    diff_qs = (
+        DiffProposal.objects.filter(agenda_item__meeting=meeting)
+        .annotate(para_body=models.F("paragraph__body"))
+        .order_by("pk")
     )
     if not include_private:
         diff_qs = diff_qs.exclude(

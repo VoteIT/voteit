@@ -2,6 +2,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth import login
 from django.contrib.auth import logout
 from django.contrib.messages import get_messages
+from django.utils.translation import gettext as _
+from django.db import models
 from django.db import transaction
 from rest_framework import filters
 from rest_framework import mixins
@@ -12,6 +14,10 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from social_core.actions import do_disconnect
+from social_core.exceptions import NotAllowedToDisconnect
+from social_django.utils import load_backend
+from social_django.utils import load_strategy
 from statemachine import registry as sm_registry
 
 from voteit.core import PERM
@@ -21,8 +27,10 @@ from voteit.core.rest_api.filters import ActionAnnotatedDjangoFilterBackend
 from voteit.core.rest_api.mixins import ModelContextMixin
 from voteit.core.rest_api.serializers import LogoutSerializer
 from voteit.core.rest_api.serializers import MessageSerializer
+from voteit.core.rest_api.serializers import ProviderSerializer
 from voteit.core.rest_api.serializers import StateMachineSchemaSerializer
 from voteit.core.rest_api.serializers import UserAndRolesSerializer
+from voteit.core.rest_api.serializers import UserConnectionSerializer
 from voteit.core.rest_api.serializers import UserSerializer
 from voteit.core.rest_api.serializers import UserListSerializer
 from voteit.core.sessions import end_tracked_sessions
@@ -34,7 +42,9 @@ from voteit.messaging.close import close_user_connections
 from voteit.messaging.models import LOGGED_OUT
 from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
 from voteit.organisation.pipeline import _transfer_social_auths
-from voteit.organisation.utils import get_idproxy_user_data
+from voteit.organisation import LOGIN_PROVIDER_SESSION_KEY
+from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
+from voteit.organisation.utils import get_user_identity_data
 
 __all__ = ()
 
@@ -93,12 +103,25 @@ class UserView(
     serializer_class = UserAndRolesSerializer
 
     def get_queryset(self):
-        if identity_id := getattr(self.request.user, "identity_id", None):
-            return User.objects.filter(identity_id=identity_id, is_active=True)
-        return User.objects.none()
+        """
+        The requesting user, plus the other accounts that are the same person.
+
+        identity_id groups those, but it belongs to the id proxy alone -- anyone
+        who only ever logged in with another provider has none, and must still
+        reach their own row to read or edit it.
+        """
+        user = self.request.user
+        if not user.is_authenticated:
+            return User.objects.none()
+        query = models.Q(pk=user.pk)
+        if user.identity_id:
+            query |= models.Q(identity_id=user.identity_id, is_active=True)
+        return User.objects.filter(query)
 
     def list(self, request):
-        serializer = self.serializer_class(request.user)
+        # get_serializer, not the class: the payload carries session-derived
+        # fields, which need the request in context.
+        serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
     @action(methods=["POST"], detail=False, serializer_class=LogoutSerializer)
@@ -145,8 +168,17 @@ class UserView(
     def switch(self, request, pk):
         user = self.get_object()
         log_auth("Switch user", for_user=user, request=request)
-        _transfer_social_auths(request.user, user, "idproxy")
+        # Every credential follows, not just the id proxy's: the account being
+        # switched to is the same person, and leaving a login method behind on
+        # the old row would send the next login straight back to it.
+        _transfer_social_auths(request.user, user)
+        # login() flushes the session on the way to the other account, and this
+        # is not a social login so nothing puts it back. Same person, same
+        # provider -- and the client still needs it to log out of that provider.
+        login_provider = request.session.get(LOGIN_PROVIDER_SESSION_KEY)
         login(request, user, backend="voteit.core.backends.PrefetchedModelBackend")
+        if login_provider:
+            request.session[LOGIN_PROVIDER_SESSION_KEY] = login_provider
         serializer = self.get_serializer(user)
         return Response(serializer.data)
 
@@ -159,9 +191,71 @@ class UserView(
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
 
+    @action(methods=["GET"], detail=False, serializer_class=UserConnectionSerializer)
+    def connections(self, request):
+        """
+        GET /api/user/connections/ -- the ways this account can be logged into.
+        """
+        serializer = self.get_serializer(
+            request.user.social_auth.order_by("created"), many=True
+        )
+        return Response(serializer.data)
+
+    @action(methods=["POST"], detail=False, serializer_class=ProviderSerializer)
+    def connect(self, request):
+        """
+        POST /api/user/connect/ -- start attaching another login method.
+
+        Records that the user asked for this, then hands back where to send
+        them. Without that record ``require_connect_intent`` treats the
+        returning credential as a different person sitting down at an open
+        session, which is exactly what it is when nobody pressed this.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        provider = serializer.validated_data["provider"]
+        request.session[CONNECT_INTENT_SESSION_KEY] = provider.provider_id
+        return Response(
+            data={
+                "provider": provider.provider_id,
+                "login_url": provider.backend.get_login_url(provider),
+            }
+        )
+
+    @action(methods=["POST"], detail=False, serializer_class=ProviderSerializer)
+    @transaction.atomic(durable=True)
+    def disconnect(self, request):
+        """
+        POST /api/user/disconnect/ -- remove a login method from this account.
+
+        This is the undo for connecting one, so it has to be reachable by
+        someone who never meant to connect it in the first place.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        provider = serializer.validated_data["provider"]
+        strategy = load_strategy(request)
+        backend = load_backend(strategy, provider.provider_id, redirect_uri=None)
+        try:
+            do_disconnect(backend, request.user)
+        except NotAllowedToDisconnect:
+            # SOCIAL_AUTH_DISCONNECT_PIPELINE drops the step that raises this,
+            # deliberately -- see the note there. Still answered properly in case
+            # a deployment puts it back.
+            raise ValidationError(
+                {"provider": _("You can't remove your only way of signing in.")}
+            )
+        log_auth(
+            "Login method disconnected",
+            request=request,
+            provider=provider.provider_id,
+            context=provider.organisation,
+        )
+        return Response(status=204)
+
     @action(methods=["GET"], detail=False)
     def email_choices(self, request):
-        emails = get_idproxy_user_data(request.user).get("email", [])
+        emails = get_user_identity_data(request.user).get("email", [])
         return Response(data={"emails": sorted(emails)})
 
     @action(

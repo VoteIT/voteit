@@ -111,8 +111,8 @@ class User(AbstractUser):
 
     def __str__(self):
         if self.userid:
-            return f"{self.get_full_name()} ({self.userid}) {self.organisation_id}"
-        return f"[{self.username}] {self.organisation_id}"
+            return f"{self.get_full_name()} ({self.userid})"
+        return f"{self.get_full_name()} (PK:{self.pk})"
 
     objects = UserManager()
 

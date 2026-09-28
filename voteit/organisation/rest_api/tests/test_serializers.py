@@ -1,9 +1,14 @@
 from django.test import TestCase
 from django.test import override_settings
 
+from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
+from voteit.organisation.testing import ALT_DUMMY_PROVIDER
+from voteit.organisation.testing import DUMMY_PROVIDER
+from voteit.organisation.testing import dummy_backend_enabled
 
 
+@dummy_backend_enabled()
 @override_settings(
     LANGUAGE_CODE="en-us",
     ID_HOST="https://idproxy",
@@ -26,9 +31,19 @@ class OrganisationSerializerTests(TestCase):
         data = serializer.data
         self.assertEqual(data.pop("pk"), self.org.pk)
         self.assertEqual(data.pop("title"), self.org.title)
-        self.assertEqual(data.pop("login_url"), "https://idproxy/login-to/testserver")
-        self.assertEqual(data.pop("scope"), ["email"])
-        self.assertIsNotNone(data.pop("id_host"))
+        self.assertEqual(
+            [
+                {
+                    "provider_id": IDPROXY_PROVIDER,
+                    "title": "VoteIT ID",
+                    "login_url": "https://idproxy/login-to/testserver",
+                    "profile_url": "https://idproxy/",
+                    "logout_url": "https://idproxy/log-out",
+                    "scope": ["email"],
+                }
+            ],
+            [dict(x) for x in data.pop("providers")],
+        )
         self.assertIsNotNone(data.pop("page_title"))
         self.assertIsNotNone(data.pop("body"))
         self.assertIsInstance(data.pop("components"), list)
@@ -36,15 +51,83 @@ class OrganisationSerializerTests(TestCase):
         self.assertEqual(data.pop("help_info"), "")
         self.assertFalse(data, "Not everything was checked")
 
-    def test_get_with_provider(self):
-        serializer = self._cut(self.org)
-        data = serializer.data
-        self.assertEqual(data.pop("login_url"), "https://idproxy/login-to/testserver")
-        self.org.provider = None
-        self.org.save()
-        serializer = self._cut(self.org)
-        data = serializer.data
-        self.assertEqual(data.pop("login_url"), None)
+    def test_get_without_providers(self):
+        self.org.providers.all().delete()
+        self.assertEqual([], self._cut(self.org).data["providers"])
+
+    def _add(self, provider_id, **kwargs):
+        return self.org.providers.create(
+            provider_id=provider_id,
+            scope="one two",
+            client_id="cid",
+            client_secret="secret",
+            **kwargs,
+        )
+
+    def _titles(self):
+        return [x["title"] for x in self._cut(self.org).data["providers"]]
+
+    def test_get_several_providers(self):
+        self._add(DUMMY_PROVIDER)
+        data = self._cut(self.org).data
+        self.assertEqual(
+            [
+                {
+                    "provider_id": DUMMY_PROVIDER,
+                    "title": "Dummy login",
+                    "login_url": "/login/dummy/",
+                    "profile_url": "https://dummy.example/testserver/account/",
+                    "logout_url": "https://dummy.example/logout/",
+                    "scope": ["one", "two"],
+                },
+                {
+                    "provider_id": IDPROXY_PROVIDER,
+                    "title": "VoteIT ID",
+                    "login_url": "https://idproxy/login-to/testserver",
+                    "profile_url": "https://idproxy/",
+                    "logout_url": "https://idproxy/log-out",
+                    "scope": ["email"],
+                },
+            ],
+            [dict(x) for x in data["providers"]],
+        )
+
+    def test_providers_sort_by_title_case_insensitively(self):
+        self._add(DUMMY_PROVIDER)
+        self._add(ALT_DUMMY_PROVIDER)
+        # Raw string order would put "VoteIT ID" before "alpha login".
+        self.assertEqual(["alpha login", "Dummy login", "VoteIT ID"], self._titles())
+
+    def test_primary_provider_comes_first(self):
+        self._add(DUMMY_PROVIDER)
+        self._add(ALT_DUMMY_PROVIDER)
+        self.org.providers.filter(provider_id=IDPROXY_PROVIDER).update(primary=True)
+        self.assertEqual(["VoteIT ID", "alpha login", "Dummy login"], self._titles())
+
+    def test_several_primaries_stay_sorted_among_themselves(self):
+        self._add(DUMMY_PROVIDER, primary=True)
+        self._add(ALT_DUMMY_PROVIDER, primary=True)
+        self.assertEqual(["alpha login", "Dummy login", "VoteIT ID"], self._titles())
+
+    def test_hidden_providers_are_omitted(self):
+        self._add(DUMMY_PROVIDER, hidden=True)
+        self.assertEqual(["VoteIT ID"], self._titles())
+
+    def test_hidden_wins_over_primary(self):
+        self._add(DUMMY_PROVIDER, primary=True, hidden=True)
+        self.assertEqual(["VoteIT ID"], self._titles())
+
+    def test_get_skips_provider_without_enabled_backend(self):
+        self.org.providers.create(
+            provider_id="retired-backend",
+            scope="email",
+            client_id="cid",
+            client_secret="secret",
+        )
+        data = self._cut(self.org).data
+        self.assertEqual(
+            [IDPROXY_PROVIDER], [x["provider_id"] for x in data["providers"]]
+        )
 
     def test_patch(self):
         serializer = self._cut(self.org, {"body": "Bye!"}, partial=True)

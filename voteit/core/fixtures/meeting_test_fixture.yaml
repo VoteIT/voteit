@@ -80,6 +80,7 @@
   pk: 1
   fields:
     organisation: 1
+    provider_id: idproxy
     scope: email
     client_id: cid_org1
     client_secret: cs_org1

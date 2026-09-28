@@ -10,6 +10,7 @@ from rest_framework.reverse import reverse
 from rest_framework.test import APITestCase
 from social_core.exceptions import AuthException
 
+from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.backends import IDProxyOAuth2
 from voteit.organisation.models import Organisation
 from voteit.organisation.roles import ROLE_ORG_MANAGER
@@ -59,15 +60,12 @@ class SocialIntegrationTests(APITestCase):
         # Unauthenticated will have this hostname
         cls.organisation.host = "testserver"
         cls.organisation.save()
-        cls.organisation.provider.client_id = "id-key"
-        cls.organisation.provider.client_secret = "id-secret"
-        cls.organisation.provider.save()
+        provider = cls.organisation.get_provider(IDPROXY_PROVIDER)
+        provider.client_id = "id-key"
+        provider.client_secret = "id-secret"
+        provider.save()
 
     def test_begin_login(self):
-        # with patch(
-        #     "motionen.core.backends.IDProxyOAuth2.AUTHORIZATION_URL",
-        #     "https://idproxy/o/auth/",
-        # ):
         response = self.client.get("/login/idproxy/")
         location = response.get("Location")
         self.assertTrue(location)

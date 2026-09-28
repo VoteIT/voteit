@@ -27,7 +27,15 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.roles import ROLE_PARTICIPANT
 from voteit.messaging.models import LOGGED_OUT
 from voteit.messaging.models import LOGGED_OUT_EVERYWHERE
+from voteit.app.scouterna import SCOUTID_PROVIDER
+from voteit.app.scouterna.backends import SCOUTNET_MEMBER_NO
+from voteit.app.scouterna.testing import scoutid_disabled
+from voteit.app.scouterna.testing import scoutid_enabled
+from voteit.messaging.testing import testing_channel_layers_setting
+from voteit.organisation import IDPROXY_PROVIDER
+from voteit.organisation import LOGIN_PROVIDER_SESSION_KEY
 from voteit.organisation.models import OAuth2Provider
+from voteit.organisation.pipeline import CONNECT_INTENT_SESSION_KEY
 from voteit.organisation.models import Organisation
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
@@ -35,6 +43,8 @@ User = get_user_model()
 
 #: Patch targets live where the view imported them, not where they are defined.
 VIEWS = "voteit.core.rest_api.views"
+#: A sign-in that came from no provider at all.
+MODEL_BACKEND = "voteit.core.backends.PrefetchedModelBackend"
 
 
 class UserSearchViewSetTests(APITestCase):
@@ -178,6 +188,27 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
         response = self.client.put(url, data={"userid": "aneeewooone"})
         self.assertEqual(404, response.status_code)
 
+    def test_update_without_an_identity_id(self):
+        """
+        identity_id belongs to the id proxy. Someone who only ever logged in
+        with another provider has none, and must still reach their own row.
+        """
+        self.participant.identity_id = None
+        self.participant.save()
+        self.client.force_login(self.participant)
+        url = reverse("user-detail", kwargs={"pk": self.participant.pk})
+        response = self.client.put(url, data={"userid": "anewone"})
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("anewone", response.json()["userid"])
+
+    def test_no_identity_id_reaches_no_one_else(self):
+        self.participant.identity_id = None
+        self.participant.save()
+        self.client.force_login(self.participant)
+        url = reverse("user-detail", kwargs={"pk": self.moderator.pk})
+        response = self.client.put(url, data={"userid": "aneeewooone"})
+        self.assertEqual(404, response.status_code)
+
     def test_update_owned_other_user(self):
         self.client.force_login(self.participant)
         url = reverse("user-detail", kwargs={"pk": 1})
@@ -226,6 +257,10 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
                 "organisation": 1,
                 "organisation_roles": [],
                 "email": "moderator@voteit.se",
+                # force_login() defaults to AUTHENTICATION_BACKENDS[0].
+                "login_provider": IDPROXY_PROVIDER,
+                # Only the requesting user's own
+                "member_ids": None,
             },
             data[0],
         )
@@ -252,6 +287,8 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
                 "pk": 1,
                 "userid": "moderator",
                 "email": "moderator@voteit.se",
+                "login_provider": IDPROXY_PROVIDER,
+                "member_ids": [],
             },
             data,
         )
@@ -268,6 +305,41 @@ class UserViewSetTests(IsolatedCacheMixin, APITestCase):
         url = reverse("user-switch", kwargs={"pk": 3})
         response = self.client.post(url)
         self.assertEqual(404, response.status_code)
+
+    def test_switch_keeps_the_provider_this_session_signed_in_with(self):
+        """
+        login() flushes the session on the way across, and switching is not a
+        social login, so nothing would put it back -- but it is the same person
+        and the client still needs it to log out of that provider.
+        """
+        self.client.force_login(self.participant, backend=MODEL_BACKEND)
+        session = self.client.session
+        session[LOGIN_PROVIDER_SESSION_KEY] = IDPROXY_PROVIDER
+        session.save()
+        self.client.post(reverse("user-switch", kwargs={"pk": self.moderator.pk}))
+        self.assertEqual(
+            IDPROXY_PROVIDER, self.client.session.get(LOGIN_PROVIDER_SESSION_KEY)
+        )
+
+    def test_a_login_that_came_from_no_provider_reports_none(self):
+        """
+        Nothing to log out of, so nothing to tell the client about.
+        """
+        self.client.force_login(self.participant, backend=MODEL_BACKEND)
+        self.assertIsNone(
+            self.client.get(reverse("user-list")).json()["login_provider"]
+        )
+
+    @scoutid_enabled()
+    def test_member_ids(self):
+        self.participant.social_auth.create(
+            provider=SCOUTID_PROVIDER,
+            uid="a-keycloak-uuid",
+            extra_data={"user_data": {SCOUTNET_MEMBER_NO: ["9876543"]}},
+        )
+        self.client.force_login(self.participant)
+        response = self.client.get(reverse("user-list"))
+        self.assertEqual(["9876543"], response.json()["member_ids"])
 
     def test_switch_transfers_social_auths(self):
         self.participant.social_auth.create(uid="abc", provider="idproxy")
@@ -701,3 +773,117 @@ class StateMachinesViewTests(TestCase):
         self.assertEqual(1, len(transitions))
         self.assertEqual("draft", transitions[0]["from"])
         self.assertEqual("review", transitions[0]["to"])
+
+
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+class UserConnectionsTests(IsolatedCacheMixin, APITestCase):
+    """
+    Attaching another way of signing in, seeing them, and taking one away.
+    """
+
+    fixtures = ["meeting_test_fixture"]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.get(pk=1)
+        cls.org.host = "testserver"
+        cls.org.save()
+        cls.user = User.objects.get(username="participant")
+        cls.user.email = "participant@example.com"
+        cls.user.save()
+        cls.scoutid = cls.org.providers.create(
+            provider_id=SCOUTID_PROVIDER,
+            scope="openid profile email",
+            client_id="voteit",
+            client_secret="s3cret",
+        )
+
+    def _social(self, provider, uid):
+        return self.user.social_auth.create(provider=provider, uid=uid, extra_data={})
+
+    def test_connections_lists_every_login_method(self):
+        self._social(IDPROXY_PROVIDER, "an-identity")
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("user-connections"))
+        self.assertEqual(200, response.status_code)
+        data = response.json()
+        self.assertEqual(1, len(data))
+        self.assertEqual(IDPROXY_PROVIDER, data[0]["provider"])
+        self.assertEqual("VoteIT ID", data[0]["title"])
+
+    def test_connections_requires_login(self):
+        self.assertEqual(401, self.client.get(reverse("user-connections")).status_code)
+
+    def test_a_lone_login_method_is_flagged_for_the_ui(self):
+        self._social(IDPROXY_PROVIDER, "an-identity")
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("user-connections"))
+        self.assertTrue(response.json()[0]["is_only_login_method"])
+
+    @scoutid_enabled()
+    def test_neither_of_two_login_methods_is_flagged(self):
+        self._social(IDPROXY_PROVIDER, "an-identity")
+        self._social(SCOUTID_PROVIDER, "a-sub")
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("user-connections"))
+        self.assertFalse(any(r["is_only_login_method"] for r in response.json()))
+
+    @scoutid_enabled()
+    def test_connect_returns_where_to_go_and_records_the_intent(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("user-connect"), data={"provider": SCOUTID_PROVIDER}
+        )
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("/login/scoutid/", response.json()["login_url"])
+        self.assertEqual(
+            SCOUTID_PROVIDER, self.client.session[CONNECT_INTENT_SESSION_KEY]
+        )
+
+    def test_connect_rejects_a_provider_the_org_does_not_have(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("user-connect"), data={"provider": "nothing-like-that"}
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("provider", response.json())
+
+    def test_connect_rejects_a_backend_this_deployment_left_out(self):
+        """
+        Configured for the org, but not in AUTHENTICATION_BACKENDS.
+        """
+        self.client.force_login(self.user)
+        with scoutid_disabled():
+            response = self.client.post(
+                reverse("user-connect"), data={"provider": SCOUTID_PROVIDER}
+            )
+        self.assertEqual(400, response.status_code)
+
+    @scoutid_enabled()
+    def test_disconnect_removes_the_credential(self):
+        self._social(IDPROXY_PROVIDER, "an-identity")
+        self._social(SCOUTID_PROVIDER, "a-sub")
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("user-disconnect"), data={"provider": SCOUTID_PROVIDER}
+        )
+        self.assertEqual(204, response.status_code)
+        self.assertEqual(
+            [IDPROXY_PROVIDER],
+            list(self.user.social_auth.values_list("provider", flat=True)),
+        )
+
+    def test_the_last_way_in_can_still_be_removed(self):
+        """
+        A credential can land on the wrong account -- the auto-linker will make
+        that mistake sooner or later -- and whoever it belongs to has to be able
+        to take it back off, even though the account is then unreachable. That
+        is where a stale account started anyway.
+        """
+        self._social(IDPROXY_PROVIDER, "an-identity")
+        self.client.force_login(self.user)
+        response = self.client.post(
+            reverse("user-disconnect"), data={"provider": IDPROXY_PROVIDER}
+        )
+        self.assertEqual(204, response.status_code)
+        self.assertEqual(0, self.user.social_auth.count())

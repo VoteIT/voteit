@@ -38,6 +38,11 @@ Built-in adapters under `app/invites/`:
 - `InviteGroup` — group annotation; applies `GroupMembership` on accept. Handles grouprole too.
 - `InviteGroupRole` — must appear immediately after a `group` column; delegates all logic to `InviteGroup`.
 - `InviteSweSSN` — Swedish personal number identity.
+- `InviteMemberId` — `member_id`, a generic member id (stripped string). No provider stores a
+  `member_id` scope. Each backend names its own key with `MEMBER_ID_KEY`, and
+  `HandleMatchedInvitesViewSet` reads the ids through
+  `voteit.organisation.utils.get_user_member_ids`. `InviteDataTypesViewSet` lists it when one
+  of the organisation's providers has a backend with a `MEMBER_ID_KEY`.
 - `InviteParticipantNumber` — participant number annotation.
 
 Registry is a singleton at `registries.invite_adapter_registry`. Access it via `utils.get_invite_adapter_registry()` to avoid circular imports.

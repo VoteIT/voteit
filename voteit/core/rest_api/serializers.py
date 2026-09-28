@@ -26,7 +26,10 @@ from voteit.core.utils import get_tagged_hashtags
 from voteit.core.utils import get_tagged_userids
 from voteit.core.validators import get_invalid_tags
 from voteit.core.validators import valid_userid
-from voteit.organisation.utils import get_idproxy_user_data
+from voteit.organisation.utils import get_enabled_backends
+from voteit.organisation.utils import get_login_provider
+from voteit.organisation.utils import get_user_identity_data
+from voteit.organisation.utils import get_user_member_ids
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -193,7 +196,7 @@ class UserSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         if user.email == value:
             return value
-        valid_emails = get_idproxy_user_data(user).get("email", [])
+        valid_emails = get_user_identity_data(user).get("email", [])
         if value not in valid_emails:
             raise ValidationError(
                 _("Email you specified isn't validated. It must exist on your profile.")
@@ -207,13 +210,42 @@ class UserAndRolesSerializer(UserSerializer):
     """
 
     organisation_roles = serializers.SerializerMethodField()
+    login_provider = serializers.SerializerMethodField()
+    member_ids = serializers.SerializerMethodField()
 
     def get_organisation_roles(self, instance: AbstractUser):
         roles = instance.organisation_roles.first()
         return [] if roles is None else roles.assigned
 
+    def get_login_provider(self, instance: AbstractUser) -> str | None:
+        """
+        Which login method this session signed in with, or null.
+
+        A property of the session, not of the user: an account can hold several
+        credentials, and only one of them opened this session. It is what the
+        client needs to end the session at the provider too -- pair it with that
+        provider's ``logout_url`` from ``/api/organisation/``.
+        """
+        request = self.context.get("request")
+        return get_login_provider(request) if request else None
+
+    def get_member_ids(self, instance: AbstractUser) -> list[str] | None:
+        """
+        Member ids vouched for by the login providers, or null for anyone but the
+        requesting user -- ``alternate`` would otherwise pay a query per account.
+        Changes are announced with ``user.inv`` on the user's own channel.
+        """
+        request = self.context.get("request")
+        if request is None or request.user.pk != instance.pk:
+            return None
+        return sorted(get_user_member_ids(instance))
+
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ("organisation_roles",)
+        fields = UserSerializer.Meta.fields + (
+            "organisation_roles",
+            "login_provider",
+            "member_ids",
+        )
 
 
 class MessageSerializer(serializers.Serializer):
@@ -231,6 +263,55 @@ class LogoutSerializer(serializers.Serializer):
             "the websockets belonging to them."
         ),
     )
+
+
+class UserConnectionSerializer(serializers.Serializer):
+    """
+    One way of logging in to this account.
+    """
+
+    pk = serializers.IntegerField(read_only=True)
+    provider = serializers.CharField(read_only=True)
+    title = serializers.SerializerMethodField()
+    created = serializers.DateTimeField(read_only=True)
+    modified = serializers.DateTimeField(read_only=True)
+    is_only_login_method = serializers.SerializerMethodField()
+
+    def get_title(self, instance) -> str:
+        backend = get_enabled_backends().get(instance.provider)
+        return backend.get_title() if backend else instance.provider
+
+    def get_is_only_login_method(self, instance) -> bool:
+        """
+        Removing this one would leave the account with no way in.
+
+        Not a refusal -- a credential can land on the wrong account, and its
+        owner has to be able to take it back off. The UI warns on this.
+        """
+        return not instance.user.social_auth.exclude(
+            provider=instance.provider
+        ).exists()
+
+
+class ProviderSerializer(serializers.Serializer):
+    """
+    Names one of the organisation's login methods.
+    """
+
+    provider = serializers.CharField(write_only=True)
+
+    def validate_provider(self, value: str):
+        organisation = self.context["request"].user.organisation
+        if organisation is None:
+            raise ValidationError(_("Organisation required"))
+        try:
+            provider = organisation.get_provider(value)
+        except ObjectDoesNotExist:
+            raise ValidationError(_("No such login method here."))
+        if provider.backend is None:
+            # Configured for the org, but left out of this deployment.
+            raise ValidationError(_("That login method is not available."))
+        return provider
 
 
 class SMEventSerializer(serializers.Serializer):

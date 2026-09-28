@@ -4,6 +4,7 @@ from django.test import TestCase
 from social_django.storage import BaseDjangoStorage
 from social_django.strategy import DjangoStrategy
 
+from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
 
 User = get_user_model()
@@ -16,10 +17,10 @@ class IDProxyBackendTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.org = Organisation.objects.get(pk=1)
-        cls.org.provider.scope = "hello world identity"
-        cls.org.provider.save()
+        provider = cls.org.get_provider(IDPROXY_PROVIDER)
+        provider.scope = "hello world identity"
+        provider.save()
         cls.org.host = "testserver"
-        # cls.org.provider = cls.provider
         cls.org.save()
         cls.user = User.objects.create(username="user")
 

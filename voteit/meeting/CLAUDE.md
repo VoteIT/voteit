@@ -48,6 +48,14 @@ Defined in `roles.py`. All non-participant roles require `ROLE_PARTICIPANT`:
 
 State transitions are triggered via `meeting.sm.send(event_name, ...)` or the `POST /meetings/{id}/event/` REST endpoint (`StateMachineMixin`).
 
+## Scheduled Jobs
+
+`jobs.py`, scheduled through `@schedule_job` onto the `long` queue.
+
+- **`delete_requested_meetings`** (weekly, Tuesday 05:10) — deletes meetings with a
+  `delete_requested` older than `DELETE_AFTER_DAYS` (7) that never got a `start_time`.
+  Cascades and is auditlogged like a manual delete.
+
 ## REST API
 
 ViewSets live in `rest_api/views.py`, all registered to the central router.

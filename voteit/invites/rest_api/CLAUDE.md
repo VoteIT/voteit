@@ -34,10 +34,10 @@ For authenticated local users accepting/rejecting their own invites. Auth: `IsAu
 - `POST /{pk}/accept/` — accept; grants roles and applies group annotations.
 - `POST /{pk}/reject/` — reject.
 
-Queryset uses `get_idproxy_user_data(user)` to extract identity data and scopes results to `user.organisation`.
+Queryset uses `get_user_identity_data(user)` — every enabled provider's validated data, not just the id proxy's — and scopes results to `user.organisation`. Providers vouch for more than the invite system indexes (ScoutID also sends a membership number), so the view keeps only keys that have a registered `is_user_data` adapter.
 
 ### `InviteDataTypesViewSet` (`/api/invite-data-types/`)
-Lists registered adapter types. Filtered by the org's provider scope (defaults to `["email"]` if no provider). Returns `InviteDataTypesSchema` dicts.
+Lists registered adapter types. Filtered by the union of every `OAuth2Provider` scope the org has configured (defaults to `["email"]` if none). Returns `InviteDataTypesSchema` dicts.
 
 ## JSON create endpoint (`POST /api/meeting-invites/`)
 

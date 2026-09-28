@@ -82,7 +82,10 @@ SOCIAL_AUTH_PIPELINE = [
     "social_core.pipeline.social_auth.social_uid",
     # "social_core.pipeline.social_auth.auth_allowed",
     # "social_core.pipeline.social_auth.social_user",
+    # Before social_user, while `user` is still only the session's user.
+    "voteit.organisation.pipeline.require_connect_intent",
     "voteit.organisation.pipeline.social_user",
+    "voteit.organisation.pipeline.match_existing_user",
     "social_core.pipeline.user.get_username",
     "voteit.organisation.pipeline.create_user",
     "voteit.organisation.pipeline.ensure_userid",
@@ -92,14 +95,27 @@ SOCIAL_AUTH_PIPELINE = [
     "voteit.organisation.pipeline.inherit_users",
     "voteit.organisation.pipeline.bump_permissions",
     "voteit.organisation.pipeline.remove_nonmatching_email",
+    "voteit.organisation.pipeline.log_new_association",
+]
+
+#: social_core's default, minus ``allowed_to_disconnect``. Nobody here has a
+#: password -- accounts are SSO-only. The UI warns instead of blocking.
+SOCIAL_AUTH_DISCONNECT_PIPELINE = [
+    "social_core.pipeline.disconnect.get_entries",
+    "social_core.pipeline.disconnect.revoke_tokens",
+    "social_core.pipeline.disconnect.disconnect",
 ]
 
 
 AUTHENTICATION_BACKENDS = [
     "voteit.organisation.backends.IDProxyOAuth2",
+    "voteit.app.scouterna.backends.ScoutIDOpenIdConnect",
 ] + AUTHENTICATION_BACKENDS
 LOGIN_REDIRECT_URL = "/"
 LOGIN_ERROR_URL = "/error"
+#: Where match_existing_user sends someone when it has to ask which account
+#: is theirs. The SPA reads the options from /api/account-link-options/.
+LINK_ACCOUNT_URL = "/link-account"
 
 # RQ
 REDIS_RQ_HOST = os.getenv("REDIS_RQ_HOST", "redis_rq")
@@ -273,6 +289,34 @@ if SLACK_WEBHOOK_URL := os.getenv("SLACK_LOGGER_WEBHOOK"):
 if SENTRY_DSN := os.getenv("SENTRY_DSN"):  # pragma: no cover
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.scrubber import DEFAULT_DENYLIST
+    from sentry_sdk.scrubber import EventScrubber
+
+    # Tells Sentry which account an error belongs to. Needed because
+    # send_default_pii is off below, which stops the Django integration
+    # attaching a user at all.
+    MIDDLEWARE = MIDDLEWARE + ["voteit.core.middleware.SentryUserMiddleware"]
+
+    #: The scrubber matches key names exactly, and its defaults stop at
+    #: "secret" and "token" -- so "client_secret" and "access_token" would sail
+    #: straight through. Everything an OAuth round trip puts in a local
+    #: variable or a stored dict is named here.
+    SENTRY_DENYLIST = DEFAULT_DENYLIST + [
+        "client_secret",
+        "access_token",
+        "refresh_token",
+        "id_token",
+        "id_token_hint",
+        "code_verifier",
+        "extra_data",
+        "user_data",
+        "partial_token",
+        "swedish_ssn",
+        # Not a secret, but it is the thing that identifies a person, and
+        # send_default_pii does not reach into frame locals. Drop it from the
+        # list if it ever makes a real bug harder to read.
+        "email",
+    ]
 
     SENTRY_TRACES_SAMPLERATE = float(os.getenv("SENTRY_TRACES_SAMPLERATE", 1.0))
     SENTRY_PROFILES_SAMPLERATE = float(os.getenv("SENTRY_PROFILES_SAMPLERATE", 1.0))
@@ -290,6 +334,10 @@ if SENTRY_DSN := os.getenv("SENTRY_DSN"):  # pragma: no cover
         return SENTRY_TRACES_SAMPLERATE
 
     def before_send(event, hint):
+        """
+        Belt and braces over ``send_default_pii=False``: whatever put a user on
+        the event, only the id leaves.
+        """
         if user := event.get("user"):
             event["user"] = {"id": user.get("id")}
         return event
@@ -302,9 +350,14 @@ if SENTRY_DSN := os.getenv("SENTRY_DSN"):  # pragma: no cover
         # We recommend adjusting this value in production.
         traces_sample_rate=SENTRY_TRACES_SAMPLERATE,
         profiles_sample_rate=SENTRY_PROFILES_SAMPLERATE,
-        # This must be on to fetch users
-        send_default_pii=True,
-        # Scrub this way instead
+        # Off: it is what would send request bodies, headers, cookies and IP
+        # addresses. SentryUserMiddleware puts the user id back, which is the
+        # only part of a person we want there.
+        send_default_pii=False,
+        # Frame locals carry the tokens and the client secret through the auth
+        # pipeline, and they arrive nested inside dicts like PSA's request
+        # params -- so recursive, or the scrubber only reads the outer name.
+        event_scrubber=EventScrubber(denylist=SENTRY_DENYLIST, recursive=True),
         before_send=before_send,
         # Filter out specific endpoints to avoid spamming
         traces_sampler=traces_sampler,

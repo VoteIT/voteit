@@ -22,6 +22,9 @@ from voteit.meeting.models import Meeting
 from voteit.meeting.models import MeetingGroup
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.models import Organisation
+from voteit.organisation.testing import ALT_DUMMY_PROVIDER
+from voteit.organisation.testing import DUMMY_PROVIDER
+from voteit.organisation.testing import dummy_backend_enabled
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
@@ -326,6 +329,39 @@ class UserMatchedInviteViewSetTests(APITestCase):
         url = reverse("handle-matched-invites-list")
         response = self.client.get(url)
         self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
+
+
+@dummy_backend_enabled()
+class UserMatchedMemberIdInviteTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.organisation = Organisation.objects.create(host="member.example")
+        cls.meeting = cls.organisation.meetings.create(title="M", state="ongoing")
+        cls.user = User.objects.create_user("member", organisation=cls.organisation)
+        cls.invite = cls.meeting.invites.create(user_data={"member_id": "123"})
+        cls.meeting.invites.create(user_data={"member_id": "456"})
+
+    def _matched(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("handle-matched-invites-list"))
+        self.assertEqual(200, response.status_code)
+        return [x["pk"] for x in response.json()]
+
+    def test_match(self):
+        self.user.social_auth.create(
+            provider=DUMMY_PROVIDER,
+            uid="1",
+            extra_data={"user_data": {"dummy_member_no": ["123"]}},
+        )
+        self.assertEqual([self.invite.pk], self._matched())
+
+    def test_no_match_from_backend_without_member_ids(self):
+        self.user.social_auth.create(
+            provider=ALT_DUMMY_PROVIDER,
+            uid="1",
+            extra_data={"user_data": {"dummy_member_no": ["123"]}},
+        )
+        self.assertEqual([], self._matched())
 
 
 class MeetingInviteViewSetCreateTests(APITestCase):
@@ -1037,6 +1073,19 @@ class InviteDataTypesViewSetTests(APITestCase):
             },
             group_data,
         )
+
+    @dummy_backend_enabled()
+    def test_member_id_follows_the_providers_backend(self):
+        organisation = Organisation.objects.create(host="member.example")
+        user = User.objects.create(username="member", organisation=organisation)
+        self.client.force_login(user)
+        url = reverse("invite-data-types-list")
+        organisation.providers.create(provider_id=ALT_DUMMY_PROVIDER, scope="email")
+        names = {x["name"] for x in self.client.get(url).json()}
+        self.assertNotIn("member_id", names)
+        organisation.providers.create(provider_id=DUMMY_PROVIDER, scope="email")
+        names = {x["name"] for x in self.client.get(url).json()}
+        self.assertIn("member_id", names)
 
     def test_auth_required(self):
         url = reverse("invite-data-types-list")
