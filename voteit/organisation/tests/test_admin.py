@@ -4,53 +4,37 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils.timezone import now
 
+from voteit.organisation.admin import TermsOfServiceAdmin
 from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
+from voteit.organisation.models import TermsOfService
+from voteit.organisation.utils import accept_tos
 
 
-class GlobalTermsOfServiceAdminTests(TestCase):
-    changelist_url = reverse("admin:organisation_globaltermsofservice_changelist")
-
+class TermsOfServiceAdminTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.org = Organisation.objects.create(title="One", host="one.example.com")
+        cls.other = Organisation.objects.create(title="Two", host="two.example.com")
         cls.admin = cls.org.users.create(
             username="admin", is_staff=True, is_superuser=True
         )
-        cls.published = GlobalTermsOfService.objects.create(
-            body="Published",
-            version=now() - timedelta(days=1),
-            required_from=now().date(),
-        )
+        cls.old = cls.org.tos.create(version=now() - timedelta(days=2))
+        GlobalTermsOfService.objects.create(required_from=now().date())
 
     def setUp(self):
         self.client.force_login(self.admin)
 
-    def _create_org_tos(self, gtos):
-        return self.client.post(
-            self.changelist_url,
-            {"action": "create_org_tos", "_selected_action": [gtos.pk]},
-            follow=True,
-        )
+    def test_changelists(self):
+        for name in ("globaltermsofservice", "termsofservice", "useraccept"):
+            response = self.client.get(reverse(f"admin:organisation_{name}_changelist"))
+            self.assertEqual(200, response.status_code, name)
 
-    def test_create_org_tos(self):
-        response = self._create_org_tos(self.published)
-        self.assertContains(response, "Created ToS for 1 organisation(s)")
-        self.assertTrue(self.org.tos.filter(based_on=self.published).exists())
-
-    def test_create_org_tos_ignores_newer_draft(self):
-        GlobalTermsOfService.objects.create(body="Draft")
-        response = self._create_org_tos(self.published)
-        self.assertContains(response, "Created ToS for 1 organisation(s)")
-
-    def test_create_org_tos_refuses_draft(self):
-        draft = GlobalTermsOfService.objects.create(body="Draft")
-        response = self._create_org_tos(draft)
-        self.assertContains(response, "Set required from before using it")
-        self.assertFalse(self.org.tos.exists())
-
-    def test_create_org_tos_refuses_older(self):
-        GlobalTermsOfService.objects.create(body="Newer", required_from=now().date())
-        response = self._create_org_tos(self.published)
-        self.assertContains(response, "Only the latest version can be used")
-        self.assertFalse(self.org.tos.exists())
+    def test_accepts_count(self):
+        accept_tos(self.admin)
+        accept_tos(self.other.users.create(username="elsewhere"))
+        new = self.org.tos.create()
+        qs = TermsOfServiceAdmin(TermsOfService, None).get_queryset(None)
+        counts = {x.pk: x.accepts__count for x in qs}
+        self.assertEqual(1, counts[self.old.pk])
+        self.assertEqual(0, counts[new.pk])

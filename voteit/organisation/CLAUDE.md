@@ -37,13 +37,13 @@ The `backend` property returns the backend class for `provider_id`, or `None` wh
 `OAuth2Provider.visible_for(organisation)` returns the login options to offer: `hidden` rows and rows with no enabled backend dropped, `primary` first, the rest by title lowercased. Sorting is in Python because the title comes from the backend class, not the row. `hidden` only affects this list — such a provider still logs in fine, which is what you want for something reached by a hint rather than a button.
 
 ### GlobalTermsOfService
-Terms shared by every organisation, one row per `version`. `notes` says what changed. A version is a draft until `required_from` is set: drafts are not in the API, are never picked as `based_on`, and the admin action refuses them. The admin action "Create organisation ToS from this version" (`create_org_tos()`) gives every active organisation without one a `TermsOfService` based on it, copying the organisation's latest body. It can be run again for organisations added later.
+Terms shared by every organisation, one row per `version`. `notes` says what changed. A version is a draft until `required_from` is set, and drafts are not in the API. A published version is shown straight away, but only forces users to accept again once `required_from` has passed, so accepts made in the meantime already cover it.
 
 ### TermsOfService
-An organisation's terms, `based_on` a `GlobalTermsOfService`. A new version is a new row, since users must accept each one. `version` is when it takes effect: the active one is the latest with `version <= now`, so a future version can be prepared in advance.
+An organisation's own terms, optional and independent of `GlobalTermsOfService`. A new version is a new row, since users must accept each one. `version` is when it takes effect: the active one is the latest with `version <= now`, so a future version can be prepared in advance.
 
 ### UserAccept
-Records that a user accepted a `TermsOfService`.
+One row per user with the time of their latest accept. It doesn't point at any terms: a user must accept again when `get_required_version()` (the newest active org version, or global version past `required_from`) is later than `accepted`. See `must_accept_tos()` in `utils.py`.
 
 ## Roles
 
@@ -93,10 +93,11 @@ The serializer also exposes read-only computed fields: `providers` and `componen
 Read-only `list` / `retrieve` of every `GlobalTermsOfService` with `required_from` set, latest `version` first. Open to anyone, logged in or not.
 
 ### `TermsOfServiceViewSet` (`/api/terms-of-service/`)
-- `list` / `retrieve` — open to anyone. Anonymous callers get the organisation by host, everyone else their own. Managers see every version, others only the active one. `global_body` is the text of `based_on`.
-- `create` — `org_manager` only, and only `body` is taken. `based_on` is always the latest global version with `required_from` set, and `version` is now.
+- `list` / `retrieve` — open to anyone. Anonymous callers get the organisation by host, everyone else their own. Managers see every version, others only the active one.
+- `create` — `org_manager` only, and only `body` is taken. `version` is now.
 - `partial_update` — `org_manager` only, for small fixes to `body`. Everything else is read-only. No `PUT` or `DELETE`.
-- `accept` (`POST /api/terms-of-service/<pk>/accept/`) — for logged in users, accepts the active version, anything else is a 400. `UserAccept` is one row per user, so accepting replaces the previous accept. A login accepts through the pipeline instead.
+- `current` (`GET /api/terms-of-service/current/`) — open to anyone. What a user accepts: `global_tos` (the latest published global version) and `organisation_tos` (the active one), either may be `null`. `version` is the newest of them, plus the caller's `accepted` and `must_accept`.
+- `accept` (`POST /api/terms-of-service/accept/`) — for logged in users. Takes `version` from `current`; one older than the required version is a 400, so nobody accepts terms they weren't shown. Replaces the previous accept. A login accepts through the pipeline instead.
 
 ### `MatchOrphansViewSet` (`/api/match-orphans/`)
 ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?email_in=a@b.com,c@d.com` (comma-separated, required). Returns users with no `identity_id` matching those emails, along with their organisation host. Used for pre-login orphan matching.
@@ -194,8 +195,8 @@ Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`:
 - `remove_nonmatching_email` — syncs the user's `email` field against the identity server's email scope data. Clears email if the scope is not present, but only when `idproxy` is the provider.
 - `match_existing_user` — after `social_user`, and only when nothing else resolved the person. Finds every active account reachable at the provider's verified address. **One** of them carrying the same name, not elevated, that somebody has actually used, is returned as `user`: `create_user` short-circuits and `associate_user` attaches the credential. An **elevated** exact match raises `AuthException` — a second account for a manager is a merge waiting to happen, so they are sent back to the login they already have — the message names it. `AuthException`, not `AuthForbidden`: `SocialAuthExceptionMiddleware` renders `str(exception)`, and `AuthForbidden.__str__` discards whatever it was given in favour of "Your credentials aren't allowed". Anything else is a `@partial` step: it **pauses the pipeline** and redirects to `LINK_ACCOUNT_URL` with the token. Nothing is created while the question is open. Resuming with `link_account=<pk>` links that account (only if it is still among the candidates — the pk comes from the browser), and `link_account=new` carries on to a fresh one.
 - `log_new_association` — `log_auth` for a login method attached to an account that already existed. Says whether it was matched or connected. A brand new account picking up its first credential is a registration, not a connection, and is skipped.
-- `require_tos_accept` — after `match_existing_user`, **before** `create_user`, so nobody gets an account without accepting. A `@partial` step: unless the user (or the one about to be created) has accepted the organisation's active `TermsOfService`, it **pauses the pipeline** and redirects to `ACCEPT_TOS_URL` with `partial_token` and `resume_url`. Resuming with `accept_tos=<pk>` of the active version passes `accepted_tos` on; any other pk asks again.
-- `store_tos_accept` — last. Stores `accepted_tos` as a `UserAccept` now that there is a user. Helpers are `get_active_tos`, `get_tos_to_accept` and `accept_tos` in `utils.py`.
+- `require_tos_accept` — after `match_existing_user`, **before** `create_user`, so nobody gets an account without accepting. A `@partial` step: if `must_accept_tos()` holds for the user (or the one about to be created), it **pauses the pipeline** and redirects to `ACCEPT_TOS_URL` with `partial_token` and `resume_url`. Resuming with `accept_tos=<version>` (from `current`) passes `accepted_tos` on, unless the version is older than the required one, which asks again.
+- `store_tos_accept` — last. Stores a `UserAccept` now that there is a user, if `accepted_tos` is set. Helpers are in `utils.py`.
 
 `SOCIAL_AUTH_DISCONNECT_PIPELINE` is social_core's default **minus `allowed_to_disconnect`**. Accounts here are SSO-only and have no password, so that step would refuse to remove anyone's last login method — but a credential can land on the wrong account, and its owner has to be able to take it back off even though the account is then unreachable. That is where a stale account started anyway. The API reports `is_only_login_method` so the UI can warn instead.
 

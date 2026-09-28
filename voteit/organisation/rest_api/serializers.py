@@ -2,7 +2,6 @@ from __future__ import annotations
 from typing import List
 
 from django.contrib.auth import get_user_model
-from django.utils.translation import gettext as _
 from rest_framework import serializers
 
 from voteit.components.rest_api.serializers import OrganisationComponentSerializer
@@ -159,30 +158,31 @@ class GlobalTermsOfServiceSerializer(serializers.ModelSerializer):
 
 
 class TermsOfServiceSerializer(serializers.ModelSerializer):
-    global_body = serializers.CharField(source="based_on.body", read_only=True)
-
     class Meta:
         model = TermsOfService
         read_only_fields = [
-            "based_on",
-            "global_body",
             "organisation",
             "pk",
             "version",
         ]
         fields = read_only_fields + ["body"]
 
-    def validate(self, attrs):
-        if self.instance is None:
-            # New versions are always based on the latest global one
-            attrs["based_on"] = GlobalTermsOfService.objects.filter(
-                required_from__isnull=False
-            ).first()
-            if attrs["based_on"] is None:
-                raise serializers.ValidationError(
-                    _("There are no global terms of service yet")
-                )
-        return attrs
+
+class CurrentTermsOfServiceSerializer(serializers.Serializer):
+    """
+    What a user accepts: the global and the organisation's terms, either may
+    be missing. ``version`` is the newest of them, and goes back on accept.
+    """
+
+    global_tos = GlobalTermsOfServiceSerializer(allow_null=True)
+    organisation_tos = TermsOfServiceSerializer(allow_null=True)
+    version = serializers.DateTimeField(allow_null=True)
+    accepted = serializers.DateTimeField(allow_null=True)
+    must_accept = serializers.BooleanField()
+
+
+class AcceptTermsOfServiceSerializer(serializers.Serializer):
+    version = serializers.DateTimeField()
 
 
 class OrganisationRolesSerializer(serializers.ModelSerializer):

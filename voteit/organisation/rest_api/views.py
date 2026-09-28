@@ -19,7 +19,6 @@ from rest_framework.filters import SearchFilter
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.serializers import Serializer
 from rest_framework.viewsets import GenericViewSet
 from social_django.utils import load_backend
 from social_django.utils import load_strategy
@@ -41,7 +40,11 @@ from voteit.organisation.rest_api.filters import OrphanUserEmailFilter
 from voteit.organisation.rest_api.filters import UserIdentitiesFilter
 from voteit.organisation.rest_api.filters import UserPkFilter
 from voteit.organisation.utils import accept_tos
+from voteit.organisation.utils import get_accepted
 from voteit.organisation.utils import get_active_tos
+from voteit.organisation.utils import get_published_global_tos
+from voteit.organisation.utils import get_required_version
+from voteit.organisation.utils import must_accept_tos
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
@@ -147,7 +150,8 @@ class TermsOfServiceViewSet(
     others only the active one: the latest that has taken effect.
 
     Managers create new versions rather than editing, users must accept each
-    version. Small fixes to body can be patched.
+    version. Small fixes to body can be patched. What users accept is
+    ``current``, which includes the global terms.
     """
 
     serializer_class = serializers.TermsOfServiceSerializer
@@ -162,9 +166,7 @@ class TermsOfServiceViewSet(
         return get_object_or_404(Organisation.objects, host=hostname)
 
     def get_queryset(self):
-        qs = TermsOfService.objects.filter(
-            organisation=self.get_organisation()
-        ).select_related("based_on")
+        qs = TermsOfService.objects.filter(organisation=self.get_organisation())
         if is_org_manager(self.request.user):
             return qs
         return qs.filter(
@@ -175,21 +177,47 @@ class TermsOfServiceViewSet(
         serializer.save(organisation=self.request.user.organisation)
 
     @action(
-        detail=True,
+        detail=False,
+        permission_classes=[AllowAny],
+        serializer_class=serializers.CurrentTermsOfServiceSerializer,
+    )
+    def current(self, request):
+        organisation = self.get_organisation()
+        user = request.user if request.user.is_authenticated else None
+        global_tos = get_published_global_tos()
+        organisation_tos = get_active_tos(organisation)
+        versions = [x.version for x in (global_tos, organisation_tos) if x]
+        serializer = self.get_serializer(
+            {
+                "global_tos": global_tos,
+                "organisation_tos": organisation_tos,
+                "version": max(versions, default=None),
+                "accepted": get_accepted(user) if user else None,
+                "must_accept": must_accept_tos(organisation, user),
+            }
+        )
+        return Response(serializer.data)
+
+    @action(
+        detail=False,
         methods=["post"],
         permission_classes=[permissions.IsAuthenticated],
-        serializer_class=Serializer,
+        serializer_class=serializers.AcceptTermsOfServiceSerializer,
     )
-    def accept(self, request, pk=None):
+    def accept(self, request):
         """
-        Accept the active terms of service. A login accepts through the
-        pipeline instead, see ``require_tos_accept``.
+        Accept ``current``, sending back its ``version``. A login accepts
+        through the pipeline instead, see ``require_tos_accept``.
         """
-        tos = self.get_object()
-        if tos != get_active_tos(tos.organisation):
-            raise ValidationError(_("Only the active terms of service can be accepted"))
-        accepted = accept_tos(request.user, tos)
-        return Response({"tos": tos.pk, "accepted": accepted.accepted})
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        required = get_required_version(request.user.organisation)
+        if required and serializer.validated_data["version"] < required:
+            raise ValidationError(
+                {"version": _("Newer terms of service have taken effect")}
+            )
+        accepted = accept_tos(request.user)
+        return Response({"accepted": accepted.accepted})
 
 
 @router.register("organisation-roles")

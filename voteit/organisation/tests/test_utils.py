@@ -1,13 +1,23 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils.timezone import localdate
+from django.utils.timezone import now
 
 from voteit.app.scouterna import SCOUTID_PROVIDER
 from voteit.app.scouterna.backends import SCOUTNET_MEMBER_NO
 from voteit.app.scouterna.testing import scoutid_disabled
 from voteit.organisation import IDPROXY_PROVIDER
+from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
+from voteit.organisation.utils import accept_tos
+from voteit.organisation.utils import get_accepted
+from voteit.organisation.utils import get_published_global_tos
+from voteit.organisation.utils import get_required_version
 from voteit.organisation.utils import get_user_identity_data
 from voteit.organisation.utils import get_user_member_ids
+from voteit.organisation.utils import must_accept_tos
 
 User = get_user_model()
 
@@ -133,3 +143,65 @@ class UtilsTests(TestCase):
         self.usa.extra_data["user_data"][SCOUTNET_MEMBER_NO] = ["9876543"]
         self.usa.save()
         self.assertEqual(set(), get_user_member_ids(self.user))
+
+
+class TermsOfServiceUtilsTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create()
+        cls.user = cls.org.users.create(username="kim")
+
+    def _global(self, days_ago=0, required_in=None):
+        return GlobalTermsOfService.objects.create(
+            version=now() - timedelta(days=days_ago),
+            required_from=None
+            if required_in is None
+            else localdate() + timedelta(days=required_in),
+        )
+
+    def test_nothing_to_accept(self):
+        self.assertIsNone(get_required_version(self.org))
+        self.assertIsNone(get_required_version(None))
+        self.assertFalse(must_accept_tos(self.org, self.user))
+        self.assertFalse(must_accept_tos(self.org, None))
+
+    def test_org_tos(self):
+        tos = self.org.tos.create(version=now() - timedelta(days=1))
+        self.org.tos.create(version=now() + timedelta(days=1))
+        self.assertEqual(tos.version, get_required_version(self.org))
+
+    def test_global_counts_from_required_from(self):
+        self._global(days_ago=2)
+        self._global(days_ago=1, required_in=1)
+        self.assertIsNone(get_required_version(self.org))
+        gtos = self._global(days_ago=3, required_in=0)
+        self.assertEqual(gtos.version, get_required_version(self.org))
+        self.assertEqual(gtos.version, get_required_version(None))
+
+    def test_newest_of_both(self):
+        gtos = self._global(days_ago=1, required_in=-1)
+        self.org.tos.create(version=now() - timedelta(days=2))
+        self.assertEqual(gtos.version, get_required_version(self.org))
+        tos = self.org.tos.create()
+        self.assertEqual(tos.version, get_required_version(self.org))
+
+    def test_published_global_includes_not_yet_required(self):
+        self._global(days_ago=2, required_in=-2)
+        upcoming = self._global(days_ago=1, required_in=5)
+        self._global()
+        self.assertEqual(upcoming, get_published_global_tos())
+
+    def test_must_accept(self):
+        self.org.tos.create(version=now() - timedelta(days=1))
+        self.assertTrue(must_accept_tos(self.org, self.user))
+        self.assertTrue(must_accept_tos(self.org, None))
+        accept_tos(self.user)
+        self.assertFalse(must_accept_tos(self.org, self.user))
+        self.org.tos.create()
+        self.assertTrue(must_accept_tos(self.org, self.user))
+
+    def test_accept_replaces_previous(self):
+        first = accept_tos(self.user)
+        second = accept_tos(self.user)
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(second.accepted, get_accepted(self.user))

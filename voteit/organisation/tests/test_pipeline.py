@@ -635,13 +635,12 @@ class RequireTosAcceptTests(TestCase):
     def setUpTestData(cls):
         cls.org = Organisation.objects.create()
         cls.user = cls.org.users.create(username="kim")
-        cls.gtos = GlobalTermsOfService.objects.create()
 
     def _run(self, user=None, answer=None):
         self.strategy = MagicMock()
         self.strategy.storage.partial.prepare.return_value.token = "a-token"
         self.strategy.request_data.return_value = (
-            {ACCEPT_TOS_FIELD: str(answer)} if answer else {}
+            {ACCEPT_TOS_FIELD: answer} if answer else {}
         )
         backend = MagicMock()
         backend.name = SCOUTID_PROVIDER
@@ -660,7 +659,7 @@ class RequireTosAcceptTests(TestCase):
         self.assertEqual({}, self._run(self.user))
 
     def test_new_user_pauses(self):
-        self.org.tos.create(based_on=self.gtos)
+        self.org.tos.create()
         self._run()
         self.assertEqual(
             "/accept-tos?partial_token=a-token&resume_url=%2Fcomplete%2Fscoutid%2F",
@@ -668,35 +667,57 @@ class RequireTosAcceptTests(TestCase):
         )
 
     def test_new_user_accepts(self):
-        tos = self.org.tos.create(based_on=self.gtos)
-        self.assertEqual({"accepted_tos": tos.pk}, self._run(answer=tos.pk))
+        tos = self.org.tos.create()
+        answer = tos.version.isoformat()
+        self.assertEqual({"accepted_tos": True}, self._run(answer=answer))
         self.strategy.redirect.assert_not_called()
         # Nothing stored until there's a user
         self.assertFalse(UserAccept.objects.exists())
 
-    def test_accepting_old_version_asks_again(self):
-        old = self.org.tos.create(based_on=self.gtos, version=now() - timedelta(days=1))
-        self.org.tos.create(based_on=self.gtos)
-        self._run(answer=old.pk)
-        self._asked()
-
-    def test_existing_user_accepted(self):
-        tos = self.org.tos.create(based_on=self.gtos)
-        accept_tos(self.user, tos)
-        self.assertEqual({}, self._run(self.user))
-
-    def test_existing_user_accepted_older_version(self):
-        old = self.org.tos.create(based_on=self.gtos, version=now() - timedelta(days=1))
-        accept_tos(self.user, old)
-        tos = self.org.tos.create(based_on=self.gtos)
+    def test_global_tos_only(self):
+        gtos = GlobalTermsOfService.objects.create(required_from=now().date())
         self._run(self.user)
         self._asked()
-        self.assertEqual({"accepted_tos": tos.pk}, self._run(self.user, answer=tos.pk))
+        answer = gtos.version.isoformat()
+        self.assertEqual({"accepted_tos": True}, self._run(self.user, answer=answer))
+
+    def test_accepting_old_version_asks_again(self):
+        old = self.org.tos.create(version=now() - timedelta(days=1))
+        self.org.tos.create()
+        self._run(answer=old.version.isoformat())
+        self._asked()
+
+    def test_garbage_answer_asks_again(self):
+        self.org.tos.create()
+        for answer in ("yes", "2026-13-01T00:00:00+00:00", "2999-01-01T00:00:00"):
+            self._run(answer=answer)
+            self._asked()
+
+    def test_existing_user_accepted(self):
+        self.org.tos.create()
+        accept_tos(self.user)
+        self.assertEqual({}, self._run(self.user))
+
+    def test_existing_user_accepted_before_new_version(self):
+        self.org.tos.create(version=now() - timedelta(days=1))
+        accept_tos(self.user)
+        tos = self.org.tos.create()
+        self._run(self.user)
+        self._asked()
+        answer = tos.version.isoformat()
+        self.assertEqual({"accepted_tos": True}, self._run(self.user, answer=answer))
 
     def test_future_version_not_required_yet(self):
-        tos = self.org.tos.create(based_on=self.gtos, version=now() - timedelta(days=1))
-        accept_tos(self.user, tos)
-        self.org.tos.create(based_on=self.gtos, version=now() + timedelta(days=1))
+        self.org.tos.create(version=now() - timedelta(days=1))
+        accept_tos(self.user)
+        self.org.tos.create(version=now() + timedelta(days=1))
+        self.assertEqual({}, self._run(self.user))
+
+    def test_global_not_required_yet(self):
+        accept_tos(self.user)
+        GlobalTermsOfService.objects.create(
+            required_from=now().date() + timedelta(days=1)
+        )
         self.assertEqual({}, self._run(self.user))
 
 
@@ -705,11 +726,10 @@ class StoreTosAcceptTests(TestCase):
     def setUpTestData(cls):
         cls.org = Organisation.objects.create()
         cls.user = cls.org.users.create(username="kim")
-        cls.tos = cls.org.tos.create(based_on=GlobalTermsOfService.objects.create())
 
     def test_stores(self):
-        store_tos_accept(user=self.user, accepted_tos=self.tos.pk)
-        self.assertEqual(self.tos, UserAccept.objects.get(user=self.user).tos)
+        store_tos_accept(user=self.user, accepted_tos=True)
+        self.assertTrue(UserAccept.objects.filter(user=self.user).exists())
 
     def test_nothing_accepted(self):
         store_tos_accept(user=self.user)

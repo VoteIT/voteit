@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from django.test import override_settings
 from django.urls import reverse
+from django.utils.dateparse import parse_datetime
 from django.utils.http import urlencode
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
@@ -515,6 +516,8 @@ class GlobalTermsOfServiceViewSetTests(APITestCase):
 
 class TermsOfServiceViewSetTests(APITestCase):
     list_url = reverse("terms-of-service-list")
+    current_url = reverse("terms-of-service-current")
+    accept_url = reverse("terms-of-service-accept")
 
     @classmethod
     def setUpTestData(cls):
@@ -530,16 +533,14 @@ class TermsOfServiceViewSetTests(APITestCase):
             version=now() - timedelta(days=10),
             required_from=now().date() - timedelta(days=10),
         )
-        cls.old = cls.org.tos.create(
-            based_on=cls.gtos, body="Old", version=now() - timedelta(days=5)
-        )
+        cls.old = cls.org.tos.create(body="Old", version=now() - timedelta(days=5))
         cls.current = cls.org.tos.create(
-            based_on=cls.gtos, body="Current", version=now() - timedelta(days=1)
+            body="Current", version=now() - timedelta(days=1)
         )
         cls.future = cls.org.tos.create(
-            based_on=cls.gtos, body="Future", version=now() + timedelta(days=1)
+            body="Future", version=now() + timedelta(days=1)
         )
-        cls.other_org.tos.create(based_on=cls.gtos, body="Other")
+        cls.other_org.tos.create(body="Other")
 
     def _pks(self, response):
         return [x["pk"] for x in response.json()]
@@ -555,7 +556,6 @@ class TermsOfServiceViewSetTests(APITestCase):
     def test_list_only_active_for_non_managers(self):
         response = self.client.get(self.list_url)
         self.assertEqual([self.current.pk], self._pks(response))
-        self.assertEqual("Global", response.json()[0]["global_body"])
         self.client.force_login(self.user)
         self.assertEqual([self.current.pk], self._pks(self.client.get(self.list_url)))
 
@@ -594,38 +594,24 @@ class TermsOfServiceViewSetTests(APITestCase):
         self.assertEqual(201, response.status_code, response.json())
         tos = TermsOfService.objects.get(pk=response.json()["pk"])
         self.assertEqual(self.org, tos.organisation)
-        self.assertEqual(self.gtos, tos.based_on)
         self.assertEqual("New", tos.body)
 
-    def test_create_ignores_based_on_and_version(self):
-        latest = GlobalTermsOfService.objects.create(
-            body="Latest", required_from=now().date()
-        )
-        # Not based on a version nobody has set required from on
-        GlobalTermsOfService.objects.create(
-            body="Draft", version=now() + timedelta(minutes=1)
-        )
+    def test_create_ignores_version(self):
         self.client.force_login(self.manager)
         before = now()
         response = self.client.post(
             self.list_url,
-            {
-                "body": "New",
-                "based_on": self.gtos.pk,
-                "version": (before + timedelta(days=5)).isoformat(),
-            },
+            {"body": "New", "version": (before + timedelta(days=5)).isoformat()},
         )
         self.assertEqual(201, response.status_code, response.json())
         tos = TermsOfService.objects.get(pk=response.json()["pk"])
-        self.assertEqual(latest, tos.based_on)
         self.assertLess(tos.version, before + timedelta(minutes=1))
 
     def test_create_without_global(self):
         self.client.force_login(self.manager)
         self.gtos.delete()
         response = self.client.post(self.list_url, {"body": "New"})
-        self.assertEqual(400, response.status_code)
-        self.assertIn("non_field_errors", response.json())
+        self.assertEqual(201, response.status_code)
 
     def test_patch_body_only(self):
         url = reverse("terms-of-service-detail", kwargs={"pk": self.current.pk})
@@ -654,31 +640,94 @@ class TermsOfServiceViewSetTests(APITestCase):
         self.client.force_login(self.manager)
         self.assertEqual(405, self.client.delete(url).status_code)
 
-    def _accept_url(self, tos):
-        return reverse("terms-of-service-accept", kwargs={"pk": tos.pk})
-
-    def test_accept(self):
+    def test_current(self):
         for func, params in run_permission_tests(
             self,
-            url=self._accept_url(self.current),
+            url=self.current_url,
+            expected=((None, 200), (self.user, 200), (self.manager, 200)),
+        ):
+            func(*params)
+        data = self.client.get(self.current_url).json()
+        self.assertEqual(
+            {"global_tos", "organisation_tos", "version", "accepted", "must_accept"},
+            set(data),
+        )
+        self.assertEqual(self.gtos.pk, data["global_tos"]["pk"])
+        self.assertEqual(self.current.pk, data["organisation_tos"]["pk"])
+        self.assertEqual(self.current.version, parse_datetime(data["version"]))
+        self.assertIsNone(data["accepted"])
+        self.assertTrue(data["must_accept"])
+
+    def test_current_accepted(self):
+        accept_tos(self.user)
+        self.client.force_login(self.user)
+        data = self.client.get(self.current_url).json()
+        self.assertIsNotNone(data["accepted"])
+        self.assertFalse(data["must_accept"])
+
+    def test_current_upcoming_global(self):
+        # Shown, and newest, but nobody has to accept it yet
+        accept_tos(self.user)
+        upcoming = GlobalTermsOfService.objects.create(
+            required_from=now().date() + timedelta(days=5)
+        )
+        self.client.force_login(self.user)
+        data = self.client.get(self.current_url).json()
+        self.assertEqual(upcoming.pk, data["global_tos"]["pk"])
+        self.assertEqual(upcoming.version, parse_datetime(data["version"]))
+        self.assertFalse(data["must_accept"])
+
+    def test_current_only_org(self):
+        self.gtos.delete()
+        data = self.client.get(self.current_url).json()
+        self.assertIsNone(data["global_tos"])
+        self.assertEqual(self.current.pk, data["organisation_tos"]["pk"])
+
+    def test_current_only_global(self):
+        self.org.tos.all().delete()
+        data = self.client.get(self.current_url).json()
+        self.assertIsNone(data["organisation_tos"])
+        self.assertEqual(self.gtos.version, parse_datetime(data["version"]))
+        self.assertTrue(data["must_accept"])
+
+    def test_current_nothing(self):
+        self.gtos.delete()
+        self.org.tos.all().delete()
+        data = self.client.get(self.current_url).json()
+        self.assertIsNone(data["version"])
+        self.assertFalse(data["must_accept"])
+
+    def test_accept(self):
+        data = {"version": self.current.version.isoformat()}
+        for func, params in run_permission_tests(
+            self,
+            url=self.accept_url,
             method="post",
+            data=data,
             expected=((None, 401), (self.user, 200), (self.manager, 200)),
         ):
             func(*params)
         self.client.force_login(self.user)
-        response = self.client.post(self._accept_url(self.current))
-        self.assertEqual(self.current.pk, response.json()["tos"])
-        self.assertEqual(self.current, self.user.tos_accepts.tos)
+        response = self.client.post(self.accept_url, data)
+        self.assertEqual(
+            UserAccept.objects.get(user=self.user).accepted,
+            parse_datetime(response.json()["accepted"]),
+        )
 
     def test_accept_replaces_previous(self):
-        accept_tos(self.user, self.old)
+        old = accept_tos(self.user)
         self.client.force_login(self.user)
-        self.client.post(self._accept_url(self.current))
-        self.assertEqual(self.current, UserAccept.objects.get(user=self.user).tos)
+        self.client.post(self.accept_url, {"version": self.current.version.isoformat()})
+        new = UserAccept.objects.get(user=self.user)
+        self.assertEqual(old.pk, new.pk)
+        self.assertGreater(new.accepted, old.accepted)
 
-    def test_accept_only_active(self):
-        self.client.force_login(self.manager)
-        for tos in (self.old, self.future):
-            response = self.client.post(self._accept_url(tos))
-            self.assertEqual(400, response.status_code)
+    def test_accept_outdated_version(self):
+        self.client.force_login(self.user)
+        response = self.client.post(
+            self.accept_url, {"version": self.old.version.isoformat()}
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("version", response.json())
+        self.assertEqual(400, self.client.post(self.accept_url).status_code)
         self.assertFalse(UserAccept.objects.exists())

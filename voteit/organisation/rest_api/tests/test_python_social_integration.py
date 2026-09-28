@@ -14,6 +14,7 @@ from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.backends import IDProxyOAuth2
 from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
+from voteit.organisation.models import UserAccept
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 
 User = get_user_model()
@@ -121,8 +122,7 @@ class SocialIntegrationTests(APITestCase):
 
     @responses.activate
     def test_complete_new_user_must_accept_tos(self):
-        gtos = GlobalTermsOfService.objects.create()
-        tos = self.organisation.tos.create(based_on=gtos)
+        gtos = GlobalTermsOfService.objects.create(required_from=now().date())
         users = User.objects.count()
         state = parse_qs(self.client.get("/login/idproxy/").get("Location"))["state"][0]
         responses.add(
@@ -145,11 +145,14 @@ class SocialIntegrationTests(APITestCase):
         self.assertEqual(users, User.objects.count())
         response = self.client.get(
             "/complete/idproxy/",
-            data={"partial_token": query["partial_token"][0], "accept_tos": tos.pk},
+            data={
+                "partial_token": query["partial_token"][0],
+                "accept_tos": gtos.version.isoformat(),
+            },
         )
         self.assertEqual(settings.LOGIN_REDIRECT_URL, response.get("Location"))
         user = User.objects.get(identity_id="123")
-        self.assertEqual(tos, user.tos_accepts.tos)
+        self.assertTrue(UserAccept.objects.filter(user=user).exists())
 
     @responses.activate
     def test_complete_existing_user(self):

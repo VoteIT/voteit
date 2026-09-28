@@ -4,6 +4,8 @@ from urllib.parse import urlencode
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.contrib.auth import login
+from django.utils.dateparse import parse_datetime
+from django.utils.timezone import is_aware
 from social_core.exceptions import AuthException
 from social_core.pipeline.partial import partial
 from django.utils.translation import gettext as _
@@ -14,12 +16,11 @@ from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.matching import find_candidates
 from voteit.organisation.matching import is_elevated
 from voteit.organisation.matching import names_match
-from voteit.organisation.models import TermsOfService
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 from voteit.organisation.utils import get_enabled_backends
 from voteit.organisation.utils import accept_tos
-from voteit.organisation.utils import get_active_tos
-from voteit.organisation.utils import get_tos_to_accept
+from voteit.organisation.utils import get_required_version
+from voteit.organisation.utils import must_accept_tos
 
 logger = getLogger(__name__)
 User = get_user_model()
@@ -393,21 +394,27 @@ def log_new_association(
 @partial
 def require_tos_accept(*args, strategy, backend, current_partial, user=None, **kwargs):
     """
-    Pause the login until the active terms of service are accepted.
+    Pause the login until the user has accepted every terms of service
+    version in effect.
 
     Before ``create_user``, so nobody gets an account without accepting. The
-    client resumes with ``accept_tos=<pk>``, and the accept is stored by
+    client resumes with ``accept_tos=<version>``, the ``version`` from
+    ``/api/terms-of-service/current/``, and the accept is stored by
     ``store_tos_accept`` once there is a user.
     """
-    if user is not None:
-        tos = get_tos_to_accept(user)
-    else:
-        tos = get_active_tos(backend.organisation)
-    if tos is None:
+    if not must_accept_tos(backend.organisation, user):
         return
     # Only the version they were shown counts, a newer one means asking again
-    if strategy.request_data().get(ACCEPT_TOS_FIELD) == str(tos.pk):
-        return {"accepted_tos": tos.pk}
+    try:
+        shown = parse_datetime(strategy.request_data().get(ACCEPT_TOS_FIELD) or "")
+    except ValueError:
+        shown = None
+    if (
+        shown
+        and is_aware(shown)
+        and shown >= get_required_version(backend.organisation)
+    ):
+        return {"accepted_tos": True}
     base = getattr(settings, "ACCEPT_TOS_URL", "/accept-tos")
     query = urlencode(
         {
@@ -418,9 +425,9 @@ def require_tos_accept(*args, strategy, backend, current_partial, user=None, **k
     return strategy.redirect(f"{base}?{query}")
 
 
-def store_tos_accept(user=None, accepted_tos=None, *args, **kwargs):
+def store_tos_accept(user=None, accepted_tos=False, *args, **kwargs):
     """
     Store what ``require_tos_accept`` got, now that there's a user.
     """
-    if user is not None and accepted_tos is not None:
-        accept_tos(user, TermsOfService.objects.get(pk=accepted_tos))
+    if user is not None and accepted_tos:
+        accept_tos(user)

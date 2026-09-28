@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Collection
+from datetime import datetime
 from typing import Generator
 from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
+from django.utils.timezone import localdate
 from django.utils.timezone import now
 from social_core.backends.base import BaseAuth
 from social_core.backends.utils import load_backends
@@ -15,6 +17,7 @@ from social_django.utils import load_strategy
 
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation import LOGIN_PROVIDER_SESSION_KEY
+from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserAccept
 
@@ -130,21 +133,60 @@ def get_active_tos(organisation: Organisation) -> TermsOfService | None:
     return organisation.tos.filter(version__lte=now()).order_by("-version").first()
 
 
-def get_tos_to_accept(user: User) -> TermsOfService | None:
+def get_published_global_tos() -> GlobalTermsOfService | None:
     """
-    The active terms of service, if the user hasn't accepted them.
+    The latest global terms. Shown before ``required_from`` too, so accepts
+    made in the meantime already cover them.
     """
-    if not user.organisation_id:
-        return None
-    tos = get_active_tos(user.organisation)
-    if tos and not UserAccept.objects.filter(user=user, tos=tos).exists():
-        return tos
-    return None
+    return (
+        GlobalTermsOfService.objects.filter(
+            required_from__isnull=False, version__lte=now()
+        )
+        .order_by("-version")
+        .first()
+    )
 
 
-def accept_tos(user: User, tos: TermsOfService) -> UserAccept:
+def get_required_version(organisation: Organisation | None) -> datetime | None:
+    """
+    Accepts older than this must be renewed. Global terms only count once
+    ``required_from`` has passed.
+    """
+    versions = [
+        GlobalTermsOfService.objects.filter(
+            required_from__lte=localdate(), version__lte=now()
+        )
+        .order_by("-version")
+        .values_list("version", flat=True)
+        .first()
+    ]
+    if organisation is not None:
+        versions.append(
+            organisation.tos.filter(version__lte=now())
+            .order_by("-version")
+            .values_list("version", flat=True)
+            .first()
+        )
+    return max((x for x in versions if x is not None), default=None)
+
+
+def get_accepted(user: User) -> datetime | None:
+    return (
+        UserAccept.objects.filter(user=user).values_list("accepted", flat=True).first()
+    )
+
+
+def must_accept_tos(organisation: Organisation | None, user: User | None) -> bool:
+    required = get_required_version(organisation)
+    if required is None:
+        return False
+    accepted = get_accepted(user) if user is not None else None
+    return accepted is None or accepted < required
+
+
+def accept_tos(user: User) -> UserAccept:
     # One row per user, the latest accept replaces the previous
     obj, _ = UserAccept.objects.update_or_create(
-        user=user, defaults={"tos": tos, "accepted": now()}
+        user=user, defaults={"accepted": now()}
     )
     return obj
