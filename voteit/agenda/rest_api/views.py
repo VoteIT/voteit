@@ -167,6 +167,7 @@ class AgendaViewSet(VerboseAutoPermissionViewSetMixin, StateMachineMixin, ModelV
                 | models.Q(meeting__roles__user=user)
                 & ~models.Q(state=AgendaItemStateMachine.private.value)
             )
+            .with_related_modified()
             .select_related("meeting")
             .distinct()
         )

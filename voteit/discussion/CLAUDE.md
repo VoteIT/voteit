@@ -80,7 +80,7 @@ The `@disable_on_raw_save` decorator on `discussion_post_change` suppresses broa
 
 ## Cross-app interactions
 
-- **`voteit.agenda.signals`**: `post_save` and `post_delete` on `DiscussionPost` also trigger `maybe_mark_related_modified` / `revert_to_last_related_modified` on the parent `AgendaItem` — this updates the `related_modified` timestamp used by the frontend "unread" indicator.
+- **`voteit.agenda.signals`**: creating or deleting a `DiscussionPost` pushes the parent `AgendaItem` again after commit, with a freshly computed `related_modified` for the frontend "unread" indicator.
 - **`voteit.reactions`**: `DiscussionPost` inherits `Reactable` (a `GenericRelation` to `Reaction`), making posts eligible for emoji reactions.
 - **`voteit.export_import`**: `DiscussionPost` is imported/exported as `DiscussionPostData` Pydantic schemas.
 

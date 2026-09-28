@@ -20,9 +20,10 @@ if TYPE_CHECKING:
 
 
 # Taken from the serializer rather than repeated, so the two cannot drift. Every
-# one is a plain concrete column, which is what makes the .values() below a
-# faithful substitute -- and if someone adds a method field to the serializer,
-# .values() raises FieldError rather than silently dropping it.
+# one is a plain concrete column or the related_modified annotation, which is
+# what makes the .values() below a faithful substitute -- and if someone adds a
+# method field to the serializer, .values() raises FieldError rather than
+# silently dropping it.
 AGENDA_ITEM_FIELDS = tuple(AgendaItemListSerializer.Meta.fields)
 
 
@@ -38,8 +39,9 @@ class AgendaItems(AppStateCollector):
     contributes to the wire. ``StateMachineModelMixin`` made that binding lazy,
     so what remains is the model and DRF overhead; still worth avoiding here,
     but no longer the order-of-magnitude difference it was. The serializer
-    declares nine plain columns and no method fields, so the payloads are
-    identical either way; ``test_values_matches_the_serializer`` holds that.
+    declares eight plain columns plus ``related_modified``, which comes from
+    the annotation either way, so the payloads are identical;
+    ``test_values_matches_the_serializer`` holds that.
     """
 
     name = "agenda.items"
@@ -47,7 +49,7 @@ class AgendaItems(AppStateCollector):
     order = 20
 
     def collect(self, state: AppState) -> None:
-        qs = self.context.agenda_items.all()
+        qs = self.context.agenda_items.with_related_modified()
         if not isinstance(self.channel, ModeratorsChannel):
             qs = qs.exclude(state=AgendaItemStateMachine.private.value)
         state.add_batch(AgendaChanged, qs.values(*AGENDA_ITEM_FIELDS))

@@ -1,9 +1,9 @@
 from collections import Counter
-from datetime import UTC
 from datetime import datetime
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.test import TestCase
 from django.test import override_settings
 from voteit.agenda.messages import AgendaChanged
@@ -167,6 +167,23 @@ class AgendaChangedTests(TestCase):
         self.assertEqual(ai_pk, msg.payload.pk)
 
 
+@override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
+class DeleteWithContentTests(TestCase):
+    def test_no_changed_after_deleted(self):
+        """Deleting children in the cascade must not resurrect the item client side."""
+        with FakeCommit():
+            meeting = Meeting.objects.create()
+            ai = meeting.agenda_items.create(state="upcoming")
+            ai.proposals.create()
+            ai.discussions.create()
+        with MessageCatcher() as messages:
+            with FakeCommit():
+                ai.delete()
+        actions = [m.action for m in messages if m.action.startswith("agenda_item.")]
+        self.assertIn("agenda_item.deleted", actions)
+        self.assertNotIn("agenda_item.changed", actions)
+
+
 class ArchiveAgendaTests(TestCase):
     def setUp(self):
         self.meeting = Meeting.objects.create()
@@ -178,99 +195,80 @@ class ArchiveAgendaTests(TestCase):
         self.assertEqual("archived", ai.state)
 
 
+def _dt(msg: AgendaChanged) -> datetime:
+    return datetime.fromisoformat(msg.payload.related_modified)
+
+
 @override_settings(CHANNEL_LAYERS=testing_channel_layers_setting)
 class RelatedItemsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.meeting: Meeting = Meeting.objects.create()
-        cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="upcoming")
-        cls.prop = cls.ai.proposals.create()
-        cls.prop.modified = datetime(2021, 1, 1, 12, 0, tzinfo=UTC)
-        cls.prop.save()
-        cls.prop_pk = cls.prop.pk
-        cls.disc = cls.ai.discussions.create()
-        cls.disc.modified = datetime(2021, 2, 2, 12, 0, tzinfo=UTC)
-        cls.disc.save()
-        cls.disc_pk = cls.disc.pk
-        # Make sure related will be triggered
-        cls.ai.related_modified = datetime(2021, 3, 3, 12, 0, tzinfo=UTC)
-        cls.ai.save()
+        # FakeCommit, or the pending push lingers in the class transaction and
+        # swallows the ones the tests schedule.
+        with FakeCommit():
+            cls.meeting: Meeting = Meeting.objects.create()
+            cls.ai: AgendaItem = cls.meeting.agenda_items.create(state="upcoming")
+            cls.ai_private: AgendaItem = cls.meeting.agenda_items.create()
+            cls.prop = cls.ai.proposals.create()
+            cls.disc = cls.ai.discussions.create()
 
     def setUp(self):
-        self.prop = self.ai.proposals.get(pk=self.prop_pk)
-        self.disc = self.ai.discussions.get(pk=self.disc_pk)
-        self.ai.refresh_from_db()
+        self.prop = self.ai.proposals.get(pk=self.prop.pk)
+        self.disc = self.ai.discussions.get(pk=self.disc.pk)
 
-    @patch.object(ParticipantsChannel, "sync_publish")
-    def test_proposal_deleted(self, mock_publish):
-        self.prop.delete()
-        self.assertEqual(
-            1,
-            len(
-                [
-                    x.args[0]
-                    for x in mock_publish.mock_calls
-                    if x.args[0].action == "agenda_item.changed"
-                ]
-            ),
-        )
+    def _pushed(self, func, channel_cls=ParticipantsChannel) -> list[AgendaChanged]:
+        with patch.object(channel_cls, "sync_publish") as mock_publish:
+            with self.captureOnCommitCallbacks(execute=True):
+                func()
+        return [
+            x.args[0]
+            for x in mock_publish.mock_calls
+            if x.args[0].action == "agenda_item.changed"
+        ]
 
-    @patch.object(ParticipantsChannel, "sync_publish")
-    def test_discussion_deleted(self, mock_publish):
-        self.disc.delete()
-        self.assertEqual(
-            1,
-            len(
-                [
-                    x.args[0]
-                    for x in mock_publish.mock_calls
-                    if x.args[0].action == "agenda_item.changed"
-                ]
-            ),
-        )
+    def test_proposal_deleted(self):
+        msgs = self._pushed(self.prop.delete)
+        self.assertEqual(1, len(msgs))
+        self.assertEqual(self.disc.created, _dt(msgs[0]))
 
-    @patch.object(ParticipantsChannel, "sync_publish")
-    def test_proposal_created(self, mock_publish):
-        self.ai.proposals.create(body="Hello")
-        self.assertTrue(
-            [
-                x.args[0]
-                for x in mock_publish.mock_calls
-                if x.args[0].action == "agenda_item.changed"
-            ]
-        )
+    def test_discussion_deleted(self):
+        msgs = self._pushed(self.disc.delete)
+        self.assertEqual(1, len(msgs))
+        self.assertEqual(self.prop.created, _dt(msgs[0]))
 
-    @patch.object(ParticipantsChannel, "sync_publish")
-    def test_proposal_changed(self, mock_publish):
+    def test_proposal_created(self):
+        msgs = self._pushed(lambda: self.ai.proposals.create(body="Hello"))
+        self.assertEqual(1, len(msgs))
+        self.assertEqual(self.ai.proposals.latest("created").created, _dt(msgs[0]))
+
+    def test_proposal_changed(self):
         self.prop.body = "Hello"
-        self.prop.save()
-        self.assertFalse(
-            [
-                x.args[0]
-                for x in mock_publish.mock_calls
-                if x.args[0].action == "agenda_item.changed"
-            ]
-        )
+        self.assertFalse(self._pushed(self.prop.save))
 
-    @patch.object(ParticipantsChannel, "sync_publish")
-    def test_discussion_created(self, mock_publish):
-        self.ai.discussions.create(body="Hello")
-        self.assertTrue(
-            [
-                x.args[0]
-                for x in mock_publish.mock_calls
-                if x.args[0].action == "agenda_item.changed"
-            ]
-        )
+    def test_discussion_created(self):
+        msgs = self._pushed(lambda: self.ai.discussions.create(body="Hello"))
+        self.assertEqual(1, len(msgs))
 
-    @patch.object(ParticipantsChannel, "sync_publish")
-    def test_discussion_changed(self, mock_publish):
+    def test_discussion_changed(self):
         self.disc.body = "Hello"
-        self.disc.save()
-        self.assertFalse(
-            [
-                x.args[0]
-                for x in mock_publish.mock_calls
-                if x.args[0].action == "agenda_item.changed"
-            ]
-        )
+        self.assertFalse(self._pushed(self.disc.save))
+
+    def test_private_only_to_moderators(self):
+        # One capture only: executed callbacks stay in run_on_commit within a test
+        with patch.object(ModeratorsChannel, "sync_publish") as mod_publish:
+            msgs = self._pushed(
+                lambda: self.ai_private.discussions.create(body="Hello")
+            )
+        self.assertFalse(msgs)
+        self.assertEqual(1, len(mod_publish.mock_calls))
+
+    def test_rollback_drops_push(self):
+        def create_and_rollback():
+            try:
+                with transaction.atomic():
+                    self.ai.proposals.create(body="Hello")
+                    raise ValueError
+            except ValueError:
+                pass
+
+        self.assertFalse(self._pushed(create_and_rollback))

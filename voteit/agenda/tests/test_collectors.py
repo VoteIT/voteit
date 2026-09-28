@@ -45,12 +45,12 @@ class AgendaItemsCollectorTests(TestCase):
         )
         # related_modified is a datetime, the field most likely to serialise
         # differently between the two routes.
-        cls.public.maybe_mark_related_modified()
-        cls.public.refresh_from_db()
+        cls.public.proposals.create()
 
     def test_values_matches_the_serializer(self):
         """Byte-for-byte identical frames, whichever route built them."""
-        qs = self.meeting.agenda_items.all()
+        qs = self.meeting.agenda_items.with_related_modified()
+        self.assertIsNotNone(qs.get(pk=self.public.pk).related_modified)
         batch_cls = batch_for(AgendaChanged)
         from_values = batch_cls(payload={"items": list(qs.values(*AGENDA_ITEM_FIELDS))})
         from_serializer = batch_cls(
@@ -66,11 +66,15 @@ class AgendaItemsCollectorTests(TestCase):
             tuple(AgendaItemListSerializer.Meta.fields), AGENDA_ITEM_FIELDS
         )
 
-    def test_every_field_is_a_concrete_column(self):
+    def test_every_field_is_selectable(self):
         """A method field added to the serializer must fail loudly, not silently."""
-        # .values() raises FieldError for anything that is not a column, so
-        # simply evaluating the queryset is the assertion.
-        list(self.meeting.agenda_items.values(*AGENDA_ITEM_FIELDS))
+        # .values() raises FieldError for anything that is neither a column
+        # nor an annotation, so simply evaluating the queryset is the assertion.
+        list(
+            self.meeting.agenda_items.with_related_modified().values(
+                *AGENDA_ITEM_FIELDS
+            )
+        )
 
     def test_moderators_see_private_items(self):
         state = run_collector(

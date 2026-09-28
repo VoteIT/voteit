@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime
-from datetime import timedelta
 
 from auditlog.registry import auditlog
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models import Max
+from django.db.models import OuterRef
+from django.db.models import Subquery
+from django.db.models.functions import Greatest
 from django.utils.timezone import now
 from voteit.core.statemachines import StateMachineModelMixin
 
@@ -21,6 +24,30 @@ from voteit.meeting.models import Meeting
 __all__ = ("AgendaItem", "LastRead")
 
 from voteit.stats.registry import history_log
+
+
+def _latest_created(model: type[models.Model]) -> Subquery:
+    return Subquery(
+        model._base_manager.filter(agenda_item=OuterRef("pk"))
+        .order_by()
+        .values("agenda_item")
+        .annotate(latest=Max("created"))
+        .values("latest")
+    )
+
+
+class AgendaItemQuerySet(models.QuerySet):
+    def with_related_modified(self):
+        """Annotate ``related_modified``: when the newest proposal or discussion post was created."""
+        from voteit.discussion.models import DiscussionPost
+        from voteit.proposal.models import Proposal
+
+        # Postgres GREATEST skips NULLs, so one kind of content is enough
+        return self.annotate(
+            related_modified=Greatest(
+                _latest_created(Proposal), _latest_created(DiscussionPost)
+            )
+        )
 
 
 @history_log("meeting__organisation")
@@ -46,8 +73,8 @@ class AgendaItem(
     State combinations with the parent meeting are documented in ``docs/workflows.md``.
 
     ``order`` is auto-assigned as the next sequential value for the meeting.
-    ``related_modified`` is a debounced timestamp updated when nested content changes;
-    the frontend compares it against ``LastRead.timestamp`` to show "unread" indicators.
+    ``related_modified`` isn't stored, see ``AgendaItemQuerySet.with_related_modified``.
+    The frontend compares it against ``LastRead.timestamp`` to show "unread" indicators.
 
     ``block_discussion`` and ``block_proposals`` are moderator flags that can disable
     new content without changing the item's state.
@@ -73,9 +100,6 @@ class AgendaItem(
         verbose_name="Block new proposals", default=False
     )
     order: int = models.PositiveSmallIntegerField(default=0)
-    related_modified: datetime | None = models.DateTimeField(
-        editable=False, null=True, blank=True
-    )
 
     @property
     def agenda_item(self) -> AgendaItem:
@@ -106,47 +130,18 @@ class AgendaItem(
     def get_discussions(self):
         return self.discussions.all()
 
-    def maybe_mark_related_modified(self):
-        """This is a "poor man's" avoid duplicate pushes."""
-        if self.state != AgendaItemStateMachine.archived.value:
-            really_now = now()
-            # Check if we really need to touch the database
-            if (
-                self.related_modified is not None
-                and self.related_modified + timedelta(seconds=3) < really_now
-            ) or (
-                self.related_modified is None
-                and (self.proposals.exists() or self.discussions.exists())
-            ):
-                self.related_modified = really_now
-                self.save()
-                return really_now
-
-    def revert_to_last_related_modified(self):
-        """
-        In case something's deleted that was contained by this agenda item,
-        set related_modified to the highest reasonable value.
-        No need to notify users that content was changed if it's just missing.
-        """
-        if self.state != AgendaItemStateMachine.archived.value:
-            candidates = [
-                x.modified
-                for x in [
-                    self.proposals.order_by("-modified").first(),
-                    self.discussions.order_by("-modified").first(),
-                ]
-                if x is not None
-            ]
-            if candidates:
-                latest = sorted(candidates, reverse=True)[0]
-                if self.related_modified != latest:
-                    self.related_modified = latest
-                    self.save()
-                    return latest
-            elif self.related_modified is not None:
-                # Blank out related_modified since last entry was deleted
-                self.related_modified = None
-                self.save()
+    def get_related_modified(self) -> datetime | None:
+        """Use the annotation if the queryset had one, otherwise query for it."""
+        if "related_modified" in self.__dict__:
+            return self.related_modified
+        if self.pk is None:
+            return None
+        return (
+            AgendaItem.objects.filter(pk=self.pk)
+            .with_related_modified()
+            .values_list("related_modified", flat=True)
+            .first()
+        )
 
     def make_upcoming(self, user):
         self.sm.send("make_upcoming", user=user)
@@ -177,8 +172,9 @@ class AgendaItem(
         )
         return last_read
 
+    objects = AgendaItemQuerySet.as_manager()
+
     # Annotations
-    objects: models.Manager
     meeting_id: int
     proposals: models.QuerySet
     polls: models.QuerySet

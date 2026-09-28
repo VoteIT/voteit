@@ -1,12 +1,10 @@
 from datetime import UTC
 from datetime import datetime
-from datetime import timedelta
 from unittest.mock import patch
 
 from django.db import IntegrityError
 from django.test import TestCase
 from django.test import override_settings
-from django.utils.timezone import now
 from voteit.messaging.testing import testing_channel_layers_setting
 
 from voteit.meeting.channels import ModeratorsChannel
@@ -50,44 +48,64 @@ class AgendaItemTests(TestCase):
         self.assertIn(prop, ai.get_proposals())
         self.assertNotIn(prop2, ai.get_proposals())
 
+    def _related_modified(self, ai):
+        return (
+            self.AgendaItem.objects.with_related_modified()
+            .get(pk=ai.pk)
+            .related_modified
+        )
+
     def test_related_modified(self):
         ai = self.meeting.agenda_items.create()
-        self.assertIsNone(ai.maybe_mark_related_modified())
-        ai.related_modified = now() - timedelta(minutes=1)
-        ai.save()
-        self.assertIsNotNone(ai.maybe_mark_related_modified())
-
-    def test_revert_to_last_related_modified(self):
-        ai = self.meeting.agenda_items.create()
-        ai.revert_to_last_related_modified()  # Should not trigger error
-        prop = ai.proposals.create()
-        prop.modified = datetime(2021, 5, 12, 8, 0, tzinfo=UTC)
+        other_ai = self.meeting.agenda_items.create()
+        self.assertIsNone(self._related_modified(ai))
+        prop = ai.proposals.create(created=datetime(2021, 5, 12, 8, 0, tzinfo=UTC))
+        self.assertEqual(prop.created, self._related_modified(ai))
+        disc = ai.discussions.create(created=datetime(2021, 5, 12, 12, 0, tzinfo=UTC))
+        self.assertEqual(disc.created, self._related_modified(ai))
+        # Newer content elsewhere doesn't matter
+        other_ai.proposals.create()
+        self.assertEqual(disc.created, self._related_modified(ai))
+        # Edits don't count as new
+        prop.body = "Changed"
         prop.save()
-        disc = ai.discussions.create()
-        disc.modified = datetime(2021, 5, 12, 12, 0, tzinfo=UTC)
-        disc.save()
-        ai.related_modified = datetime(2021, 1, 1, tzinfo=UTC)
-        ai.save()
-        ai.revert_to_last_related_modified()
-        self.assertEqual(disc.modified, ai.related_modified)
+        self.assertEqual(disc.created, self._related_modified(ai))
         disc.delete()
-        ai.revert_to_last_related_modified()
-        self.assertEqual(prop.modified, ai.related_modified)
+        self.assertEqual(prop.created, self._related_modified(ai))
         prop.delete()
-        ai.revert_to_last_related_modified()
-        self.assertIsNone(ai.related_modified)
+        self.assertIsNone(self._related_modified(ai))
+
+    def test_related_modified_diff_proposal(self):
+        from voteit.proposal.models import DiffProposal
+
+        ai = self.meeting.agenda_items.create()
+        doc = ai.text_documents.create(body="Hello\n\nworld")
+        prop = DiffProposal.objects.create(
+            agenda_item=ai, paragraph=doc.text_paragraphs.first()
+        )
+        self.assertEqual(prop.created, self._related_modified(ai))
+
+    def test_get_related_modified(self):
+        ai = self.meeting.agenda_items.create()
+        prop = ai.proposals.create()
+        with self.assertNumQueries(1):
+            self.assertEqual(prop.created, ai.get_related_modified())
+        annotated = self.AgendaItem.objects.with_related_modified().get(pk=ai.pk)
+        with self.assertNumQueries(0):
+            self.assertEqual(prop.created, annotated.get_related_modified())
+        self.assertIsNone(self.AgendaItem().get_related_modified())
 
     @patch.object(ModeratorsChannel, "sync_publish")
-    def test_only_one_push_when_several_proposals_changed(self, mock_channel):
+    def test_one_push_when_several_proposals_created(self, mock_channel):
         ai = self.meeting.agenda_items.create()
-        ai.related_modified = now() - timedelta(minutes=1)
-        ai.save()
         mock_channel.reset_mock()
-        ai.proposals.create()
-        ai.proposals.create()
+        with self.captureOnCommitCallbacks(execute=True):
+            ai.proposals.create()
+            ai.proposals.create()
         messages = [x.args[0] for x in mock_channel.mock_calls]
         agenda_messages = [x for x in messages if x.action == "agenda_item.changed"]
         self.assertEqual(1, len(agenda_messages))
+        self.assertIsNotNone(agenda_messages[0].payload.related_modified)
 
 
 class LastReadTests(TestCase):

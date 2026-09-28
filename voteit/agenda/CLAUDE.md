@@ -10,9 +10,9 @@ State machine model (`AgendaItemStateMachine`). Key fields:
 - `state` — initial state is `private`; access state machine via `agenda_item.sm`
 - `order` — auto-assigned as next sequential value per meeting on creation
 - `block_discussion` / `block_proposals` — moderator flags that prevent new content
-- `related_modified` — timestamp updated when nested proposals/discussions are created; frontend compares this against `LastRead.timestamp` to show "unread" indicators
+`related_modified` is **not a column**. `AgendaItem.objects.with_related_modified()` annotates it as the newest `created` among the item's proposals and discussion posts (edits don't count); `get_related_modified()` uses the annotation or queries for it. The frontend compares it against `LastRead.timestamp` to show "unread" indicators. Querysets that feed `AgendaItemSerializer` / `AgendaItemListSerializer` in bulk should be annotated, or each row costs a query.
 
-`related_modified` has a 3-second debounce (`maybe_mark_related_modified`). On delete of nested content, `revert_to_last_related_modified` walks the remaining items and sets it back to the most recent modification date (or clears it if nothing remains).
+When a proposal (any subclass) or discussion post is created or deleted, `signals.py` schedules a `RelatedModifiedPush` on commit: one `AgendaChanged` per touched agenda item per transaction, read fresh from the database. Items deleted in the same transaction aren't found, so a cascade can't resurrect them client side.
 
 ### LastRead
 
@@ -77,5 +77,4 @@ All signal-based messages are deferred to transaction commit (`@on_commit`). Bul
 
 - **Visibility routing:** Private items are actively deleted from participant views on transition to PRIVATE (not just withheld). `signals.py:ai_made_private` handles this.
 - **Order assignment:** Only set on first save (when not provided). Computed as `max(order) + 1` for the meeting.
-- **`related_modified` debounce:** Prevents redundant WebSocket pushes when many proposals are created quickly (e.g., bulk import). The 3-second window is intentional.
 - **Serializer split by audience:** List views use `AgendaItemListSerializer` (no body), detail/channel uses full serializer. Body updates go through `AgendaItemBodySerializer` on the item channel separately.

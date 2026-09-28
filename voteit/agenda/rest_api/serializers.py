@@ -13,13 +13,15 @@ from voteit.meeting.rest_api.fields import ModeratorMeetingField
 class AgendaItemSerializer(RichTextSerializerMixin, BaseModelSerializer):
     add_body_tags = False
     pk = serializers.IntegerField(read_only=True)
+    related_modified = serializers.DateTimeField(
+        source="get_related_modified", read_only=True
+    )
 
     class Meta:
         model = AgendaItem
         read_only_fields = (
             "meeting",
             "order",
-            "related_modified",
             "state",
             "pk",
         )
@@ -64,12 +66,13 @@ class AgendaItemBodySerializer(AgendaItemSerializer):
 
 
 class CreateAgendaItemSerializer(AgendaItemSerializer):
+    related_modified = None
+
     class Meta(AgendaItemSerializer.Meta):
         read_only_fields = []
         exclude = (
             "author",
             "id",
-            "related_modified",
             "mentions",
             "state",
         )
