@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-27 18:28+0200\n"
-"PO-Revision-Date: 2026-08-27 19:51+0200\n"
+"POT-Creation-Date: 2026-09-28 10:37+0200\n"
+"PO-Revision-Date: 2026-09-28 10:40+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -22,19 +22,19 @@ msgstr ""
 msgid "Give users access automatically"
 msgstr "Ge användare access automatiskt"
 
-#: agenda/rest_api/serializers.py:118
+#: agenda/rest_api/serializers.py:119
 msgid "Duplicate agenda item IDs are not allowed."
 msgstr "Dubbletter av dagordningspunkt-ID är inte tillåtna."
 
-#: agenda/rest_api/serializers.py:130
+#: agenda/rest_api/serializers.py:131
 msgid "One or more agenda items not found in the specified meeting."
 msgstr "En eller flera dagordningspunkter hittades inte i det angivna mötet."
 
-#: agenda/rest_api/serializers.py:161
+#: agenda/rest_api/serializers.py:162
 msgid "state, block_discussion or block_proposals required"
 msgstr "state, block_discussion eller block_proposals krävs"
 
-#: agenda/rest_api/serializers.py:169
+#: agenda/rest_api/serializers.py:170
 msgid "Can't bulk delete in ongoing meeting"
 msgstr "Kan inte radera många på en gång i ett pågående möte"
 
@@ -71,20 +71,32 @@ msgstr "Det pågår redan en operation."
 msgid "Please wait a few seconds before retrying."
 msgstr "Vänta några sekunder innan du försöker igen."
 
-#: core/rest_api/serializers.py:130
+#: core/rest_api/serializers.py:133
 msgid "Meeting group doesn't exist"
 msgstr "Gruppen existerar inte"
 
-#: core/rest_api/serializers.py:137
+#: core/rest_api/serializers.py:140
 msgid "You're not a member of this group"
 msgstr "Du är inte medlem av den här gruppen"
 
-#: core/rest_api/serializers.py:199
+#: core/rest_api/serializers.py:202
 msgid "Email you specified isn't validated. It must exist on your profile."
 msgstr ""
 "Eposten du specificerade är inte validerad. Den måste finnas i din profil."
 
-#: core/rest_api/serializers.py:447
+#: core/rest_api/serializers.py:306 invites/rest_api/views.py:532
+msgid "Organisation required"
+msgstr "Organisation krävs"
+
+#: core/rest_api/serializers.py:310
+msgid "No such login method here."
+msgstr "Det finns ingen sådan inloggningsmetod här."
+
+#: core/rest_api/serializers.py:313
+msgid "That login method is not available."
+msgstr "Den inloggningsmetoden är inte tillgänglig."
+
+#: core/rest_api/serializers.py:538
 msgid "You can only pick existing users within this meeting"
 msgstr "Du kan bara välja existerande användare som är med i mötet"
 
@@ -102,6 +114,10 @@ msgid ""
 "This meeting group doesn't allow you to create posts in its name. "
 "(post_as=False)"
 msgstr "Denna mötesgrupp tillåter inte att du postar som den (post_as=False)"
+
+#: core/rest_api/views.py:246
+msgid "You can't remove your only way of signing in."
+msgstr "Du kan inte ta bort ditt enda sätt att logga in."
 
 #: core/templates/admin/sm_event_action.html:6
 msgid "Home"
@@ -170,6 +186,10 @@ msgstr "GroupRole kräver att kolumnen till vänster om den är group"
 msgid "The following role_ids don't exist: %(role_ids)s"
 msgstr "Följande role_id existerar inte: %(role_ids)s"
 
+#: invites/app/invites/member_id.py:46
+msgid "Member id"
+msgstr "Medlems-id"
+
 #: invites/app/invites/swedish_ssn.py:43
 msgid "Incorrect swedish personnummer"
 msgstr "Felaktigt svenskt personnummer"
@@ -206,14 +226,14 @@ msgstr ""
 "Samma användardata har olika roller på rad %(first_row)s och %(row_no)s: "
 "%(values)s"
 
-#: invites/rest_api/import_utils.py:63
+#: invites/rest_api/import_utils.py:64
 #, python-format
 msgid ""
 "File is too large (%(size)s KB). Maximum allowed size is %(maximum)s MB."
 msgstr ""
 "Filen är för stor (%(size)s KB). Största tillåtna storlek är %(maximum)s MB."
 
-#: invites/rest_api/import_utils.py:79
+#: invites/rest_api/import_utils.py:80
 msgid ""
 "Unsupported file format. Upload an Excel file (.xlsx), an ODS spreadsheet, "
 "or a UTF-8 CSV/TSV file."
@@ -221,45 +241,45 @@ msgstr ""
 "Filformatet stöds inte. Ladda upp en Excel-fil (.xlsx), ett ODS-kalkylblad "
 "eller en CSV/TSV-fil i UTF-8."
 
-#: invites/rest_api/import_utils.py:96
+#: invites/rest_api/import_utils.py:97
 #, python-format
 msgid "The file contains an entry that is too large to process (%(name)s)."
 msgstr "Filen innehåller en post som är för stor för att bearbeta (%(name)s)."
 
-#: invites/rest_api/import_utils.py:113
+#: invites/rest_api/import_utils.py:114
 #, python-format
 msgid ""
 "Unsupported ODF format '%(mime)s'. Only spreadsheets (.ods) are supported."
 msgstr "ODF-formatet ’%(mime)s’ stöds inte. Bara kalkylblad (.ods) stöds."
 
-#: invites/rest_api/import_utils.py:125
+#: invites/rest_api/import_utils.py:126
 msgid ""
 "Unrecognised ZIP-based format. Upload an Excel (.xlsx) or ODS (.ods) file."
 msgstr ""
 "Okänt ZIP-baserat format. Ladda upp en Excel-fil (.xlsx) eller ODS-fil "
 "(.ods)."
 
-#: invites/rest_api/import_utils.py:131
+#: invites/rest_api/import_utils.py:132
 msgid "The file appears to be corrupt or is not a valid spreadsheet."
 msgstr "Filen verkar vara skadad eller är inte ett giltigt kalkylblad."
 
-#: invites/rest_api/import_utils.py:157
+#: invites/rest_api/import_utils.py:158
 msgid "No worksheet found in the Excel file."
 msgstr "Hittade inget kalkylblad i Excel-filen."
 
-#: invites/rest_api/import_utils.py:196
+#: invites/rest_api/import_utils.py:197
 msgid "No sheet found in the ODS file."
 msgstr "Hittade inget blad i ODS-filen."
 
-#: invites/rest_api/import_utils.py:238
+#: invites/rest_api/import_utils.py:239
 msgid "The spreadsheet contains no data."
 msgstr "Kalkylbladet innehåller ingen data."
 
-#: invites/rest_api/import_utils.py:249
+#: invites/rest_api/import_utils.py:250
 msgid "The spreadsheet header row is empty."
 msgstr "Kalkylbladets rubrikrad är tom."
 
-#: invites/rest_api/import_utils.py:294
+#: invites/rest_api/import_utils.py:295
 msgid "File is empty"
 msgstr "Filen är tom"
 
@@ -285,7 +305,7 @@ msgstr ""
 "Hittade existerande inbjudningar som bara matchade en del av raden. Leta "
 "efter rader med följande innehåll: %(cols)s"
 
-#: invites/rest_api/serializers.py:172
+#: invites/rest_api/serializers.py:173
 #, python-format
 msgid ""
 "Your action would downgrade permissions for some moderators. Handle "
@@ -295,49 +315,45 @@ msgstr ""
 "Hantera istället moderatorerna via fliken ”Deltagare”. Berörda användar-ID: "
 "%(userids)s"
 
-#: invites/rest_api/serializers.py:193
+#: invites/rest_api/serializers.py:195
 msgid "The file contains no data rows"
 msgstr "Filen innehåller inga datarader"
 
-#: invites/rest_api/serializers.py:255
+#: invites/rest_api/serializers.py:257
 #, python-format
 msgid "Item %(item_no)s has no identity field (e.g. email)."
 msgstr "Post %(item_no)s saknar identitetsfält (t.ex. epost)."
 
-#: invites/rest_api/serializers.py:262
+#: invites/rest_api/serializers.py:264
 #, python-format
 msgid "Item %(item_no)s: '%(key)s' is not a valid field."
 msgstr "Post %(item_no)s: ’%(key)s’ är inte ett giltigt fält."
 
-#: invites/rest_api/serializers.py:272
+#: invites/rest_api/serializers.py:274
 #, python-format
 msgid "Item %(item_no)s: invalid value for '%(key)s': %(error)s"
 msgstr "Post %(item_no)s: ogiltigt värde för ’%(key)s’: %(error)s"
 
-#: invites/rest_api/views.py:526
-msgid "Organisation required"
-msgstr "Organisation krävs"
-
-#: invites/schemas.py:120
+#: invites/schemas.py:154
 #, python-format
 msgid "Got bogus value on row %(row_no)s: %(row)s"
 msgstr "Felaktigt värde på rad %(row_no)s: %(row)s"
 
-#: invites/schemas.py:125
+#: invites/schemas.py:162
 msgid "Couldn't validate rows because of invalid column names"
 msgstr "Kunde inte validera raderna på grund av ogiltiga kolumnnamn"
 
-#: invites/schemas.py:130
+#: invites/schemas.py:167
 msgid "Initial value of rows must be either string or list"
 msgstr "Ursprungsvärdet för rader måste vara antingen en sträng eller en lista"
 
-#: invites/schemas.py:165
+#: invites/schemas.py:202
 #, python-format
 msgid "We only allow %(limit)s rows to be added this way at one time"
 msgstr ""
 "Vi tillåter bara att %(limit)s rader läggs till på det här sättet åt gången"
 
-#: invites/schemas.py:187
+#: invites/schemas.py:224
 #, python-format
 msgid ""
 "You have rows that contain data that wouldn't be used since they have to "
@@ -348,7 +364,7 @@ msgstr ""
 "för många kolumner. Exempel på rad %(line)s - med tabbar ersatta:\n"
 "’%(example)s’\n"
 
-#: invites/schemas.py:199
+#: invites/schemas.py:236
 #, python-format
 msgid ""
 "\n"
@@ -357,7 +373,7 @@ msgstr ""
 "\n"
 "Det finns %(count)s andra rader också - kontrollera din data."
 
-#: invites/schemas.py:204
+#: invites/schemas.py:241
 #, python-format
 msgid ""
 "\n"
@@ -430,13 +446,78 @@ msgstr "Mötet måste ha en giltig röstlängdspolicy"
 msgid "Meeting has ongoing polls - close them first"
 msgstr "Mötet har pågående omröstningar - stäng dem först"
 
-#: organisation/pipeline.py:14
+#: organisation/jobs.py:101
+msgid "A new login method was connected"
+msgstr "En ny inloggningsmetod har kopplats"
+
+#: organisation/jobs.py:105
+msgid "A new login method was connected to your account"
+msgstr "En ny inloggningsmetod har kopplats till ditt konto"
+
+#: organisation/pipeline.py:29
 msgid "This organisation is no longer active."
 msgstr "Organisationen är inte längre aktiv."
 
-#: organisation/rest_api/views.py:55
+#: organisation/pipeline.py:194
+msgid ""
+"You already have an account here that manages the organisation, but it has "
+"no way to sign in. Ask another organisation manager for help."
+msgstr ""
+"Du har redan ett konto här som administrerar organisationen, men det saknar "
+"sätt att logga in. Be en annan organisationsadministratör om hjälp."
+
+#: organisation/pipeline.py:199
+#, python-format
+msgid ""
+"You already have an account here that manages the organisation. Sign in with "
+"%(existing)s instead, then connect %(new)s from your profile."
+msgstr ""
+"Du har redan ett konto här som administrerar organisationen. Logga in med "
+"%(existing)s i stället och koppla sedan %(new)s från din profil."
+
+#: organisation/rest_api/views.py:62
 msgid "You're logged in to another organisation"
 msgstr "Du är inloggad i en annan organisation"
+
+#: organisation/rest_api/views.py:344
+msgid "Required"
+msgstr "Obligatoriskt"
+
+#: organisation/rest_api/views.py:348
+msgid "That question has already been answered."
+msgstr "Den frågan har redan besvarats."
+
+#: organisation/templates/voteit/organisation/login_method_added.html:5
+#, python-format
+msgid "Hi %(full_name)s!"
+msgstr "Hej %(full_name)s!"
+
+#: organisation/templates/voteit/organisation/login_method_added.html:8
+#, python-format
+msgid ""
+"A new way of signing in, <strong>%(provider_title)s</strong>, was just "
+"connected to your account at %(org_title)s."
+msgstr ""
+"Ett nytt sätt att logga in, <strong>%(provider_title)s</strong>, har precis "
+"kopplats till ditt konto hos %(org_title)s."
+
+#: organisation/templates/voteit/organisation/login_method_added.html:12
+msgid ""
+"If that was you, everything is in order and you don't have to do anything."
+msgstr "Om det var du så är allt som det ska, du behöver inte göra något."
+
+#: organisation/templates/voteit/organisation/login_method_added.html:16
+#, python-format
+msgid ""
+"If it wasn't, someone else's login may have been connected to your account "
+"by mistake. Remove it under your profile at <a "
+"href=\"%(site_url)s\">%(site_url)s</a>, and contact the organisers if "
+"anything looks wrong."
+msgstr ""
+"Om det inte var du kan någon annans inloggning av misstag ha kopplats till "
+"ditt konto. Ta bort den under din profil på <a "
+"href=\"%(site_url)s\">%(site_url)s</a> och kontakta arrangörerna om något "
+"verkar fel."
 
 #: participant_number/apps.py:7
 msgid "Participant number"
@@ -696,11 +777,11 @@ msgstr "Fel antal förslag."
 msgid "Meeting isn't ongoing"
 msgstr "Mötet är inte pågående"
 
-#: poll/rest_api/serializers.py:335
+#: poll/rest_api/serializers.py:332
 msgid "Can't provide a vote when abstaining."
 msgstr "Du kan inte ange en röst när du avstår."
 
-#: poll/rest_api/serializers.py:343
+#: poll/rest_api/serializers.py:340
 msgid "Must be an object matching this poll's vote format."
 msgstr "Måste vara ett objekt som matchar omröstningens röstformat."
 
@@ -724,11 +805,11 @@ msgstr "Avbryt"
 msgid "Revert to private"
 msgstr "Återgå till privat"
 
-#: proposal/rest_api/serializers.py:201 proposal/rest_api/serializers.py:228
+#: proposal/rest_api/serializers.py:202 proposal/rest_api/serializers.py:229
 msgid "Identical with original text"
 msgstr "Identisk med ursprungstexten"
 
-#: proposal/rest_api/serializers.py:279 proposal/rest_api/serializers.py:321
+#: proposal/rest_api/serializers.py:280 proposal/rest_api/serializers.py:322
 msgid "Must be unique for agenda item"
 msgstr "Måste vara unik för dagordninspunkten"
 
@@ -787,6 +868,10 @@ msgstr "Inaktivera"
 #: speaker/statemachines.py:42
 msgid "Stop current speaker first"
 msgstr "Stoppa pågående talare först"
+
+#, fuzzy
+#~ msgid "If that was you, there is nothing to do."
+#~ msgstr "Om det var du behöver du inte göra något."
 
 #~ msgid "Private"
 #~ msgstr "Privat"
