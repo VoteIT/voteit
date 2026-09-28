@@ -1,11 +1,11 @@
 # Changelog
 
-## v1.1 (unreleased)
+## v1.1 (2026-09-28)
 
 Multiple login providers per organisation.
 
-- **ScoutID login** (OpenID Connect) alongside the id proxy. Providers get
-  `primary` / `hidden` flags and a sort order for the login screen.
+- **Login via generic providers** alongside the id proxy. Providers get
+  `primary` / `hidden` flags and a sort order for the login screen. Top one means default.
 - **Several credentials per account.** New `/api/user/connections/`,
   `connect/` and `disconnect/`. New logins are matched against existing users;
   when ambiguous the user is sent to `LINK_ACCOUNT_URL` and picks from
