@@ -37,7 +37,7 @@ The `backend` property returns the backend class for `provider_id`, or `None` wh
 `OAuth2Provider.visible_for(organisation)` returns the login options to offer: `hidden` rows and rows with no enabled backend dropped, `primary` first, the rest by title lowercased. Sorting is in Python because the title comes from the backend class, not the row. `hidden` only affects this list — such a provider still logs in fine, which is what you want for something reached by a hint rather than a button.
 
 ### GlobalTermsOfService
-Terms shared by every organisation, one row per `version`. The admin action "Create organisation ToS from this version" (`create_org_tos()`) gives every active organisation without one a `TermsOfService` based on it, copying the organisation's latest body. It can be run again for organisations added later.
+Terms shared by every organisation, one row per `version`. `notes` says what changed. A version is a draft until `required_from` is set: drafts are not in the API, are never picked as `based_on`, and the admin action refuses them. The admin action "Create organisation ToS from this version" (`create_org_tos()`) gives every active organisation without one a `TermsOfService` based on it, copying the organisation's latest body. It can be run again for organisations added later.
 
 ### TermsOfService
 An organisation's terms, `based_on` a `GlobalTermsOfService`. A new version is a new row, since users must accept each one. `version` is when it takes effect: the active one is the latest with `version <= now`, so a future version can be prepared in advance.
@@ -90,11 +90,11 @@ The serializer also exposes read-only computed fields: `providers` and `componen
 - `remove_roles` (`POST /api/organisation-roles/remove/`) — removes roles; returns `204` if the row is deleted entirely after the last role is removed. Also logs.
 
 ### `GlobalTermsOfServiceViewSet` (`/api/global-terms-of-service/`)
-Read-only `list` / `retrieve` of every `GlobalTermsOfService`, latest `version` first. Open to anyone, logged in or not.
+Read-only `list` / `retrieve` of every `GlobalTermsOfService` with `required_from` set, latest `version` first. Open to anyone, logged in or not.
 
 ### `TermsOfServiceViewSet` (`/api/terms-of-service/`)
 - `list` / `retrieve` — open to anyone. Anonymous callers get the organisation by host, everyone else their own. Managers see every version, others only the active one. `global_body` is the text of `based_on`.
-- `create` — `org_manager` only, and only `body` is taken. `based_on` is always the latest global version and `version` is now.
+- `create` — `org_manager` only, and only `body` is taken. `based_on` is always the latest global version with `required_from` set, and `version` is now.
 - `partial_update` — `org_manager` only, for small fixes to `body`. Everything else is read-only. No `PUT` or `DELETE`.
 - `accept` (`POST /api/terms-of-service/<pk>/accept/`) — for logged in users, accepts the active version, anything else is a 400. `UserAccept` is one row per user, so accepting replaces the previous accept. A login accepts through the pipeline instead.
 

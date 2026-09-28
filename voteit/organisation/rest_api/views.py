@@ -127,7 +127,9 @@ class OrganisationViewSet(
 
 @router.register("global-terms-of-service", basename="global-terms-of-service")
 class GlobalTermsOfServiceViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = GlobalTermsOfService.objects.order_by("-version")
+    queryset = GlobalTermsOfService.objects.filter(
+        required_from__isnull=False
+    ).order_by("-version")
     serializer_class = serializers.GlobalTermsOfServiceSerializer
     permission_classes = (AllowAny,)
 
@@ -188,24 +190,6 @@ class TermsOfServiceViewSet(
             raise ValidationError(_("Only the active terms of service can be accepted"))
         accepted = accept_tos(request.user, tos)
         return Response({"tos": tos.pk, "accepted": accepted.accepted})
-
-
-# @router.register("user_consents", basename="user_consents")
-# class UserConsentViewSet(DefaultModelViewSet):
-#     serializer_class = serializers.UserConsentSerializer
-#     serializer_classes = {"create": serializers.UserConsentCreateSerializer}
-#     context_queryset = TermsOfService.objects.all()
-#     context_lookup_kwarg = "tos"
-#     model = UserConsent
-#
-#     def get_queryset(self):
-#         if self.request.user.is_superuser:
-#             return self.model.objects.all()
-#         if self.request.user.organisation:
-#             return self.model.objects.filter(
-#                 tos__organisation=self.request.user.organisation
-#             )
-#         return self.model.objects.none()
 
 
 @router.register("organisation-roles")

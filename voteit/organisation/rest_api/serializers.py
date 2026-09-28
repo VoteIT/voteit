@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import List
-from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext as _
@@ -15,10 +14,6 @@ from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.models import TermsOfService
-
-
-if TYPE_CHECKING:
-    pass
 
 
 class OAuth2ProviderSerializer(serializers.Serializer):
@@ -154,7 +149,13 @@ class OrganisationSerializer(serializers.ModelSerializer):
 class GlobalTermsOfServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = GlobalTermsOfService
-        fields = read_only_fields = ["pk", "body", "version"]
+        fields = read_only_fields = [
+            "pk",
+            "body",
+            "version",
+            "required_from",
+            "notes",
+        ]
 
 
 class TermsOfServiceSerializer(serializers.ModelSerializer):
@@ -174,27 +175,14 @@ class TermsOfServiceSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if self.instance is None:
             # New versions are always based on the latest global one
-            attrs["based_on"] = GlobalTermsOfService.objects.first()
+            attrs["based_on"] = GlobalTermsOfService.objects.filter(
+                required_from__isnull=False
+            ).first()
             if attrs["based_on"] is None:
                 raise serializers.ValidationError(
                     _("There are no global terms of service yet")
                 )
         return attrs
-
-
-# class UserConsentSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = UserConsent
-#         read_only_fields = ["pk", "user", "tos", "created", "revoked"]
-#         fields = read_only_fields
-#
-#
-# class UserConsentCreateSerializer(BaseModelSerializer):
-#     author_kw = "user"
-#
-#     class Meta:
-#         model = UserConsent
-#         fields = ["tos"]
 
 
 class OrganisationRolesSerializer(serializers.ModelSerializer):

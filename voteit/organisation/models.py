@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -284,7 +285,23 @@ class GlobalTermsOfService(models.Model):
         default="",
         html_cleaner=relaxed_clean_html,
     )
-    version: datetime = models.DateTimeField(default=now, unique=True)
+    version: datetime = models.DateTimeField(
+        verbose_name="Version",
+        default=now,
+        unique=True,
+    )
+    required_from: date | None = models.DateField(
+        verbose_name="Required from",
+        null=True,
+        blank=True,
+        default=None,
+    )
+    notes: str = RichTextField(
+        verbose_name="Why has this changed?",
+        html_cleaner=relaxed_clean_html,
+        default="",
+        blank=True,
+    )
 
     class Meta:
         ordering = ["-version"]

@@ -229,8 +229,8 @@ class OrganisationRolesAdmin(admin.ModelAdmin):
 
 @admin.register(GlobalTermsOfService)
 class GlobalTermsOfServiceAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "version", "tos_count")
-    fields = ("body", "version")
+    list_display = ("__str__", "version", "required_from", "tos_count")
+    fields = ("body", "notes", "version", "required_from")
     actions = ["create_org_tos"]
 
     def get_queryset(self, request):
@@ -248,8 +248,15 @@ class GlobalTermsOfServiceAdmin(admin.ModelAdmin):
             self.message_user(request, "Select exactly one version", messages.ERROR)
             return
         obj = queryset.get()
+        if obj.required_from is None:
+            self.message_user(
+                request, "Set required from before using it", messages.ERROR
+            )
+            return
         # An older version would become the newest ToS of every organisation
-        if GlobalTermsOfService.objects.filter(version__gt=obj.version).exists():
+        if GlobalTermsOfService.objects.filter(
+            version__gt=obj.version, required_from__isnull=False
+        ).exists():
             self.message_user(
                 request, "Only the latest version can be used", messages.ERROR
             )

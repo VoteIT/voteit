@@ -471,9 +471,16 @@ class GlobalTermsOfServiceViewSetTests(APITestCase):
         cls.org = Organisation.objects.create(title="Test org", host="testserver")
         cls.user = cls.org.users.create(username="user")
         cls.old = GlobalTermsOfService.objects.create(
-            body="Old", version=now() - timedelta(days=10)
+            body="Old",
+            version=now() - timedelta(days=10),
+            required_from=now().date() - timedelta(days=10),
         )
-        cls.new = GlobalTermsOfService.objects.create(body="New")
+        cls.new = GlobalTermsOfService.objects.create(
+            body="New", notes="Why", required_from=now().date()
+        )
+        cls.draft = GlobalTermsOfService.objects.create(
+            body="Draft", version=now() + timedelta(minutes=1)
+        )
 
     def test_list(self):
         for func, params in run_permission_tests(
@@ -487,11 +494,18 @@ class GlobalTermsOfServiceViewSetTests(APITestCase):
         response = self.client.get(self.list_url)
         self.assertEqual([self.new.pk, self.old.pk], [x["pk"] for x in response.json()])
 
+    def test_draft_not_visible(self):
+        url = reverse("global-terms-of-service-detail", kwargs={"pk": self.draft.pk})
+        self.assertEqual(404, self.client.get(url).status_code)
+
     def test_retrieve(self):
         url = reverse("global-terms-of-service-detail", kwargs={"pk": self.old.pk})
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
-        self.assertEqual("Old", response.json()["body"])
+        data = response.json()
+        self.assertEqual({"pk", "body", "version", "required_from", "notes"}, set(data))
+        self.assertEqual("Old", data["body"])
+        self.assertEqual(self.old.required_from.isoformat(), data["required_from"])
 
     def test_read_only(self):
         self.client.force_login(self.user)
@@ -512,7 +526,9 @@ class TermsOfServiceViewSetTests(APITestCase):
             title="Other org", host="other.voteit.se"
         )
         cls.gtos = GlobalTermsOfService.objects.create(
-            body="Global", version=now() - timedelta(days=10)
+            body="Global",
+            version=now() - timedelta(days=10),
+            required_from=now().date() - timedelta(days=10),
         )
         cls.old = cls.org.tos.create(
             based_on=cls.gtos, body="Old", version=now() - timedelta(days=5)
@@ -582,7 +598,13 @@ class TermsOfServiceViewSetTests(APITestCase):
         self.assertEqual("New", tos.body)
 
     def test_create_ignores_based_on_and_version(self):
-        latest = GlobalTermsOfService.objects.create(body="Latest")
+        latest = GlobalTermsOfService.objects.create(
+            body="Latest", required_from=now().date()
+        )
+        # Not based on a version nobody has set required from on
+        GlobalTermsOfService.objects.create(
+            body="Draft", version=now() + timedelta(minutes=1)
+        )
         self.client.force_login(self.manager)
         before = now()
         response = self.client.post(
