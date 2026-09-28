@@ -57,11 +57,6 @@ Settings module for dev: `DJANGO_SETTINGS_MODULE=project.settings_development` (
 
 Every resource belongs to an `Organisation`. The `Organisation.host` field maps a hostname to a tenant. The hierarchy is: **Organisation → Meeting → AgendaItem → Proposal / Poll / DiscussionPost**.
 
-Abstract base classes enforce consistent context properties across all models:
-- `OrganisationContext` → `.organisation`
-- `MeetingContext` → `.organisation`, `.meeting`
-- `AgendaItemContext` → `.organisation`, `.meeting`, `.agenda_item`
-
 ### Role & Permission System
 
 - **Roles** (`voteit/core/role.py`): named singletons with optional requirements (e.g. Moderator requires Participant). Stored as a PostgreSQL `ArrayField` via `RolesField` on `Roles` abstract model.
@@ -72,10 +67,6 @@ Abstract base classes enforce consistent context properties across all models:
 ### State Machines
 
 `python-statemachine` is used on most models. State machine classes follow the pattern `*StateMachine` (e.g. `MeetingStateMachine`, `PollStateMachine`, `ProposalStateMachine`) and live in each app's `statemachines.py`. They subclass `StateChart` and mix in `TransitionSignalMixin`. Models bind to their machine via `voteit.core.statemachines.StateMachineModelMixin` (accessed as `instance.sm`, built lazily on first access — the upstream `MachineMixin` built one inside every `Model.__init__`). Transitions are `Event` objects with `validators` for permission and condition guards. The REST layer exposes a `POST /{id}/event/` endpoint via `StateMachineMixin`.
-
-### REST API
-
-DRF with a central router at `voteit/core/rest_api/router.py`. Apps register ViewSets with `@router.register(...)`. All endpoints live under `/api/`. Auth: Token + Session.
 
 ### WebSocket / Real-time
 
@@ -99,13 +90,6 @@ message was migrated to REST.
 - Each outgoing type also gets a generated `<action>.batch` sibling. Runs of the same
   message to the same target within one transaction collapse into one batch on commit
   (`voteit/messaging/utils.py::TransactionBatcher`, threshold `VOTEIT_BATCH_THRESHOLD`).
-- Subscribing is deferred to RQ. The worker streams `channel.subscribed` (naming the
-  collectors that will contribute), then the initial state as `channel.state` bundles
-  built by the named, ordered collectors in `voteit/*/collectors.py`, then
-  `channel.state_complete`.
-- Connection rows live in `voteit/messaging/models.py`; `code` is null while open.
-- RQ queues: `default`, `long`.
-- `/asyncapi/docs/` (DEBUG only) publishes the full message schema.
 
 ### Registry Pattern
 

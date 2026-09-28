@@ -52,6 +52,13 @@ and lets each consumer forward the frame unchanged. Turning it off routes
 through chanx's event dispatcher instead, which re-validates per recipient. The
 frame the client sees is the same either way.
 
+## Subscribe
+
+Subscribing is deferred to RQ. The worker streams `channel.subscribed` (naming the
+collectors that will contribute), then the initial state as `channel.state` bundles
+built by the named, ordered collectors in `voteit/*/collectors.py`, then
+`channel.state_complete`.
+
 ## Connect
 
 An authenticated socket joins its own `user_<pk>` group and the
