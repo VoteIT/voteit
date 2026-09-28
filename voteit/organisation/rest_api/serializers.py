@@ -151,6 +151,12 @@ class OrganisationSerializer(serializers.ModelSerializer):
 #         return instance
 
 
+class GlobalTermsOfServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GlobalTermsOfService
+        fields = read_only_fields = ["pk", "body", "version"]
+
+
 class TermsOfServiceSerializer(serializers.ModelSerializer):
     global_body = serializers.CharField(source="based_on.body", read_only=True)
 

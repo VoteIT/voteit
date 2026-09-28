@@ -463,6 +463,42 @@ class HandleIdentitiesViewSetTests(APITestCase):
         self.assertContains(response, "required", status_code=400)
 
 
+class GlobalTermsOfServiceViewSetTests(APITestCase):
+    list_url = reverse("global-terms-of-service-list")
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.org = Organisation.objects.create(title="Test org", host="testserver")
+        cls.user = cls.org.users.create(username="user")
+        cls.old = GlobalTermsOfService.objects.create(
+            body="Old", version=now() - timedelta(days=10)
+        )
+        cls.new = GlobalTermsOfService.objects.create(body="New")
+
+    def test_list(self):
+        for func, params in run_permission_tests(
+            self,
+            url=self.list_url,
+            expected=((None, 200), (self.user, 200)),
+        ):
+            func(*params)
+
+    def test_list_latest_first(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual([self.new.pk, self.old.pk], [x["pk"] for x in response.json()])
+
+    def test_retrieve(self):
+        url = reverse("global-terms-of-service-detail", kwargs={"pk": self.old.pk})
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("Old", response.json()["body"])
+
+    def test_read_only(self):
+        self.client.force_login(self.user)
+        response = self.client.post(self.list_url, data={"body": "Nope"})
+        self.assertEqual(405, response.status_code)
+
+
 class TermsOfServiceViewSetTests(APITestCase):
     list_url = reverse("terms-of-service-list")
 

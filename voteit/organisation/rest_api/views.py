@@ -32,6 +32,7 @@ from voteit.core.rest_api.mixins import VerboseAutoPermissionViewSetMixin
 from voteit.core.rest_api.permissions import HasIDProxyAPIKey
 from voteit.organisation.matching import find_candidates
 from voteit.organisation.matching import is_elevated
+from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import OrganisationRoles
 from voteit.organisation.models import TermsOfService
@@ -122,6 +123,13 @@ class OrganisationViewSet(
 #     model = Organisation
 #     queryset = Organisation.objects.all()
 #     expected_default_http_status = 401
+
+
+@router.register("global-terms-of-service", basename="global-terms-of-service")
+class GlobalTermsOfServiceViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = GlobalTermsOfService.objects.order_by("-version")
+    serializer_class = serializers.GlobalTermsOfServiceSerializer
+    permission_classes = (AllowAny,)
 
 
 @router.register("terms-of-service", basename="terms-of-service")

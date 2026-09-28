@@ -89,6 +89,9 @@ The serializer also exposes read-only computed fields: `providers` and `componen
 - `add_roles` (`POST /api/organisation-roles/add/`) — adds roles; requires `change_roles` on the caller's org. The `user` field is validated by `SameOrgUserField` to block cross-org assignments. Logs the change via `log_roles_change`.
 - `remove_roles` (`POST /api/organisation-roles/remove/`) — removes roles; returns `204` if the row is deleted entirely after the last role is removed. Also logs.
 
+### `GlobalTermsOfServiceViewSet` (`/api/global-terms-of-service/`)
+Read-only `list` / `retrieve` of every `GlobalTermsOfService`, latest `version` first. Open to anyone, logged in or not.
+
 ### `TermsOfServiceViewSet` (`/api/terms-of-service/`)
 - `list` / `retrieve` — open to anyone. Anonymous callers get the organisation by host, everyone else their own. Managers see every version, others only the active one. `global_body` is the text of `based_on`.
 - `create` — `org_manager` only, and only `body` is taken. `based_on` is always the latest global version and `version` is now.
