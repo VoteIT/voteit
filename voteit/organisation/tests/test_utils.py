@@ -13,12 +13,11 @@ from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
 from voteit.organisation.utils import accept_tos
 from voteit.organisation.utils import get_accepted
+from voteit.organisation.utils import get_current_tos
 from voteit.organisation.utils import get_published_global_tos
-from voteit.organisation.utils import has_newer_global_tos
-from voteit.organisation.utils import get_required_version
 from voteit.organisation.utils import get_user_identity_data
 from voteit.organisation.utils import get_user_member_ids
-from voteit.organisation.utils import must_accept_tos
+from voteit.organisation.utils import has_newer_global_tos
 
 User = get_user_model()
 
@@ -161,31 +160,31 @@ class TermsOfServiceUtilsTests(TestCase):
         )
 
     def test_nothing_to_accept(self):
-        self.assertIsNone(get_required_version(self.org))
-        self.assertIsNone(get_required_version(None))
-        self.assertFalse(must_accept_tos(self.org, self.user))
-        self.assertFalse(must_accept_tos(self.org, None))
+        self.assertIsNone(get_current_tos(self.org).version)
+        self.assertIsNone(get_current_tos(None).version)
+        self.assertFalse(get_current_tos(self.org, self.user).must_accept)
+        self.assertFalse(get_current_tos(self.org).must_accept)
 
     def test_org_tos(self):
         tos = self.org.tos.create(version=now() - timedelta(days=1))
         self.org.tos.create(version=now() + timedelta(days=1))
-        self.assertEqual(tos.version, get_required_version(self.org))
+        self.assertEqual(tos.version, get_current_tos(self.org).version)
 
     def test_global_counts_from_required_from(self):
         self.org.tos.create(version=now() - timedelta(days=5))
         self._global(days_ago=2)
         upcoming = self._global(days_ago=1, required_in=1)
         gtos = self._global(days_ago=3, required_in=0)
-        self.assertEqual(gtos.version, get_required_version(self.org))
+        self.assertEqual(gtos.version, get_current_tos(self.org).version)
         # Without organisation terms there's nothing to wait for
-        self.assertEqual(upcoming.version, get_required_version(None))
+        self.assertEqual(upcoming.version, get_current_tos(None).version)
 
     def test_newest_of_both(self):
         gtos = self._global(days_ago=1, required_in=-1)
         self.org.tos.create(version=now() - timedelta(days=2))
-        self.assertEqual(gtos.version, get_required_version(self.org))
+        self.assertEqual(gtos.version, get_current_tos(self.org).version)
         tos = self.org.tos.create()
-        self.assertEqual(tos.version, get_required_version(self.org))
+        self.assertEqual(tos.version, get_current_tos(self.org).version)
 
     def test_published_global_in_effect(self):
         tos = self.org.tos.create(version=now() - timedelta(days=5))
@@ -212,7 +211,7 @@ class TermsOfServiceUtilsTests(TestCase):
         gtos = self._global(days_ago=3, required_in=-3)
         self._global(days_ago=2, required_in=5)
         self.org.tos.create(version=now() + timedelta(days=1))
-        self.assertEqual(gtos.version, get_required_version(self.org))
+        self.assertEqual(gtos.version, get_current_tos(self.org).version)
 
     def test_has_newer_global_tos(self):
         self.assertFalse(has_newer_global_tos(None))
@@ -223,17 +222,31 @@ class TermsOfServiceUtilsTests(TestCase):
         self._global(days_ago=1)
         self.assertFalse(has_newer_global_tos(tos))
         # Upcoming counts, managers get time to review before it's required
-        self._global(days_ago=1, required_in=5)
+        upcoming = self._global(days_ago=1, required_in=5)
         self.assertTrue(has_newer_global_tos(tos))
+        # Already newer, no need to ask
+        with self.assertNumQueries(0):
+            self.assertTrue(has_newer_global_tos(tos, upcoming))
 
     def test_must_accept(self):
         self.org.tos.create(version=now() - timedelta(days=1))
-        self.assertTrue(must_accept_tos(self.org, self.user))
-        self.assertTrue(must_accept_tos(self.org, None))
+        self.assertTrue(get_current_tos(self.org, self.user).must_accept)
+        self.assertTrue(get_current_tos(self.org).must_accept)
         accept_tos(self.user)
-        self.assertFalse(must_accept_tos(self.org, self.user))
+        self.assertFalse(get_current_tos(self.org, self.user).must_accept)
         self.org.tos.create()
-        self.assertTrue(must_accept_tos(self.org, self.user))
+        self.assertTrue(get_current_tos(self.org, self.user).must_accept)
+
+    def test_current_is_lazy(self):
+        self.org.tos.create(version=now() - timedelta(days=1))
+        with self.assertNumQueries(2):
+            current = get_current_tos(self.org, self.user)
+        with self.assertNumQueries(1):
+            self.assertTrue(current.must_accept)
+            self.assertIsNone(current.accepted)
+        current = get_current_tos(self.org)
+        with self.assertNumQueries(0):
+            self.assertIsNone(current.accepted)
 
     def test_accept_replaces_previous(self):
         first = accept_tos(self.user)

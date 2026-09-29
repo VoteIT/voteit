@@ -19,8 +19,7 @@ from voteit.organisation.matching import names_match
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 from voteit.organisation.utils import get_enabled_backends
 from voteit.organisation.utils import accept_tos
-from voteit.organisation.utils import get_required_version
-from voteit.organisation.utils import must_accept_tos
+from voteit.organisation.utils import get_current_tos
 
 logger = getLogger(__name__)
 User = get_user_model()
@@ -402,18 +401,15 @@ def require_tos_accept(*args, strategy, backend, current_partial, user=None, **k
     ``/api/terms-of-service/current/``, and the accept is stored by
     ``store_tos_accept`` once there is a user.
     """
-    if not must_accept_tos(backend.organisation, user):
+    current = get_current_tos(backend.organisation, user)
+    if not current.must_accept:
         return
     # Only the version they were shown counts, a newer one means asking again
     try:
         shown = parse_datetime(strategy.request_data().get(ACCEPT_TOS_FIELD) or "")
     except ValueError:
         shown = None
-    if (
-        shown
-        and is_aware(shown)
-        and shown >= get_required_version(backend.organisation)
-    ):
+    if shown and is_aware(shown) and shown >= current.version:
         return {"accepted_tos": True}
     base = getattr(settings, "ACCEPT_TOS_URL", "/accept-tos")
     query = urlencode(

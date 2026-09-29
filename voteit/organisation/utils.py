@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Collection
+from dataclasses import dataclass
 from datetime import datetime
+from functools import cached_property
 from typing import Generator
 from typing import TYPE_CHECKING
 
@@ -152,38 +154,75 @@ def get_published_global_tos(
     return qs.order_by("-version").first()
 
 
-def has_newer_global_tos(org_tos: TermsOfService | None) -> bool:
+def has_newer_global_tos(
+    org_tos: TermsOfService | None, global_tos: GlobalTermsOfService | None = None
+) -> bool:
     """
     Global terms published after ``org_tos``, so managers should review them.
+    Pass ``global_tos`` from ``get_published_global_tos`` to skip the query
+    when it's already newer.
     """
     if org_tos is None:
         return False
+    if global_tos is not None and global_tos.version > org_tos.version:
+        return True
     return GlobalTermsOfService.objects.filter(
         required_from__isnull=False, version__gt=org_tos.version, version__lte=now()
     ).exists()
 
 
-def get_required_version(organisation: Organisation | None) -> datetime | None:
-    """
-    Accepts older than this must be renewed.
-    """
-    org_tos = get_active_tos(organisation) if organisation is not None else None
-    versions = [get_published_global_tos(org_tos), org_tos]
-    return max((x.version for x in versions if x is not None), default=None)
-
-
-def get_accepted(user: User) -> datetime | None:
+def get_accepted(user: User | None) -> datetime | None:
+    if user is None or user.is_anonymous:
+        return None
     return (
         UserAccept.objects.filter(user=user).values_list("accepted", flat=True).first()
     )
 
 
-def must_accept_tos(organisation: Organisation | None, user: User | None) -> bool:
-    required = get_required_version(organisation)
-    if required is None:
-        return False
-    accepted = get_accepted(user) if user is not None else None
-    return accepted is None or accepted < required
+@dataclass
+class CurrentTermsOfService:
+    """
+    What ``user`` must accept, see ``get_current_tos``. Anything touching the
+    user is fetched on first access.
+    """
+
+    global_tos: GlobalTermsOfService | None
+    organisation_tos: TermsOfService | None
+    user: User | None = None
+
+    @property
+    def version(self) -> datetime | None:
+        """
+        Accepts older than this must be renewed.
+        """
+        versions = (self.global_tos, self.organisation_tos)
+        return max((x.version for x in versions if x is not None), default=None)
+
+    @cached_property
+    def accepted(self) -> datetime | None:
+        return get_accepted(self.user)
+
+    @property
+    def must_accept(self) -> bool:
+        required = self.version
+        if required is None:
+            return False
+        return self.accepted is None or self.accepted < required
+
+    @cached_property
+    def newer_global_tos(self) -> bool:
+        return has_newer_global_tos(self.organisation_tos, self.global_tos)
+
+
+def get_current_tos(
+    organisation: Organisation | None, user: User | None = None
+) -> CurrentTermsOfService:
+    org_tos = get_active_tos(organisation) if organisation is not None else None
+    return CurrentTermsOfService(
+        global_tos=get_published_global_tos(org_tos),
+        organisation_tos=org_tos,
+        user=user,
+    )
 
 
 def accept_tos(user: User) -> UserAccept:

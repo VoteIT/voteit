@@ -40,12 +40,7 @@ from voteit.organisation.rest_api.filters import OrphanUserEmailFilter
 from voteit.organisation.rest_api.filters import UserIdentitiesFilter
 from voteit.organisation.rest_api.filters import UserPkFilter
 from voteit.organisation.utils import accept_tos
-from voteit.organisation.utils import get_accepted
-from voteit.organisation.utils import get_active_tos
-from voteit.organisation.utils import get_published_global_tos
-from voteit.organisation.utils import get_required_version
-from voteit.organisation.utils import has_newer_global_tos
-from voteit.organisation.utils import must_accept_tos
+from voteit.organisation.utils import get_current_tos
 
 if TYPE_CHECKING:
     from voteit.core.models import User as UserType
@@ -183,22 +178,8 @@ class TermsOfServiceViewSet(
         serializer_class=serializers.CurrentTermsOfServiceSerializer,
     )
     def current(self, request):
-        organisation = self.get_organisation()
-        user = request.user if request.user.is_authenticated else None
-        organisation_tos = get_active_tos(organisation)
-        global_tos = get_published_global_tos(organisation_tos)
-        versions = [x.version for x in (global_tos, organisation_tos) if x]
-        serializer = self.get_serializer(
-            {
-                "global_tos": global_tos,
-                "organisation_tos": organisation_tos,
-                "version": max(versions, default=None),
-                "accepted": get_accepted(user) if user else None,
-                "must_accept": must_accept_tos(organisation, user),
-                "newer_global_tos": has_newer_global_tos(organisation_tos),
-            }
-        )
-        return Response(serializer.data)
+        current = get_current_tos(self.get_organisation(), request.user)
+        return Response(self.get_serializer(current).data)
 
     @action(
         detail=False,
@@ -213,7 +194,7 @@ class TermsOfServiceViewSet(
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        required = get_required_version(request.user.organisation)
+        required = get_current_tos(request.user.organisation).version
         if required and serializer.validated_data["version"] < required:
             raise ValidationError(
                 {"version": _("Newer terms of service have taken effect")}
