@@ -649,7 +649,14 @@ class TermsOfServiceViewSetTests(APITestCase):
             func(*params)
         data = self.client.get(self.current_url).json()
         self.assertEqual(
-            {"global_tos", "organisation_tos", "version", "accepted", "must_accept"},
+            {
+                "global_tos",
+                "organisation_tos",
+                "version",
+                "accepted",
+                "must_accept",
+                "newer_global_tos",
+            },
             set(data),
         )
         self.assertEqual(self.gtos.pk, data["global_tos"]["pk"])
@@ -657,6 +664,7 @@ class TermsOfServiceViewSetTests(APITestCase):
         self.assertEqual(self.current.version, parse_datetime(data["version"]))
         self.assertIsNone(data["accepted"])
         self.assertTrue(data["must_accept"])
+        self.assertFalse(data["newer_global_tos"])
 
     def test_current_accepted(self):
         accept_tos(self.user)
@@ -666,16 +674,24 @@ class TermsOfServiceViewSetTests(APITestCase):
         self.assertFalse(data["must_accept"])
 
     def test_current_upcoming_global(self):
-        # Shown, and newest, but nobody has to accept it yet
+        # Not shown until required, or until the org publishes newer terms
         accept_tos(self.user)
         upcoming = GlobalTermsOfService.objects.create(
-            required_from=now().date() + timedelta(days=5)
+            version=now() - timedelta(days=2),
+            required_from=now().date() + timedelta(days=5),
         )
         self.client.force_login(self.user)
         data = self.client.get(self.current_url).json()
         self.assertEqual(upcoming.pk, data["global_tos"]["pk"])
-        self.assertEqual(upcoming.version, parse_datetime(data["version"]))
+        self.assertEqual(self.current.version, parse_datetime(data["version"]))
         self.assertFalse(data["must_accept"])
+        self.assertFalse(data["newer_global_tos"])
+        upcoming.version = now()
+        upcoming.save()
+        data = self.client.get(self.current_url).json()
+        self.assertEqual(self.gtos.pk, data["global_tos"]["pk"])
+        self.assertFalse(data["must_accept"])
+        self.assertTrue(data["newer_global_tos"])
 
     def test_current_only_org(self):
         self.gtos.delete()
@@ -689,6 +705,7 @@ class TermsOfServiceViewSetTests(APITestCase):
         self.assertIsNone(data["organisation_tos"])
         self.assertEqual(self.gtos.version, parse_datetime(data["version"]))
         self.assertTrue(data["must_accept"])
+        self.assertFalse(data["newer_global_tos"])
 
     def test_current_nothing(self):
         self.gtos.delete()

@@ -172,6 +172,7 @@ class CurrentTermsOfServiceSerializer(serializers.Serializer):
     """
     What a user accepts: the global and the organisation's terms, either may
     be missing. ``version`` is the newest of them, and goes back on accept.
+    ``newer_global_tos`` tells managers to review the organisation's terms.
     """
 
     global_tos = GlobalTermsOfServiceSerializer(allow_null=True)
@@ -179,6 +180,7 @@ class CurrentTermsOfServiceSerializer(serializers.Serializer):
     version = serializers.DateTimeField(allow_null=True)
     accepted = serializers.DateTimeField(allow_null=True)
     must_accept = serializers.BooleanField()
+    newer_global_tos = serializers.BooleanField()
 
 
 class AcceptTermsOfServiceSerializer(serializers.Serializer):

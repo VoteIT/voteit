@@ -714,6 +714,7 @@ class RequireTosAcceptTests(TestCase):
         self.assertEqual({}, self._run(self.user))
 
     def test_global_not_required_yet(self):
+        self.org.tos.create(version=now() - timedelta(days=1))
         accept_tos(self.user)
         GlobalTermsOfService.objects.create(
             required_from=now().date() + timedelta(days=1)

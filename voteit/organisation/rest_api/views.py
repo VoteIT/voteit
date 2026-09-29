@@ -44,6 +44,7 @@ from voteit.organisation.utils import get_accepted
 from voteit.organisation.utils import get_active_tos
 from voteit.organisation.utils import get_published_global_tos
 from voteit.organisation.utils import get_required_version
+from voteit.organisation.utils import has_newer_global_tos
 from voteit.organisation.utils import must_accept_tos
 
 if TYPE_CHECKING:
@@ -184,8 +185,8 @@ class TermsOfServiceViewSet(
     def current(self, request):
         organisation = self.get_organisation()
         user = request.user if request.user.is_authenticated else None
-        global_tos = get_published_global_tos()
         organisation_tos = get_active_tos(organisation)
+        global_tos = get_published_global_tos(organisation_tos)
         versions = [x.version for x in (global_tos, organisation_tos) if x]
         serializer = self.get_serializer(
             {
@@ -194,6 +195,7 @@ class TermsOfServiceViewSet(
                 "version": max(versions, default=None),
                 "accepted": get_accepted(user) if user else None,
                 "must_accept": must_accept_tos(organisation, user),
+                "newer_global_tos": has_newer_global_tos(organisation_tos),
             }
         )
         return Response(serializer.data)

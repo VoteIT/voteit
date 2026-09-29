@@ -133,41 +133,43 @@ def get_active_tos(organisation: Organisation) -> TermsOfService | None:
     return organisation.tos.filter(version__lte=now()).order_by("-version").first()
 
 
-def get_published_global_tos() -> GlobalTermsOfService | None:
+def get_published_global_tos(
+    org_tos: TermsOfService | None,
+) -> GlobalTermsOfService | None:
     """
-    The latest global terms. Shown before ``required_from`` too, so accepts
-    made in the meantime already cover them.
+    The latest global terms. ``required_from`` gives organisations time to
+    roll out their own terms, so with ``org_tos`` it only includes global
+    terms that are required or older than them.
     """
-    return (
-        GlobalTermsOfService.objects.filter(
-            required_from__isnull=False, version__lte=now()
-        )
-        .order_by("-version")
-        .first()
+    qs = GlobalTermsOfService.objects.filter(
+        required_from__isnull=False, version__lte=now()
     )
+    if org_tos is not None:
+        qs = qs.filter(
+            models.Q(required_from__lte=localdate())
+            | models.Q(version__lte=org_tos.version)
+        )
+    return qs.order_by("-version").first()
+
+
+def has_newer_global_tos(org_tos: TermsOfService | None) -> bool:
+    """
+    Global terms published after ``org_tos``, so managers should review them.
+    """
+    if org_tos is None:
+        return False
+    return GlobalTermsOfService.objects.filter(
+        required_from__isnull=False, version__gt=org_tos.version, version__lte=now()
+    ).exists()
 
 
 def get_required_version(organisation: Organisation | None) -> datetime | None:
     """
-    Accepts older than this must be renewed. Global terms only count once
-    ``required_from`` has passed.
+    Accepts older than this must be renewed.
     """
-    versions = [
-        GlobalTermsOfService.objects.filter(
-            required_from__lte=localdate(), version__lte=now()
-        )
-        .order_by("-version")
-        .values_list("version", flat=True)
-        .first()
-    ]
-    if organisation is not None:
-        versions.append(
-            organisation.tos.filter(version__lte=now())
-            .order_by("-version")
-            .values_list("version", flat=True)
-            .first()
-        )
-    return max((x for x in versions if x is not None), default=None)
+    org_tos = get_active_tos(organisation) if organisation is not None else None
+    versions = [get_published_global_tos(org_tos), org_tos]
+    return max((x.version for x in versions if x is not None), default=None)
 
 
 def get_accepted(user: User) -> datetime | None:
