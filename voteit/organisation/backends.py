@@ -161,14 +161,6 @@ class IDProxyOAuth2(OrganisationBackendMixin, BaseOAuth2):
     ]
 
     @classmethod
-    def get_login_url(cls, provider: OAuth2Provider) -> str:
-        """
-        The id proxy is entered through itself, not through social_django.
-        This is to check required data before starting the login process.
-        """
-        return f"{settings.ID_HOST}/login-to/{provider.organisation.host}"
-
-    @classmethod
     def get_profile_url(cls, provider: OAuth2Provider) -> str:
         return f"{settings.ID_HOST}/"
 
