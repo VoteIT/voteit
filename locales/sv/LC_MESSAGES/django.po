@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-28 10:37+0200\n"
-"PO-Revision-Date: 2026-09-28 10:40+0200\n"
+"POT-Creation-Date: 2026-10-06 10:07+0200\n"
+"PO-Revision-Date: 2026-10-06 10:10+0200\n"
 "Last-Translator: Robin Harms Oredsson <robin@betahaus.net>\n"
 "Language-Team: \n"
 "Language: sv\n"
@@ -22,19 +22,19 @@ msgstr ""
 msgid "Give users access automatically"
 msgstr "Ge användare access automatiskt"
 
-#: agenda/rest_api/serializers.py:119
+#: agenda/rest_api/serializers.py:122
 msgid "Duplicate agenda item IDs are not allowed."
 msgstr "Dubbletter av dagordningspunkt-ID är inte tillåtna."
 
-#: agenda/rest_api/serializers.py:131
+#: agenda/rest_api/serializers.py:134
 msgid "One or more agenda items not found in the specified meeting."
 msgstr "En eller flera dagordningspunkter hittades inte i det angivna mötet."
 
-#: agenda/rest_api/serializers.py:162
+#: agenda/rest_api/serializers.py:165
 msgid "state, block_discussion or block_proposals required"
 msgstr "state, block_discussion eller block_proposals krävs"
 
-#: agenda/rest_api/serializers.py:170
+#: agenda/rest_api/serializers.py:173
 msgid "Can't bulk delete in ongoing meeting"
 msgstr "Kan inte radera många på en gång i ett pågående möte"
 
@@ -454,11 +454,23 @@ msgstr "En ny inloggningsmetod har kopplats"
 msgid "A new login method was connected to your account"
 msgstr "En ny inloggningsmetod har kopplats till ditt konto"
 
-#: organisation/pipeline.py:29
+#: organisation/pipeline.py:34
 msgid "This organisation is no longer active."
 msgstr "Organisationen är inte längre aktiv."
 
-#: organisation/pipeline.py:194
+#: organisation/pipeline.py:212
+#, python-format
+msgid ""
+"This %(provider)s login already belongs to another account here. Sign in "
+"with %(provider)s to use that account. To connect it to this account "
+"instead, first remove %(provider)s from the other account."
+msgstr ""
+"Den här inloggningen med %(provider)s tillhör redan ett annat konto här. "
+"Logga in med %(provider)s för att använda det kontot. Om du vill koppla den "
+"till det här kontot istället måste du först ta bort %(provider)s från det "
+"andra kontot."
+
+#: organisation/pipeline.py:243
 msgid ""
 "You already have an account here that manages the organisation, but it has "
 "no way to sign in. Ask another organisation manager for help."
@@ -466,7 +478,7 @@ msgstr ""
 "Du har redan ett konto här som administrerar organisationen, men det saknar "
 "sätt att logga in. Be en annan organisationsadministratör om hjälp."
 
-#: organisation/pipeline.py:199
+#: organisation/pipeline.py:248
 #, python-format
 msgid ""
 "You already have an account here that manages the organisation. Sign in with "
@@ -475,15 +487,19 @@ msgstr ""
 "Du har redan ett konto här som administrerar organisationen. Logga in med "
 "%(existing)s i stället och koppla sedan %(new)s från din profil."
 
-#: organisation/rest_api/views.py:62
+#: organisation/rest_api/views.py:81
 msgid "You're logged in to another organisation"
 msgstr "Du är inloggad i en annan organisation"
 
-#: organisation/rest_api/views.py:344
+#: organisation/rest_api/views.py:200
+msgid "Newer terms of service have taken effect"
+msgstr "Nya användarvillkor har börjat gälla"
+
+#: organisation/rest_api/views.py:406
 msgid "Required"
 msgstr "Obligatoriskt"
 
-#: organisation/rest_api/views.py:348
+#: organisation/rest_api/views.py:410
 msgid "That question has already been answered."
 msgstr "Den frågan har redan besvarats."
 

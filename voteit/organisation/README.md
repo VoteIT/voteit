@@ -340,6 +340,23 @@ stays `social_user`'s business.
     >>> coming_back({}, uid="a-known-sub", user=existing) is None
     True
 
+A credential that already reaches another account is refused while connecting.
+Logging in with it would switch to that account -- right for a login, but somebody
+who asked to add a login method would land elsewhere without a word. Typically an
+old account they forgot, and a new one made by another provider.
+
+    >>> forgotten = org.users.create(username="forgotten")
+    >>> _ = forgotten.social_auth.create(
+    ...     provider="scoutid", uid="an-old-sub", extra_data={}
+    ... )
+    >>> coming_back(
+    ...     {CONNECT_INTENT_SESSION_KEY: "scoutid"}, uid="an-old-sub", user=existing
+    ... )
+    Traceback (most recent call last):
+    social_core.exceptions.AuthException: This ScoutID login already belongs to
+    another account here. Sign in with ScoutID to use that account. To connect it
+    to this account instead, first remove ScoutID from the other account.
+
 Nobody signed in, nothing to protect.
 
     >>> coming_back({}) is None
