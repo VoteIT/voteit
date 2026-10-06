@@ -5,7 +5,9 @@ Manages the top-level tenant (`Organisation`) and everything directly owned by i
 ## Models
 
 ### Organisation
+
 The root tenant. Key fields:
+
 - `host` — unique hostname (e.g. `"meeting.myorg.se"`). Used at every request boundary to resolve the tenant; `host.split(":")[0]` strips any port.
 - `active` — when `False`, the `org_active` pipeline step blocks all logins for this organisation.
 - `body` / `help_info` — `RichTextField` values cleaned by `relaxed_clean_html`.
@@ -19,6 +21,7 @@ The root tenant. Key fields:
 Auditlog is registered on `title`, `body`, `page_title`, `host`, `active`, and `help_info` only.
 
 ### OrganisationRoles
+
 One row per `(user, organisation)` pair. The `assigned` field is a `RolesField` (PostgreSQL `ArrayField`). Valid values are `org_manager` and `meeting_creator`.
 
 The `context` FK is to `Organisation` and the `organisation` property returns `self.context` — this satisfies the `OrganisationContext` ABC without a duplicate column.
@@ -28,6 +31,7 @@ Changes fire `roles_added` / `roles_removed` core signals, which in turn publish
 Auditlog stores `{"o": self.context_id}` in `get_additional_data()` for every change.
 
 ### OAuth2Provider
+
 Holds the OAuth2/OIDC credentials used for SSO login. **Required foreign key** to `Organisation`, one row per social auth backend, uniquely constrained on `(organisation, provider_id)`. Fields: `provider_id` (the `social_core` backend `name`), `scope` (space-separated), `client_id`, `client_secret`, `oidc_endpoint` (blank unless an OIDC backend needs to override its own default issuer), `primary`, `hidden`.
 
 Look one up with `organisation.get_provider(provider_id)`, which raises `OAuth2Provider.DoesNotExist`.
@@ -37,22 +41,25 @@ The `backend` property returns the backend class for `provider_id`, or `None` wh
 `OAuth2Provider.visible_for(organisation)` returns the login options to offer: `hidden` rows and rows with no enabled backend dropped, `primary` first, the rest by title lowercased. Sorting is in Python because the title comes from the backend class, not the row. `hidden` only affects this list — such a provider still logs in fine, which is what you want for something reached by a hint rather than a button.
 
 ### GlobalTermsOfService
+
 Terms shared by every organisation, one row per `version`. `notes` says what changed. A version is a draft until `required_from` is set, and drafts are not in the API. A published version is shown straight away, but only forces users to accept again once `required_from` has passed, so accepts made in the meantime already cover it.
 
 ### TermsOfService
+
 An organisation's own terms, optional and independent of `GlobalTermsOfService`. A new version is a new row, since users must accept each one. `version` is when it takes effect: the active one is the latest with `version <= now`, so a future version can be prepared in advance.
 
 ### UserAccept
+
 One row per user with the time of their latest accept. It doesn't point at any terms: a user must accept again when the required version (the newest active org version, or global version past `required_from`) is later than `accepted`. See `CurrentTermsOfService` / `get_current_tos()` in `utils.py`, which fetches the user's accept and `newer_global_tos` lazily.
 
 ## Roles
 
 Defined in `roles.py`:
 
-| Constant | Name | String value |
-|---|---|---|
-| `ROLE_ORG_MANAGER` | Organisation manager | `org_manager` |
-| `ROLE_MEETING_CREATOR` | Meeting creator | `meeting_creator` |
+| Constant               | Name                 | String value      |
+| ---------------------- | -------------------- | ----------------- |
+| `ROLE_ORG_MANAGER`     | Organisation manager | `org_manager`     |
+| `ROLE_MEETING_CREATOR` | Meeting creator      | `meeting_creator` |
 
 `is_meeting_creator` grants access for either `meeting_creator` or `org_manager` — org managers implicitly have meeting creation rights without needing the secondary role.
 
@@ -60,12 +67,12 @@ Defined in `roles.py`:
 
 All permissions are guarded by predicates registered via the `rules` library:
 
-| Permission | Predicate |
-|---|---|
-| `organisation.change` | `is_manager` |
-| `organisation.manage` | `is_manager` |
+| Permission                  | Predicate    |
+| --------------------------- | ------------ |
+| `organisation.change`       | `is_manager` |
+| `organisation.manage`       | `is_manager` |
 | `organisation.change_roles` | `is_manager` |
-| `organisation.view_roles` | `is_manager` |
+| `organisation.view_roles`   | `is_manager` |
 
 There is no explicit `VIEW` permission on `Organisation` — the list endpoint is publicly readable (requires `IsAuthenticatedOrReadOnly` only).
 
@@ -74,6 +81,7 @@ There is no explicit `VIEW` permission on `Organisation` — the list endpoint i
 All ViewSets are registered to the central router in `rest_api/views.py`.
 
 ### `OrganisationViewSet` (`/api/organisation/`)
+
 - `list` — returns the single organisation matching the request's `Host` header. Unauthenticated callers get the org by hostname lookup. Authenticated callers get their own org; if their org's host does not match the request host, a `401 AuthenticationFailed` is raised with the message "You're logged in to another organisation".
 - `change` (`PATCH /api/organisation/change/`) — partial update of `body`, `help_info`, and `page_title`. Requires `org_manager`.
 - Create/delete are not supported (405).
@@ -83,6 +91,7 @@ The serializer also exposes read-only computed fields: `providers` and `componen
 `providers` is the list of login methods, from `OAuth2Provider.visible_for()`.
 
 ### `OrganisationRolesViewSet` (`/api/organisation-roles/`)
+
 - `list` — returns all `OrganisationRoles` for the user's organisation. Non-managers see an empty list (queryset scoped by `view_roles` permission check).
 - Supports `?user_id_in=1,2,3` filter and `^user__first_name` / `^user__last_name` search.
 - `available` (`GET /api/organisation-roles/available/`) — lists valid role definitions; open to anonymous.
@@ -90,9 +99,11 @@ The serializer also exposes read-only computed fields: `providers` and `componen
 - `remove_roles` (`POST /api/organisation-roles/remove/`) — removes roles; returns `204` if the row is deleted entirely after the last role is removed. Also logs.
 
 ### `GlobalTermsOfServiceViewSet` (`/api/global-terms-of-service/`)
+
 Read-only `list` / `retrieve` of every `GlobalTermsOfService` with `required_from` set, latest `version` first. Open to anyone, logged in or not.
 
 ### `TermsOfServiceViewSet` (`/api/terms-of-service/`)
+
 - `list` / `retrieve` — open to anyone. Anonymous callers get the organisation by host, everyone else their own. Managers see every version, others only the active one.
 - `create` — `org_manager` only, and only `body` is taken. `version` is now.
 - `partial_update` — `org_manager` only, for small fixes to `body`. Everything else is read-only. No `PUT` or `DELETE`.
@@ -100,9 +111,11 @@ Read-only `list` / `retrieve` of every `GlobalTermsOfService` with `required_fro
 - `accept` (`POST /api/terms-of-service/accept/`) — for logged in users. Takes `version` from `current`; one older than the required version is a 400, so nobody accepts terms they weren't shown. Replaces the previous accept. A login accepts through the pipeline instead.
 
 ### `MatchOrphansViewSet` (`/api/match-orphans/`)
+
 ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?email_in=a@b.com,c@d.com` (comma-separated, required). Returns users with no `identity_id` matching those emails, along with their organisation host. Used for pre-login orphan matching.
 
 ### `AccountLinkOptionsViewSet` (`/api/account-link-options/`)
+
 The accounts a paused login could be claiming. `AllowAny`, because the pipeline pauses
 before anyone is signed in — the `partial_token` stands in for a session. It is single-use
 (`do_complete` clears it on resume) and `manage.py clearsocial --age` removes stale ones.
@@ -133,11 +146,13 @@ The connect flow needs almost no machinery: a signed-in user visiting
   configured for it.
 
 ### `HandleIdentitiesViewSet` (`/api/handle-identities/`)
+
 ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?identity_in=uid1,uid2` (required). Provides a `query` action that returns user details for the matched identities. Raises `ValidationError` if >3 users would be affected, if any affected user has org roles / staff / superuser status, or if identities span multiple organisations. All validation errors are also emitted to the `notification_logger`.
 
 ## SSO Backends (`backends.py`)
 
 `OrganisationBackendMixin` is the shared multi-tenant half of every social auth backend in the project. Mix it in **before** the `social_core` backend, so `get_scope()` can extend `DEFAULT_SCOPE` through `super()`. It provides:
+
 - `organisation` — resolved from the request hostname.
 - `provider` — that organisation's `OAuth2Provider` row for `self.name`; raises `AuthException` if there is none.
 - `get_key_and_secret()` / `get_scope()` — credentials and the org's scopes merged with the backend's defaults.
@@ -172,6 +187,7 @@ ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?identity_in=ui
 - `get_title()`, `get_login_url(provider)`, `get_profile_url(provider)`, `get_logout_url(provider)` — what the SPA shows, and where it sends people to log in, manage their account and log out. Backends set `TITLE`; the default login URL is `reverse("social:begin", args=[name])` and the other two default to `None`. They take the **provider row**, not the organisation, because an OIDC backend's URLs derive from its issuer — which is a per-provider column. They are classmethods, so they work outside a login request where there is no strategy.
 
 `IDProxyOAuth2` is the backend for the project's central identity proxy service. Key behaviours:
+
 - Overrides `get_login_url()`: the id proxy is entered through itself (`{ID_HOST}/login-to/{host}`), because it must know which tenant is asking before it can offer a login.
 - Merges `OAuth2Provider.scope` with `DEFAULT_SCOPE = ["email", "identity"]` and sorts the combined list for deterministic OAuth requests.
 - `AUTHORIZATION_URL`, `ACCESS_TOKEN_URL`, and `IDENTITY_URL` can be overridden per-environment via `SOCIAL_AUTH_IDPROXY_<KEY>` settings.
@@ -188,6 +204,7 @@ Custom PSA pipeline steps used in `SOCIAL_AUTH_PIPELINE`:
   - Identity-ID lookup with no social auth: only considers `is_active=True` users.
 
   Every other backend returns early, resolving by `(provider, uid)` alone. None of the above applies to them: `identity_id` is not their namespace.
+
 - `create_user` — creates a new user scoped to `backend.organisation`, passing `identity_id=uid` **only for `idproxy`**; an account created by any other backend has no `identity_id` and is reached through its `UserSocialAuth`.
 - `ensure_userid` — generates a slugified `userid` from first/last name if not already set. Deduplicates by appending a suffix.
 - `inherit_users` — maintains `identity_id` for `idproxy` only: it overwrites when the uid has changed, and `extra_identity_ids` in the response updates all same-org active users carrying those IDs to share the authenticated user's `identity_id`. Returns immediately for every other backend — see "`identity_id` belongs to the id proxy" below.
@@ -226,7 +243,7 @@ On subscribe, the `organisation.roles` collector pushes the user's current org r
 
 ## Scheduled Jobs (`jobs.py`)
 
-- `email_login_method_added` (RQ, `long`) — tells someone a login method was attached to their account. Enqueued by the `notify_login_method_added` signal, and only for a *second* or later credential: a first one is a registration. The mail goes to the address the **account already had**, never the one the new credential brought, because the point is to reach whoever owns the account — which matters most when they are not the person who just logged in.
+- `email_login_method_added` (RQ, `long`) — tells someone a login method was attached to their account. Enqueued by the `notify_login_method_added` signal, and only for a _second_ or later credential: a first one is a registration. The mail goes to the address the **account already had**, never the one the new credential brought, because the point is to reach whoever owns the account — which matters most when they are not the person who just logged in.
 - `cleanup_social_auth_leftovers` (daily at 04:40) — deletes `Partial` rows and unverified `Code` rows older than `SOCIAL_LEFTOVER_DAYS` (1). This is what `manage.py clearsocial` does, scheduled rather than left to a cron entry nobody remembers to add. A partial is the whole pipeline frozen mid-flight, so it carries the provider's response and the tokens in it; `clearsocial`'s own default of 14 days is far too long for that. Abandoning one costs the person nothing — they log in again and are asked again.
 - `cleanup_extra_data_for_older_users` (daily at 04:00) — clears `UserSocialAuth.extra_data` for records not modified in the past 365 days. Prevents long-lived accumulation of potentially sensitive identity data. The credential row itself survives — it is still how its owner reaches the account it belongs to.
 
@@ -288,6 +305,7 @@ answer that links it — asserted by `tests/test_docs.py::OrganisationDocTests::
 passing.
 
 Test modules:
+
 - `tests/test_models.py` — model and `OAuth2Provider` basics.
 - `tests/test_rules.py` — predicate logic for `is_manager` and `is_meeting_creator`.
 - `tests/test_backends.py` — `IDProxyOAuth2` scope merging.
