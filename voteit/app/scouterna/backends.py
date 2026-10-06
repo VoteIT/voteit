@@ -5,6 +5,7 @@ from typing import Any
 
 from django.conf import settings
 from social_core.backends.open_id_connect import OpenIdConnectAuth
+from social_core.exceptions import AuthMissingParameter
 from social_core.utils import cache
 
 from voteit.app.scouterna import SCOUTID_PROVIDER
@@ -53,8 +54,6 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
     DEFAULT_SCOPE = ["openid", "profile", "email"]
     # OpenIdConnectAuth turns off the PKCE its own base class enables.
     DEFAULT_USE_PKCE = True
-    # Keycloak UUID, stable per user per realm.
-    ID_KEY = "sub"
     MEMBER_ID_KEY = SCOUTNET_MEMBER_NO
     EXTRA_DATA = [
         ("sub", "id"),
@@ -143,6 +142,14 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
             logger.warning("Unexpected preferred_username format: %r", username)
             return None
         return member_no
+
+    def get_user_id(self, details: dict[str, Any], response: dict[str, Any]) -> str:
+        """
+        Users are matched on their Scoutnet membership number, not on ``sub``.
+        """
+        if member_no := self.get_member_no(response):
+            return member_no
+        raise AuthMissingParameter(self, "preferred_username")
 
     def extra_data(
         self,

@@ -24,10 +24,12 @@ credentials from that organisation's `OAuth2Provider` row with
 - `DEFAULT_SCOPE = ["openid", "profile", "email"]`, merged with the org's
   `provider.scope` by the mixin.
 - `DEFAULT_USE_PKCE = True` — see below.
-- `ID_KEY = "sub"` — a Keycloak UUID, stored as `UserSocialAuth.uid`. It never reaches
-  `User.identity_id`: that column holds an id proxy identifier and nothing else, so a
-  ScoutID-only account has no `identity_id` at all and is reached through its credential.
-  See `voteit/organisation/CLAUDE.md`.
+- `get_user_id()` returns the Scoutnet membership number (from `preferred_username`,
+  see `get_member_no()`), stored as `UserSocialAuth.uid` — users are matched on it, not
+  on the Keycloak `sub`. A login without a member number fails with
+  `AuthMissingParameter`. The uid never reaches `User.identity_id`: that column holds an
+  id proxy identifier and nothing else, so a ScoutID-only account has no `identity_id`
+  at all and is reached through its credential. See `voteit/organisation/CLAUDE.md`.
 
 ### Endpoint resolution order
 
@@ -68,8 +70,8 @@ From the default scopes — see the wiki's
 
 | Claim | Lands on |
 |---|---|
-| `sub` | `UserSocialAuth.uid` (**not** `User.identity_id` — see above) |
-| `preferred_username` | `User.username`, after cleaning |
+| `sub` | `UserSocialAuth.extra_data["id"]` |
+| `preferred_username` | `User.username` after cleaning; its member number is `UserSocialAuth.uid` (**not** `User.identity_id` — see above) |
 | `given_name` / `family_name` | `User.first_name` / `last_name` |
 | `picture` | `User.img_url` (mapped in `get_user_details`) |
 | `email` | `User.email` |
@@ -144,20 +146,16 @@ lives in Scoutnet.
 
 ## Setup
 
-1. Request a client from `scoutid@scouterna.se` (see the wiki's Home page) with the
-   redirect URI `https://<org host>/complete/scoutid/`. Self-service registration is
-   planned for September 2026; until then the
-   [scoutid-keycloak-provider](https://github.com/Scouterna/scoutid-keycloak-provider)
-   repo has a local Docker Compose setup with a pre-configured test client.
-2. Add an `OAuth2Provider` in the admin for the organisation, with
+
+1. Add an `OAuth2Provider` in the admin for the organisation, with
    `provider_id="scoutid"`, the client id and secret, and scope `openid profile email`.
-3. The organisation's `/api/organisation/` payload then lists it under `providers`, and
+2. The organisation's `/api/organisation/` payload then lists it under `providers`, and
    the SPA can offer its `login_url`.
 
 ## Tests
 
 ```
-POSTGRES_PORT=5433 python manage.py test voteit.app.scouterna --keepdb --failfast
+make test voteit.app.scouterna
 ```
 
 Both test classes are decorated with `@scoutid_enabled()` from `testing.py`, which adds
