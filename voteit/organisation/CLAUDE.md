@@ -12,6 +12,8 @@ The root tenant. Key fields:
 - `active` — when `False`, the `org_active` pipeline step blocks all logins for this organisation.
 - `body` / `help_info` — `RichTextField` values cleaned by `relaxed_clean_html`.
 - `page_title` — defaults to `title` on first save if left blank.
+- `colors` — JSON validated by `schemas.OrganisationColors`, currently only `appBar` as `{r, g, b}`. Unknown keys are rejected, so a new setting needs adding to the schema.
+- `logo` — SVG, stored at `org_{pk}/logo/{uuid}.svg`. `core.validators.SVGValidator` rejects anything that could run script or load external resources, instead of sanitizing it.
 - `providers` — reverse relation to `OAuth2Provider`, one row per configured login method. Use `get_provider(provider_id)` to fetch one.
 
 `enabled_components()` yields `OrganisationComponent` instances where `enabled=True` and `is_valid` is truthy.
@@ -83,7 +85,7 @@ All ViewSets are registered to the central router in `rest_api/views.py`.
 ### `OrganisationViewSet` (`/api/organisation/`)
 
 - `list` — returns the single organisation matching the request's `Host` header. Unauthenticated callers get the org by hostname lookup. Authenticated callers get their own org; if their org's host does not match the request host, a `401 AuthenticationFailed` is raised with the message "You're logged in to another organisation".
-- `change` (`PATCH /api/organisation/change/`) — partial update of `body`, `help_info`, and `page_title`. Requires `org_manager`.
+- `change` (`PATCH /api/organisation/change/`) — partial update of `body`, `colors`, `help_info`, `logo` and `page_title`. Requires `org_manager`. `logo` is sent as multipart, `"logo": null` removes it. `colors` replaces the whole object.
 - Create/delete are not supported (405).
 
 The serializer also exposes read-only computed fields: `providers` and `components` (enabled org components via `OrganisationComponentSerializer`).

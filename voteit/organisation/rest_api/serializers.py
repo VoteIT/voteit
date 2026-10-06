@@ -65,7 +65,9 @@ class OrganisationSerializer(serializers.ModelSerializer):
         ]
         fields = read_only_fields + [
             "body",
+            "colors",
             "help_info",
+            "logo",
             "page_title",
         ]
 

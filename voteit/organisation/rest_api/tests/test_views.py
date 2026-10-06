@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import tempfile
 from datetime import timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.dateparse import parse_datetime
@@ -44,8 +46,10 @@ class OrganisationViewSetTests(APITestCase):
         cls.other_org_response = {
             "active": True,
             "body": "",
+            "colors": {},
             "components": [],
             "help_info": "",
+            "logo": None,
             "page_title": "Other org",
             "providers": [],
             "title": "Other org",
@@ -74,8 +78,10 @@ class OrganisationViewSetTests(APITestCase):
         expected_data = {
             "active": True,
             "body": "",
+            "colors": {},
             "components": [],
             "help_info": "",
+            "logo": None,
             "page_title": "Test org",
             "pk": self.org.pk,
             "providers": [],
@@ -142,6 +148,121 @@ class OrganisationViewSetTests(APITestCase):
         data = response.json()
         self.assertEqual(response.status_code, 200, data)
         self.assertDictEqual(self.other_org_response, data)
+
+
+_LOGO = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+    b'<rect width="10" height="10"/></svg>'
+)
+
+
+@override_settings(ID_HOST="https://testserver")
+class OrganisationBrandingTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.org: Organisation = Organisation.objects.create(
+            title="Test org", host="testserver"
+        )
+        cls.manager = cls.org.users.create(username="manager")
+        cls.user = cls.org.users.create(username="user")
+        cls.org.add_roles(cls.manager, ROLE_ORG_MANAGER)
+        cls.url = reverse("organisation-change")
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._override = override_settings(MEDIA_ROOT=self._tmp.name)
+        self._override.enable()
+
+    def tearDown(self):
+        self._override.disable()
+        self._tmp.cleanup()
+
+    def _upload(self, content=_LOGO, name="logo.svg"):
+        return self.client.patch(
+            self.url,
+            data={
+                "logo": SimpleUploadedFile(name, content, content_type="image/svg+xml")
+            },
+            format="multipart",
+        )
+
+    def test_colors(self):
+        colors = {"appBar": {"r": 0, "g": 128, "b": 255}}
+        for func, params in run_permission_tests(
+            self,
+            url=self.url,
+            data={"colors": colors},
+            method="PATCH",
+            expected=(
+                (self.manager, 200, {"colors": colors}),
+                (self.user, 403),
+                (None, 401),
+            ),
+        ):
+            func(*params)
+
+    def test_colors_saved(self):
+        self.client.force_login(self.manager)
+        colors = {"appBar": {"r": 1, "g": 2, "b": 3}}
+        response = self.client.patch(self.url, {"colors": colors}, format="json")
+        self.assertEqual(200, response.status_code)
+        self.org.refresh_from_db()
+        self.assertEqual(colors, self.org.colors)
+
+    def test_colors_empty(self):
+        self.client.force_login(self.manager)
+        response = self.client.patch(self.url, {"colors": {}}, format="json")
+        self.assertEqual(200, response.status_code)
+
+    def test_colors_invalid(self):
+        self.client.force_login(self.manager)
+        for colors in (
+            {"appBar": {"r": 256, "g": 0, "b": 0}},
+            {"appBar": {"r": -1, "g": 0, "b": 0}},
+            {"appBar": {"r": "1", "g": 0, "b": 0}},
+            {"appBar": {"r": 1.5, "g": 0, "b": 0}},
+            {"appBar": {"r": 0, "g": 0}},
+            {"appBar": {"r": 0, "g": 0, "b": 0, "a": 1}},
+            {"appBar": "#ff0000"},
+            {"other": 1},
+            ["appBar"],
+            "x",
+        ):
+            with self.subTest(colors=colors):
+                response = self.client.patch(
+                    self.url, {"colors": colors}, format="json"
+                )
+                self.assertEqual(400, response.status_code)
+                self.assertIn("colors", response.json())
+
+    def test_logo_upload(self):
+        self.client.force_login(self.manager)
+        response = self._upload(name="whatever.png")
+        self.assertEqual(200, response.status_code)
+        logo = response.json()["logo"]
+        self.assertIn(f"org_{self.org.pk}/logo/", logo)
+        self.assertTrue(logo.endswith(".svg"))
+
+    def test_logo_upload_forbidden(self):
+        self.client.force_login(self.user)
+        self.assertEqual(403, self._upload().status_code)
+
+    def test_logo_invalid(self):
+        self.client.force_login(self.manager)
+        response = self._upload(
+            b'<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>'
+        )
+        self.assertEqual(400, response.status_code)
+        self.assertIn("logo", response.json())
+        self.org.refresh_from_db()
+        self.assertFalse(self.org.logo)
+
+    def test_logo_remove(self):
+        self.client.force_login(self.manager)
+        self._upload()
+        response = self.client.patch(self.url, {"logo": None}, format="json")
+        self.assertEqual(200, response.status_code)
+        self.assertIsNone(response.json()["logo"])
 
 
 class OrganisationRolesTests(APITestCase):

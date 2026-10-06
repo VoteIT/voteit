@@ -49,6 +49,8 @@ class OrganisationSerializerTests(TestCase):
         self.assertIsInstance(data.pop("components"), list)
         self.assertEqual(data.pop("active"), True)
         self.assertEqual(data.pop("help_info"), "")
+        self.assertEqual(data.pop("colors"), {})
+        self.assertIsNone(data.pop("logo"))
         self.assertFalse(data, "Not everything was checked")
 
     def test_get_without_providers(self):
