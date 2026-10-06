@@ -1,4 +1,5 @@
 # Common validators
+import re
 from collections.abc import Iterable
 from typing import Dict
 
@@ -69,6 +70,123 @@ class ImageValidator:
         if ext:
             base = file.name.rsplit(".", 1)[0] if "." in file.name else file.name
             file.name = f"{base}.{ext}"
+
+
+_SVG_NS = "http://www.w3.org/2000/svg"
+_XLINK_NS = "http://www.w3.org/1999/xlink"
+_XML_NS = "http://www.w3.org/XML/1998/namespace"
+# Editor metadata that design tools leave in exported files. Nothing in them renders.
+_SVG_EDITOR_NAMESPACES = frozenset(
+    {
+        "http://www.inkscape.org/namespaces/inkscape",
+        "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd",
+        "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+        "http://purl.org/dc/elements/1.1/",
+        "http://creativecommons.org/ns#",
+    }
+)
+# No script, foreignObject, a, image, use of external resources or animation
+# (animate/set can rewrite href into javascript:).
+_SVG_ELEMENTS = frozenset(
+    {
+        "svg", "g", "defs", "symbol", "use", "title", "desc", "metadata", "style",
+        "path", "rect", "circle", "ellipse", "line", "polyline", "polygon",
+        "text", "tspan", "textPath",
+        "linearGradient", "radialGradient", "stop", "pattern",
+        "clipPath", "mask", "marker",
+        "filter", "feBlend", "feColorMatrix", "feComponentTransfer", "feComposite",
+        "feFlood", "feGaussianBlur", "feMerge", "feMergeNode", "feMorphology",
+        "feOffset", "feFuncR", "feFuncG", "feFuncB", "feFuncA",
+        "feDropShadow",
+    }
+)  # fmt: skip
+# Any url() that isn't a fragment reference to something in the same file.
+_EXTERNAL_URL = re.compile(r"url\s*\(\s*+['\"]?+\s*+(?!#)", re.IGNORECASE)
+_PROCESSING_INSTRUCTION = re.compile(r"<\?(?!xml\s)", re.IGNORECASE)
+_CSS_DENY = ("@import", "javascript:", "expression(", "\\")
+
+
+@deconstructible
+class SVGValidator:
+    """
+    Accepts only plain vector SVG. Rejects rather than sanitizes, anything
+    that could run script or load something from elsewhere is an error.
+    """
+
+    def __init__(self, max_size: int = 200 * 1024):
+        self.max_size = max_size
+
+    def __call__(self, file):
+        from lxml import etree
+
+        if file.size > self.max_size:
+            raise ValidationError(
+                _("File too large. Max size: %s") % _fmt_bytes(self.max_size)
+            )
+        file.seek(0)
+        data = file.read()
+        file.seek(0)
+        # UTF-8 only, so the DOCTYPE check can't be dodged with another encoding.
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            raise ValidationError(_("SVG must be UTF-8 encoded."))
+        lowered = text.lower()
+        if "<!doctype" in lowered or "<!entity" in lowered:
+            raise ValidationError(_("SVG must not contain a DOCTYPE or entities."))
+        # Only the XML declaration. Others, i.e. xml-stylesheet, may sit outside root.
+        if _PROCESSING_INSTRUCTION.search(text):
+            raise ValidationError(_("SVG must not contain processing instructions."))
+        parser = etree.XMLParser(
+            resolve_entities=False,
+            no_network=True,
+            load_dtd=False,
+            huge_tree=False,
+        )
+        try:
+            root = etree.fromstring(data, parser)
+        except etree.XMLSyntaxError:
+            raise ValidationError(_("Not a valid SVG file."))
+        if root.tag != f"{{{_SVG_NS}}}svg":
+            raise ValidationError(_("Not a valid SVG file."))
+        for el in root.iter():
+            if isinstance(el, etree._Comment):
+                continue
+            if not isinstance(el.tag, str):
+                raise ValidationError(_("Not a valid SVG file."))
+            self._check_element(el)
+
+    def _check_element(self, el):
+        from lxml import etree
+
+        qname = etree.QName(el)
+        if qname.namespace == _SVG_NS:
+            if qname.localname not in _SVG_ELEMENTS:
+                raise ValidationError(
+                    _("SVG element not allowed: %s") % qname.localname
+                )
+            if qname.localname == "style":
+                self._check_css(el.text or "")
+        elif qname.namespace not in _SVG_EDITOR_NAMESPACES:
+            raise ValidationError(_("SVG element not allowed: %s") % qname.localname)
+        for name, value in el.attrib.items():
+            attr = etree.QName(name)
+            if attr.namespace not in (None, _XLINK_NS, _XML_NS) and (
+                attr.namespace not in _SVG_EDITOR_NAMESPACES
+            ):
+                raise ValidationError(_("SVG attribute not allowed: %s") % name)
+            local = attr.localname.lower()
+            if local.startswith("on"):
+                raise ValidationError(_("SVG attribute not allowed: %s") % local)
+            if local == "href" and not value.strip().startswith("#"):
+                raise ValidationError(_("SVG may only link within the file."))
+            self._check_css(value)
+
+    @staticmethod
+    def _check_css(value: str):
+        lowered = value.lower()
+        if _EXTERNAL_URL.search(value) or any(x in lowered for x in _CSS_DENY):
+            raise ValidationError(_("SVG must not reference external resources."))
 
 
 def validate_model_shortname(v: str):

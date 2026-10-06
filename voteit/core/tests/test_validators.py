@@ -6,6 +6,7 @@ from django.test import SimpleTestCase
 
 from voteit.core.models import user_image_upload_to
 from voteit.core.validators import ImageValidator
+from voteit.core.validators import SVGValidator
 
 # Minimal but structurally valid images recognised correctly by libmagic.
 # JPEG: SOI + JFIF APP0 marker + EOI
@@ -226,3 +227,163 @@ class UserImageUploadToTests(SimpleTestCase):
         instance = self._instance(1)
         paths = {user_image_upload_to(instance, "photo.jpg") for _ in range(10)}
         self.assertEqual(len(paths), 10)
+
+
+_SVG_HEAD = b'<?xml version="1.0" encoding="UTF-8"?>\n'
+_SVG_OPEN = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" '
+    b'xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">'
+)
+
+
+def _svg(body: bytes, head: bytes = _SVG_HEAD) -> SimpleUploadedFile:
+    return _upload(head + _SVG_OPEN + body + b"</svg>", "logo.svg")
+
+
+class SVGValidatorTests(SimpleTestCase):
+    def setUp(self):
+        self.v = SVGValidator()
+
+    def assertRejected(self, file):
+        with self.assertRaises(ValidationError):
+            self.v(file)
+
+    def test_plain_shapes(self):
+        self.v(_svg(b'<rect width="10" height="10" fill="#f00"/>'))
+
+    def test_without_xml_declaration(self):
+        self.v(_svg(b"<circle r='4'/>", head=b""))
+
+    def test_gradient_with_local_references(self):
+        self.v(
+            _svg(
+                b'<defs><linearGradient id="g"><stop offset="0"/></linearGradient>'
+                b'<path id="p" d="M0 0h10"/></defs>'
+                b'<rect fill="url(#g)" width="10" height="10"/>'
+                b'<use xlink:href="#p"/><use href="#p"/>'
+            )
+        )
+
+    def test_style_element_and_attribute(self):
+        self.v(
+            _svg(
+                b"<style>.a{fill:url(#g);stroke:#000}</style>"
+                b'<rect class="a" style="fill: url( \'#g\' )"/>'
+            )
+        )
+
+    def test_editor_metadata(self):
+        self.v(
+            _upload(
+                b'<svg xmlns="http://www.w3.org/2000/svg" '
+                b'xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" '
+                b'xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" '
+                b'inkscape:version="1.3"><metadata><rdf:RDF/></metadata>'
+                b'<g inkscape:label="Layer 1"/></svg>',
+                "logo.svg",
+            )
+        )
+
+    def test_too_large(self):
+        self.assertRejected(_svg(b"<!--" + b"x" * 200 * 1024 + b"-->"))
+
+    def test_not_xml(self):
+        self.assertRejected(_upload(b"<svg><rect></svg>", "logo.svg"))
+
+    def test_png_named_svg(self):
+        self.assertRejected(_upload(_PNG, "logo.svg"))
+
+    def test_not_svg_root(self):
+        self.assertRejected(
+            _upload(b'<html xmlns="http://www.w3.org/1999/xhtml"/>', "logo.svg")
+        )
+
+    def test_svg_without_namespace(self):
+        self.assertRejected(_upload(b"<svg><rect/></svg>", "logo.svg"))
+
+    def test_not_utf8(self):
+        self.assertRejected(
+            _upload(
+                '<?xml version="1.0" encoding="UTF-16"?><svg/>'.encode("utf-16"),
+                "logo.svg",
+            )
+        )
+
+    def test_script(self):
+        self.assertRejected(_svg(b"<script>alert(1)</script>"))
+
+    def test_xhtml_script(self):
+        self.assertRejected(
+            _svg(b'<script xmlns="http://www.w3.org/1999/xhtml">alert(1)</script>')
+        )
+
+    def test_foreign_object(self):
+        self.assertRejected(_svg(b"<foreignObject><div/></foreignObject>"))
+
+    def test_event_handler(self):
+        self.assertRejected(_svg(b'<rect onload="alert(1)"/>'))
+
+    def test_event_handler_on_root(self):
+        self.assertRejected(
+            _upload(
+                b'<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>',
+                "logo.svg",
+            )
+        )
+
+    def test_animation(self):
+        self.assertRejected(
+            _svg(b'<set attributeName="href" to="javascript:alert(1)"/>')
+        )
+
+    def test_link(self):
+        self.assertRejected(_svg(b'<a href="https://example.com"><rect/></a>'))
+
+    def test_external_href(self):
+        self.assertRejected(_svg(b'<use href="https://example.com/x.svg#a"/>'))
+
+    def test_javascript_xlink_href(self):
+        self.assertRejected(_svg(b'<use xlink:href="javascript:alert(1)"/>'))
+
+    def test_data_href(self):
+        self.assertRejected(_svg(b'<use href="data:image/svg+xml;base64,AAAA"/>'))
+
+    def test_image(self):
+        self.assertRejected(_svg(b'<image href="#x"/>'))
+
+    def test_external_url_in_attribute(self):
+        self.assertRejected(_svg(b'<rect fill="url(https://example.com/a#g)"/>'))
+
+    def test_style_import(self):
+        self.assertRejected(
+            _svg(b"<style>@import 'https://example.com/a.css';</style>")
+        )
+
+    def test_style_external_url(self):
+        self.assertRejected(_svg(b"<style>.a{background:url(//example.com)}</style>"))
+
+    def test_style_css_escape(self):
+        self.assertRejected(_svg(b"<style>.a{fill:\\75 rl(//example.com)}</style>"))
+
+    def test_doctype(self):
+        self.assertRejected(
+            _svg(b"", head=b'<!DOCTYPE svg [<!ENTITY a "aaaaaaaaaa">]>')
+        )
+
+    def test_external_entity(self):
+        self.assertRejected(
+            _svg(
+                b"<text>&xxe;</text>",
+                head=b'<!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>',
+            )
+        )
+
+    def test_xml_stylesheet(self):
+        self.assertRejected(
+            _svg(b"", head=b'<?xml-stylesheet href="https://example.com/a.css"?>')
+        )
+
+    def test_unknown_attribute_namespace(self):
+        self.assertRejected(
+            _svg(b'<rect xmlns:x="http://example.com/x" x:onload="alert(1)"/>')
+        )
