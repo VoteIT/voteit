@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from logging import getLogger
 from typing import Any
 
 from django.conf import settings
@@ -12,13 +11,11 @@ from voteit.app.scouterna import SCOUTID_PROVIDER
 from voteit.organisation.backends import OrganisationBackendMixin
 from voteit.organisation.models import OAuth2Provider
 
-logger = getLogger(__name__)
-
 #: Production (``https://id.scouterna.se``) is not live yet.
 DEV_OIDC_ENDPOINT = "https://dev.id.scouterna.se/realms/scoutnet"
 
-#: Identity scope for the Scoutnet membership number. Named like an id proxy
-#: scope because it lands in the same ``user_data`` dict.
+#: Claim holding the Scoutnet membership number. Also its key in ``user_data``,
+#: named like an id proxy scope since it lands in the same dict.
 SCOUTNET_MEMBER_NO = "scoutnet_member_no"
 
 
@@ -132,16 +129,8 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
         return self._claim(response, "email") or None
 
     def get_member_no(self, response: dict[str, Any]) -> str | None:
-        """
-        The Scoutnet membership number, from ``preferred_username``, which is
-        always ``scoutnet|<member_no>``.
-        """
-        username = self._claim(response, "preferred_username") or ""
-        _prefix, sep, member_no = username.partition("|")
-        if not sep or not member_no:
-            logger.warning("Unexpected preferred_username format: %r", username)
-            return None
-        return member_no
+        member_no = self._claim(response, SCOUTNET_MEMBER_NO)
+        return str(member_no) if member_no else None
 
     def get_user_id(self, details: dict[str, Any], response: dict[str, Any]) -> str:
         """
@@ -149,7 +138,7 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
         """
         if member_no := self.get_member_no(response):
             return member_no
-        raise AuthMissingParameter(self, "preferred_username")
+        raise AuthMissingParameter(self, SCOUTNET_MEMBER_NO)
 
     def extra_data(
         self,
