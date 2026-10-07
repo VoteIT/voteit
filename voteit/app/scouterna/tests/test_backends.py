@@ -87,6 +87,7 @@ class _Realm:
             "exp": int(time.time()) + 3600,
             "nonce": nonce,
             "preferred_username": "scoutnet|9876543",
+            "scoutnet_member_no": "9876543",
             "name": "Kim Scout",
             "given_name": "Kim",
             "family_name": "Scout",
@@ -266,39 +267,41 @@ class ScoutIDBackendTests(TestCase):
         self.assertEqual(
             "9876543",
             self._backend().get_user_id(
-                {}, {"sub": "uuid", "preferred_username": "scoutnet|9876543"}
+                {}, {"sub": "uuid", SCOUTNET_MEMBER_NO: "9876543"}
             ),
         )
 
     def test_user_id_without_a_member_no_is_an_auth_error(self):
-        with self.assertLogs("voteit.app.scouterna.backends", level="WARNING"):
-            with self.assertRaises(AuthMissingParameter):
-                self._backend().get_user_id({}, {"sub": "uuid"})
+        with self.assertRaises(AuthMissingParameter):
+            self._backend().get_user_id(
+                {}, {"sub": "uuid", "preferred_username": "scoutnet|9876543"}
+            )
 
     def _extra_data(self, **claims):
         response = {"access_token": "a-token", "expires_in": 300, **claims}
         return self._backend().extra_data("uuid", "uuid", response, {}, {})
 
-    def test_member_no_comes_from_preferred_username(self):
+    def test_member_no_comes_from_its_claim(self):
         backend = self._backend()
         self.assertEqual(
-            "9876543",
-            backend.get_member_no({"preferred_username": "scoutnet|9876543"}),
+            "9876543", backend.get_member_no({SCOUTNET_MEMBER_NO: "9876543"})
         )
 
-    def test_member_no_is_none_without_the_separator(self):
+    def test_member_no_is_a_string(self):
         backend = self._backend()
-        with self.assertLogs("voteit.app.scouterna.backends", level="WARNING"):
-            self.assertIsNone(backend.get_member_no({"preferred_username": "9876543"}))
+        self.assertEqual(
+            "9876543", backend.get_member_no({SCOUTNET_MEMBER_NO: 9876543})
+        )
 
     def test_member_no_is_none_without_the_claim(self):
         backend = self._backend()
-        with self.assertLogs("voteit.app.scouterna.backends", level="WARNING"):
-            self.assertIsNone(backend.get_member_no({}))
+        self.assertIsNone(
+            backend.get_member_no({"preferred_username": "scoutnet|9876543"})
+        )
 
     def test_extra_data_stores_verified_email_and_member_no(self):
         data = self._extra_data(
-            preferred_username="scoutnet|9876543",
+            scoutnet_member_no="9876543",
             email="kim@scoutkaren.example",
             email_verified=True,
         )
@@ -316,7 +319,7 @@ class ScoutIDBackendTests(TestCase):
         an address ScoutID will not vouch for has no business in it.
         """
         data = self._extra_data(
-            preferred_username="scoutnet|9876543",
+            scoutnet_member_no="9876543",
             email="kim@scoutkaren.example",
             email_verified=False,
         )
@@ -328,7 +331,7 @@ class ScoutIDBackendTests(TestCase):
         """
         backend = self._backend()
         backend.id_token = {
-            "preferred_username": "scoutnet|9876543",
+            SCOUTNET_MEMBER_NO: "9876543",
             "email": "kim@scoutkaren.example",
             "email_verified": True,
         }
@@ -343,7 +346,7 @@ class ScoutIDBackendTests(TestCase):
     def test_identity_data_reads_back_what_extra_data_stored(self):
         social = SimpleNamespace(
             extra_data=self._extra_data(
-                preferred_username="scoutnet|9876543",
+                scoutnet_member_no="9876543",
                 email="kim@scoutkaren.example",
                 email_verified=True,
             )
@@ -538,14 +541,11 @@ class ScoutIDLoginTests(APITestCase):
     def test_complete_without_a_member_no_is_rejected(self):
         state, nonce = self._begin()
         self.realm.register(
-            self.realm.id_token("voteit", nonce, preferred_username="kim"),
+            self.realm.id_token("voteit", nonce, scoutnet_member_no=None),
             userinfo={"sub": "b4d3e2f1-0000-4000-8000-000000000001"},
         )
-        with self.assertLogs("voteit.app.scouterna.backends", level="WARNING"):
-            with self.assertRaises(AuthMissingParameter):
-                self.client.get(
-                    "/complete/scoutid/", data={"state": state, "code": "code"}
-                )
+        with self.assertRaises(AuthMissingParameter):
+            self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
         self.assertFalse(
             UserSocialAuth.objects.filter(provider=SCOUTID_PROVIDER).exists()
         )

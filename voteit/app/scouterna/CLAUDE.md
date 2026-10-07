@@ -24,8 +24,8 @@ credentials from that organisation's `OAuth2Provider` row with
 - `DEFAULT_SCOPE = ["openid", "profile", "email"]`, merged with the org's
   `provider.scope` by the mixin.
 - `DEFAULT_USE_PKCE = True` — see below.
-- `get_user_id()` returns the Scoutnet membership number (from `preferred_username`,
-  see `get_member_no()`), stored as `UserSocialAuth.uid` — users are matched on it, not
+- `get_user_id()` returns the Scoutnet membership number (the `scoutnet_member_no`
+  claim, see `get_member_no()`), stored as `UserSocialAuth.uid` — users are matched on it, not
   on the Keycloak `sub`. A login without a member number fails with
   `AuthMissingParameter`. The uid never reaches `User.identity_id`: that column holds an
   id proxy identifier and nothing else, so a ScoutID-only account has no `identity_id`
@@ -71,7 +71,8 @@ From the default scopes — see the wiki's
 | Claim | Lands on |
 |---|---|
 | `sub` | `UserSocialAuth.extra_data["id"]` |
-| `preferred_username` | `User.username` after cleaning; its member number is `UserSocialAuth.uid` (**not** `User.identity_id` — see above) |
+| `scoutnet_member_no` | `UserSocialAuth.uid` (**not** `User.identity_id` — see above) |
+| `preferred_username` | `User.username`, after cleaning |
 | `given_name` / `family_name` | `User.first_name` / `last_name` |
 | `picture` | `User.img_url` (mapped in `get_user_details`) |
 | `email` | `User.email` |
@@ -94,7 +95,7 @@ which is what `OrganisationBackendMixin.get_identity_data` reads for every backe
 | Key | Source |
 |---|---|
 | `email` | the `email` claim, **only when `email_verified` is true** |
-| `scoutnet_member_no` | the number in `preferred_username`, via `get_member_no()` |
+| `scoutnet_member_no` | the `scoutnet_member_no` claim, via `get_member_no()` |
 
 That dict decides which invites a user matches and which address they may set on their
 profile (`UserSerializer.validate_email`), so an address ScoutID will not vouch for has no
