@@ -18,6 +18,7 @@ from voteit.organisation.models import GlobalTermsOfService
 from voteit.organisation.models import Organisation
 from voteit.organisation.models import TermsOfService
 from voteit.organisation.models import UserAccept
+from voteit.organisation.rest_api.serializers import OrganisationSerializer
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
 from voteit.organisation.utils import accept_tos
@@ -242,6 +243,14 @@ class OrganisationBrandingTests(APITestCase):
         logo = response.json()["logo"]
         self.assertIn(f"org_{self.org.pk}/logo/", logo)
         self.assertTrue(logo.endswith(".svg"))
+
+    def test_logo_url_same_without_request(self):
+        self.client.force_login(self.manager)
+        logo = self._upload().json()["logo"]
+        self.assertTrue(logo.startswith("/media/org_"))
+        self.org.refresh_from_db()
+        # What the organisation.changed push sends
+        self.assertEqual(logo, OrganisationSerializer(self.org).data["logo"])
 
     def test_logo_upload_forbidden(self):
         self.client.force_login(self.user)

@@ -279,7 +279,8 @@ class SVGValidatorTests(SimpleTestCase):
                 b'xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" '
                 b'xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" '
                 b'inkscape:version="1.3"><metadata><rdf:RDF/></metadata>'
-                b'<g inkscape:label="Layer 1"/></svg>',
+                b'<g inkscape:label="Layer 1" '
+                b'inkscape:export-filename="C:\\Users\\a\\logo.png"/></svg>',
                 "logo.svg",
             )
         )
@@ -361,6 +362,24 @@ class SVGValidatorTests(SimpleTestCase):
 
     def test_style_external_url(self):
         self.assertRejected(_svg(b"<style>.a{background:url(//example.com)}</style>"))
+
+    def test_style_text_after_comment(self):
+        self.assertRejected(
+            _svg(b"<style>.a{}<!-- x -->@import url(//example.com/a.css);</style>")
+        )
+
+    def test_style_text_after_child(self):
+        self.assertRejected(
+            _svg(b"<style>.a{}<desc/>.b{fill:url(//example.com/a#g)}</style>")
+        )
+
+    def test_style_cdata(self):
+        self.v(_svg(b"<style><![CDATA[.a{fill:red}]]></style>"))
+
+    def test_style_image_set(self):
+        self.assertRejected(
+            _svg(b"<style>svg{background:image-set('//example.com/a.png' 1x)}</style>")
+        )
 
     def test_style_css_escape(self):
         self.assertRejected(_svg(b"<style>.a{fill:\\75 rl(//example.com)}</style>"))

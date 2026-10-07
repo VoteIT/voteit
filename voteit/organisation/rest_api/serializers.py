@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import List
 
 from django.contrib.auth import get_user_model
+from django.db import models
 from rest_framework import serializers
 
 from voteit.components.rest_api.serializers import OrganisationComponentSerializer
@@ -48,7 +49,21 @@ class OAuth2ProviderSerializer(serializers.Serializer):
         return instance.scope.split()
 
 
+class RelativeFileField(serializers.FileField):
+    """
+    The URL without scheme and host, so the ``organisation.changed`` push,
+    which has no request, sends the same value as REST does.
+    """
+
+    def to_representation(self, value):
+        return value.url if value else None
+
+
 class OrganisationSerializer(serializers.ModelSerializer):
+    serializer_field_mapping = {
+        **serializers.ModelSerializer.serializer_field_mapping,
+        models.FileField: RelativeFileField,
+    }
     providers = serializers.SerializerMethodField()
     components = OrganisationComponentSerializer(
         read_only=True, many=True, source="enabled_components"

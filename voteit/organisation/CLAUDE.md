@@ -85,7 +85,7 @@ All ViewSets are registered to the central router in `rest_api/views.py`.
 ### `OrganisationViewSet` (`/api/organisation/`)
 
 - `list` — returns the single organisation matching the request's `Host` header. Unauthenticated callers get the org by hostname lookup. Authenticated callers get their own org; if their org's host does not match the request host, a `401 AuthenticationFailed` is raised with the message "You're logged in to another organisation".
-- `change` (`PATCH /api/organisation/change/`) — partial update of `body`, `colors`, `help_info`, `logo` and `page_title`. Requires `org_manager`. `logo` is sent as multipart, `"logo": null` removes it. `colors` replaces the whole object.
+- `change` (`PATCH /api/organisation/change/`) — partial update of `body`, `colors`, `help_info`, `logo` and `page_title`. Requires `org_manager`. `logo` is sent as multipart, `"logo": null` removes it, and is returned as a relative `/media/…` URL so the `organisation.changed` push matches. `colors` replaces the whole object.
 - Create/delete are not supported (405).
 
 The serializer also exposes read-only computed fields: `providers` and `components` (enabled org components via `OrganisationComponentSerializer`).

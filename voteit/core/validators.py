@@ -103,7 +103,7 @@ _SVG_ELEMENTS = frozenset(
 # Any url() that isn't a fragment reference to something in the same file.
 _EXTERNAL_URL = re.compile(r"url\s*\(\s*+['\"]?+\s*+(?!#)", re.IGNORECASE)
 _PROCESSING_INSTRUCTION = re.compile(r"<\?(?!xml\s)", re.IGNORECASE)
-_CSS_DENY = ("@import", "javascript:", "expression(", "\\")
+_CSS_DENY = ("@import", "javascript:", "expression(", "image-set(", "\\")
 
 
 @deconstructible
@@ -166,18 +166,23 @@ class SVGValidator:
                     _("SVG element not allowed: %s") % qname.localname
                 )
             if qname.localname == "style":
+                # Browsers join the text around comments and children,
+                # el.text is only the part before the first one.
+                if len(el):
+                    raise ValidationError(_("SVG style must only contain text."))
                 self._check_css(el.text or "")
         elif qname.namespace not in _SVG_EDITOR_NAMESPACES:
             raise ValidationError(_("SVG element not allowed: %s") % qname.localname)
         for name, value in el.attrib.items():
             attr = etree.QName(name)
-            if attr.namespace not in (None, _XLINK_NS, _XML_NS) and (
-                attr.namespace not in _SVG_EDITOR_NAMESPACES
-            ):
-                raise ValidationError(_("SVG attribute not allowed: %s") % name)
             local = attr.localname.lower()
             if local.startswith("on"):
                 raise ValidationError(_("SVG attribute not allowed: %s") % local)
+            # Never rendered, and may hold things like Windows export paths.
+            if attr.namespace in _SVG_EDITOR_NAMESPACES:
+                continue
+            if attr.namespace not in (None, _XLINK_NS, _XML_NS):
+                raise ValidationError(_("SVG attribute not allowed: %s") % name)
             if local == "href" and not value.strip().startswith("#"):
                 raise ValidationError(_("SVG may only link within the file."))
             self._check_css(value)
