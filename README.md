@@ -64,8 +64,9 @@ docker compose up
 # 5. Apply migrations
 uv run python manage.py migrate
 
-# 6. Create a superuser
-uv run python manage.py createsuperuser
+# 6. Create an organisation for the host you browse to, with a superuser in it
+#    (use the hostname you actually use, e.g. voteit.localhost)
+uv run python manage.py create_organisation localhost --superuser admin
 
 # 7. Start everything (Django dev server + RQ worker)
 make up

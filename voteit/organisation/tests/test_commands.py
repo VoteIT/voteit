@@ -1,6 +1,9 @@
 import re
 from io import StringIO
+from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
+from django.core.management import CommandError
 from django.core.management import call_command
 from django.test import TestCase
 from django.utils.timezone import now
@@ -131,3 +134,59 @@ class ReportMatchCandidatesTests(TestCase):
             + counts["Needs the other login"][0]
         )
         self.assertEqual(counts["reachable at an address"][0], buckets)
+
+
+class CreateOrganisationTests(TestCase):
+    def _run(self, *args, **options):
+        out = StringIO()
+        call_command("create_organisation", *args, stdout=out, **options)
+        return out.getvalue()
+
+    def test_creates_organisation(self):
+        self._run("voteit.localhost:8000")
+        org = Organisation.objects.get(host="voteit.localhost")
+        self.assertEqual("voteit.localhost", org.title)
+
+    def test_reuses_existing_organisation(self):
+        org = Organisation.objects.create(title="Mine", host="localhost")
+        self._run("localhost", title="Other")
+        self.assertEqual(1, Organisation.objects.filter(host="localhost").count())
+        org.refresh_from_db()
+        self.assertEqual("Mine", org.title)
+
+    @patch.dict("os.environ", {"DJANGO_SUPERUSER_PASSWORD": "not-a-weak-pw-42"})
+    def test_creates_superuser_in_organisation(self):
+        self._run("localhost", superuser="admin", interactive=False)
+        user = get_user_model().objects.get(username="admin")
+        self.assertTrue(user.is_superuser)
+        self.assertEqual("localhost", user.organisation.host)
+        self.assertTrue(user.check_password("not-a-weak-pw-42"))
+        self.assertTrue(user.organisation.has_roles(user, ROLE_ORG_MANAGER))
+
+    def test_noinput_requires_password(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaises(CommandError):
+                self._run("localhost", superuser="admin", interactive=False)
+
+    def test_attaches_existing_user_without_organisation(self):
+        get_user_model().objects.create_superuser("admin", "", "pw")
+        self._run("localhost", superuser="admin")
+        user = get_user_model().objects.get(username="admin")
+        self.assertEqual("localhost", user.organisation.host)
+        self.assertTrue(user.organisation.has_roles(user, ROLE_ORG_MANAGER))
+
+    def test_refuses_user_from_other_organisation(self):
+        other = Organisation.objects.create(title="Other", host="other.example")
+        other.users.create(username="admin")
+        with self.assertRaises(CommandError):
+            self._run("localhost", superuser="admin")
+
+    def test_weak_password_can_bypass_validation(self):
+        with (
+            patch("getpass.getpass", return_value="1"),
+            patch("builtins.input", return_value="y"),
+        ):
+            self._run("localhost", superuser="admin")
+        self.assertTrue(
+            get_user_model().objects.get(username="admin").check_password("1")
+        )

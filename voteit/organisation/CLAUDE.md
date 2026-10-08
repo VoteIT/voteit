@@ -319,7 +319,7 @@ Test modules:
 - `tests/test_docs.py` — runs module doctests (`backends.py` docstrings).
 - `rest_api/tests/test_views.py` — `OrganisationViewSet`, `OrganisationRolesViewSet`, `MatchOrphansViewSet`, `HandleIdentitiesViewSet`.
 - `rest_api/tests/test_python_social_integration.py` — end-to-end SSO login flows using `responses` mock library.
-- `tests/test_commands.py` — `report_match_candidates`.
+- `tests/test_commands.py` — `report_match_candidates`, `create_organisation`.
 
 ## Management commands
 
@@ -328,3 +328,8 @@ anything. The number that matters is how many accounts share an
 `(email, first name, last name)` triple with another: that is the rate at which the matcher
 stops and asks instead. Takes `--host`, `--provider` and
 `--show-ambiguous` (which lists the colliding triples with addresses masked).
+
+`create_organisation <host>` — gets or creates the organisation for a hostname. With
+`--superuser USERNAME` it also creates a superuser in it (password prompted, or
+`DJANGO_SUPERUSER_PASSWORD` with `--noinput`), or attaches an existing user that has no
+organisation. Either way the user gets `org_manager`. Exists because `createsuperuser` leaves `User.organisation` empty.
