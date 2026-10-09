@@ -90,10 +90,11 @@ SOCIAL_AUTH_PIPELINE = [
     "voteit.organisation.pipeline.require_tos_accept",
     "social_core.pipeline.user.get_username",
     "voteit.organisation.pipeline.create_user",
-    "voteit.organisation.pipeline.ensure_userid",
     "social_core.pipeline.social_auth.associate_user",
     "social_core.pipeline.social_auth.load_extra_data",
     "social_core.pipeline.user.user_details",
+    # Builds the userid from the name, which user_details sets
+    "voteit.organisation.pipeline.ensure_userid",
     "voteit.organisation.pipeline.inherit_users",
     "voteit.organisation.pipeline.bump_permissions",
     "voteit.organisation.pipeline.remove_nonmatching_email",

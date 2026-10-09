@@ -512,6 +512,7 @@ class ScoutIDLoginTests(APITestCase):
         self.assertEqual("Kim", user.first_name)
         self.assertEqual("Scout", user.last_name)
         self.assertEqual("kim@scoutkaren.example", user.email)
+        self.assertEqual("kim-scout", user.userid)
         self.assertEqual("https://scoutnet/avatar/9876543.png", user.img_url)
         # The '|' in scoutnet|9876543 is not a legal Django username character.
         self.assertEqual("scoutnet9876543", user.username)
