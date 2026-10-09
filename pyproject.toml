@@ -1,6 +1,6 @@
 [project]
 name = "voteit"
-version = "0.1.dev"
+version = "1.2.2"
 description = "Decisions online or in general assemblies, realtime or async"
 authors = [{ name = "VoteIT dev team", email = "info@voteit.se" }]
 requires-python = ">=3.12"

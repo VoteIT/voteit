@@ -35,8 +35,8 @@ name = "anyio"
 version = "4.15.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "idna", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.15' and platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "idna" },
+    { name = "typing-extensions", marker = "python_full_version < '3.15'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a9/d2/f4d173e22df740bc37b1db102b386ba719b66e95b0f0d751f556b387e6d2/anyio-4.15.1.tar.gz", hash = "sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94", size = 276966, upload-time = "2026-09-05T10:42:39.44Z" }
 wheels = [
@@ -75,14 +75,14 @@ name = "autobahn"
 version = "26.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cbor2", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "cffi", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "cryptography", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "hyperlink", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "msgpack", marker = "platform_python_implementation == 'CPython' and sys_platform != 'win32'" },
-    { name = "txaio", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "u-msgpack-python", marker = "platform_python_implementation != 'CPython' and platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "ujson", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "cbor2" },
+    { name = "cffi" },
+    { name = "cryptography" },
+    { name = "hyperlink" },
+    { name = "msgpack", marker = "platform_python_implementation == 'CPython'" },
+    { name = "txaio" },
+    { name = "u-msgpack-python", marker = "platform_python_implementation != 'CPython'" },
+    { name = "ujson" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/de/73/f109f563c27e048e45d135d81af19e6ca391e24905550b06bd1c9d674c57/autobahn-26.7.1.tar.gz", hash = "sha256:c6949a2c6eb95fb1c218837dbda0a59abbbebafb8b11098551c01a7061dfd245", size = 14056542, upload-time = "2026-07-15T19:14:01.246Z" }
 wheels = [
@@ -117,8 +117,8 @@ name = "beautifulsoup4"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "soupsieve", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "soupsieve" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/43/65/318323f98dbee45d42dff61d8f047181bc6f2268a9068cfad035a46be5af/beautifulsoup4-4.15.0.tar.gz", hash = "sha256:288e3ca7d54b06f2ac191970bc275c1939cb46d450b255bf6718b04aa37ab4f7", size = 632571, upload-time = "2026-06-07T16:44:20.453Z" }
 wheels = [
@@ -180,7 +180,7 @@ name = "bs4"
 version = "0.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "beautifulsoup4", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "beautifulsoup4" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c9/aa/4acaf814ff901145da37332e05bb510452ebed97bc9602695059dd46ef39/bs4-0.0.2.tar.gz", hash = "sha256:a48685c58f50fe127722417bae83fe6badf500d54b55f7e39ffe43b798653925", size = 698, upload-time = "2024-01-17T18:15:47.371Z" }
 wheels = [
@@ -239,7 +239,7 @@ name = "cffi"
 version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy' and platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9e/ef/008a1939e372c06329a3fce4279c02f328488f3526744906eeec3da7ad5f/cffi-2.1.1.tar.gz", hash = "sha256:dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be", size = 530807, upload-time = "2026-08-03T21:21:18.939Z" }
 wheels = [
@@ -315,8 +315,8 @@ name = "channels"
 version = "4.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "asgiref", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "asgiref" },
+    { name = "django" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/74/92/b18d4bb54d14986a8b35215a1c9e6a7f9f4d57ca63ac9aee8290ebb4957d/channels-4.3.2.tar.gz", hash = "sha256:f2bb6bfb73ad7fb4705041d07613c7b4e69528f01ef8cb9fb6c21d9295f15667", size = 27023, upload-time = "2025-11-20T15:13:05.102Z" }
 wheels = [
@@ -328,10 +328,10 @@ name = "channels-redis"
 version = "4.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "asgiref", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "channels", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "msgpack", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "redis", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "asgiref" },
+    { name = "channels" },
+    { name = "msgpack" },
+    { name = "redis" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ab/69/fd3407ad407a80e72ca53850eb7a4c306273e67d5bbb71a86d0e6d088439/channels_redis-4.3.0.tar.gz", hash = "sha256:740ee7b54f0e28cf2264a940a24453d3f00526a96931f911fcb69228ef245dd2", size = 31440, upload-time = "2025-07-22T13:48:46.087Z" }
 wheels = [
@@ -343,7 +343,7 @@ name = "chanx"
 version = "2.11.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pydantic", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "pydantic" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/fd/f1/65e87a27a21cae9d3548be6747c2194d7a9d74f717ab237afd35dcbb1285/chanx-2.11.7.tar.gz", hash = "sha256:cb273c174e420f4fa1f04609904fb035bcae258725fcc2ff9661940f4ab3d896", size = 88555, upload-time = "2026-10-02T09:02:41.567Z" }
 wheels = [
@@ -352,11 +352,11 @@ wheels = [
 
 [package.optional-dependencies]
 cli = [
-    { name = "click", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "httpx", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "jinja2", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pyyaml", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "websockets", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "click" },
+    { name = "httpx" },
+    { name = "jinja2" },
+    { name = "pyyaml" },
+    { name = "websockets" },
 ]
 
 [[package]]
@@ -582,7 +582,7 @@ name = "croniter"
 version = "6.2.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "python-dateutil", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "python-dateutil" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/37/57/2e2a65aee2a70483cb28e2b7e15a072d00a523207593b44400d4717bb100/croniter-6.2.4.tar.gz", hash = "sha256:fc124f751b1b04805c2a04b061898b436b45ab2320b045e1e052ea895de65189", size = 166267, upload-time = "2026-07-10T09:52:59.955Z" }
 wheels = [
@@ -600,7 +600,7 @@ name = "cryptography"
 version = "50.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "cffi" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9d/af/182eb91b0df3fe75c4d9f26fe70684569566745f6ba7e5c9c73a862c5252/cryptography-50.0.2.tar.gz", hash = "sha256:7b46165bb56eb4704e2eaaf86f3c940d19154535d9b0ca7d6d590b04060e00d5", size = 880623, upload-time = "2026-09-30T15:30:04.884Z" }
 wheels = [
@@ -659,9 +659,9 @@ name = "daphne"
 version = "4.2.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "asgiref", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "autobahn", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "twisted", extra = ["tls"], marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "asgiref" },
+    { name = "autobahn" },
+    { name = "twisted", extra = ["tls"] },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ed/23/81d442839029f3f343e536650ee49dbfb5a444520876fadb5b5f19f33c02/daphne-4.2.3.tar.gz", hash = "sha256:1c458f81926b37301cadc8ec1b6316d9a5db53fba061fc4826610395fe5d5c81", size = 47898, upload-time = "2026-07-21T13:15:19.753Z" }
 wheels = [
@@ -691,8 +691,8 @@ name = "django"
 version = "5.2.17"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "asgiref", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "sqlparse", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "asgiref" },
+    { name = "sqlparse" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d5/d8/43e9d000519adceb189620b6869ff88031e046df91c2e9da72f8f6918399/django-5.2.17.tar.gz", hash = "sha256:9d4d93be539a18ab80d058eb515900e10951e04c537c5a6b394fc49528d3251f", size = 10889740, upload-time = "2026-08-04T15:04:03.173Z" }
 wheels = [
@@ -704,8 +704,8 @@ name = "django-auditlog"
 version = "3.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python-dateutil", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django" },
+    { name = "python-dateutil" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/70/e5/2beb2b256775c4fc041ed60cb44f5d77acb6cde307f01567dcf2756721a7/django_auditlog-3.4.1.tar.gz", hash = "sha256:ad07b9db452d5fa8303822cccd78cd3fcb2c2863aeb6abe039ec45739b4d7e33", size = 91611, upload-time = "2025-12-18T08:56:35.378Z" }
 wheels = [
@@ -717,7 +717,7 @@ name = "django-controlcenter"
 version = "0.3.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django-pkgconf", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django-pkgconf" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/84/1e/047466fec2635c180bdbd59de1a09f3c986f95b294df919f5dcd293e573d/django_controlcenter-0.3.3.tar.gz", hash = "sha256:ffc982455a54c79c98df70180c549c79ba067f74f208cc9657418a7fc735aa6c", size = 120173, upload-time = "2025-03-25T19:41:32.704Z" }
 wheels = [
@@ -729,8 +729,8 @@ name = "django-cors-headers"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "asgiref", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "asgiref" },
+    { name = "django" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/21/39/55822b15b7ec87410f34cd16ce04065ff390e50f9e29f31d6d116fc80456/django_cors_headers-4.9.0.tar.gz", hash = "sha256:fe5d7cb59fdc2c8c646ce84b727ac2bca8912a247e6e68e1fb507372178e59e8", size = 21458, upload-time = "2025-09-18T10:40:52.326Z" }
 wheels = [
@@ -742,7 +742,7 @@ name = "django-filter"
 version = "25.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/2c/e4/465d2699cd388c0005fb8d6ae6709f239917c6d8790ac35719676fffdcf3/django_filter-25.2.tar.gz", hash = "sha256:760e984a931f4468d096f5541787efb8998c61217b73006163bf2f9523fe8f23", size = 143818, upload-time = "2025-10-05T09:51:31.521Z" }
 wheels = [
@@ -754,7 +754,7 @@ name = "django-hijack"
 version = "3.7.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/81/8c/7093814ce82d29034d339bdf660f6bc0276ccf8c2a31be26fcb0e378caf7/django_hijack-3.7.9.tar.gz", hash = "sha256:b43fb47b2501e230a7343aaae94e1748ee628a16161916e1edc83a52b3924347", size = 14559, upload-time = "2026-10-01T22:00:39.353Z" }
 wheels = [
@@ -766,7 +766,7 @@ name = "django-model-utils"
 version = "5.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/81/60/5e232c32a2c977cc1af8c70a38ef436598bc649ad89c2c4568454edde2c9/django_model_utils-5.0.0.tar.gz", hash = "sha256:041cdd6230d2fbf6cd943e1969318bce762272077f4ecd333ab2263924b4e5eb", size = 80559, upload-time = "2024-09-04T11:35:22.858Z" }
 wheels = [
@@ -784,9 +784,9 @@ name = "django-rq"
 version = "3.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "redis", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "rq", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django" },
+    { name = "redis" },
+    { name = "rq" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a1/8e/569d9456aba71746c4ae0f5884440825603bf551350a764801282a1f1f75/django_rq-3.2.2.tar.gz", hash = "sha256:2eaac4e05092895ec09b6da978e5ae9fafc917574934bb2db1bebf1b3395c049", size = 39243, upload-time = "2025-12-24T01:39:53.721Z" }
 wheels = [
@@ -798,8 +798,8 @@ name = "django-sql-utils"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "sqlparse", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django" },
+    { name = "sqlparse" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c5/45/65af5fefdbee24221e50ec37eaa65d870c407171c5ba62aacbf338647f94/django_sql_utils-0.7.0.tar.gz", hash = "sha256:9371ff28eaf326836a7c52887259123cdd3fbffb7b738e42ae1a21258be0feb6", size = 15567, upload-time = "2023-09-28T15:29:32.516Z" }
 wheels = [
@@ -811,10 +811,10 @@ name = "django-stubs"
 version = "6.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django-stubs-ext", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "types-pyyaml", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django" },
+    { name = "django-stubs-ext" },
+    { name = "types-pyyaml" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/2b/d6/fb467f5f769b831680d8cb6705e4bbec335c79b328ff7e347e220e676da8/django_stubs-6.1.1.tar.gz", hash = "sha256:291fd79197416d191ec9f4e443bc6800b64dd5d41e476b91e679495d005f3d61", size = 295523, upload-time = "2026-09-14T08:46:24.686Z" }
 wheels = [
@@ -826,8 +826,8 @@ name = "django-stubs-ext"
 version = "6.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4c/70/5f80a3acf99d26dea89e892d4573f0e650904e573708b5fbf3bfc9cec72c/django_stubs_ext-6.1.1.tar.gz", hash = "sha256:c35263135558d4c5d12b69e1f4c98632bf59bc3ab5118f7d4882d12800e3a7dd", size = 7217, upload-time = "2026-09-14T08:45:52.44Z" }
 wheels = [
@@ -839,7 +839,7 @@ name = "djangorestframework"
 version = "3.18.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8a/2e/b3ce9d449b1ed9f9dd74fb7dfbc5f20860d5f40c2b4b10a2c3eabd8ff579/djangorestframework-3.18.1.tar.gz", hash = "sha256:605d79fa2ec2f02905492e5ea13d903c2d842d0b4c915a57f7bf02ab9f3c91dd", size = 915653, upload-time = "2026-09-07T18:04:08.288Z" }
 wheels = [
@@ -851,7 +851,7 @@ name = "djangorestframework-api-key"
 version = "3.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "packaging", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "packaging" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/95/d9/d187626f67eec3d8c7fb170009ffc323e70553dbac8832ca051f4c7e0a53/djangorestframework_api_key-3.1.0.tar.gz", hash = "sha256:7e9c88360933b3c46467d80645a50cf36697674c7856a737a1c674d570860ac9", size = 36922, upload-time = "2025-04-04T08:53:19.422Z" }
 wheels = [
@@ -863,9 +863,9 @@ name = "djangorestframework-stubs"
 version = "3.18.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "django-stubs", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "types-pyyaml", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django-stubs" },
+    { name = "types-pyyaml" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6b/71/a7727b07e0433da02fb1ea22994f492ecb437a1fe7be5bf952dbb545a0f5/djangorestframework_stubs-3.18.1.tar.gz", hash = "sha256:65ed4a9ea094616759a2cba4fe0ad85efe25b471b28281b790bfefb46704c64a", size = 32439, upload-time = "2026-08-25T22:49:27.506Z" }
 wheels = [
@@ -886,8 +886,8 @@ name = "email-validator"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "dnspython", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "idna", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "dnspython" },
+    { name = "idna" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f5/22/900cb125c76b7aaa450ce02fd727f452243f2e91a61af068b40adba60ea9/email_validator-2.3.0.tar.gz", hash = "sha256:9fc05c37f2f6cf439ff414f8fc46d917929974a82244c20eb10231ba60c54426", size = 51238, upload-time = "2025-08-26T13:09:06.831Z" }
 wheels = [
@@ -908,8 +908,8 @@ name = "fakeredis"
 version = "2.39.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "redis", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "sortedcontainers", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "redis" },
+    { name = "sortedcontainers" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/2f/27/3ed3eee5e5a929345c37024b814a70f6e2452ffdab77a2680c2ebba3614a/fakeredis-2.39.0.tar.gz", hash = "sha256:e89c3410f290330042638ff5cca3e22788fa267dcaf28a64b4f483e14577208d", size = 301722, upload-time = "2026-10-01T12:35:19.404Z" }
 wheels = [
@@ -930,12 +930,12 @@ name = "flask"
 version = "3.1.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "blinker", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "click", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "itsdangerous", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "jinja2", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "markupsafe", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "werkzeug", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "blinker" },
+    { name = "click" },
+    { name = "itsdangerous" },
+    { name = "jinja2" },
+    { name = "markupsafe" },
+    { name = "werkzeug" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/26/00/35d85dcce6c57fdc871f3867d465d780f302a175ea360f62533f12b27e2b/flask-3.1.3.tar.gz", hash = "sha256:0ef0e52b8a9cd932855379197dd8f94047b359ca0a78695144304cb45f87c9eb", size = 759004, upload-time = "2026-02-19T05:00:57.678Z" }
 wheels = [
@@ -947,8 +947,8 @@ name = "flask-cors"
 version = "6.0.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "flask", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "werkzeug", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "flask" },
+    { name = "werkzeug" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/47/03/4e464a50860f9adf08b5c1d3479cb8ea1f12af2aa69535c7042c6e628135/flask_cors-6.0.5.tar.gz", hash = "sha256:30c5031552cd59f620ac0c8211dac45b345d3b2df310e7721879e4f46ef9c601", size = 101386, upload-time = "2026-06-08T20:20:17.765Z" }
 wheels = [
@@ -960,8 +960,8 @@ name = "flask-login"
 version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "flask", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "werkzeug", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "flask" },
+    { name = "werkzeug" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c3/6e/2f4e13e373bb49e68c02c51ceadd22d172715a06716f9299d9df01b6ddb2/Flask-Login-0.6.3.tar.gz", hash = "sha256:5e23d14a607ef12806c699590b89d0f0e0d67baeec599d75947bf9c147330333", size = 48834, upload-time = "2023-10-30T14:53:21.151Z" }
 wheels = [
@@ -973,7 +973,7 @@ name = "freezegun"
 version = "1.5.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "python-dateutil", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "python-dateutil" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/95/dd/23e2f4e357f8fd3bdff613c1fe4466d21bfb00a6177f238079b17f7b1c84/freezegun-1.5.5.tar.gz", hash = "sha256:ac7742a6cc6c25a2c35e9292dfd554b897b517d2dec26891a2e8debf205cb94a", size = 35914, upload-time = "2025-08-09T10:39:08.338Z" }
 wheels = [
@@ -985,9 +985,9 @@ name = "gevent"
 version = "26.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "greenlet", marker = "platform_python_implementation == 'CPython' and sys_platform != 'win32'" },
-    { name = "zope-event", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "zope-interface", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "greenlet", marker = "platform_python_implementation == 'CPython'" },
+    { name = "zope-event" },
+    { name = "zope-interface" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/2b/ac/dd3137ae695aef399373088c84c66398f3eac597fba542f0a22280bc21d6/gevent-26.9.0.tar.gz", hash = "sha256:4dd4703d71737a456c1c9df5cd43a82934e5b10c87549caa02495f487d1ef0b1", size = 6718097, upload-time = "2026-09-16T18:05:35.008Z" }
 wheels = [
@@ -1026,9 +1026,9 @@ name = "geventhttpclient"
 version = "2.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "brotli", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "certifi", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "gevent", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "brotli" },
+    { name = "certifi" },
+    { name = "gevent" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f1/68/34577ab9caad3bd9f6cde27cb0822a9f71d05a6d48969d7088cac2ead2f0/geventhttpclient-2.5.1.tar.gz", hash = "sha256:9a5e9baf254dc63f57e04bf606aa4475a858d005c191ce346bda2e63152409c6", size = 88484, upload-time = "2026-09-30T05:25:55.571Z" }
 wheels = [
@@ -1158,8 +1158,8 @@ name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "certifi", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "h11", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "certifi" },
+    { name = "h11" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/06/94/82699a10bca87a5556c9c59b5963f2d039dbd239f25bc2a63907a05a14cb/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8", size = 85484, upload-time = "2025-04-24T22:06:22.219Z" }
 wheels = [
@@ -1203,10 +1203,10 @@ name = "httpx"
 version = "0.28.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "certifi", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "httpcore", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "idna", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "anyio" },
+    { name = "certifi" },
+    { name = "httpcore" },
+    { name = "idna" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b1/df/48c586a5fe32a0f01324ee087459e112ebb7224f646c0b5023f5e79e9956/httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc", size = 141406, upload-time = "2024-12-06T15:37:23.222Z" }
 wheels = [
@@ -1218,7 +1218,7 @@ name = "hyperlink"
 version = "21.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "idna", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "idna" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3a/51/1947bd81d75af87e3bb9e34593a4cf118115a8feb451ce7a69044ef1412e/hyperlink-21.0.0.tar.gz", hash = "sha256:427af957daa58bc909471c6c40f74c5450fa123dd093fc53efd2e91d2705a56b", size = 140743, upload-time = "2021-01-08T05:51:20.972Z" }
 wheels = [
@@ -1248,7 +1248,7 @@ name = "incremental"
 version = "24.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "packaging", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "packaging" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ef/3c/82e84109e02c492f382c711c58a3dd91badda6d746def81a1465f74dc9f5/incremental-24.11.0.tar.gz", hash = "sha256:87d3480dbb083c1d736222511a8cf380012a8176c2456d01ef483242abbbcf8c", size = 24000, upload-time = "2025-11-28T02:30:17.861Z" }
 wheels = [
@@ -1269,15 +1269,15 @@ name = "ipython"
 version = "9.17.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ipython-pygments-lexers", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "jedi", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "matplotlib-inline", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pexpect", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "prompt-toolkit", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "psutil", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "pygments", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "stack-data", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "traitlets", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "ipython-pygments-lexers" },
+    { name = "jedi" },
+    { name = "matplotlib-inline" },
+    { name = "pexpect", marker = "sys_platform != 'emscripten'" },
+    { name = "prompt-toolkit" },
+    { name = "psutil", marker = "sys_platform != 'cygwin' and sys_platform != 'emscripten'" },
+    { name = "pygments" },
+    { name = "stack-data" },
+    { name = "traitlets" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/32/99451b1283ec5d92ad77073f12e1c667dc10775384d8f15c2914207149dd/ipython-9.17.1.tar.gz", hash = "sha256:8919be8c27f20a6f4423145028063f6637b42a03ce57665bb12015ee1f073529", size = 4539289, upload-time = "2026-09-01T08:29:32.6Z" }
 wheels = [
@@ -1289,7 +1289,7 @@ name = "ipython-pygments-lexers"
 version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pygments", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "pygments" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ef/4c/5dd1d8af08107f88c7f741ead7a40854b8ac24ddf9ae850afbcf698aa552/ipython_pygments_lexers-1.1.1.tar.gz", hash = "sha256:09c0138009e56b6854f9535736f4171d855c8c08a563a0dcd8022f78355c7e81", size = 8393, upload-time = "2025-01-17T11:24:34.505Z" }
 wheels = [
@@ -1310,7 +1310,7 @@ name = "jedi"
 version = "0.20.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "parso", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "parso" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/46/b7/a3635f6a2d7cf5b5dd98064fc1d5fbbafcb25477bcea204a3a92145d158b/jedi-0.20.0.tar.gz", hash = "sha256:c3f4ccbd276696f4b19c54618d4fb18f9fc24b0aef02acf704b23f487daa1011", size = 3119416, upload-time = "2026-05-01T23:38:47.814Z" }
 wheels = [
@@ -1322,7 +1322,7 @@ name = "jinja2"
 version = "3.1.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "markupsafe", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "markupsafe" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/df/bf/f7da0350254c0ed7c72f3e33cef02e048281fec7ecec5f032d4aac52226b/jinja2-3.1.6.tar.gz", hash = "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d", size = 245115, upload-time = "2025-03-05T20:05:02.478Z" }
 wheels = [
@@ -1334,20 +1334,20 @@ name = "locust"
 version = "2.46.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "configargparse", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "flask", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "flask-cors", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "flask-login", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "gevent", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "geventhttpclient", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "msgpack", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "psutil", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pytest", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python-engineio", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python-socketio", extra = ["client"], marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pyzmq", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "requests", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "werkzeug", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "configargparse" },
+    { name = "flask" },
+    { name = "flask-cors" },
+    { name = "flask-login" },
+    { name = "gevent" },
+    { name = "geventhttpclient" },
+    { name = "msgpack" },
+    { name = "psutil" },
+    { name = "pytest" },
+    { name = "python-engineio" },
+    { name = "python-socketio", extra = ["client"] },
+    { name = "pyzmq" },
+    { name = "requests" },
+    { name = "werkzeug" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/44/de/45f598ddfa8f00889b10ffdf1f21e0e2bac5fe868c44b6ef7e98d0603f1e/locust-2.46.6.tar.gz", hash = "sha256:424833db016bbfa3e0ee83f4966f4577a39ea9d2d311368ff1313ee88f76b968", size = 1479271, upload-time = "2026-09-17T17:46:15.451Z" }
 wheels = [
@@ -1546,7 +1546,7 @@ name = "matplotlib-inline"
 version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "traitlets", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "traitlets" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/bd/c0/9f7c9a46090390368a4d7bcb76bb87a4a36c421e4c0792cdb53486ffac7a/matplotlib_inline-0.2.2.tar.gz", hash = "sha256:72f3fe8fce36b70d4a5b612f899090cd0401deddc4ea90e1572b9f4bfb058c79", size = 8150, upload-time = "2026-05-08T17:33:33.49Z" }
 wheels = [
@@ -1690,7 +1690,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -1720,11 +1720,11 @@ name = "pre-commit"
 version = "4.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cfgv", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "identify", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "nodeenv", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pyyaml", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "virtualenv", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "cfgv" },
+    { name = "identify" },
+    { name = "nodeenv" },
+    { name = "pyyaml" },
+    { name = "virtualenv" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/74/89/1f3e8e1fc3e97de0fa963495832f581f025f29471602a309e48808244292/pre_commit-4.6.2.tar.gz", hash = "sha256:8f5d7bfb021ecdbcd9d49d89847082dd24172ccde534390081a679ad046e2441", size = 198670, upload-time = "2026-08-10T22:07:18.421Z" }
 wheels = [
@@ -1736,7 +1736,7 @@ name = "prompt-toolkit"
 version = "3.0.53"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "wcwidth", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "wcwidth" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7d/ea/39b988c938f75cb75d7045b5c69f8bfed47ee2152c8837fb403de29d6fb8/prompt_toolkit-3.0.53.tar.gz", hash = "sha256:9ec8a0ad96d5c56148b3f914aa79c1564c3fde5d2e6b876e7bc327e353cf8fa6", size = 435492, upload-time = "2026-07-26T20:56:14.758Z" }
 wheels = [
@@ -1770,7 +1770,7 @@ name = "psycopg"
 version = "3.3.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/26/3ea4ca5eaea1c0debcdf7ee7c1613fbe721dc27a03c461c0817ffd8a0601/psycopg-3.3.6.tar.gz", hash = "sha256:c081f2250df751a943036e42db6df4571c66cd0aabe8291a7a506512b12007d2", size = 168171, upload-time = "2026-09-18T13:22:55.152Z" }
 wheels = [
@@ -1779,10 +1779,10 @@ wheels = [
 
 [package.optional-dependencies]
 binary = [
-    { name = "psycopg-binary", marker = "implementation_name != 'pypy' and platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "psycopg-binary", marker = "implementation_name != 'pypy'" },
 ]
 pool = [
-    { name = "psycopg-pool", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "psycopg-pool" },
 ]
 
 [[package]]
@@ -1837,7 +1837,7 @@ name = "psycopg-pool"
 version = "3.3.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/74/5e/c0664b968b102ff68b811d999c728546c48d5c1eec03e3bbaf88c0cb4472/psycopg_pool-3.3.3.tar.gz", hash = "sha256:df87b5d9d0ad7db37f6cdad4fa8ce113d250f5997f6db38e9a99192fb67f9e1d", size = 32006, upload-time = "2026-09-22T15:53:24.947Z" }
 wheels = [
@@ -1867,7 +1867,7 @@ name = "py-vote-core"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "python-graph", extra = ["dot"], marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "python-graph", extra = ["dot"] },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/83/cc/64d00107eec5097d809b5117ddac038ec823f96241594ab3428ee9b9ec0d/py_vote_core-2.0.0.tar.gz", hash = "sha256:a7981614d78ef09c4448806088fdfe9dc10b6f1aec4592ed5cde3d7bfded668b", size = 95270, upload-time = "2026-04-30T08:13:07.372Z" }
 wheels = [
@@ -1888,10 +1888,10 @@ name = "pydantic"
 version = "2.13.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "annotated-types", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pydantic-core", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "typing-inspection", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "annotated-types" },
+    { name = "pydantic-core" },
+    { name = "typing-extensions" },
+    { name = "typing-inspection" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/53/ef/fc4f868f4e2cee79f863883abffceff107875f569b848507319842d2a681/pydantic-2.13.5.tar.gz", hash = "sha256:51a9c5f7b2f8e636f04c6cada605d9b6a3bf1348fdf945a3d8869b19bba0ee08", size = 845750, upload-time = "2026-08-28T14:04:00.916Z" }
 wheels = [
@@ -1900,7 +1900,7 @@ wheels = [
 
 [package.optional-dependencies]
 email = [
-    { name = "email-validator", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "email-validator" },
 ]
 
 [[package]]
@@ -1908,7 +1908,7 @@ name = "pydantic-core"
 version = "2.46.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/af/f9/8a06bea35ef8daf588f707784c973a7046e0034c8d8cfb08828eeffb8b75/pydantic_core-2.46.5.tar.gz", hash = "sha256:10416c15b8839ecc4ef4d0885da76da6fd0f67333a0eb8aff6d93c4b8f2910fc", size = 472262, upload-time = "2026-08-28T10:01:31.677Z" }
 wheels = [
@@ -1971,7 +1971,7 @@ name = "pydot"
 version = "4.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyparsing", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "pyparsing" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/35/b17cb89ff865484c6a20ef46bf9d95a5f07328292578de0b295f4a6beec2/pydot-4.0.1.tar.gz", hash = "sha256:c2148f681c4a33e08bf0e26a9e5f8e4099a82e0e2a068098f32ce86577364ad5", size = 162594, upload-time = "2025-06-17T20:09:56.454Z" }
 wheels = [
@@ -2007,7 +2007,7 @@ wheels = [
 
 [package.optional-dependencies]
 crypto = [
-    { name = "cryptography", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "cryptography" },
 ]
 
 [[package]]
@@ -2015,8 +2015,8 @@ name = "pyopenssl"
 version = "26.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cryptography", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "cryptography" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3f/e8/7325d258199b159eb2c03fe32107533e2832e70e63f4fb88a6aa00023201/pyopenssl-26.4.0.tar.gz", hash = "sha256:28dfcce0162b9211413e26dfbfdf1d24317fbeba18fc93c12400a1856b2a0bc7", size = 182046, upload-time = "2026-08-01T19:50:50.512Z" }
 wheels = [
@@ -2037,10 +2037,10 @@ name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "iniconfig", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "packaging", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pluggy", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pygments", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "iniconfig" },
+    { name = "packaging" },
+    { name = "pluggy" },
+    { name = "pygments" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
 wheels = [
@@ -2052,7 +2052,7 @@ name = "python-dateutil"
 version = "2.9.0.post0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "six", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "six" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/66/c0/0c8b6ad9f17a802ee498c46e004a0eb49bc148f2fd230864601a86dcf6db/python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3", size = 342432, upload-time = "2024-03-01T18:36:20.211Z" }
 wheels = [
@@ -2064,7 +2064,7 @@ name = "python-discovery"
 version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "filelock", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "filelock" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0c/57/250bd238b966cece44328235eb85290045d059265fdaf7527a3a958123db/python_discovery-1.6.1.tar.gz", hash = "sha256:cf87d3627dfb4412437fdd5b13eae402607722998d21567993aedbc59b23c15e", size = 84338, upload-time = "2026-09-18T01:31:53.971Z" }
 wheels = [
@@ -2085,7 +2085,7 @@ name = "python-engineio"
 version = "4.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "simple-websocket", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "simple-websocket" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/fc/65/f8bae11b228647e2e2f45b63dec7448efaddb7cb51f529de1fdba69e63b5/python_engineio-4.14.0.tar.gz", hash = "sha256:eaa1e386baf9c2c7959eef7f9d9165c5ea910c5b392f5316e78d29ed073cb43d", size = 80863, upload-time = "2026-08-30T19:52:01.32Z" }
 wheels = [
@@ -2103,7 +2103,7 @@ wheels = [
 
 [package.optional-dependencies]
 dot = [
-    { name = "pydot", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "pydot" },
 ]
 
 [[package]]
@@ -2129,8 +2129,8 @@ name = "python-socketio"
 version = "5.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "bidict", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python-engineio", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "bidict" },
+    { name = "python-engineio" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/04/8647675c93b5e74a3daa41a2a03930bac0cbdcfcf307900f0441ae6550ba/python_socketio-5.17.0.tar.gz", hash = "sha256:c3bbfc4937dcfea7c4d1b182afa94d4a30335d153987e8f2078b344beacf95a0", size = 134574, upload-time = "2026-09-14T22:51:02.968Z" }
 wheels = [
@@ -2139,8 +2139,8 @@ wheels = [
 
 [package.optional-dependencies]
 client = [
-    { name = "requests", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "websocket-client", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "requests" },
+    { name = "websocket-client" },
 ]
 
 [[package]]
@@ -2157,7 +2157,7 @@ name = "python3-openid"
 version = "3.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "defusedxml", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "defusedxml" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/5f/4a/29feb8da6c44f77007dcd29518fea73a3d5653ee02a587ae1f17f1f5ddb5/python3-openid-3.2.0.tar.gz", hash = "sha256:33fbf6928f401e0b790151ed2b5290b02545e8775f982485205a066f874aaeaf", size = 305600, upload-time = "2020-06-29T12:15:49.026Z" }
 wheels = [
@@ -2205,7 +2205,7 @@ name = "pyzmq"
 version = "27.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "implementation_name == 'pypy' and platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "cffi", marker = "implementation_name == 'pypy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e7/8d/5b3d5631c2f4b4b8862f64cd0c9eb777b5710eeb5125b4be8dd0a200a4c0/pyzmq-27.2.0.tar.gz", hash = "sha256:54d4259d1bfae24ecdb5ca79f7acc2eac6c286a02d6a0ae617797cb45f0726d3", size = 292316, upload-time = "2026-08-20T19:08:21.19Z" }
 wheels = [
@@ -2253,10 +2253,10 @@ name = "requests"
 version = "2.34.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "certifi", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "charset-normalizer", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "idna", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "urllib3", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "certifi" },
+    { name = "charset-normalizer" },
+    { name = "idna" },
+    { name = "urllib3" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ac/c3/e2a2b89f2d3e2179abd6d00ebd70bff6273f37fb3e0cc209f48b39d00cbf/requests-2.34.2.tar.gz", hash = "sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed", size = 142856, upload-time = "2026-05-14T19:25:27.735Z" }
 wheels = [
@@ -2268,8 +2268,8 @@ name = "requests-oauthlib"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "oauthlib", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "requests", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "oauthlib" },
+    { name = "requests" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/f2/05f29bc3913aea15eb670be136045bf5c5bbf4b99ecb839da9b422bb2c85/requests-oauthlib-2.0.0.tar.gz", hash = "sha256:b3dffaebd884d8cd778494369603a9e7b58d29111bf6b41bdc2dcd87203af4e9", size = 55650, upload-time = "2024-03-22T20:32:29.939Z" }
 wheels = [
@@ -2281,9 +2281,9 @@ name = "responses"
 version = "0.25.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyyaml", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "requests", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "urllib3", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "urllib3" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0e/95/89c054ad70bfef6da605338b009b2e283485835351a9935c7bfbfaca7ffc/responses-0.25.8.tar.gz", hash = "sha256:9374d047a575c8f781b94454db5cab590b6029505f488d12899ddb10a4af1cf4", size = 79320, upload-time = "2025-08-08T19:01:46.709Z" }
 wheels = [
@@ -2295,9 +2295,9 @@ name = "rq"
 version = "2.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "croniter", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "redis", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "click" },
+    { name = "croniter" },
+    { name = "redis" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a2/81/dacb94c8f67606b233cb7836dd67042daf9a61f7b585dcec65113f1e71f7/rq-2.12.0.tar.gz", hash = "sha256:78116d0c860f6285817b52d7d6d0b16a726372073ce8ea1d229732ce74ef9378", size = 760892, upload-time = "2026-08-30T12:05:25.048Z" }
 wheels = [
@@ -2309,10 +2309,10 @@ name = "rq-scheduler"
 version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "crontab", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "freezegun", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python-dateutil", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "rq", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "crontab" },
+    { name = "freezegun" },
+    { name = "python-dateutil" },
+    { name = "rq" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a0/4e/977bbcc1f3b25ed9ea60ec968b13f7147661defe5b2f9272b44fdb1c5549/rq-scheduler-0.14.0.tar.gz", hash = "sha256:2d5a14a1ab217f8693184ebaa1fe03838edcbc70b4f76572721c0b33058cd023", size = 16582, upload-time = "2024-10-29T13:30:32.641Z" }
 wheels = [
@@ -2356,8 +2356,8 @@ name = "sentry-sdk"
 version = "2.71.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "certifi", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "urllib3", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "certifi" },
+    { name = "urllib3" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/67/93/9ef70bfb7346c778caf09b7cd10c17c33f601f2d17019fa1aedcda738b5f/sentry_sdk-2.71.0.tar.gz", hash = "sha256:7beb27a22f06396f3a05510c3da6ea10e1c79e02e859993c27ce4ff074e296d6", size = 1052358, upload-time = "2026-09-28T14:04:00.645Z" }
 wheels = [
@@ -2369,8 +2369,8 @@ name = "service-identity"
 version = "26.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "attrs", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "cryptography", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "attrs" },
+    { name = "cryptography" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/61/87/ad52e2c582c0f0e7f0a1b86950494c38d67422dc0f5ed9044a5fb9569a49/service_identity-26.1.0.tar.gz", hash = "sha256:6358c52882c96e66ac4a55eb3a72c7dd4a70763f8cc6fa4e70abde2656f4bf3b", size = 42898, upload-time = "2026-05-30T12:04:55.184Z" }
 wheels = [
@@ -2382,7 +2382,7 @@ name = "simple-websocket"
 version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "wsproto", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "wsproto" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b0/d4/bfa032f961103eba93de583b161f0e6a5b63cebb8f2c7d0c6e6efe1e3d2e/simple_websocket-1.1.0.tar.gz", hash = "sha256:7939234e7aa067c534abdab3a9ed933ec9ce4691b0713c78acb195560aa52ae4", size = 17300, upload-time = "2024-10-10T22:39:31.412Z" }
 wheels = [
@@ -2411,9 +2411,9 @@ name = "social-auth-app-django"
 version = "5.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "asgiref", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "social-auth-core", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "asgiref" },
+    { name = "django" },
+    { name = "social-auth-core" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/62/f9/c761cf93cb0a102ddd59498ea560b398be6bd14b8d6a4c493cc011b4bb80/social_auth_app_django-5.9.0.tar.gz", hash = "sha256:5b79c53321f9528334d53ddb154452a3b7e598b7ff4c2c1302be9a76b1349e8d", size = 29751, upload-time = "2026-04-29T14:52:50.715Z" }
 wheels = [
@@ -2425,13 +2425,13 @@ name = "social-auth-core"
 version = "4.9.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cryptography", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "defusedxml", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "oauthlib", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pyjwt", extra = ["crypto"], marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python3-openid", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "requests", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "requests-oauthlib", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "cryptography" },
+    { name = "defusedxml" },
+    { name = "oauthlib" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "python3-openid" },
+    { name = "requests" },
+    { name = "requests-oauthlib" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/32/2e/15fd3e5bfd7eba91b04e3ebf2dac8a2d1237ba69e63752567b0dc2586a4a/social_auth_core-4.9.1.tar.gz", hash = "sha256:34ee16bddc10b8bf5d6a90c3a033f6e5bb1300197984ad66a4d363783f23bcd8", size = 252961, upload-time = "2026-04-30T07:16:18.62Z" }
 wheels = [
@@ -2470,9 +2470,9 @@ name = "stack-data"
 version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "asttokens", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "executing", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pure-eval", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "asttokens" },
+    { name = "executing" },
+    { name = "pure-eval" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/28/e3/55dcc2cfbc3ca9c29519eb6884dd1415ecb53b0e934862d3559ddcb7e20b/stack_data-0.6.3.tar.gz", hash = "sha256:836a778de4fec4dcd1dcd89ed8abff8a221f58308462e1c4aa2a3cf30148f0b9", size = 44707, upload-time = "2023-09-30T13:58:05.479Z" }
 wheels = [
@@ -2493,8 +2493,8 @@ name = "stvpoll"
 version = "0.4.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "tarjan", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "tarjan" },
+    { name = "typing-extensions" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/16/e3/2d29eba2345acd39b12681eb7a5631bfba4c986cac79ad2ac598833f51e3/stvpoll-0.4.7-py3-none-any.whl", hash = "sha256:837d262946eb600d3a594c5f8b273b84153a8bcf56fb41e419ace98068f0148c", size = 17498, upload-time = "2025-11-29T09:45:59.926Z" },
@@ -2520,13 +2520,13 @@ name = "twisted"
 version = "26.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "attrs", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "automat", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "constantly", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "hyperlink", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "incremental", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "zope-interface", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "attrs" },
+    { name = "automat" },
+    { name = "constantly" },
+    { name = "hyperlink" },
+    { name = "incremental" },
+    { name = "typing-extensions" },
+    { name = "zope-interface" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/db/97/6e9beb1e78247ae6dc34114f27d538cf2cb183c4afcd3609dfdf2b0439c8/twisted-26.4.0.tar.gz", hash = "sha256:dbfd0fe1ee409d0243fdd7a6a6ff14f4948cec1fd78e0376291f805e1501fae9", size = 3575095, upload-time = "2026-05-11T11:24:51.861Z" }
 wheels = [
@@ -2535,9 +2535,9 @@ wheels = [
 
 [package.optional-dependencies]
 tls = [
-    { name = "idna", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pyopenssl", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "service-identity", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "idna" },
+    { name = "pyopenssl" },
+    { name = "service-identity" },
 ]
 
 [[package]]
@@ -2572,7 +2572,7 @@ name = "typing-inspection"
 version = "0.4.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a3/26/b09b8010994eccc3c09092e6b34058f36a460eea2d4c3e8b910c695975a0/typing_inspection-0.4.4.tar.gz", hash = "sha256:547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47", size = 76928, upload-time = "2026-08-12T12:37:25.997Z" }
 wheels = [
@@ -2675,8 +2675,8 @@ name = "uvicorn"
 version = "0.38.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "h11", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "click" },
+    { name = "h11" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cb/ce/f06b84e2697fef4688ca63bdb2fdf113ca0a3be33f94488f2cadb690b0cf/uvicorn-0.38.0.tar.gz", hash = "sha256:fd97093bdd120a2609fc0d3afe931d4d4ad688b6e75f0f929fde1bc36fe0e91d", size = 80605, upload-time = "2025-10-18T13:46:44.63Z" }
 wheels = [
@@ -2685,12 +2685,12 @@ wheels = [
 
 [package.optional-dependencies]
 standard = [
-    { name = "httptools", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python-dotenv", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pyyaml", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "uvloop", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'" },
-    { name = "watchfiles", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "websockets", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "httptools" },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "uvloop", marker = "sys_platform != 'cygwin'" },
+    { name = "watchfiles" },
+    { name = "websockets" },
 ]
 
 [[package]]
@@ -2742,11 +2742,11 @@ name = "virtualenv"
 version = "21.14.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "distlib", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "filelock", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "packaging", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "platformdirs", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python-discovery", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "distlib" },
+    { name = "filelock" },
+    { name = "packaging" },
+    { name = "platformdirs" },
+    { name = "python-discovery" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c4/f9/f323b3b6058cff3853b31cf6a49c0425ed797bf9611572ec10d065e08bac/virtualenv-21.14.5.tar.gz", hash = "sha256:c4cb6c13e46b57225a999c7e22a09b163393878facc7ac4c059a57f46faa1647", size = 5467127, upload-time = "2026-10-02T17:42:25.613Z" }
 wheels = [
@@ -2755,67 +2755,67 @@ wheels = [
 
 [[package]]
 name = "voteit"
-version = "0.1.dev0"
+version = "1.2.2"
 source = { editable = "." }
 dependencies = [
-    { name = "bs4", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "channels", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "channels-redis", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "chanx", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django-auditlog", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django-controlcenter", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django-cors-headers", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django-filter", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django-model-utils", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django-rq", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django-sql-utils", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "djangorestframework", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "djangorestframework-api-key", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "lxml", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "nh3", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "psycopg", extra = ["binary", "pool"], marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "py-vote-core", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pydantic", extra = ["email"], marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pyhumps", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python-json-logger", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python-magic", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python-statemachine", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pyyaml", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "redis", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "rq", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "rq-scheduler", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "rules", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "social-auth-app-django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "structlog", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "stvpoll", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "uvicorn", extra = ["standard"], marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "bs4" },
+    { name = "channels" },
+    { name = "channels-redis" },
+    { name = "chanx" },
+    { name = "django" },
+    { name = "django-auditlog" },
+    { name = "django-controlcenter" },
+    { name = "django-cors-headers" },
+    { name = "django-filter" },
+    { name = "django-model-utils" },
+    { name = "django-rq" },
+    { name = "django-sql-utils" },
+    { name = "djangorestframework" },
+    { name = "djangorestframework-api-key" },
+    { name = "lxml" },
+    { name = "nh3" },
+    { name = "psycopg", extra = ["binary", "pool"] },
+    { name = "py-vote-core" },
+    { name = "pydantic", extra = ["email"] },
+    { name = "pyhumps" },
+    { name = "python-json-logger" },
+    { name = "python-magic" },
+    { name = "python-statemachine" },
+    { name = "pyyaml" },
+    { name = "redis" },
+    { name = "rq" },
+    { name = "rq-scheduler" },
+    { name = "rules" },
+    { name = "social-auth-app-django" },
+    { name = "structlog" },
+    { name = "stvpoll" },
+    { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.dev-dependencies]
 dev = [
-    { name = "chanx", extra = ["cli"], marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "coverage", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "daphne", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "django-hijack", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "djangorestframework-stubs", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "fakeredis", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "ipython", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "personnummer", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "pre-commit", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "python-dotenv", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "responses", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "ruff", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "voteit-org", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "chanx", extra = ["cli"] },
+    { name = "coverage" },
+    { name = "daphne" },
+    { name = "django-hijack" },
+    { name = "djangorestframework-stubs" },
+    { name = "fakeredis" },
+    { name = "ipython" },
+    { name = "personnummer" },
+    { name = "pre-commit" },
+    { name = "python-dotenv" },
+    { name = "responses" },
+    { name = "ruff" },
+    { name = "voteit-org" },
 ]
 docker = [
-    { name = "personnummer", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "sentry-sdk", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "slack-logger", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "personnummer" },
+    { name = "sentry-sdk" },
+    { name = "slack-logger" },
 ]
 locust = [
-    { name = "locust", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "websocket-client", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "locust" },
+    { name = "websocket-client" },
 ]
 
 [package.metadata]
@@ -2885,8 +2885,8 @@ name = "voteit-org"
 version = "1.0.0"
 source = { editable = "src/voteit_org" }
 dependencies = [
-    { name = "django", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
-    { name = "voteit", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "django" },
+    { name = "voteit" },
 ]
 
 [package.metadata]
@@ -2900,7 +2900,7 @@ name = "watchfiles"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "anyio" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b3/68/e6aa0b77d217b31f8f486ec0cdfe5e00e6e38dc0be657e7d85819b9faf0a/watchfiles-1.3.0.tar.gz", hash = "sha256:99aee4a07847c06820765fd7b1b49ceac4f3f711ccb7d104655a33231de1c207", size = 108119, upload-time = "2026-09-21T09:08:55.664Z" }
 wheels = [
@@ -3075,7 +3075,7 @@ name = "werkzeug"
 version = "3.1.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "markupsafe", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "markupsafe" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a4/34/4dd12fc8bb7d61c91467ec3efe415ffa7d5456f799954b40c5bbaeae470e/werkzeug-3.1.9.tar.gz", hash = "sha256:55ca7c70a75689be937aa27f8ff4b018f06ff4838fc73045560bf0f5a1291060", size = 940188, upload-time = "2026-09-27T18:33:41.637Z" }
 wheels = [
@@ -3087,7 +3087,7 @@ name = "wsproto"
 version = "1.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "h11", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'win32'" },
+    { name = "h11" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c7/79/12135bdf8b9c9367b8701c2c19a14c913c120b882d50b014ca0d38083c2c/wsproto-1.3.2.tar.gz", hash = "sha256:b86885dcf294e15204919950f666e06ffc6c7c114ca900b060d6e16293528294", size = 50116, upload-time = "2025-11-20T18:18:01.871Z" }
 wheels = [
