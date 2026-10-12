@@ -8,6 +8,7 @@ from social_core.exceptions import AuthResponseError
 from social_core.utils import cache
 
 from voteit.app.scouterna import SCOUTID_PROVIDER
+from voteit.core.decorators import url_origin
 from voteit.organisation.backends import OrganisationBackendMixin
 from voteit.organisation.models import OAuth2Provider
 
@@ -72,6 +73,10 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
 
     def oidc_endpoint(self) -> str:
         return self.get_issuer(self.provider)
+
+    @classmethod
+    def get_login_origins(cls, provider: OAuth2Provider) -> set[str]:
+        return {url_origin(cls.get_issuer(provider))}
 
     @classmethod
     def get_profile_url(cls, provider: OAuth2Provider) -> str:

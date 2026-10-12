@@ -55,6 +55,7 @@ Everything else (authorization, token, userinfo, JWKS, issuer) is discovered fro
 | `get_login_url` | `/login/scoutid/` (the `social_django` default) |
 | `get_profile_url` | `<issuer>/account` — Keycloak's account console |
 | `get_logout_url` | `<issuer>/protocol/openid-connect/logout` |
+| `get_login_origins` | the issuer's origin, may POST to `/login/scoutid/` without a CSRF token |
 
 The last two are **built from the issuer, not discovered**. Discovery would put an
 outbound HTTP call on the path of every `/api/organisation/` response and make it

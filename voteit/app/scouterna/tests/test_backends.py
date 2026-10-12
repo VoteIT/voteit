@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from django.conf import settings
 from django.contrib import auth
 from django.contrib.auth import get_user_model
+from django.test import Client
 from django.test import RequestFactory
 from django.test import TestCase
 from django.test import override_settings
@@ -210,6 +211,16 @@ class ScoutIDBackendTests(TestCase):
         self.assertEqual(
             f"{ISSUER}/protocol/openid-connect/logout",
             ScoutIDOpenIdConnect.get_logout_url(self.provider),
+        )
+
+    def test_login_origins_follow_the_realm(self):
+        self.assertEqual(
+            {"https://dev.id.scouterna.se"},
+            ScoutIDOpenIdConnect.get_login_origins(self.provider),
+        )
+        self.provider.oidc_endpoint = ISSUER
+        self.assertEqual(
+            {"https://scoutid"}, ScoutIDOpenIdConnect.get_login_origins(self.provider)
         )
 
     @responses.activate
@@ -436,6 +447,21 @@ class ScoutIDLoginTests(APITestCase):
         params = parse_qs(urlparse(location).query)
         self.challenge = params.get("code_challenge", [None])[0]
         return params["state"][0], params["nonce"][0]
+
+    @responses.activate
+    def test_realm_may_post_login_without_csrf_token(self):
+        responses.add(
+            responses.GET,
+            f"{ISSUER}/.well-known/openid-configuration",
+            json=self.realm.config,
+        )
+        client = Client(enforce_csrf_checks=True)
+        response = client.post("/login/scoutid/", headers={"origin": "https://scoutid"})
+        self.assertEqual(302, response.status_code)
+        response = client.post(
+            "/login/scoutid/", headers={"origin": "https://other-scoutid"}
+        )
+        self.assertEqual(403, response.status_code)
 
     @responses.activate
     def test_begin_uses_discovered_endpoint_and_org_credentials(self):
