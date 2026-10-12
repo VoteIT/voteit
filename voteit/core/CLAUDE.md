@@ -210,6 +210,7 @@ All ViewSets in the project register themselves here. The router is a `DefaultRo
 | `@receiver_all_subclasses(signal, sender=Base)` | Connect a signal handler to all models that subclass `sender` |
 | `@has_exact_filter(*names)` | Assert that a Manager method's queryset has specific exact filters applied (guards against accidental cross-tenant queries) |
 | `@schedule_job(cron_string, ...)` | Schedule a function in the `long` RQ queue via `django-rq`'s scheduler |
+| `@csrf_exempt_for_origins(get_origins)` | Skip CSRF for requests whose `Origin` (or `Referer`) is in `get_origins(request, *args, **kwargs)`; everyone else gets Django's usual check. Used for `social:begin`, see `voteit/organisation/views.py` |
 
 ## Signals (`signals.py`)
 

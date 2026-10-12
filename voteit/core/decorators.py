@@ -1,21 +1,28 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
+from collections.abc import Collection
 from functools import wraps
 from logging import getLogger
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 import django_rq
 from django.apps import apps
 from django.db import IntegrityError
 from django.db.transaction import get_connection
 from django.db.transaction import on_commit
+from django.middleware.csrf import CsrfViewMiddleware
+from django.views.decorators.csrf import csrf_exempt
 from redis.exceptions import ConnectionError
 
 from voteit.core import RQ_LONG_QUEUE
 
 if TYPE_CHECKING:
     from django.db.models import Manager
+    from django.http import HttpRequest
+    from django.http import HttpResponseBase
     from voteit.core.role import Role
     from voteit.core.predicate import Predicate
 
@@ -300,3 +307,58 @@ def schedule_job(
         return f
 
     return wrapper
+
+
+def url_origin(url: str) -> str:
+    """
+    The origin of a URL, in the form browsers send in the Origin header.
+
+    >>> url_origin("https://id.example.com/realms/x/")
+    'https://id.example.com'
+    >>> url_origin("http://localhost:8001")
+    'http://localhost:8001'
+    """
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}"
+
+
+def request_origin(request: HttpRequest) -> str | None:
+    """
+    The request's Origin header, falling back to the origin of the Referer
+    header. None when the request carries neither.
+    """
+    if origin := request.headers.get("Origin"):
+        return origin
+    if referer := request.headers.get("Referer"):
+        return url_origin(referer)
+
+
+def csrf_exempt_for_origins(
+    get_origins: Callable[..., Collection[str]],
+) -> Callable[[Callable[..., HttpResponseBase]], Callable[..., HttpResponseBase]]:
+    """
+    Exempt a view from CSRF checks for requests from the origins
+    ``get_origins(request, *args, **kwargs)`` returns. Requests from anywhere
+    else get Django's usual CSRF checks, run here since the wrapped view is
+    marked csrf_exempt for the middleware.
+    """
+
+    def decorator(
+        view_func: Callable[..., HttpResponseBase],
+    ) -> Callable[..., HttpResponseBase]:
+        csrf_middleware = CsrfViewMiddleware(lambda request: None)
+
+        @wraps(view_func)
+        def _wrapped_view(request: HttpRequest, *args, **kwargs) -> HttpResponseBase:
+            origin = request_origin(request)
+            if origin is None or origin not in get_origins(request, *args, **kwargs):
+                rejection = csrf_middleware.process_view(
+                    request, view_func, args, kwargs
+                )
+                if rejection is not None:
+                    return rejection
+            return view_func(request, *args, **kwargs)
+
+        return csrf_exempt(_wrapped_view)
+
+    return decorator
