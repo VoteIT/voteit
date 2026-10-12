@@ -6,6 +6,7 @@ from django.urls import include
 from django.urls import path
 
 from voteit.core.rest_api.router import router
+from voteit.organisation.views import begin
 from voteit.token_api import router as token_router
 
 urlpatterns = [
@@ -14,6 +15,8 @@ urlpatterns = [
     path("api/", include(router.urls)),
     path("token-api/", include((token_router.urls, "token-api"))),
     path("django-rq/", include("django_rq.urls")),
+    # Shadows social:begin, so providers can post logins here
+    path("login/<str:backend>/", begin),
     path("", include("social_django.urls")),
 ]
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

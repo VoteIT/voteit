@@ -10,6 +10,7 @@ from django.utils.functional import cached_property
 from social_core.backends.oauth import BaseOAuth2
 from social_core.exceptions import AuthException
 
+from voteit.core.decorators import url_origin
 from voteit.organisation.models import OAuth2Provider
 from voteit.organisation.models import Organisation
 
@@ -44,6 +45,14 @@ class OrganisationBackendMixin:
     @classmethod
     def get_login_url(cls, provider: OAuth2Provider) -> str:
         return reverse("social:begin", args=[cls.name])
+
+    @classmethod
+    def get_login_origins(cls, provider: OAuth2Provider) -> set[str]:
+        """
+        Origins allowed to POST to ``social:begin`` for this backend without a
+        CSRF token -- the provider's own pages, sending people here to log in.
+        """
+        return set()
 
     @classmethod
     def get_profile_url(cls, provider: OAuth2Provider) -> str | None:
@@ -159,6 +168,13 @@ class IDProxyOAuth2(OrganisationBackendMixin, BaseOAuth2):
         ("user_data",),
         ("is_superuser", "is_superuser", True),
     ]
+
+    @classmethod
+    def get_login_origins(cls, provider: OAuth2Provider) -> set[str]:
+        """
+        The proxy's ``login-to`` page posts here, see :meth:`get_login_url`.
+        """
+        return {url_origin(settings.ID_HOST)}
 
     @classmethod
     def get_profile_url(cls, provider: OAuth2Provider) -> str:

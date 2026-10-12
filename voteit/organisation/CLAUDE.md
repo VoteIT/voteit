@@ -187,10 +187,11 @@ ID-proxy service endpoint. Requires `HasIDProxyAPIKey`. Accepts `?identity_in=ui
   invites. The user sees their own as `member_ids` on `/api/user/` (null on other accounts'
   rows, e.g. in `alternate/`).
 - `get_title()`, `get_login_url(provider)`, `get_profile_url(provider)`, `get_logout_url(provider)` — what the SPA shows, and where it sends people to log in, manage their account and log out. Backends set `TITLE`; the default login URL is `reverse("social:begin", args=[name])` and the other two default to `None`. They take the **provider row**, not the organisation, because an OIDC backend's URLs derive from its issuer — which is a per-provider column. They are classmethods, so they work outside a login request where there is no strategy.
+- `get_login_origins(provider)` — origins allowed to POST to `/login/<backend>/` without a CSRF token, empty by default. social_django's begin view is POST-only and CSRF protected, but a provider's own page may send people there cross-origin. `project/urls.py` shadows `social:begin` with `views.begin`, which wraps it in `voteit.core.decorators.csrf_exempt_for_origins`: the origin must be one the request host's organisation's provider row for **that** backend lists, anything else gets the normal CSRF check.
 
 `IDProxyOAuth2` is the backend for the project's central identity proxy service. Key behaviours:
 
-- Overrides `get_login_url()`: the id proxy is entered through itself (`{ID_HOST}/login-to/{host}`), because it must know which tenant is asking before it can offer a login.
+- Overrides `get_login_url()`: the id proxy is entered through itself (`{ID_HOST}/login-to/{host}`), because it must know which tenant is asking before it can offer a login. That page posts back to `/login/idproxy/`, so `get_login_origins()` trusts `ID_HOST`'s origin.
 - Merges `OAuth2Provider.scope` with `DEFAULT_SCOPE = ["email", "identity"]` and sorts the combined list for deterministic OAuth requests.
 - `AUTHORIZATION_URL`, `ACCESS_TOKEN_URL`, and `IDENTITY_URL` can be overridden per-environment via `SOCIAL_AUTH_IDPROXY_<KEY>` settings.
 - `extra_data` restructures the flat `user_data` list from the identity server into `{scope: [data, ...]}` dicts before storage.
@@ -321,6 +322,7 @@ Test modules:
 - `rest_api/tests/test_views.py` — `OrganisationViewSet`, `OrganisationRolesViewSet`, `MatchOrphansViewSet`, `HandleIdentitiesViewSet`.
 - `rest_api/tests/test_python_social_integration.py` — end-to-end SSO login flows using `responses` mock library.
 - `tests/test_commands.py` — `report_match_candidates`, `create_organisation`.
+- `tests/test_views.py` — which origins may post to `/login/<backend>/` without a CSRF token.
 
 ## Management commands
 
