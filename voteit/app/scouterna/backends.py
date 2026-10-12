@@ -1,23 +1,21 @@
 from __future__ import annotations
 
-from logging import getLogger
 from typing import Any
 
 from django.conf import settings
 from social_core.backends.open_id_connect import OpenIdConnectAuth
+from social_core.exceptions import AuthMissingParameter
 from social_core.utils import cache
 
 from voteit.app.scouterna import SCOUTID_PROVIDER
 from voteit.organisation.backends import OrganisationBackendMixin
 from voteit.organisation.models import OAuth2Provider
 
-logger = getLogger(__name__)
-
 #: Production (``https://id.scouterna.se``) is not live yet.
 DEV_OIDC_ENDPOINT = "https://dev.id.scouterna.se/realms/scoutnet"
 
-#: Identity scope for the Scoutnet membership number. Named like an id proxy
-#: scope because it lands in the same ``user_data`` dict.
+#: Claim holding the Scoutnet membership number. Also its key in ``user_data``,
+#: named like an id proxy scope since it lands in the same dict.
 SCOUTNET_MEMBER_NO = "scoutnet_member_no"
 
 
@@ -53,8 +51,6 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
     DEFAULT_SCOPE = ["openid", "profile", "email"]
     # OpenIdConnectAuth turns off the PKCE its own base class enables.
     DEFAULT_USE_PKCE = True
-    # Keycloak UUID, stable per user per realm.
-    ID_KEY = "sub"
     MEMBER_ID_KEY = SCOUTNET_MEMBER_NO
     EXTRA_DATA = [
         ("sub", "id"),
@@ -133,16 +129,16 @@ class ScoutIDOpenIdConnect(OrganisationBackendMixin, OpenIdConnectAuth):
         return self._claim(response, "email") or None
 
     def get_member_no(self, response: dict[str, Any]) -> str | None:
+        member_no = self._claim(response, SCOUTNET_MEMBER_NO)
+        return str(member_no) if member_no else None
+
+    def get_user_id(self, details: dict[str, Any], response: dict[str, Any]) -> str:
         """
-        The Scoutnet membership number, from ``preferred_username``, which is
-        always ``scoutnet|<member_no>``.
+        Users are matched on their Scoutnet membership number, not on ``sub``.
         """
-        username = self._claim(response, "preferred_username") or ""
-        _prefix, sep, member_no = username.partition("|")
-        if not sep or not member_no:
-            logger.warning("Unexpected preferred_username format: %r", username)
-            return None
-        return member_no
+        if member_no := self.get_member_no(response):
+            return member_no
+        raise AuthMissingParameter(self, SCOUTNET_MEMBER_NO)
 
     def extra_data(
         self,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import date
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -18,9 +19,11 @@ from voteit.core.models import BaseContent
 from voteit.core.models import RoleContextMixin
 from voteit.core.models import Roles
 from voteit.core.utils import relaxed_clean_html
+from voteit.core.validators import SVGValidator
 from voteit.organisation import IDPROXY_PROVIDER
 from voteit.organisation.roles import ROLE_MEETING_CREATOR
 from voteit.organisation.roles import ROLE_ORG_MANAGER
+from voteit.organisation.schemas import validate_colors
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractUser
@@ -28,6 +31,10 @@ if TYPE_CHECKING:
     from voteit.meeting.models import Meeting
 
 _marker = object()
+
+
+def organisation_logo_upload_to(instance, filename):
+    return f"org_{instance.pk}/logo/{uuid.uuid4().hex}.svg"
 
 
 @auditlog.register(
@@ -123,6 +130,17 @@ class Organisation(BaseContent, RoleContextMixin, OrganisationContext):
         blank=True,
         default="",
         html_cleaner=relaxed_clean_html,
+    )
+    colors: dict = models.JSONField(
+        default=dict,
+        blank=True,
+        validators=[validate_colors],
+    )
+    logo: str | None = models.FileField(
+        upload_to=organisation_logo_upload_to,
+        validators=[SVGValidator()],
+        blank=True,
+        null=True,
     )
 
     class Meta:

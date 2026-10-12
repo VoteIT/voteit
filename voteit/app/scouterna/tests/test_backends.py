@@ -19,6 +19,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
 from social_core.exceptions import AuthException
+from social_core.exceptions import AuthMissingParameter
 from social_django.models import UserSocialAuth
 from social_django.storage import BaseDjangoStorage
 from social_django.strategy import DjangoStrategy
@@ -86,6 +87,7 @@ class _Realm:
             "exp": int(time.time()) + 3600,
             "nonce": nonce,
             "preferred_username": "scoutnet|9876543",
+            "scoutnet_member_no": "9876543",
             "name": "Kim Scout",
             "given_name": "Kim",
             "family_name": "Scout",
@@ -261,30 +263,45 @@ class ScoutIDBackendTests(TestCase):
         details = self._backend().get_user_details({"sub": "uuid", "given_name": "Kim"})
         self.assertIsNone(details["img_url"])
 
+    def test_user_id_is_the_member_no(self):
+        self.assertEqual(
+            "9876543",
+            self._backend().get_user_id(
+                {}, {"sub": "uuid", SCOUTNET_MEMBER_NO: "9876543"}
+            ),
+        )
+
+    def test_user_id_without_a_member_no_is_an_auth_error(self):
+        with self.assertRaises(AuthMissingParameter):
+            self._backend().get_user_id(
+                {}, {"sub": "uuid", "preferred_username": "scoutnet|9876543"}
+            )
+
     def _extra_data(self, **claims):
         response = {"access_token": "a-token", "expires_in": 300, **claims}
         return self._backend().extra_data("uuid", "uuid", response, {}, {})
 
-    def test_member_no_comes_from_preferred_username(self):
+    def test_member_no_comes_from_its_claim(self):
         backend = self._backend()
         self.assertEqual(
-            "9876543",
-            backend.get_member_no({"preferred_username": "scoutnet|9876543"}),
+            "9876543", backend.get_member_no({SCOUTNET_MEMBER_NO: "9876543"})
         )
 
-    def test_member_no_is_none_without_the_separator(self):
+    def test_member_no_is_a_string(self):
         backend = self._backend()
-        with self.assertLogs("voteit.app.scouterna.backends", level="WARNING"):
-            self.assertIsNone(backend.get_member_no({"preferred_username": "9876543"}))
+        self.assertEqual(
+            "9876543", backend.get_member_no({SCOUTNET_MEMBER_NO: 9876543})
+        )
 
     def test_member_no_is_none_without_the_claim(self):
         backend = self._backend()
-        with self.assertLogs("voteit.app.scouterna.backends", level="WARNING"):
-            self.assertIsNone(backend.get_member_no({}))
+        self.assertIsNone(
+            backend.get_member_no({"preferred_username": "scoutnet|9876543"})
+        )
 
     def test_extra_data_stores_verified_email_and_member_no(self):
         data = self._extra_data(
-            preferred_username="scoutnet|9876543",
+            scoutnet_member_no="9876543",
             email="kim@scoutkaren.example",
             email_verified=True,
         )
@@ -302,7 +319,7 @@ class ScoutIDBackendTests(TestCase):
         an address ScoutID will not vouch for has no business in it.
         """
         data = self._extra_data(
-            preferred_username="scoutnet|9876543",
+            scoutnet_member_no="9876543",
             email="kim@scoutkaren.example",
             email_verified=False,
         )
@@ -314,7 +331,7 @@ class ScoutIDBackendTests(TestCase):
         """
         backend = self._backend()
         backend.id_token = {
-            "preferred_username": "scoutnet|9876543",
+            SCOUTNET_MEMBER_NO: "9876543",
             "email": "kim@scoutkaren.example",
             "email_verified": True,
         }
@@ -329,7 +346,7 @@ class ScoutIDBackendTests(TestCase):
     def test_identity_data_reads_back_what_extra_data_stored(self):
         social = SimpleNamespace(
             extra_data=self._extra_data(
-                preferred_username="scoutnet|9876543",
+                scoutnet_member_no="9876543",
                 email="kim@scoutkaren.example",
                 email_verified=True,
             )
@@ -488,20 +505,51 @@ class ScoutIDLoginTests(APITestCase):
         self.assertEqual(302, response.status_code)
         self.assertEqual(settings.LOGIN_REDIRECT_URL, response.get("Location"))
 
-        user = User.objects.get(social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001")
+        user = User.objects.get(social_auth__uid="9876543")
         self.assertEqual(self.org, user.organisation)
         # identity_id is the id proxy's namespace; this account has none.
         self.assertIsNone(user.identity_id)
         self.assertEqual("Kim", user.first_name)
         self.assertEqual("Scout", user.last_name)
         self.assertEqual("kim@scoutkaren.example", user.email)
+        self.assertEqual("kim-scout", user.userid)
         self.assertEqual("https://scoutnet/avatar/9876543.png", user.img_url)
         # The '|' in scoutnet|9876543 is not a legal Django username character.
         self.assertEqual("scoutnet9876543", user.username)
 
         social = user.social_auth.get()
         self.assertEqual(SCOUTID_PROVIDER, social.provider)
-        self.assertEqual("b4d3e2f1-0000-4000-8000-000000000001", social.uid)
+        self.assertEqual("9876543", social.uid)
+
+    @responses.activate
+    def test_a_new_sub_with_the_same_member_no_finds_the_same_account(self):
+        user = self.org.users.create(username="kim", is_active=True)
+        user.social_auth.create(provider=SCOUTID_PROVIDER, uid="9876543", extra_data={})
+        before = self.org.users.count()
+        state, nonce = self._begin()
+        self.realm.register(
+            self.realm.id_token("voteit", nonce, sub="another-keycloak-uuid"),
+            userinfo={"sub": "another-keycloak-uuid"},
+        )
+        response = self.client.get(
+            "/complete/scoutid/", data={"state": state, "code": "code"}
+        )
+        self.assertEqual(302, response.status_code)
+        self.assertEqual(user, auth.get_user(self.client))
+        self.assertEqual(before, self.org.users.count())
+
+    @responses.activate
+    def test_complete_without_a_member_no_is_rejected(self):
+        state, nonce = self._begin()
+        self.realm.register(
+            self.realm.id_token("voteit", nonce, scoutnet_member_no=None),
+            userinfo={"sub": "b4d3e2f1-0000-4000-8000-000000000001"},
+        )
+        with self.assertRaises(AuthMissingParameter):
+            self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
+        self.assertFalse(
+            UserSocialAuth.objects.filter(provider=SCOUTID_PROVIDER).exists()
+        )
 
     @responses.activate
     def test_complete_stores_what_scoutid_vouches_for(self):
@@ -520,9 +568,7 @@ class ScoutIDLoginTests(APITestCase):
             },
         )
         self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
-        social = User.objects.get(
-            social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001"
-        ).social_auth.get()
+        social = User.objects.get(social_auth__uid="9876543").social_auth.get()
         self.assertEqual(
             {
                 "email": ["kim@scoutkaren.example"],
@@ -545,7 +591,7 @@ class ScoutIDLoginTests(APITestCase):
             },
         )
         self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
-        user = User.objects.get(social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001")
+        user = User.objects.get(social_auth__uid="9876543")
         self.assertEqual({"9876543"}, get_user_member_ids(user))
         self.client.force_login(user)
         response = self.client.get(reverse("handle-matched-invites-list"))
@@ -620,9 +666,7 @@ class ScoutIDLoginTests(APITestCase):
             [IDPROXY_PROVIDER],
             list(existing.social_auth.values_list("provider", flat=True)),
         )
-        stranger = User.objects.get(
-            social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001"
-        )
+        stranger = User.objects.get(social_auth__uid="9876543")
         self.assertNotEqual(existing, stranger)
 
     @responses.activate
@@ -680,7 +724,7 @@ class ScoutIDLoginTests(APITestCase):
 
         self.assertEqual(
             existing,
-            User.objects.get(social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001"),
+            User.objects.get(social_auth__uid="9876543"),
         )
         existing.refresh_from_db()
         # Matched, not created, and the id proxy still owns identity_id.
@@ -780,7 +824,7 @@ class ScoutIDLoginTests(APITestCase):
         self.assertEqual(stale, auth.get_user(self.client))
         self.assertEqual(
             stale,
-            User.objects.get(social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001"),
+            User.objects.get(social_auth__uid="9876543"),
         )
 
     @responses.activate
@@ -796,9 +840,7 @@ class ScoutIDLoginTests(APITestCase):
             data={"partial_token": token, "link_account": "new"},
         )
         self.assertEqual(302, response.status_code)
-        created = User.objects.get(
-            social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001"
-        )
+        created = User.objects.get(social_auth__uid="9876543")
         self.assertNotEqual(stale, created)
         self.assertEqual(created, auth.get_user(self.client))
 
@@ -857,16 +899,16 @@ class ScoutIDLoginTests(APITestCase):
         )
 
     @responses.activate
-    def test_an_identity_id_matching_the_sub_is_not_adopted(self):
+    def test_an_identity_id_matching_the_member_no_is_not_adopted(self):
         """
         identity_id is an id proxy identifier. A value in it that happens to
-        equal a Keycloak sub is a collision between namespaces, not the same
+        equal a member number is a collision between namespaces, not the same
         person, so this login gets its own account -- matching it to an existing
         one is the account matcher's job, on evidence it can actually check.
         """
         existing = self.org.users.create(
             username="scoutnet9876543",
-            identity_id="b4d3e2f1-0000-4000-8000-000000000001",
+            identity_id="9876543",
             is_active=True,
         )
         state, nonce = self._begin()
@@ -879,9 +921,7 @@ class ScoutIDLoginTests(APITestCase):
         )
         self.assertEqual(302, response.status_code)
         self.assertEqual(0, existing.social_auth.count())
-        created = User.objects.get(
-            social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001"
-        )
+        created = User.objects.get(social_auth__uid="9876543")
         self.assertNotEqual(existing, created)
         self.assertIsNone(created.identity_id)
 
@@ -904,7 +944,7 @@ class ScoutIDLoginTests(APITestCase):
             },
         )
         self.client.get("/complete/scoutid/", data={"state": state, "code": "code"})
-        user = User.objects.get(social_auth__uid="b4d3e2f1-0000-4000-8000-000000000001")
+        user = User.objects.get(social_auth__uid="9876543")
         self.assertEqual("kim@scoutkaren.example", user.email)
 
     @responses.activate

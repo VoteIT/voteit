@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.3 (2026-10-09)
+
+Organisation-specific layout
+
+- **Logo and primary color** per organisation. Shown in few places so far, so this functionality is a stub.
+- **Bugfix** - `ensure_userid` was run before name fields saved, so it was empty the first time.
+
+## v1.2 (2026-09-29)
+
+Terms of service.
+
+- **Global and per-organisation terms of service** with a required-from date.
+  Login pauses at `ACCEPT_TOS_URL` until the current version is accepted.
+  New `/api/terms-of-service/` and `/api/global-terms-of-service/`.
+- `AgendaItem.related_modified` is no longer a field, it's looked up instead.
+
 ## v1.1 (2026-09-28)
 
 Multiple login providers per organisation.

@@ -154,16 +154,29 @@ def require_connect_intent(backend, uid, user=None, *args, **kwargs):
     flushes the session when a different user logs in, so nothing of A's
     survives.
 
+    With the intent recorded, a credential that already reaches another account
+    is refused. ``social_user`` would otherwise switch the session to that
+    account -- right for a login, but here the person asked to add a login
+    method and would silently land somewhere else.
+
     The intent is popped whatever happens, so a flag can never sit in the
     session waiting to wave through some later login.
     """
     intent = backend.strategy.session_pop(CONNECT_INTENT_SESSION_KEY)
     if user is None:
         return
-    if backend.strategy.storage.user.get_social_auth(backend.name, uid):
-        # A credential we already know. Whose it is, is social_user's call.
-        return
+    social = backend.strategy.storage.user.get_social_auth(backend.name, uid)
     if intent == backend.name:
+        if _reaches_other_account(backend, uid, user, social):
+            logger.info(
+                "Refused connecting %s to user %s: it belongs to another account",
+                backend.name,
+                user.pk,
+            )
+            raise AuthException(backend, _connected_elsewhere_message(backend))
+        return
+    if social:
+        # A credential we already know. Whose it is, is social_user's call.
         return
     logger.info(
         "Unintended %s association refused for user %s; continuing as a new login",
@@ -171,6 +184,35 @@ def require_connect_intent(backend, uid, user=None, *args, **kwargs):
         user.pk,
     )
     return {"user": None}
+
+
+def _reaches_other_account(backend, uid, user, social) -> bool:
+    """
+    Whether ``social_user`` would resolve this login to an account other than
+    ``user``. Mirrors its id proxy rules: an active account holding the identity
+    wins over an inactive credential owner, and an identity the session user
+    already holds moves the credential to them.
+    """
+    owner = social.user if social else None
+    if backend.name == IDPROXY_PROVIDER:
+        if user.identity_id == uid:
+            return False
+        if owner is None or not owner.is_active:
+            owner = (
+                backend.organisation.users.filter(identity_id=uid, is_active=True)
+                .exclude(pk=user.pk)
+                .first()
+                or owner
+            )
+    return owner is not None and owner != user
+
+
+def _connected_elsewhere_message(backend) -> str:
+    return _(
+        "This %(provider)s login already belongs to another account here. Sign "
+        "in with %(provider)s to use that account. To connect it to this account "
+        "instead, first remove %(provider)s from the other account."
+    ) % {"provider": backend.get_title()}
 
 
 #: Field the resume request carries the decision in.

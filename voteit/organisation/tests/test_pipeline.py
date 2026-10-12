@@ -425,6 +425,61 @@ class RequireConnectIntentTests(TestCase):
             {"user": None}, require_connect_intent(backend, "a-sub", user=user)
         )
 
+    def test_intent_for_a_credential_on_another_account_is_refused(self):
+        """
+        social_user would switch the session to the other account, and the
+        person who asked to connect would land there without a word.
+        """
+        user = self.org.users.create(username="kim")
+        old = self.org.users.create(username="kim-old")
+        social = old.social_auth.create(
+            provider=SCOUTID_PROVIDER, uid="a-sub", extra_data={}
+        )
+        backend = self._make_backend(session=SCOUTID_PROVIDER, social=social)
+        backend.get_title.return_value = "ScoutID"
+        with self.assertRaisesRegex(AuthException, "belongs to another account"):
+            require_connect_intent(backend, "a-sub", user=user)
+
+    def test_intent_for_a_credential_already_on_this_account_passes(self):
+        user = self.org.users.create(username="kim")
+        social = user.social_auth.create(
+            provider=SCOUTID_PROVIDER, uid="a-sub", extra_data={}
+        )
+        backend = self._make_backend(session=SCOUTID_PROVIDER, social=social)
+        self.assertIsNone(require_connect_intent(backend, "a-sub", user=user))
+
+    def test_intent_for_an_id_proxy_identity_on_another_account_is_refused(self):
+        """
+        No credential yet, but social_user finds the identity_id holder and
+        switches to it all the same.
+        """
+        user = self.org.users.create(username="kim")
+        self.org.users.create(
+            username="kim-old", identity_id="an-identity", is_active=True
+        )
+        backend = self._make_backend(session=IDPROXY_PROVIDER)
+        backend.name = IDPROXY_PROVIDER
+        backend.get_title.return_value = "VoteIT ID"
+        with self.assertRaises(AuthException):
+            require_connect_intent(backend, "an-identity", user=user)
+
+    def test_intent_for_the_session_users_own_id_proxy_identity_passes(self):
+        """
+        Same identity: social_user moves the credential to the session user.
+        """
+        user = self.org.users.create(
+            username="kim", identity_id="an-identity", is_active=True
+        )
+        old = self.org.users.create(
+            username="kim-old", identity_id="an-identity", is_active=True
+        )
+        social = old.social_auth.create(
+            provider=IDPROXY_PROVIDER, uid="an-identity", extra_data={}
+        )
+        backend = self._make_backend(session=IDPROXY_PROVIDER, social=social)
+        backend.name = IDPROXY_PROVIDER
+        self.assertIsNone(require_connect_intent(backend, "an-identity", user=user))
+
     def test_the_intent_is_always_consumed(self):
         """
         A flag left behind could wave through some later login nobody asked for.
